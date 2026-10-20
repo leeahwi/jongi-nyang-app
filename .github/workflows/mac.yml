@@ -1,0 +1,48 @@
+name: macOS app
+
+# Separate from CI (the README badge) because it needs a GitHub-hosted runner with Xcode 26; if that
+# image isn't available yet, only this workflow is affected.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mac-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TZ: Asia/Seoul
+
+jobs:
+  mac-app:
+    name: macOS app · build + core tests
+    runs-on: macos-26
+    defaults:
+      run:
+        working-directory: mac
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 26.4.1 (Swift 6.3, the toolchain the app is built with)
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.4.1.app
+          swift --version
+      - name: Build
+        run: swift build
+      - name: Core regression checks
+        run: ./scripts/test.sh
+      - name: Shared-case and core suites
+        run: |
+          for suite in intent timeblock daystrip ahead focus convenience alarms duration reminders task-reminders time-labels; do
+            echo "::group::test-$suite"
+            "./scripts/test-$suite.sh"
+            echo "::endgroup::"
+          done
+      - name: WCAG contrast (day and night tokens)
+        run: python3 scripts/check-contrast.py
+      - name: Translations complete (en, nl)
+        run: ./scripts/i18n/check.sh

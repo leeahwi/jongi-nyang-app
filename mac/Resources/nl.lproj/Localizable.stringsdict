@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>찾은 내용 %lld개</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld resultaat</string>
+			<key>other</key>
+			<string>%lld resultaten</string>
+		</dict>
+	</dict>
+	<key>최장 %lld일</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Langste: %lld dag</string>
+			<key>other</key>
+			<string>Langste: %lld dagen</string>
+		</dict>
+	</dict>
+	<key>메모 %lld개</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld notitie</string>
+			<key>other</key>
+			<string>%lld notities</string>
+		</dict>
+	</dict>
+	<key>오늘 할 일 %lld개 모두 마침</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>De taak van vandaag is klaar</string>
+			<key>other</key>
+			<string>Alle %lld taken van vandaag zijn klaar</string>
+		</dict>
+	</dict>
+	<key>%lld시간마다</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Elk uur</string>
+			<key>other</key>
+			<string>Elke %lld uur</string>
+		</dict>
+	</dict>
+	<key>날짜가 기록되기 전에 완료한 %lld개는 달력에 표시하지 않아요.</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld taak die is afgevinkt voordat datums werden bewaard, staat niet in de kalender.</string>
+			<key>other</key>
+			<string>%lld taken die zijn afgevinkt voordat datums werden bewaard, staan niet in de kalender.</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

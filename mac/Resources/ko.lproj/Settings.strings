@@ -1,0 +1,5 @@
+/* Korean: the key is the text. Here so the table isn’t looked up in another language. */
+"시작" = "시작";
+"완료" = "완료";
+"끄기" = "끄기";
+"없음" = "없음";

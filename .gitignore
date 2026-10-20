@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# macOS app (mac/)
+mac/.build/
+mac/dist/
+mac/docs/design/
+
+# Windows app (windows/)
+windows/node_modules/
+windows/out/
+windows/out-test/
+windows/dist/
+windows/snapshots/
+
+# Editors
+.vscode/
+.idea/
+*.swp

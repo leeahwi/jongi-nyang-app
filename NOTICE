@@ -1,0 +1,70 @@
+Jongi-nyang (종이냥)
+Copyright 2026 leeAhwi
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE),
+except for the third-party components listed below, which keep their own licenses.
+
+-------------------------------------------------------------------------------
+Bundled fonts — SIL Open Font License, Version 1.1
+-------------------------------------------------------------------------------
+
+The fonts below are NOT covered by the Apache License. Each stays under the
+SIL Open Font License 1.1, whose full text is kept next to the font files.
+
+1. Nanum Pen Script, Nanum Brush Script
+   Copyright (c) 2010, NHN Corporation, with Reserved Font Names Nanum,
+   NanumPen, NanumBrush (and others listed in the license).
+   Original files:
+     mac/Resources/FontSources/NanumPenScript-Regular.ttf
+     mac/Resources/FontSources/NanumBrushScript-Regular.ttf
+     windows/Resources/FontSources/ (same files)
+   License: mac/Resources/FontSources/OFL.txt, windows/Resources/FontSources/OFL.txt
+
+2. HanJang Pen, HanJang Brush (modified versions of Nanum Pen Script and
+   Nanum Brush Script)
+   The advance widths of the stand-alone Hangul jamo (ㄱ, ㅇ, ㅏ …) were
+   narrowed to fit their ink (scripts: mac/scripts/tighten-handwriting-jamo.py,
+   windows/tools/tighten-handwriting-jamo.py). As the OFL requires for
+   modified versions, they are renamed and do not use the Reserved Font Names.
+     mac/Sources/PaperTodo/Assets/Fonts/HanJangPen-Regular.ttf
+     mac/Sources/PaperTodo/Assets/Fonts/HanJangBrush-Regular.ttf
+     windows/assets/fonts/HanJangPen-Regular.ttf
+     windows/assets/fonts/HanJangBrush-Regular.ttf
+   License: mac/Sources/PaperTodo/Assets/Fonts/OFL.txt, windows/assets/fonts/OFL.txt
+
+3. Caveat
+   Copyright 2014 The Caveat Project Authors (https://github.com/googlefonts/caveat)
+     mac/Sources/PaperTodo/Assets/Fonts/Caveat.ttf, windows/assets/fonts/Caveat.ttf
+   License: mac/Sources/PaperTodo/Assets/Fonts/Caveat-OFL.txt,
+            windows/assets/fonts/Caveat-OFL.txt
+
+4. Kalam
+   Copyright (c) 2014, Indian Type Foundry
+     mac/Sources/PaperTodo/Assets/Fonts/Kalam-Regular.ttf,
+     windows/assets/fonts/Kalam-Regular.ttf
+   License: mac/Sources/PaperTodo/Assets/Fonts/Kalam-OFL.txt,
+            windows/assets/fonts/Kalam-OFL.txt
+
+-------------------------------------------------------------------------------
+Artwork
+-------------------------------------------------------------------------------
+
+The cat illustrations and the paper texture were made for this project with
+an AI image-generation tool from prompts written for it (mac/art/), then
+selected and normalized by the author. They are part of this product and are
+licensed with it under the Apache License 2.0.
+
+-------------------------------------------------------------------------------
+Release builds
+-------------------------------------------------------------------------------
+
+The macOS app uses only Apple system frameworks. The Windows installer built
+from windows/ bundles Electron (MIT License) and Chromium and their
+dependencies; their license files are included inside the installed app
+(LICENSE.electron.txt, LICENSES.chromium.html). The build tools in
+windows/package.json (electron-builder, esbuild, TypeScript) are used at build
+time only and are not part of this repository.
+
+The released apps show "© 2026 leeAhwi. All rights reserved." in their About
+and Help screens, as shipped. The source code in this repository is offered
+under the Apache License 2.0 as stated above.

@@ -1,0 +1,126 @@
+{
+  "frame_count": 8,
+  "parts_animated_separately": false,
+  "frames": [
+    {
+      "file": "walk-cycle-01.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        87,
+        77,
+        988,
+        953
+      ],
+      "baseline": 952,
+      "sha256": "ddbab3db73f1ddc663bd200438c89ee62ef5a322f4902a1358448b43e9c7ca97"
+    },
+    {
+      "file": "walk-cycle-02.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        88,
+        63,
+        987,
+        953
+      ],
+      "baseline": 952,
+      "sha256": "ebc0e63c1ba7e27dce0f68d5654294f5203c8e4cd03ba91f8a797e32e25dc91e"
+    },
+    {
+      "file": "walk-cycle-03.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        89,
+        59,
+        988,
+        953
+      ],
+      "baseline": 952,
+      "sha256": "eded09abbbe14c938e4e32ab392be087d7a0068fa6c2d6cba9253265a8f3b90b"
+    },
+    {
+      "file": "walk-cycle-04.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        88,
+        63,
+        987,
+        953
+      ],
+      "baseline": 952,
+      "sha256": "1335101f7a522424bae2d6a6af38261db9fa5b6f94829be7839f8dbf58278000"
+    },
+    {
+      "file": "walk-cycle-05.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        89,
+        63,
+        988,
+        953
+      ],
+      "baseline": 952,
+      "sha256": "284664af1b95bc785dfb6d42bcde394cd9f29ec031d330ecc4e2b14409952680"
+    },
+    {
+      "file": "walk-cycle-06.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        89,
+        62,
+        987,
+        953
+      ],
+      "baseline": 952,
+      "sha256": "0b3ed74d3c2f9fa2b287281a8be917ac11fa92de4bb10f3cf1aa8a44bb6fcf74"
+    },
+    {
+      "file": "walk-cycle-07.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        89,
+        82,
+        988,
+        953
+      ],
+      "baseline": 952,
+      "sha256": "ef1e2570d3de135b3a902407d3a8e0d9a3297aa2aa55d5c68a4ec18fd720b440"
+    },
+    {
+      "file": "walk-cycle-08.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        87,
+        83,
+        987,
+        953
+      ],
+      "baseline": 952,
+      "sha256": "18e96b58c5cb72bf0f2b73616b6c640538038c7a8543f40c8b0265bb7f690300"
+    }
+  ]
+}

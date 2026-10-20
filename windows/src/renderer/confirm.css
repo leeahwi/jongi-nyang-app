@@ -1,0 +1,6 @@
+/* A question on a slip (neutral tape): the topic's badge and title, the message, a quieter line, the cat wondering. */
+.confirm-body { display: flow-root; padding-top: 12px; }
+.confirm-body .cat { float: right; width: 56px; height: 56px; object-fit: contain; margin: -4px -4px 4px 10px; }
+.confirm-msg { font: 15px/1.5 var(--ui); color: var(--ink); white-space: pre-line; }
+.confirm-sub { margin-top: 6px; font: 500 12.5px/1.55 var(--ui); color: var(--ink-2); white-space: pre-line; overflow-wrap: anywhere; word-break: keep-all; }
+.slip-foot { flex-wrap: wrap; row-gap: 6px; }

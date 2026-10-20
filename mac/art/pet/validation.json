@@ -1,0 +1,236 @@
+{
+  "count": 13,
+  "assets": [
+    {
+      "name": "blink",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        101,
+        61,
+        954,
+        953
+      ],
+      "baseline": 952,
+      "transparent_pixels": 459945,
+      "sha256": "7fa5eef5073c7a7e1bdb349b2cedd7795cdd0fee18448f6a92ba975f2429997f"
+    },
+    {
+      "name": "happy",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        96,
+        61,
+        954,
+        953
+      ],
+      "baseline": 952,
+      "transparent_pixels": 458611,
+      "sha256": "132f69e1ddf68451cf58d913a8054621409b393240aebc9ab644893a59305e55"
+    },
+    {
+      "name": "sleep",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        32,
+        276,
+        1001,
+        953
+      ],
+      "baseline": 952,
+      "transparent_pixels": 534097,
+      "sha256": "cfdf2ae5e6e9c1693ae8341708a14ce03870839c4fee3c17867906f10686ab5e"
+    },
+    {
+      "name": "yawn",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        92,
+        114,
+        957,
+        953
+      ],
+      "baseline": 952,
+      "transparent_pixels": 470183,
+      "sha256": "65e161997ce7b67a5abbb28e5727e1b552352fdd5fadd2564197169aad088d16"
+    },
+    {
+      "name": "stretch",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        77,
+        54,
+        950,
+        953
+      ],
+      "baseline": 952,
+      "transparent_pixels": 478014,
+      "sha256": "659fdaab08e0f3a7331c4fa8adf4195326596e39ea66b214a38d62b2bdaa09c9"
+    },
+    {
+      "name": "cheer",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        70,
+        32,
+        955,
+        871
+      ],
+      "baseline": 870,
+      "transparent_pixels": 541413,
+      "sha256": "a4e624543b4dbf1141c464da6b275c7f8acce27d0a9aff55492c7cb9ed95a3f1"
+    },
+    {
+      "name": "curious",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        81,
+        50,
+        940,
+        953
+      ],
+      "baseline": 952,
+      "transparent_pixels": 505487,
+      "sha256": "d9b4bb1d64e818d9a424cbe11c88cefafe9424a4f6a724ebcc86de5bb30ebb43"
+    },
+    {
+      "name": "groom",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        96,
+        54,
+        955,
+        953
+      ],
+      "baseline": 952,
+      "transparent_pixels": 459871,
+      "sha256": "26ec0b97938e45679896dac0a0e9e0d3c01b0de18e2a9057fec9f62a7109c4f6"
+    },
+    {
+      "name": "tea",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        100,
+        62,
+        953,
+        953
+      ],
+      "baseline": 952,
+      "transparent_pixels": 460176,
+      "sha256": "c03d83967250576f3b5f001f304c42dfc1aafd0098f0e41a7e48a02767b43106"
+    },
+    {
+      "name": "walk-1",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        87,
+        77,
+        988,
+        953
+      ],
+      "baseline": 952,
+      "transparent_pixels": 520574,
+      "sha256": "ddbab3db73f1ddc663bd200438c89ee62ef5a322f4902a1358448b43e9c7ca97"
+    },
+    {
+      "name": "walk-2",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        89,
+        59,
+        988,
+        953
+      ],
+      "baseline": 952,
+      "transparent_pixels": 511206,
+      "sha256": "eded09abbbe14c938e4e32ab392be087d7a0068fa6c2d6cba9253265a8f3b90b"
+    },
+    {
+      "name": "walk-3",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        89,
+        63,
+        988,
+        953
+      ],
+      "baseline": 952,
+      "transparent_pixels": 501552,
+      "sha256": "284664af1b95bc785dfb6d42bcde394cd9f29ec031d330ecc4e2b14409952680"
+    },
+    {
+      "name": "walk-4",
+      "size": [
+        1024,
+        1024
+      ],
+      "bounds_alpha_gt_8": [
+        89,
+        82,
+        988,
+        953
+      ],
+      "baseline": 952,
+      "transparent_pixels": 516658,
+      "sha256": "ef1e2570d3de135b3a902407d3a8e0d9a3297aa2aa55d5c68a4ec18fd720b440"
+    }
+  ],
+  "reference": {
+    "size": [
+      1254,
+      1254
+    ],
+    "bounds": [
+      124,
+      100,
+      1166,
+      1189
+    ]
+  },
+  "verification": {
+    "rgba_1024_pngs": 13,
+    "copies_matched": 26,
+    "clear_corners": true,
+    "baseline_952_except_cheer_870": true,
+    "min_top_padding_px": 32,
+    "swift_typecheck": "passed",
+    "preview_script_syntax": "passed",
+    "app_runtime_exercised": false
+  },
+  "walk_sequence_validation": "walk-validation.json"
+}

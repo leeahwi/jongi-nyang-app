@@ -1,0 +1,140 @@
+/* Settings' panes on the desk (꾸미기 · 알림 · 반복 · 종이냥 · 시계 · 일정 · 저장과 백업): the pane's header, then
+   its groups as cards in a reading column. */
+#app { display: flex; flex-direction: column; height: 100vh; }
+.content { flex: 1; overflow-y: auto; padding: 4px 20px 24px; display: flex; flex-direction: column; gap: 20px; scrollbar-gutter: stable both-edges; }
+.content > * { width: 100%; max-width: 640px; margin-inline: auto; flex: none; }
+/* The header lines up with the column of cards below it. */
+.pane-head { width: 100%; max-width: 696px; margin-inline: auto; }
+.group { display: flex; flex-direction: column; gap: 7px; }
+.group > .label { font-size: 11px; font-weight: 600; color: var(--ink-2); padding-left: 4px; }
+.card { background: var(--card); border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; }
+.foot { font-size: 11px; color: var(--ink-2); padding: 0 4px; line-height: 1.45; }
+.row { min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 0 14px; font-size: 13px; }
+.row + .row { border-top: 1px solid var(--rule); margin-left: 14px; padding-left: 0; }
+.row .grow { flex: 1; min-width: 0; }
+.row .sub { font-size: 11px; color: var(--ink-2); margin-top: 2px; }
+.row .icon { color: var(--ink-2); }
+/* A row's line icon on a small square tinted by the pane (as on the Mac): 꾸미기 honey, 알림 lavender,
+   종이냥 rose, 시계 clay, 일정 sky, 저장과 백업 paper, 반복 sage. */
+:root { --tint: var(--sage-2); }
+:root[data-pane="appearance"] { --tint: var(--tab-1); }
+:root[data-pane="notifications"] { --tint: var(--tab-2); }
+:root[data-pane="pet"] { --tint: var(--tab-3); }
+:root[data-pane="clock"] { --tint: var(--clay-2); }
+:root[data-pane="events"] { --tint: var(--event-blue-2); }
+:root[data-pane="storage"] { --tint: var(--paper-2); }
+.glyph { width: 28px; height: 28px; flex: none; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: var(--tint); }
+.row .glyph .icon { color: var(--ink); }
+.choice { width: 100%; text-align: left; }
+.row + .choice { width: calc(100% - 14px); } /* the rule under the first row is inset 14px, and so is the button */
+.choice .radio { width: 15px; height: 15px; border-radius: 50%; border: 1.3px solid var(--check-border); flex: none; }
+.choice[aria-checked="true"] .radio { border: 4.5px solid var(--sage); }
+.choice .sample { font-family: var(--sample-font); font-size: var(--sample-size); color: var(--secondary); white-space: nowrap; padding-right: 12px; }
+.choice[aria-checked="true"] .sample { color: var(--ink); }
+
+.segmented { display: flex; padding: 2px; border-radius: 8px; background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.segmented button { flex: 1; height: 28px; padding: 0 10px; border-radius: 6px; font-size: 12.5px; color: var(--ink); white-space: nowrap; }
+.segmented button[aria-checked="true"] { background: var(--raised); box-shadow: var(--lift); font-weight: 600; }
+.segmented.wide { flex: 1; }
+
+select { height: 28px; border-radius: 7px; border: 1px solid var(--rule); background: var(--card); padding: 0 8px; font: 12.5px var(--ui); color: var(--ink); }
+.disabled { opacity: 0.45; pointer-events: none; }
+
+.preview { background: var(--paper); border: 1px solid var(--rule); border-radius: 12px; padding: 2px 0; }
+.preview .line { height: var(--row); display: flex; align-items: center; gap: 12px; padding: 0 16px; }
+.preview .line { position: relative; }
+.preview .line + .line::before { content: ""; position: absolute; left: 44px; right: 0; top: 0; border-top: 1px solid var(--rule); }
+.preview .box { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--check-border); flex: none; display: flex; align-items: center; justify-content: center; color: var(--on-sage); }
+.preview .done .box { background: var(--sage); border-color: transparent; }
+.preview .text { padding-inline-end: var(--ink-over); font-family: var(--body-font); font-size: var(--body-size); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.preview .done .text { color: var(--faded); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--ink) 50%, transparent); }
+
+.tiles { display: flex; gap: 10px; padding: 12px; }
+.tile { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px; }
+.tile .frame { width: 100%; height: 70px; border-radius: 8px; background: color-mix(in srgb, var(--sage) 6%, transparent); border: 1px solid var(--rule); display: flex; align-items: flex-end; gap: 3px; padding: 7px; }
+.tile[aria-checked="true"] .frame { border: 2px solid var(--sage); padding: 5.8px; }
+.tile .mini-cat { object-fit: contain; }
+.tile .mini-bubble { padding: 6px; border-radius: 6px; background: var(--bubble); border: 0.6px solid color-mix(in srgb, var(--sage) 18%, transparent); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); display: flex; flex-direction: column; gap: 4px; }
+.tile .bar { display: flex; align-items: center; gap: 3px; }
+.tile .dot { width: 5px; height: 5px; border-radius: 50%; border: 0.8px solid color-mix(in srgb, var(--sage) 70%, transparent); }
+.tile .stroke { height: 2.5px; border-radius: 2px; background: color-mix(in srgb, var(--ink) 35%, transparent); }
+.tile .pill { width: 28px; height: 7px; border-radius: 4px; background: color-mix(in srgb, var(--sage) 18%, transparent); }
+.tile .name { font-size: 12px; color: var(--secondary); display: flex; align-items: center; gap: 4px; }
+.tile[aria-checked="true"] .name { color: var(--sage-text); font-weight: 600; }
+
+.bottom { flex: none; display: flex; align-items: center; padding: 12px 28px; border-top: 1px solid var(--rule); background: color-mix(in srgb, var(--paper) 94%, transparent); }
+.bottom .spacer { flex: 1; }
+.row.series { padding-top: 8px; padding-bottom: 8px; }
+.row.series .quiet .icon { color: var(--sage-text); }
+.series-title { padding-inline-end: var(--ink-over); font-family: var(--body-font); font-size: 19px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quiet.danger:hover { color: var(--clay-text); }
+.series-form { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; background: color-mix(in srgb, var(--sage) 4%, transparent); }
+.series-form + .row, .row + .series-form { border-top: 1px solid var(--rule); }
+.title-input { height: 36px; border-radius: 8px; border: 1px solid var(--rule); background: var(--card); padding: 0 10px; font-family: var(--body-font); font-size: 20px; color: var(--ink); user-select: text; }
+.form-actions { display: flex; gap: 6px; }
+.form-actions .spacer { flex: 1; }
+.form-actions .action { height: 32px; padding: 0 12px; font-size: 12px; }
+
+/* "− 25분 +" on paper. */
+.stepper { flex: none; display: flex; align-items: center; padding: 2px; border-radius: 15px; background: color-mix(in srgb, var(--sage) 8%, transparent); box-shadow: inset 0 0 0 0.7px var(--rule); }
+.stepper .step-value { min-width: 46px; text-align: center; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stepper .step { width: 26px; height: 24px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: var(--card); color: color-mix(in srgb, var(--ink) 70%, transparent); box-shadow: var(--lift); }
+.stepper .step:hover:not(:disabled) { color: var(--ink); background: color-mix(in srgb, var(--sage) 8%, var(--card)); }
+.stepper .step:disabled { background: color-mix(in srgb, var(--card) 40%, transparent); color: var(--faint); box-shadow: none; }
+.row.timer-start { gap: 6px; padding-top: 10px; padding-bottom: 10px; }
+.row.timer-start .action { height: 32px; padding: 0 12px; font-size: 12.5px; }
+.row .action.primary .icon { color: inherit; }
+
+.foot.warn { color: var(--clay-text); }
+.row.storage { padding-top: 9px; padding-bottom: 9px; }
+.row.storage .path { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.row.storage .where { display: flex; justify-content: space-between; gap: 8px; }
+.row.storage .kind { color: var(--secondary); font-weight: 500; }
+/* A folder's place on disk: one line, shortened in the middle when it is long (settings.ts folderPath); select it to copy the whole path. */
+.folder-path { margin-top: 3px; font: 11px/1.4 Consolas, "Cascadia Mono", ui-monospace, monospace; color: var(--secondary); white-space: nowrap; overflow: hidden; user-select: text; cursor: text; }
+.row.storage-actions { gap: 6px; padding-top: 8px; padding-bottom: 8px; }
+.row .action.small { height: 30px; padding: 0 12px; font-size: 12px; font-weight: 600; gap: 5px; }
+.row .action.small .icon { color: inherit; }
+
+/* 캘린더 */
+.row .sub.warn { color: var(--clay-text); }
+.calendar-alert .segmented button { padding: 0 8px; }
+
+/* The stepper's value can be typed: an input that looks like the old label. */
+input.step-value { width: 58px; height: 24px; border: 0; background: transparent; padding: 0 2px; font: 600 13px var(--ui); color: var(--ink); user-select: text; border-radius: 6px; }
+input.step-value:focus { background: var(--card); outline: 2px solid color-mix(in srgb, var(--sage) 45%, transparent); outline-offset: 0; }
+
+/* 시계 → 알람: the time big in the notebook's hand, the name and days under it, a switch. */
+.row.alarm { padding-top: 6px; padding-bottom: 6px; gap: 12px; }
+.alarm-open { text-align: left; display: flex; flex-direction: column; gap: 1px; padding: 2px 0; min-width: 0; }
+.alarm-time { font-family: var(--title-font); font-size: 30px; line-height: 1.1; color: var(--ink); white-space: nowrap; }
+.alarm-label { font-size: 13px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.alarm .sub { margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row.alarm.off .alarm-time, .row.alarm.off .alarm-label { color: var(--faded); }
+.row.empty-alarms { padding-top: 12px; padding-bottom: 12px; }
+.row.empty-alarms .sub { line-height: 1.5; font-size: 12px; }
+
+.alarm-editor { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; background: color-mix(in srgb, var(--sage) 5%, transparent); }
+.alarm-editor + .row, .row + .alarm-editor, .alarm-editor + .choice { border-top: 1px solid var(--rule); }
+.editor-row { display: flex; align-items: center; gap: 8px; min-height: 30px; font-size: 12.5px; }
+.editor-label { width: 64px; flex: none; color: var(--secondary); font-weight: 600; font-size: 12px; white-space: nowrap; }
+.editor-row .segmented { flex: 1; min-width: 0; }
+.time-fields { display: flex; align-items: center; gap: 2px; }
+.time-field { width: 46px; height: 38px; border-radius: 8px; border: 1px solid var(--rule); background: var(--card); text-align: center; font-family: var(--title-font); font-size: 26px; color: var(--ink); padding: 0; user-select: text; font-variant-numeric: tabular-nums; }
+.time-fields .colon { font-family: var(--title-font); font-size: 24px; color: var(--secondary); padding: 0 1px; }
+.time-preview { margin-left: 6px; font-size: 12px; color: var(--secondary); white-space: nowrap; }
+.alarm-editor .days .day { height: 30px; }
+.days-note { color: var(--sage-text); font-weight: 600; font-size: 12px; }
+.editor-row .listen { flex: none; height: 30px; padding: 0 10px; font-size: 12px; gap: 5px; white-space: nowrap; }
+.editor-row .listen .icon { color: inherit; }
+.alarm-editor .form-actions .action .icon { color: inherit; }
+.action.danger { color: var(--clay-text); }
+
+/* 시계 → 타이머 시작 → 직접. */
+.row.custom-timer { gap: 8px; padding-top: 8px; padding-bottom: 8px; }
+.custom-label { flex: none; min-width: 34px; font-weight: 600; font-size: 12.5px; color: var(--secondary); white-space: nowrap; }
+.custom-box { display: flex; align-items: center; gap: 8px; }
+.custom-field { flex: 1; min-width: 0; height: 32px; border-radius: 8px; border: 1px solid var(--rule); background: var(--card); padding: 0 10px; font: 13px var(--ui); color: var(--ink); user-select: text; }
+.custom-hint { flex: none; max-width: 48%; font-size: 12px; font-weight: 600; color: var(--sage-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.custom-hint.invalid { color: var(--clay-text); font-weight: 500; }
+.row.custom-timer .action { height: 32px; padding: 0 14px; font-size: 12.5px; white-space: nowrap; }

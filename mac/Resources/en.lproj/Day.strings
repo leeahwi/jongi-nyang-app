@@ -1,0 +1,4 @@
+/* English: the 하루 띠 (1.40) — one to-do / event (Localizable has the plural tab names), and 접기 for folding the day (Localizable’s is “Show fewer”). */
+"할 일" = "To-do";
+"일정" = "Event";
+"접기" = "Fold";

@@ -1,0 +1,636 @@
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+/* Top row: washi index tabs for the three pages (오늘 · 앞으로 · 메모), the tools on the right; the rest of the row and
+   the header below drag the window (double-click folds it). The active tab joins the sheet through
+   a 3px band of its colour under the row; the others stand a little lower. */
+:root { --tab-today: var(--tab-1); --tab-ahead: var(--tab-2); --tab-memos: var(--tab-3); --band: var(--tab-today); }
+:root[data-page="ahead"] { --band: var(--tab-ahead); }
+:root[data-page="memos"] { --band: var(--tab-memos); }
+.tabs-row { height: 40px; flex: none; display: flex; align-items: flex-end; padding: 0 8px 0 12px; -webkit-app-region: drag; position: relative; border-bottom: 3px solid var(--band); }
+.index-tabs { display: flex; align-items: flex-end; gap: 4px; -webkit-app-region: no-drag; flex: none; }
+.index-tab {
+  position: relative; height: 25px; padding: 0 12px; display: flex; align-items: center; gap: 5px; flex: none;
+  border-radius: 8px 8px 0 0; background: var(--tab-color); transition: height 0.12s ease-out, box-shadow 0.12s;
+}
+/* Faint vertical washi stripes over the tab colour. */
+.index-tab::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.18) 0 2px, transparent 2px 6px); pointer-events: none; }
+:root[data-paper="night"] .index-tab::after { background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0 2px, transparent 2px 6px); }
+.index-tab:hover, .index-tab.hover { height: 26px; }
+.index-tab[aria-selected="true"] { height: 28px; }
+/* A task dragged over 앞으로 (or, from 앞으로, over 오늘): the tab rises with a sage edge. */
+.index-tab.drop-target { height: 30px; box-shadow: inset 0 0 0 1.5px var(--sage), 0 -2px 6px color-mix(in srgb, var(--sage) 25%, transparent); }
+.index-tab.drop-target .tab-label { color: var(--ink); }
+.tab-today { --tab-color: var(--tab-today); }
+.tab-ahead { --tab-color: var(--tab-ahead); }
+.tab-memos { --tab-color: var(--tab-memos); }
+.tab-label { position: relative; font-family: var(--title-font); font-size: 19px; line-height: 1.15; color: var(--tab-ink); white-space: nowrap; padding-top: 1px; }
+:root[data-font="clean"] .tab-label { font-size: 12.5px; }
+.index-tab[aria-selected="true"] .tab-label { color: var(--ink); }
+/* Night: the pen's thin strokes thinned out further on the dark tabs (앞으로 on lavender); a hair of stroke keeps them legible. */
+:root[data-paper="night"]:not([data-font="clean"]) .tab-label { -webkit-text-stroke: 0.35px currentColor; }
+.tab-count { position: relative; font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--tab-ink); min-width: 8px; text-align: center; margin-top: -4px; }
+.index-tabs.tight .index-tab { padding: 0 9px; gap: 3px; }
+.index-tabs.compact .tab-count { display: none; }
+.index-tabs.narrow { gap: 3px; }
+.index-tabs.narrow .index-tab { padding: 0 7px; }
+.index-tabs.narrow .tab-label { font-size: 16.5px; }
+:root[data-font="clean"] .index-tabs.narrow .tab-label { font-size: 11.5px; }
+/* The longest names (Dutch) in the narrowest note: smaller still, so pin · ⋯ · × keep their place. */
+.index-tabs.narrower { gap: 2px; }
+.index-tabs.narrower .index-tab { padding: 0 4px; }
+.index-tabs.narrower .tab-label { font-size: 14px; }
+:root[data-font="clean"] .index-tabs.narrower .tab-label { font-size: 11px; }
+.tabs-row > .spacer { flex: 1; min-width: 16px; }
+.tools.compact .optional { display: none; }
+.tools { flex: none; display: flex; align-items: center; gap: 1px; padding-bottom: 5px; -webkit-app-region: no-drag; }
+.tools .quiet { width: 28px; height: 28px; color: var(--ink-2); }
+.tools .pin.on { color: var(--clay-text); }
+.tools .pin.on .icon { transform: rotate(-25deg); }
+.tools .close:hover { background: #c4412f; color: white; }
+
+/* Header: the date as a small sage eyebrow, the page title in the hand, and on 오늘 a donut with "2 / 5 끝냈어요". */
+.title-row { flex: none; display: flex; align-items: flex-end; min-height: 78px; padding: 10px 18px 6px 22px; -webkit-app-region: drag; position: relative; }
+.title-text { flex: 1; min-width: 0; padding-bottom: 2px; }
+.date-line { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--sage-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.title-line { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 12px; min-width: 0; }
+.title-line .title { flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.title-line .prog { flex: none; }
+.title { margin-top: 2px; font-family: var(--title-font); font-size: 34px; line-height: 1.12; padding-bottom: 2px; padding-inline-end: var(--ink-over); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root[data-font="clean"] .title { font-size: 23px; font-weight: 600; line-height: 1.3; }
+:root[data-font="brush"] .title { font-size: 31px; }
+.prog { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 11px; font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.donut { width: 16px; height: 16px; border-radius: 50%; flex: none; background: conic-gradient(var(--sage) 0 var(--done, 0%), var(--rule) var(--done, 0%) 100%); display: grid; place-items: center; }
+.donut::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--paper); }
+.donut.full::after { background: var(--sage); box-shadow: inset 0 0 0 2px var(--paper); }
+
+/* The cat peeking over the top edge of the sheet, paws on the edge; it nods when a task is checked
+   and sleeps from 11 p.m. to 5 a.m. */
+.peek { position: relative; width: 70px; height: 54px; margin: 0 0 -6px 6px; flex: none; align-self: flex-end; }
+.peek-window { position: absolute; inset: -12px 0 0; overflow: hidden; }
+.peek-window img { position: absolute; left: 0; top: 18px; width: 70px; height: 70px; transform-origin: 50% 90%; }
+.peek.nod .peek-window img { animation: nod 0.4s ease-out; }
+@keyframes nod { 40% { transform: rotate(2deg) translateY(2px); } }
+.peek.sleeping .peek-window img { top: 12px; }
+/* 밤 종이: the cat a touch dimmer, so its own white paper doesn't glare. */
+:root[data-paper="night"] .peek-window img, :root[data-paper="night"] .peek-paws { opacity: 0.92; }
+/* …with a faint light outline (spec 3B), so it doesn't sink grey into the dark paper. */
+:root[data-paper="night"] .peek-window img { filter: drop-shadow(0 0 0.6px rgba(255, 255, 255, 0.5)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.12)); }
+/* A short note (under 480 px high): a compact header — the title a size smaller, the cat smaller, less air —
+   so the list keeps room for more than one row. */
+@media (max-height: 480px) {
+  .title-row { min-height: 58px; padding: 4px 16px 4px 22px; }
+  .date-line { font-size: 10.5px; }
+  .title { font-size: 27px; margin-top: 0; }
+  :root[data-font="clean"] .title { font-size: 19px; }
+  :root[data-font="brush"] .title { font-size: 25px; }
+  .peek { width: 56px; height: 44px; margin-bottom: -4px; }
+  .peek-window img { width: 56px; height: 56px; top: 14px; }
+  .peek.sleeping .peek-window img { top: 10px; }
+  .peek-paws { gap: 12px; bottom: -4px; }
+  .peek .paw { width: 10px; height: 9px; }
+}
+.peek-edge { position: absolute; left: 3px; right: 3px; bottom: 0; height: 1.2px; border-radius: 1px; background: color-mix(in srgb, var(--ink) 28%, transparent); }
+.peek-paws { position: absolute; left: 0; right: 0; bottom: -5px; display: flex; justify-content: center; gap: 16px; }
+.peek.sleeping .peek-paws { display: none; }
+.peek .paw { width: 12px; height: 11px; overflow: visible; }
+.peek .paw path { fill: rgb(247, 230, 196); stroke: rgba(107, 77, 48, 0.85); stroke-width: 0.85; }
+.peek .paw .toe { fill: none; stroke-width: 0.55; stroke-linecap: round; }
+.sheet { flex: 1; min-height: 0; overflow-y: auto; position: relative; scrollbar-width: none; }
+/* Soft 12px fades where the list goes on beyond the edge. */
+.sheet.fade-top { -webkit-mask-image: linear-gradient(to bottom, transparent, black 12px); }
+.sheet.fade-bottom { -webkit-mask-image: linear-gradient(to top, transparent, black 12px); }
+.sheet.fade-top.fade-bottom { -webkit-mask-image: linear-gradient(to bottom, transparent, black 12px, black calc(100% - 12px), transparent); }
+.sheet::-webkit-scrollbar { display: none; }
+.lines {
+  min-height: 100%; position: relative;
+  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--row) - 1px), var(--rule) calc(var(--row) - 1px), var(--rule) var(--row));
+  background-size: calc(100% - 38px) 100%; background-position: 18px 0; background-repeat: no-repeat;
+}
+.lines::before { content: ""; position: absolute; left: var(--margin); top: 0; bottom: 0; width: 0.6px; background: color-mix(in srgb, var(--accent) 22%, transparent); pointer-events: none; }
+
+.row { height: var(--row); display: flex; align-items: center; position: relative; }
+.row::after { content: ""; position: absolute; inset: 3px 7px 3px 14px; border-radius: 4px; background: color-mix(in srgb, var(--sage) 5.5%, transparent); opacity: 0; pointer-events: none; transition: opacity 0.1s; }
+.row:hover::after, .row.editing::after, .row.preview-hover::after { opacity: 1; }
+.row.dragging { opacity: 0.55; }
+.row.dragging.to-tab { opacity: 0.32; }
+/* The keyboard's row: a soft sage tint and a sage bar on the margin line. */
+.row.selected::after { opacity: 1; background: color-mix(in srgb, var(--sage) 11%, transparent); }
+.row.flash::after { opacity: 1; background: color-mix(in srgb, var(--sage) 16%, transparent); animation: flash 1.2s ease-out forwards; }
+@keyframes flash { 70% { opacity: 1; } 100% { opacity: 0; } }
+.row.up-next .grip { visibility: hidden; }
+.row.selected { background-image: linear-gradient(var(--sage), var(--sage)); background-repeat: no-repeat; background-size: 2px calc(100% - 10px); background-position: calc(var(--margin) - 1px) 5px; }
+.row.drop-before::before, .row.drop-after::before { content: ""; position: absolute; left: calc(var(--margin) + 9px); right: 12px; height: 2px; background: var(--sage); border-radius: 1px; z-index: 2; }
+.row.drop-before::before { top: -1px; }
+.row.drop-after::before { bottom: -1px; }
+
+.grip { width: 24px; height: 100%; display: flex; align-items: center; justify-content: center; opacity: 0; cursor: grab; touch-action: none; transition: opacity 0.12s; z-index: 1; }
+.grip svg { color: var(--faint); }
+.row:hover .grip, .row.dragging .grip { opacity: 1; }
+.grip:active { cursor: grabbing; }
+
+.check { width: 30px; height: 100%; display: flex; align-items: center; justify-content: center; z-index: 1; }
+.box { width: 19px; height: 19px; border-radius: 5px; border: 1.5px solid var(--check-border); display: flex; align-items: center; justify-content: center; color: var(--on-sage); transform: rotate(-3deg); }
+.row:hover .box { border-color: var(--ink-2); }
+.row.done .box { background: var(--sage); border-color: var(--sage); }
+.box .icon { opacity: 0; }
+.row.done .box .icon { opacity: 1; }
+/* Checking: the box fills sage with a short pop (0.85 → 1, 160 ms), then the strike draws left to right (220 ms). Unchecking is instant. */
+.row.pop .box { animation: pop 0.16s ease-out; }
+@keyframes pop { from { transform: rotate(-3deg) scale(0.85); } }
+
+.text { flex: 1; min-width: 0; padding-left: 17px; padding-right: 8px; position: relative; z-index: 1; }
+.label { font-family: var(--body-font); font-size: var(--body-size); padding-inline-end: var(--ink-over); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; max-width: 100%; position: relative; vertical-align: middle; line-height: 1.25; }
+:root[data-font="clean"] .label { font-weight: 400; }
+.row.done .label { color: var(--faded); }
+.strike { position: absolute; left: 0; top: 0; width: calc(100% - var(--ink-over)); height: 100%; overflow: visible; pointer-events: none; }
+.strike { clip-path: inset(0 100% 0 0); }
+.strike path { fill: none; stroke: color-mix(in srgb, var(--ink) 62%, transparent); stroke-width: 1.25; stroke-linecap: round; }
+.row.done .strike { clip-path: inset(0 0 0 0); }
+.row.animate .strike { transition: clip-path 0.22s ease-out 0.08s; }
+.edit { width: 100%; font-family: var(--body-font); font-size: var(--body-size); color: var(--ink); background: transparent; border: 0; outline: none; padding: 0; line-height: 1.25; user-select: text; }
+
+.time { height: 24px; margin-left: 10px; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--sage-text); white-space: nowrap; z-index: 1; }
+.time.quiet-time { color: var(--faded); }
+/* The end of the row shows the deadline and alert as quiet text; hovering swaps that spot for
+   the row's buttons (nothing covers the title). Editing a title keeps the text. */
+.row-icon { width: 26px; height: 28px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; color: var(--secondary); z-index: 1; transition: color 0.12s, background 0.12s; flex: none; }
+.actions { display: none; align-items: center; gap: 2px; z-index: 1; }
+.row:hover:not(.editing) .actions, .row.preview-hover .actions, .actions:focus-within { display: flex; }
+.row:hover:not(.editing) :is(.due, .time, .sent-mark, .carry), .row.preview-hover :is(.due, .time, .sent-mark, .carry) { display: none; }
+/* 어제부터 · 3일째: a quiet ink3 word before the deadline and the time. */
+.carry { height: 24px; margin-left: 8px; display: inline-flex; align-items: center; font: 500 11px var(--ui); color: var(--ink-3); white-space: nowrap; z-index: 1; flex: none; }
+.carry[hidden], .star[hidden] { display: none; }
+/* 오늘 꼭 하나: a small filled star before the title. */
+.star { display: inline-flex; vertical-align: middle; margin-right: 5px; color: var(--sage-text); position: relative; top: -1px; }
+.star .icon { fill: currentColor; }
+.star:not([hidden]) + .label { max-width: calc(100% - 17px); }
+.row.done .star { display: none; }
+.move .icon { flex: none; }
+/* Put in the calendar: a small, faint sage calendar at the end of the row. */
+.sent-mark { height: 24px; margin-left: 8px; display: inline-flex; align-items: center; color: color-mix(in srgb, var(--sage) 55%, transparent); z-index: 1; flex: none; }
+.move { height: 24px; padding: 0 8px; margin-right: 4px; border-radius: 12px; display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--sage-text); background: color-mix(in srgb, var(--sage) 10%, transparent); box-shadow: inset 0 0 0 0.7px color-mix(in srgb, var(--sage) 25%, transparent); }
+.move:hover { color: var(--on-sage); background: var(--sage); }
+.row-icon:hover { background: color-mix(in srgb, var(--sage) 10%, transparent); color: var(--ink) !important; }
+.row-icon.trash:hover { color: var(--clay-text) !important; }
+.row-icon.hidden { visibility: hidden; }
+.row .end { width: 16px; flex: none; }
+
+.new { height: var(--row); display: flex; align-items: center; }
+.new .plus { width: var(--margin); display: flex; justify-content: center; color: var(--faint); }
+
+.all-done { height: var(--row); display: flex; align-items: center; gap: 8px; padding-left: calc(var(--margin) + 17px); color: var(--sage-text); font-family: var(--body-font); font-size: var(--body-size); animation: rise 0.3s ease-out; }
+@keyframes rise { from { opacity: 0; transform: translateY(-6px); } }
+
+.footer { height: 34px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 25px; font-size: 11px; color: var(--secondary); position: relative; container: footer / inline-size; }
+/* One line at every width: the labels never wrap; a long sentence ends in … before a button is squeezed. */
+.footer > * { flex: none; white-space: nowrap; }
+.footer > span:not(.spacer):not(.progress) { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.footer > span:has(> .icon:only-child) { flex: none; overflow: visible; }
+.footer .spacer { min-width: 0; }
+/* 앞으로 in a narrow note: the drag hint goes before anything is squeezed. */
+@container footer (max-width: 300px) { .footer .footer-hint { display: none; } }
+
+.footer .spacer { flex: 1; }
+.footer .history { height: 24px; padding: 0 7px; gap: 5px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; color: var(--secondary); }
+.footer .history:hover { color: var(--sage-text); background: color-mix(in srgb, var(--sage) 10%, transparent); }
+.footer .toggle-done { font-size: 10.5px; color: var(--faded); }
+.footer .toggle-done:hover:not(:disabled) { color: var(--secondary); }
+.footer .warning { color: var(--clay-text); display: inline-flex; align-items: center; gap: 5px; }
+.footer > span:has(> .icon:only-child) { display: inline-flex; color: var(--ink-3); }
+/* Reminder editor, attached to its row */
+/* 다른 날짜·시간: one row that opens the calendar, like the Mac's. */
+.editor .other-toggle { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border-radius: 9px; border: 1px solid var(--rule); background: color-mix(in srgb, var(--card) 55%, transparent); color: var(--ink); font: 12.5px var(--ui); text-align: left; }
+.editor .other-toggle:hover { background: color-mix(in srgb, var(--card) 80%, transparent); }
+.editor .other-toggle .grow { flex: 1; }
+.editor .other-toggle svg:last-child { color: var(--faint); transition: transform 0.15s ease; }
+.editor .other-toggle.open svg:last-child { transform: rotate(90deg); }
+.editor .panel { display: flex; flex-direction: column; gap: 10px; }
+.editor .tabs { margin-top: 2px; }
+.editor .task { font-family: var(--body-font); font-size: 21px; padding-inline-end: var(--ink-over); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.editor .caption { font-size: 11px; font-weight: 600; color: var(--secondary); }
+/* 시간: start → end as chips (the event sheet's), the length beside them; quick lengths under. */
+.editor .time-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-family: var(--ui); }
+.editor .quick.lengths { grid-template-columns: repeat(3, 1fr); }
+.editor .quick.lengths button { justify-content: flex-start; }
+.pop-list button.pop-none { color: var(--secondary); border-bottom: 1px solid var(--rule); border-radius: 8px 8px 0 0; margin-bottom: 2px; }
+.quick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.quick button { height: 34px; border-radius: 8px; border: 1px solid var(--rule); background: color-mix(in srgb, var(--card) 45%, transparent); display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 12.5px; }
+.quick button::before { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 1.2px solid var(--check-border); flex: none; }
+.quick button.selected { border-color: var(--sage); background: color-mix(in srgb, var(--sage) 9%, transparent); }
+.quick button.selected::before { border: 4px solid var(--sage); }
+.quick button.two-line { height: 44px; }
+.choice-text { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; }
+.choice-title { white-space: nowrap; }
+.choice-sub { font-size: 10.5px; color: var(--secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.quick button.selected .choice-title { font-weight: 600; }
+.empty-note { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 36px 24px 0; font-size: 12px; line-height: 1.5; color: var(--faded); text-align: center; white-space: pre-line; }
+.empty-note img { width: 84px; height: 84px; object-fit: contain; opacity: 0.9; user-select: none; }
+.custom { display: flex; align-items: center; gap: 8px; }
+.custom input { flex: 1; height: 32px; border-radius: 8px; border: 1px solid var(--rule); background: var(--card); padding: 0 8px; font: 12.5px var(--ui); color: var(--ink); user-select: text; }
+
+/* Deadline badge: "D-3" / "~금" */
+.due { height: 24px; display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; z-index: 1; color: var(--sage-text); }
+.due.later { font-weight: 500; color: var(--secondary); }
+.due.overdue { color: var(--clay-text); }
+
+.footer-hint { color: var(--ink-3); display: inline-flex; align-items: center; gap: 6px; }
+.footer-hint > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+/* Memos */
+.memo-new { width: 100%; text-align: left; }
+.memo-new-label { margin-left: 17px; font-family: var(--body-font); font-size: var(--body-size); color: var(--faded); }
+.memo-row { cursor: default; }
+.memo-icon { width: var(--margin); display: flex; justify-content: center; color: color-mix(in srgb, var(--secondary) 60%, transparent); z-index: 1; }
+.memo-row .text { display: flex; align-items: baseline; gap: 8px; }
+.memo-row .label { flex: none; max-width: 60%; }
+.memo-preview { font-size: 11px; color: var(--secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-inline-end: 2px; }
+.memo-date { font-size: 11px; color: var(--faded); font-variant-numeric: tabular-nums; white-space: nowrap; margin-right: 6px; z-index: 1; }
+/* Like the task rows: the time at rest, and the trash in that spot on hover. */
+.memo-row .trash { display: none; }
+.memo-row:hover .trash, .memo-row .trash:focus-visible { display: inline-flex; }
+.memo-row:hover .memo-date { display: none; }
+.memo-editor { display: flex; flex-direction: column; height: 100%; }
+.memo-bar { height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 16px 0 22px; }
+.memo-back { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--sage-text); }
+.memo-back .icon { transform: rotate(90deg); }
+.memo-text { flex: 1; resize: none; border: 0; outline: none; background: transparent; padding: 6px 18px 20px calc(var(--margin) + 17px); font-family: var(--body-font); font-size: var(--body-size); line-height: 1.55; color: var(--ink); user-select: text;
+  background-image: linear-gradient(to right, transparent calc(var(--margin) - 0.3px), color-mix(in srgb, var(--accent) 22%, transparent) calc(var(--margin) - 0.3px), color-mix(in srgb, var(--accent) 22%, transparent) calc(var(--margin) + 0.3px), transparent calc(var(--margin) + 0.3px)); }
+.memo-text::placeholder { color: var(--faded); }
+.restore { font-size: 11px; font-weight: 600; color: var(--sage-text); }
+
+.editor .alert-row input[type="time"] { height: 28px; border-radius: 7px; border: 1px solid var(--rule); background: var(--card); color: var(--ink); padding: 0 6px; font: 12.5px var(--ui); }
+
+/* First-launch guide: a paper card over the note. */
+.guide { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.guide-scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--ink) 18%, transparent); }
+/* At night ink is light: a black scrim dims the note instead of fogging it. */
+:root[data-paper="night"] .guide-scrim { background: rgba(0, 0, 0, 0.4); }
+.guide-card {
+  position: relative; width: 320px; max-width: 100%; display: flex; flex-direction: column; align-items: center; padding: 18px 18px 16px;
+  border-radius: 16px; border: 0.8px solid var(--rule); box-shadow: 0 8px 36px rgba(0, 0, 0, 0.16);
+  background-color: var(--paper); background-image: var(--grain); background-size: cover;
+}
+.guide-card.turn .guide-art { animation: guide-pop 0.32s cubic-bezier(.3, 1.4, .5, 1); }
+@keyframes guide-pop { from { transform: scale(0.85); opacity: 0; } }
+.guide-art { width: 96px; height: 96px; object-fit: contain; user-select: none; }
+.guide-title { margin-top: 6px; font-family: var(--title-font); font-size: 24px; color: var(--ink); }
+:root[data-font="clean"] .guide-title { font-size: 17px; font-weight: 600; }
+.guide-body { min-height: 66px; margin-top: 8px; padding: 0 4px; font-size: 12.5px; line-height: 1.55; color: var(--secondary); text-align: center; white-space: pre-line; word-break: keep-all; }
+.guide-keys { min-height: 76px; width: 100%; margin-top: 10px; padding: 0 8px; display: flex; flex-direction: column; gap: 5px; }
+.guide-key { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--secondary); }
+.guide-key kbd { font: 600 11px var(--ui); font-variant-numeric: tabular-nums; color: var(--sage-text); background: color-mix(in srgb, var(--sage) 10%, transparent); border-radius: 5px; padding: 3px 7px; }
+.guide-login { width: 100%; margin-top: 10px; padding: 9px 10px 9px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-radius: 10px; background: var(--paper-2); font: 500 12px var(--ui); color: var(--ink); }
+.guide-login span { min-width: 0; }
+.guide-dots { display: flex; gap: 6px; margin-top: 14px; }
+.guide-dots span { width: 6px; height: 6px; border-radius: 3px; background: var(--rule); transition: width 0.2s; }
+.guide-dots span.on { width: 16px; background: var(--sage); }
+.guide-actions { width: 100%; display: flex; align-items: center; gap: 6px; margin-top: 16px; }
+.guide-actions .spacer { flex: 1; }
+.guide-actions .action { height: 32px; padding: 0 14px; font-size: 12.5px; min-width: 56px; }
+.guide-skip { font-size: 12px; color: var(--faded); }
+.guide-skip:hover { color: var(--secondary); }
+@media (prefers-reduced-motion: reduce) { .guide-card.turn .guide-art { animation: none; } }
+
+/* 오늘: the 하루 띠 above the list (the list fills the rest). */
+.sheet.with-strip { display: flex; flex-direction: column; }
+.sheet.with-strip > .lines { flex: 1 0 auto; min-height: 0; }
+
+/* 다음 · 오늘 할 일: each group under a heading row of its own (22px, like the Mac's): the rows then draw
+   their own ruled line, so a heading never sits on the line of the row above, and the paper goes on
+   ruled below the last row. */
+.lines.grouped { display: flex; flex-direction: column; background-image: none; }
+.lines.grouped > .row, .lines.grouped > .all-done { flex: none; background-image: linear-gradient(var(--rule), var(--rule)); background-repeat: no-repeat; background-size: calc(100% - 38px) 1px; background-position: 18px 100%; }
+.lines.grouped > .row.selected { background-image: linear-gradient(var(--sage), var(--sage)), linear-gradient(var(--rule), var(--rule)); background-size: 2px calc(100% - 10px), calc(100% - 38px) 1px; background-position: calc(var(--margin) - 1px) 5px, 18px 100%; }
+.lines-fill { flex: 1 0 0; min-height: 0; background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--row) - 1px), var(--rule) calc(var(--row) - 1px), var(--rule) var(--row)); background-size: calc(100% - 38px) 100%; background-position: 18px 0; background-repeat: no-repeat; }
+.group-head, .group-mark { flex: none; height: 22px; display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; padding: 0 20px 3px calc(var(--margin) + 17px); position: relative; z-index: 1; pointer-events: none; font: 600 10.5px/14px var(--ui); letter-spacing: 0.04em; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.group-head .group-name, .group-mark .group-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.group-head .group-count, .group-mark .group-count { flex: none; }
+
+/* 하루 띠 (1.25): a region on the paper under the header — no card, a rule above and below. The top line: all-day
+   events and 하루 전체 ›; a thin bar of the day (the past a shade darker, events in their colours, to-dos with a time in
+   sage, now a short still clay mark) with its hours; what's on now in large beside a ring of the time left; the next
+   ones as rows indented to the text. Opened in place: the day's timetable. (Same sizes as the Mac's, in px.) */
+.strip { flex: none; position: relative; margin: 6px 16px 2px; padding: 8px 0 10px; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); font-family: var(--ui); cursor: default; }
+.strip.growing { transition: height 0.22s ease-in-out; }
+.strip button { color: inherit; }
+.strip button:focus-visible { outline: 2px solid color-mix(in srgb, var(--sage) 60%, transparent); outline-offset: 2px; border-radius: 4px; }
+.strip-top { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 18px; }
+.strip-top .spacer { flex: 1 1 0; min-width: 0; }
+.strip-allday { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 0 1 auto; }
+.ad-pill { display: inline-flex; align-items: center; gap: 5px; min-width: 0; height: 18px; padding: 0; font: 600 10.5px/18px var(--ui); color: var(--ink-2) !important; }
+.ad-pill span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ad-pill i { flex: none; width: 6px; height: 6px; border-radius: 50%; }
+.ad-pill:hover span { text-decoration: underline; text-decoration-color: var(--rule-strong); text-underline-offset: 2px; }
+.ad-more { flex: none; font: 600 10.5px/18px var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-3); }
+.strip-link { flex: none; display: inline-flex; align-items: center; gap: 3px; min-height: 18px; padding: 0; font: 500 11px/18px var(--ui); color: var(--sage-text) !important; white-space: nowrap; }
+.strip-link:hover { text-decoration: underline; text-underline-offset: 2px; }
+.strip-link.fold .icon { transform: rotate(180deg); }
+
+.strip-bar { display: block; position: relative; width: 100%; height: 12px; margin-top: 4px; padding: 0; }
+.sb-track { position: absolute; left: 0; right: 0; top: 3px; height: 6px; border-radius: 3px; overflow: hidden; background: var(--paper-2); }
+.strip-bar:hover .sb-track { box-shadow: 0 0 0 1px var(--rule-strong); }
+.sb-past { position: absolute; left: 0; top: 0; bottom: 0; background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.sb-track i { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+.sb-track i.past { opacity: 0.5; }
+.sb-track i.task { background: var(--sage); opacity: 0.5; }
+.sb-track i.task.done { opacity: 0.25; }
+.sb-now { position: absolute; top: 0; width: 2px; height: 12px; border-radius: 1px; background: var(--clay); }
+.strip-hours { position: relative; height: 12px; font: 500 9px/12px var(--ui); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.strip-hours span { position: absolute; top: 0; transform: translateX(-50%); }
+.strip-hours span.first { transform: none; }
+.strip-hours span.last { transform: translateX(-100%); }
+
+.strip-lead { display: flex; align-items: center; gap: 12px; margin-top: 9px; min-width: 0; }
+.strip-ring { position: relative; flex: none; width: 52px; height: 52px; padding: 0; border-radius: 50% !important; }
+.strip-ring svg { position: absolute; inset: 0; width: 52px; height: 52px; }
+.rc-face { fill: var(--paper); }
+.strip-ring:hover .rc-face { fill: var(--paper-2); }
+.rc-track { fill: none; stroke-width: 5; stroke: var(--rule); }
+.strip-ring.now .rc-track { stroke: var(--sage-2); }
+.strip-ring.soon .rc-track { stroke: var(--clay-2); }
+.rc-arc { fill: none; stroke-width: 5; stroke: var(--clay); }
+.strip-ring.now .rc-arc { stroke: var(--sage); }
+.rc-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding-top: 1px; }
+.rc-text b { font: 600 13px/15px var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; }
+.strip-ring.now .rc-text b { color: var(--ink); }
+.strip-ring.soon .rc-text b { color: var(--clay-text); }
+.rc-text small { display: block; width: 40px; text-align: center; font: 500 8.5px/11px var(--ui); color: var(--ink-3); white-space: nowrap; overflow: hidden; }
+.strip-ring.soon .rc-text small { color: var(--clay-text); }
+.lead-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lead-kicker { font: 600 10.5px/14px var(--ui); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; color: var(--sage-text); white-space: nowrap; overflow: hidden; }
+.lead-row { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.lead-title { flex: 0 1 auto; min-width: 0; padding: 0 var(--ink-over) 0 0; text-align: left; font: 400 27px/1.2 var(--body-font); color: var(--ink) !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 깔끔 (the UI face for the hand): sizes the UI face reads well at, with its taller line box (as the focus card's title). */
+:root[data-font="clean"] .lead-title { font-size: 20px; font-weight: 600; line-height: 1.35; }
+:root[data-font="clean"] .strip-row.task .sr-title, :root[data-font="clean"] .strip-row.reminder .sr-title { font-size: 13.5px; }
+:root[data-font="clean"] .tb-hand { font-size: 12.5px; font-weight: 600; line-height: 1.35; }
+:root[data-font="clean"] .ttn-field { font-size: 13.5px; }
+.lead-title:hover { text-decoration: underline; text-decoration-color: var(--rule-strong); text-decoration-thickness: 1px; text-underline-offset: 4px; }
+.lead-check { flex: none; width: 20px; height: 22px; padding: 0; display: grid; place-items: center; }
+.lc-box { width: 15px; height: 15px; box-sizing: border-box; border-radius: 4px; border: 1.5px solid var(--check-border); display: grid; place-items: center; color: transparent; transition: background 0.2s, border-color 0.2s, transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1); }
+.lc-box .icon { width: 9px; height: 9px; }
+.lead-check:hover .lc-box { border-color: var(--sage); }
+.lead-check.ticked .lc-box { background: var(--sage); border-color: var(--sage); color: var(--on-sage); transform: scale(1.12); }
+.lead-sub { display: flex; align-items: center; gap: 4px; min-width: 0; margin-top: 1px; font: 500 11px/14px var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lead-sub .icon { flex: none; }
+.strip-nothing { min-height: 24px; margin-top: 9px; display: flex; align-items: center; font: 400 12.5px/16px var(--ui); color: var(--ink-3); }
+
+.strip-rows { display: flex; flex-direction: column; gap: 1px; margin-top: 6px; padding-left: 60px; }
+.strip-row { display: flex; align-items: baseline; gap: 6px; min-width: 0; min-height: 22px; padding: 0 4px; border-radius: 6px; text-align: left; }
+.strip-row:hover { background: color-mix(in srgb, var(--sage) 7%, transparent); }
+.sr-time { flex: none; width: 40px; font: 600 11px/22px var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; }
+:root:lang(en) .sr-time { width: 52px; }
+.sr-mark { flex: none; width: 7px; height: 7px; margin: 0 -1px 1px 0; border-radius: 50%; box-sizing: border-box; }
+.sr-mark.task { border-radius: 2px; border: 1.5px solid var(--sage); }
+.sr-mark.reminder { border: 1.5px solid var(--ink-3); }
+.sr-title { flex: 0 1 auto; min-width: 0; font: 400 12.5px/22px var(--ui); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.strip-row.task .sr-title, .strip-row.reminder .sr-title { padding-right: var(--ink-over); font: 400 19px/22px var(--body-font); }
+.sr-away { flex: none; margin-left: auto; padding-left: 6px; font: 500 10.5px/22px var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-3); white-space: nowrap; }
+.sr-away.soon { font-weight: 600; color: var(--clay-text); }
+
+/* 하루 일정표: the day on an hour grid (50px an hour, the hours in a 36px column), scrolled so an hour before now is
+   at the top. Events: tinted blocks with their colour bar; to-dos with a time: card blocks with a sage outline (clay
+   once over, faded and struck when done), a box and their end's handle; reminders: small pills. Side by side where
+   they overlap (three columns, then +N). Now: a clay line with a dot. */
+.strip.open .strip-top { gap: 10px; }
+.tt-title { flex: none; padding: 0; font: 600 13px/18px var(--ui); color: var(--ink) !important; white-space: nowrap; }
+.tt-scroll { position: relative; margin-top: 6px; overflow-x: hidden; overflow-y: auto; scrollbar-width: none; outline: none; }
+.tt-scroll::-webkit-scrollbar { display: none; }
+.tt-scroll:focus-visible { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sage) 45%, transparent); border-radius: 6px; }
+.tt-grid { position: relative; }
+.tt-hour { position: absolute; left: 0; right: 0; height: 13px; margin-top: -6.5px; display: flex; align-items: center; pointer-events: none; }
+.tt-hour span { flex: none; padding-right: 4px; font: 500 9.5px/13px var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-3); }
+.tt-hour::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+.tt-block { position: absolute; box-sizing: border-box; display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; border-radius: 7px; cursor: pointer; touch-action: none; }
+.tt-block.picked { outline: 2px solid var(--sage-text); outline-offset: 2px; z-index: 2; }
+.tt-block.dragging { z-index: 4; cursor: grabbing; box-shadow: 0 6px 14px -8px rgba(0, 0, 0, 0.35); }
+.tb-title { flex: 0 1 auto; min-width: 0; max-width: 100%; font: 600 11px/14px var(--ui); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-time { flex: none; min-width: 0; max-width: 100%; font: 500 10px/13px var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-time.hidden { display: none; }
+.tt-block.event { --tint: 14%; padding: 2px 6px 2px 10px; background: color-mix(in srgb, var(--ev) var(--tint), var(--paper)); box-shadow: inset 3px 0 0 var(--ev); }
+:root[data-paper="night"] .tt-block.event { --tint: 24%; box-shadow: inset 3px 0 0 color-mix(in srgb, var(--ev) 85%, black); }
+.tt-block.event.tall { flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 1px; padding: 4px 6px 4px 10px; }
+.tt-block.event.tall .tb-time { flex: 0 1 auto; }
+.tt-block.event.over { opacity: 0.6; }
+.tt-block.event.movable { cursor: grab; }
+.tt-block.task { gap: 5px; padding: 0 7px 0 4px; background: var(--card); box-shadow: inset 0 0 0 1.5px var(--sage); cursor: grab; }
+.tt-block.task.late { box-shadow: inset 0 0 0 1.5px var(--clay); }
+.tt-block.task.tall { align-items: flex-start; padding: 3px 7px 3px 4px; }
+.tt-block.task.done { opacity: 0.5; cursor: pointer; }
+.tt-block.task:not(.tall) .tb-time { margin-left: auto; padding-left: 4px; }
+.tb-check { flex: none; width: 16px; height: 16px; padding: 0; display: grid; place-items: center; }
+.tt-block.task.tall .tb-check { margin-top: 2px; }
+.tbc { width: 11px; height: 11px; box-sizing: border-box; border-radius: 3px; border: 1.5px solid var(--sage); display: grid; place-items: center; color: var(--on-sage); }
+.tbc .icon { width: 7px; height: 7px; }
+.tt-block.task.late .tbc { border-color: var(--clay); }
+.tt-block.task.done .tbc { background: var(--sage); }
+.tb-check:hover .tbc { box-shadow: 0 0 0 2px var(--sage-2); }
+.tb-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tb-hand { flex: 0 1 auto; min-width: 0; padding-right: var(--ink-over); font: 400 17px/1.15 var(--body-font); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tt-block.task.done .tb-hand { text-decoration: line-through; text-decoration-color: var(--ink-2); }
+.tb-grab { position: absolute; left: 50%; bottom: 0; width: 40px; height: 9px; margin-left: -20px; cursor: ns-resize; }
+.tb-grab::after { content: ""; position: absolute; left: 11px; right: 11px; bottom: 2px; height: 3px; border-radius: 2px; background: var(--sage); opacity: 0.5; }
+.tt-block.reminder { gap: 4px; padding: 0 7px; background: var(--paper-2); }
+.tt-block.reminder.picked { outline-width: 1.5px; outline-offset: 0; }
+.tt-block.reminder .tb-title { font: 500 10px/13px var(--ui); color: var(--ink-2); }
+.tb-ring { flex: none; width: 7px; height: 7px; box-sizing: border-box; border-radius: 50%; border: 1.2px solid var(--ink-3); }
+.tt-more { position: absolute; right: 4px; z-index: 2; height: 16px; padding: 0 6px; border-radius: 8px; background: var(--paper-2); box-shadow: inset 0 0 0 1px var(--rule); font: 600 10px/16px var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-2) !important; }
+.tt-more:hover { box-shadow: inset 0 0 0 1px var(--rule-strong); }
+.tt-now { position: absolute; left: 30px; right: 0; height: 2px; background: var(--clay); pointer-events: none; z-index: 3; }
+.tt-now::before { content: ""; position: absolute; left: -3px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--clay); }
+
+/* The little line a click on the timetable opens, and the +N list. */
+.tt-pop { background: var(--paper); }
+.ttn { width: 250px; box-sizing: border-box; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.ttn-when { font: 600 10.5px/14px var(--ui); font-variant-numeric: tabular-nums; color: var(--sage-text); }
+.ttn-field { height: 30px; box-sizing: border-box; padding: 0 8px; border-radius: 7px; border: 1px solid var(--rule); background: var(--card); font: 400 19px/28px var(--body-font); color: var(--ink); outline: none; }
+.ttn-field:focus { border-color: var(--sage); }
+.ttn-field::placeholder { color: var(--ink-3); }
+.ttn-foot { display: flex; align-items: center; gap: 6px; }
+.ttn-foot .spacer { flex: 1; }
+.ttn-chip { height: 22px; padding: 0 9px; border-radius: 11px; background: var(--paper-2); box-shadow: inset 0 0 0 1px var(--rule); font: 500 11px/22px var(--ui); color: var(--ink-2); white-space: nowrap; }
+.ttn-chip.on { background: var(--sage-2); box-shadow: inset 0 0 0 1px var(--sage); color: var(--sage-text); font-weight: 600; }
+.tt-more-list { min-width: 160px; max-width: 260px; box-sizing: border-box; padding: 10px; display: flex; flex-direction: column; gap: 2px; }
+.tt-more-list button { display: flex; align-items: center; gap: 6px; min-height: 22px; padding: 0 4px; border-radius: 6px; text-align: left; font: 400 12px var(--ui); color: var(--ink); }
+.tt-more-list button:hover { background: color-mix(in srgb, var(--sage) 8%, transparent); }
+.tt-more-list .sr-mark { margin: 0; }
+.tml-time { flex: none; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.tml-title { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* The input line at the bottom: a card (sage border and halo while typing), chips above the text. */
+.dock { flex: none; position: relative; padding: 8px 12px 4px; }
+/* The toast sits on the sheet just above the line. */
+.toast-host { position: absolute; left: 12px; right: 12px; bottom: calc(100% + 2px); display: flex; justify-content: center; pointer-events: none; z-index: 30; }
+.toast-host .toast { max-width: 100%; }
+@media (forced-colors: active) {
+  .sb-now, .tt-now, .tt-now::before { background: Highlight; forced-color-adjust: none; }
+}
+
+/* 앞으로: section headings like 다음's (small, ink3, the count at the right); a day per row — the
+   weekday over the date on the left (tomorrow in sage, 내일 above), its events (colour bar · time ·
+   title) then its tasks; ruled lines between days. 그 뒤's months, then 언젠가. */
+.prog.ahead-sum { margin-top: 3px; color: var(--ink-2); font-weight: 600; }
+/* The day column: 46 wide, a little more for English's "Tomorrow". */
+.ahead { --key-w: 46px; }
+:root:lang(en) .ahead { --key-w: 56px; }
+.ahead { min-height: 100%; padding: 2px 16px 14px 18px; position: relative; }
+.ahead-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 14px 2px 2px 0; font: 600 10.5px/14px var(--ui); letter-spacing: 0.04em; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.ahead-head:first-child { margin-top: 6px; }
+.ahead-head .group-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ahead-head .group-count { flex: none; }
+/* A day (and 언젠가) reaches 8px past the list on both sides, so its drop highlight has room; its ruled line stays the list's width. */
+.aday { display: grid; grid-template-columns: var(--key-w) minmax(0, 1fr); gap: 10px; padding: 7px 8px; margin: 0 -8px; align-items: start; position: relative; }
+.aday::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 1px; background: var(--rule); pointer-events: none; }
+.aday-key { padding-top: 2px; font: 600 11px/1.25 var(--ui); color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.aday-key span { display: block; overflow: hidden; text-overflow: ellipsis; }
+.aday-key b { display: block; font: 600 17px/1.2 var(--ui); color: var(--ink); }
+.aday-key.tomorrow, .aday-key.tomorrow b { color: var(--sage-text); }
+.aday-items { display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; min-width: 0; }
+.aev { display: flex; align-items: center; gap: 7px; min-width: 0; height: 22px; padding: 0 6px 0 2px; border-radius: 6px; text-align: left; font-size: 12px; color: var(--ink); }
+.aev:hover { background: color-mix(in srgb, var(--sage) 6%, transparent); }
+.aev i { width: 4px; height: 13px; border-radius: 3px; flex: none; }
+.aev-time { flex: none; font-size: 11.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.aev-title { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.amonth { padding: 6px 0 6px; border-bottom: 1px solid var(--rule); }
+/* 1px of room before the text: a descender like januari's j reaches left of its box. */
+.amonth-title { padding-left: 1px; margin-left: -1px; font: 600 11px/1.3 var(--ui); color: var(--ink-2); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.amonth .aday-items, .someday .aday-items { margin-left: calc(var(--key-w) + 10px); }
+.someday { padding: 4px 8px 6px; margin: 0 -8px; position: relative; }
+.someday.empty { margin-top: 2px; padding-block: 0; }
+.someday.empty .aday-items { min-height: 40px; place-items: center start; padding: 0 12px; border: 1.5px dashed var(--rule); border-radius: 10px; }
+.zone-hint { font: 500 11.5px var(--ui); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* The task row on 앞으로: the same row, smaller; its grip hangs in the gap to the left. */
+.ahead .row { height: auto; min-height: 32px; }
+.ahead .row::after { inset: 1px 0 1px -4px; }
+.ahead .row .grip { position: absolute; left: -24px; top: 0; bottom: 0; width: 20px; height: auto; }
+.ahead .row .check { width: 24px; height: 30px; }
+.ahead .row .box { width: 17px; height: 17px; }
+.ahead .text { padding-left: 6px; }
+.ahead .label { font-size: calc(var(--body-size) * 0.84); }
+:root[data-font="clean"] .ahead .label { font-size: 13.5px; }
+.ahead .row .end { width: 2px; }
+.ahead .row.selected { background-image: none; }
+.ahead .row.drop-before::before, .ahead .row.drop-after::before { left: 0; right: 0; }
+.due.ahead-day { color: var(--ink-3); font-weight: 600; }
+.due.ahead-day.late { color: var(--clay-text); }
+.ahead .due.later { font-weight: 500; color: var(--ink-3); }
+/* Where a dragged task would land: the day (or 언젠가) lights up in sage — behind it, in the 8px
+   room around its content, so the edge never runs through the date or a title. */
+.drop-zone { isolation: isolate; }
+.drop-zone.drop-target::before { content: ""; position: absolute; inset: 1px 0; z-index: -1; border-radius: 10px; background: color-mix(in srgb, var(--sage) 8%, transparent); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--sage) 70%, transparent); pointer-events: none; }
+.someday.empty.drop-target .aday-items { border-color: var(--sage); }
+.ahead-empty { padding-left: 0; padding-top: 44px; max-width: 300px; margin: 0 auto; }
+@media (forced-colors: active) {
+  .drop-zone.drop-target::before { forced-color-adjust: none; box-shadow: inset 0 0 0 2px Highlight; }
+  .aev i { forced-color-adjust: none; }
+}
+/* A day with nothing on it, shown only while a task is dragged (to drop on). */
+.aday.placeholder .aday-key { color: var(--ink-3); }
+.aday.placeholder .aday-key b { color: var(--ink-3); font-weight: 500; }
+.aday.placeholder .aday-key.tomorrow, .aday.placeholder .aday-key.tomorrow b { color: var(--sage-text); }
+
+/* ─── 집중: the note as one card (the design's "할 일 하나와 남은 시간만") ─────────────────────── */
+:root[data-focus] #app > :not(.focus-card) { display: none !important; }
+.focus-card { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; font-family: var(--ui); }
+/* The toast, while the card is up, floats over its foot. */
+.focus-card .toast-host { bottom: 56px; }
+.fc-top { height: 40px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 22px; -webkit-app-region: drag; }
+.fc-top .spacer { flex: 1; }
+.fc-kicker { min-width: 0; font: 600 11px/1.3 var(--ui); letter-spacing: 0.02em; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc-kicker.up { color: var(--sage-text); }
+.fc-dots { flex: none; display: flex; gap: 5px; }
+.fc-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--rule); }
+.fc-dots i.d { background: var(--clay); }
+.fc-close { flex: none; width: 28px; height: 28px; color: var(--ink-2); -webkit-app-region: no-drag; }
+/* The column: centred in the window while it fits; the folded list scrolls inside it. */
+.fc-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 8px; padding: 2px 18px 10px; text-align: center; }
+.fc-body::-webkit-scrollbar { display: none; }
+.fc-body > * { flex: none; }
+/* With the list open the column keeps its height (nothing in it is squeezed) and the list takes the rest. */
+.focus-card.expanded .fc-body { flex: 0 1 auto; justify-content: flex-start; padding-bottom: 8px; }
+/* 170 like the mock in a note up to 560 wide; a little bigger in a big one; smaller in a short one. */
+.fc-ring { --size: clamp(116px, min(100vh - 238px, 170px + max(0px, 100vw - 560px) * 0.35), 230px); width: var(--size); height: var(--size); position: relative; display: grid; place-items: center; }
+.focus-card.expanded .fc-ring { --size: clamp(104px, calc(100vh - 360px), 150px); }
+.fc-svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+.fc-track, .fc-progress { fill: none; stroke-width: 5.4; }
+/* The track in rule (paper-2 all but vanished on the grain, 1.07:1 — the Mac's choice too). */
+.fc-track { stroke: var(--rule); }
+.fc-progress { stroke: var(--clay); }
+.focus-card:is([data-stage="timeUp"], [data-stage="break"], [data-stage="breakOver"]) .fc-progress { stroke: var(--sage); }
+@media (prefers-reduced-motion: no-preference) { .fc-progress { transition: stroke-dashoffset 0.95s linear, stroke 0.2s; } }
+.fc-in { position: relative; display: grid; justify-items: center; gap: 1px; }
+.fc-time { font: 650 calc(var(--size) * 0.205) / 1.1 var(--ui); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
+.fc-time.tclock { justify-items: center; }
+.fc-under { font-size: 11px; line-height: 1.3; color: var(--ink-3); }
+.fc-task { max-width: 100%; margin-top: 2px; font-family: var(--title-font); font-size: 33px; line-height: 1.15; color: var(--ink); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; padding: 0 var(--ink-over);
+  background: linear-gradient(color-mix(in srgb, var(--ink) 62%, transparent), color-mix(in srgb, var(--ink) 62%, transparent)) no-repeat 0 58% / 0% 1.5px; }
+:root[data-font="clean"] .fc-task { font-size: 20px; font-weight: 600; line-height: 1.35; }
+:root[data-font="brush"] .fc-task { font-size: 30px; }
+.fc-task.one-line { -webkit-line-clamp: 1; }
+.focus-card.tight .fc-next { display: none; }
+.fc-task.struck { background-size: 100% 1.5px; color: var(--ink-3); transition: background-size 0.22s ease-out, color 0.22s; }
+.fc-next { max-width: 100%; font-size: 12px; line-height: 1.4; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc-btns { max-width: 100%; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 4px; }
+/* The slips' buttons (as on the Mac): ghost a soft paper-2 pill, primary sage with a light top edge. */
+.fc-btn { height: 34px; padding: 0 12px 0 14px; border-radius: 10px; display: inline-flex; align-items: center; gap: 7px; font: 600 13px var(--ui); white-space: nowrap; color: var(--ink); background: var(--paper-2); }
+.fc-btn .keycap { font-weight: 600; }
+.fc-btn.pri .keycap { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.28); color: #f3f6ef; }
+:root[data-paper="night"] .fc-btn.pri .keycap { background: rgba(31, 42, 30, 0.1); border-color: rgba(31, 42, 30, 0.3); color: var(--on-sage); }
+/* A narrow note: the buttons keep their words, the keycaps step aside. */
+@media (max-width: 400px) { .fc-btn .keycap { display: none; } .fc-btn { padding: 0 14px; } }
+/* ⏸ / ▶ under the time. */
+.fc-play { width: 26px; height: 26px; margin-top: 4px; border-radius: 50%; display: grid; place-items: center; color: var(--ink-2); background: var(--paper-2); }
+.fc-play:hover { color: var(--ink); background: color-mix(in srgb, var(--sage) 10%, var(--paper-2)); }
+.fc-play:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
+.fc-ring[style*="--size: 9"] .fc-play, .fc-ring[style*="--size: 8"] .fc-play { width: 22px; height: 22px; margin-top: 2px; }
+.fc-btn:hover { background: color-mix(in srgb, var(--sage) 8%, var(--paper-2)); }
+.fc-btn:active { background: color-mix(in srgb, var(--ink) 8%, var(--paper-2)); }
+.fc-btn.pri { color: var(--on-sage); background: var(--sage); box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 2px 6px -2px rgba(60, 90, 60, 0.5); }
+.fc-btn.pri:hover { background: color-mix(in srgb, black 6%, var(--sage)); }
+:root[data-paper="night"] .fc-btn.pri { box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.6); }
+:root[data-paper="night"] .fc-btn.pri:hover { background: color-mix(in srgb, var(--sage) 88%, white); }
+.fc-btn.pulse { animation: fc-pulse 0.9s ease-out 1; }
+@keyframes fc-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--sage) 55%, transparent); } 100% { box-shadow: 0 0 0 12px transparent; } }
+/* The rest of today: folded under a line at the bottom, with the cat at its left. */
+.fc-foot { flex: none; height: 48px; margin: 0 14px; display: grid; grid-template-columns: 52px minmax(0, 1fr) 52px; align-items: center; border-top: 1px solid var(--rule); }
+.fc-cat { width: 44px; height: 44px; object-fit: contain; align-self: end; margin-bottom: 1px; user-select: none; transform-origin: 50% 90%; }
+.fc-cat.nod { animation: nod 0.4s ease-out; }
+:root[data-paper="night"] .fc-cat { opacity: 0.92; }
+.fc-rest { justify-self: center; max-width: 100%; height: 26px; padding: 0 8px; border-radius: 7px; font-size: 11.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc-rest:hover { color: var(--ink-2); background: color-mix(in srgb, var(--sage) 8%, transparent); }
+/* The list opens below the line: it scrolls on its own (soft edge at the bottom), the column above gives room. */
+.fc-list { flex: 1 1 0; min-height: 64px; overflow-y: auto; scrollbar-width: none; margin: 0 14px; padding: 2px 6px 12px; text-align: left; -webkit-mask-image: linear-gradient(to top, transparent, black 12px); }
+.fc-list::-webkit-scrollbar { display: none; }
+.fc-row { height: 32px; display: flex; align-items: center; gap: 4px; border-radius: 6px; }
+.fc-row:hover { background: color-mix(in srgb, var(--sage) 5%, transparent); }
+.fc-row .check { width: 28px; height: 30px; flex: none; }
+.fc-row .box { width: 17px; height: 17px; }
+.fc-row.done .box { background: var(--sage); border-color: var(--sage); }
+.fc-row.done .box .icon { opacity: 1; }
+.fc-row-title { min-width: 0; flex: 1; padding-inline-end: var(--ink-over); font-family: var(--body-font); font-size: calc(var(--body-size) * 0.82); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root[data-font="clean"] .fc-row-title { font-size: 13.5px; }
+.fc-row.done .fc-row-title { color: var(--ink-3); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--ink) 50%, transparent); }
+
+/* 할 일 골라 집중…: a sage bar in the line's place; each open row offers 집중 on hover. */
+.pick-bar { height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px; border-radius: 12px; border: 1.5px solid var(--sage); background: var(--sage-2); color: var(--sage-text); font: 600 12.5px var(--ui); }
+.pick-bar .spacer { flex: 1; }
+.pick-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pick-bar .keycap { flex: none; }
+.pick-cancel { flex: none; height: 28px; padding: 0 10px; border-radius: 8px; font: 600 12px var(--ui); color: var(--ink-2); }
+.pick-cancel:hover { color: var(--ink); background: color-mix(in srgb, var(--sage) 12%, transparent); }
+.focus-pick { display: none; flex: none; height: 24px; margin-left: 6px; padding: 0 9px 0 7px; border-radius: 12px; align-items: center; gap: 4px; font: 600 11px var(--ui); white-space: nowrap; color: var(--on-sage); background: var(--sage); z-index: 1; }
+.focus-pick:hover { background: color-mix(in srgb, black 6%, var(--sage)); }
+:root[data-pick] .row .actions { display: none !important; }
+:root[data-pick] .row:not(.done):is(:hover, .selected, .preview-hover) .focus-pick, :root[data-pick] .focus-pick:focus-visible { display: inline-flex; }
+:root[data-pick] .row:not(.done):is(:hover, .selected, .preview-hover) :is(.due, .time, .sent-mark) { display: none; }
+
+/* A narrow note: the row's → 내일 · ↓ 언젠가 pills keep only their arrows (the words are in the tooltips),
+   so the title keeps room while the row is hovered. English and Dutch words are longer: a little sooner. */
+@media (max-width: 400px) {
+  .actions .move .move-label { display: none; }
+  .actions .move { padding: 0 7px; margin-right: 2px; }
+}
+@media (max-width: 470px) {
+  :root:lang(en) .actions .move .move-label, :root:lang(nl) .actions .move .move-label { display: none; }
+  :root:lang(en) .actions .move, :root:lang(nl) .actions .move { padding: 0 7px; margin-right: 2px; }
+}

@@ -1,0 +1,81 @@
+/* 오늘 창: a paper slip without tape, 320 wide — three cards, today's tasks, the input line, links. */
+/* One column the slip's width: nothing inside (a long link row in Dutch) may widen it. */
+.slip.glance { width: 320px; padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.slip.glance.appear { animation: glance-in 0.18s ease-out; }
+@keyframes glance-in { from { opacity: 0; transform: translateY(8px); } }
+
+/* The three cards: next event · timer · next alarm; the one within the hour (or a running timer) in clay. */
+.cards3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.c3 { position: relative; display: grid; gap: 1px; min-width: 0; padding: 7px 8px 8px; border-radius: 10px; background: var(--card); border: 1px solid var(--rule); }
+.c3 small { font: 600 9.5px/13px var(--ui); letter-spacing: 0.04em; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.c3 b { font: 600 17px/22px var(--ui); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Up to two lines (between words), so "Tomorrow · Weekdays" or a title with its time keeps both. */
+.c3-small { font: 500 10.5px/14px var(--ui); color: var(--ink-2); font-variant-numeric: tabular-nums; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.c3.empty b { color: var(--ink-3); font-weight: 500; }
+.c3.empty .c3-small { color: var(--ink-3); }
+.c3.hot { border-color: var(--clay); background: var(--clay-2); }
+.c3.hot b { color: var(--clay-text); }
+.c3.link:hover { border-color: var(--rule-strong); }
+.c3.hot.link:hover { border-color: var(--clay); background: color-mix(in srgb, var(--clay) 18%, var(--clay-2)); }
+/* A running timer is sage, not clay: clay means "soon · late" only (as on the Mac). */
+.c3.timer.hot { border-color: var(--sage); background: var(--sage-2); }
+.c3.timer.hot b { color: var(--sage-text); }
+.c3.link:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
+/* The timer's pause and stop sit in its corner, shown on hover (and to the keyboard). */
+.c3-tools { position: absolute; top: 4px; right: 4px; display: flex; gap: 2px; opacity: 0; transition: opacity 0.12s; }
+.c3:hover .c3-tools, .c3-tools:focus-within { opacity: 1; }
+.c3-tool { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; color: var(--clay-text); background: var(--card); box-shadow: 0 0 0 1px var(--rule); }
+.c3:not(.hot) .c3-tool { color: var(--ink-2); }
+.c3-tool:hover { color: var(--ink); }
+
+/* Today's tasks: the note's square check, the handwritten title, the reminder's time. */
+.g-tasks { display: grid; gap: 0; min-width: 0; }
+.g-head { font: 600 10.5px/14px var(--ui); letter-spacing: 0.04em; color: var(--ink-3); padding: 4px 2px 1px; }
+.g-row { position: relative; display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 32px; border-radius: 8px; }
+.g-row:hover { background: color-mix(in srgb, var(--sage) 5%, transparent); }
+.g-row .check { width: 28px; height: 30px; display: grid; place-items: center; flex: none; }
+.g-row .box { width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid var(--check-border); display: grid; place-items: center; color: var(--on-sage); transform: rotate(-3deg); }
+.g-row .box .icon { opacity: 0; }
+.g-row:hover .box { border-color: var(--ink-2); }
+.g-row.done .box { background: var(--sage); border-color: var(--sage); }
+.g-row.done .box .icon { opacity: 1; }
+.g-row.pop .box { animation: g-pop 0.16s ease-out; }
+@keyframes g-pop { from { transform: rotate(-3deg) scale(0.85); } }
+.g-row .label { position: relative; flex: 1; min-width: 0; font-family: var(--body-font); font-size: calc(var(--body-size) * 0.84); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); padding-right: var(--ink-over); }
+:root[data-font="clean"] .g-row .label { font-size: 13.5px; }
+.g-row.done .label { color: var(--ink-3); }
+.g-row .strike { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; clip-path: inset(0 100% 0 0); }
+.g-row .strike path { fill: none; stroke: color-mix(in srgb, var(--ink) 62%, transparent); stroke-width: 1.25; stroke-linecap: round; }
+.g-row.done .strike { clip-path: inset(0 0 0 0); }
+.g-row.pop .strike { transition: clip-path 0.22s ease-out 0.08s; }
+.g-row .meta { flex: none; display: inline-flex; align-items: center; gap: 4px; padding-right: 6px; font: 500 11px var(--ui); color: var(--sage-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.g-empty { padding: 6px 4px; font: 500 12px var(--ui); color: var(--ink-3); }
+/* "외 3개 · 노트에서 보기": a small sage pill under the rows. */
+.g-more { justify-self: start; height: 22px; padding: 0 9px; margin: 2px 0 0 2px; border-radius: 11px; font: 600 11px var(--ui); color: var(--sage-text); background: color-mix(in srgb, var(--sage) 10%, transparent); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.g-more:hover { background: color-mix(in srgb, var(--sage) 16%, transparent); }
+
+/* The input line, with its toast over it. */
+.g-line { position: relative; }
+.g-line .inp { padding: 6px 9px 6px 11px; }
+.g-line .inp .typed { font-size: calc(var(--body-size) * 0.8); }
+:root[data-font="clean"] .g-line .inp .typed { font-size: 13.5px; }
+.g-toast { position: absolute; left: 0; right: 0; bottom: calc(100% + 6px); display: flex; justify-content: center; pointer-events: none; z-index: 5; }
+.g-toast .toast { max-width: 100%; }
+.g-toast:empty { display: none; }
+
+/* 노트 열기 · 달력 · 종이냥 숨기기 */
+.g-links { display: flex; justify-content: space-between; gap: 6px; padding: 0 2px; }
+.g-link { height: 24px; padding: 0 7px 0 6px; border-radius: 7px; display: inline-flex; align-items: center; gap: 4px; font: 500 11.5px var(--ui); color: var(--ink-2); white-space: nowrap; min-width: 0; }
+.g-link span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.g-link .icon { flex: none; color: var(--ink-3); }
+.g-link:hover { color: var(--ink); background: color-mix(in srgb, var(--sage) 9%, transparent); }
+.g-link:hover .icon { color: var(--sage-text); }
+
+@media (prefers-reduced-motion: reduce) {
+  .slip.glance.appear, .g-row.pop .box { animation: none; }
+  .g-row.pop .strike { transition: none; }
+}
+@media (forced-colors: active) {
+  .c3.hot { outline: 2px solid Highlight; }
+  .g-row.done .box { forced-color-adjust: none; }
+}

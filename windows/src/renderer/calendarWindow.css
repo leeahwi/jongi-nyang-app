@@ -1,0 +1,111 @@
+/* 달력 on the desk: its toolbar (the month, ‹ 오늘 ›, 주 · 월, + 새 일정), then the month (or the week) beside the chosen day's panel. */
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+.top { flex: none; height: 52px; display: flex; align-items: center; gap: 2px; padding: 0 14px 0 12px; border-bottom: 1px solid var(--rule); }
+/* The title in the UI face like every other pane's (22px semibold), not the hand. */
+.top .title { min-width: 0; margin: 0 10px 0 8px; font: 600 22px/1.4 var(--ui); font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top .nav { flex: none; display: flex; align-items: center; gap: 2px; }
+.top .today { flex: none; height: 26px; padding: 0 11px; border-radius: 13px; font-size: 12px; font-weight: 600; color: var(--sage-text); background: color-mix(in srgb, var(--sage) 10%, transparent); }
+.top .today:hover { background: color-mix(in srgb, var(--sage) 16%, transparent); }
+.top .spacer { flex: 1; }
+.view-seg { flex: none; width: 92px; margin-left: 8px; background: var(--paper-2); }
+.view-seg button { height: 26px; font-size: 12px; }
+.top-new { flex: none; height: 28px; margin-left: 8px; padding: 0 11px 0 8px; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--on-sage); background: var(--sage); white-space: nowrap; }
+.top-new:hover { background: color-mix(in srgb, var(--sage) 90%, var(--ink)); }
+
+
+/* The day's panel grows a little with the window (280px at 820 wide); the month takes the rest. */
+.calendar-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(260px, 34vw, 360px); gap: 12px; padding: 12px 14px 14px; }
+
+/* The month: six weeks of seven days. */
+.month, .week { min-height: 0; border: 1px solid var(--rule); border-radius: 12px; background: var(--card); overflow: hidden; }
+.month { display: grid; grid-template-rows: 24px repeat(6, minmax(0, 1fr)); }
+.weekdays { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-bottom: 0.8px solid var(--rule); font-size: 11px; font-weight: 600; line-height: 24px; text-align: center; color: var(--ink); }
+.weekdays .sun { color: var(--clay-text); }
+.weekdays .sat { color: var(--secondary); }
+.grid-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); min-height: 0; }
+.grid-row + .grid-row { border-top: 0.6px solid var(--rule); }
+.cell { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 1px; padding: 3px 3px 2px; overflow: hidden; }
+.cell + .cell { border-left: 0.6px solid var(--rule); }
+.cell:hover { background: color-mix(in srgb, var(--sage) 5%, transparent); }
+/* The chosen day: a light sage card inside the cell (a full sage box was heavy), as on the Mac. */
+.cell.selected::before { content: ""; position: absolute; inset: 1.5px; border-radius: 6px; background: color-mix(in srgb, var(--sage) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sage) 60%, transparent); pointer-events: none; }
+.cell.outside > * { opacity: 0.4; }
+.cell-head { flex: none; height: 20px; display: flex; align-items: center; gap: 2px; margin-bottom: 1px; }
+.cell .num { width: 20px; height: 20px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--ink); }
+.cell.sun .num { color: var(--clay-text); }
+.cell.sat .num { color: var(--secondary); }
+.cell.today .num { background: var(--sage); color: var(--on-sage); font-weight: 700; }
+.cell .more { margin-left: auto; padding-right: 2px; font-size: 10px; font-weight: 600; color: var(--secondary); font-variant-numeric: tabular-nums; }
+.item { flex: none; height: 16px; display: flex; align-items: center; gap: 3px; min-width: 0; padding-right: 2px; border-radius: 3px; font-size: 10.5px; line-height: 16px; white-space: nowrap; overflow: hidden; color: var(--ink); }
+.item .bar { width: 2.5px; height: 11px; flex: none; border-radius: 1.5px; background: var(--color); }
+.item.all-day { background: color-mix(in srgb, var(--color) 20%, transparent); }
+.item.all-day .bar { height: 16px; border-radius: 3px 0 0 3px; }
+.item .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* A deadline: a quiet ink flag and the title; clay only on its day or after (due or late). */
+.item.deadline { padding-left: 1px; }
+.item.deadline .icon { flex: none; color: var(--ink-3); }
+.item.deadline.late, .item.deadline.late .icon { color: var(--clay-text); }
+/* Very narrow cells: a dot per event, a small flag per deadline. */
+.dots { display: flex; flex-wrap: wrap; gap: 4px; padding: 1px 2px 0; }
+.dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--color); }
+.dot.deadline { width: 9px; height: 9px; border-radius: 0; background: none; display: grid; place-items: center; color: var(--ink-3); }
+.dot.deadline.late { color: var(--clay-text); }
+
+/* The week: a row a day. */
+.week { display: grid; grid-template-rows: repeat(7, minmax(0, 1fr)); }
+.day-row { min-height: 0; display: flex; overflow: hidden; }
+.day-row + .day-row { border-top: 0.6px solid var(--rule); }
+.day-row:hover { background: color-mix(in srgb, var(--sage) 5%, transparent); }
+.day-row { position: relative; }
+.day-row.selected::before { content: ""; position: absolute; inset: 2px; border-radius: 6px; background: color-mix(in srgb, var(--sage) 10%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sage) 60%, transparent); pointer-events: none; }
+.day-row .label { width: 70px; flex: none; display: flex; align-items: baseline; gap: 5px; padding: 7px 0 0 14px; color: var(--ink); }
+.day-row .label .n { font-family: ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", var(--ui); font-size: 22px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.day-row .label .w { font-size: 11.5px; color: var(--secondary); }
+.day-row.sun .label .n { color: var(--clay-text); }
+.day-row.today .label .n, .day-row.today .label .w { color: var(--sage-text); font-weight: 700; }
+.day-row .lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; padding: 6px 12px 4px 0; }
+.line { flex: none; height: 17px; display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 12px; white-space: nowrap; color: var(--ink); }
+.line .time { width: 76px; flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--secondary); font-variant-numeric: tabular-nums; }
+.line .bar { width: 3px; height: 12px; flex: none; border-radius: 2px; }
+.line .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.line.task .time .icon { color: var(--sage-text); }
+.line.task.deadline .time, .line.task.deadline .time .icon { color: var(--ink-3); }
+.line.task.deadline.late .time, .line.task.deadline.late .time .icon { color: var(--clay-text); }
+.line.task .t { margin-left: 10px; }
+/* 시간 정하기: a task's hours — an outlined card (a sage edge on the card colour), like its block on the ribbon. */
+.line.task.range .t { height: 17px; line-height: 14px; margin-left: 4px; padding: 0 7px; font-size: 11.5px; border: 1.5px solid color-mix(in srgb, var(--sage) 75%, transparent); border-radius: 5px; background: var(--card); box-sizing: border-box; }
+.task-row.range { margin: 2px 0; box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--sage) 55%, transparent); }
+.task-row.range:hover { background: color-mix(in srgb, var(--sage) 8%, transparent); }
+.more-line { align-self: flex-start; padding: 0 6px; margin-left: 78px; border-radius: 5px; font-size: 11px; font-weight: 600; color: var(--sage-text); }
+.more-line:hover { background: color-mix(in srgb, var(--sage) 10%, transparent); }
+
+/* The chosen day. */
+.panel { min-height: 0; display: flex; flex-direction: column; padding: 14px 10px 12px 14px; border: 1px solid var(--rule); border-radius: 12px; background: var(--card); }
+.panel-head { flex: none; display: flex; align-items: center; gap: 8px; padding-right: 4px; }
+.panel-head .date { min-width: 0; font: 600 15px/1.4 var(--ui); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.panel-head .badge { flex: none; height: 19px; padding: 0 8px; border-radius: 10px; display: inline-flex; align-items: center; font-size: 10.5px; font-weight: 700; color: var(--on-sage); background: var(--sage); }
+.panel-scroll { flex: 1; min-height: 0; overflow-y: auto; margin-top: 4px; padding-right: 4px; display: flex; flex-direction: column; align-items: stretch; }
+.panel-scroll > * { flex: none; }
+.section { margin: 12px 0 4px; padding-left: 2px; font-size: 11px; font-weight: 600; color: var(--secondary); }
+.nothing { padding: 4px 2px; font-size: 12px; color: var(--faded); }
+.ev { width: 100%; display: flex; align-items: stretch; gap: 8px; padding: 5px 6px 5px 4px; border-radius: 7px; text-align: left; }
+.ev:hover { background: color-mix(in srgb, var(--sage) 8%, transparent); }
+.ev .bar { width: 3px; flex: none; border-radius: 2px; }
+.ev .main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ev .first { display: flex; align-items: baseline; gap: 7px; min-width: 0; }
+.ev .time { flex: none; font-size: 11px; color: var(--secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ev .t { min-width: 0; font-size: 12.5px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev .sub { font-size: 10.5px; color: var(--faded); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.new-event { align-self: flex-start; height: 28px; margin-top: 6px; padding: 0 10px 0 8px; border-radius: 8px; display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--sage-text); background: color-mix(in srgb, var(--sage) 9%, transparent); }
+.new-event:hover { background: color-mix(in srgb, var(--sage) 15%, transparent); }
+.task-row { width: 100%; height: 28px; display: flex; align-items: center; gap: 7px; padding: 0 6px; border-radius: 7px; text-align: left; font-size: 12.5px; color: var(--ink); }
+.task-row:hover { background: color-mix(in srgb, var(--sage) 8%, transparent); }
+.task-row .icon { color: var(--sage-text); }
+.task-row.deadline .icon { color: var(--ink-3); }
+.task-row.deadline.late .icon { color: var(--clay-text); }
+.task-row .time { flex: none; font-size: 11px; color: var(--secondary); font-variant-numeric: tabular-nums; }
+.task-row .t { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+
+/* The event sheet sits over the month (the same card as in the note). */

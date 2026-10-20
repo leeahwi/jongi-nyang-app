@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Some shared cases are written for the developer's time zone (e.g. timeblock, search).
+  TZ: Asia/Seoul
+
+jobs:
+  windows-app:
+    name: Windows app · typecheck + tests
+    # The tests are pure Node (node:test on the esbuild output); they were verified on macOS.
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: windows
+    env:
+      # Tests and the type check don't need the Electron binary, only its type definitions.
+      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: windows/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit -p .
+      - run: npm test

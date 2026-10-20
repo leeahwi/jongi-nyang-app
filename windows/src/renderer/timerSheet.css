@@ -1,0 +1,4 @@
+/* 직접 정하기…: an S slip with mint tape — the length in the hand, what it means beside it, and length chips. */
+.presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 12px; }
+.presets .chip { padding: 5px 0; }
+.slip-note { min-height: 18px; }

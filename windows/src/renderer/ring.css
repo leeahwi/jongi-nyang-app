@@ -1,0 +1,37 @@
+/*
+ * 울리는 쪽지 (option A): the cat in a clay disc with rings rippling out, how long it has rung,
+ * the time big in the UI face, the label in the hand, when it rings next, one big 끄기 and the
+ * snooze lengths as chips. Everything about its look is here and in ring.ts (to swap for B or C).
+ */
+.slip.ring { width: 340px; text-align: center; }
+.ring .stage { position: relative; width: 132px; height: 132px; margin: 26px auto 4px; display: grid; place-items: center; }
+.ring .stage::before, .ring .stage::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--clay); opacity: 0; }
+.ring .disc { position: absolute; inset: 16px; border-radius: 50%; background: radial-gradient(circle at 50% 40%, var(--disc-light, #fff6ef), var(--clay-2)); }
+:root[data-paper="night"] .ring .disc { --disc-light: #5a4038; }
+.ring .stage img { position: relative; width: 104px; height: 104px; object-fit: contain; transform-origin: 50% 90%; }
+.ring .ringing { display: inline-flex; align-items: center; gap: 6px; height: 20px; margin-top: 8px; padding: 0 10px; border-radius: 999px; background: var(--clay-2); color: var(--clay-text); font: 600 11px var(--ui); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ring .ringing i { width: 6px; height: 6px; border-radius: 50%; background: var(--clay); }
+.ring .time { margin-top: 6px; font: 600 52px/1 var(--ui); font-variant-numeric: tabular-nums; letter-spacing: -0.03em; color: var(--ink); white-space: nowrap; }
+.ring .time small { margin-left: 4px; font-size: 18px; font-weight: 500; letter-spacing: 0; color: var(--ink-2); }
+/* The label (why it rings): up to two lines at 36px, then up to three a size smaller, then an ellipsis (ring.ts fitLabel). */
+.ring .label { margin: 6px 18px 0; padding: 0 var(--ink-over) 2px; font-family: var(--body-font); font-size: 36px; line-height: 1.15; color: var(--ink); overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.ring .label.smaller { font-size: 28px; -webkit-line-clamp: 3; }
+:root[data-font="clean"] .ring .label { font-size: 22px; font-weight: 600; line-height: 1.3; }
+:root[data-font="clean"] .ring .label.smaller { font-size: 18px; }
+.ring .time small.before { margin: 0 4px 0 0; }
+.ring .meta { margin: 4px 18px 0; font: 500 12px var(--ui); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ring .acts { display: grid; gap: 10px; padding: 18px; }
+.ring .snz { display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)); gap: 6px; align-items: center; }
+.ring .snz > span { padding-right: 4px; font: 500 12px var(--ui); color: var(--ink-2); white-space: nowrap; }
+.ring .snz .chip { padding: 6px 0; }
+@media (prefers-reduced-motion: no-preference) {
+  :root:not(.still) .ring .stage::before { animation: wave 2s ease-out infinite; }
+  :root:not(.still) .ring .stage::after { animation: wave 2s ease-out 1s infinite; }
+  :root:not(.still) .ring .stage img { animation: rock 1s ease-in-out infinite; }
+  :root:not(.still) .ring .ringing i { animation: blink 1s steps(1) infinite; }
+  @keyframes wave { 0% { transform: scale(0.72); opacity: 0.55; } 100% { transform: scale(1.12); opacity: 0; } }
+  @keyframes rock { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(4deg) translateY(-2px); } }
+  @keyframes blink { 50% { opacity: 0.2; } }
+}
+.ring .snz[hidden] { display: none; }

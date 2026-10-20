@@ -1,0 +1,238 @@
+@font-face { font-family: "HanJang Pen"; src: url("../../assets/fonts/HanJangPen-Regular.ttf") format("truetype"); font-display: block; }
+@font-face { font-family: "HanJang Brush"; src: url("../../assets/fonts/HanJangBrush-Regular.ttf") format("truetype"); font-display: block; }
+/* English and Dutch: Caveat (pen) and Kalam (marker) for Latin text, the Korean faces behind them for
+   Hangul. Scaled so their capitals stand as tall as Hangul (Caveat runs small, Kalam large), with line
+   metrics close to the Korean faces' (0.85 em up, 0.27 down, after the scaling) so rows, titles and
+   ellipsized labels keep their Korean heights and nothing is cut. */
+@font-face { font-family: "Caveat"; src: url("../../assets/fonts/Caveat.ttf") format("truetype"); font-weight: 400 700; font-display: block; size-adjust: 110%; ascent-override: 77%; descent-override: 25%; line-gap-override: 0%; }
+@font-face { font-family: "Kalam"; src: url("../../assets/fonts/Kalam-Regular.ttf") format("truetype"); font-display: block; size-adjust: 86%; ascent-override: 99%; descent-override: 29%; line-gap-override: 0%; }
+
+:root {
+  /* 종이 (light paper) — the redesign's tokens; 밤 종이 (stage 3) adds a second set of the same names. */
+  --paper: #fbf9f3;
+  --paper-2: #f5f1e7;
+  --card: #fffdf8;
+  --ink: #2f2e2a;
+  --ink-2: #6b685e;
+  /* ink-3: faint *text* (meta, hints, group headers) — darkened in stage 4 to pass AA (4.5:1) on paper,
+     paper-2 and card; the old #a5a195 lives on as --faint for marks that aren't text. */
+  --ink-3: #726e64;
+  --faint: #a5a195;
+  --rule: #e6e0d2;
+  --rule-strong: #d8d0bd;
+  --sage: #5c7a5a;
+  --sage-2: #e4ebe0;
+  --clay: #b06a4f;
+  --clay-2: #f6e3db;
+  /* Sage and clay as *text* (on paper, cards and their own tints); sage and clay stay for fills, bars, rings. */
+  --sage-text: #546f52;
+  --clay-text: #955842;
+  --tab-1: #f5e7b2;
+  --tab-2: #e3ddf2;
+  --tab-3: #f3dbd7;
+  /* The slips' washi tape, by kind. */
+  --tape-todo: #e9cf7a;
+  --tape-memo: #cfc6ea;
+  --tape-event: #bcd0ea;
+  --tape-timer: #c9dcc4;
+  --tape-alarm: #ecc4bc;
+  --tape-confirm: #d9d3c4;
+  --event-blue: #5585cc;
+  --event-blue-2: #e2eaf6;
+  --memo-ink: #7a6aae;
+  --memo-2: #ebe6f6;
+  --toast-action: #f6d9c7;
+  --toast-strong: #cfe3c9;
+  --shadow-float: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 18px 40px -18px rgba(70, 58, 30, 0.35), 0 2px 6px rgba(70, 58, 30, 0.08);
+  --shadow-slip: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 16px 30px -16px rgba(70, 58, 30, 0.45), 0 2px 6px rgba(70, 58, 30, 0.1);
+  /* Text and marks on a sage fill (the primary button, a checked box, today's date). */
+  --on-sage: #fffdf8;
+  /* An empty checkbox's edge. */
+  --check-border: #908a7b;
+  /* The tab names on the washi tabs: ink, day and night (as on the Mac; ink-2 on lavender and rose was under AA). */
+  --tab-ink: var(--ink);
+  /* A raised control's soft shadow and surface (a selected segment, the desk's chosen row). */
+  --lift: 0 1px 2px rgba(0, 0, 0, 0.12);
+  --raised: var(--card);
+  /* Paper grain: the texture under a veil of the paper's colour (off at night). */
+  --grain: linear-gradient(rgba(251, 249, 243, 0.68), rgba(251, 249, 243, 0.68)), url("../../assets/texture.png");
+  /* The older names, kept as aliases of the tokens. */
+  --secondary: var(--ink-2);
+  --faded: var(--ink-3);
+  --accent: var(--clay);
+  --bubble: var(--card);
+  --row: 44px;
+  --margin: 54px;
+  --ui: "Segoe UI Variable Text", "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --pen-font: "HanJang Pen", var(--ui);
+  --brush-font: "HanJang Brush", var(--ui);
+  --body-font: var(--pen-font);
+  --title-font: var(--pen-font);
+  --body-size: 23px;
+  /* Room after handwritten text that ends in an ellipsis box: Caveat's and Kalam's d, e, f, k reach past
+     their advance width, and overflow:hidden would crop that ink ("Ahead" read "Aheaa"). Used as end padding. */
+  --ink-over: 0.25em;
+  color-scheme: light;
+}
+
+/* 밤 종이 (night paper): the same names, the paper of a room with the light off. Tab colours lowered,
+   sage and clay lifted so they keep their contrast (test/contrast.test.ts checks every text pair).
+   ink-3 and the checkbox edge are a step lighter than the mock (#8a8577 · #77725f) to pass AA. */
+:root[data-paper="night"] {
+  --paper: #2a2924;
+  --paper-2: #33322c;
+  --card: #312f29;
+  --ink: #ece6d6;
+  --ink-2: #bdb7a7;
+  --ink-3: #9f9989;
+  --faint: #8a8577;
+  --rule: #3e3c34;
+  --rule-strong: #4d4a40;
+  --sage: #a3c49c;
+  --sage-2: #39443a;
+  --clay: #e29a7c;
+  --clay-2: #4a3630;
+  --sage-text: #a3c49c;
+  --clay-text: #e29a7c;
+  --tab-1: #6a5e35;
+  --tab-2: #4f4868;
+  --tab-3: #63443f;
+  --tape-todo: #8a7a3f;
+  --tape-memo: #5d5578;
+  --tape-event: #4d5f7a;
+  --tape-timer: #4f6650;
+  --tape-alarm: #7a4f4a;
+  --tape-confirm: #55524a;
+  --event-blue: #8fb1e3;
+  --event-blue-2: #313b4a;
+  --memo-ink: #bcb0e2;
+  --memo-2: #3a3548;
+  /* The toast is a light pill at night (ink on paper turned round): its action and strong words dark. */
+  --toast-action: #8f4a30;
+  --toast-strong: #3d6639;
+  /* A faint light edge too: dark paper on a dark screen would otherwise lose its outline. */
+  --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 18px 40px -18px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-slip: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 16px 30px -16px rgba(0, 0, 0, 0.75), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --on-sage: #1f2a1e;
+  --check-border: #837e69;
+  --tab-ink: var(--ink);
+  --lift: 0 1px 2px rgba(0, 0, 0, 0.45);
+  /* At night a card is darker than paper-2, so a chosen segment or row gets its own lighter surface. */
+  --raised: #46433b;
+  --grain: none;
+  color-scheme: dark;
+}
+/* Event colours keep their hue at 85 % brightness at night, so they don't glare. */
+:root[data-paper="night"] .evc { filter: brightness(0.85); }
+:root:lang(en), :root:lang(nl) { --pen-font: "Caveat", "HanJang Pen", var(--ui); --brush-font: "Kalam", "HanJang Brush", var(--ui); }
+:root[data-font="brush"] { --body-font: var(--brush-font); --title-font: var(--brush-font); }
+:root[data-font="clean"] { --body-font: var(--ui); --title-font: var(--ui); }
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+/* Selected text: a sage wash (the meaning colour for "selected"), the same when the window isn't focused. */
+::selection { background: color-mix(in srgb, var(--sage) 26%, transparent); color: inherit; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: var(--ui);
+  font-size: 12px;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overflow: hidden;
+  /* Korean wraps between words, never inside one; a string with no room at all may still break. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: default; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; border-radius: 6px; }
+.tabular { font-variant-numeric: tabular-nums; }
+.icon { display: block; flex: none; }
+
+.paper-bg {
+  background-color: var(--paper);
+  background-image: var(--grain);
+  background-size: cover;
+}
+
+.quiet {
+  width: 28px; height: 28px; border-radius: 7px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--secondary);
+  transition: background 0.12s, color 0.12s;
+}
+.quiet:hover { background: color-mix(in srgb, var(--sage) 10%, transparent); color: var(--ink); }
+.quiet:active { transform: scale(0.94); }
+
+.action {
+  display: inline-flex; align-items: center; gap: 7px;
+  height: 36px; padding: 0 16px; border-radius: 9px;
+  font-size: 13px; font-weight: 600;
+  background: color-mix(in srgb, var(--sage) 9%, var(--card)); color: var(--ink);
+  border: 1px solid var(--rule);
+}
+.action.primary { background: var(--sage); color: var(--on-sage); border-color: transparent; }
+.action:hover { filter: brightness(0.97); }
+.action:disabled { opacity: 0.45; filter: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
+}
+/* High contrast (Windows contrast themes): system colours, no textures or tints that could hide text. */
+@media (forced-colors: active) {
+  .paper-bg { background-image: none; }
+  :root { --rule: CanvasText; }
+}
+
+/* Thin, paper-toned scrollbars (Windows otherwise draws a heavy gray bar). */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--secondary) 28%, transparent); border-radius: 4px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: color-mix(in srgb, var(--secondary) 45%, transparent); }
+
+/* Recurrence form (row editor and Settings → 반복) */
+.seg { display: flex; padding: 2px; border-radius: 8px; background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.seg button { flex: 1; height: 28px; border-radius: 6px; font-size: 12.5px; color: var(--ink); display: inline-flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; }
+.seg button[aria-checked="true"] { background: var(--raised); box-shadow: var(--lift); font-weight: 600; }
+.repeat-fields { display: flex; flex-direction: column; gap: 10px; }
+.days { display: flex; gap: 5px; }
+.days .day { flex: 1; height: 30px; border-radius: 8px; border: 1px solid var(--rule); background: color-mix(in srgb, var(--card) 45%, transparent); font-size: 12.5px; color: var(--secondary); }
+.days .day[aria-pressed="true"] { background: var(--sage); border-color: var(--sage); color: var(--on-sage); font-weight: 600; }
+.month-row, .alert-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.month-row .hint { font-size: 11px; color: var(--secondary); }
+.alert-row { height: 38px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--rule); background: color-mix(in srgb, var(--card) 45%, transparent); }
+.alert-row .icon { color: var(--sage-text); }
+.alert-row .grow { flex: 1; }
+.alert-row input[type="time"], .month-row select { height: 28px; border-radius: 7px; border: 1px solid var(--rule); background: var(--card); padding: 0 6px; font: 12.5px var(--ui); color: var(--ink); }
+.alert-row input:disabled { opacity: 0.45; }
+/* The paper switch (as on the Mac): off a rule track with a check-border edge, on sage; the knob card-white by day, ink at night. */
+.switch { width: 40px; height: 22px; border-radius: 11px; background: var(--rule); box-shadow: inset 0 0 0 1px var(--check-border); position: relative; flex: none; transition: background 0.15s; }
+.switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fffdf8; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); transition: transform 0.15s; }
+:root[data-paper="night"] .switch::after { background: #ece6d6; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
+.switch[aria-checked="true"] { background: var(--sage); box-shadow: none; }
+.switch[aria-checked="true"]::after { transform: translateX(18px); }
+.switch.small { width: 34px; height: 20px; }
+.switch.small::after { width: 16px; height: 16px; }
+.switch.small[aria-checked="true"]::after { transform: translateX(14px); }
+.summary { display: flex; gap: 10px; padding: 10px 12px; border-radius: 9px; background: color-mix(in srgb, var(--sage) 8%, transparent); color: var(--sage-text); }
+.summary .when { font-size: 14px; font-weight: 700; color: var(--ink); margin: 2px 0; }
+.summary .hint { font-size: 11px; color: var(--secondary); }
+.summary.invalid .when { color: var(--clay-text); }
+
+/* A scrolling box with more beyond its edge (api.ts scrollFade): the content fades out over 12px there. */
+.scroll-fade.fade-top { -webkit-mask-image: linear-gradient(to bottom, transparent, black 12px); }
+.scroll-fade.fade-bottom { -webkit-mask-image: linear-gradient(to top, transparent, black 12px); }
+.scroll-fade.fade-top.fade-bottom { -webkit-mask-image: linear-gradient(to bottom, transparent, black 12px, black calc(100% - 12px), transparent); }
+
+/* A desk pane's header (설정's panes, 완료 기록, 도움말): a 22px title, a 12px line under it, room on the right. */
+.pane-head { flex: none; display: flex; align-items: center; gap: 14px; min-height: 76px; padding: 18px 28px 12px; }
+.pane-head .ph-text { flex: 1; min-width: 0; }
+.pane-head h1 { margin: 0; font: 600 22px/1.4 var(--ui); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pane-head .ph-sub { margin: 3px 0 0; font: 12px/1.45 var(--ui); color: var(--ink-2); }
+.pane-head .ph-cat { width: 58px; height: 58px; object-fit: contain; flex: none; margin: -6px 0 -8px; }
+:root[data-paper="night"] .ph-cat { opacity: 0.92; }
+
+/* A running time sized by an invisible copy of its widest text (tabularClock.ts): it never changes width as it ticks. */
+.tclock { display: inline-grid; justify-items: start; font-variant-numeric: tabular-nums; }
+.tclock > span { grid-area: 1 / 1; white-space: nowrap; }
+.tclock > .tc-size { visibility: hidden; }

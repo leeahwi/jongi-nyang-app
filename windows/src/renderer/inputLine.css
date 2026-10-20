@@ -1,0 +1,23 @@
+/* The input line (입력 줄): a card (sage border and halo while typing), the chips above the text —
+   the note's line at the bottom of the sheet and the 오늘 창's. 빠른 입력's slip draws it its own way (quick.css). */
+.inp { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding: 7px 10px 7px 12px; border: 1.5px solid var(--rule); border-radius: 12px; background: var(--card); transition: border-color 0.12s, box-shadow 0.12s; }
+.inp.focused { border-color: var(--sage); box-shadow: 0 0 0 4px var(--sage-2); }
+.inp .reads[hidden] { display: none; }
+.inp-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.inp .typed { flex: 1; min-width: 0; height: auto; padding: 0; border: 0; outline: none; resize: none; background: transparent; overflow: hidden; user-select: text;
+  font-family: var(--body-font); font-size: calc(var(--body-size) * 0.9); line-height: 1.25; color: var(--ink); caret-color: var(--sage); }
+.inp .typed::placeholder { color: var(--ink-3); opacity: 1; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.inp .typed:focus-visible { outline: none; }
+:root[data-font="clean"] .inp .typed { font-size: 14px; }
+.inp-side { flex: none; display: inline-flex; }
+.inp-side[hidden] { display: none; }
+.kbd.dim { opacity: 0.35; }
+.kbd { font: 600 10px var(--ui); color: var(--ink-3); border: 1px solid var(--rule); border-radius: 5px; padding: 1px 5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.inp .chip { min-height: 22px; padding: 2px 8px; font-size: 11px; border-radius: 8px; }
+.inp .chip .icon { width: 13px; height: 13px; }
+.inp-hint { font: 500 11.5px var(--ui); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: 0.01em; }
+.inp-hint.bad { color: var(--clay-text); }
+.inp-hint[hidden] { display: none; }
+@media (forced-colors: active) {
+  .inp.focused { outline: 2px solid Highlight; }
+}

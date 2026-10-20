@@ -1,0 +1,4 @@
+/* Dutch: the 하루 띠 (1.40) — one to-do / event (Localizable has the plural tab names), and 접기 for folding the day (Localizable’s is “Show fewer”). */
+"할 일" = "Taak";
+"일정" = "Afspraak";
+"접기" = "Inklappen";

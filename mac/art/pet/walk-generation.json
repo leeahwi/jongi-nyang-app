@@ -1,0 +1,307 @@
+{
+  "generator": "built-in image_gen",
+  "method": "complete-image-frames",
+  "reference": "walk-previous/walk-4.png",
+  "frame_count": 8,
+  "parts_animated_separately": false,
+  "full_stride_points": 17.25,
+  "walking_speed_points_per_second": 24,
+  "frames": [
+    {
+      "name": "walk-cycle-01",
+      "prompt": "Use case: precise-object-edit. Final animation frame, FULL COMPLETE CAT.\nEdit the attached image itself. This exact cat is the mandatory design. Keep the enormous head, rectangular rounded face silhouette, eye, mouth, whiskers, ear folds, blush, small torso, scarf knot, tail, paper texture, all proportions, framing and positions unchanged. Do NOT create a different side-profile character, do NOT elongate the torso, do NOT shrink the head, do NOT change the current three-quarter left-facing pose.\nOnly reposition the FOUR SHORT LEGS/PAWS beneath the scarf to create the specified next walking frame. Whole character in every PNG, never isolated parts, never a rig or a sprite sheet. The upper head and scarf area must be visually identical to the reference. Keep the torso at the same location. Natural small steps, gently bent elbows/knees, no extra legs, no long human arms, no exaggerated reach.\nAnimation direction is LEFT. Grounded feet move toward RIGHT under the body during stance as the body travels left in the app. A foot travelling back toward the left must be lifted slightly; do not lift all feet simultaneously. Keep the sole of grounded NEAR paws at y952 in the1024 canvas, FAR paws at y938 to respect depth. Keep all existing transparent margins. Use unchanged body/head size and top position; no framing adjustments.\nThere are four legs: NEAR FRONT is the large central foreleg under the neck (neutral paw center x450); FAR FRONT is the smaller foreleg further LEFT (neutral x315); NEAR HIND is the large rightmost hindleg below rump (neutral x760); FAR HIND is the small paw between front and back near center-right (neutral x615), partly occluded. Preserve this exact existing leg style, toe marks, line weight and cream paper. Keep a clear gap between front and back legs. Four legs only.\nOutput one complete1024x1024 RGBA PNG, actual fully transparent background, no ground line, no shadow, no text or labels. Do not redraw the character into a new style.\n\nFRAME 1 OF8: NEAR FRONT: paw center x390, sole y952, planted flat on floor; FAR FRONT: paw center x351, sole y938, planted flat on floor; NEAR HIND: paw center x789, sole y928, lifted for its forward swing, toes gently curled; FAR HIND: paw center x603, sole y938, planted flat on floor.\nThese coordinates describe only subtle foot changes; all other original pixels and character design should stay unchanged. Prioritize correct leg identity and smooth small stepping.",
+      "source_filename": "exec-7bbb428a-ea48-44a1-87e9-08c45a136129.png",
+      "raw_file": "walk-frames-v2/walk-cycle-01.png",
+      "final_file": "walk-cycle-01.png",
+      "requested_contact_positions": [
+        {
+          "name": "NEAR FRONT",
+          "phase": 0,
+          "x": 390,
+          "soleY": 952,
+          "grounded": true
+        },
+        {
+          "name": "FAR FRONT",
+          "phase": 0.5,
+          "x": 351,
+          "soleY": 938,
+          "grounded": true
+        },
+        {
+          "name": "NEAR HIND",
+          "phase": 0.75,
+          "x": 789,
+          "soleY": 928,
+          "grounded": false
+        },
+        {
+          "name": "FAR HIND",
+          "phase": 0.25,
+          "x": 603,
+          "soleY": 938,
+          "grounded": true
+        }
+      ]
+    },
+    {
+      "name": "walk-cycle-02",
+      "prompt": "Use case: precise-object-edit. Final animation frame, FULL COMPLETE CAT.\nEdit the attached image itself. This exact cat is the mandatory design. Keep the enormous head, rectangular rounded face silhouette, eye, mouth, whiskers, ear folds, blush, small torso, scarf knot, tail, paper texture, all proportions, framing and positions unchanged. Do NOT create a different side-profile character, do NOT elongate the torso, do NOT shrink the head, do NOT change the current three-quarter left-facing pose.\nOnly reposition the FOUR SHORT LEGS/PAWS beneath the scarf to create the specified next walking frame. Whole character in every PNG, never isolated parts, never a rig or a sprite sheet. The upper head and scarf area must be visually identical to the reference. Keep the torso at the same location. Natural small steps, gently bent elbows/knees, no extra legs, no long human arms, no exaggerated reach.\nAnimation direction is LEFT. Grounded feet move toward RIGHT under the body during stance as the body travels left in the app. A foot travelling back toward the left must be lifted slightly; do not lift all feet simultaneously. Keep the sole of grounded NEAR paws at y952 in the1024 canvas, FAR paws at y938 to respect depth. Keep all existing transparent margins. Use unchanged body/head size and top position; no framing adjustments.\nThere are four legs: NEAR FRONT is the large central foreleg under the neck (neutral paw center x450); FAR FRONT is the smaller foreleg further LEFT (neutral x315); NEAR HIND is the large rightmost hindleg below rump (neutral x760); FAR HIND is the small paw between front and back near center-right (neutral x615), partly occluded. Preserve this exact existing leg style, toe marks, line weight and cream paper. Keep a clear gap between front and back legs. Four legs only.\nOutput one complete1024x1024 RGBA PNG, actual fully transparent background, no ground line, no shadow, no text or labels. Do not redraw the character into a new style.\n\nFRAME 2 OF8: NEAR FRONT: paw center x414, sole y952, planted flat on floor; FAR FRONT: paw center x375, sole y938, planted flat on floor; NEAR HIND: paw center x731, sole y928, lifted for its forward swing, toes gently curled; FAR HIND: paw center x627, sole y938, planted flat on floor.\nThese coordinates describe only subtle foot changes; all other original pixels and character design should stay unchanged. Prioritize correct leg identity and smooth small stepping.",
+      "source_filename": "exec-d77cf1e4-35c3-4fc0-9004-d62647b1a4bb.png",
+      "raw_file": "walk-frames-v2/walk-cycle-02.png",
+      "final_file": "walk-cycle-02.png",
+      "requested_contact_positions": [
+        {
+          "name": "NEAR FRONT",
+          "phase": 0.125,
+          "x": 414,
+          "soleY": 952,
+          "grounded": true
+        },
+        {
+          "name": "FAR FRONT",
+          "phase": 0.625,
+          "x": 375,
+          "soleY": 938,
+          "grounded": true
+        },
+        {
+          "name": "NEAR HIND",
+          "phase": 0.875,
+          "x": 731,
+          "soleY": 928,
+          "grounded": false
+        },
+        {
+          "name": "FAR HIND",
+          "phase": 0.375,
+          "x": 627,
+          "soleY": 938,
+          "grounded": true
+        }
+      ]
+    },
+    {
+      "name": "walk-cycle-03",
+      "prompt": "Use case: precise-object-edit. Final animation frame, FULL COMPLETE CAT.\nEdit the attached image itself. This exact cat is the mandatory design. Keep the enormous head, rectangular rounded face silhouette, eye, mouth, whiskers, ear folds, blush, small torso, scarf knot, tail, paper texture, all proportions, framing and positions unchanged. Do NOT create a different side-profile character, do NOT elongate the torso, do NOT shrink the head, do NOT change the current three-quarter left-facing pose.\nOnly reposition the FOUR SHORT LEGS/PAWS beneath the scarf to create the specified next walking frame. Whole character in every PNG, never isolated parts, never a rig or a sprite sheet. The upper head and scarf area must be visually identical to the reference. Keep the torso at the same location. Natural small steps, gently bent elbows/knees, no extra legs, no long human arms, no exaggerated reach.\nAnimation direction is LEFT. Grounded feet move toward RIGHT under the body during stance as the body travels left in the app. A foot travelling back toward the left must be lifted slightly; do not lift all feet simultaneously. Keep the sole of grounded NEAR paws at y952 in the1024 canvas, FAR paws at y938 to respect depth. Keep all existing transparent margins. Use unchanged body/head size and top position; no framing adjustments.\nThere are four legs: NEAR FRONT is the large central foreleg under the neck (neutral paw center x450); FAR FRONT is the smaller foreleg further LEFT (neutral x315); NEAR HIND is the large rightmost hindleg below rump (neutral x760); FAR HIND is the small paw between front and back near center-right (neutral x615), partly occluded. Preserve this exact existing leg style, toe marks, line weight and cream paper. Keep a clear gap between front and back legs. Four legs only.\nOutput one complete1024x1024 RGBA PNG, actual fully transparent background, no ground line, no shadow, no text or labels. Do not redraw the character into a new style.\n\nFRAME 3 OF8: NEAR FRONT: paw center x438, sole y952, planted flat on floor; FAR FRONT: paw center x344, sole y914, lifted for its forward swing, toes gently curled; NEAR HIND: paw center x700, sole y952, planted flat on floor; FAR HIND: paw center x651, sole y938, planted flat on floor.\nThese coordinates describe only subtle foot changes; all other original pixels and character design should stay unchanged. Prioritize correct leg identity and smooth small stepping.",
+      "source_filename": "exec-968de612-f8fb-464d-8ff3-f5e1704d3a78.png",
+      "raw_file": "walk-frames-v2/walk-cycle-03.png",
+      "final_file": "walk-cycle-03.png",
+      "requested_contact_positions": [
+        {
+          "name": "NEAR FRONT",
+          "phase": 0.25,
+          "x": 438,
+          "soleY": 952,
+          "grounded": true
+        },
+        {
+          "name": "FAR FRONT",
+          "phase": 0.75,
+          "x": 344,
+          "soleY": 914,
+          "grounded": false
+        },
+        {
+          "name": "NEAR HIND",
+          "phase": 0,
+          "x": 700,
+          "soleY": 952,
+          "grounded": true
+        },
+        {
+          "name": "FAR HIND",
+          "phase": 0.5,
+          "x": 651,
+          "soleY": 938,
+          "grounded": true
+        }
+      ]
+    },
+    {
+      "name": "walk-cycle-04",
+      "prompt": "Use case: precise-object-edit. Final animation frame, FULL COMPLETE CAT.\nEdit the attached image itself. This exact cat is the mandatory design. Keep the enormous head, rectangular rounded face silhouette, eye, mouth, whiskers, ear folds, blush, small torso, scarf knot, tail, paper texture, all proportions, framing and positions unchanged. Do NOT create a different side-profile character, do NOT elongate the torso, do NOT shrink the head, do NOT change the current three-quarter left-facing pose.\nOnly reposition the FOUR SHORT LEGS/PAWS beneath the scarf to create the specified next walking frame. Whole character in every PNG, never isolated parts, never a rig or a sprite sheet. The upper head and scarf area must be visually identical to the reference. Keep the torso at the same location. Natural small steps, gently bent elbows/knees, no extra legs, no long human arms, no exaggerated reach.\nAnimation direction is LEFT. Grounded feet move toward RIGHT under the body during stance as the body travels left in the app. A foot travelling back toward the left must be lifted slightly; do not lift all feet simultaneously. Keep the sole of grounded NEAR paws at y952 in the1024 canvas, FAR paws at y938 to respect depth. Keep all existing transparent margins. Use unchanged body/head size and top position; no framing adjustments.\nThere are four legs: NEAR FRONT is the large central foreleg under the neck (neutral paw center x450); FAR FRONT is the smaller foreleg further LEFT (neutral x315); NEAR HIND is the large rightmost hindleg below rump (neutral x760); FAR HIND is the small paw between front and back near center-right (neutral x615), partly occluded. Preserve this exact existing leg style, toe marks, line weight and cream paper. Keep a clear gap between front and back legs. Four legs only.\nOutput one complete1024x1024 RGBA PNG, actual fully transparent background, no ground line, no shadow, no text or labels. Do not redraw the character into a new style.\n\nFRAME 4 OF8: NEAR FRONT: paw center x462, sole y952, planted flat on floor; FAR FRONT: paw center x286, sole y914, lifted for its forward swing, toes gently curled; NEAR HIND: paw center x724, sole y952, planted flat on floor; FAR HIND: paw center x675, sole y938, planted flat on floor.\nThese coordinates describe only subtle foot changes; all other original pixels and character design should stay unchanged. Prioritize correct leg identity and smooth small stepping.",
+      "source_filename": "exec-505b53dc-54bf-481a-ae02-ff2755feffec.png",
+      "raw_file": "walk-frames-v2/walk-cycle-04.png",
+      "final_file": "walk-cycle-04.png",
+      "requested_contact_positions": [
+        {
+          "name": "NEAR FRONT",
+          "phase": 0.375,
+          "x": 462,
+          "soleY": 952,
+          "grounded": true
+        },
+        {
+          "name": "FAR FRONT",
+          "phase": 0.875,
+          "x": 286,
+          "soleY": 914,
+          "grounded": false
+        },
+        {
+          "name": "NEAR HIND",
+          "phase": 0.125,
+          "x": 724,
+          "soleY": 952,
+          "grounded": true
+        },
+        {
+          "name": "FAR HIND",
+          "phase": 0.625,
+          "x": 675,
+          "soleY": 938,
+          "grounded": true
+        }
+      ]
+    },
+    {
+      "name": "walk-cycle-05",
+      "prompt": "Use case: precise-object-edit. Final animation frame, FULL COMPLETE CAT.\nEdit the attached image itself. This exact cat is the mandatory design. Keep the enormous head, rectangular rounded face silhouette, eye, mouth, whiskers, ear folds, blush, small torso, scarf knot, tail, paper texture, all proportions, framing and positions unchanged. Do NOT create a different side-profile character, do NOT elongate the torso, do NOT shrink the head, do NOT change the current three-quarter left-facing pose.\nOnly reposition the FOUR SHORT LEGS/PAWS beneath the scarf to create the specified next walking frame. Whole character in every PNG, never isolated parts, never a rig or a sprite sheet. The upper head and scarf area must be visually identical to the reference. Keep the torso at the same location. Natural small steps, gently bent elbows/knees, no extra legs, no long human arms, no exaggerated reach.\nAnimation direction is LEFT. Grounded feet move toward RIGHT under the body during stance as the body travels left in the app. A foot travelling back toward the left must be lifted slightly; do not lift all feet simultaneously. Keep the sole of grounded NEAR paws at y952 in the1024 canvas, FAR paws at y938 to respect depth. Keep all existing transparent margins. Use unchanged body/head size and top position; no framing adjustments.\nThere are four legs: NEAR FRONT is the large central foreleg under the neck (neutral paw center x450); FAR FRONT is the smaller foreleg further LEFT (neutral x315); NEAR HIND is the large rightmost hindleg below rump (neutral x760); FAR HIND is the small paw between front and back near center-right (neutral x615), partly occluded. Preserve this exact existing leg style, toe marks, line weight and cream paper. Keep a clear gap between front and back legs. Four legs only.\nOutput one complete1024x1024 RGBA PNG, actual fully transparent background, no ground line, no shadow, no text or labels. Do not redraw the character into a new style.\n\nFRAME 5 OF8: NEAR FRONT: paw center x486, sole y952, planted flat on floor; FAR FRONT: paw center x255, sole y938, planted flat on floor; NEAR HIND: paw center x748, sole y952, planted flat on floor; FAR HIND: paw center x644, sole y914, lifted for its forward swing, toes gently curled.\nThese coordinates describe only subtle foot changes; all other original pixels and character design should stay unchanged. Prioritize correct leg identity and smooth small stepping.",
+      "source_filename": "exec-6980f083-0c00-4ef4-9e7c-52bbc801ea09.png",
+      "raw_file": "walk-frames-v2/walk-cycle-05.png",
+      "final_file": "walk-cycle-05.png",
+      "requested_contact_positions": [
+        {
+          "name": "NEAR FRONT",
+          "phase": 0.5,
+          "x": 486,
+          "soleY": 952,
+          "grounded": true
+        },
+        {
+          "name": "FAR FRONT",
+          "phase": 0,
+          "x": 255,
+          "soleY": 938,
+          "grounded": true
+        },
+        {
+          "name": "NEAR HIND",
+          "phase": 0.25,
+          "x": 748,
+          "soleY": 952,
+          "grounded": true
+        },
+        {
+          "name": "FAR HIND",
+          "phase": 0.75,
+          "x": 644,
+          "soleY": 914,
+          "grounded": false
+        }
+      ]
+    },
+    {
+      "name": "walk-cycle-06",
+      "prompt": "Use case: precise-object-edit. Final animation frame, FULL COMPLETE CAT.\nEdit the attached image itself. This exact cat is the mandatory design. Keep the enormous head, rectangular rounded face silhouette, eye, mouth, whiskers, ear folds, blush, small torso, scarf knot, tail, paper texture, all proportions, framing and positions unchanged. Do NOT create a different side-profile character, do NOT elongate the torso, do NOT shrink the head, do NOT change the current three-quarter left-facing pose.\nOnly reposition the FOUR SHORT LEGS/PAWS beneath the scarf to create the specified next walking frame. Whole character in every PNG, never isolated parts, never a rig or a sprite sheet. The upper head and scarf area must be visually identical to the reference. Keep the torso at the same location. Natural small steps, gently bent elbows/knees, no extra legs, no long human arms, no exaggerated reach.\nAnimation direction is LEFT. Grounded feet move toward RIGHT under the body during stance as the body travels left in the app. A foot travelling back toward the left must be lifted slightly; do not lift all feet simultaneously. Keep the sole of grounded NEAR paws at y952 in the1024 canvas, FAR paws at y938 to respect depth. Keep all existing transparent margins. Use unchanged body/head size and top position; no framing adjustments.\nThere are four legs: NEAR FRONT is the large central foreleg under the neck (neutral paw center x450); FAR FRONT is the smaller foreleg further LEFT (neutral x315); NEAR HIND is the large rightmost hindleg below rump (neutral x760); FAR HIND is the small paw between front and back near center-right (neutral x615), partly occluded. Preserve this exact existing leg style, toe marks, line weight and cream paper. Keep a clear gap between front and back legs. Four legs only.\nOutput one complete1024x1024 RGBA PNG, actual fully transparent background, no ground line, no shadow, no text or labels. Do not redraw the character into a new style.\n\nFRAME 6 OF8: NEAR FRONT: paw center x510, sole y952, planted flat on floor; FAR FRONT: paw center x279, sole y938, planted flat on floor; NEAR HIND: paw center x772, sole y952, planted flat on floor; FAR HIND: paw center x586, sole y914, lifted for its forward swing, toes gently curled.\nThese coordinates describe only subtle foot changes; all other original pixels and character design should stay unchanged. Prioritize correct leg identity and smooth small stepping.",
+      "source_filename": "exec-23fc83f3-dd23-4c7e-9078-e54a2eb88832.png",
+      "raw_file": "walk-frames-v2/walk-cycle-06.png",
+      "final_file": "walk-cycle-06.png",
+      "requested_contact_positions": [
+        {
+          "name": "NEAR FRONT",
+          "phase": 0.625,
+          "x": 510,
+          "soleY": 952,
+          "grounded": true
+        },
+        {
+          "name": "FAR FRONT",
+          "phase": 0.125,
+          "x": 279,
+          "soleY": 938,
+          "grounded": true
+        },
+        {
+          "name": "NEAR HIND",
+          "phase": 0.375,
+          "x": 772,
+          "soleY": 952,
+          "grounded": true
+        },
+        {
+          "name": "FAR HIND",
+          "phase": 0.875,
+          "x": 586,
+          "soleY": 914,
+          "grounded": false
+        }
+      ]
+    },
+    {
+      "name": "walk-cycle-07",
+      "prompt": "Use case: precise-object-edit. Final animation frame, FULL COMPLETE CAT.\nEdit the attached image itself. This exact cat is the mandatory design. Keep the enormous head, rectangular rounded face silhouette, eye, mouth, whiskers, ear folds, blush, small torso, scarf knot, tail, paper texture, all proportions, framing and positions unchanged. Do NOT create a different side-profile character, do NOT elongate the torso, do NOT shrink the head, do NOT change the current three-quarter left-facing pose.\nOnly reposition the FOUR SHORT LEGS/PAWS beneath the scarf to create the specified next walking frame. Whole character in every PNG, never isolated parts, never a rig or a sprite sheet. The upper head and scarf area must be visually identical to the reference. Keep the torso at the same location. Natural small steps, gently bent elbows/knees, no extra legs, no long human arms, no exaggerated reach.\nAnimation direction is LEFT. Grounded feet move toward RIGHT under the body during stance as the body travels left in the app. A foot travelling back toward the left must be lifted slightly; do not lift all feet simultaneously. Keep the sole of grounded NEAR paws at y952 in the1024 canvas, FAR paws at y938 to respect depth. Keep all existing transparent margins. Use unchanged body/head size and top position; no framing adjustments.\nThere are four legs: NEAR FRONT is the large central foreleg under the neck (neutral paw center x450); FAR FRONT is the smaller foreleg further LEFT (neutral x315); NEAR HIND is the large rightmost hindleg below rump (neutral x760); FAR HIND is the small paw between front and back near center-right (neutral x615), partly occluded. Preserve this exact existing leg style, toe marks, line weight and cream paper. Keep a clear gap between front and back legs. Four legs only.\nOutput one complete1024x1024 RGBA PNG, actual fully transparent background, no ground line, no shadow, no text or labels. Do not redraw the character into a new style.\n\nFRAME 7 OF8: NEAR FRONT: paw center x479, sole y928, lifted for its forward swing, toes gently curled; FAR FRONT: paw center x303, sole y938, planted flat on floor; NEAR HIND: paw center x796, sole y952, planted flat on floor; FAR HIND: paw center x555, sole y938, planted flat on floor.\nThese coordinates describe only subtle foot changes; all other original pixels and character design should stay unchanged. Prioritize correct leg identity and smooth small stepping.",
+      "source_filename": "exec-1ee9eeb0-36fa-41c9-a9b2-28a35bfda30d.png",
+      "raw_file": "walk-frames-v2/walk-cycle-07.png",
+      "final_file": "walk-cycle-07.png",
+      "requested_contact_positions": [
+        {
+          "name": "NEAR FRONT",
+          "phase": 0.75,
+          "x": 479,
+          "soleY": 928,
+          "grounded": false
+        },
+        {
+          "name": "FAR FRONT",
+          "phase": 0.25,
+          "x": 303,
+          "soleY": 938,
+          "grounded": true
+        },
+        {
+          "name": "NEAR HIND",
+          "phase": 0.5,
+          "x": 796,
+          "soleY": 952,
+          "grounded": true
+        },
+        {
+          "name": "FAR HIND",
+          "phase": 0,
+          "x": 555,
+          "soleY": 938,
+          "grounded": true
+        }
+      ]
+    },
+    {
+      "name": "walk-cycle-08",
+      "prompt": "Use case: precise-object-edit. Final animation frame, FULL COMPLETE CAT.\nEdit the attached image itself. This exact cat is the mandatory design. Keep the enormous head, rectangular rounded face silhouette, eye, mouth, whiskers, ear folds, blush, small torso, scarf knot, tail, paper texture, all proportions, framing and positions unchanged. Do NOT create a different side-profile character, do NOT elongate the torso, do NOT shrink the head, do NOT change the current three-quarter left-facing pose.\nOnly reposition the FOUR SHORT LEGS/PAWS beneath the scarf to create the specified next walking frame. Whole character in every PNG, never isolated parts, never a rig or a sprite sheet. The upper head and scarf area must be visually identical to the reference. Keep the torso at the same location. Natural small steps, gently bent elbows/knees, no extra legs, no long human arms, no exaggerated reach.\nAnimation direction is LEFT. Grounded feet move toward RIGHT under the body during stance as the body travels left in the app. A foot travelling back toward the left must be lifted slightly; do not lift all feet simultaneously. Keep the sole of grounded NEAR paws at y952 in the1024 canvas, FAR paws at y938 to respect depth. Keep all existing transparent margins. Use unchanged body/head size and top position; no framing adjustments.\nThere are four legs: NEAR FRONT is the large central foreleg under the neck (neutral paw center x450); FAR FRONT is the smaller foreleg further LEFT (neutral x315); NEAR HIND is the large rightmost hindleg below rump (neutral x760); FAR HIND is the small paw between front and back near center-right (neutral x615), partly occluded. Preserve this exact existing leg style, toe marks, line weight and cream paper. Keep a clear gap between front and back legs. Four legs only.\nOutput one complete1024x1024 RGBA PNG, actual fully transparent background, no ground line, no shadow, no text or labels. Do not redraw the character into a new style.\n\nFRAME 8 OF8: NEAR FRONT: paw center x421, sole y928, lifted for its forward swing, toes gently curled; FAR FRONT: paw center x327, sole y938, planted flat on floor; NEAR HIND: paw center x820, sole y952, planted flat on floor; FAR HIND: paw center x579, sole y938, planted flat on floor.\nThese coordinates describe only subtle foot changes; all other original pixels and character design should stay unchanged. Prioritize correct leg identity and smooth small stepping.",
+      "source_filename": "exec-03c17943-50c1-4208-b819-3cf190b49ad6.png",
+      "raw_file": "walk-frames-v2/walk-cycle-08.png",
+      "final_file": "walk-cycle-08.png",
+      "requested_contact_positions": [
+        {
+          "name": "NEAR FRONT",
+          "phase": 0.875,
+          "x": 421,
+          "soleY": 928,
+          "grounded": false
+        },
+        {
+          "name": "FAR FRONT",
+          "phase": 0.375,
+          "x": 327,
+          "soleY": 938,
+          "grounded": true
+        },
+        {
+          "name": "NEAR HIND",
+          "phase": 0.625,
+          "x": 820,
+          "soleY": 952,
+          "grounded": true
+        },
+        {
+          "name": "FAR HIND",
+          "phase": 0.125,
+          "x": 579,
+          "soleY": 938,
+          "grounded": true
+        }
+      ]
+    }
+  ]
+}

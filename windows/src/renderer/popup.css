@@ -1,0 +1,64 @@
+html, body { background: transparent; }
+#stage { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+
+/* The reminder slip: the 쪽지 family's paper with rose (to-dos) or sky (events) tape, a speech-bubble
+   tail toward the cat. It rises into place; the window leaves room around it for the tape and shadow. */
+.bubble {
+  position: absolute; bottom: 32px; display: flex; flex-direction: column;
+  background: var(--paper); border-radius: 16px; box-shadow: var(--shadow-slip); font-family: var(--ui);
+  opacity: 0; transform: translateY(8px) rotate(-0.6deg);
+  transition: transform 0.12s ease-in, opacity 0.12s ease-in;
+}
+.bubble.open { opacity: 1; transform: none; transition: transform 0.18s ease-out, opacity 0.18s ease-out; }
+.bubble.tail::before {
+  content: ""; position: absolute; left: -6px; bottom: calc(var(--tail) - 6px); width: 12px; height: 12px;
+  background: var(--paper); transform: rotate(45deg); border-bottom-left-radius: 3px;
+  box-shadow: -2px 2px 3px -1px rgba(70, 58, 30, 0.08);
+}
+.bubble .tape { left: 70%; }
+
+.rows { display: flex; flex-direction: column; }
+.task { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 36px; border-bottom: 1px solid var(--rule); }
+.task:last-child { border-bottom: 0; }
+.check { width: 22px; height: 36px; display: grid; place-items: center; }
+.check span { width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid var(--check-border); display: grid; place-items: center; color: var(--on-sage); transition: background 0.16s, border-color 0.16s; }
+.check span .icon { opacity: 0; }
+.check:hover span { border-color: var(--ink-2); }
+.task.done .check span { background: var(--sage); border-color: var(--sage); animation: pop 0.16s ease-out; }
+.task.done .check span .icon { opacity: 1; }
+@keyframes pop { from { transform: scale(0.85); } }
+.check:disabled { opacity: 0.45; }
+.task.done .check:disabled { opacity: 1; }
+.open-task { min-width: 0; text-align: left; color: var(--ink); font-family: var(--body-font); font-size: var(--popup-size); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 2px var(--ink-over) 2px 0; }
+.task.done .open-task { color: var(--ink-3); text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.when { font: 500 11px var(--ui); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.more { padding-top: 8px; font: 500 12px var(--ui); color: var(--ink-3); text-align: left; align-self: flex-start; }
+.more:hover { color: var(--ink); }
+
+/* 저녁 정리: the question, then the tasks (ticked ones go along), at most five rows before it scrolls. */
+.sweep-msg { font: 500 13px var(--ui); color: var(--ink); line-height: 1.45; margin-bottom: 6px; }
+.sweep-rows { max-height: 180px; overflow-y: auto; }
+.task.picked .check span { background: var(--sage); border-color: var(--sage); }
+.task.picked .check span .icon { opacity: 1; }
+.task:not(.picked) .sweep-title { color: var(--ink-3); }
+.sweep-title { cursor: default; }
+
+/* An event: its title in the hand, where and when under it. */
+.event-title { padding-inline-end: var(--ink-over); font-family: var(--body-font); font-size: 28px; line-height: 1.15; color: var(--ink); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; padding-bottom: 2px; }
+:root[data-font="clean"] .event-title { font-size: 19px; font-weight: 600; }
+.event-place { display: flex; align-items: center; gap: 6px; margin-top: 4px; font: 500 12px var(--ui); color: var(--ink-2); font-variant-numeric: tabular-nums; min-width: 0; }
+.event-place span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.event-place .icon { flex: none; color: var(--ink-3); }
+
+.cat-track { position: absolute; left: 1px; bottom: 36px; will-change: transform; }
+.cat-lift { position: relative; }
+.cat-shadow { position: absolute; left: 50%; bottom: 0; transform: translate(-50%, 50%); border-radius: 50%; background: rgba(0, 0, 0, 0.1); }
+.cat-img { display: block; object-fit: contain; cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .bubble, .bubble.open { transform: none; transition: opacity 0.01ms; } }
+
+/* A footer that doesn't fit (Dutch, a wide font): 내일로 and 5분 전에 다시 keep their icons, the words in the tooltip. */
+.slip-foot.tight .sbtn.optional > span { display: none; }
+.slip-foot.tight .sbtn.optional { padding: 0 10px; }
+/* 내일로 is words alone while there is room; its arrow comes only when the words step aside. */
+.sbtn.to-tomorrow > .icon { display: none; }
+.slip-foot.tight .sbtn.to-tomorrow > .icon { display: inline; }

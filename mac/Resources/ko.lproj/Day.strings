@@ -1,0 +1,4 @@
+/* Korean: the key is the text. Here so the table isn’t looked up in another language. */
+"할 일" = "할 일";
+"일정" = "일정";
+"접기" = "접기";

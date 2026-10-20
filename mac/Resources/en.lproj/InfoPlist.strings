@@ -1,0 +1,4 @@
+/* The app's name in English and Dutch. */
+"CFBundleName" = "Jongi-nyang";
+"CFBundleDisplayName" = "Jongi-nyang";
+"NSHumanReadableCopyright" = "© 2026 leeAhwi. All rights reserved.";

@@ -1,0 +1,64 @@
+html, body { background: transparent; }
+#stage { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+
+/* The pet stands on the floor (the bottom of the window). */
+#pet { position: absolute; bottom: 2px; width: 252px; display: flex; flex-direction: column; align-items: center; }
+.body { position: relative; width: 132px; height: 100px; }
+
+.shadow { position: absolute; left: 50%; bottom: 2.8px; height: 6.4px; border-radius: 50%; transform: translateX(-50%); }
+
+.cat { position: absolute; left: 20px; bottom: 0; width: 92px; height: 92px; transform-origin: 50% 93%; cursor: default; outline: none; }
+.art { display: block; width: 100%; height: 100%; object-fit: contain; transform-origin: 50% 93%; pointer-events: none; }
+.art.awake { animation: breathe-awake 2.6s ease-in-out infinite, sway 5.3s ease-in-out infinite; }
+.art.asleep { animation: breathe-asleep 3.4s ease-in-out infinite; }
+/* Breathing: a little taller and narrower on the in-breath; a slow sway on another period. */
+@keyframes breathe-awake { 0%, 100% { scale: 1 1; } 45% { scale: 0.9944 1.016; } }
+@keyframes breathe-asleep { 0%, 100% { scale: 1 1; } 45% { scale: 0.9902 1.028; } }
+@keyframes sway { 0%, 50%, 100% { rotate: 0deg; } 25% { rotate: 1.1deg; } 75% { rotate: -1.1deg; } }
+
+/* What the cat says (the weekly look-back): a paper bubble just above its head. */
+.bubble {
+  position: relative; max-width: 240px; translate: var(--shift, 0px) 0; padding: 8px 12px; margin-bottom: -6px; z-index: 1;
+  font-size: 13px; font-weight: 500; line-height: 1.4; font-variant-numeric: tabular-nums; text-align: center; white-space: pre-line; word-break: keep-all; color: var(--ink);
+  background: var(--paper); border-radius: 14px; border: 1px solid var(--rule);
+  box-shadow: 0 8px 18px -10px rgba(70, 58, 30, 0.35);
+  transform-origin: 50% 100%; animation: bubble-in 0.3s cubic-bezier(.3, 1.5, .5, 1);
+}
+/* The tail: the rule's colour, then the paper over it. */
+.bubble::before, .bubble::after { content: ""; position: absolute; left: calc(50% + var(--pointer, 0px)); margin-left: -7px; border: 7px solid transparent; border-bottom: 0; }
+.bubble::before { bottom: -8px; border-top: 8px solid var(--rule); }
+.bubble::after { bottom: -6.5px; border-top: 8px solid var(--paper); }
+@keyframes bubble-in { from { transform: scale(0.6); opacity: 0; } }
+/* 종이냥 한마디 asking: the question, then two or three answer buttons. */
+.bubble.asking { padding: 9px 10px; font-size: 13px; font-weight: 600; }
+.bubble .answers { display: flex; justify-content: center; gap: 5px; margin-top: 8px; }
+.bubble .answer {
+  height: 24px; padding: 0 9px; border-radius: 12px; white-space: nowrap;
+  font: 500 11.5px var(--ui); color: var(--ink); background: var(--card);
+  border: 0.8px solid color-mix(in srgb, var(--sage) 25%, transparent); cursor: pointer;
+}
+.bubble .answer.first { color: var(--sage-text); background: color-mix(in srgb, var(--sage) 16%, transparent); border-color: color-mix(in srgb, var(--sage) 45%, transparent); }
+.bubble .answer:hover { background: color-mix(in srgb, var(--sage) 24%, var(--card)); }
+
+.fx { position: absolute; inset: 0; pointer-events: none; }
+.fx svg { position: absolute; overflow: visible; }
+
+/* Sleep can last all night, so the Z's are a compositor animation too. */
+.zs { position: absolute; left: calc(50% + 11px); bottom: 66px; width: 44px; height: 56px; pointer-events: none; }
+.zs span {
+  position: absolute; left: 22px; bottom: 28px; translate: -50% 50%; opacity: 0;
+  font-weight: 600; color: var(--secondary); animation: rise 3s linear infinite;
+}
+.zs span:nth-child(1) { font-size: 9px; }
+.zs span:nth-child(2) { font-size: 11px; animation-delay: -2s; }
+.zs span:nth-child(3) { font-size: 13px; animation-delay: -1s; }
+@keyframes rise { 0% { transform: none; opacity: 0; } 50% { opacity: 1; } 100% { transform: translate(10px, -22px); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  /* base.css shortens animations; infinite ones would then spin every frame, so stop them outright. */
+  .art.awake, .art.asleep, .bubble { animation: none !important; }
+  .zs span { animation: none !important; opacity: 1; }
+  .zs span:nth-child(1) { transform: translate(4px, -6px); }
+  .zs span:nth-child(2) { transform: translate(7px, -13px); }
+  .zs span:nth-child(3) { transform: translate(10px, -20px); }
+}

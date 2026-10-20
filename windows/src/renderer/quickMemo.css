@@ -1,0 +1,13 @@
+/* 빠른 메모: an M slip with lavender tape, ruled handwriting lines every 40px. */
+:root { --line: 40px; }
+.memo-body { padding: 8px 16px 0; }
+textarea.ruled {
+  display: block; width: 100%; height: calc(var(--line) * 4); padding: 0 2px; margin: 0;
+  font-family: var(--body-font); font-size: 24px; line-height: var(--line); color: var(--ink);
+  background: transparent repeating-linear-gradient(transparent 0, transparent calc(var(--line) - 1px), var(--rule) calc(var(--line) - 1px), var(--rule) var(--line));
+  background-attachment: local; border: 0; outline: none; resize: none; caret-color: var(--sage); user-select: text;
+}
+:root[data-font="clean"] textarea.ruled { font-size: 16px; }
+textarea.ruled::placeholder { font: 14px var(--ui); color: var(--ink-3); opacity: 1; line-height: var(--line); }
+textarea.ruled:focus-visible { outline: none; }
+textarea.ruled::-webkit-scrollbar { width: 6px; }

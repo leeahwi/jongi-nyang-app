@@ -1,0 +1,31 @@
+html, body { background: transparent; }
+/* The folded post-it: honey paper by day; at night a lowered honey (the 오늘 tab's night colour) with light ink. */
+:root { --postit: rgb(247, 230, 163); --postit-veil: linear-gradient(rgba(247, 230, 163, 0.84), rgba(247, 230, 163, 0.84)), url("../../assets/texture.png"); --postit-ink: 77, 66, 43; --postit-rule: rgba(145, 122, 66, 0.24); --postit-fold: rgb(255, 247, 204); }
+:root[data-paper="night"] { --postit: #6a5e35; --postit-veil: none; --postit-ink: 240, 232, 210; --postit-rule: rgba(240, 232, 210, 0.18); --postit-fold: #8a7a48; }
+#icon { position: relative; width: 110px; height: 130px; outline: none; }
+.cat { position: absolute; left: 28px; top: 3px; width: 74px; height: 74px; transition: transform 0.18s ease-out; }
+#icon:hover .cat { transform: translateY(-3px); }
+.note {
+  position: absolute; left: 14px; top: 44px; width: 76px; height: 76px; border-radius: 2px;
+  background-color: var(--postit);
+  background-image: var(--postit-veil);
+  background-size: cover;
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.18);
+  transform: rotate(4deg); transition: transform 0.18s ease-out;
+}
+#icon:hover .note { transform: rotate(2deg); }
+.band { position: absolute; left: 0; right: 0; top: 0; height: 9px; background: rgba(153, 122, 51, 0.07); }
+.lines { position: absolute; left: 8px; right: 10px; top: 16px; display: flex; flex-direction: column; }
+.line { height: 12.5px; display: flex; align-items: flex-end; gap: 3px; border-bottom: 0.6px solid var(--postit-rule); overflow: hidden; }
+.line .box { width: 5.5px; height: 5.5px; border: 0.7px solid rgba(var(--postit-ink), 0.5); border-radius: 1px; flex: none; margin-bottom: 2px; }
+.line .t { padding-inline-end: var(--ink-over); font-family: var(--pen-font); font-size: 11.5px; line-height: 12px; color: rgba(var(--postit-ink), 0.88); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.line .more { font-size: 7.5px; font-weight: 500; color: rgba(var(--postit-ink), 0.6); }
+.caption { position: absolute; left: 9px; bottom: 7px; font-size: 8.5px; font-weight: 600; color: rgba(var(--postit-ink), 0.8); }
+.caption.done { color: var(--sage-text); }
+:root:not([data-paper="night"]) .caption.done { color: rgba(89, 115, 84, 0.95); }
+.fold { position: absolute; right: 0; bottom: 0; width: 11px; height: 11px; background: linear-gradient(135deg, var(--postit-fold) 50%, transparent 50%); border-top: 0.6px solid rgba(166, 138, 74, 0.2); transform: scaleX(-1); }
+.paw { position: absolute; top: -7px; width: 14px; height: 13px; overflow: visible; }
+.paw.left { left: 22px; }
+.paw.right { left: 49px; }
+.paw path { fill: rgb(247, 230, 196); stroke: rgba(107, 77, 48, 0.85); stroke-width: 0.85; }
+.paw .toe { fill: none; stroke-width: 0.55; stroke-linecap: round; }

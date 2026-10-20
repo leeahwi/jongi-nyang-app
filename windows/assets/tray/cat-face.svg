@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 18" width="18" height="18">
+  <!-- The tray's cat face: the macOS menu bar's (TodayWindow.swift CatFaceIcon), ears and a round
+       head with the eyes and the nose cut out. tools/tray-icon.cjs draws it at 16–64 px in the
+       taskbar's light and dark colours (currentColor is replaced there). -->
+  <defs>
+    <mask id="cut" maskUnits="userSpaceOnUse" x="0" y="0" width="18" height="18">
+      <rect width="18" height="18" fill="#fff"/>
+      <ellipse cx="6.15" cy="9.85" rx="0.95" ry="1.25" fill="#000"/>
+      <ellipse cx="11.85" cy="9.85" rx="0.95" ry="1.25" fill="#000"/>
+      <path d="M8.1 12 L9.9 12 L9 13.2 Z" fill="#000"/>
+    </mask>
+  </defs>
+  <g mask="url(#cut)" fill="currentColor" stroke="currentColor" stroke-width="0.4" stroke-linejoin="round">
+    <path d="M2.2 9 L3.4 1.8 L8 5.2 Z"/>
+    <path d="M15.8 9 L14.6 1.8 L10 5.2 Z"/>
+    <ellipse cx="9" cy="10.1" rx="7.4" ry="6.1" stroke="none"/>
+  </g>
+</svg>

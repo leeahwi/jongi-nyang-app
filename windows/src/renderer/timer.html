@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'">
+  <title>집중 타이머</title>
+  <link rel="stylesheet" href="base.css">
+  <link rel="stylesheet" href="timer.css">
+</head>
+<body>
+  <div id="widget">
+    <div class="bubble-slot"></div>
+    <div class="stage">
+    <img class="cat awake" src="../../assets/cat.png" alt="" draggable="false">
+    <div class="board" role="button" tabindex="-1" hidden>
+      <svg class="disc" viewBox="0 0 40 40" aria-hidden="true">
+        <circle class="face" cx="20" cy="20" r="18.5"/>
+        <path class="wedge" d=""/>
+        <g class="ticks"></g>
+        <circle class="rim" cx="20" cy="20" r="18.5"/>
+        <circle class="pin" cx="20" cy="20" r="2.5"/>
+      </svg>
+      <div class="readout">
+        <div class="clock">00:00</div>
+        <div class="phase-row"><span class="phase"></span><span class="rounds" aria-hidden="true"></span></div>
+      </div>
+      <div class="buttons">
+        <button class="pause" title="일시정지" aria-label="일시정지"></button>
+        <button class="stop" title="타이머 종료" aria-label="타이머 종료"><svg viewBox="0 0 8 8" aria-hidden="true"><rect x="1" y="1" width="6" height="6" rx="1"/></svg></button>
+      </div>
+    </div>
+    </div>
+  </div>
+  <script src="timer.js"></script>
+</body>
+</html>

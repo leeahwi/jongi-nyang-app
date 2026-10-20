@@ -1,0 +1,65 @@
+/* 책상: the sidebar (paper-2, 180px; icons only under 820px) and the chosen pane, each pane a page in a frame. */
+body { display: flex; height: 100vh; background: var(--paper); }
+
+.dside {
+  width: 180px; flex: none; display: flex; flex-direction: column; gap: 2px; padding: 12px 8px; overflow-y: auto; overflow-x: hidden;
+  background: var(--paper-2); border-right: 1px solid var(--rule);
+}
+.dside::-webkit-scrollbar { width: 0; }
+.dhead { margin: 12px 8px 4px; font: 600 10.5px/14px var(--ui); letter-spacing: 0.06em; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: none; }
+.dhead:first-child, .drow.find + .dhead { margin-top: 4px; }
+.drow {
+  flex: none; height: 32px; display: flex; align-items: center; gap: 9px; padding: 0 9px; border-radius: 8px;
+  font: 500 12.5px var(--ui); color: var(--ink-2); text-align: left; min-width: 0;
+  transition: background 0.12s ease-out, color 0.12s ease-out;
+}
+.drow .icon { flex: none; }
+.drow .dlabel { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drow:hover { background: color-mix(in srgb, var(--sage) 6%, transparent); color: var(--ink); }
+.drow[aria-selected="true"] { background: var(--raised); color: var(--ink); font-weight: 600; box-shadow: var(--lift), 0 0 0 1px color-mix(in srgb, var(--rule) 70%, transparent); }
+.drow[aria-selected="true"] .icon { color: var(--sage-text); }
+.drow:focus-visible { outline: 2px solid var(--sage); outline-offset: -2px; }
+
+.dmain { flex: 1; min-width: 0; position: relative; }
+/* A pane's page: drawn under the others until it is chosen; while it loads, the desk's paper shows. */
+.pane-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; color-scheme: light; background: transparent; }
+.pane-frame.away, .pane-frame.loading { visibility: hidden; }
+
+/* Windows: a 36px title strip of the desk's own (titleBarOverlay): it drags the window, the sidebar runs
+   up to the top under it, the pane starts below it, and Windows' − □ × sit on its right end. */
+:root[data-chrome] .dside { padding-top: 48px; }
+:root[data-chrome] .dmain { margin-top: 36px; }
+.dbar { position: fixed; left: 0; right: 0; top: 0; height: 36px; -webkit-app-region: drag; z-index: 5; }
+/* Snapshots: Windows' three caption buttons, drawn (46 × 36 each) in ink-2. */
+.dcaption { position: absolute; right: 0; top: 0; display: flex; }
+.dcaption i { width: 46px; height: 36px; position: relative; }
+.dcaption i::before, .dcaption i::after { content: ""; position: absolute; left: 18px; top: 17px; width: 10px; height: 1px; background: var(--ink-2); }
+.dcaption .max::before { top: 13px; height: 10px; width: 10px; background: none; box-shadow: inset 0 0 0 1px var(--ink-2); }
+.dcaption .max::after, .dcaption .min::after { display: none; }
+.dcaption .close::before { transform: rotate(45deg); width: 13px; left: 17px; }
+.dcaption .close::after { transform: rotate(-45deg); width: 13px; left: 17px; }
+
+/* A narrow desk: the sidebar folds to its icons (the names as tooltips). */
+@media (max-width: 819px) {
+  .dside { width: 56px; padding: 12px 8px; align-items: stretch; }
+  :root[data-chrome] .dside { padding-top: 48px; }
+  .dhead { height: 1px; margin: 9px 6px 8px; background: var(--rule); }
+  .dhead span { display: none; }
+  .dhead:first-child, .drow.find + .dhead { display: none; }
+  .drow { justify-content: center; padding: 0; height: 36px; }
+  .drow .dlabel { display: none; }
+}
+
+/* 검색 at the sidebar's top. With the Windows title strip it sits in the strip's left end (no row of its own,
+   so the sidebar's list keeps its room), looking like a small search field. */
+.drow.find { color: var(--ink-3); }
+:root[data-chrome] .drow.find {
+  position: fixed; top: 5px; left: 8px; width: 164px; height: 26px; padding: 0 8px; gap: 7px; z-index: 6; -webkit-app-region: no-drag;
+  background: var(--paper); box-shadow: inset 0 0 0 1px var(--rule); font-size: 12px;
+}
+:root[data-chrome] .drow.find:hover { color: var(--ink-2); background: var(--card); }
+.drow.find kbd { margin-left: auto; font: 600 10px var(--ui); color: var(--ink-3); }
+@media (max-width: 819px) {
+  :root[data-chrome] .drow.find { width: 40px; padding: 0; justify-content: center; }
+  .drow.find kbd { display: none; }
+}

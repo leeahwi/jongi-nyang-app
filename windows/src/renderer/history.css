@@ -1,0 +1,142 @@
+/* Sequential sage ramp, validated: monotone light→dark, lightest step 2.13:1 on paper. At night it runs
+   the other way (dark → bright sage), so more still reads as stronger on the dark paper. */
+:root { --mint: var(--sage-2); --heat-0: #ebe9e0; --heat-1: #9db48f; --heat-2: #86a278; --heat-3: #627f55; --heat-4: #3e5a33; --cell: 10px; --gap: 3px; }
+:root[data-paper="night"] { --heat-0: #3a3832; --heat-1: #4f6a4a; --heat-2: #6a8c63; --heat-3: #87ab7f; --heat-4: #a8cc9f; }
+
+#app {
+  display: flex; flex-direction: column; height: 100vh;
+  /* A big desk: the record stays one page in the middle instead of stretching to the edges. */
+  padding: max(0px, calc((100vh - 1040px) / 2)) max(0px, calc((100vw - 1240px) / 2));
+}
+.pane-head { padding-bottom: 6px; }
+.ranges { flex: none; display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--paper-2); }
+.ranges button { height: 26px; padding: 0 12px; border-radius: 6px; font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ranges button[aria-pressed="true"] { background: var(--raised); color: var(--ink); font-weight: 600; box-shadow: var(--lift); }
+
+.content { flex: 1; min-height: 0; overflow-y: auto; padding: 8px 28px 20px; display: flex; flex-direction: column; gap: 14px; }
+.content > * { flex: none; }
+.card { background: var(--card); border: 1px solid var(--rule); border-radius: 12px; padding: 14px 16px; }
+.card h2 { font-size: 12px; font-weight: 600; color: var(--secondary); margin: 0 0 10px; display: flex; align-items: baseline; gap: 8px; }
+.card h2 .note { font-weight: 400; font-size: 11px; color: var(--faded); }
+
+/* Five tiles (집중 joined in stage 4): the ones with longer words a little wider, and a detail that
+   would be cut wraps to a second line instead. */
+.tiles { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) minmax(0, 0.85fr) minmax(0, 1fr) minmax(0, 1.2fr); gap: 10px; container-type: inline-size; }
+.tile { background: var(--card); border: 1px solid var(--rule); border-radius: 12px; padding: 11px 14px; min-width: 0; }
+.tile .k { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--secondary); white-space: nowrap; }
+.tile .kt { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.tile .badge { width: 20px; height: 20px; flex: none; display: grid; place-items: center; border-radius: 5px; background: var(--mint); color: var(--sage-text); }
+/* Rounded digits where the system has them (SF Rounded on a Mac preview); Segoe UI Variable Display elsewhere. */
+.tile .v { font-family: ui-rounded, "SF Pro Rounded", "Segoe UI Variable Display", var(--ui); font-size: clamp(18px, 3.8cqw, 24px); font-weight: 700; line-height: 1.2; color: var(--ink); margin-top: 3px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tile .v small { font-size: 12px; font-weight: 600; margin-left: 2px; margin-right: 3px; color: var(--secondary); }
+.tile .v small:last-child { margin-right: 0; }
+.tile.focus .v small { font-size: 11px; margin-left: 1px; }
+.tile .d { font-size: 11px; line-height: 1.35; color: var(--secondary); margin-top: 1px; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
+
+/* The squares grow with the card: 53 weeks always fill its width. */
+.heat-card { container: heat / inline-size; }
+.heat {
+  --step: max(9px, calc((100cqw - 28px) / 53)); --gap: clamp(2px, calc(var(--step) * 0.2), 4px); --cell: calc(var(--step) - var(--gap));
+  display: grid; grid-template-columns: 24px auto; column-gap: 4px;
+}
+.months { grid-column: 2; position: relative; height: 16px; font-size: 10px; color: var(--secondary); }
+.months span { position: absolute; top: 0; left: calc(var(--column) * var(--step)); white-space: nowrap; }
+.weekdays { display: grid; grid-template-rows: repeat(7, var(--cell)); row-gap: var(--gap); font-size: 9.5px; color: var(--secondary); line-height: var(--cell); }
+.grid { display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, var(--cell)); grid-auto-columns: var(--cell); gap: var(--gap); }
+.cell { width: var(--cell); height: var(--cell); border-radius: 2.5px; background: var(--heat-0); padding: 0; position: relative; }
+.cell[data-level="1"] { background: var(--heat-1); }
+.cell[data-level="2"] { background: var(--heat-2); }
+.cell[data-level="3"] { background: var(--heat-3); }
+.cell[data-level="4"] { background: var(--heat-4); }
+.cell.future { background: transparent; box-shadow: inset 0 0 0 0.8px color-mix(in srgb, var(--rule) 80%, transparent); }
+.cell.outside { visibility: hidden; }
+.cell.today { box-shadow: 0 0 0 1.5px var(--ink); }
+.cell.selected { box-shadow: 0 0 0 1.5px var(--paper), 0 0 0 3px var(--accent); z-index: 1; }
+.cell:hover { outline: 1px solid color-mix(in srgb, var(--ink) 55%, transparent); outline-offset: 1px; }
+.legend { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 10.5px; color: var(--secondary); }
+.legend .scale { display: flex; align-items: center; gap: 4px; }
+.legend .cell { cursor: default; }
+.legend .cell:hover { outline: none; }
+
+/* 가장 오래 집중한 일: one quiet line under the grid — the three tasks with their time. */
+/* Narrow: the sessions go first, then the third task. */
+@container heat (max-width: 760px) { .ft-n { display: none; } }
+@container heat (max-width: 520px) { .ft-item:nth-of-type(n + 4) { display: none; } }
+.focus-top { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--rule); font-size: 11px; color: var(--secondary); min-width: 0; overflow: hidden; }
+.ft-head { flex: none; font-weight: 600; margin-right: 4px; white-space: nowrap; }
+.ft-item { display: inline-flex; align-items: baseline; gap: 5px; min-width: 0; flex: 0 1 auto; height: 22px; padding: 0 9px; border-radius: 11px; background: var(--paper-2); line-height: 22px; }
+.ft-title { min-width: 0; padding-inline-end: var(--ink-over); font-family: var(--body-font); font-size: 15px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root[data-font="clean"] .ft-title { font-size: 12px; }
+.ft-min { flex: none; font-variant-numeric: tabular-nums; color: var(--ink-3); white-space: nowrap; }
+.day-focus { display: flex; align-items: center; gap: 5px; margin: -2px 0 4px; font-size: 11px; font-weight: 600; color: var(--sage-text); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* The bottom row takes whatever height is left, so the day's list gets the room the taller window adds. */
+.split { flex: 1 1 0; min-height: 190px; display: grid; grid-template-columns: minmax(0, 1fr) clamp(280px, 30%, 360px); grid-template-rows: minmax(0, 1fr); gap: 14px; }
+.split > .card { min-height: 0; display: flex; flex-direction: column; }
+/* The bars take the card's height: taller in a taller window (each fill is a share of its track). */
+.bars { flex: 1 1 150px; min-height: 96px; max-height: 420px; margin-top: auto; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 6px; padding-top: 6px; }
+.bar { display: flex; flex-direction: column; align-items: center; min-height: 0; gap: 5px; }
+.bar .track { flex: 1; min-height: 0; width: 100%; position: relative; display: flex; align-items: flex-end; justify-content: center; }
+.bar .fill { width: 100%; max-width: clamp(20px, 3.2vw, 34px); border-radius: 6px 6px 0 0; background: var(--heat-2); min-height: 0; }
+.bar.current .fill { background: var(--heat-4); }
+.bar.zero .fill { height: 2px !important; background: var(--heat-0); border-radius: 1px; }
+.bar .n { position: absolute; left: 0; right: 0; text-align: center; font-size: 10.5px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+.bar .m { font-size: 10px; color: var(--secondary); white-space: nowrap; }
+.bar.current .m { color: var(--ink); font-weight: 600; }
+/* A faint baseline under the bars, above the month names. */
+.baseline { height: 0.7px; background: var(--rule); margin-top: -21px; margin-bottom: 20px; }
+
+.day-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+/* The day in the UI face (system text; the hand is for what the user wrote), like the calendar's day panel. */
+.day-head .date { font: 600 15px/1.4 var(--ui); color: var(--ink); white-space: nowrap; }
+.day-head .count { flex: none; height: 20px; padding: 0 8px; border-radius: 10px; display: inline-flex; align-items: center; background: var(--mint); font-size: 11px; font-weight: 700; color: var(--sage-text); font-variant-numeric: tabular-nums; }
+.day ul { flex: 1; min-height: 0; list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.day li { display: flex; align-items: center; gap: 8px; min-height: 30px; border-bottom: 1px solid var(--rule); }
+.day li:last-child { border-bottom: 0; }
+.day li .dot { width: 15px; height: 15px; flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--sage); color: var(--on-sage); }
+.day li .t { flex: 1; min-width: 0; padding-inline-end: var(--ink-over); font-family: var(--body-font); font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.day li time { font-size: 10.5px; color: var(--secondary); font-variant-numeric: tabular-nums; }
+.day .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--secondary); font-size: 12px; padding: 12px 0; text-align: center; line-height: 1.6; white-space: pre-line; }
+.day .empty img { width: 64px; height: 64px; object-fit: contain; opacity: 0.9; }
+
+.foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 11px; color: var(--secondary); }
+.foot > span:first-child { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.foot button { color: var(--sage-text); font-weight: 600; font-size: 11px; white-space: nowrap; flex: none; }
+.foot button:hover { text-decoration: underline; }
+.foot .folder { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 0 1 auto; }
+
+/* A short desk (… × 600): a slimmer top and tighter gaps, so the whole record fits without scrolling. */
+@media (max-height: 700px) {
+  .pane-head { min-height: 64px; padding-top: 14px; }
+  .content { padding-top: 12px; padding-bottom: 14px; gap: 10px; }
+  .card { padding: 12px 16px; }
+  .card h2 { margin-bottom: 8px; }
+  .tile { padding: 9px 14px; }
+  .tile .v { font-size: clamp(18px, 3.6cqw, 22px); margin-top: 1px; }
+  .legend { margin-top: 8px; }
+  .split { min-height: 150px; }
+}
+
+#tooltip { position: fixed; z-index: 10; pointer-events: none; background: var(--ink); color: var(--paper); font-size: 11px; padding: 5px 8px; border-radius: 6px; white-space: nowrap; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.18); }
+#tooltip b { font-variant-numeric: tabular-nums; }
+
+/* The smallest desk (… × 520): a little tighter again, so the record still fits without scrolling. */
+@media (max-height: 560px) {
+  .pane-head { min-height: 58px; padding-top: 10px; }
+  .content { gap: 8px; padding-bottom: 10px; }
+  .split { min-height: 100px; }
+  .bars { min-height: 62px; }
+  .focus-top { margin-top: 6px; padding-top: 6px; }
+  .ft-item { height: 20px; line-height: 20px; }
+}
+
+/* A narrower desk: tighter tiles with smaller icons; the narrowest drops the icons (and, if still short, ends a name in …). */
+@container (max-width: 760px) {
+  .tile { padding: 10px 11px; }
+  .tile .k { gap: 5px; }
+  .tile .badge { width: 17px; height: 17px; border-radius: 4px; }
+  .tile .badge .icon { width: 11px; height: 11px; }
+}
+@container (max-width: 560px) {
+  .tile .badge { display: none; }
+}

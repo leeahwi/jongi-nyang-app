@@ -1,0 +1,60 @@
+{
+  "name": "paper-todo-windows",
+  "productName": "종이냥",
+  "version": "1.25.1",
+  "description": "종이 한 장처럼 작게 꺼내 쓰는 Windows 할 일 앱",
+  "author": "leeAhwi",
+  "main": "out/main.js",
+  "private": true,
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "start": "npm run build && electron .",
+    "test": "node tools/build.mjs --tests && node --test out-test/",
+    "snapshot": "npm run build && node tools/snapshot.mjs",
+    "perf": "npm run build && node tools/perf.mjs",
+    "pet-art": "electron tools/pet-art.cjs",
+    "tray-icon": "electron tools/tray-icon.cjs",
+    "dist": "npm run typecheck && npm test && node tools/build.mjs --production && electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "com.noa.PaperTodo",
+    "productName": "종이냥",
+    "artifactName": "JongiNyang-${version}-${arch}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/**",
+      "!out/**/*.map",
+      "assets/**",
+      "!assets/pet/*.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "종이냥"
+    },
+    "copyright": "© 2026 leeAhwi. All rights reserved."
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

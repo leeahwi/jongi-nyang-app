@@ -1,0 +1,104 @@
+html, body { background: transparent; overflow: hidden; }
+/* The phases' colours: focus red, rest sage — lifted at night so they read on the dark board. */
+:root { --focus: #c74a36; --rest: #627f55; --board: rgb(254, 252, 247); --board-veil: linear-gradient(rgba(254, 252, 247, 0.82), rgba(254, 252, 247, 0.82)), url("../../assets/texture.png"); --face: white; }
+:root[data-paper="night"] { --focus: #e3866f; --rest: var(--sage); --board: var(--card); --board-veil: none; --face: #3b3933; }
+
+/* The paper cat holds the board at the bottom of the window; its speech bubble above. Once a
+   countdown has ended the board is gone and the cat cheers under the message. */
+#widget {
+  position: absolute; inset: 0 0 8px 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+}
+.stage { display: flex; flex-direction: column; align-items: center; }
+/* The cat stands well above the board's bottom so its face clears the taller sign (as on mac:
+   the cat's feet 35px above the board's bottom edge, so it overlaps a 64px board by 29px). */
+.cat { width: 92px; height: 92px; object-fit: contain; margin-bottom: -29px; transform-origin: 50% 93%; pointer-events: auto; user-select: none; }
+.done .cat { margin-bottom: 0; }
+.cat[hidden] { display: none; }
+.cat.awake { animation: breathe-awake 2.6s ease-in-out infinite, sway 5.3s ease-in-out infinite; }
+.cat.asleep { animation: breathe-asleep 3.4s ease-in-out infinite; }
+@keyframes breathe-awake { 0%, 100% { scale: 1 1; } 45% { scale: 0.9944 1.016; } }
+@keyframes breathe-asleep { 0%, 100% { scale: 1 1; } 45% { scale: 0.9902 1.028; } }
+@keyframes sway { 0%, 50%, 100% { rotate: 0deg; } 25% { rotate: 1.1deg; } 75% { rotate: -1.1deg; } }
+.bubble-slot { display: flex; justify-content: center; }
+
+/* A paper tag: a Time Timer disc, the time left in big digits, the phase as a coloured pill with
+   the pomodoro rounds, round pause / stop buttons, and a thin top edge in the phase's colour. */
+.board {
+  --phase: var(--focus);
+  display: flex; align-items: center; gap: 10px; padding: 11px 8px 9px 10px;
+  border-radius: 6px;
+  background-color: var(--board);
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--phase) 75%, transparent) 0 2.5px, transparent 2.5px),
+    var(--board-veil);
+  background-size: 100% 100%, cover, cover;
+  box-shadow: 0 0 0 0.6px rgba(0, 0, 0, 0.04), 0 3px 10px rgba(0, 0, 0, 0.14), 0 0.5px 2px rgba(0, 0, 0, 0.06);
+  rotate: -3deg; white-space: nowrap; cursor: default; outline: none;
+  position: relative; z-index: 1;
+}
+/* The cat's paws rest on the top edge. */
+.board::before, .board::after {
+  content: ""; position: absolute; top: -6px; width: 14px; height: 13px; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 13'%3E%3Cpath d='M3.2 12C.6 10 0 5.6 1.3 3.5 2.5.4 5.2-.1 7.1.9c3-.8 5.3 1 5.8 3.4.9 2.6.6 5.9-1.4 7.6-2.8 1-5.4 1-8.3.1z' fill='%23f8eedf' stroke='%236b5646' stroke-width='1'/%3E%3Cpath d='M5.2 7.6v3M8.7 7.6v3' stroke='%236b5646' stroke-width='.8' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat center / contain;
+}
+.board::before { left: calc(50% - 25px); }
+.board::after { left: calc(50% + 11px); }
+.board.rest { --phase: var(--rest); }
+.board.paused { --phase: var(--secondary); }
+
+.disc { width: 40px; height: 40px; flex: none; overflow: visible; }
+.board.paused .disc { opacity: 0.75; }
+.disc .face { fill: var(--face); }
+.disc .rim { fill: none; stroke: color-mix(in srgb, var(--ink) 30%, transparent); stroke-width: 1; }
+.disc .ticks line { stroke: color-mix(in srgb, var(--ink) 25%, transparent); stroke-width: 0.7; }
+.disc .ticks line.major { stroke: color-mix(in srgb, var(--ink) 45%, transparent); stroke-width: 1; }
+.disc .pin { fill: var(--face); stroke: color-mix(in srgb, var(--ink) 60%, transparent); stroke-width: 1.2; }
+
+.readout { display: flex; flex-direction: column; gap: 3px; }
+.clock {
+  font-family: "Segoe UI Variable Display", "Segoe UI", "SF Pro Rounded", var(--ui);
+  font-size: 19px; font-weight: 700; line-height: 22px; letter-spacing: 0.2px;
+  font-variant-numeric: tabular-nums; color: var(--ink);
+}
+.phase-row { display: flex; align-items: center; gap: 5px; }
+.phase {
+  height: 15px; padding: 0 6px; border-radius: 8px; display: inline-flex; align-items: center;
+  font-size: 9.5px; font-weight: 700; line-height: 1; color: var(--phase);
+  background: color-mix(in srgb, var(--phase) 13%, transparent);
+}
+/* 집중 with the note away: the task's title, cut short. */
+.phase.task { display: inline-block; max-width: 92px; line-height: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rounds { display: flex; gap: 3px; }
+.rounds:empty { display: none; }
+.rounds i { width: 5px; height: 5px; border-radius: 50%; border: 1px solid var(--rule); }
+.rounds i.done { background: var(--focus); border-color: var(--focus); }
+.rounds i.now { border-color: var(--focus); }
+
+.buttons { display: flex; flex-direction: column; gap: 4px; }
+.buttons button {
+  width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  color: var(--secondary); background: color-mix(in srgb, var(--sage) 12%, transparent);
+  transition: background 0.12s, color 0.12s;
+}
+.buttons button:hover { color: var(--on-sage); background: var(--sage); }
+.buttons svg { width: 8px; height: 8px; fill: currentColor; }
+
+.bubble {
+  position: relative; max-width: 200px; padding: 8px 12px; margin-bottom: 10px;
+  font-size: 13px; font-weight: 500; line-height: 1.4; font-variant-numeric: tabular-nums; text-align: center; white-space: pre-line; color: var(--ink);
+  background: var(--paper); border-radius: 14px; border: 1px solid var(--rule);
+  box-shadow: 0 8px 18px -10px rgba(70, 58, 30, 0.35);
+  transform-origin: 50% 100%; animation: bubble-in 0.3s cubic-bezier(.3, 1.5, .5, 1);
+}
+/* The tail: the rule's colour, then the paper over it. */
+.bubble::before, .bubble::after { content: ""; position: absolute; left: 50%; margin-left: -7px; border: 7px solid transparent; border-bottom: 0; }
+.bubble::before { bottom: -8px; border-top: 8px solid var(--rule); }
+.bubble::after { bottom: -6.5px; border-top: 8px solid var(--paper); }
+/* Once the board has gone the bubble points at the cheering cat. */
+.done .bubble { margin-bottom: 6px; }
+@keyframes bubble-in { from { transform: scale(0.6); opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .bubble, .cat { animation: none !important; }
+}
