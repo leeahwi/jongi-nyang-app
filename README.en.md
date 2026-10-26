@@ -6,7 +6,7 @@ A paper-notebook app for tasks, events, notes, and focus timers on macOS and Win
 
 [![CI](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml/badge.svg)](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml)
 
-[Download for macOS](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.40.1) | [Download for Windows](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.25.1)
+[Download for macOS](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0) | [Download for Windows](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.26.0)
 
 ![JongiNyang on macOS in light and dark themes, and on Windows](docs/screenshots/hero-en.png)
 
@@ -18,7 +18,7 @@ JongiNyang brings tasks and events into one small notebook. Start without an acc
 
 - **Tasks and notes:** Organize items in Today, Ahead, and Notes. Set deadlines and recurring tasks, and search using Korean initial consonants.
 - **Natural-language input:** Add tasks, events, timers, and alarms in one input line. Check the interpretation shown while typing and press `Tab` to choose another candidate.
-- **Daily schedule:** See the current and upcoming events. Drag blocks in the expanded timetable to adjust their times in 15-minute increments.
+- **Daily schedule:** See the current and upcoming events. Drag blocks in the expanded timetable to move them, or drag their top or bottom edge to change the start or end. They snap to 15 minutes on release.
 - **Focus mode:** Keep the selected task and remaining time together. Use a regular timer or Pomodoro sessions, and review your focus history.
 - **Reminders and a cat:** Receive task and event reminders and alarms. The cat celebrates completion and suggests breaks.
 - **Appearance and languages:** Choose light or dark themes, handwriting or system fonts, and Korean, English, or Dutch.
@@ -44,8 +44,8 @@ The [screenshots](docs/screenshots/) were rendered from the app using sample dat
 
 | Platform | Requirements | Download |
 | --- | --- | --- |
-| macOS | macOS 14 or later, Apple Silicon | [v1.40.1 DMG](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.40.1) |
-| Windows | Windows 10/11, x64 | [v1.25.1 installer and ZIP](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.25.1) |
+| macOS | macOS 14 or later, Apple Silicon | [v1.41.0 DMG](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0) |
+| Windows | Windows 10/11, x64 | [v1.26.0 installer and ZIP](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.26.0) |
 
 On macOS, open the DMG and drag the app into Applications. On Windows, run the installer or extract the ZIP. Intel Macs require a source build. Other versions are available on the [releases page](https://github.com/leeahwi/jongi-nyang-app/releases).
 
@@ -115,6 +115,7 @@ Packages are written to `windows/dist/`. In POSIX shells, use `TZ=Asia/Seoul npm
 | [Architecture](docs/architecture.md) | UI and core logic, data formats, concurrent editing |
 | [Engineering](docs/engineering.md) | Shared tests, rendering, translation checks, performance measurements |
 | [Design process](docs/design-process.md) | Screens, themes, and component design |
+| [Timetable drag postmortem](docs/postmortem-timetable-drag.md) | Why timetable blocks jittered, how it was fixed and measured |
 | [Decisions](docs/decisions.md) | Reasons for file storage and separate platform implementations |
 | [Changelog](CHANGELOG.en.md) | Notable changes by version |
 | [Project overview](portfolio/one-pager-en.md), [Troubleshooting](portfolio/troubleshooting.en.md) | Project background and implementation examples |

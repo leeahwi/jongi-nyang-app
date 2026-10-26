@@ -181,6 +181,8 @@ struct PaperToast: Identifiable {
     var moved: UUID?
     /// 되돌리기 for a change in the list (지웠어요, 3개 끝냈어요 …): ⌘Z takes it back and the toast goes too.
     var undoable = false
+    /// A change outside the list (an event moved or stretched in the timetable, 1.41): ⌘Z runs this while the toast is up.
+    var takeBack: (() -> Void)?
 }
 
 struct ToastView: View {

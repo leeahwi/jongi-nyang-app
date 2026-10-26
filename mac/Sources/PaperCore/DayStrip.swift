@@ -342,8 +342,12 @@ public enum DayStrip {
     /// A block dragged `points` down (up when negative) in the timetable: whole quarter hours (the nearest), the
     /// length kept, inside the day's hours. `edge` `.end` moves the end only (at least 15 minutes after the start).
     public static func dragged(start: Int, end: Int, edge: TimeBlock.Edge, points: Double, startHour: Int, endHour: Int) -> (start: Int, end: Int) {
-        let range = TimeBlock.dragged(TimeRange(start: start, end: end), edge: edge, by: points / hourHeight * 60,
-                                      bounds: startHour * 60...endHour * 60)
+        dragged(start: start, end: end, edge: edge, points: points, bounds: startHour * 60...endHour * 60)
+    }
+
+    /// The same inside `bounds` (a to-do moved whole stays inside `stretchBounds`, W3).
+    public static func dragged(start: Int, end: Int, edge: TimeBlock.Edge, points: Double, bounds: ClosedRange<Int>) -> (start: Int, end: Int) {
+        let range = TimeBlock.dragged(TimeRange(start: start, end: end), edge: edge, by: points / hourHeight * 60, bounds: bounds)
         return (range.start, range.drawnEnd)
     }
 
@@ -368,5 +372,50 @@ public enum DayStrip {
     /// ⌥↑ / ⌥↓: a block 15 minutes earlier or later, inside the day's hours.
     public static func nudged(start: Int, end: Int, by steps: Int, startHour: Int, endHour: Int) -> (start: Int, end: Int) {
         dragged(start: start, end: end, edge: .whole, points: Double(steps) * hourHeight / 4, startHour: startHour, endHour: endHour)
+    }
+
+    // MARK: Stretching and following (1.41)
+
+    /// The minutes a block can be stretched within (ribbon-cases.md R6) — and a to-do moved whole (W3): the day's hours;
+    /// a to-do's end stops at 03:45 when the day runs to 04:00, since an end at 04:00 isn't kept on a to-do (W2).
+    public static func stretchBounds(startHour: Int, endHour: Int, kind: Kind) -> ClosedRange<Int> {
+        let high = min(TimeBlock.dayEnd, endHour * 60)
+        return max(TimeBlock.dayStart, startHour * 60)...(kind == .task ? min(high, TimeBlock.dayEnd - 15) : high)
+    }
+
+    /// The band at a block's top and bottom that stretches it instead of moving it (R1): 6 pt, less on a short block so
+    /// its middle (at least 10 pt) still moves it; none on a block under 20 pt.
+    public static func stretchBand(height: Double) -> Double {
+        height < 20 ? 0 : min(6, ((height - 10) / 2).rounded(.down))
+    }
+
+    /// A block's top (`.start`) or bottom (`.end`) dragged `points` down (up when negative): TimeBlock.resized in the
+    /// timetable's points (R3–R5).
+    public static func resized(start: Int, end: Int, edge: TimeBlock.Edge, points: Double, bounds: ClosedRange<Int>) -> (start: Int, end: Int) {
+        let range = TimeBlock.resized(TimeRange(start: start, end: end), edge: edge, by: points / hourHeight * 60, bounds: bounds)
+        return (range.start, range.drawnEnd)
+    }
+
+    /// ⇧⌥↑ / ⇧⌥↓: the end 15 minutes earlier or later (R7).
+    public static func stretched(start: Int, end: Int, by steps: Int, bounds: ClosedRange<Int>) -> (start: Int, end: Int) {
+        resized(start: start, end: end, edge: .end, points: Double(steps) * hourHeight / 4, bounds: bounds)
+    }
+
+    /// Where a block is drawn while it's dragged (R2): exactly where the pointer took it (no quarter hours), in minutes
+    /// with fractions — moved whole inside the day's hours, or an edge kept at least 15 minutes from the other. Where it
+    /// lands is `dragged` (moved) or `resized` (stretched).
+    public static func following(start: Int, end: Int, edge: TimeBlock.Edge, points: Double, bounds: ClosedRange<Int>) -> (start: Double, end: Double) {
+        let delta = points / hourHeight * 60
+        let low = Double(max(TimeBlock.dayStart, bounds.lowerBound)), high = Double(min(TimeBlock.dayEnd, bounds.upperBound))
+        let from = Double(start), to = Double(end)
+        switch edge {
+        case .whole:
+            let top = min(max(low, from + delta), high - (to - from))
+            return (top, top + to - from)
+        case .start:
+            return (min(max(low, from + delta), max(to - 15, from)), to)
+        case .end:
+            return (from, max(min(high, to + delta), min(from + 15, to)))
+        }
     }
 }

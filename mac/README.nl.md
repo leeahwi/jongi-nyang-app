@@ -84,7 +84,7 @@
 - Herinneringen voor taken gaan af op elk apparaat dat aan staat.
 
 ### 📅 Afspraken · kalender
-- Bewaar **afspraken** in de app (geen online account). Ze staan als nu · volgende op de **dagbalk** van het tabblad Vandaag, en als gekleurde blokken in het **dagschema** als je hem openklapt. Klik op een blok om te wijzigen, sleep om het per kwartier te verplaatsen.
+- Bewaar **afspraken** in de app (geen online account). Ze staan als nu · volgende op de **dagbalk** van het tabblad Vandaag, en als gekleurde blokken in het **dagschema** als je hem openklapt. Klik op een blok om te wijzigen; sleep het en het volgt de muis en valt dan op een kwartier; sleep de boven- of onderrand voor het begin of het einde.
 - **Nieuwe afspraak**: „morgen om 3 uur overleg” op de invoerregel, ⋯ → Nieuwe afspraak, dubbelklikken op een dag in de kalender, of `⌘Return` in snel toevoegen `⌃⌥N`. Op het afsprakenbriefje kies je titel · datum · tijd (of hele dag) · **herhaling** (elke dag · week · maand · jaar) · **kleur** (6) · plaats met chips. Een herhalende afspraak verwijder je voor ‘Alleen deze dag’ of voor alle dagen.
 - **Taak → In kalender zetten** (rechtsklik op een taak): de datum komt van de herinneringstijd of deadline, en de taak krijgt een kalendertje.
 - **Herinneringen voor afspraken** 5 · 10 · 15 · 30 min vooraf (klik om de kalender op die dag te openen), en de **kalender** in het bureau (`⌘D`): afspraken, deadlines en herinneringen per maand of week. In het Nederlands begint de week op maandag.
@@ -103,6 +103,16 @@
 - Bureau → Weergave → **Taal**: Automatisch · 한국어 · English · Nederlands. Automatisch volgt de taalvolgorde van je Mac (Engels als geen van de drie erin staat); na een wijziging start Jongi-nyang opnieuw.
 - Menu’s, instellingen, help, herinneringen, kattenpraat, datums en tijden: alles in die taal. Engels en Nederlands handschrift gebruikt Caveat (pen) en Kalam (stift); titels die je in het Koreaans schrijft, blijven in Koreaans handschrift.
 
+### ↕ Slepen en oprekken in het dagschema (1.41)
+| Slepen |
+| --- |
+| ![Een blok slepen](../docs/screenshots/mac/en/day-drag.png) |
+
+- Een gesleept blok blijft aan de muis hangen. Het kwartier waar het landt is een vage stippellijn, de nieuwe tijd een klein label op het blok, en bij loslaten glijdt het in 0,12 s op zijn plek (meteen met Beperk beweging).
+- In 1.40 trilde het blok tussen zijn plek en een stap lager, omdat het slepen gemeten werd ten opzichte van het blok dat zelf bewoog. Oorzaak en metingen staan in het [verslag](../docs/postmortem-timetable-drag.md) (in het Koreaans).
+- Taken en eenmalige afspraken tonen ↕ en een klein handvat als de muis op de boven- of onderrand staat. Sleep de bovenrand voor het begin, de onderrand voor het einde (dichtstbijzijnde kwartier, minstens 15 minuten, binnen de dag). `⇧⌥↑` `⇧⌥↓` op een gekozen blok verschuift het einde per 15 minuten.
+- ‘Tijd gewijzigd · 14:00–16:00 · Ongedaan maken’, of `⌘Z`. Sleep je voorbij de boven- of onderkant, dan scrolt het dagschema mee; `Esc` tijdens het slepen zet het blok terug.
+
 ### 🕰 Dagbalk · het dagschema (1.40)
 | Wat er nu is |
 | --- |
@@ -111,12 +121,12 @@
 - Een **dagbalk** zonder kader, alleen een lijn erboven en eronder: bovenaan de afspraken voor de hele dag en ‘Hele dag ›’, daaronder een dunne balk van de dag (het verleden iets donkerder, afspraken in hun kleur, taken met een tijd in groen, nu als een rood streepje).
 - In het midden groot in handschrift **wat er nu is**, met de resterende tijd in een ring (`40 min over`, boven een uur `1:20 over`). Is er nu niets, dan hoe lang het nog duurt tot het volgende (`40 min te gaan`, rood binnen het uur). Een taak: klik op de ring om erop te focussen, vink het vakje aan om hem af te ronden.
 - Daaronder de **volgende** twee dingen (één in een smal notitieblok, drie in een hoog): `14:00 □ Rapport afmaken · over 40 min`. Herinneringen tellen ook mee.
-- ‘Hele dag ›’ of de balk opent het **dagschema** op zijn plek (50 pt per uur, vanaf een uur voor nu): afspraken als gekleurde blokken, taken als groen omrande blokken, herinneringen als kleine labels, naast elkaar als ze overlappen (`+N` vanaf de vierde). Sleep om per kwartier te verplaatsen, sleep het handvat om het einde te wijzigen; klik op een lege plek voor `Wat ga je doen?`, dubbelklik voor een nieuwe afspraak. `↑↓` · `Return` · `Spatie` · `⌥↑↓` · `Esc`.
+- ‘Hele dag ›’ of de balk opent het **dagschema** op zijn plek (50 pt per uur, vanaf een uur voor nu): afspraken als gekleurde blokken, taken als groen omrande blokken, herinneringen als kleine labels, naast elkaar als ze overlappen (`+N` vanaf de vierde). Sleep om te verplaatsen, sleep de boven- of onderrand voor het begin of het einde (1.41, [hieronder](#-slepen-en-oprekken-in-het-dagschema-141)); klik op een lege plek voor `Wat ga je doen?`, dubbelklik voor een nieuwe afspraak. `↑↓` · `Return` · `Spatie` · `⌥↑↓` · `⇧⌥↑↓` (het einde, 15 min) · `Esc`.
 - Maar één keer per minuut opnieuw getekend (het CPU-gebruik met het notitieblok open blijft onder 1%). Het timerbriefje verandert niet meer van breedte als de seconden tikken.
 
 ### 🕑 Een tijd voor een taak (1.39)
 - Geef een taak een **tijd** op zijn dag (begin–eind; alleen een begin telt als 30 min): rechtsklik → **Tijd instellen…**, het tabblad **Tijd** in het herinneringsbriefje (een lijst per kwartier of een getypte tijd, en 30 min · 1 u · 2 u), of typ `verslag 14:00-15:30`, `verslag van 2 tot 4 uur` → chip `Taak · vandaag 14:00–16:00` (met Tab wordt het een afspraak op dezelfde tijd).
-- De balk van de **dagbalk** toont hem in groen, het opengeklapte **dagschema** als groen omrand blok: vaag en doorgestreept als hij af is, rood omrand als de tijd voorbij is en hij niet af is. Sleep het blok om het te verplaatsen, of het handvat eronder om het einde te wijzigen, per kwartier. Hij staat ook in de regels nu · volgende.
+- De balk van de **dagbalk** toont hem in groen, het opengeklapte **dagschema** als groen omrand blok: vaag en doorgestreept als hij af is, rood omrand als de tijd voorbij is en hij niet af is. Sleep het blok om het te verplaatsen, of de boven- of onderrand voor het begin of het einde, per kwartier. Hij staat ook in de regels nu · volgende.
 - Regels tonen `🕑 14:00–16:00`; **Volgende** zet taken met een tijd op begintijd. Vooruit, de bureaukalender (week en daglijst), het Vandaag-venster en zoeken tonen de tijd ook. Een taak zonder herinnering krijgt er een bij het begin, en een herinnering op het begin schuift mee. Focussen biedt eerst de resterende tijd aan.
 - Bewaard als optionele `timeStart` · `timeEnd` (`"HH:mm"`) in het takenbestand (hetzelfde op Windows); blijft in de geschiedenis, back-ups en tekstexport.
 - **Lichter**: met het notitieblok open en niets te doen ging het CPU-gebruik van zo’n 60% naar onder 1% (de knipperende nu-lijn van de dagbalk tekende het hele notitieblok steeds opnieuw); typen, tabbladen wisselen en Vooruit zijn veel sneller. `scripts/perf.sh` meet het opnieuw.
@@ -247,7 +257,8 @@ swift build -Xswiftc -warnings-as-errors
 ./scripts/test-alarms.sh             # wekkers (dezelfde gevallen als Windows)
 ./scripts/test-intent.sh             # invoerregel · dagbalk · Volgende (84 gevallen gedeeld met Windows)
 ./scripts/test-timeblock.sh          # een tijd voor een taak (57, gevallen gedeeld met Windows · invoerregels 301–324)
-./scripts/test-daystrip.sh           # dagbalk · dagschema (18, gevallen R1–R14 · K1–K8 · G1–G4 · N1–N5 gedeeld met Windows)
+./scripts/test-daystrip.sh           # dagbalk · dagschema (19, gevallen R1–R14 · K1–K8 · G1–G4 · N1–N5 en slepen/oprekken R1–R8 · W3 gedeeld met Windows)
+./scripts/drag-check.sh              # sleepcontrole dagschema: speelt slepen af in een testkopie en kijkt elke tik of het blok de aanwijzer volgt (1.41)
 ./scripts/perf.sh [map] [--quick]    # prestatiecheck: een testkopie met een testlijst — CPU, geheugen, reactietijden (1.39)
 ./scripts/test-ahead.sh              # tabblad Vooruit (45 regels + 12 verplaatst + 3 leeg, gedeeld met Windows)
 ./scripts/test-focus.sh              # focusgeschiedenis · focussessies (F1–F17 · FB1–FB4, gedeeld met Windows)

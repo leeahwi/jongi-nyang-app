@@ -24,6 +24,9 @@
 | `mac/note-toast.png` | 넣은 뒤 아래 안내의 '할 일로 바꾸기' | 사례 글 |
 | `mac/strip-now-event.png` | 하루 띠: 지금 하는 일과 남은 시간, 다음 두 줄 | README |
 | `mac/day-open.png` | 펼친 하루 일정표: 일정은 색 블록, 할 일은 초록 테두리 | README, 사례 글 |
+| `mac/day-drag.png` | 하루 일정표에서 블록을 끄는 중: 놓일 15분 칸은 점선, 바뀔 시간은 작은 표시 | README, 사례 글 |
+| `mac/day-stretch-bottom.png` | 블록의 아래 끝을 끌어 끝 시간을 늘리는 중 | README, 사례 글 |
+| `mac/day-band-hover.png` | 블록 위 끝에 마우스를 올렸을 때 보이는 작은 손잡이 | README |
 | `mac/ahead.png`, `mac/ahead-drag.png` | 앞으로 탭, 할 일을 다른 날로 끌어 놓는 중 | README |
 | `mac/focus-running.png` | 집중 카드: 할 일 하나와 남은 시간 고리 | README |
 | `mac/focus-pomodoro.png` | 뽀모도로 4라운드 중 2라운드의 집중 카드 | 사례 글 |
@@ -42,7 +45,7 @@
 
 | 파일 | 한 줄 설명 | 자리 |
 | --- | --- | --- |
-| `mac/en/note-today.png`, `line-event.png`, `strip-now-event.png`, `day-open.png` | 위 화면들의 영어판 | README.en, 영어 한 장 |
+| `mac/en/note-today.png`, `line-event.png`, `strip-now-event.png`, `day-open.png`, `day-drag.png` | 위 화면들의 영어판 | README.en, 영어 한 장 |
 | `mac/en/focus-running.png`, `alarm-ring.png`, `desk-calendar.png`, `conv-sweep-evening.png` | 집중, 알람, 책상, 저녁 정리의 영어판 | README.en |
 | `mac/night/note-today.png` | 밤 종이의 오늘 노트 | README, 한 장 |
 | `mac/night/focus-running.png`, `alarm-ring.png`, `desk-calendar.png` | 밤 종이의 집중, 알람, 책상 | 사례 글 |
@@ -53,6 +56,8 @@
 | --- | --- | --- |
 | `windows/strip.png`, `windows/en/strip.png` | Windows의 오늘 노트와 하루 띠 (한국어, 영어) | README |
 | `windows/strip-day.png` | Windows에서 펼친 하루 일정표 | README |
+| `windows/strip-day-drag.png` | Windows 일정표에서 블록을 끄는 중: 점선 자리와 시간 표시 | README, 사례 글 |
+| `windows/strip-day-edge-hover.png` | Windows 일정표에서 블록 끝에 마우스를 올린 모습 | 사례 글 |
 | `windows/note-typing-event.png` | 입력 줄에 일정을 적는 중 | 사례 글 |
 | `windows/focus.png` | Windows 집중 카드 | 사례 글 |
 | `windows/desk-calendar.png` | Windows 책상 창의 달력 | 사례 글 |
@@ -70,7 +75,7 @@ Mac은 `cd mac && ./scripts/render-design.sh [ko|en|nl] [night]`로 `mac/docs/de
 | 아이디어 | 보여 줄 것 | 만드는 법 |
 | --- | --- | --- |
 | 입력 줄 | `내일 3시 회의` 입력 → '일정' 칩 → `Tab`으로 '할 일' → Return → 안내의 '바꾸기' | 화면 녹화 6–8초, 노트 창만 자르기 |
-| 하루 일정표 | `하루 전체 ›` → 일정표가 펼쳐짐 → 할 일 블록을 15분씩 끌기 → `Esc` | 화면 녹화 6초 |
+| 하루 일정표 | `하루 전체 ›` → 일정표가 펼쳐짐 → 블록이 마우스를 따라오고 놓으면 15분 칸에 → 아래 끝을 끌어 늘리기 | 화면 녹화 6–8초 |
 | 체크 | 네모가 세이지색으로 톡 커지고 연필 선이 그어짐 | 2–3초 반복 GIF |
 | 고양이가 알림을 가져옴 | 화면 오른쪽에서 걸어 들어와 말풍선을 열고 인사 | 화면 녹화, 데스크톱 배경은 단색 |
 | 낮 → 밤 종이 | 시스템 어두운 모드를 켜면 열린 창이 모두 밤 종이로 | 화면 녹화 3초 |

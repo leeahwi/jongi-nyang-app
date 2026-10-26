@@ -239,6 +239,73 @@ private enum DayStripTests {
             try equal(item.timeRange?.drawnEnd, 1680, "W2 drawn to 04:00")
         }
 
+        try test("R1–R8 stretching and following (1.41)") {
+            // R1 the bands: none under 20 pt, then 5, then 6.
+            for (height, band) in [(18.0, 0.0), (19.5, 0.0), (20.0, 5.0), (22.0, 6.0), (48.0, 6.0), (300.0, 6.0)] {
+                try equal(DayStrip.stretchBand(height: height), band, "R1 band at \(height)")
+            }
+            let day = DayStrip.stretchBounds(startHour: 8, endHour: 24, kind: .event)
+            try equal(day, 480...1440, "R6 an event's bounds")
+            try equal(DayStrip.stretchBounds(startHour: 8, endHour: 24, kind: .task), 480...1440, "R6 a to-do's (the day ends before 04:00)")
+            try equal(DayStrip.stretchBounds(startHour: 8, endHour: 28, kind: .task), 480...1665, "R6 a to-do's end stops at 03:45 (W2)")
+            try equal(DayStrip.stretchBounds(startHour: 8, endHour: 28, kind: .event), 480...1680, "R6 an event's runs to 04:00")
+            // R2 following the pointer: exact (fractions of minutes), kept inside the day, an edge 15 minutes from the other.
+            func follow(_ edge: TimeBlock.Edge, _ points: Double, _ start: Int = 840, _ end: Int = 930) -> String {
+                let f = DayStrip.following(start: start, end: end, edge: edge, points: points, bounds: day)
+                return "\(f.start)-\(f.end)"
+            }
+            try equal(follow(.whole, 10), "852.0-942.0", "R2 whole follows exactly")
+            try equal(follow(.whole, 3.5), "844.2-934.2", "R2 a fraction of a step")
+            try equal(follow(.whole, -1000), "480.0-570.0", "R2 not before the day")
+            try equal(follow(.whole, 1000), "1350.0-1440.0", "R2 not after it")
+            try equal(follow(.start, -20), "816.0-930.0", "R2 top")
+            try equal(follow(.start, 200), "915.0-930.0", "R2 top stops 15 before the end")
+            try equal(follow(.end, 7), "840.0-938.4", "R2 bottom")
+            try equal(follow(.end, -200), "840.0-855.0", "R2 bottom stops 15 after the start")
+            try equal(follow(.start, 5, 850, 860), "850.0-860.0", "R2 a block under 15 minutes doesn't shrink")
+            // R3 where a stretched edge lands: the nearest quarter hour.
+            func stretch(_ edge: TimeBlock.Edge, _ points: Double, _ start: Int = 840, _ end: Int = 930, bounds: ClosedRange<Int> = day) -> String {
+                let r = DayStrip.resized(start: start, end: end, edge: edge, points: points, bounds: bounds)
+                return "\(r.start)-\(r.end)"
+            }
+            try equal(stretch(.end, 30), "840-960", "R3 bottom +36 min → 16:00")
+            try equal(stretch(.end, 20), "840-960", "R3 bottom +24 min → nearest 16:00")
+            try equal(stretch(.end, 6), "840-930", "R3 less than half a step: unchanged")
+            try equal(stretch(.start, -25), "810-930", "R3 top −30 min")
+            try equal(stretch(.start, 200), "915-930", "R3 at least 15 minutes")
+            try equal(stretch(.end, -200), "840-855", "R3 the bottom can't cross the top")
+            try equal(stretch(.start, -1000), "480-930", "R3 not before the day")
+            try equal(stretch(.end, 1000), "840-1440", "R3 not after it")
+            try equal(stretch(.end, 0), "840-930", "R3 no move, no change")
+            // R4 an edge off the quarter hours lands on one once it moves half a step.
+            try equal(stretch(.end, 3, 850, 900), "850-900", "R4 14:10–15:00, a nudge: unchanged")
+            try equal(stretch(.end, 10, 850, 900), "850-915", "R4 bottom → 15:15")
+            try equal(stretch(.start, -10, 850, 900), "840-900", "R4 top → 14:00")
+            // R5 a start alone (drawn 30 minutes) stretched gets the end it was drawn with.
+            try equal(TimeBlock.resized(TimeRange(start: 840), edge: .start, by: -15, bounds: day), TimeRange(start: 825, end: 870), "R5 top")
+            try equal(TimeBlock.resized(TimeRange(start: 840), edge: .end, by: 30, bounds: day), TimeRange(start: 840, end: 900), "R5 bottom")
+            try equal(TimeBlock.resized(TimeRange(start: 840), edge: .end, by: 0, bounds: day), TimeRange(start: 840, end: 870), "R5 an explicit end even unmoved")
+            // R6 a to-do's end at 03:45 at the latest on a day to 04:00.
+            let night = DayStrip.stretchBounds(startHour: 8, endHour: 28, kind: .task)
+            try equal(stretch(.end, 200, 1560, 1620, bounds: night), "1560-1665", "R6 to 03:45")
+            // R7 ⇧⌥↓ / ⇧⌥↑: the end 15 minutes later or earlier.
+            try equal("\(DayStrip.stretched(start: 840, end: 930, by: 1, bounds: day))", "(start: 840, end: 945)", "R7 ⇧⌥↓")
+            try equal("\(DayStrip.stretched(start: 840, end: 930, by: -1, bounds: day))", "(start: 840, end: 915)", "R7 ⇧⌥↑")
+            try equal("\(DayStrip.stretched(start: 840, end: 855, by: -1, bounds: day))", "(start: 840, end: 855)", "R7 not under 15 minutes")
+            try equal("\(DayStrip.stretched(start: 1380, end: 1440, by: 1, bounds: day))", "(start: 1380, end: 1440)", "R7 not past the day")
+            // W3 (Windows' row, adopted): a to-do moved whole stays inside the same bounds; an event runs to 04:00.
+            let moved = DayStrip.dragged(start: 1560, end: 1620, edge: .whole, points: 100, bounds: night)
+            try equal("\(moved.start)-\(moved.end)", "1605-1665", "W3 to-do moved whole")
+            let event = DayStrip.dragged(start: 1560, end: 1620, edge: .whole, points: 100, bounds: DayStrip.stretchBounds(startHour: 8, endHour: 28, kind: .event))
+            try equal("\(event.start)-\(event.end)", "1620-1680", "W3 an event")
+            // R8 the ghost while moving is `dragged` (G rows): the follow and the landing agree on whole steps.
+            for points in stride(from: -62.5, through: 62.5, by: 12.5) {
+                let f = DayStrip.following(start: 840, end: 930, edge: .whole, points: points, bounds: day)
+                let d = DayStrip.dragged(start: 840, end: 930, edge: .whole, points: points, startHour: 8, endHour: 24)
+                try equal("\(Int(f.start))-\(Int(f.end))", "\(d.start)-\(d.end)", "R8 at \(points) pt")
+            }
+        }
+
         try test("N1–N5 a new item from the timetable") {
             let base = at(13, 20), calendar = seoul
             func describe(_ candidates: [Intent.Candidate]) -> [String] {

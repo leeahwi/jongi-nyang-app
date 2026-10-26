@@ -6,7 +6,7 @@ A desktop to-do app for macOS and Windows. I built it separately on each platfor
 | --- | --- |
 | Team and role | Solo developer, pair programming with AI (Claude Code) |
 | Stack | Swift 6, SwiftUI + AppKit / Electron, TypeScript / GitHub Actions |
-| Versions | Mac 1.0 → 1.40.1, Windows 1.0 → 1.25.1 |
+| Versions | Mac 1.0 → 1.41.0, Windows 1.0 → 1.26.0 |
 | Links | Repository `github.com/leeahwi/jongi-nyang-app`, website `leeahwi.github.io/jongi-nyang-app/en/`, downloads under the repository's Releases |
 
 ## Why I built it
@@ -29,7 +29,7 @@ The alarm window before and after. It used to look like a system alert; now it's
 
 ## What I did
 
-- Wrote a case table for each feature, one input and its expected output per row, and made the Swift and TypeScript tests produce the same strings. The input line alone has 136 rows; the Windows suite has 464 tests.
+- Wrote a case table for each feature, one input and its expected output per row, and made the Swift and TypeScript tests produce the same strings. The input line alone has 136 rows; the Windows suite has 471 tests.
 - Built measurement scripts (`mac/scripts/perf.sh`, `windows/tools/perf.mjs`) and used them to find what was burning CPU at idle. Mac went from 61% to 0.7%, Windows from 5.7% to 1.5%.
 - Added snapshot rendering of real screens in 3 languages, day and night (about 1,500 images), and a layout sweep that resizes every Windows window across sizes, scale factors and fonts. A contrast check fails if any of 38 text/background pairs falls below WCAG AA.
 - Picked and combined AI-generated design proposals into a redesign shipped in four stages (Mac 1.34–1.37, Windows 1.19–1.22). The day strip was redrawn three times.
@@ -54,10 +54,10 @@ Full write-ups: [Troubleshooting log](troubleshooting.en.md).
 
 | | |
 | --- | --- |
-| Shipped | Mac 1.40.1, Windows 1.25.1 (GitHub Releases) |
+| Shipped | Mac 1.41.0, Windows 1.26.0 (GitHub Releases) |
 | Performance (Mac 1.38 → 1.39) | idle CPU 61% → 0.7%, input latency 0.46 s → 0.01 s, launch 2.7 s → 1.0 s, memory 213 MB → 136 MB |
 | Performance (Windows 1.23 → 1.24) | idle CPU 5.7% → 1.5%, after an alarm 9.2% → 0.5%, memory 692 MB → 457 MB |
-| Tests | Mac: 15 test scripts, about 300 checks; Windows: 464 `node:test` tests |
+| Tests | Mac: 15 test scripts, about 300 checks; Windows: 471 `node:test` tests |
 | Languages | Korean, English, Dutch (Dutch for my friends in Belgium and the Netherlands; English and Dutch drafted by AI, not yet reviewed by a native speaker) |
 | Code | about 29k lines of Swift (zero dependencies), about 24k lines of TypeScript plus 2.1k lines of CSS |
 

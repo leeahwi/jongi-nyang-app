@@ -18,6 +18,8 @@ struct DayStripView: View {
     var compact = false
     /// Snapshots: a fixed now.
     var now: Date?
+    /// Snapshots: a block of the open day dragged, stretched or under the pointer (1.41).
+    var timetablePreview: TimetablePreview?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorSchemeContrast) private var contrast
     /// The strip's width (the note's): narrow at 400 pt or less.
@@ -57,7 +59,7 @@ struct DayStripView: View {
             if open {
                 DayTimetable(model: model, calendar: calendar, layout: layout, items: items, now: now, noteHeight: noteHeight,
                              narrow: narrow, allDay: { allDayEvents(layout.allDay, limit: narrow ? 1 : 2) },
-                             onClose: { setOpen(false, now: now) }, takesFocus: openedHere)
+                             onClose: { setOpen(false, now: now) }, takesFocus: openedHere, preview: timetablePreview)
                     .transition(.opacity)
             } else {
                 strip(layout, state: state, now: now)

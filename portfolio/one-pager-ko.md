@@ -6,7 +6,7 @@ macOS와 Windows용 데스크톱 할 일 앱. 두 플랫폼에서 따로 만들�
 | --- | --- |
 | 인원, 역할 | 1인 개발 (AI 페어 프로그래밍: Claude Code) |
 | 기술 | Swift 6, SwiftUI + AppKit / Electron, TypeScript / GitHub Actions |
-| 버전 | Mac 1.0 → 1.40.1, Windows 1.0 → 1.25.1 |
+| 버전 | Mac 1.0 → 1.41.0, Windows 1.0 → 1.26.0 |
 | 링크 | 저장소 `github.com/leeahwi/jongi-nyang-app`, 소개 페이지 `leeahwi.github.io/jongi-nyang-app`, 내려받기는 저장소의 Releases |
 
 ## 왜 만들었나
@@ -29,7 +29,7 @@ macOS와 Windows용 데스크톱 할 일 앱. 두 플랫폼에서 따로 만들�
 
 ## 내가 한 일
 
-- 기능마다 입력과 기대 결과를 한 줄씩 적은 사례 표를 먼저 쓰고, Swift와 TypeScript 시험이 같은 문자열을 통과하게 했다. 입력 줄 사례만 136줄이고, Windows 시험은 464개다.
+- 기능마다 입력과 기대 결과를 한 줄씩 적은 사례 표를 먼저 쓰고, Swift와 TypeScript 시험이 같은 문자열을 통과하게 했다. 입력 줄 사례만 136줄이고, Windows 시험은 471개다.
 - 측정 스크립트(`mac/scripts/perf.sh`, `windows/tools/perf.mjs`)를 만들어 쉴 때 CPU의 원인을 찾았다. Mac은 61%에서 0.7%, Windows는 5.7%에서 1.5%로 줄었다.
 - 실제 화면을 3개 언어와 낮/밤으로 약 1,500장 그리는 스냅숏과, Windows 창을 크기, 배율, 글꼴별로 훑는 레이아웃 검사를 넣었다. 글자/바탕 38쌍이 WCAG AA를 넘지 못하면 실패한다.
 - AI가 낸 디자인 제안 가운데 고르고 섞어 새 디자인을 네 단계로 나눠 냈다(Mac 1.34–1.37, Windows 1.19–1.22). 하루 띠는 세 번 다시 그렸다.
@@ -54,10 +54,10 @@ macOS와 Windows용 데스크톱 할 일 앱. 두 플랫폼에서 따로 만들�
 
 | 항목 | 값 |
 | --- | --- |
-| 출시 | Mac 1.40.1, Windows 1.25.1 (GitHub Releases) |
+| 출시 | Mac 1.41.0, Windows 1.26.0 (GitHub Releases) |
 | 성능 (Mac 1.38 → 1.39) | 쉴 때 CPU 61% → 0.7%, 입력 지연 0.46초 → 0.01초, 시작 2.7초 → 1.0초, 메모리 213MB → 136MB |
 | 성능 (Windows 1.23 → 1.24) | 쉴 때 CPU 5.7% → 1.5%, 알람 뒤 9.2% → 0.5%, 메모리 692MB → 457MB |
-| 시험 | Mac 시험 스크립트 15개(검사 약 300개), Windows `node:test` 464개 |
+| 시험 | Mac 시험 스크립트 15개(검사 약 300개), Windows `node:test` 471개 |
 | 언어 | 한국어, 영어, 네덜란드어 (네덜란드어는 벨기에와 네덜란드의 친구들을 위해. 영어와 네덜란드어는 AI 초안이고 원어민 검토 전) |
 | 코드 | Swift 약 29,000줄(외부 의존성 0개), TypeScript 약 24,000줄과 CSS 2,100줄 |
 

@@ -177,8 +177,8 @@ jongi-nyang-app/
 │  └─ art/                 고양이 그림 프롬프트와 검사 기록
 ├─ windows/              Windows 앱 (Electron + TypeScript)
 │  ├─ src/core, main, renderer, i18n
-│  ├─ test/                node:test 시험 (464개)
-│  ├─ tools/               빌드, 스냅숏과 크기 훑기, 성능 측정, 아이콘
+│  ├─ test/                node:test 시험 (471개)
+│  ├─ tools/               빌드, 스냅숏과 크기 훑기, 성능 측정, 끌기 측정, 아이콘
 │  └─ assets/              글꼴, 고양이 그림, 알림 영역과 작업 표시줄 아이콘
 ├─ docs/                 이 문서들과 골라 둔 화면(screenshots/)
 ├─ portfolio/            포트폴리오용 요약, 숫자, 질문과 답

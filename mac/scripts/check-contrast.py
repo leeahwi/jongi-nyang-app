@@ -65,6 +65,8 @@ PAIRS = [
     ('sage', 'sage2', 'large', 'day ribbon ring: the time gone on its track (1.40)'),
     ('clay', 'clay2', 'large', 'day ribbon ring: the hour before the next thing (1.40)'),
     ('ink2', 'paper', 'large', 'day ribbon ring: the next thing more than an hour away (1.40)'),
+    ('sage', 'card', 'large', 'timetable: the grab bar on a to-do block\'s edge (1.41)'),
+    ('toastText', 'toastBack', 'text', 'timetable: the time label on a dragged block (1.41)'),
     ('onSage', 'clayText', 'text', 'delete button (clay fill)'),
     ('switchKnob', 'sage', 'note', 'switch knob on (shape, with a shadow)'),
     ('ink', 'raised', 'text', 'selected pane, segmented pick'),

@@ -8,6 +8,7 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 
 | Phase | Milestone | Mac | Windows |
 | --- | --- | --- | --- |
+| Polish | [Timetable drag · Stretch](#timetable-drag--stretch) | 1.41.0 | 1.26.0 |
 | Polish | [Focus fixes](#focus-fixes) | 1.40.1 | 1.25.1 |
 | Polish | [New day strip · Day timetable](#new-day-strip--day-timetable) | 1.40.0 | 1.25.0 |
 | Polish | [Lighter · Times for to-dos](#lighter--times-for-to-dos) | 1.39.0 | 1.24.0 |
@@ -32,6 +33,20 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 | Mac | [From a first notepad to the cat](#from-a-first-notepad-to-the-cat) | 1.0 – 1.10 | — |
 
 ---
+
+## Timetable drag · Stretch
+
+**Mac 1.41.0 · Windows 1.26.0** — shared cases: drag and stretch R1–R8, the 04:00 limit W3
+
+![Dragging a block in the day timetable](docs/screenshots/mac/en/day-drag.png)
+
+- A block dragged in the day timetable now follows the mouse exactly. The quarter hour it will land on shows as a dashed outline, the new time as a small tag on the block, and on release it slides into place in 0.12 s (at once with reduced motion).
+- To-dos and one-off events can be stretched by their top or bottom edge to change the start or end (nearest quarter hour, at least 15 minutes, within the day). On a selected block, `⇧⌥↑↓` (Windows `Shift+Alt+↑↓`) moves the end by 15 minutes. The old bottom handle became this edge band.
+- In 1.40 a dragged block on the Mac jittered between its place and one step below, and on Windows it jumped from one 15-minute slot to the next. I found it while using the app. The Mac measured the drag against the moving block, so the step it had just moved was cancelled by the next event; Windows drew the snapped position on every `pointermove`. [Postmortem](docs/postmortem-timetable-drag.md) (in Korean) · [Troubleshooting log](portfolio/troubleshooting.en.md#4-timetable-blocks-jittered-when-dragged-mac-140--1410-windows-125--1260)
+- Largest gap between block and pointer while dragging: Mac 51.5 pt → 0.20 pt, Windows 6 px → 0 px. Other blocks aren't redrawn during a drag, and the change is saved once, on release.
+- Dragging past the top or bottom of the timetable scrolls it. On Windows, scrolling during a drag no longer shifts the block, and a block lands where the button is released rather than at the last move.
+- A to-do's end stops at 03:45. Before, an end at 04:00 wasn't saved, yet the app still said the block had moved (Windows).
+- To measure again: Mac `scripts/drag-check.sh`, Windows `tools/drag-probe.mjs`, which log the block and the pointer every tick.
 
 ## Focus fixes
 

@@ -1,8 +1,8 @@
 # 엔지니어링
 
-[← 저장소로](../README.md) · [구조](architecture.md) · [디자인 과정](design-process.md) · [결정 기록](decisions.md)
+[← 저장소로](../README.md) · [구조](architecture.md) · [디자인 과정](design-process.md) · [결정 기록](decisions.md) · [일정표 끌기 수정 기록](postmortem-timetable-drag.md)
 
-같은 제품을 Swift와 TypeScript로 두 번 만들면서, 두 앱이 어긋나지 않게 하려고 만든 검사들을 정리했다. 공유 시험 사례, 화면 스냅숏과 크기 훑기, 번역 검사, 대비 검사, 성능 측정 순서다.
+같은 제품을 Swift와 TypeScript로 두 번 만들면서, 두 앱이 어긋나지 않게 하려고 만든 검사들을 정리했다. 공유 시험 사례, 화면 스냅숏과 크기 훑기(끌기 측정 포함), 번역 검사, 대비 검사, 성능 측정 순서다.
 
 ## 규모
 
@@ -11,10 +11,10 @@
 | 코어 로직 | Swift 35개 파일, 약 8,000줄 | TypeScript 44개 파일, 약 8,000줄 |
 | 앱과 화면 | Swift 64개 파일, 약 21,000줄 | main 약 8,400줄, renderer 약 7,700줄, CSS 2,100줄 |
 | 시험 코드 | 약 6,100줄 | 31개 파일, 약 4,600줄 |
-| 자동 시험 | 시험 스크립트 15개, 검사 약 300개 | `node:test` 464개 |
+| 자동 시험 | 시험 스크립트 15개, 검사 약 300개 | `node:test` 471개 |
 | 외부 런타임 의존성 | 없음 (Apple 프레임워크만) | Electron 하나 |
 
-Mac 검사 수는 `mac/scripts/test*.sh` 각각이 마지막에 출력하는 수를 더한 것이다(54 + 6 + 7 + 11 + 18 + 4 + 7 + 13 + 9 + 언어마다 9 + 44 + 13 + 14 + 21 + 58). Windows는 `npm test` 결과다.
+Mac 검사 수는 `mac/scripts/test*.sh` 각각이 마지막에 출력하는 수를 더한 것이다(54 + 6 + 7 + 11 + 19 + 4 + 7 + 13 + 9 + 언어마다 9 + 44 + 13 + 14 + 21 + 58). Windows는 `npm test` 결과다.
 
 ## 1. 공유 시험 사례
 
@@ -43,6 +43,7 @@ Mac 검사 수는 `mac/scripts/test*.sh` 각각이 마지막에 출력하는 수
 | 입력 줄: 시간 | 301–324 | '3시부터 5시까지 보고서' 같은 시간 범위 | `TimeBlockTests.swift` | `intent.test.ts`, `timeRange.test.ts` |
 | 하루 띠 | R1–R14 | 지금, 다음, 남은 시간, 화면 읽기 문장 | `DayStripTests.swift` | `dayStrip.test.ts` |
 | 하루 일정표 | K1–K8, G1–G4, N1–N5 | 키보드, 겹친 블록 배치, 빈 칸에서 새로 만들기 | `DayStripTests.swift` | `dayStrip.test.ts` |
+| 일정표 끌기 · 늘리기 | R1–R8, W3 (하루 띠의 R과 다른 묶음) | 끄는 동안 포인터 따라가기, 위 · 아래 끝 늘리기, 놓을 때 가장 가까운 15분, 최소 15분, 할 일 끝 03:45 | `DayStripTests.swift` | `dayStrip.test.ts` |
 | 타이머 폭과 시간 | T1–T4, C1… | 고정 폭 숫자, 할 일 시간과 알림 | `TimeBlockTests.swift` | `timeRange.test.ts`, `timerWidget.test.ts` |
 | 앞으로 탭 | 45줄 + 12 + 3 | 이번 주, 다음 주, 달, 언젠가, 옮김 안내, 빈 화면 | `AheadTests.swift` | `ahead.test.ts` |
 | 집중 | F1–F17, FB1–FB4 | 집중 기록 읽기, 새벽 4시 기준 합계, 합치기 | `FocusTests.swift` | `focus.test.ts` |
@@ -69,6 +70,24 @@ Windows에서는 `npm run snapshot`이 모든 창을 화면 밖에서 그리고 
 잉크 잘림 검사는 처음부터 있던 게 아니다. Caveat와 Kalam의 d, e, f, k 끝이 칸 밖으로 나가 'Ahead'가 'Aheaa'로, 'coffee'가 'coffe'로 보였고, 이걸 Windows 1.22.1과 Mac 1.37.1에서 고치면서 검사를 더했다.
 
 두 플랫폼의 스냅숏이 같은 화면 이름으로 나오니, Mac과 Windows 그림을 나란히 놓고 다른 곳을 찾을 수 있었다. 새 디자인 네 단계를 마친 뒤의 점검 판(Mac 1.37.1, Windows 1.22.1)이 그렇게 나왔다.
+
+### 끌기를 틱마다 재기 (Mac 1.41, Windows 1.26)
+
+멈춘 화면은 움직이는 동안의 문제를 보여 주지 못한다. 하루 일정표 블록이 끄는 동안 떨리던 문제(Mac 1.40)는 스냅숏 약 1,500장과 시험을 모두 통과한 상태에서 내가 쓰다가 찾았다. 그래서 끄는 동안 블록이 그려진 위치를 틱마다 기록하는 도구를 두 앱에 하나씩 만들었다.
+
+- macOS `scripts/drag-check.sh`: 다른 번들 ID의 디버그 사본을 만들어 할 일 하나를 넣고 띄운다. 사본에 보낸 가짜 마우스 이벤트는 SwiftUI `DragGesture`까지 가지 않아서, 디버그 빌드에만 있는 재생 장치(`--timetable-replay`, `TimetableReplay.swift`)가 제스처와 같은 함수를 초당 60번 부르며 옮기기, 아래 끝, 위 끝, `Esc`, 일정표 아래로 넘기기를 재생한다. `drag-check.py`가 틱마다 블록과 포인터의 차이, 반대로 튄 횟수, 다른 블록을 다시 그린 횟수를 판정한다. 설치된 앱과 데이터는 건드리지 않는다.
+- Windows `tools/drag-probe.mjs`: `--demo`로 띄운 앱에 CDP로 실제 마우스 이벤트를 1px씩 보내고, `requestAnimationFrame`마다 끌리는 블록의 `top`을 기록한다.
+- `scripts/drag-sim-1.40.py`는 옛 계산을 같은 포인터 경로로 재현한다. 118틱 동안 블록 위치가 114번 바뀌고 61번은 포인터와 반대 방향이었다.
+
+| | 고치기 전 | 고친 뒤 |
+| --- | --- | --- |
+| Mac 옮기기, 포인터와 최대 차이 | 51.5pt (두 칸 사이를 오감) | 0.20pt (118틱, 반대로 튐 0) |
+| Mac 위 · 아래 끝 늘리기 | — | 0.00pt (30틱, 60틱) |
+| Windows 옮기기 | 최대 6px, 216프레임 중 1px 안 38프레임 | 0px (225프레임) |
+| Windows 위 · 아래 끝 | — | 0px (75프레임, 180프레임) |
+| 끄는 동안 다시 그린 것 | Mac은 한 칸마다 일정표 전체 | 시작할 때 일정표 한 번, 끌리는 블록만 |
+
+원인과 고친 방법은 [수정 기록](postmortem-timetable-drag.md)에 있다.
 
 ## 3. 번역 검사
 
@@ -168,11 +187,11 @@ python3 scripts/check-contrast.py
 cd windows
 npm ci
 npx tsc --noEmit -p .
-npm test                          # 464
+npm test                          # 471
 npm run dist                      # Windows 설치 파일 (macOS에서도 만들 수 있다)
 ```
 
-GitHub Actions 워크플로는 두 개다. `.github/workflows/ci.yml`(README 배지)은 Windows 앱의 타입 검사와 시험 464개를 macOS 러너에서 돌린다. `.github/workflows/mac.yml`은 Xcode 26 러너에서 Mac 앱을 빌드하고 코어 시험, 대비 검사, 번역 검사를 돌린다. Xcode 26 이미지가 없으면 이 워크플로만 실패하도록 둘을 나눴다.
+GitHub Actions 워크플로는 두 개다. `.github/workflows/ci.yml`(README 배지)은 Windows 앱의 타입 검사와 시험 471개를 macOS 러너에서 돌린다. `.github/workflows/mac.yml`은 Xcode 26 러너에서 Mac 앱을 빌드하고 코어 시험, 대비 검사, 번역 검사를 돌린다. Xcode 26 이미지가 없으면 이 워크플로만 실패하도록 둘을 나눴다.
 
 ## 아직 못 한 것
 

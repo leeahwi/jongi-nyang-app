@@ -22,6 +22,7 @@
 | 코드 대신 사례 표를 나눠 두 플랫폼의 동작을 맞춘 방법 (입력 줄 136줄) | 설계, 시험 전략 | 사례 글의 중심, 면접 | [engineering.md 1장](../docs/engineering.md#1-공유-시험-사례), ADR 4 |
 | 시험용 사본에서 쉴 때 CPU 61%(가려지면 87%)를 찾아 0.7%로 줄인 과정 | 측정, 원인 분석 | 문제 해결 1번, 이력서 | [troubleshooting.md 1번](troubleshooting.md) |
 | 쓰다가 찾은 멈춤: 0×0 확인 쪽지 때문에 앱이 클릭을 받지 않던 버그 | 사용 중 발견 → 원인 추적, 디버깅 (프로세스 샘플링, 창 목록) | 문제 해결 2번, 면접 | [troubleshooting.md 2번](troubleshooting.md) |
+| 쓰다가 찾은 떨림: 하루 일정표 블록이 끄는 동안 떨린 원인을 틱마다 재서 고친 과정 | 사용 중 발견 → 측정 도구, 두 앱에 같은 규칙으로 수정 | 문제 해결 4번, 면접 | [troubleshooting.md 4번](troubleshooting.md#4-하루-일정표-블록이-떨림-mac-140--1410-windows-125--1260), [수정 기록](../docs/postmortem-timetable-drag.md) |
 | 디자인 안을 고르고 하루 띠를 세 번 다시 그린 과정 | 기획, 디자인 판단 | 디자인 과정 페이지 | [design-process.md](../docs/design-process.md) |
 | 3개 언어, 대비, 화면 자동 검사 | 품질 기준 | 이력서 한 줄, README | [engineering.md 2–4장](../docs/engineering.md) |
 | Google 연동을 빼고 파일 기반으로 바꾼 결정 | 범위 판단 | 설계 결정 | [decisions.md ADR 2](../docs/decisions.md#adr-2-google-연동을-뺐다) |

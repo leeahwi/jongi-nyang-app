@@ -402,6 +402,7 @@ const strip = new DayStripView({
   flow,
   changed: () => fadeEdges(),
   room: () => sheet.clientHeight || window.innerHeight - 170,
+  redraw: () => { if (state) render(); },
 });
 window.addEventListener("ribbon-now", () => { if (state) render(); });
 

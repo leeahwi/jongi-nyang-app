@@ -115,6 +115,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         window.center()
         if !isolated { window.setFrameAutosaveName("PaperTodoWindow") }
         model.window = window
+        #if DEBUG
+        TimetableReplay.start(arguments: arguments, window: window, model: model)
+        #endif
         floatingMascot = FloatingMascotController(
             preferences: preferences,
             image: model.mascotImage,
@@ -696,6 +699,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
         if let editor = window.firstResponder as? NSTextView, !editor.string.isEmpty, editor.undoManager?.canUndo == true {
             editor.undoManager?.undo()
+        } else if let takeBack = model.toast?.takeBack {
+            takeBack()
         } else {
             model.undo()
             // A move on 앞으로 taken back: its toast goes too.

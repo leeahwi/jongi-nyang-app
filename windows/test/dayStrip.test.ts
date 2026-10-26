@@ -5,8 +5,8 @@ import type { Candidate } from "../src/core/intent";
 import { langs } from "../src/core/lang";
 import type { TodoItem } from "../src/core/notebook";
 import {
-  awayText, columns, draggedSpan, isSoon, kicker, leftText, minutesUntil, newCandidates, nudged, ringText, rowLimit, scrollTop, slot,
-  stripItems, stripSentence, stripSpans, stripState, wholeDayLink, type Span, type StripItem, type StripKind,
+  awayText, columns, dragBounds, draggedSpan, edgeBand, followedSpan, isSoon, kicker, leftText, minutesUntil, newCandidates, nudged, ringText, rowLimit, scrollTop, slot,
+  stretched, stripItems, stripSentence, stripSpans, stripState, wholeDayLink, type DragEdge, type Span, type StripItem, type StripKind,
 } from "../src/core/dayStrip";
 import { clockKey } from "../src/core/timeRange";
 
@@ -226,6 +226,69 @@ test("G1–G4 slot, scroll, drag, nudge", () => {
   assert.deepEqual(nudged(480, 540, -1, 8, 24), { start: 480, end: 540 }, "not before the day");
   // [Win] a block ending at 04:00 keeps its end as 1680 (not 04:00 of the day's start).
   assert.deepEqual(draggedSpan(1620, 1680, "whole", -50, 8, 28), { start: 1560, end: 1620 }, "W1 the night's last hour");
+});
+
+// ─── 1.26: following the pointer, stretching from the edges (ribbon-cases "R — stretching", shared with the Mac) ──
+
+const near = (actual: { start: number; end: number }, start: number, end: number, label: string) => {
+  assert.ok(Math.abs(actual.start - start) < 1e-6 && Math.abs(actual.end - end) < 1e-6, `${label}: ${actual.start}–${actual.end}, wanted ${start}–${end}`);
+};
+
+test("1.26 R1 the edge bands", () => {
+  for (const [height, band] of [[18, 0], [19.5, 0], [20, 5], [22, 6], [48, 6], [300, 6]]) assert.equal(edgeBand(height), band, `h ${height}`);
+});
+
+test("1.26 R2 following the pointer", () => {
+  const cases: [DragEdge, number, number, number, number, number][] = [
+    ["whole", 10, 840, 930, 852, 942], ["whole", 3.5, 840, 930, 844.2, 934.2], ["whole", -1000, 840, 930, 480, 570], ["whole", 1000, 840, 930, 1350, 1440],
+    ["start", -20, 840, 930, 816, 930], ["start", 200, 840, 930, 915, 930], ["end", 7, 840, 930, 840, 938.4], ["end", -200, 840, 930, 840, 855],
+    ["start", 5, 850, 860, 850, 860],
+  ];
+  for (const [edge, pixels, start, end, toStart, toEnd] of cases) near(followedSpan(start, end, edge, pixels, 8, 24), toStart, toEnd, `${edge} ${pixels} from ${start}–${end}`);
+});
+
+test("1.26 R3–R4 where a stretched edge lands", () => {
+  const cases: [DragEdge, number, number, number, number, number][] = [
+    ["end", 30, 840, 930, 840, 960], ["end", 20, 840, 930, 840, 960], ["end", 6, 840, 930, 840, 930], ["end", 0, 840, 930, 840, 930],
+    ["start", -25, 840, 930, 810, 930], ["start", 200, 840, 930, 915, 930], ["end", -200, 840, 930, 840, 855], ["start", -1000, 840, 930, 480, 930], ["end", 1000, 840, 930, 840, 1440],
+    // R4: edges off the quarter hours (14:10–15:00).
+    ["end", 3, 850, 900, 850, 900], ["end", 10, 850, 900, 850, 915], ["start", -10, 850, 900, 840, 900],
+  ];
+  for (const [edge, pixels, start, end, toStart, toEnd] of cases) assert.deepEqual(draggedSpan(start, end, edge, pixels, 8, 24, "task"), { start: toStart, end: toEnd }, `${edge} ${pixels} from ${start}–${end}`);
+});
+
+test("1.26 R5 a start alone is stretched from its drawn 30 minutes", () => {
+  const [span] = stripSpans(stripItems([], [task("보고서", "14:00")], at(9)), at(9));
+  assert.deepEqual([span.start, span.end], [840, 870]);
+  assert.deepEqual(draggedSpan(span.start, span.end, "start", -12.5, 8, 24, "task"), { start: 825, end: 870 }, "top −15 min: the end is kept");
+  assert.deepEqual(draggedSpan(span.start, span.end, "end", 25, 8, 24, "task"), { start: 840, end: 900 }, "bottom +30 min");
+  assert.deepEqual(draggedSpan(span.start, span.end, "end", 0, 8, 24, "task"), { start: 840, end: 870 }, "bottom by 0");
+});
+
+test("1.26 R6 bounds: a to-do's end stops at 03:45", () => {
+  assert.deepEqual(dragBounds(8, 24, "task"), { low: 480, high: 1440 });
+  assert.deepEqual(dragBounds(8, 28, "task"), { low: 480, high: 1665 });
+  assert.deepEqual(dragBounds(8, 28, "event"), { low: 480, high: 1680 });
+  assert.deepEqual(draggedSpan(1560, 1620, "end", 200, 8, 28, "task"), { start: 1560, end: 1665 });
+  assert.deepEqual(followedSpan(1560, 1620, "end", 200, 8, 28, "task"), { start: 1560, end: 1665 });
+  // [Win] W3: the same bound when a to-do is moved whole (a drag or Alt+↓): an end at 04:00 wouldn't be kept.
+  assert.deepEqual(draggedSpan(1560, 1620, "whole", 100, 8, 28, "task"), { start: 1605, end: 1665 }, "W3 dragged");
+  assert.deepEqual(nudged(1605, 1665, 1, 8, 28, "task"), { start: 1605, end: 1665 }, "W3 Alt+↓");
+  assert.deepEqual(draggedSpan(1560, 1620, "whole", 100, 8, 28, "event"), { start: 1620, end: 1680 }, "an event runs to 04:00");
+});
+
+test("1.26 R7 Shift+Alt+↑ ↓: the end by 15 minutes", () => {
+  assert.deepEqual(stretched(840, 930, 1, 8, 24, "task"), { start: 840, end: 945 });
+  assert.deepEqual(stretched(840, 930, -1, 8, 24, "task"), { start: 840, end: 915 });
+  assert.deepEqual(stretched(840, 855, -1, 8, 24, "task"), { start: 840, end: 855 }, "15 minutes at least");
+  assert.deepEqual(stretched(1380, 1440, 1, 8, 24, "event"), { start: 1380, end: 1440 }, "inside the day");
+});
+
+test("1.26 R8 moving whole: the follow and the landing agree at whole steps", () => {
+  for (let pixels = -62.5; pixels <= 62.5; pixels += 12.5) {
+    assert.deepEqual(followedSpan(840, 930, "whole", pixels, 8, 24), draggedSpan(840, 930, "whole", pixels, 8, 24), `${pixels}`);
+  }
+  assert.deepEqual(draggedSpan(840, 930, "whole", 12.5, 8, 24), { start: 855, end: 945 });
 });
 
 test("N1–N5 a new item from the timetable", () => {

@@ -165,6 +165,25 @@ public enum TimeBlock {
             return TimeRange(start: start, end: range.end.map { _ in start + length })
         }
     }
+
+    /// 1.41 (ribbon-cases.md R3–R5): a block stretched from its top (`.start`) or bottom (`.end`) edge by `delta`
+    /// minutes. The edge goes to the nearest quarter hour (an edge moved less than half a step stays where it was), at
+    /// least 15 minutes from the other edge (a block already shorter than that never shrinks or jumps), inside `bounds`
+    /// and the 4 a.m. day. The result always has an end: a start alone, drawn as 30 minutes, keeps the end it was drawn
+    /// with. `.whole` is a move (`dragged`).
+    public static func resized(_ range: TimeRange, edge: Edge, by delta: Double, bounds: ClosedRange<Int>) -> TimeRange {
+        let end = range.drawnEnd
+        let low = max(dayStart, bounds.lowerBound), high = min(dayEnd, bounds.upperBound)
+        func moved(_ value: Int) -> Int { abs(delta) < 7.5 ? value : snap(Double(value) + delta) }
+        switch edge {
+        case .start:
+            return TimeRange(start: min(max(low, moved(range.start)), max(end - 15, range.start)), end: end)
+        case .end:
+            return TimeRange(start: range.start, end: max(min(high, moved(end)), min(range.start + 15, end)))
+        case .whole:
+            return dragged(range, edge: .whole, by: delta, bounds: bounds)
+        }
+    }
 }
 
 // MARK: Reading a range in the input line

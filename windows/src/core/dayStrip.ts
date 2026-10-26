@@ -10,7 +10,7 @@ import { rangeToday } from "./timeRange";
  * 하루 띠 (1.25): the strip under the 오늘 sheet's header — what's on now (or next) in large with a ring of the
  * time left, the next few things as rows, a thin bar of the whole day — and, opened, the day as a timetable
  * (하루 일정표). Pure: the note draws what this decides. Same rules and cases as the macOS app (DayStrip.swift),
- * listed in ribbon-cases.md (R1–R14, K1–K8, G1–G4, N1–N5).
+ * listed in ribbon-cases.md (R1–R14, K1–K8, G1–G4, N1–N5; 1.26's drag and stretch: the "R — stretching" rows).
  */
 
 /** Events first, then to-dos with a time, then reminders, wherever two start in the same minute. */
@@ -291,24 +291,66 @@ export function scrollTop(now: Date, startHour: number): number {
   return Math.max(0, (Math.floor((minutes - 60) / 60) - startHour) * hourHeight);
 }
 
+/** What a drag on a block changes: the whole block (moved), or its start or its end (the other edge stays). */
+export type DragEdge = "start" | "end" | "whole";
+
+/** The shortest a block can be made by its edges. */
+export const minimumLength = 15;
+
 /**
- * A block dragged `pixels` down (up when negative) in the timetable: whole quarter hours (the nearest), the length kept,
- * inside the day's hours. `edge` "end" moves the end only (at least 15 minutes after the start). Logical minutes in and out.
+ * Where a block may go: the timetable's hours, inside the 4 a.m. day — a to-do's end no later than 03:45 when the day
+ * runs to 04:00 (an end at 04:00 isn't kept on a to-do; ribbon-cases R6).
  */
-export function draggedSpan(start: number, end: number, edge: "end" | "whole", pixels: number, startHour: number, endHour: number): { start: number; end: number } {
-  // The nearest quarter hour, halves away from zero (as the Mac rounds).
-  const quarters = (pixels / hourHeight) * 4;
-  const step = Math.sign(quarters) * Math.round(Math.abs(quarters)) * 15;
-  const low = Math.max(dayStartMinutes, startHour * 60), high = Math.min(dayEndMinutes, endHour * 60);
-  if (edge === "end") return { start, end: Math.max(start + 15, Math.min(high, end + step)) };
-  const length = end - start;
-  const from = Math.min(Math.max(low, start + step), high - length);
-  return { start: from, end: from + length };
+export function dragBounds(startHour: number, endHour: number, kind: StripKind = "event"): { low: number; high: number } {
+  return { low: Math.max(dayStartMinutes, startHour * 60), high: Math.min(kind === "task" ? dayEndMinutes - 15 : dayEndMinutes, endHour * 60) };
 }
 
+/**
+ * While the button is down the block follows the pointer exactly (R2): `pixels` in the grid, fractions of minutes, no
+ * steps. Moved whole it keeps its length inside the bounds; its top never comes within 15 minutes of its end, nor its
+ * end of its start (a block already shorter never shrinks or jumps).
+ */
+export function followedSpan(start: number, end: number, edge: DragEdge, pixels: number, startHour: number, endHour: number, kind: StripKind = "event"): { start: number; end: number } {
+  const { low, high } = dragBounds(startHour, endHour, kind);
+  const delta = (pixels / hourHeight) * 60;
+  if (edge === "start") return { start: Math.min(Math.max(low, start + delta), Math.max(end - minimumLength, start)), end };
+  if (edge === "end") return { start, end: Math.max(Math.min(high, end + delta), Math.min(start + minimumLength, end)) };
+  const from = Math.min(Math.max(low, start + delta), high - (end - start));
+  return { start: from, end: from + end - start };
+}
+
+/**
+ * Where a block dragged `pixels` down (up when negative) lands. Moved whole (G rows, R8): by whole quarter hours (the
+ * nearest, halves away from zero, as the Mac rounds), the length kept, inside the bounds. An edge (R3, R4): to the
+ * nearest quarter hour of where it was dragged — unless moved less than half a step (7.5 minutes), then it stays —
+ * at least 15 minutes from the other edge, inside the bounds. Logical minutes in and out.
+ */
+export function draggedSpan(start: number, end: number, edge: DragEdge, pixels: number, startHour: number, endHour: number, kind: StripKind = "event"): { start: number; end: number } {
+  const { low, high } = dragBounds(startHour, endHour, kind);
+  const delta = (pixels / hourHeight) * 60;
+  if (edge === "whole") {
+    const step = Math.sign(delta) * Math.round(Math.abs(delta) / 15) * 15;
+    const from = Math.min(Math.max(low, start + step), high - (end - start));
+    return { start: from, end: from + end - start };
+  }
+  const quarter = (minutes: number) => (Math.abs(delta) < 7.5 ? minutes : Math.round((minutes + delta) / 15) * 15);
+  if (edge === "start") return { start: Math.min(Math.max(low, quarter(start)), Math.max(end - minimumLength, start)), end };
+  return { start, end: Math.max(Math.min(high, quarter(end)), Math.min(start + minimumLength, end)) };
+}
+
+/**
+ * The bands at a block's top and bottom where a press changes its start or end instead of moving it (R1): 6 px, less
+ * on a short block so at least 10 px in the middle still moves it; none on a block under 20 px.
+ */
+export const edgeBand = (height: number): number => (height < 20 ? 0 : Math.max(0, Math.min(6, Math.floor((height - 10) / 2))));
+
 /** Alt+↑ / Alt+↓: a block 15 minutes earlier or later, inside the day's hours. */
-export const nudged = (start: number, end: number, steps: number, startHour: number, endHour: number): { start: number; end: number } =>
-  draggedSpan(start, end, "whole", (steps * hourHeight) / 4, startHour, endHour);
+export const nudged = (start: number, end: number, steps: number, startHour: number, endHour: number, kind: StripKind = "event"): { start: number; end: number } =>
+  draggedSpan(start, end, "whole", (steps * hourHeight) / 4, startHour, endHour, kind);
+
+/** Shift+Alt+↑ / Shift+Alt+↓ (R7): a block's end 15 minutes earlier or later (at least 15 minutes after its start, inside the day's hours). */
+export const stretched = (start: number, end: number, steps: number, startHour: number, endHour: number, kind: StripKind = "event"): { start: number; end: number } =>
+  draggedSpan(start, end, "end", (steps * hourHeight) / 4, startHour, endHour, kind);
 
 const pad = (value: number) => String(value).padStart(2, "0");
 const dateKey = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;

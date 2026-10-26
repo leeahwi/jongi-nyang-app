@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml/badge.svg)](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml)
 
-[macOS 다운로드](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.40.1) | [Windows 다운로드](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.25.1)
+[macOS 다운로드](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0) | [Windows 다운로드](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.26.0)
 
 ![종이냥의 macOS 밝은 테마, 어두운 테마와 Windows 화면](docs/screenshots/hero-ko.png)
 
@@ -18,7 +18,7 @@
 
 - **할 일과 메모**를 오늘, 앞으로, 메모 탭에서 관리합니다. 마감과 반복을 설정하고 한글 초성 검색으로 항목을 찾습니다.
 - **자연어 입력**으로 할 일, 일정, 타이머와 알람을 등록합니다. 입력 중 표시되는 해석을 확인하고 `Tab`으로 다른 후보를 선택합니다.
-- **하루 일정표**에서 현재 일정과 다음 일정을 확인합니다. 블록을 드래그하면 시간을 15분 단위로 조정할 수 있습니다.
+- **하루 일정표**에서 현재 일정과 다음 일정을 확인합니다. 블록을 드래그해 옮기고, 위아래 끝을 끌어 시작과 끝 시간을 바꿉니다. 놓을 때 15분 단위로 맞춥니다.
 - **집중 모드**는 선택한 할 일과 남은 시간을 함께 보여 줍니다. 일반 타이머, 뽀모도로와 집중 기록을 지원합니다.
 - **알림과 고양이**가 할 일과 일정, 알람을 알려 줍니다. 고양이는 완료를 축하하거나 휴식을 제안합니다.
 - **화면 설정**에서 밝은 테마와 어두운 테마, 손글씨와 기본 글꼴을 선택합니다. 한국어·영어·네덜란드어를 지원합니다.
@@ -44,8 +44,8 @@
 
 | 플랫폼 | 요구 사항 | 배포 파일 |
 | --- | --- | --- |
-| macOS | macOS 14 이상, Apple Silicon | [v1.40.1 DMG](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.40.1) |
-| Windows | Windows 10/11, x64 | [v1.25.1 설치 파일과 ZIP](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.25.1) |
+| macOS | macOS 14 이상, Apple Silicon | [v1.41.0 DMG](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0) |
+| Windows | Windows 10/11, x64 | [v1.26.0 설치 파일과 ZIP](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.26.0) |
 
 macOS에서는 DMG를 열어 앱을 Applications 폴더로 옮깁니다. Windows에서는 설치 파일을 실행하거나 ZIP을 풀어 사용합니다. Intel Mac은 소스에서 빌드해야 합니다. 다른 버전은 [릴리스 목록](https://github.com/leeahwi/jongi-nyang-app/releases)에서 확인할 수 있습니다.
 
@@ -115,6 +115,7 @@ npm run dist
 | [아키텍처](docs/architecture.md) | UI와 핵심 로직, 데이터 형식과 동시 편집 |
 | [엔지니어링](docs/engineering.md) | 공유 테스트, 화면 렌더링, 번역 검사와 성능 측정 |
 | [디자인 과정](docs/design-process.md) | 화면, 테마와 컴포넌트 설계 |
+| [일정표 드래그 수정 기록](docs/postmortem-timetable-drag.md) | 블록이 떨리던 원인, 수정 방법과 측정 결과 |
 | [의사결정 기록](docs/decisions.md) | 파일 저장과 플랫폼별 구현을 선택한 배경 |
 | [변경 기록](CHANGELOG.md) | 주요 버전의 변경 사항 |
 | [프로젝트 요약](portfolio/one-pager-ko.md), [문제 해결 사례](portfolio/troubleshooting.md) | 개발 배경과 구현 과정 |

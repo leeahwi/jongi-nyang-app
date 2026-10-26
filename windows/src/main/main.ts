@@ -2395,6 +2395,56 @@ async function timeblockShots(directory: string, save: Save, wait: Wait, settled
   return problems;
 }
 
+/** Snapshots: a real mouse on the note (CSS px of the page at zoom 1): a move — with the left button held when `held` —, a press or a release. */
+function noteMouse(type: "mouseMove" | "mouseDown" | "mouseUp", x: number, y: number, held = false): void {
+  note.webContents.sendInputEvent({ type, x: Math.round(x), y: Math.round(y), button: "left", clickCount: 1, ...(held ? { modifiers: ["leftButtonDown"] } : {}) } as Electron.MouseInputEvent);
+}
+
+/**
+ * Snapshots: a point on the open day's block titled `title` — in its top band, its middle or its bottom band. `place`:
+ * the timetable is first scrolled so the block sits at its top (room to stretch the bottom) or in its middle, away
+ * from the edges where a held drag would scroll it.
+ */
+function blockPoint(title: string, where: "top" | "middle" | "bottom", place?: "top" | "middle"): Promise<{ x: number; y: number } | undefined> {
+  return note.webContents.executeJavaScript(`(() => {
+    const block = [...document.querySelectorAll(".tt-block")].find((element) => element.querySelector(".tb-hand, .tb-title")?.textContent === ${JSON.stringify(title)});
+    if (!block) return undefined;
+    const scroller = block.closest(".tt-scroll");
+    scroller.scrollIntoView({ block: "nearest" });
+    if (${JSON.stringify(place ?? "")} === "top") scroller.scrollTop = block.offsetTop - 8;
+    else if (${JSON.stringify(place ?? "")} === "middle") scroller.scrollTop = block.offsetTop - (scroller.clientHeight - block.offsetHeight) / 2;
+    else block.scrollIntoView({ block: "nearest" });
+    const box = block.getBoundingClientRect();
+    return { x: box.left + box.width / 2, y: ${JSON.stringify(where)} === "top" ? box.top + 2 : ${JSON.stringify(where)} === "bottom" ? box.bottom - 2 : (box.top + box.bottom) / 2 };
+  })()`).catch(() => undefined) as Promise<{ x: number; y: number } | undefined>;
+}
+
+/** Snapshots: a press on that block's `where`, dragged `dy` px in small steps and held there; where it was pressed. */
+/** Snapshots: a held drag put back — Esc, then the button let go (nothing changes). */
+async function cancelDrag(at: { x: number; y: number }, wait: Wait): Promise<void> {
+  note.webContents.sendInputEvent({ type: "keyDown", keyCode: "Escape" });
+  note.webContents.sendInputEvent({ type: "keyUp", keyCode: "Escape" });
+  await wait(60);
+  noteMouse("mouseUp", at.x, at.y);
+  noteMouse("mouseMove", 2, 2);
+  await wait(300);
+}
+
+async function dragBlock(title: string, where: "top" | "middle" | "bottom", dy: number, wait: Wait, place?: "top" | "middle"): Promise<{ x: number; y: number } | undefined> {
+  const from = await blockPoint(title, where, place);
+  if (!from) return undefined;
+  noteMouse("mouseMove", from.x, from.y);
+  await wait(60);
+  noteMouse("mouseDown", from.x, from.y);
+  for (let moved = 0; Math.abs(moved) < Math.abs(dy); moved += Math.sign(dy) * 2) {
+    noteMouse("mouseMove", from.x, from.y + moved, true);
+    await wait(8);
+  }
+  noteMouse("mouseMove", from.x, from.y + dy, true);
+  await wait(200);
+  return from;
+}
+
 /**
  * 1.25's shots, day and night: the 하루 띠 in each of its states (something on now — an event, a to-do —, nothing on with
  * the next soon or far off, nothing left, all-day pills with +N, a long title, narrow with one row, tall with three) and
@@ -2522,6 +2572,28 @@ async function stripShots(directory: string, save: Save, wait: Wait, settled: (w
     openDay(true);
     await wait(500);
     await check(`${prefix}strip-day`);
+    // 1.26, with real mouse events: the top band hovered (its grab bar), a block mid-drag (it follows the pointer, the
+    // dashed outline where it lands, the new time on it), its top and its bottom mid-stretch, then let go (the toast).
+    const report = t("보고서 마무리");
+    const hover = await blockPoint(report, "top");
+    if (hover) { noteMouse("mouseMove", hover.x, hover.y); await wait(200); }
+    await check(`${prefix}strip-day-edge-hover`);
+    for (const [name, where, dy] of [["strip-day-drag", "middle", 40], ["strip-day-stretch-top", "top", -30], ["strip-day-stretch-bottom", "bottom", 20]] as const) {
+      const from = await dragBlock(report, where, dy, wait);
+      console.log(`strip ${prefix}${name}: ${await run(`[document.querySelector(".tt-block.dragging .tb-drag")?.textContent ?? "NO LABEL", document.querySelector(".tt-ghost") ? "ghost" : "NO GHOST"].join(" · ")`)}`);
+      await check(`${prefix}${name}`);
+      if (!from) { problems += 1; continue; }
+      if (name === "strip-day-stretch-bottom") {
+        noteMouse("mouseUp", from.x, from.y + dy);
+        noteMouse("mouseMove", 2, 2);
+        await wait(500);
+        console.log(`strip ${prefix}strip-day-dropped: ${await run(`document.querySelector(".toast")?.textContent ?? "NO TOAST"`)}`);
+        await check(`${prefix}strip-day-dropped`);
+        await run(`document.querySelector(".toast .toast-act")?.click()`); // 되돌리기
+        await wait(400);
+      } else await cancelDrag(from, wait);
+    }
+    noteMouse("mouseMove", 2, 2);
     // A crowded hour (side by side, +N), a done and a late to-do, reminders; now 14:20.
     store.replaceEvents([...baseEvents, event(t("점심 약속"), 720, 810, "blue", t("김밥천국"))]);
     add("walk", t("아침 산책"), { start: 540, end: 570 });
@@ -3321,11 +3393,24 @@ async function sizeSweep(directory: string, save: Save, wait: Wait, settled: (wi
   await wait(300);
   type NoteState = { name: string; open: () => Promise<unknown>; close?: () => Promise<unknown> };
   let deleted = 0; // the empty pages' tasks, put back with undo
+  let dragging: { x: number; y: number } | undefined; // the open day's block held by the mouse
+  // After Esc the block is where it was and nothing was written (a toast would say otherwise).
+  const heldTime = () => run(`[...document.querySelectorAll(".tt-block")].find((element) => element.querySelector(".tb-hand")?.textContent === ${JSON.stringify(t("보고서 쓰기"))})?.querySelector(".tb-time")?.textContent + (document.querySelector(".toast") ? " + toast" : "")`);
+  let heldBefore: unknown;
+  const putBack = async () => {
+    const after = await heldTime();
+    if (after !== heldBefore) { console.log(`sweep: the held block wasn't put back (${heldBefore} → ${after})`); problems += 1; }
+  };
   const closeCards = async () => { send("close-editor"); await wait(200); };
   const noteStates: NoteState[] = [
     { name: "today", open: async () => send("page-today") },
     // 하루 띠 (1.25): the whole day opened (scrolled to an hour before now), then a block picked with ↓.
     { name: "today-open", open: async () => openDay(true) },
+    // 1.26: a block mid-drag and one mid-stretch (real mouse events, away from the timetable's edges; put back with Esc).
+    { name: "today-open-drag", open: async () => { heldBefore = await heldTime(); dragging = await dragBlock(t("보고서 쓰기"), "middle", 30, wait, "middle"); },
+      close: async () => { if (dragging) await cancelDrag(dragging, wait); dragging = undefined; await putBack(); } },
+    { name: "today-open-stretch", open: async () => { heldBefore = await heldTime(); dragging = await dragBlock(t("보고서 쓰기"), "bottom", 24, wait, "top"); },
+      close: async () => { if (dragging) await cancelDrag(dragging, wait); dragging = undefined; await putBack(); } },
     { name: "today-open-picked", open: () => run(`document.querySelector(".tt-scroll")?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }))`), close: async () => openDay(false) },
     // 1.23: a carried row hovered (→ 내일 · ↓ 언젠가 · 집중 · 알림 · 지우기), and the search slip.
     // (The ribbon steps aside for this one, so the row needn't scroll it out of view.)
@@ -3399,11 +3484,11 @@ async function sizeSweep(directory: string, save: Save, wait: Wait, settled: (wi
   await sweepNote([[420, 560]], 1.5, "@150", scaledStates);
   note.webContents.setZoomFactor(1);
   const fontKey = await note.webContents.insertCSS(windowsFont);
-  await sweepNote([[350, 400], [420, 560]], 1, "-noto", ["today", "today-open", "today-open-picked", "row-hover", "search", "reminder", "reminder-other", "repeat", "time-editor", "time-list", "range-chips", "event-new", "ahead", "ahead-drag", "memos", "focus", "focus-expanded", "focus-pomodoro-up", "pick"]);
+  await sweepNote([[350, 400], [420, 560]], 1, "-noto", ["today", "today-open", "today-open-drag", "today-open-stretch", "today-open-picked", "row-hover", "search", "reminder", "reminder-other", "repeat", "time-editor", "time-list", "range-chips", "event-new", "ahead", "ahead-drag", "memos", "focus", "focus-expanded", "focus-pomodoro-up", "pick"]);
   // 집중 and the 하루 띠 in the other two fonts (the task's and the strip's titles are in the hand).
   for (const font of ["brush", "clean"] as const) {
     store.setPref("font", font);
-    await sweepNote([[350, 400], [420, 560]], 1, `-${font}`, ["today", "today-open", "today-open-picked", "focus", "focus-expanded", "focus-pomodoro-up", "pick", "overhang", "ahead"]);
+    await sweepNote([[350, 400], [420, 560]], 1, `-${font}`, ["today", "today-open", "today-open-drag", "today-open-stretch", "today-open-picked", "focus", "focus-expanded", "focus-pomodoro-up", "pick", "overhang", "ahead"]);
   }
   store.setPref("font", defaultPrefs.font);
   await note.webContents.removeInsertedCSS(fontKey);

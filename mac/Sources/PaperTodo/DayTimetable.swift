@@ -8,10 +8,13 @@ import SwiftUI
 /// faded and struck through when done), reminders are small pills at their time; overlapping ones stand side by side
 /// (three columns, then "+N"). Now is a clay line with a dot.
 ///
-/// Drag a to-do or a (one-off) event to move it, or a to-do's bottom handle to change its end, a quarter hour at a time
-/// (a toast takes it back). A click on empty space asks `무엇을 할까요?` for a to-do or an event at that time; a
-/// double click opens a new event there. Keys: ↑ ↓ pick a block, Return opens it, Space ticks a to-do, ⌥↑ ⌥↓ move
-/// a to-do by 15 minutes, Esc folds the day back into the strip.
+/// Drag a to-do or a (one-off) event to move it; its top or bottom band (the ↕ cursor and a grab bar show on it) to
+/// stretch it from that edge (1.41). The block follows the pointer exactly, a dashed ghost and a small time label show
+/// where it will land (a quarter hour at a time), it eases into place on the drop, and a toast takes it back (⌘Z too);
+/// Esc while dragging sends it back; held near the top or bottom the timetable scrolls (TimetableDrag). A click on empty
+/// space asks `무엇을 할까요?` for a to-do or an event at that time; a double click opens a new event there. Keys: ↑ ↓
+/// pick a block, Return opens it, Space ticks a to-do, ⌥↑ ⌥↓ move a to-do by 15 minutes, ⇧⌥↑ ⇧⌥↓ its end (or a
+/// one-off event's), Esc folds the day back into the strip.
 struct DayTimetable<AllDay: View>: View {
     @ObservedObject var model: AppModel
     @ObservedObject var calendar: EventBook
@@ -26,14 +29,20 @@ struct DayTimetable<AllDay: View>: View {
     var takesFocus = false
     /// Snapshots: a block picked.
     var previewSelected: String?
+    /// Snapshots: a block dragged or stretched (or its band under the pointer).
+    var preview: TimetablePreview?
     @State private var selected: String?
-    @State private var drag: Drag?
+    /// The drag in progress: only the dragged block and its ghost watch it tick (TimetableDrag).
+    @State private var drag = TimetableDrag()
     @State private var newSlot: Slot?
     @State private var moreShown: Slot?
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    struct Drag: Equatable { var id: String; var start: Int; var end: Int }
     struct Slot: Identifiable, Equatable { var minutes: Int; var ids: [String] = []; var id: Int { minutes } }
+
+    /// The viewport the drags are measured in: it doesn't move with the block or scroll with the hours.
+    static var viewportSpace: String { "timetable.viewport" }
 
     static var labelColumn: CGFloat { 36 }
     /// Room above the first hour's line and under the last's for their labels.
@@ -43,7 +52,8 @@ struct DayTimetable<AllDay: View>: View {
     static var moreLane: CGFloat { 30 }
     private var hour: CGFloat { CGFloat(DayStrip.hourHeight) }
     private var firstMinute: Int { layout.startHour * 60 }
-    private func y(_ minutes: Int) -> CGFloat { Self.pad + CGFloat(minutes - firstMinute) / 60 * hour }
+    private func y(_ minutes: Int) -> CGFloat { scale.y(Double(minutes)) }
+    private var scale: TimetableScale { TimetableScale(firstMinute: firstMinute) }
     private var contentHeight: CGFloat { CGFloat(layout.endHour - layout.startHour) * hour + Self.pad * 2 }
     private var viewport: CGFloat { min(contentHeight, max(260, noteHeight * 0.55)) }
     private var midnight: Date { Calendar.paper.startOfDay(for: CalendarDay.window(now).start) }
@@ -65,15 +75,24 @@ struct DayTimetable<AllDay: View>: View {
                                 Color.clear.frame(height: 1).id("timetable.top")
                             }
                         }
+                        .background { TimetableScrollFinder(scroller: drag.scroller) }
                 }
                 .scrollIndicators(.never)
                 .scrollEdgeFade()
                 .frame(height: viewport)
+                .coordinateSpace(.named(Self.viewportSpace))
+                .probeFrame("viewport")
                 .onAppear { proxy.scrollTo("timetable.top", anchor: .top) }
             }
         }
-        .onAppear { if takesFocus { claimKeys() } }
-        .onDisappear { model.timetableKey = nil }
+        .onAppear {
+            if takesFocus { claimKeys() }
+            if let preview { drag = preview.drag(spans: spans, startHour: layout.startHour, endHour: layout.endHour) }
+        }
+        .onDisappear {
+            model.timetableKey = nil
+            drag.scroller.stop()
+        }
         // The handler sees the day as it is now.
         .onChange(of: items) { if model.timetableKey != nil { claimKeys() } }
         .onChange(of: now) { if model.timetableKey != nil { claimKeys() } }
@@ -126,6 +145,7 @@ struct DayTimetable<AllDay: View>: View {
         let (placed, more) = DayStrip.columns(spans)
         let byID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
         let spanByID = Dictionary(uniqueKeysWithValues: spans.map { ($0.id, $0) })
+        TimetableProbe.count("grid")
         return ZStack(alignment: .topLeading) {
             // The empty space: a click asks what to put there, a double click opens a new event.
             Color.clear
@@ -141,9 +161,18 @@ struct DayTimetable<AllDay: View>: View {
                 if let item = byID[place.id], let span = spanByID[place.id] {
                     // A group with more than three columns leaves a lane on the right for its "+N".
                     let room = more.contains { $0.group == place.group } ? width - Self.moreLane : width
-                    blockBack(item, span: span, place: place, width: room)
-                    block(item, span: span, place: place, width: room)
+                    let lifted = drag.id == item.id
+                    blockBack(item, span: span, place: place, width: room).zIndex(lifted ? 5 : 1)
+                    block(item, span: span, place: place, width: room).zIndex(lifted ? 6 : 3)
                 }
+            }
+            // Where the dragged block will land.
+            if let id = drag.id, !drag.settling, let item = byID[id], let place = placed.first(where: { $0.id == id }) {
+                let room = more.contains { $0.group == place.group } ? width - Self.moreLane : width
+                let column = columnFrame(place, width: room)
+                TimetableGhost(drag: drag, scale: scale, x: column.x, width: column.width, color: tint(item))
+                    .allowsHitTesting(false)
+                    .zIndex(4)
             }
             ForEach(more, id: \.start) { group in
                 Button { moreShown = Slot(minutes: group.start, ids: group.ids) } label: {
@@ -211,84 +240,98 @@ struct DayTimetable<AllDay: View>: View {
 
     // MARK: Blocks
 
-    /// Where a block is drawn: its column's x and width, its top and height (a reminder's pill is 20 pt).
-    private func frame(_ item: DayStrip.Item, span: DayStrip.Span, place: DayStrip.Placed, width: CGFloat)
-        -> (x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat, shown: (Int, Int)) {
+    /// A block's column: its x and width.
+    private func columnFrame(_ place: DayStrip.Placed, width: CGFloat) -> (x: CGFloat, width: CGFloat) {
         let columns = CGFloat(place.columns)
         let columnWidth = (width - Self.labelColumn - Self.gap * (columns - 1)) / columns
-        let x = Self.labelColumn + CGFloat(place.column) * (columnWidth + Self.gap)
-        let shown = drag?.id == item.id ? (drag!.start, drag!.end) : (span.start, span.end)
-        let height = item.kind == .reminder ? 20 : max(18, y(shown.1) - y(shown.0) - 2)
-        return (x, y(shown.0) + 1, columnWidth, height, shown)
+        return (Self.labelColumn + CGFloat(place.column) * (columnWidth + Self.gap), columnWidth)
     }
 
-    /// A block's words and controls (its fill is `blockBack`, under the now line).
-    @ViewBuilder
+    /// An event's colour, a to-do's sage: its ghost and grab bars.
+    private func tint(_ item: DayStrip.Item) -> Color {
+        item.kind == .event ? PaperTheme.event(item.event?.color ?? "", fallback: PaperTheme.sage) : PaperTheme.sage
+    }
+
+    /// Moved or stretched by a drag: a to-do not done, a one-off event that can be changed.
+    private func draggable(_ item: DayStrip.Item) -> Bool {
+        switch item.kind {
+        case .task: return !item.done
+        case .event: return item.event.map { $0.canEdit && !$0.recurring } ?? false
+        case .reminder: return false
+        }
+    }
+
+    /// A block's words and controls (its fill is `blockBack`, under the now line). Placed by TimetableSlot: where the
+    /// model has it, or — while it's dragged — where the pointer took it.
     private func block(_ item: DayStrip.Item, span: DayStrip.Span, place: DayStrip.Placed, width: CGFloat) -> some View {
-        let f = frame(item, span: span, place: place, width: width)
-        Group {
+        let column = columnFrame(place, width: width)
+        return TimetableSlot(drag: drag, id: item.id, scale: scale, x: column.x, width: column.width, start: span.start, end: span.end,
+                             pill: item.kind == .reminder, front: true) { height, shown, lifted in
             switch item.kind {
-            case .event: eventBlock(item, span: span, height: f.height)
-            case .task: taskBlock(item, span: span, height: f.height, width: f.width, shown: f.shown)
+            case .event: eventBlock(item, span: span, height: height, width: column.width, shown: shown, lifted: lifted)
+            case .task: taskBlock(item, span: span, height: height, width: column.width, shown: shown, lifted: lifted)
             case .reminder: reminderPill(item)
             }
         }
-        .frame(width: f.width, height: f.height, alignment: .topLeading)
-        .offset(x: f.x, y: f.y)
-        .zIndex(drag?.id == item.id ? 6 : 3)
     }
 
     /// What's under a block's words: the event's tint and colour bar, a to-do's card and outline, and the pick ring —
-    /// drawn below the now line, so the line runs across the day while the words stay readable on top of it.
-    @ViewBuilder
+    /// drawn below the now line, so the line runs across the day while the words stay readable on top of it. Lifted by a
+    /// drag, it goes over the line with a soft shadow.
     private func blockBack(_ item: DayStrip.Item, span: DayStrip.Span, place: DayStrip.Placed, width: CGFloat) -> some View {
-        let f = frame(item, span: span, place: place, width: width)
+        let column = columnFrame(place, width: width)
         let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
         let over = item.end.map { $0 <= now } ?? false
-        Group {
-            switch item.kind {
-            case .event:
-                let color = PaperTheme.event(item.event?.color ?? "", fallback: PaperTheme.sage)
-                // 14 % by day, 24 % at night: ink2 on the tint stays above 4.5:1 for every colour (scripts/check-contrast.py).
-                ZStack(alignment: .leading) {
-                    color.opacity(scheme == .dark ? 0.24 : 0.14)
-                    Rectangle().fill(color).frame(width: 3)
-                }
-                .clipShape(shape)
-                .opacity(over ? 0.6 : 1)
-                // Solid under the fade, so the hour lines don't show through a block that's over.
-                .background(PaperTheme.paper, in: shape)
-            case .task:
-                shape.fill(PaperTheme.card)
-                    .overlay { shape.strokeBorder(!item.done && over ? PaperTheme.clay : PaperTheme.sage, lineWidth: 1.5) }
-                    .opacity(item.done ? 0.5 : 1)
+        let picked = self.picked == item.id && item.kind != .reminder
+        let dark = scheme == .dark
+        return TimetableSlot(drag: drag, id: item.id, scale: scale, x: column.x, width: column.width, start: span.start, end: span.end,
+                             pill: item.kind == .reminder, front: false) { height, _, lifted in
+            Group {
+                switch item.kind {
+                case .event:
+                    let color = PaperTheme.event(item.event?.color ?? "", fallback: PaperTheme.sage)
+                    // 14 % by day, 24 % at night: ink2 on the tint stays above 4.5:1 for every colour (scripts/check-contrast.py).
+                    ZStack(alignment: .leading) {
+                        color.opacity(dark ? 0.24 : 0.14)
+                        Rectangle().fill(color).frame(width: 3)
+                    }
+                    .clipShape(shape)
+                    .opacity(over ? 0.6 : 1)
+                    // Solid under the fade, so the hour lines don't show through a block that's over.
                     .background(PaperTheme.paper, in: shape)
-            case .reminder:
-                Color.clear
+                case .task:
+                    shape.fill(PaperTheme.card)
+                        .overlay { shape.strokeBorder(!item.done && over ? PaperTheme.clay : PaperTheme.sage, lineWidth: 1.5) }
+                        .opacity(item.done ? 0.5 : 1)
+                        .background(PaperTheme.paper, in: shape)
+                case .reminder:
+                    Color.clear
+                }
             }
-        }
-        .frame(width: f.width, height: f.height)
-        .background {
-            if picked == item.id && item.kind != .reminder {
-                RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(PaperTheme.sageText, lineWidth: 2).padding(-2)
+            .frame(width: column.width, height: height)
+            .background {
+                if picked {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous).strokeBorder(PaperTheme.sageText, lineWidth: 2).padding(-2)
+                }
             }
+            // One shadow for the whole block (not one under its tint too).
+            .compositingGroup()
+            .shadow(color: .black.opacity(lifted ? (dark ? 0.4 : 0.16) : 0), radius: lifted ? 6 : 0, y: lifted ? 3 : 0)
         }
-        .offset(x: f.x, y: f.y)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
-        .zIndex(drag?.id == item.id ? 5 : 1)
     }
 
-    private func eventBlock(_ item: DayStrip.Item, span: DayStrip.Span, height: CGFloat) -> some View {
+    private func eventBlock(_ item: DayStrip.Item, span: DayStrip.Span, height: CGFloat, width: CGFloat, shown: (Int, Int), lifted: Bool) -> some View {
         let event = item.event!
         let color = PaperTheme.event(event.color, fallback: PaperTheme.sage)
         // The block's own fill behind its words: where the now line crosses a block, it stops at the words.
         let over = item.end.map { $0 <= now } ?? false
         // (Not on a block that's over: faded, the patch would show — and the now line is past it anyway.)
         let under = ZStack { PaperTheme.paper; color.opacity(scheme == .dark ? 0.24 : 0.14) }.opacity(over ? 0 : 1)
-        let time = DayStrip.rangeText(minuteDate(drag?.id == item.id ? drag!.start : span.start), minuteDate(drag?.id == item.id ? drag!.end : span.end), language: .current)
+        let time = DayStrip.rangeText(minuteDate(shown.0), minuteDate(shown.1), language: .current)
         let detail = [time, event.location].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · ")
-        let movable = event.canEdit && !event.recurring
+        let movable = draggable(item)
         return Group {
             if height >= 32 {
                 VStack(alignment: .leading, spacing: 1) {
@@ -311,22 +354,26 @@ struct DayTimetable<AllDay: View>: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
         .opacity(over ? 0.6 : 1)
+        // The top and bottom bands: drag one to change the start or the end (a click there still opens it).
+        .modifier(TimetableBands(item: item, height: height, leading: 0, color: color, halo: PaperTheme.paper, enabled: movable, lifted: lifted ? drag.edge : nil,
+                                 preview: preview?.hover == true && preview?.id == item.id ? preview?.edge : nil,
+                                 stretch: { dragGesture(item, span: span, edge: $0) }))
         .contentShape(Rectangle())
         .onTapGesture {
             pick(item.id)
             calendar.sheet = .edit(event, in: calendar)
         }
-        .gesture(movable ? moveGesture(item, span: span, edge: .whole) : nil)
-        .onContinuousHover { phase in hover(phase, movable ? NSCursor.openHand : nil) }
+        .gesture(movable ? dragGesture(item, span: span, edge: .whole) : nil)
         .help(TodayEventsStrip.tooltip(event))
         .contextMenu { TodayEventsStrip.menu(event, calendar: calendar, onAddTask: { model.add($0, literal: true) }) { calendar.sheet = $0 } }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(item.title + ", " + detail)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { calendar.sheet = .edit(event, in: calendar) }
+        .accessibilityActions { if movable { stretchActions(item) } }
     }
 
-    private func taskBlock(_ item: DayStrip.Item, span: DayStrip.Span, height: CGFloat, width: CGFloat, shown: (Int, Int)) -> some View {
+    private func taskBlock(_ item: DayStrip.Item, span: DayStrip.Span, height: CGFloat, width: CGFloat, shown: (Int, Int), lifted: Bool) -> some View {
         let id = item.taskID.flatMap(UUID.init(uuidString:))
         let overdue = !item.done && (item.end.map { $0 <= now } ?? false)
         let time = TimeRange(start: shown.0, end: shown.1).text(.current)
@@ -367,28 +414,20 @@ struct DayTimetable<AllDay: View>: View {
         .padding(.trailing, 7)
         .padding(.vertical, tall ? 3 : 0)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: tall ? .topLeading : .leading)
-        .overlay(alignment: .bottom) {
-            if !item.done && height >= 30 {
-                // The end's handle: drag it to change how long.
-                Capsule().fill(PaperTheme.sage).opacity(0.5).frame(width: 18, height: 3)
-                    .frame(width: 40, height: 9, alignment: .center)
-                    .contentShape(Rectangle())
-                    .highPriorityGesture(moveGesture(item, span: span, edge: .end))
-                    .onContinuousHover { phase in hover(phase, NSCursor.resizeUpDown) }
-                    .padding(.bottom, -1)
-                    .help(L("끌어서 끝 시간 바꾸기"))
-            }
-        }
         .opacity(item.done ? 0.5 : 1)
         // Inside the 1.5 pt outline (drawn under the words): a tall handwriting line's card can't cover it.
         .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous).inset(by: 1.5))
+        // The top and bottom bands (not over the box): drag one to change the start or the end. Their grab bars sit on the
+        // outline, outside the clip.
+        .modifier(TimetableBands(item: item, height: height, leading: 22, color: PaperTheme.sage, halo: PaperTheme.card, enabled: !item.done,
+                                 lifted: lifted ? drag.edge : nil, preview: preview?.hover == true && preview?.id == item.id ? preview?.edge : nil,
+                                 stretch: { dragGesture(item, span: span, edge: $0) }))
         .contentShape(Rectangle())
         .onTapGesture {
             pick(item.id)
             if let id { model.selectedTaskID = id }
         }
-        .gesture(item.done ? nil : moveGesture(item, span: span, edge: .whole))
-        .onContinuousHover { phase in hover(phase, item.done ? nil : NSCursor.openHand) }
+        .gesture(item.done ? nil : dragGesture(item, span: span, edge: .whole))
         .help(item.title + " · " + time)
         .contextMenu {
             if let id {
@@ -402,6 +441,7 @@ struct DayTimetable<AllDay: View>: View {
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { if let id { model.selectedTaskID = id } }
         .accessibilityAction(named: Text(item.done ? L("완료 취소") : L("완료 표시"))) { if let id { model.toggle(id) } }
+        .accessibilityActions { if !item.done { stretchActions(item) } }
     }
 
     private func title(_ item: DayStrip.Item) -> some View {
@@ -468,26 +508,88 @@ struct DayTimetable<AllDay: View>: View {
 
     // MARK: Dragging
 
-    private func moveGesture(_ item: DayStrip.Item, span: DayStrip.Span, edge: TimeBlock.Edge) -> some Gesture {
-        DragGesture(minimumDistance: 3)
-            .onChanged { value in
-                let moved = DayStrip.dragged(start: span.start, end: span.end, edge: edge, points: Double(value.translation.height),
-                                             startHour: layout.startHour, endHour: layout.endHour)
-                drag = Drag(id: item.id, start: moved.start, end: moved.end)
-                pick(item.id)
-            }
-            .onEnded { _ in
-                defer { drag = nil }
-                guard let drag, drag.id == item.id, drag.start != span.start || drag.end != span.end else { return }
-                if item.kind == .event { moveEvent(item, to: drag) } else { moveTask(item, to: drag, edge: edge) }
-            }
+    /// Moves a block (`.whole`) or stretches it from an edge. Measured in the viewport — not in the block, which moves under
+    /// the pointer (in 1.40 the gesture was in the block's own space: each step the block took came off the pointer's
+    /// next reading, so it flipped between two slots every event).
+    private func dragGesture(_ item: DayStrip.Item, span: DayStrip.Span, edge: TimeBlock.Edge) -> some Gesture {
+        let handlers = dragHandlers(item, span: span, edge: edge)
+        #if DEBUG
+        if TimetableProbe.isOn { TimetableProbe.handlers["\(item.id)/\(edge)"] = handlers }
+        #endif
+        return DragGesture(minimumDistance: 3, coordinateSpace: .named(Self.viewportSpace))
+            .onChanged { value in handlers.changed(value.startLocation.y, value.location.y) }
+            .onEnded { _ in handlers.ended() }
+    }
+
+    /// What the gesture does with each reading (and what the debug replay calls, scripts/drag-check.sh).
+    private func dragHandlers(_ item: DayStrip.Item, span: DayStrip.Span, edge: TimeBlock.Edge) -> TimetableDragHandlers {
+        let drag = self.drag, height = viewport, startHour = layout.startHour, endHour = layout.endHour
+        return TimetableDragHandlers(
+            changed: { from, to in
+                if drag.cancelled {
+                    // Esc sent it back: the rest of that press does nothing.
+                    guard from != drag.startPointer else { return }
+                    drag.cancelled = false
+                }
+                if drag.id != item.id || drag.settling {
+                    drag.begin(id: item.id, kind: item.kind, edge: edge, start: span.start, end: span.end,
+                               startHour: startHour, endHour: endHour, pointer: from)
+                    pick(item.id)
+                }
+                drag.move(to: to, viewport: height)
+                (edge == .whole ? NSCursor.closedHand : NSCursor.resizeUpDown).set()
+            },
+            ended: {
+                drag.scroller.stop()
+                if drag.cancelled { drag.cancelled = false; return }
+                guard drag.id == item.id, !drag.settling else { return }
+                drop(item)
+                if edge == .whole { NSCursor.openHand.set() }
+            })
+    }
+
+    /// The drop: the block eases from where the pointer left it into its slot, and the model gets the change (one undo
+    /// step, a toast). Nothing changed: it eases back.
+    private func drop(_ item: DayStrip.Item) {
+        let target = drag.landing, edge = drag.edge, id = item.id
+        let changed = target != (drag.start, drag.end)
+        let commit = {
+            guard changed else { return }
+            if item.kind == .event { changeEvent(item, to: target, moved: edge == .whole) }
+            else if edge == .whole { moveTask(item, to: target) }
+            else { stretchTask(item, to: target) }
+        }
+        settle(to: target, id: id, then: commit)
+    }
+
+    /// Esc while dragging: back where it was, nothing changed.
+    private func cancelDrag() {
+        guard let id = drag.id, !drag.settling else { return }
+        drag.cancelled = true
+        settle(to: (drag.start, drag.end), id: id, then: {})
+    }
+
+    private func settle(to target: (start: Int, end: Int), id: String, then commit: @escaping () -> Void) {
+        let drag = self.drag
+        guard !reduceMotion else {
+            drag.settle(to: target)
+            commit()
+            drag.finish(id)
+            return
+        }
+        withAnimation(.easeOut(duration: 0.12)) {
+            drag.settle(to: target)
+            commit()
+        } completion: {
+            drag.finish(id)
+        }
     }
 
     /// One undo step; a start alone stays a start alone when moved whole.
-    private func moveTask(_ item: DayStrip.Item, to drag: Drag, edge: TimeBlock.Edge) {
+    private func moveTask(_ item: DayStrip.Item, to target: (start: Int, end: Int)) {
         guard let id = item.taskID.flatMap(UUID.init(uuidString:)), let task = model.items.first(where: { $0.id == id }) else { return }
         let old = task.timeRange
-        let new = TimeRange(start: drag.start, end: old?.end == nil && edge == .whole ? nil : drag.end)
+        let new = TimeRange(start: target.start, end: old?.end == nil ? nil : target.end)
         guard new != old else { return }
         model.setTimeRange(id, to: new)
         model.offerUndo(symbol: "clock", text: L("시간을 옮겼어요 · \(new.text(.current))"), after: model.notebookNow) { [model] in
@@ -495,34 +597,56 @@ struct DayTimetable<AllDay: View>: View {
         }
     }
 
-    /// A one-off event moves to the new time (same length); the toast takes it back.
-    private func moveEvent(_ item: DayStrip.Item, to drag: Drag) {
+    /// Stretched from an edge: always with an end (a start alone keeps the end it was drawn with); one undo step.
+    private func stretchTask(_ item: DayStrip.Item, to target: (start: Int, end: Int)) {
+        guard let id = item.taskID.flatMap(UUID.init(uuidString:)), let task = model.items.first(where: { $0.id == id }) else { return }
+        let old = task.timeRange
+        let new = TimeRange(start: target.start, end: target.end)
+        guard new != old else { return }
+        model.setTimeRange(id, to: new)
+        model.offerUndo(symbol: "clock", text: L("시간을 바꿨어요 · \(new.text(.current))"), after: model.notebookNow) { [model] in
+            model.setTimeRange(id, to: old)
+        }
+    }
+
+    /// A one-off event moved (same length) or stretched; the toast — or ⌘Z while it's up — takes it back.
+    private func changeEvent(_ item: DayStrip.Item, to target: (start: Int, end: Int), moved: Bool) {
         guard let event = item.event, let local = calendar.event(event.eventId), local.repeatRule == .none, !local.allDay else { return }
         let old = CalendarDraft.forEvent(local)
         var draft = old
-        let start = minuteDate(drag.start)
+        let start = minuteDate(target.start)
         draft.date = CalendarDraft.day(start)
-        draft.startMinutes = drag.start % 1440
-        draft.endMinutes = drag.end % 1440
+        draft.startMinutes = target.start % 1440
+        draft.endMinutes = target.end % 1440
         calendar.perform(.update(local.id, draft))
-        var toast = PaperToast(symbol: "calendar", text: L("일정을 옮겼어요 · \(DayStrip.rangeText(start, minuteDate(drag.end), language: .current))"))
+        let range = DayStrip.rangeText(start, minuteDate(target.end), language: .current)
+        var toast = PaperToast(symbol: "calendar", text: moved ? L("일정을 옮겼어요 · \(range)") : L("시간을 바꿨어요 · \(range)"))
         toast.action = L("되돌리기")
-        toast.perform = { [calendar, model] in
+        let takeBack = { [calendar, model] in
             calendar.perform(.update(local.id, old))
             model.toast = nil
         }
+        toast.perform = takeBack
+        toast.takeBack = takeBack
         model.toast = toast
     }
 
-    private func minuteDate(_ minutes: Int) -> Date { Calendar.paper.date(byAdding: .minute, value: minutes, to: midnight)! }
-
-    private func hover(_ phase: HoverPhase, _ cursor: NSCursor?) {
-        guard let cursor else { return }
-        switch phase {
-        case .active: cursor.set()
-        case .ended: NSCursor.arrow.set()
-        }
+    /// ⇧⌥↑ ⇧⌥↓ and the VoiceOver actions: the end 15 minutes earlier or later.
+    private func stretchEnd(_ item: DayStrip.Item, by steps: Int) {
+        guard draggable(item), let span = spans.first(where: { $0.id == item.id }) else { return }
+        let bounds = DayStrip.stretchBounds(startHour: layout.startHour, endHour: layout.endHour, kind: item.kind)
+        let target = DayStrip.stretched(start: span.start, end: span.end, by: steps, bounds: bounds)
+        guard target != (span.start, span.end) else { return }
+        if item.kind == .event { changeEvent(item, to: target, moved: false) } else { stretchTask(item, to: target) }
     }
+
+    @ViewBuilder
+    private func stretchActions(_ item: DayStrip.Item) -> some View {
+        Button(L("끝 15분 늘리기")) { stretchEnd(item, by: 1) }
+        Button(L("끝 15분 줄이기")) { stretchEnd(item, by: -1) }
+    }
+
+    private func minuteDate(_ minutes: Int) -> Date { Calendar.paper.date(byAdding: .minute, value: minutes, to: midnight)! }
 
     // MARK: Making
 
@@ -567,7 +691,8 @@ struct DayTimetable<AllDay: View>: View {
         return items.filter { column[$0.id] != nil }.sorted { (start[$0.id]!, column[$0.id]!) < (start[$1.id]!, column[$1.id]!) }
     }
 
-    /// ↑ ↓ pick, Return opens, Space ticks a to-do, ⌥↑ ⌥↓ move it 15 minutes, Esc folds the day.
+    /// ↑ ↓ pick, Return opens, Space ticks a to-do, ⌥↑ ⌥↓ move it 15 minutes, ⇧⌥↑ ⇧⌥↓ its end (or a one-off
+    /// event's), Esc sends a dragged block back or folds the day.
     private func key(_ event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection([.command, .option, .control, .shift])
         let blocks = order
@@ -575,13 +700,21 @@ struct DayTimetable<AllDay: View>: View {
         let current = index.map { blocks[$0] }
         switch (event.keyCode, flags) {
         case (53, []):
+            // Esc while dragging sends the block back; otherwise it folds the day.
+            if drag.isDragging { cancelDrag(); return true }
             model.timetableKey = nil
             onClose()
             return true
         case (125, [.option]), (126, [.option]):
             guard let current, current.kind == .task, !current.done, let span = spans.first(where: { $0.id == current.id }) else { return true }
-            let moved = DayStrip.nudged(start: span.start, end: span.end, by: event.keyCode == 125 ? 1 : -1, startHour: layout.startHour, endHour: layout.endHour)
-            moveTask(current, to: Drag(id: current.id, start: moved.start, end: moved.end), edge: .whole)
+            let bounds = DayStrip.stretchBounds(startHour: layout.startHour, endHour: layout.endHour, kind: .task)
+            let moved = DayStrip.dragged(start: span.start, end: span.end, edge: .whole, points: Double(event.keyCode == 125 ? 1 : -1) * DayStrip.hourHeight / 4,
+                                         bounds: bounds)
+            moveTask(current, to: moved)
+            return true
+        case (125, [.option, .shift]), (126, [.option, .shift]):
+            guard let current else { return true }
+            stretchEnd(current, by: event.keyCode == 125 ? 1 : -1)
             return true
         case (125, []), (126, []):
             guard !blocks.isEmpty else { return true }

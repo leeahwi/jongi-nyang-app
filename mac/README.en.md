@@ -84,7 +84,7 @@
 - To-do reminders go off on every device that's running.
 
 ### 📅 Events · calendar
-- Keep **events** in the app (no online account). They show as now · next on the Today tab's **day ribbon**, and as coloured blocks in the **day’s timetable** when you open it. Click a block to edit, drag it to move it by quarter hours.
+- Keep **events** in the app (no online account). They show as now · next on the Today tab's **day ribbon**, and as coloured blocks in the **day’s timetable** when you open it. Click a block to edit; drag it and it follows the mouse, then settles on a quarter hour; drag its top or bottom edge to change its start or end.
 - **New event**: “meeting tomorrow 3pm” on the input line, ⋯ → New event, a double-click on a day in the calendar, or `⌘Return` in quick add `⌃⌥N`. On the event slip, pick title · date · time (or all day) · **repeat** (every day · week · month · year) · **color** (6) · place with chips. A repeating event can be deleted for ‘Only this day’ or all days.
 - **To-do → Add to calendar** (right-click a to-do): the date comes from its reminder time or due date, and the to-do gets a little calendar mark.
 - **Event reminders** 5 · 10 · 15 · 30 min before the start (click to open the calendar on that day), and the **calendar** in the desk (`⌘D`): events, due dates and reminders by month or week. Dutch weeks start on Monday.
@@ -103,6 +103,16 @@
 - Desk → Appearance → **Language**: Automatic · 한국어 · English · Nederlands. Automatic follows your Mac's language order (English when none of the three is there); changing it restarts Jongi-nyang.
 - Menus, settings, help, reminders, cat talk, dates and times are all in that language. English and Dutch handwriting uses Caveat (pen) and Kalam (marker); titles written in Korean still show in Korean handwriting.
 
+### ↕ Dragging and stretching in the timetable (1.41)
+| Dragging |
+| --- |
+| ![Dragging a block](../docs/screenshots/mac/en/day-drag.png) |
+
+- A dragged block sticks to the mouse. The quarter hour it will land on shows as a faint dashed outline, the new time as a small tag on the block, and on release it slides into place in 0.12 s (at once with Reduce Motion).
+- In 1.40 the block jittered between its place and one step below, because the drag was measured against the block that was moving. The cause and the measurements are in the [postmortem](../docs/postmortem-timetable-drag.md) (in Korean).
+- To-dos and one-off events show ↕ and a small handle when the mouse is over their top or bottom edge. Drag the top to change the start, the bottom to change the end (nearest quarter hour, at least 15 minutes, within the day). `⇧⌥↑` `⇧⌥↓` on a selected block moves the end by 15 minutes.
+- ‘Time changed · 2:00–4:00 PM · Undo’, or `⌘Z`. Dragging past the top or bottom of the timetable scrolls it; `Esc` while dragging puts the block back.
+
 ### 🕰 Day ribbon · the day’s timetable (1.40)
 | What’s on now |
 | --- |
@@ -111,12 +121,12 @@
 - A **day ribbon** without a box, just a rule above and below: all-day events and ‘Whole day ›’ on top, then a thin bar of the day (the past a little darker, events in their colours, to-dos with a time in green, now as a red mark).
 - In the middle, **what’s on now** in large handwriting with the time left in a ring (`40 min left`, `1:20 left` past an hour). With nothing on, how long until the next thing (`40 min away`, red within the hour). A to-do: click the ring to focus on it, tick its box to finish it.
 - Under it the **next** two things (one in a narrow notepad, three in a tall one): `2:00 PM □ Finish the report · in 40 min`. Reminders count too.
-- ‘Whole day ›’ or the bar opens the **day’s timetable** in place (50 pt an hour, from an hour before now): events as coloured blocks, to-dos as green-outlined blocks, reminders as small tags, side by side when they overlap (`+N` from the fourth). Drag to move by quarter hours, drag the handle to change the end; click an empty spot for `What will you do?`, double-click for a new event. `↑↓` · `Return` · `Space` · `⌥↑↓` · `Esc`.
+- ‘Whole day ›’ or the bar opens the **day’s timetable** in place (50 pt an hour, from an hour before now): events as coloured blocks, to-dos as green-outlined blocks, reminders as small tags, side by side when they overlap (`+N` from the fourth). Drag to move, drag the top or bottom edge to change the start or end (1.41, [below](#-dragging-and-stretching-in-the-timetable-141)); click an empty spot for `What will you do?`, double-click for a new event. `↑↓` · `Return` · `Space` · `⌥↑↓` · `⇧⌥↑↓` (the end, 15 min) · `Esc`.
 - Redrawn once a minute only (idle CPU with the notepad open stays under 1%). The timer tag no longer changes width as the seconds tick.
 
 ### 🕑 A time for a to-do (1.39)
 - Give a to-do a **time** on its day (start–end; a start alone counts as 30 min): right-click → **Set a time…**, the **Time** tab in its reminder slip (a quarter-hour list or a typed time, and 30 min · 1 h · 2 h), or type `report 2-4pm`, `report from 2 to 4`, `2pm–3:30pm report` → chip `To-do · today 2:00–4:00 PM` (Tab makes it an event at the same time).
-- The **day ribbon**’s bar shows it in green, and the opened **timetable** as a green-outlined block: faded and crossed out when done, outlined in red when its time is over and it isn't. Drag the block to move it, or its bottom handle to change the end, a quarter hour at a time. It joins the now · next lines too.
+- The **day ribbon**’s bar shows it in green, and the opened **timetable** as a green-outlined block: faded and crossed out when done, outlined in red when its time is over and it isn't. Drag the block to move it, or its top or bottom edge to change the start or end, in quarter hours. It joins the now · next lines too.
 - Rows show `🕑 2:00–4:00 PM`; **Next** lists timed to-dos by start. Ahead, the Desk calendar (week and day list), the Today window and search show the time too. A to-do without a reminder gets one at the start, and a reminder at the start moves with the time. Focus offers what's left of the time first.
 - Saved as optional `timeStart` · `timeEnd` (`"HH:mm"`) in the to-do file (the same on Windows); kept in the history, backups and text export.
 - **Lighter**: with the notepad open and nothing happening, CPU went from around 60% to under 1% (the ribbon's pulsing now-line was redrawing the whole notepad all the time); typing, tab switches and Ahead are much quicker. `scripts/perf.sh` measures it again.
@@ -247,7 +257,8 @@ swift build -Xswiftc -warnings-as-errors
 ./scripts/test-alarms.sh             # alarms (same cases as Windows)
 ./scripts/test-intent.sh             # input line · day ribbon · Next (84 cases shared with Windows)
 ./scripts/test-timeblock.sh          # a time for a to-do (57, cases shared with Windows · intent rows 301–324)
-./scripts/test-daystrip.sh           # day ribbon · the day’s timetable (18, cases R1–R14 · K1–K8 · G1–G4 · N1–N5 shared with Windows)
+./scripts/test-daystrip.sh           # day ribbon · the day’s timetable (19, cases R1–R14 · K1–K8 · G1–G4 · N1–N5 and drag/stretch R1–R8 · W3 shared with Windows)
+./scripts/drag-check.sh              # timetable drag check: replays drags in a test copy and checks the block follows the pointer every tick (1.41)
 ./scripts/perf.sh [folder] [--quick] # performance check: a test copy with a test list — CPU, memory, response times (1.39)
 ./scripts/test-ahead.sh              # Ahead tab (45 rows + 12 moved + 3 empty, shared with Windows)
 ./scripts/test-focus.sh              # focus history · focus sessions (F1–F17 · FB1–FB4, shared with Windows)

@@ -1,9 +1,9 @@
 import { dayKey } from "../core/archive";
 import type { CalendarEvent } from "../core/calendar";
 import {
-  awayText, clockText, columns, dayEndMinutes, dayMinutes, draggedSpan, hourHeight, isSoon, kicker, leftText, minutesUntil, newCandidates, nothingLeftText, nudged,
-  rangeText, ringText, rowLimit, scrollTop, slot, stripItems, stripSentence, stripSpans, stripState, wholeDayLink,
-  type Span, type StripItem, type StripState,
+  awayText, clockText, columns, dayEndMinutes, dayMinutes, draggedSpan, edgeBand, followedSpan, hourHeight, isSoon, kicker, leftText, minutesUntil, newCandidates,
+  nothingLeftText, nudged, rangeText, ringText, rowLimit, scrollTop, slot, stretched, stripItems, stripSentence, stripSpans, stripState, wholeDayLink,
+  type DragEdge, type Span, type StripItem, type StripState,
 } from "../core/dayStrip";
 import { draftFromEvent } from "../core/events";
 import { clock as timerClock } from "../core/focusTimer";
@@ -20,10 +20,12 @@ import { commitReading, type FlowHost } from "./intentFlow";
  * time in sage, the past a shade darker, now a short clay mark) with its hours; then what's on now in large with a ring
  * of the time left (or, with nothing on, the next thing and the time until it), and the next few as rows. Clicking
  * `하루 전체 ›`, the bar or the strip's empty space opens it in place into the day's timetable (하루 일정표): an hour
- * grid where to-dos and one-off events move by dragging (15 minutes a step), a click on empty space asks what to put
- * there, and ↑ ↓ · Enter · Space · Alt+↑ ↓ · Esc work the blocks. Drawn again only when what it shows changes — the
- * note asks once a minute, on the minute, and on every change of the data; nothing in it moves in between (the now
- * mark is still). Same rules as the macOS app (DayStripView · DayTimetable).
+ * grid where to-dos and one-off events follow the pointer when dragged and land on the nearest quarter hour (1.26: a
+ * dashed outline where it will land and the new time on the block; the top and bottom edges change the start or the
+ * end), a click on empty space asks what to put there, and ↑ ↓ · Enter · Space · Alt+↑ ↓ · Shift+Alt+↑ ↓ · Esc work
+ * the blocks. Drawn again only when what it shows changes — the note asks once a minute, on the minute, and on every
+ * change of the data; nothing in it moves in between (the now mark is still), and nothing is drawn again while a
+ * block is dragged. Same rules as the macOS app (DayStripView · DayTimetable).
  */
 
 const api = paper();
@@ -39,6 +41,8 @@ export interface StripHost {
   changed: () => void;
   /** The scrolling sheet's height: the open day fits in it whole. */
   room: () => number;
+  /** Draw the note again (a drag has landed: what came in meanwhile shows now). */
+  redraw: () => void;
 }
 
 const pct = (value: number) => `${(value * 100).toFixed(3)}%`;
@@ -51,7 +55,7 @@ const edge = 3;
 export class DayStripView {
   readonly element = h("div", { class: "strip", role: "group" });
   private drawnKey = "";
-  /** A block being dragged (nothing is drawn again until it lands). */
+  /** A block being dragged, or settling where it landed (nothing is drawn again until then). */
   private dragging = false;
   /** The timetable's picked block. */
   private selected?: string;
@@ -125,6 +129,8 @@ export class DayStripView {
     if (open) {
       this.element.setAttribute("aria-label", t("오늘 하루"));
       this.element.replaceChildren(this.top(ribbon, narrow, true), this.timetable(ribbon, items, now, keepScroll));
+      // Drawn again in place (after a drag, a change of the data): where it was scrolled, before anything is painted.
+      if (keepScroll !== undefined && this.scroller?.isConnected) this.scroller.scrollTop = keepScroll;
     } else {
       this.scroller = undefined;
       this.selected = undefined;
@@ -435,9 +441,9 @@ export class DayStripView {
 
   private block(item: StripItem, entry: Span, column: number, count: number, y: (minutes: number) => number, ribbon: Ribbon, reserve = 0): HTMLElement {
     const element = h("div", { class: `tt-block ${item.kind}`, role: "listitem", "data-id": item.id });
-    const place = (start: number, end: number) => {
-      element.style.top = `${y(start) + 1}px`;
-      element.style.height = `${item.kind === "reminder" ? 20 : Math.max(18, y(end) - y(start) - 2)}px`;
+    const place = (start: number, end: number, target: HTMLElement = element) => {
+      target.style.top = `${y(start) + 1}px`;
+      target.style.height = `${item.kind === "reminder" ? 20 : Math.max(18, y(end) - y(start) - 2)}px`;
     };
     // Columns: a share of the width right of the hours, with a small gap between (and room on the right for a picked one's ring).
     const share = `(100% - ${labelColumn + edge + reserve}px - ${gap * (count - 1)}px) / ${count}`;
@@ -461,10 +467,14 @@ export class DayStripView {
       time.dataset.place = tall ? event.location ?? "" : "";
       element.title = this.tooltip(item);
       element.setAttribute("aria-label", `${item.title}, ${detail}`);
-      const local = this.host.state().events?.find((entry) => entry.id === event.eventId);
-      const movable = event.canEdit && !event.recurring && local && local.repeat === "none" && !local.allDay;
-      if (movable) element.classList.add("movable");
-      this.press(element, item, entry, ribbon, movable ? "whole" : undefined, place, time);
+      const movable = this.movable(item);
+      if (movable) {
+        element.classList.add("movable");
+        this.edges(element, height);
+        element.setAttribute("aria-keyshortcuts", "Shift+Alt+ArrowDown Shift+Alt+ArrowUp");
+        element.setAttribute("aria-description", `${t("끝 15분 늘리기")} (Shift+Alt+↓) · ${t("끝 15분 줄이기")} (Shift+Alt+↑)`);
+      }
+      this.press(element, item, entry, ribbon, movable, place);
       element.addEventListener("contextmenu", (contextEvent) => this.menu(contextEvent, item));
     } else if (item.kind === "task") {
       const overdue = !item.done && over;
@@ -484,79 +494,180 @@ export class DayStripView {
       if (height < 40) requestAnimationFrame(() => time.classList.toggle("hidden", element.clientWidth <= 150));
       element.title = `${item.title} · ${time.textContent}`;
       element.setAttribute("aria-label", `${item.title}, ${time.textContent}${item.done ? `, ${t("완료됨")}` : overdue ? `, ${t("시간 지남")}` : ""}`);
-      if (!item.done && height >= 30) {
-        const grab = h("span", { class: "tb-grab", title: t("끌어서 끝 시간 바꾸기") });
-        element.append(grab);
-        this.press(grab, item, entry, ribbon, "end", place, time, element, range === undefined || range.end === undefined);
+      if (!item.done) {
+        this.edges(element, height);
+        // What the keys do with the picked block (the timetable has the keys).
+        element.setAttribute("aria-keyshortcuts", "Alt+ArrowUp Alt+ArrowDown Shift+Alt+ArrowDown Shift+Alt+ArrowUp");
+        element.setAttribute("aria-description", `${t("15분 옮기기")} (Alt+↑ ↓) · ${t("끝 15분 늘리기")} (Shift+Alt+↓) · ${t("끝 15분 줄이기")} (Shift+Alt+↑)`);
       }
-      this.press(element, item, entry, ribbon, item.done ? undefined : "whole", place, time, undefined, range?.end === undefined);
+      this.press(element, item, entry, ribbon, !item.done, place, range?.end === undefined);
       element.addEventListener("contextmenu", (contextEvent) => this.menu(contextEvent, item));
     } else {
       element.append(h("i", { class: "tb-ring", "aria-hidden": "true" }), h("span", { class: "tb-title" }, item.title), h("span", { class: "tb-time" }, clockText(item.start, lang())));
       element.title = this.tooltip(item);
       element.setAttribute("aria-label", `${t("알림", undefined, "row")}: ${item.title}, ${clockText(item.start, lang())}`);
-      this.press(element, item, entry, ribbon, undefined, place);
+      this.press(element, item, entry, ribbon, false, place);
       element.addEventListener("contextmenu", (contextEvent) => this.menu(contextEvent, item));
     }
     return element;
   }
 
+  /** A one-off event of the app's own calendar, not all day: it can be moved and stretched here. */
+  private movable(item: StripItem): boolean {
+    const event = item.event;
+    if (!event || !event.canEdit || event.recurring) return false;
+    const local = this.host.state().events?.find((entry) => entry.id === event.eventId);
+    return Boolean(local && local.repeat === "none" && !local.allDay);
+  }
+
   /**
-   * A press on a block (or its end's handle): a click picks it and opens it; a drag (3 px or more) moves it, or its
-   * end, a quarter hour at a time; Esc puts it back. `startOnly`: a to-do with a start alone stays one when moved.
+   * The bands at a block's top and bottom (6 px, less on a short one; none under 20 px): hovered, the resize pointer
+   * and a small grab bar; pressed and dragged, the start or the end follows (see `press`).
    */
-  private press(target: HTMLElement, item: StripItem, entry: Span, ribbon: Ribbon, edge: "whole" | "end" | undefined,
-    place: (start: number, end: number) => void, time?: HTMLElement, block = target, startOnly = false): void {
-    target.addEventListener("pointerdown", (event) => {
+  private edges(element: HTMLElement, height: number): void {
+    const band = edgeBand(height);
+    if (band <= 0) return;
+    for (const edge of ["start", "end"] as const) {
+      const handle = h("span", { class: `tb-edge ${edge}`, "data-edge": edge, "aria-hidden": "true", title: edge === "start" ? t("끌어서 시작 시간 바꾸기") : t("끌어서 끝 시간 바꾸기") });
+      handle.style.height = `${band}px`;
+      element.append(handle);
+    }
+  }
+
+  /**
+   * A press on a block: a click picks it and opens it; on a movable one a drag (3 px or more) moves it, or — pressed
+   * on its top or bottom band — its start or its end. While the button is down the block follows the pointer exactly:
+   * measured in the grid's own space (so the block's movement never feeds back into it), its column and width kept,
+   * nothing else in the timetable drawn again, the model untouched. A dashed outline shows where it will land and a
+   * small label the new time, a quarter hour at a time; near the timetable's top or bottom it scrolls. Let go, it
+   * settles onto the outline (120 ms, at once under reduced motion) and the change is written; Esc puts it back.
+   * `startOnly`: a to-do with a start alone stays one when moved whole (an edge gives it its drawn end).
+   */
+  private press(element: HTMLElement, item: StripItem, entry: Span, ribbon: Ribbon, movable: boolean,
+    place: (start: number, end: number, target?: HTMLElement) => void, startOnly = false): void {
+    element.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
       event.stopPropagation();
       this.closePopover();
-      const startY = event.clientY;
-      let moved: { start: number; end: number } | undefined;
-      target.setPointerCapture(event.pointerId);
-      const move = (moveEvent: PointerEvent) => {
-        const dy = moveEvent.clientY - startY;
-        if (!edge || (!moved && Math.abs(dy) < 3)) return;
+      const grid = element.parentElement, scroller = this.scroller;
+      const handle = (event.target as HTMLElement).closest<HTMLElement>(".tb-edge");
+      const edge: DragEdge | undefined = movable ? (handle?.dataset.edge as DragEdge | undefined) ?? "whole" : undefined;
+      const gridY = (clientY: number) => clientY - (grid?.getBoundingClientRect().top ?? 0);
+      const from = gridY(event.clientY);
+      let pointerY = event.clientY;
+      let drag: { ghost: HTMLElement; label: HTMLElement; landing: { start: number; end: number }; frame?: number } | undefined;
+      try { element.setPointerCapture(event.pointerId); } catch { /* not a live pointer */ }
+      const label = (to: { start: number; end: number }) => item.kind === "event"
+        ? rangeText(this.dateAt(to.start), this.dateAt(to.end), lang())
+        : taskRangeText({ start: to.start % 1440, end: to.end % 1440 }, lang());
+      const follow = () => {
+        if (!drag || !edge) return;
+        const pixels = gridY(pointerY) - from;
+        const shown = followedSpan(entry.start, entry.end, edge, pixels, ribbon.startHour, ribbon.endHour, item.kind);
+        place(shown.start, shown.end);
+        const landing = draggedSpan(entry.start, entry.end, edge, pixels, ribbon.startHour, ribbon.endHour, item.kind);
+        if (landing.start === drag.landing.start && landing.end === drag.landing.end) return;
+        drag.landing = landing;
+        place(landing.start, landing.end, drag.ghost);
+        drag.label.textContent = label(landing);
+      };
+      // Near the timetable's top or bottom edge (24 px) or past it, it scrolls, faster the deeper; it stops where it can't go on.
+      const speed = () => {
+        if (!scroller) return 0;
+        const box = scroller.getBoundingClientRect(), zone = 24;
+        if (pointerY < box.top + zone) return -Math.min(1, (box.top + zone - pointerY) / zone);
+        if (pointerY > box.bottom - zone) return Math.min(1, (pointerY - box.bottom + zone) / zone);
+        return 0;
+      };
+      const scroll = () => {
+        if (!drag || !scroller) return;
+        drag.frame = undefined;
+        const step = speed();
+        if (step === 0) return;
+        const before = scroller.scrollTop;
+        scroller.scrollTop = before + step * 10;
+        if (scroller.scrollTop === before) return;
+        follow();
+        drag.frame = requestAnimationFrame(scroll);
+      };
+      const begin = () => {
         this.dragging = true;
-        block.classList.add("dragging");
-        moved = draggedSpan(entry.start, entry.end, edge, dy, ribbon.startHour, ribbon.endHour);
-        place(moved.start, moved.end);
-        if (time) {
-          const range = item.kind === "event" ? rangeText(this.dateAt(moved.start), this.dateAt(moved.end), lang()) : taskRangeText({ start: moved.start % 1440, end: moved.end % 1440 }, lang());
-          time.textContent = time.dataset.place ? `${range} · ${time.dataset.place}` : range;
+        element.classList.add("dragging", edge === "whole" ? "moving" : "resizing");
+        handle?.classList.add("active");
+        const ghost = h("div", { class: `tt-ghost ${item.kind}`, "aria-hidden": "true" });
+        ghost.style.left = element.style.left;
+        ghost.style.width = element.style.width;
+        if (item.event) ghost.style.setProperty("--ev", item.event.color);
+        const tag = h("span", { class: `tb-drag${edge === "end" ? " low" : ""}`, "aria-hidden": "true" });
+        element.append(tag);
+        element.before(ghost);
+        drag = { ghost, label: tag, landing: { start: Number.NaN, end: Number.NaN } };
+      };
+      const move = (moveEvent: PointerEvent) => {
+        pointerY = moveEvent.clientY;
+        if (!edge) return;
+        if (!drag) {
+          if (Math.abs(gridY(pointerY) - from) < 3) return;
+          begin();
         }
+        follow();
+        if (drag && drag.frame === undefined && speed() !== 0) drag.frame = requestAnimationFrame(scroll);
       };
       const finish = (commit: boolean) => {
-        target.removeEventListener("pointermove", move);
-        target.removeEventListener("pointerup", up);
-        target.removeEventListener("pointercancel", cancel);
+        element.removeEventListener("pointermove", move);
+        element.removeEventListener("pointerup", up);
+        element.removeEventListener("pointercancel", cancel);
+        element.removeEventListener("lostpointercapture", cancel);
         window.removeEventListener("keydown", escape, true);
-        block.classList.remove("dragging");
-        const was = this.dragging;
-        this.dragging = false;
-        if (!moved) {
+        const was = drag;
+        drag = undefined;
+        if (!was) {
           if (commit) { this.pick(item.id); this.open(item); }
           return;
         }
-        if (commit && (moved.start !== entry.start || moved.end !== entry.end)) {
-          if (item.kind === "event") this.moveEvent(item, moved);
-          else this.moveTask(item, moved, edge === "whole" && startOnly);
-        } else if (was) place(entry.start, entry.end);
-        this.drawnKey = "";
+        if (was.frame !== undefined) cancelAnimationFrame(was.frame);
+        was.ghost.remove();
+        was.label.remove();
+        handle?.classList.remove("active");
+        element.classList.remove("moving", "resizing");
+        const to = commit ? was.landing : { start: entry.start, end: entry.end };
+        const changed = to.start !== entry.start || to.end !== entry.end;
+        if (changed && edge) {
+          if (item.kind === "event") this.moveEvent(item, to, edge !== "whole");
+          else this.moveTask(item, to, edge === "whole" && startOnly, edge !== "whole");
+        }
+        // Settled: what came in meanwhile (the change itself among it) is drawn now.
+        const land = () => {
+          element.classList.remove("dragging", "settling");
+          this.dragging = false;
+          if (changed) this.drawnKey = "";
+          this.host.redraw();
+        };
+        if (reduceMotion()) { place(to.start, to.end); land(); return; }
+        element.classList.add("settling");
+        place(to.start, to.end);
+        setTimeout(land, 130);
       };
-      const up = () => finish(true);
+      const up = (upEvent: PointerEvent) => {
+        // Where it was let go (a release away from the last move lands there).
+        pointerY = upEvent.clientY;
+        follow();
+        finish(true);
+      };
       const cancel = () => finish(false);
-      const escape = (keyEvent: KeyboardEvent) => { if (keyEvent.key === "Escape" && moved) { keyEvent.preventDefault(); keyEvent.stopPropagation(); finish(false); place(entry.start, entry.end); } };
-      target.addEventListener("pointermove", move);
-      target.addEventListener("pointerup", up);
-      target.addEventListener("pointercancel", cancel);
+      const escape = (keyEvent: KeyboardEvent) => { if (keyEvent.key === "Escape" && drag) { keyEvent.preventDefault(); keyEvent.stopPropagation(); finish(false); } };
+      element.addEventListener("pointermove", move);
+      element.addEventListener("pointerup", up);
+      element.addEventListener("pointercancel", cancel);
+      // The capture taken away without a pointerup (the window lost the mouse): put it back.
+      element.addEventListener("lostpointercapture", cancel);
       window.addEventListener("keydown", escape, true);
     });
-    target.addEventListener("click", (event) => event.stopPropagation());
+    element.addEventListener("click", (event) => event.stopPropagation());
   }
 
-  /** One undo step (the toast's 되돌리기); a start alone stays a start alone when moved whole. */
-  private moveTask(item: StripItem, to: { start: number; end: number }, startOnly: boolean): void {
+  /** One undo step (the toast's 되돌리기); a start alone stays a start alone when moved whole. `resized`: an edge was dragged (시간을 바꿨어요). */
+  private moveTask(item: StripItem, to: { start: number; end: number }, startOnly: boolean, resized = false): void {
     const id = item.taskId;
     const task = id ? this.host.state().items.find((entry) => entry.id === id) : undefined;
     const old = task ? rangeOf(task) : undefined;
@@ -566,12 +677,13 @@ export class DayStripView {
     void api.act({ type: "setRange", id, start: next.start, ...(next.end !== undefined ? { end: next.end } : {}) });
     const undo = () => void api.act({ type: "setRange", id, start: old.start, ...(old.end !== undefined ? { end: old.end } : {}) });
     this.lastMove = undo;
-    this.host.flow.toast.show({ icon: "clock", text: t("시간을 옮겼어요 · {range}", { range: taskRangeText(next, lang()) }), action: { label: t("되돌리기"), run: undo },
+    const range = taskRangeText(next, lang());
+    this.host.flow.toast.show({ icon: "clock", text: resized ? t("시간을 바꿨어요 · {range}", { range }) : t("시간을 옮겼어요 · {range}", { range }), action: { label: t("되돌리기"), run: undo },
       onHide: () => { if (this.lastMove === undo) this.lastMove = undefined; } });
   }
 
-  /** A one-off event moves to the new time (same length); the toast takes it back. */
-  private moveEvent(item: StripItem, to: { start: number; end: number }): void {
+  /** A one-off event moves to the new time (same length), or (`resized`) gets a new start or end; the toast takes it back. */
+  private moveEvent(item: StripItem, to: { start: number; end: number }, resized = false): void {
     const local = item.event && this.host.state().events?.find((entry) => entry.id === item.event!.eventId);
     if (!local || local.repeat !== "none" || local.allDay) return;
     const old = draftFromEvent(local);
@@ -581,7 +693,8 @@ export class DayStripView {
       if (!result.ok) return;
       const undo = () => void api.calendarWrite({ kind: "update", id: local.id, draft: old });
       this.lastMove = undo;
-      this.host.flow.toast.show({ icon: "calendar", text: t("일정을 옮겼어요 · {range}", { range: rangeText(start, this.dateAt(to.end), lang()) }), action: { label: t("되돌리기"), run: undo },
+      const range = rangeText(start, this.dateAt(to.end), lang());
+      this.host.flow.toast.show({ icon: "calendar", text: resized ? t("시간을 바꿨어요 · {range}", { range }) : t("일정을 옮겼어요 · {range}", { range }), action: { label: t("되돌리기"), run: undo },
         onHide: () => { if (this.lastMove === undo) this.lastMove = undefined; } });
     });
   }
@@ -607,7 +720,7 @@ export class DayStripView {
     }
   }
 
-  /** ↑ ↓ pick a block, Enter opens it, Space ticks a to-do, Alt+↑ ↓ move a to-do by 15 minutes, Esc folds the day. */
+  /** ↑ ↓ pick a block, Enter opens it, Space ticks a to-do, Alt+↑ ↓ move a to-do by 15 minutes, Shift+Alt+↑ ↓ a to-do's or a one-off event's end, Esc folds the day. */
   private key(event: KeyboardEvent, order: string[], spans: Span[], ribbon: Ribbon): void {
     if (event.target !== this.scroller) return;
     const index = this.selected ? order.indexOf(this.selected) : -1;
@@ -619,9 +732,19 @@ export class DayStripView {
       const down = event.key === "ArrowDown";
       if (event.altKey) {
         const entry = current && spans.find((span) => span.id === current.id);
-        if (!current || current.kind !== "task" || current.done || !entry) return;
+        if (!current || !entry) return;
+        const steps = down ? 1 : -1;
+        // Shift+Alt: the end only, of a to-do (a start alone gets its drawn end ± 15 minutes) or a one-off event.
+        if (event.shiftKey) {
+          const to = stretched(entry.start, entry.end, steps, ribbon.startHour, ribbon.endHour, current.kind);
+          if (to.end === entry.end) return;
+          if (current.kind === "task" && !current.done) this.moveTask(current, to, false, true);
+          else if (current.kind === "event" && this.movable(current)) this.moveEvent(current, to, true);
+          return;
+        }
+        if (current.kind !== "task" || current.done) return;
         const task = this.host.state().items.find((item) => item.id === current.taskId);
-        this.moveTask(current, nudged(entry.start, entry.end, down ? 1 : -1, ribbon.startHour, ribbon.endHour), Boolean(task && rangeOf(task)?.end === undefined));
+        this.moveTask(current, nudged(entry.start, entry.end, steps, ribbon.startHour, ribbon.endHour, "task"), Boolean(task && rangeOf(task)?.end === undefined));
         return;
       }
       if (order.length === 0) return;

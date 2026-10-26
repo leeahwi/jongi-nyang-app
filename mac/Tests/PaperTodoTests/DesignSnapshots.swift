@@ -140,6 +140,10 @@ enum DesignSnapshots {
         // reminders, a crowd with +N) and the timer tag at several times.
         func at(_ hour: Int, _ minute: Int = 0) -> Date { Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: now)! }
         let ribbonNow = at(13, 20)
+        // The demo list's reminder (an hour from the real now) at a fixed 21:30 for these, so the day looks the same
+        // whenever it's drawn (1.41; before, a morning render put it beside 메일 답장 and split that into two columns).
+        let scheduledAt = model.items.first { $0.id == scheduled.id }?.reminderAt
+        model.setTaskReminder(scheduled.id, at: at(21, 30))
         func event(_ id: String, _ title: String, _ color: LocalEvent.Color, _ from: Date, _ to: Date, location: String? = nil) -> LocalEvent {
             LocalEvent(id: id, title: title, date: CalendarDraft.day(from), start: CalendarDraft.minutes(from), end: CalendarDraft.minutes(to), color: color, location: location)
         }
@@ -171,6 +175,10 @@ enum DesignSnapshots {
         let strip = { (time: Date, width: CGFloat, height: CGFloat) in
             DayStripView(model: model, calendar: model.calendar, noteHeight: height, now: time).frame(width: width).background(PaperTheme.paper)
         }
+        let timetable = { (preview: TimetablePreview) in
+            DayStripView(model: model, calendar: model.calendar, noteHeight: 640, now: ribbonNow, timetablePreview: preview)
+                .frame(width: 420).background(PaperTheme.paper)
+        }
         try render(strip(ribbonNow, 420, 560), size: nil, to: output.appendingPathComponent("strip-now-event.png"))
         try render(strip(at(14, 20), 420, 560), size: nil, to: output.appendingPathComponent("strip-now-task.png"))
         try render(strip(at(12, 40), 420, 560), size: nil, to: output.appendingPathComponent("strip-next-soon.png"))
@@ -196,6 +204,22 @@ enum DesignSnapshots {
         try render(strip(at(9, 10), 420, 640), size: nil, to: output.appendingPathComponent("day-open-morning.png"))
         try render(PaperView(model: model, previewNow: ribbonNow), size: NSSize(width: 420, height: 760), to: output.appendingPathComponent("note-day-open.png"))
         try render(PaperView(model: model, previewNow: ribbonNow), size: NSSize(width: 720, height: 1000), to: output.appendingPathComponent("note-day-open-wide.png"))
+        // 1.41: the pointer on 보고서's top band (↕ and its grab bar); 보고서 dragged 31 pt down (it follows the pointer, the
+        // ghost and the label show where it lands: 14:30–16:00); its bottom stretched (to 16:15) and its top (to 13:30);
+        // the dentist's end stretched (to 17:00); then dropped, 14:00–16:00, with the toast.
+        let reportID = report.uuidString
+        try render(timetable(TimetablePreview(id: reportID, edge: .start, hover: true)), size: nil, to: output.appendingPathComponent("day-band-hover.png"))
+        try render(timetable(TimetablePreview(id: reportID, edge: .whole, points: 31)), size: nil, to: output.appendingPathComponent("day-drag.png"))
+        try render(timetable(TimetablePreview(id: reportID, edge: .end, points: 33)), size: nil, to: output.appendingPathComponent("day-stretch-bottom.png"))
+        try render(timetable(TimetablePreview(id: reportID, edge: .start, points: -28)), size: nil, to: output.appendingPathComponent("day-stretch-top.png"))
+        if let dentist = model.calendar.todayEvents(now: ribbonNow).first(where: { $0.title == t("치과", "Dentist", "Tandarts") }) {
+            try render(timetable(TimetablePreview(id: dentist.key, edge: .end, points: 26)), size: nil, to: output.appendingPathComponent("day-stretch-event.png"))
+        }
+        model.setTimeRange(report, to: TimeRange(start: 840, end: 960))
+        model.toast = PaperToast(symbol: "clock", text: L("시간을 바꿨어요 · \(TimeRange(start: 840, end: 960).text(.current))"), action: L("되돌리기"), perform: {})
+        try render(PaperView(model: model, previewNow: ribbonNow), size: NSSize(width: 420, height: 760), to: output.appendingPathComponent("note-day-stretched.png"))
+        model.toast = nil
+        model.setTimeRange(report, to: TimeRange(start: 840, end: 930))
         // A crowd at 15:30: the dentist and three to-dos and a reminder — three columns, then +N.
         let crowd = [ranged(t("발표 연습", "Practice the talk", "Presentatie oefenen"), "15:30", "16:00"),
                      ranged(t("자료 출력", "Print the slides", "Slides printen"), "15:45", "16:15"),
@@ -210,6 +234,7 @@ enum DesignSnapshots {
         try render(TimetableNewItem(minutes: 15 * 60, onMake: { _, _ in }, onCancel: {}, text: t("치과 예약 전화", "dentist appointment", "afspraak tandarts")).padding(14).background(PaperTheme.desk),
                    size: nil, to: output.appendingPathComponent("day-new-item-event.png"))
         for id in [report, water, shopping, done, late, pill, call] + crowd { model.delete(id) }
+        model.setTaskReminder(scheduled.id, at: scheduledAt)
         // The timer tag at 10:00, 9:59, 1:11, 0:08, 59:59, 1:00:00: the same width in each form (1.40).
         let tagStart = Date()
         func tag(_ minutes: Int, left: TimeInterval) -> some View {

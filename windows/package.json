@@ -1,7 +1,7 @@
 {
   "name": "paper-todo-windows",
   "productName": "종이냥",
-  "version": "1.25.1",
+  "version": "1.26.0",
   "description": "종이 한 장처럼 작게 꺼내 쓰는 Windows 할 일 앱",
   "author": "leeAhwi",
   "main": "out/main.js",

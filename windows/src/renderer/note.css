@@ -404,6 +404,7 @@
 .tt-block { position: absolute; box-sizing: border-box; display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; border-radius: 7px; cursor: pointer; touch-action: none; }
 .tt-block.picked { outline: 2px solid var(--sage-text); outline-offset: 2px; z-index: 2; }
 .tt-block.dragging { z-index: 4; cursor: grabbing; box-shadow: 0 6px 14px -8px rgba(0, 0, 0, 0.35); }
+@media (prefers-reduced-motion: reduce) { .tt-block.settling { transition: none; } }
 .tb-title { flex: 0 1 auto; min-width: 0; max-width: 100%; font: 600 11px/14px var(--ui); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tb-time { flex: none; min-width: 0; max-width: 100%; font: 500 10px/13px var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tb-time.hidden { display: none; }
@@ -428,8 +429,31 @@
 .tb-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .tb-hand { flex: 0 1 auto; min-width: 0; padding-right: var(--ink-over); font: 400 17px/1.15 var(--body-font); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tt-block.task.done .tb-hand { text-decoration: line-through; text-decoration-color: var(--ink-2); }
-.tb-grab { position: absolute; left: 50%; bottom: 0; width: 40px; height: 9px; margin-left: -20px; cursor: ns-resize; }
-.tb-grab::after { content: ""; position: absolute; left: 11px; right: 11px; bottom: 2px; height: 3px; border-radius: 2px; background: var(--sage); opacity: 0.5; }
+/* 1.26: the top and bottom bands (6 px, less on a short block) change the start or the end: the resize pointer and,
+   hovered, a small grab bar (faint on a hovered block). Under the to-do's box, so the box still ticks. */
+.tb-edge { position: absolute; left: 0; right: 0; cursor: ns-resize; }
+.tb-edge.start { top: 0; }
+.tb-edge.end { bottom: 0; }
+.tb-edge::after { content: ""; position: absolute; left: 50%; width: 22px; margin-left: -11px; height: 3px; border-radius: 2px; background: var(--sage); opacity: 0; }
+.tt-block.event .tb-edge::after { background: color-mix(in srgb, var(--ev) 80%, var(--ink)); }
+.tb-edge.start::after { top: 1px; }
+.tb-edge.end::after { bottom: 1px; }
+.tt-block:hover .tb-edge::after { opacity: 0.35; }
+.tt-block .tb-edge:hover::after, .tt-block .tb-edge.active::after { opacity: 1; }
+.tt-block.dragging:not(.resizing) .tb-edge::after { opacity: 0; }
+.tb-check { position: relative; z-index: 1; }
+/* While dragged: the block follows the pointer, a little see-through; under it a dashed outline where it will land,
+   and the new time on the block (its own time line steps aside); let go, it settles onto the outline. */
+.tt-block.moving { cursor: grabbing; }
+.tt-block.resizing { cursor: ns-resize; }
+.tt-block.dragging .tb-time { visibility: hidden; }
+.tt-block.settling { transition: top 0.12s ease-out, height 0.12s ease-out; }
+.tt-ghost { position: absolute; z-index: 3; box-sizing: border-box; border-radius: 7px; border: 1.5px dashed color-mix(in srgb, var(--sage-text) 80%, transparent); background: color-mix(in srgb, var(--sage) 10%, transparent); pointer-events: none; }
+.tt-ghost.event { border-color: color-mix(in srgb, var(--ev) 70%, var(--ink)); background: color-mix(in srgb, var(--ev) 12%, transparent); }
+.tt-block.dragging:not(.over) { opacity: 0.92; }
+.tb-drag { position: absolute; top: 2px; right: 3px; z-index: 2; max-width: calc(100% - 6px); box-sizing: border-box; height: 14px; padding: 0 5px; border-radius: 7px; background: var(--paper); box-shadow: inset 0 0 0 1px var(--rule-strong);
+  font: 600 10px/14px var(--ui); font-variant-numeric: tabular-nums; color: var(--sage-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.tb-drag.low { top: auto; bottom: 2px; }
 .tt-block.reminder { gap: 4px; padding: 0 7px; background: var(--paper-2); }
 .tt-block.reminder.picked { outline-width: 1.5px; outline-offset: 0; }
 .tt-block.reminder .tb-title { font: 500 10px/13px var(--ui); color: var(--ink-2); }
