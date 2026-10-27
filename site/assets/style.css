@@ -204,6 +204,8 @@ h3 { font-size: 18px; line-height: 1.35; font-weight: 650; letter-spacing: -.015
 .slides { position: relative; border: 1px solid var(--rule); border-radius: 16px; background: var(--card); overflow: hidden; }
 .slide { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); align-items: center; gap: 40px; padding: 48px 56px; min-height: 620px; }
 .js .slide[hidden] { display: none; }
+/* The browser hides [hidden] by itself; without JS every slide must show, stacked. */
+.no-js .slide[hidden] { display: grid; }
 .no-js .slide + .slide { border-top: 1px solid var(--rule); }
 .slide .kicker { font: 500 12.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 16px; }
 .slide h3 { font-size: clamp(28px, 3.4vw, 40px); line-height: 1.15; font-weight: 700; letter-spacing: -.035em; }
@@ -276,6 +278,7 @@ h3 { font-size: 18px; line-height: 1.35; font-weight: 650; letter-spacing: -.015
 .pane .result .chip { font-size: 15px; padding: 4px 14px; }
 .pane .result p { margin: 0; color: var(--ink-2); font-size: 15.5px; }
 .js .tabpanel[hidden] { display: none; }
+.no-js .tabpanel[hidden] { display: block; }
 .no-js .panel-top [role="tablist"] { display: none; }
 .no-js .tabpanel + .tabpanel { margin-top: 14px; }
 @media (max-width: 760px) { .panes { grid-template-columns: 1fr; } .pane { min-height: 0; } .panel-top { flex-wrap: wrap; } .panel-top .note { margin-left: 0; width: 100%; } }
