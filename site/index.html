@@ -72,7 +72,22 @@
     </div>
   </section>
 
-  <section id="tour" class="tour" aria-label="종이냥 둘러보기">
+  <section class="film" aria-label="종이냥 소개 영상">
+    <div class="wrap reveal">
+      <div class="stage">
+        <div class="film-frame">
+          <video class="film-video" data-film src="assets/promo-ko.mp4" poster="assets/promo-ko.jpg" width="1280" height="720" muted loop playsinline autoplay preload="metadata" aria-label="29초 소개 영상: 할 일, 일정, 타이머, 알람이 종이 한 장으로 모이고, 지금 하는 일과 남은 시간, 입력 줄, 하루 일정표, 집중 카드, 알람, 저녁 정리를 차례로 보여 줘요. 소리는 없어요."></video>
+          <button class="film-toggle" type="button" data-film-toggle aria-label="영상 멈추기" data-label-pause="영상 멈추기" data-label-play="영상 재생"><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><rect x="4" y="3" width="3" height="10" rx="1"/><rect x="9" y="3" width="3" height="10" rx="1"/></svg><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M5 3.2v9.6a.6.6 0 0 0 .9.5l7.6-4.8a.6.6 0 0 0 0-1L5.9 2.7a.6.6 0 0 0-.9.5z"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tour" class="tour" aria-labelledby="tour-title">
+    <div class="head reveal">
+      <p class="eyebrow">둘러보기</p>
+      <h2 id="tour-title">화면 하나씩 넘겨 보기</h2>
+    </div>
     <div class="wrap reveal" data-tabs>
       <div class="stage">
         <div class="slides">

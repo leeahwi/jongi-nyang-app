@@ -81,6 +81,22 @@
     }
   }
 
+  // The intro video loops silently; it waits for a click when the visitor asked for less motion.
+  const film = document.querySelector("[data-film]");
+  const filmToggle = document.querySelector("[data-film-toggle]");
+  if (film && filmToggle) {
+    const showFilm = () => {
+      const paused = film.paused;
+      filmToggle.classList.toggle("paused", paused);
+      filmToggle.setAttribute("aria-label", paused ? filmToggle.dataset.labelPlay : filmToggle.dataset.labelPause);
+    };
+    if (calm) { film.removeAttribute("autoplay"); film.pause(); }
+    film.addEventListener("play", showFilm);
+    film.addEventListener("pause", showFilm);
+    filmToggle.addEventListener("click", () => (film.paused ? film.play().catch(() => {}) : film.pause()));
+    showFilm();
+  }
+
   // Sections fade in once as they scroll into view.
   const items = document.querySelectorAll(".reveal");
   if (calm || !("IntersectionObserver" in window)) {

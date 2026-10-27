@@ -73,7 +73,22 @@
     </div>
   </section>
 
-  <section id="tour" class="tour" aria-label="A tour of Jongi-nyang">
+  <section class="film" aria-label="Jongi-nyang intro video">
+    <div class="wrap reveal">
+      <div class="stage">
+        <div class="film-frame">
+          <video class="film-video" data-film src="../assets/promo-en.mp4" poster="../assets/promo-en.jpg" width="1280" height="720" muted loop playsinline autoplay preload="metadata" aria-label="A 29-second intro: to-dos, events, timers and alarms fold into one sheet of paper, then the video shows what's on now and the time left, the input line, the day timetable, the focus card, alarms and the evening tidy-up. No sound."></video>
+          <button class="film-toggle" type="button" data-film-toggle aria-label="Pause video" data-label-pause="Pause video" data-label-play="Play video"><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><rect x="4" y="3" width="3" height="10" rx="1"/><rect x="9" y="3" width="3" height="10" rx="1"/></svg><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M5 3.2v9.6a.6.6 0 0 0 .9.5l7.6-4.8a.6.6 0 0 0 0-1L5.9 2.7a.6.6 0 0 0-.9.5z"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tour" class="tour" aria-labelledby="tour-title">
+    <div class="head reveal">
+      <p class="eyebrow">Tour</p>
+      <h2 id="tour-title">One screen at a time</h2>
+    </div>
     <div class="wrap reveal" data-tabs>
       <div class="stage">
         <div class="slides">
