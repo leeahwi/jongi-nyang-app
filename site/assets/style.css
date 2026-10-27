@@ -101,6 +101,11 @@ body {
 }
 :lang(en) body, body:lang(en) { word-break: normal; overflow-wrap: break-word; }
 
+/* Even out heading lines and avoid one-word last lines in paragraphs. */
+h1, h2, h3, summary { text-wrap: balance; }
+p, li { text-wrap: pretty; }
+:lang(ko) p, :lang(ko) li { line-height: 1.75; }
+
 img { max-width: 100%; height: auto; display: block; }
 a { color: var(--sage-text); text-underline-offset: .2em; }
 a:hover { color: var(--ink); }
