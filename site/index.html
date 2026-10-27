@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" class="no-js">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -17,176 +17,314 @@
 <meta property="og:image" content="https://leeahwi.github.io/jongi-nyang-app/assets/og-ko.png">
 <meta property="og:url" content="https://leeahwi.github.io/jongi-nyang-app/">
 <meta name="twitter:card" content="summary_large_image">
+<script>(function(d){d.className=d.className.replace("no-js","js");try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t)}catch(e){}})(document.documentElement)</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap">
 <link rel="stylesheet" href="assets/style.css">
+<script src="assets/site.js" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">본문으로 건너뛰기</a>
 
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="./" aria-label="종이냥 처음으로"><img src="assets/cat.webp" alt="" width="36" height="36">종이냥</a>
+    <a class="brand" href="./" aria-label="종이냥 처음으로"><img src="assets/cat.webp" alt="" width="30" height="30">종이냥</a>
     <nav class="nav" aria-label="주요 메뉴">
-      <a class="hide-s" href="#features">기능</a>
-      <a class="hide-s" href="#built">만든 방식</a>
-      <a href="#download">내려받기</a>
-      <a class="hide-s" href="https://github.com/leeahwi/jongi-nyang-app">GitHub</a>
-      <a class="lang" href="en/" hreflang="en" lang="en">English</a>
+      <a href="#tour">둘러보기</a>
+      <a href="#features">기능</a>
+      <a href="#built">만든 방식</a>
+      <a href="#faq">질문</a>
+      <a href="https://github.com/leeahwi/jongi-nyang-app">GitHub</a>
     </nav>
+    <div class="tools">
+      <div class="theme" role="group" aria-label="화면 밝기">
+        <button type="button" data-theme-set="auto" aria-pressed="true" title="시스템 따라가기"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg><span class="sr">시스템 따라가기</span></button>
+        <button type="button" data-theme-set="light" aria-pressed="false" title="낮 종이"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="2.8"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg><span class="sr">낮 종이</span></button>
+        <button type="button" data-theme-set="dark" aria-pressed="false" title="밤 종이"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M13.5 9.6A5.6 5.6 0 0 1 6.4 2.5a5.6 5.6 0 1 0 7.1 7.1z"/></svg><span class="sr">밤 종이</span></button>
+      </div>
+      <a class="lang" href="en/" hreflang="en" lang="en">EN</a>
+      <a class="btn primary small" href="#download">내려받기</a>
+    </div>
   </div>
 </header>
 
 <main id="main">
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap">
-      <div>
-        <p class="eyebrow">macOS · Windows 할 일 앱</p>
-        <h1 id="hero-title">오늘 할 일,<br>종이 한 장에.</h1>
-        <p class="lede">할 일을 적고 체크하는 노트예요. 목록 위에는 지금 하는 일과 남은 시간이, 화면 아래에는 알림을 가져오는 종이 고양이가 있어요. 계정 없이 내 컴퓨터의 파일에 저장해요.</p>
-        <div class="buttons">
-          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
-            Mac용 내려받기 <small>1.41.0</small>
-          </a>
-          <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.26.0">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
-            Windows용 내려받기 <small>1.26.0</small>
-          </a>
+      <a class="badge" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0"><span class="dot" aria-hidden="true"></span>새 판 · 일정표 블록을 끌어 시간 바꾸기<span class="go" aria-hidden="true">→</span></a>
+      <h1 id="hero-title">오늘 할 일,<br><span class="hand">종이 한 장</span>에.</h1>
+      <p class="lede">할 일을 적고 체크하는 노트예요. 목록 위에는 지금 하는 일과 남은 시간이, 화면 아래에는 알림을 가져오는 종이 고양이가 있어요. 계정 없이 내 컴퓨터의 파일에 저장해요.</p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
+          Mac용 내려받기 <small>1.41.0</small>
+        </a>
+        <div class="line" role="img" aria-label="입력 줄 예: ‘내일 3시 회의’라고 적으면 ‘일정 · 내일 15:00’으로 알아들어요" data-line='[["내일 3시 회의","일정 · 내일 15:00"],["금요일까지 보고서","할 일 · 마감 금요일"],["타이머 40","40분 타이머"],["알람 7시 평일","알람 · 평일 오전 7:00","clay"]]'>
+          <span class="pen" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg></span>
+          <span class="typed" aria-hidden="true">내일 3시 회의</span>
+          <span class="chip" aria-hidden="true">일정 · 내일 15:00</span>
         </div>
-        <p class="fine">무료 · macOS 14 이상(Apple Silicon) · Windows 10/11 · 한국어 · English · Nederlands</p>
       </div>
-      <div class="stack">
-        <figure class="sheet a" style="margin:0"><span class="tape" aria-hidden="true"></span><img src="assets/note-ko.webp" width="640" height="976" alt="Mac의 종이냥 노트: 하루 띠에 지금 하는 일 ‘팀 회의’와 30분 남음, 그 아래 다음 일과 오늘 할 일 목록"></figure>
-        <figure class="sheet b" style="margin:0"><span class="tape" aria-hidden="true"></span><img src="assets/note-night.webp" width="640" height="976" alt="같은 노트를 밤 종이로 본 모습"></figure>
+      <p class="alt">Windows를 쓰나요? <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.26.0">Windows용 내려받기 1.26.0</a></p>
+    </div>
+  </section>
+
+  <section id="tour" class="tour" aria-label="종이냥 둘러보기">
+    <div class="wrap reveal" data-tabs>
+      <div class="stage">
+        <div class="slides">
+          <article class="slide" id="s-note" role="tabpanel" aria-labelledby="t-note">
+            <div>
+              <p class="kicker">01 · 노트</p>
+              <h3>지금 하는 일이 먼저 보이는 노트</h3>
+              <p>오늘, 앞으로, 메모 탭이 있는 종이 한 장이에요. 맨 위 하루 띠에는 지금 하는 일이 손글씨로 크게, 남은 시간이 동그라미로 보이고, 아래에 다음 일과 오늘 할 일이 이어져요.</p>
+            </div>
+            <figure class="shot" style="margin:0"><img src="assets/note-ko.webp" width="640" height="976" alt="Mac의 종이냥 노트: 하루 띠에 지금 하는 일 ‘팀 회의’와 30분 남음, 그 아래 다음 일과 오늘 할 일 목록"></figure>
+          </article>
+          <article class="slide" id="s-day" role="tabpanel" aria-labelledby="t-day" hidden>
+            <div>
+              <p class="kicker">02 · 하루 일정표</p>
+              <h3>누르면 펼쳐지는 하루</h3>
+              <p>하루 띠를 누르면 그 자리에서 하루 일정표가 펼쳐져요. 블록을 끌면 마우스를 따라오다 15분 칸에 놓이고, 위아래 끝을 끌면 시간이 늘거나 줄어요.</p>
+            </div>
+            <figure class="shot" style="margin:0"><img src="assets/day-ko.webp" width="640" height="613" alt="펼친 하루 일정표: 색 블록으로 놓인 일정과 초록 테두리의 할 일" loading="lazy"></figure>
+          </article>
+          <article class="slide" id="s-focus" role="tabpanel" aria-labelledby="t-focus" hidden>
+            <div>
+              <p class="kicker">03 · 집중</p>
+              <h3>할 일 하나에 집중</h3>
+              <p>‘보고서 25분 집중’이라고 적으면 노트가 카드 한 장으로 바뀌어요. ‘다 했어요’, ‘5분 더’, ‘다음에’ 단추가 있고 뽀모도로 라운드도 돼요.</p>
+            </div>
+            <figure class="shot" style="margin:0"><img src="assets/focus-ko.webp" width="640" height="854" alt="집중 카드: 남은 시간 고리와 할 일 ‘보고서 마무리’" loading="lazy"></figure>
+          </article>
+          <article class="slide" id="s-alarm" role="tabpanel" aria-labelledby="t-alarm" hidden>
+            <div>
+              <p class="kicker">04 · 알람</p>
+              <h3>종이 쪽지로 울리는 알람</h3>
+              <p>요일, 소리, 다시 울림을 정해요. 울리면 종이냥이 종을 흔드는 쪽지가 뜨고, 뜬 뒤 1.5초는 키를 받지 않아서 다른 앱에서 치던 글자로 꺼지지 않아요.</p>
+            </div>
+            <figure class="shot" style="margin:0"><img src="assets/alarm-ko.webp" width="600" height="740" alt="울리는 알람 쪽지: 오전 7:00, 끄기 단추와 다시 울림 5 · 10 · 15분" loading="lazy"></figure>
+          </article>
+          <article class="slide" id="s-ahead" role="tabpanel" aria-labelledby="t-ahead" hidden>
+            <div>
+              <p class="kicker">05 · 앞으로</p>
+              <h3>끌어서 날짜 바꾸기</h3>
+              <p>이번 주와 다음 주의 날마다 일정과 마감이 함께 보여요. 할 일을 다른 날로 끌어 놓으면 마감이 그날로 바뀌어요.</p>
+            </div>
+            <figure class="shot" style="margin:0"><img src="assets/ahead-ko.webp" width="640" height="1159" alt="앞으로 탭에서 할 일을 다른 날로 끄는 모습" loading="lazy"></figure>
+          </article>
+          <article class="slide wide" id="s-desk" role="tabpanel" aria-labelledby="t-desk" hidden>
+            <div>
+              <p class="kicker">06 · 책상</p>
+              <h3>달력과 설정은 책상 창에</h3>
+              <p>달력, 완료 기록, 설정, 도움말을 책상 창 하나에 모았어요. 노트는 가볍게 두고, 길게 볼 일은 여기서 봐요.</p>
+            </div>
+            <figure class="shot" style="margin:0"><img src="assets/desk-ko.webp" width="1200" height="835" alt="책상 창의 달력: 월 보기와 오른쪽의 그날 일정" loading="lazy"></figure>
+          </article>
+        </div>
+      </div>
+      <div class="deckbar">
+        <div role="tablist" aria-label="화면">
+          <button class="pill" type="button" role="tab" id="t-note" aria-controls="s-note" aria-selected="true">노트</button>
+          <button class="pill" type="button" role="tab" id="t-day" aria-controls="s-day" aria-selected="false" tabindex="-1">하루 일정표</button>
+          <button class="pill" type="button" role="tab" id="t-focus" aria-controls="s-focus" aria-selected="false" tabindex="-1">집중</button>
+          <button class="pill" type="button" role="tab" id="t-alarm" aria-controls="s-alarm" aria-selected="false" tabindex="-1">알람</button>
+          <button class="pill" type="button" role="tab" id="t-ahead" aria-controls="s-ahead" aria-selected="false" tabindex="-1">앞으로</button>
+          <button class="pill" type="button" role="tab" id="t-desk" aria-controls="s-desk" aria-selected="false" tabindex="-1">책상</button>
+        </div>
+        <span class="count" data-count aria-hidden="true">01 / 06</span>
+        <div class="arrows">
+          <button type="button" data-prev aria-label="이전 화면"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 5 8l5 5"/></svg></button>
+          <button type="button" data-next aria-label="다음 화면"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 3 5 5-5 5"/></svg></button>
+        </div>
       </div>
     </div>
   </section>
 
-  <section id="input" aria-labelledby="input-title">
-    <div class="wrap split">
-      <div>
-        <div class="section-head">
-          <h2 id="input-title">무엇이든 한 줄에</h2>
-          <p>맨 아래 입력 줄에 적으면 할 일인지, 일정인지, 타이머인지 알아듣고 칩으로 보여 줘요. 틀렸으면 <kbd>Tab</kbd>을 누르면 되고, 넣은 뒤에는 안내의 ‘바꾸기’로 다른 뜻으로 바꿀 수 있어요.</p>
-        </div>
-        <ul class="examples">
-          <li><code>내일 3시 회의</code><span class="arrow" aria-hidden="true">→</span><span class="chip">일정 · 내일 15:00</span></li>
-          <li><code>금요일까지 보고서</code><span class="arrow" aria-hidden="true">→</span><span class="chip">할 일 · 마감 금요일</span></li>
-          <li><code>타이머 40</code><span class="arrow" aria-hidden="true">→</span><span class="chip">40분 타이머</span></li>
-          <li><code>알람 7시 평일</code><span class="arrow" aria-hidden="true">→</span><span class="chip clay">알람 · 평일 오전 7:00</span></li>
-        </ul>
+  <section id="how" aria-labelledby="how-title">
+    <div class="wrap">
+      <div class="head reveal">
+        <p class="eyebrow">하루의 흐름</p>
+        <h2 id="how-title">적고, 보고, 정리해요.</h2>
+        <p>아침에 적어 두면 하루 동안 지금 할 일을 먼저 보여 주고, 저녁에는 남은 일을 같이 정리해요.</p>
       </div>
-      <div class="shot pad"><img src="assets/line-ko.webp" width="720" height="160" alt="입력 줄에 ‘내일 3시 회의’를 적자 위에 ‘일정’ 칩이 뜬 모습" loading="lazy"></div>
+      <div class="steps">
+        <article class="step reveal">
+          <span class="num">01</span>
+          <h3>한 줄로 적어요</h3>
+          <p>맨 아래 입력 줄에 적으면 할 일인지, 일정인지, 타이머인지 알아듣고 칩으로 보여 줘요.</p>
+          <div class="mini" aria-hidden="true">
+            <div class="typed-row"><span class="pen">✎</span>금요일까지 보고서</div>
+            <div><span class="chip">할 일 · 마감 금요일</span></div>
+          </div>
+        </article>
+        <article class="step reveal">
+          <span class="num">02</span>
+          <h3>지금을 먼저 봐요</h3>
+          <p>목록 위 하루 띠에 지금 하는 일과 남은 시간이 보여요. 하루 전체는 누르면 펼쳐져요.</p>
+          <div class="mini" aria-hidden="true">
+            <div class="now">
+              <div class="ring"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="17" fill="none" stroke="var(--rule)" stroke-width="4"/><circle cx="20" cy="20" r="17" fill="none" stroke="var(--sage)" stroke-width="4" stroke-linecap="round" stroke-dasharray="72 107"/></svg><b>30<small>분 남음</small></b></div>
+              <div><div class="when">지금 · 19:39–20:24</div><div class="what">팀 회의</div></div>
+            </div>
+          </div>
+        </article>
+        <article class="step reveal">
+          <span class="num">03</span>
+          <h3>저녁에 정리해요</h3>
+          <p>저녁 8시에 남은 할 일을 내일로 넘길지 물어요. 놓치면 다음 날 아침에 물어요.</p>
+          <div class="mini" aria-hidden="true">
+            <div class="ask">오늘 3개 남았어요. 내일로 넘길까요?</div>
+            <div class="ask-btns"><span>내일로</span><span>언젠가로</span><span>그대로 두기</span></div>
+          </div>
+        </article>
+      </div>
     </div>
   </section>
 
   <section id="features" aria-labelledby="features-title">
     <div class="wrap">
-      <div class="section-head">
-        <h2 id="features-title">노트 안에 있는 것</h2>
-        <p>하루 띠, 집중 카드, 알람, 앞으로 탭, 저녁 정리, 그리고 고양이.</p>
+      <div class="head reveal">
+        <p class="eyebrow">기능</p>
+        <h2 id="features-title">무엇이든 한 줄에.<br>나머지는 노트가 알아서.</h2>
+        <p>입력 줄 하나로 할 일, 일정, 타이머, 알람을 넣어요. 틀렸으면 <kbd>Tab</kbd>을 누르고, 넣은 뒤에는 안내의 ‘바꾸기’로 다른 뜻으로 바꿀 수 있어요.</p>
       </div>
-      <div class="cards">
-        <article class="card" style="--t: var(--tape-event)">
-          <h3>지금이 먼저 보이는 하루 띠</h3>
-          <p>지금 하는 일은 손글씨로 크게, 남은 시간은 동그라미에 보여요. 누르면 그 자리에서 하루 일정표가 펼쳐지고, 블록을 끌면 마우스를 따라오다 15분 칸에 놓이고, 위아래 끝을 끌면 시간이 늘거나 줄어요.</p>
-          <div class="shot"><img src="assets/day-ko.webp" width="640" height="613" alt="펼친 하루 일정표: 색 블록으로 놓인 일정과 초록 테두리의 할 일" loading="lazy"></div>
-        </article>
-        <article class="card" style="--t: var(--tape-timer)">
-          <h3>할 일 하나에 집중</h3>
-          <p>‘보고서 25분 집중’이라고 적으면 노트가 카드 한 장으로 바뀌어요. ‘다 했어요’, ‘5분 더’, ‘다음에’ 단추가 있고 뽀모도로 라운드도 돼요.</p>
-          <div class="shot"><img src="assets/focus-ko.webp" width="640" height="854" alt="집중 카드: 남은 시간 고리와 할 일 ‘보고서 마무리’" loading="lazy"></div>
-        </article>
-        <article class="card" style="--t: var(--tape-alarm)">
-          <h3>종이 쪽지로 울리는 알람</h3>
-          <p>요일, 소리, 다시 울림을 정해요. 울리면 종이냥이 종을 흔드는 쪽지가 뜨고, 뜬 뒤 1.5초는 키를 받지 않아서 다른 앱에서 치던 글자로 꺼지지 않아요.</p>
-          <div class="shot"><img src="assets/alarm-ko.webp" width="600" height="740" alt="울리는 알람 쪽지: 오전 7:00, 끄기 단추와 다시 울림 5 · 10 · 15분" loading="lazy"></div>
-        </article>
-        <article class="card" style="--t: var(--tape-memo)">
-          <h3>앞으로 탭: 끌어서 날짜 바꾸기</h3>
-          <p>이번 주와 다음 주의 날마다 일정과 마감이 함께 보여요. 할 일을 다른 날로 끌어 놓으면 마감이 그날로 바뀌어요.</p>
-          <div class="shot"><img src="assets/ahead-ko.webp" width="640" height="1159" alt="앞으로 탭에서 할 일을 다른 날로 끄는 모습" loading="lazy"></div>
-        </article>
-        <article class="card" style="--t: var(--tape-todo)">
-          <h3>저녁 정리</h3>
-          <p>저녁 8시에 ‘오늘 3개 남았어요. 내일로 넘길까요?’ 하고 물어요. 놓치면 다음 날 아침에 물어요. 검색은 초성(ㅂㄱㅅ → 보고서)도 알아들어요.</p>
-          <div class="shot"><img src="assets/sweep-ko.webp" width="600" height="484" alt="저녁 정리 쪽지: 오늘 남은 할 일 목록과 내일로 · 언젠가로 · 그대로 두기" loading="lazy"></div>
-        </article>
-        <article class="card" style="--t: var(--tape-event)">
-          <h3>곁에 있는 종이냥</h3>
-          <p>Dock 위에서 숨 쉬고 걸어 다니다가 알림을 가져오고, 할 일을 끝내면 축하해요. 가끔 질문도 하는데, 단추로 답하면 그대로 해 줘요(‘5분 쉬어 갈까요?’ → 5분 타이머).</p>
-          <div class="shot"><img src="assets/pet-ko.webp" width="600" height="500" alt="종이냥이 말풍선으로 질문하고 답 단추가 있는 모습" loading="lazy"></div>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <section id="together" aria-labelledby="together-title">
-    <div class="wrap split flip">
-      <div>
-        <div class="section-head">
-          <h2 id="together-title">Mac과 Windows, 한 목록</h2>
-          <p>iCloud Drive나 OneDrive, Dropbox 폴더를 저장 위치로 고르면 두 컴퓨터가 같은 목록을 써요. 거의 동시에 고쳐도 양쪽 변경이 남고, 같은 메모를 양쪽에서 고치면 줄과 글자 단위로 합쳐요. 계정과 서버는 없어요.</p>
-          <p>달력, 완료 기록, 설정, 도움말은 책상 창 하나에 모았어요. 시스템이 어두운 모드면 불 끈 방의 종이 같은 밤 종이로 바뀌어요.</p>
+      <div class="panel reveal" data-tabs>
+        <div class="panel-top">
+          <div role="tablist" aria-label="입력 예">
+            <button class="pill" type="button" role="tab" id="k-event" aria-controls="p-event" aria-selected="true">일정</button>
+            <button class="pill" type="button" role="tab" id="k-todo" aria-controls="p-todo" aria-selected="false" tabindex="-1">할 일</button>
+            <button class="pill" type="button" role="tab" id="k-timer" aria-controls="p-timer" aria-selected="false" tabindex="-1">타이머</button>
+            <button class="pill" type="button" role="tab" id="k-alarm" aria-controls="p-alarm" aria-selected="false" tabindex="-1">알람</button>
+          </div>
+          <span class="note">검색은 초성(ㅂㄱㅅ → 보고서)도 알아들어요</span>
+        </div>
+        <div class="tabpanel" id="p-event" role="tabpanel" aria-labelledby="k-event">
+          <div class="panes">
+            <div class="pane"><div class="pane-head"><span>적은 것</span><span>입력 줄</span></div><div class="pane-body"><div class="input"><span class="pen" aria-hidden="true">✎</span>내일 3시 회의</div><p class="hint">날짜와 시각을 함께 적었어요.</p></div></div>
+            <div class="pane"><div class="pane-head"><span>알아들은 것</span><span class="live">칩</span></div><div class="pane-body result"><span class="chip">일정 · 내일 15:00</span><p>일정은 하루 띠와 하루 일정표에 블록으로 놓여요. 블록을 끌어 15분 단위로 옮기고, 위아래 끝을 끌어 길이를 바꿔요.</p></div></div>
+          </div>
+        </div>
+        <div class="tabpanel" id="p-todo" role="tabpanel" aria-labelledby="k-todo" hidden>
+          <div class="panes">
+            <div class="pane"><div class="pane-head"><span>적은 것</span><span>입력 줄</span></div><div class="pane-body"><div class="input"><span class="pen" aria-hidden="true">✎</span>금요일까지 보고서</div><p class="hint">‘까지’로 마감을 적었어요.</p></div></div>
+            <div class="pane"><div class="pane-head"><span>알아들은 것</span><span class="live">칩</span></div><div class="pane-body result"><span class="chip">할 일 · 마감 금요일</span><p>마감은 앞으로 탭의 그날에 보여요. 할 일을 다른 날로 끌어 놓으면 마감도 그날로 바뀌어요.</p></div></div>
+          </div>
+        </div>
+        <div class="tabpanel" id="p-timer" role="tabpanel" aria-labelledby="k-timer" hidden>
+          <div class="panes">
+            <div class="pane"><div class="pane-head"><span>적은 것</span><span>입력 줄</span></div><div class="pane-body"><div class="input"><span class="pen" aria-hidden="true">✎</span>타이머 40</div><p class="hint">‘타이머’ 뒤에 분을 적었어요.</p></div></div>
+            <div class="pane"><div class="pane-head"><span>알아들은 것</span><span class="live">칩</span></div><div class="pane-body result"><span class="chip">40분 타이머</span><p>‘보고서 25분 집중’처럼 할 일과 함께 적으면 노트가 집중 카드 한 장으로 바뀌어요.</p></div></div>
+          </div>
+        </div>
+        <div class="tabpanel" id="p-alarm" role="tabpanel" aria-labelledby="k-alarm" hidden>
+          <div class="panes">
+            <div class="pane"><div class="pane-head"><span>적은 것</span><span>입력 줄</span></div><div class="pane-body"><div class="input"><span class="pen" aria-hidden="true">✎</span>알람 7시 평일</div><p class="hint">‘평일’처럼 울릴 요일을 붙였어요.</p></div></div>
+            <div class="pane"><div class="pane-head"><span>알아들은 것</span><span class="live">칩</span></div><div class="pane-body result"><span class="chip clay">알람 · 평일 오전 7:00</span><p>울리면 종이냥이 종을 흔드는 쪽지가 떠요. 다시 울림은 5 · 10 · 15분이에요.</p></div></div>
+          </div>
         </div>
       </div>
-      <div class="shot"><img src="assets/desk-ko.webp" width="1200" height="835" alt="책상 창의 달력: 월 보기와 오른쪽의 그날 일정" loading="lazy"></div>
+
+      <div class="bento">
+        <article class="tile reveal" style="--t: var(--tape-todo)">
+          <div class="art"><img src="assets/sweep-ko.webp" width="600" height="484" alt="저녁 정리 쪽지: 오늘 남은 할 일 목록과 내일로 · 언젠가로 · 그대로 두기" loading="lazy"></div>
+          <div class="copy"><h3>저녁 정리</h3><p>저녁 8시에 ‘오늘 3개 남았어요. 내일로 넘길까요?’ 하고 물어요. 하나씩 내일로, 언젠가로 보내거나 그대로 둬요.</p></div>
+        </article>
+        <article class="tile reveal" style="--t: var(--tape-event)">
+          <div class="art"><img src="assets/pet-ko.webp" width="600" height="500" alt="종이냥이 말풍선으로 질문하고 답 단추가 있는 모습" loading="lazy"></div>
+          <div class="copy"><h3>곁에 있는 종이냥</h3><p>Dock 위에서 숨 쉬고 걸어 다니다가 알림을 가져오고, 할 일을 끝내면 축하해요. 가끔 묻는 말에 단추로 답하면 그대로 해 줘요(‘5분 쉬어 갈까요?’ → 5분 타이머).</p></div>
+        </article>
+        <article class="tile reveal" style="--t: var(--tape-timer)">
+          <div class="art" aria-hidden="true">
+            <div class="sync">
+              <div class="device"><div class="screen"><i></i><i></i><i></i></div>Mac</div>
+              <div class="folder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2h9A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/><path d="M8 13.5h8M12 11v5" stroke-linecap="round"/></svg>iCloud Drive · OneDrive · Dropbox</div>
+              <div class="device"><div class="screen"><i></i><i></i><i></i></div>Windows</div>
+            </div>
+          </div>
+          <div class="copy"><h3>Mac과 Windows, 한 목록</h3><p>같은 클라우드 폴더를 저장 위치로 고르면 두 컴퓨터가 같은 목록을 써요. 거의 동시에 고쳐도 양쪽 변경이 남고, 같은 메모는 줄과 글자 단위로 합쳐요. 계정과 서버는 없어요.</p></div>
+        </article>
+        <article class="tile reveal" style="--t: var(--tape-memo)">
+          <div class="art top"><img src="assets/note-night.webp" width="640" height="976" alt="같은 노트를 밤 종이로 본 모습" loading="lazy"></div>
+          <div class="copy"><h3>밤 종이</h3><p>시스템이 어두운 모드면 모든 창이 불 끈 방의 종이 같은 밤 종이로 바뀌어요. 낮과 밤의 모든 글자 쌍이 WCAG AA 대비를 넘어요.</p></div>
+        </article>
+      </div>
     </div>
   </section>
 
   <section id="design" aria-labelledby="design-title">
     <div class="wrap">
-      <div class="section-head">
+      <div class="head reveal">
+        <p class="eyebrow">디자인</p>
         <h2 id="design-title">하루 띠는 세 번 그렸어요</h2>
         <p>목록 위에 오늘을 어떻게 보여 줄지에 시간을 가장 많이 썼어요. 1차와 2차는 하루 전체를 보여 줬는데, 써 보니 필요한 건 지금 하는 일과 남은 시간이었어요.</p>
       </div>
-      <div class="rounds">
-        <div class="round"><div><h3>1차</h3><p>하루를 막대 한 줄로, 지금과 다음을 한 문장으로.</p></div><div class="shot"><img src="assets/round1.webp" width="720" height="189" alt="하루 띠 1차: 카드 안의 막대와 ‘지금 팀 회의 → 40분 뒤 치과’ 문장" loading="lazy"></div></div>
-        <div class="round"><div><h3>2차</h3><p>6시간 눈금, 시간을 정한 할 일이 막대 아래로.</p></div><div class="shot"><img src="assets/round2.webp" width="720" height="189" alt="하루 띠 2차: 6시간 단위 눈금" loading="lazy"></div></div>
-        <div class="round"><div><h3>3차</h3><p>카드를 빼고 지금 하는 일을 크게. 하루 전체는 누르면 펼쳐져요.</p></div><div class="shot"><img src="assets/round3.webp" width="720" height="296" alt="하루 띠 3차: 얇은 막대, 30분 남음 동그라미, 큰 손글씨 ‘팀 회의’, 다음 두 줄" loading="lazy"></div></div>
+      <div class="rounds reveal">
+        <div class="round"><span class="n">01</span><div><h3>1차</h3><p>하루를 막대 한 줄로, 지금과 다음을 한 문장으로.</p></div><div class="shot"><img src="assets/round1.webp" width="720" height="189" alt="하루 띠 1차: 카드 안의 막대와 ‘지금 팀 회의 → 40분 뒤 치과’ 문장" loading="lazy"></div></div>
+        <div class="round"><span class="n">02</span><div><h3>2차</h3><p>6시간 눈금, 시간을 정한 할 일이 막대 아래로.</p></div><div class="shot"><img src="assets/round2.webp" width="720" height="189" alt="하루 띠 2차: 6시간 단위 눈금" loading="lazy"></div></div>
+        <div class="round"><span class="n">03</span><div><h3>3차</h3><p>카드를 빼고 지금 하는 일을 크게. 하루 전체는 누르면 펼쳐져요.</p></div><div class="shot"><img src="assets/round3.webp" width="720" height="296" alt="하루 띠 3차: 얇은 막대, 30분 남음 동그라미, 큰 손글씨 ‘팀 회의’, 다음 두 줄" loading="lazy"></div></div>
       </div>
-      <p class="docs"><a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/design-process.md">디자인 과정 읽기</a></p>
+      <div class="more"><a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/design-process.md">디자인 과정 읽기 <span class="ext" aria-hidden="true">↗</span></a></div>
     </div>
   </section>
 
   <section id="built" aria-labelledby="built-title">
     <div class="wrap">
-      <div class="section-head">
+      <div class="head reveal">
+        <p class="eyebrow">만든 방식</p>
         <h2 id="built-title">두 번 만들고, 같게 지켰어요</h2>
         <p>Mac은 Swift(SwiftUI + AppKit), Windows는 Electron + TypeScript로 따로 만들었어요. 코드는 나누지 않고, 두 앱이 같은 시험 사례 표를 통과하게 해서 동작을 맞춰요.</p>
       </div>
-      <div class="stats">
+      <div class="stats reveal">
         <div class="stat"><b>136줄</b><span>두 앱이 글자 하나 다르지 않게 통과하는 입력 줄 사례</span></div>
         <div class="stat"><b>471 + 300</b><span>Windows 시험 471개, Mac 시험 스크립트 15개 · 검사 약 300개</span></div>
         <div class="stat"><b>61% → 0.7%</b><span>Mac에서 노트를 열어 두고 쉴 때 CPU</span></div>
         <div class="stat"><b>WCAG AA</b><span>낮 · 밤 모든 글자 쌍, 못 넘으면 검사가 실패</span></div>
       </div>
       <ul class="points">
-        <li><strong>사례 표를 먼저 써요</strong><span>‘내일 3시 회의’를 무엇으로 읽고 칩에 무엇이 보이는지까지 한 줄로 적어요. Swift 시험과 TypeScript 시험이 같은 문자열을 내야 통과해요.</span></li>
-        <li><strong>화면은 그려서 확인해요</strong><span>Mac은 실제 화면을 3개 언어와 낮/밤으로 약 1,500장 그리고, Windows는 창마다 크기와 배율, 글꼴을 바꿔 가며 잘린 글을 찾아요.</span></li>
-        <li><strong>CPU 61%의 원인</strong><span>깜빡이는 ‘지금’ 선이 노트 전체를 매 프레임 다시 그리고 있었어요. 같은 판에서 입력 지연 0.46초 → 0.01초, 시작 2.7초 → 1.0초(Mac), 10분 뒤 메모리 692MB → 457MB(Windows)로 줄였어요.</span></li>
-        <li><strong>아직 못 한 것</strong><span>Windows 판은 macOS 위 Electron에서만 확인했고, 실제 Windows PC에서는 돌려 보지 않았어요. 두 앱 모두 코드 서명이 없어요.</span></li>
+        <li class="reveal"><strong>사례 표를 먼저 써요</strong><span>‘내일 3시 회의’를 무엇으로 읽고 칩에 무엇이 보이는지까지 한 줄로 적어요. Swift 시험과 TypeScript 시험이 같은 문자열을 내야 통과해요.</span></li>
+        <li class="reveal"><strong>화면은 그려서 확인해요</strong><span>Mac은 실제 화면을 3개 언어와 낮/밤으로 약 1,500장 그리고, Windows는 창마다 크기와 배율, 글꼴을 바꿔 가며 잘린 글을 찾아요.</span></li>
+        <li class="reveal"><strong>CPU 61%의 원인</strong><span>깜빡이는 ‘지금’ 선이 노트 전체를 매 프레임 다시 그리고 있었어요. 같은 판에서 입력 지연 0.46초 → 0.01초, 시작 2.7초 → 1.0초(Mac), 10분 뒤 메모리 692MB → 457MB(Windows)로 줄였어요.</span></li>
+        <li class="reveal"><strong>아직 못 한 것</strong><span>Windows 판은 macOS 위 Electron에서만 확인했고, 실제 Windows PC에서는 돌려 보지 않았어요. 두 앱 모두 코드 서명이 없어요.</span></li>
       </ul>
-      <div class="docs">
-        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/engineering.md">엔지니어링</a>
-        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/troubleshooting.md">문제 해결 기록</a>
-        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/architecture.md">구조</a>
-        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/decisions.md">결정 기록</a>
-        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/ai-collaboration.md">AI와 일한 방식</a>
+      <div class="more">
+        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/engineering.md">엔지니어링 <span class="ext" aria-hidden="true">↗</span></a>
+        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/troubleshooting.md">문제 해결 기록 <span class="ext" aria-hidden="true">↗</span></a>
+        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/architecture.md">구조 <span class="ext" aria-hidden="true">↗</span></a>
+        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/decisions.md">결정 기록 <span class="ext" aria-hidden="true">↗</span></a>
+        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/ai-collaboration.md">AI와 일한 방식 <span class="ext" aria-hidden="true">↗</span></a>
       </div>
     </div>
   </section>
 
-  <section id="download" aria-labelledby="download-title">
+  <section id="faq" aria-labelledby="faq-title">
     <div class="wrap">
-      <div class="section-head">
-        <h2 id="download-title">내려받기</h2>
-        <p>무료예요. 코드 서명이 없는 빌드라 처음 한 번은 열기를 허락해 주세요.</p>
+      <div class="head reveal">
+        <p class="eyebrow">질문</p>
+        <h2 id="faq-title">자주 묻는 것</h2>
+      </div>
+      <div class="faq reveal">
+        <details><summary>정말 무료예요?</summary><p>네, 무료예요. 결제나 잠긴 기능이 없어요. 소스 코드는 Apache License 2.0으로 GitHub에 있어요.</p></details>
+        <details><summary>계정이 필요해요? 내 기록은 어디에 있어요?</summary><p>계정도 서버도 없어요. 내가 고른 폴더에 파일로 저장해요. 저장 위치는 책상 → 저장과 백업에서 바꿔요.</p></details>
+        <details><summary>Mac과 Windows에서 같이 쓸 수 있어요?</summary><p>iCloud Drive, OneDrive, Dropbox처럼 두 컴퓨터가 같이 보는 폴더를 저장 위치로 고르면 같은 목록을 써요. 거의 동시에 고쳐도 양쪽 변경이 남아요.</p></details>
+        <details><summary>Google 캘린더와 연결돼요?</summary><p>아니요. 한때 만들어 잘 동작했지만, 개인 일정과 업무를 나누고 싶어서 뺐어요. 같이 써 본 사람들도 같은 말을 했어요. 이유는 <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/decisions.md">결정 기록</a>에 적었어요.</p></details>
+        <details><summary>처음 열 때 왜 막혀요?</summary><p>코드 서명이 없는 빌드라서 그래요. Mac은 응용 프로그램 폴더에서 우클릭 → 열기, Windows는 SmartScreen에서 추가 정보 → 실행을 눌러요.</p></details>
+        <details><summary>어떤 언어와 환경에서 돼요?</summary><p>한국어, English, Nederlands. Mac은 macOS 14 이상의 Apple Silicon, Windows는 10/11 x64예요. Windows 판은 macOS 위 Electron에서 확인했고 실제 Windows PC에서는 아직 시험하지 못했어요.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section id="download" class="final" aria-labelledby="download-title">
+    <div class="wrap">
+      <div class="reveal">
+        <h2 id="download-title">오늘 할 일,<br><span class="hand">지금 적어 보세요.</span></h2>
+        <p class="lede">무료예요. 코드 서명이 없는 빌드라 처음 한 번은 열기를 허락해 주세요.</p>
       </div>
       <div class="downloads">
-        <div class="dl">
+        <div class="dl reveal">
           <h3>Mac</h3>
           <p class="meta">1.41.0 · macOS 14 이상 · Apple Silicon · DMG</p>
           <ol>
@@ -195,7 +333,7 @@
           </ol>
           <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0">Mac용 내려받기</a>
         </div>
-        <div class="dl">
+        <div class="dl reveal">
           <h3>Windows</h3>
           <p class="meta">1.26.0 · Windows 10/11 x64 · 설치 파일 또는 무설치 zip</p>
           <ol>
@@ -211,11 +349,42 @@
 
 <footer>
   <div class="wrap">
-    <img src="assets/cat.webp" alt="" width="40" height="40" loading="lazy">
-    <span>© 2026 leeAhwi · 소스 코드는 <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/LICENSE">Apache License 2.0</a></span>
-    <a href="https://github.com/leeahwi/jongi-nyang-app">GitHub 저장소</a>
-    <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/CHANGELOG.md">변경 기록</a>
-    <a href="en/" hreflang="en" lang="en">English</a>
+    <div class="foot">
+      <div class="about">
+        <a class="brand" href="./"><img src="assets/cat.webp" alt="" width="30" height="30" loading="lazy">종이냥</a>
+        <p>종이 한 장처럼 꺼내 쓰는 할 일 앱과 종이 고양이. macOS와 Windows.</p>
+      </div>
+      <div>
+        <h4>앱</h4>
+        <ul>
+          <li><a href="#tour">둘러보기</a></li>
+          <li><a href="#features">기능</a></li>
+          <li><a href="#download">내려받기</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/CHANGELOG.md">변경 기록</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>문서</h4>
+        <ul>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/design-process.md">디자인 과정</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/engineering.md">엔지니어링</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/architecture.md">구조</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/decisions.md">결정 기록</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>다른 곳</h4>
+        <ul>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app">GitHub 저장소</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/releases">릴리스</a></li>
+          <li><a href="en/" hreflang="en" lang="en">English</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="legal">
+      <span>© 2026 leeAhwi · 소스 코드는 <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/LICENSE">Apache License 2.0</a></span>
+      <span>Mac 1.41.0 · Windows 1.26.0</span>
+    </div>
   </div>
 </footer>
 </body>

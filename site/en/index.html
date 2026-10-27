@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="no-js">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -17,176 +17,314 @@
 <meta property="og:image" content="https://leeahwi.github.io/jongi-nyang-app/assets/og-en.png">
 <meta property="og:url" content="https://leeahwi.github.io/jongi-nyang-app/en/">
 <meta name="twitter:card" content="summary_large_image">
+<script>(function(d){d.className=d.className.replace("no-js","js");try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t)}catch(e){}})(document.documentElement)</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=Nanum+Pen+Script&display=swap">
 <link rel="stylesheet" href="../assets/style.css">
 <style>:root { --hand: "Caveat", "Nanum Pen Script", cursive; }</style>
+<script src="../assets/site.js" defer></script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="./" aria-label="Jongi-nyang home"><img src="../assets/cat.webp" alt="" width="36" height="36">Jongi-nyang</a>
+    <a class="brand" href="./" aria-label="Jongi-nyang home"><img src="../assets/cat.webp" alt="" width="30" height="30">Jongi-nyang</a>
     <nav class="nav" aria-label="Main">
-      <a class="hide-s" href="#features">Features</a>
-      <a class="hide-s" href="#built">How it's built</a>
-      <a href="#download">Download</a>
-      <a class="hide-s" href="https://github.com/leeahwi/jongi-nyang-app">GitHub</a>
-      <a class="lang" href="../" hreflang="ko" lang="ko">한국어</a>
+      <a href="#tour">Tour</a>
+      <a href="#features">Features</a>
+      <a href="#built">How it's built</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/leeahwi/jongi-nyang-app">GitHub</a>
     </nav>
+    <div class="tools">
+      <div class="theme" role="group" aria-label="Appearance">
+        <button type="button" data-theme-set="auto" aria-pressed="true" title="Match the system"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg><span class="sr">Match the system</span></button>
+        <button type="button" data-theme-set="light" aria-pressed="false" title="Day paper"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="2.8"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg><span class="sr">Day paper</span></button>
+        <button type="button" data-theme-set="dark" aria-pressed="false" title="Night paper"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M13.5 9.6A5.6 5.6 0 0 1 6.4 2.5a5.6 5.6 0 1 0 7.1 7.1z"/></svg><span class="sr">Night paper</span></button>
+      </div>
+      <a class="lang" href="../" hreflang="ko" lang="ko">한국어</a>
+      <a class="btn primary small" href="#download">Download</a>
+    </div>
   </div>
 </header>
 
 <main id="main">
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap">
-      <div>
-        <p class="eyebrow">A to-do app for macOS · Windows</p>
-        <h1 id="hero-title">Today's to-dos,<br>on one sheet of paper.</h1>
-        <p class="lede">A note for writing down to-dos and ticking them off. Above the list you see what's on now and how long is left; at the bottom of the screen, a paper cat brings your reminders. No account: everything is saved in files on your computer.</p>
-        <div class="buttons">
-          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
-            Download for Mac <small>1.41.0</small>
-          </a>
-          <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.26.0">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
-            Download for Windows <small>1.26.0</small>
-          </a>
+      <a class="badge" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0"><span class="dot" aria-hidden="true"></span>New · drag timetable blocks to change times<span class="go" aria-hidden="true">→</span></a>
+      <h1 id="hero-title">Today's to-dos,<br>on <span class="hand">one sheet of paper.</span></h1>
+      <p class="lede">A note for writing down to-dos and ticking them off. Above the list you see what's on now and how long is left; at the bottom of the screen, a paper cat brings your reminders. No account: everything is saved in files on your computer.</p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
+          Download for Mac <small>1.41.0</small>
+        </a>
+        <div class="line" role="img" aria-label="Input line example: ‘meeting tomorrow 3pm’ is read as ‘Event · tomorrow 3:00 PM’" data-line='[["meeting tomorrow 3pm","Event · tomorrow 3:00 PM"],["report by Friday","To-do · due Friday"],["timer 40","40-minute timer"],["alarm 7am weekdays","Alarm · weekdays 7:00 AM","clay"]]'>
+          <span class="pen" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg></span>
+          <span class="typed" aria-hidden="true">meeting tomorrow 3pm</span>
+          <span class="chip" aria-hidden="true">Event · tomorrow 3:00 PM</span>
         </div>
-        <p class="fine">Free · macOS 14+ (Apple Silicon) · Windows 10/11 · Korean · English · Dutch. <span lang="ko">종이냥</span> (<i>jongi-nyang</i>) means “paper cat”.</p>
       </div>
-      <div class="stack">
-        <figure class="sheet a" style="margin:0"><span class="tape" aria-hidden="true"></span><img src="../assets/note-en.webp" width="640" height="976" alt="The Jongi-nyang note on a Mac: the day strip shows ‘Team meeting’ now with 30 minutes left, then what's next and today's list"></figure>
-        <figure class="sheet b" style="margin:0"><span class="tape" aria-hidden="true"></span><img src="../assets/win-en.webp" width="640" height="976" alt="The same note in the Windows app"></figure>
+      <p class="alt">On Windows? <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.26.0">Download for Windows 1.26.0</a> · <span lang="ko">종이냥</span> (<i>jongi-nyang</i>) means “paper cat”.</p>
+    </div>
+  </section>
+
+  <section id="tour" class="tour" aria-label="A tour of Jongi-nyang">
+    <div class="wrap reveal" data-tabs>
+      <div class="stage">
+        <div class="slides">
+          <article class="slide" id="s-note" role="tabpanel" aria-labelledby="t-note">
+            <div>
+              <p class="kicker">01 · The note</p>
+              <h3>A note that puts now first</h3>
+              <p>One sheet of paper with Today, Ahead and Memo tabs. The day strip at the top shows what's on now in large handwriting and the time left in a ring; what's next and today's list follow below.</p>
+            </div>
+            <figure class="shot" style="margin:0"><img src="../assets/note-en.webp" width="640" height="976" alt="The Jongi-nyang note on a Mac: the day strip shows ‘Team meeting’ now with 30 minutes left, then what's next and today's list"></figure>
+          </article>
+          <article class="slide" id="s-day" role="tabpanel" aria-labelledby="t-day" hidden>
+            <div>
+              <p class="kicker">02 · Timetable</p>
+              <h3>Your day, unfolded</h3>
+              <p>Click the day strip and the day unfolds as a timetable right there. A dragged block follows the mouse and settles on a quarter hour; drag its top or bottom edge to stretch it.</p>
+            </div>
+            <figure class="shot" style="margin:0"><img src="../assets/day-en.webp" width="640" height="613" alt="The unfolded day timetable: events as color blocks and to-dos outlined in green" loading="lazy"></figure>
+          </article>
+          <article class="slide" id="s-focus" role="tabpanel" aria-labelledby="t-focus" hidden>
+            <div>
+              <p class="kicker">03 · Focus</p>
+              <h3>Focus on one thing</h3>
+              <p>Type “report 25 min focus” and the note turns into a single card with Done, 5 more min and Not now. Pomodoro rounds work too.</p>
+            </div>
+            <figure class="shot" style="margin:0"><img src="../assets/focus-en.webp" width="640" height="854" alt="The focus card: a ring of time left around one to-do" loading="lazy"></figure>
+          </article>
+          <article class="slide" id="s-alarm" role="tabpanel" aria-labelledby="t-alarm" hidden>
+            <div>
+              <p class="kicker">04 · Alarms</p>
+              <h3>Alarms on a paper slip</h3>
+              <p>Set days, sound and snooze. When it rings, a slip appears with the cat shaking a bell. It ignores keys for 1.5 seconds, so typing in another app can't dismiss it.</p>
+            </div>
+            <figure class="shot" style="margin:0"><img src="../assets/alarm-en.webp" width="600" height="766" alt="The ringing alarm slip: 7:00 AM, a Stop button and snooze for 5, 10 or 15 minutes" loading="lazy"></figure>
+          </article>
+          <article class="slide" id="s-ahead" role="tabpanel" aria-labelledby="t-ahead" hidden>
+            <div>
+              <p class="kicker">05 · Ahead</p>
+              <h3>Drag to reschedule</h3>
+              <p>Each day of this week and next with its events and due to-dos. Drag a to-do onto another day and its due date follows.</p>
+            </div>
+            <figure class="shot" style="margin:0"><img src="../assets/ahead-ko.webp" width="640" height="1159" alt="Dragging a to-do to another day in the Ahead tab (Korean interface)" loading="lazy"></figure>
+          </article>
+          <article class="slide wide" id="s-desk" role="tabpanel" aria-labelledby="t-desk" hidden>
+            <div>
+              <p class="kicker">06 · Desk</p>
+              <h3>Calendar and settings on the Desk</h3>
+              <p>Calendar, history, settings and help live in one Desk window, so the note itself stays light.</p>
+            </div>
+            <figure class="shot" style="margin:0"><img src="../assets/desk-en.webp" width="1200" height="835" alt="The Desk window's calendar: a month view with the selected day's events on the right" loading="lazy"></figure>
+          </article>
+        </div>
+      </div>
+      <div class="deckbar">
+        <div role="tablist" aria-label="Screens">
+          <button class="pill" type="button" role="tab" id="t-note" aria-controls="s-note" aria-selected="true">Note</button>
+          <button class="pill" type="button" role="tab" id="t-day" aria-controls="s-day" aria-selected="false" tabindex="-1">Timetable</button>
+          <button class="pill" type="button" role="tab" id="t-focus" aria-controls="s-focus" aria-selected="false" tabindex="-1">Focus</button>
+          <button class="pill" type="button" role="tab" id="t-alarm" aria-controls="s-alarm" aria-selected="false" tabindex="-1">Alarms</button>
+          <button class="pill" type="button" role="tab" id="t-ahead" aria-controls="s-ahead" aria-selected="false" tabindex="-1">Ahead</button>
+          <button class="pill" type="button" role="tab" id="t-desk" aria-controls="s-desk" aria-selected="false" tabindex="-1">Desk</button>
+        </div>
+        <span class="count" data-count aria-hidden="true">01 / 06</span>
+        <div class="arrows">
+          <button type="button" data-prev aria-label="Previous screen"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 5 8l5 5"/></svg></button>
+          <button type="button" data-next aria-label="Next screen"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 3 5 5-5 5"/></svg></button>
+        </div>
       </div>
     </div>
   </section>
 
-  <section id="input" aria-labelledby="input-title">
-    <div class="wrap split">
-      <div>
-        <div class="section-head">
-          <h2 id="input-title">Anything, on one line</h2>
-          <p>Type into the input line at the bottom and it works out whether you meant a to-do, an event or a timer, and shows its reading as a chip. If it's wrong, press <kbd>Tab</kbd>. After adding, “Switch” in the toast changes it to the other kind.</p>
-        </div>
-        <ul class="examples">
-          <li><code>meeting tomorrow 3pm</code><span class="arrow" aria-hidden="true">→</span><span class="chip">Event · tomorrow 3:00 PM</span></li>
-          <li><code>report by Friday</code><span class="arrow" aria-hidden="true">→</span><span class="chip">To-do · due Friday</span></li>
-          <li><code>timer 40</code><span class="arrow" aria-hidden="true">→</span><span class="chip">40-minute timer</span></li>
-          <li><code>alarm 7am weekdays</code><span class="arrow" aria-hidden="true">→</span><span class="chip clay">Alarm · weekdays 7:00 AM</span></li>
-        </ul>
+  <section id="how" aria-labelledby="how-title">
+    <div class="wrap">
+      <div class="head reveal">
+        <p class="eyebrow">A day with it</p>
+        <h2 id="how-title">Write it, see it, tidy it.</h2>
+        <p>Jot things down in the morning; through the day it shows what's on now; in the evening it helps you sort out what's left.</p>
       </div>
-      <div class="shot pad"><img src="../assets/line-en.webp" width="720" height="204" alt="The input line reading a typed event, with an ‘Event’ chip above it" loading="lazy"></div>
+      <div class="steps">
+        <article class="step reveal">
+          <span class="num">01</span>
+          <h3>Write one line</h3>
+          <p>Type into the input line at the bottom. It works out whether you meant a to-do, an event or a timer, and shows its reading as a chip.</p>
+          <div class="mini" aria-hidden="true">
+            <div class="typed-row"><span class="pen">✎</span>report by Friday</div>
+            <div><span class="chip">To-do · due Friday</span></div>
+          </div>
+        </article>
+        <article class="step reveal">
+          <span class="num">02</span>
+          <h3>See now first</h3>
+          <p>The day strip above the list shows what's on now and how long is left. Click it to see the whole day.</p>
+          <div class="mini" aria-hidden="true">
+            <div class="now">
+              <div class="ring"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="17" fill="none" stroke="var(--rule)" stroke-width="4"/><circle cx="20" cy="20" r="17" fill="none" stroke="var(--sage)" stroke-width="4" stroke-linecap="round" stroke-dasharray="72 107"/></svg><b>30<small>min left</small></b></div>
+              <div><div class="when">Now · 19:39–20:24</div><div class="what">Team meeting</div></div>
+            </div>
+          </div>
+        </article>
+        <article class="step reveal">
+          <span class="num">03</span>
+          <h3>Tidy up in the evening</h3>
+          <p>At 8 pm it asks whether to move what's left to tomorrow. If you miss it, it asks the next morning.</p>
+          <div class="mini" aria-hidden="true">
+            <div class="ask">3 left today. Move them to tomorrow?</div>
+            <div class="ask-btns"><span>To tomorrow</span><span>To Someday</span><span>Leave as is</span></div>
+          </div>
+        </article>
+      </div>
     </div>
   </section>
 
   <section id="features" aria-labelledby="features-title">
     <div class="wrap">
-      <div class="section-head">
-        <h2 id="features-title">What's in the note</h2>
-        <p>The day strip, a focus card, alarms, the Ahead tab, an evening tidy-up, and the cat.</p>
+      <div class="head reveal">
+        <p class="eyebrow">Features</p>
+        <h2 id="features-title">Anything, on one line.<br>The note does the rest.</h2>
+        <p>One input line for to-dos, events, timers and alarms. If it reads you wrong, press <kbd>Tab</kbd>. After adding, “Switch” in the toast changes it to the other kind.</p>
       </div>
-      <div class="cards">
-        <article class="card" style="--t: var(--tape-event)">
-          <h3>A day strip that puts now first</h3>
-          <p>What's on now is in large handwriting, with the time left in a ring. Click it to unfold the day as a timetable, where a dragged block follows the mouse and settles on a quarter hour, and its top or bottom edge stretches it.</p>
-          <div class="shot"><img src="../assets/day-en.webp" width="640" height="613" alt="The unfolded day timetable: events as color blocks and to-dos outlined in green" loading="lazy"></div>
-        </article>
-        <article class="card" style="--t: var(--tape-timer)">
-          <h3>Focus on one thing</h3>
-          <p>Type “report 25 min focus” and the note turns into a single card with Done, 5 more min and Not now. Pomodoro rounds work too.</p>
-          <div class="shot"><img src="../assets/focus-en.webp" width="640" height="854" alt="The focus card: a ring of time left around one to-do" loading="lazy"></div>
-        </article>
-        <article class="card" style="--t: var(--tape-alarm)">
-          <h3>Alarms on a paper slip</h3>
-          <p>Set days, sound and snooze. When it rings, a slip appears with the cat shaking a bell. It ignores keys for 1.5 seconds, so typing in another app can't dismiss it.</p>
-          <div class="shot"><img src="../assets/alarm-en.webp" width="600" height="766" alt="The ringing alarm slip: 7:00 AM, a Stop button and snooze for 5, 10 or 15 minutes" loading="lazy"></div>
-        </article>
-        <article class="card" style="--t: var(--tape-memo)">
-          <h3>Ahead: drag to reschedule</h3>
-          <p>Each day of this week and next with its events and due to-dos. Drag a to-do onto another day and its due date follows.</p>
-          <div class="shot"><img src="../assets/ahead-ko.webp" width="640" height="1159" alt="Dragging a to-do to another day in the Ahead tab (Korean interface)" loading="lazy"></div>
-        </article>
-        <article class="card" style="--t: var(--tape-todo)">
-          <h3>Evening tidy-up</h3>
-          <p>At 8 pm it asks: “3 left today. Move them to tomorrow?” If you miss it, it asks the next morning. Search covers today, Ahead, memos, history and events, and understands Korean initial consonants.</p>
-          <div class="shot"><img src="../assets/sweep-en.webp" width="600" height="484" alt="The evening tidy-up slip: the to-dos left today, with To tomorrow, To Someday and Leave as is" loading="lazy"></div>
-        </article>
-        <article class="card" style="--t: var(--tape-event)">
-          <h3>A cat for company</h3>
-          <p>It breathes and wanders above the Dock, walks in with your reminders and celebrates finished to-dos. Sometimes it asks a question with answer buttons, like “A 5-minute break?”, which starts a 5-minute timer.</p>
-          <div class="shot"><img src="../assets/pet-ko.webp" width="600" height="500" alt="The cat asking a question in a speech bubble with answer buttons (Korean interface)" loading="lazy"></div>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <section id="together" aria-labelledby="together-title">
-    <div class="wrap split flip">
-      <div>
-        <div class="section-head">
-          <h2 id="together-title">Mac and Windows, one list</h2>
-          <p>Pick an iCloud Drive, OneDrive or Dropbox folder as the storage location and both computers share one list. Edits made at nearly the same time both survive, and a memo edited on two devices is merged line by line and character by character. There is no account and no server.</p>
-          <p>Calendar, history, settings and help are in one Desk window. When the system is in dark mode, every window switches to night paper, the color of paper in a room with the lights off.</p>
+      <div class="panel reveal" data-tabs>
+        <div class="panel-top">
+          <div role="tablist" aria-label="Input examples">
+            <button class="pill" type="button" role="tab" id="k-event" aria-controls="p-event" aria-selected="true">Event</button>
+            <button class="pill" type="button" role="tab" id="k-todo" aria-controls="p-todo" aria-selected="false" tabindex="-1">To-do</button>
+            <button class="pill" type="button" role="tab" id="k-timer" aria-controls="p-timer" aria-selected="false" tabindex="-1">Timer</button>
+            <button class="pill" type="button" role="tab" id="k-alarm" aria-controls="p-alarm" aria-selected="false" tabindex="-1">Alarm</button>
+          </div>
+          <span class="note">Reads English, Korean and Dutch</span>
+        </div>
+        <div class="tabpanel" id="p-event" role="tabpanel" aria-labelledby="k-event">
+          <div class="panes">
+            <div class="pane"><div class="pane-head"><span>You type</span><span>Input line</span></div><div class="pane-body"><div class="input"><span class="pen" aria-hidden="true">✎</span>meeting tomorrow 3pm</div><p class="hint">A day and a time, together.</p></div></div>
+            <div class="pane"><div class="pane-head"><span>It reads</span><span class="live">Chip</span></div><div class="pane-body result"><span class="chip">Event · tomorrow 3:00 PM</span><p>Events sit as blocks on the day strip and the day timetable. Drag a block to move it by quarter hours, or drag its top or bottom edge to change its length.</p></div></div>
+          </div>
+        </div>
+        <div class="tabpanel" id="p-todo" role="tabpanel" aria-labelledby="k-todo" hidden>
+          <div class="panes">
+            <div class="pane"><div class="pane-head"><span>You type</span><span>Input line</span></div><div class="pane-body"><div class="input"><span class="pen" aria-hidden="true">✎</span>report by Friday</div><p class="hint">A due date with “by”.</p></div></div>
+            <div class="pane"><div class="pane-head"><span>It reads</span><span class="live">Chip</span></div><div class="pane-body result"><span class="chip">To-do · due Friday</span><p>Due dates show on that day in the Ahead tab. Drag a to-do onto another day and its due date follows.</p></div></div>
+          </div>
+        </div>
+        <div class="tabpanel" id="p-timer" role="tabpanel" aria-labelledby="k-timer" hidden>
+          <div class="panes">
+            <div class="pane"><div class="pane-head"><span>You type</span><span>Input line</span></div><div class="pane-body"><div class="input"><span class="pen" aria-hidden="true">✎</span>timer 40</div><p class="hint">Minutes after “timer”.</p></div></div>
+            <div class="pane"><div class="pane-head"><span>It reads</span><span class="live">Chip</span></div><div class="pane-body result"><span class="chip">40-minute timer</span><p>Write it with a to-do, like “report 25 min focus”, and the note turns into a single focus card.</p></div></div>
+          </div>
+        </div>
+        <div class="tabpanel" id="p-alarm" role="tabpanel" aria-labelledby="k-alarm" hidden>
+          <div class="panes">
+            <div class="pane"><div class="pane-head"><span>You type</span><span>Input line</span></div><div class="pane-body"><div class="input"><span class="pen" aria-hidden="true">✎</span>alarm 7am weekdays</div><p class="hint">Days to ring on, like “weekdays”.</p></div></div>
+            <div class="pane"><div class="pane-head"><span>It reads</span><span class="live">Chip</span></div><div class="pane-body result"><span class="chip clay">Alarm · weekdays 7:00 AM</span><p>When it rings, a slip appears with the cat shaking a bell. Snooze for 5, 10 or 15 minutes.</p></div></div>
+          </div>
         </div>
       </div>
-      <div class="shot"><img src="../assets/desk-en.webp" width="1200" height="835" alt="The Desk window's calendar: a month view with the selected day's events on the right" loading="lazy"></div>
+
+      <div class="bento">
+        <article class="tile reveal" style="--t: var(--tape-todo)">
+          <div class="art"><img src="../assets/sweep-en.webp" width="600" height="484" alt="The evening tidy-up slip: the to-dos left today, with To tomorrow, To Someday and Leave as is" loading="lazy"></div>
+          <div class="copy"><h3>Evening tidy-up</h3><p>At 8 pm it asks: “3 left today. Move them to tomorrow?” Send each one to tomorrow or Someday, or leave it as is. Search understands Korean initial consonants too.</p></div>
+        </article>
+        <article class="tile reveal" style="--t: var(--tape-event)">
+          <div class="art"><img src="../assets/pet-ko.webp" width="600" height="500" alt="The cat asking a question in a speech bubble with answer buttons (Korean interface)" loading="lazy"></div>
+          <div class="copy"><h3>A cat for company</h3><p>It breathes and wanders above the Dock, walks in with your reminders and celebrates finished to-dos. Sometimes it asks a question with answer buttons, like “A 5-minute break?”, which starts a 5-minute timer.</p></div>
+        </article>
+        <article class="tile reveal" style="--t: var(--tape-timer)">
+          <div class="art" aria-hidden="true">
+            <div class="sync">
+              <div class="device"><div class="screen"><i></i><i></i><i></i></div>Mac</div>
+              <div class="folder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2h9A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/><path d="M8 13.5h8M12 11v5" stroke-linecap="round"/></svg>iCloud Drive · OneDrive · Dropbox</div>
+              <div class="device"><div class="screen"><i></i><i></i><i></i></div>Windows</div>
+            </div>
+          </div>
+          <div class="copy"><h3>Mac and Windows, one list</h3><p>Pick the same cloud folder as the storage location and both computers share one list. Edits made at nearly the same time both survive, and a memo edited on two devices is merged line by line and character by character. No account, no server.</p></div>
+        </article>
+        <article class="tile reveal" style="--t: var(--tape-memo)">
+          <div class="art top"><img src="../assets/note-night.webp" width="640" height="976" alt="The same note on night paper (Korean interface)" loading="lazy"></div>
+          <div class="copy"><h3>Night paper</h3><p>When the system is in dark mode, every window switches to night paper, the color of paper in a room with the lights off. Every text pair, day and night, passes WCAG AA contrast.</p></div>
+        </article>
+      </div>
     </div>
   </section>
 
   <section id="design" aria-labelledby="design-title">
     <div class="wrap">
-      <div class="section-head">
+      <div class="head reveal">
+        <p class="eyebrow">Design</p>
         <h2 id="design-title">The day strip, drawn three times</h2>
         <p>I spent more time on how to show today above the list than on anything else. Rounds 1 and 2 showed the whole day. Using it, I found that what I needed was what's on now and how long is left.</p>
       </div>
-      <div class="rounds">
-        <div class="round"><div><h3>Round 1</h3><p>The day as one bar; now and next as one sentence.</p></div><div class="shot"><img src="../assets/round1.webp" width="720" height="189" alt="Day strip, round 1: a bar inside a card and a now-and-next sentence (Korean interface)" loading="lazy"></div></div>
-        <div class="round"><div><h3>Round 2</h3><p>Six-hour ticks; timed to-dos below the bar.</p></div><div class="shot"><img src="../assets/round2.webp" width="720" height="189" alt="Day strip, round 2: six-hour ticks (Korean interface)" loading="lazy"></div></div>
-        <div class="round"><div><h3>Round 3</h3><p>No card; what's on now, large. Click to see the whole day.</p></div><div class="shot"><img src="../assets/round3.webp" width="720" height="296" alt="Day strip, round 3: a thin bar, a 30-minutes-left ring, the current event in large handwriting and the next two rows (Korean interface)" loading="lazy"></div></div>
+      <div class="rounds reveal">
+        <div class="round"><span class="n">01</span><div><h3>Round 1</h3><p>The day as one bar; now and next as one sentence.</p></div><div class="shot"><img src="../assets/round1.webp" width="720" height="189" alt="Day strip, round 1: a bar inside a card and a now-and-next sentence (Korean interface)" loading="lazy"></div></div>
+        <div class="round"><span class="n">02</span><div><h3>Round 2</h3><p>Six-hour ticks; timed to-dos below the bar.</p></div><div class="shot"><img src="../assets/round2.webp" width="720" height="189" alt="Day strip, round 2: six-hour ticks (Korean interface)" loading="lazy"></div></div>
+        <div class="round"><span class="n">03</span><div><h3>Round 3</h3><p>No card; what's on now, large. Click to see the whole day.</p></div><div class="shot"><img src="../assets/round3.webp" width="720" height="296" alt="Day strip, round 3: a thin bar, a 30-minutes-left ring, the current event in large handwriting and the next two rows (Korean interface)" loading="lazy"></div></div>
       </div>
-      <p class="docs"><a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/design-process.md">Read the design process (Korean)</a></p>
+      <div class="more"><a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/design-process.md">Read the design process (Korean) <span class="ext" aria-hidden="true">↗</span></a></div>
     </div>
   </section>
 
   <section id="built" aria-labelledby="built-title">
     <div class="wrap">
-      <div class="section-head">
+      <div class="head reveal">
+        <p class="eyebrow">How it's built</p>
         <h2 id="built-title">Built twice, kept identical</h2>
         <p>Swift (SwiftUI + AppKit) on the Mac, Electron + TypeScript on Windows, built separately. They share no code. Both have to pass the same tables of test cases, which keeps their behavior the same.</p>
       </div>
-      <div class="stats">
+      <div class="stats reveal">
         <div class="stat"><b>136 rows</b><span>of input-line cases both apps pass character for character</span></div>
         <div class="stat"><b>471 + 300</b><span>Windows tests; Mac test scripts with ~300 checks</span></div>
         <div class="stat"><b>61% → 0.7%</b><span>Mac idle CPU with the note open</span></div>
         <div class="stat"><b>WCAG AA</b><span>every text pair, day and night, or the check fails</span></div>
       </div>
       <ul class="points">
-        <li><strong>Case tables come first</strong><span>How “meeting tomorrow 3pm” is read, down to the words on the chip, is one row. The Swift and TypeScript tests must both produce that exact string.</span></li>
-        <li><strong>Screens are checked by rendering them</strong><span>About 1,500 real Mac screens in 3 languages, day and night. Every Windows window is resized and redrawn at different scale factors and fonts to catch clipped text.</span></li>
-        <li><strong>Where the 61% CPU came from</strong><span>A blinking “now” line was redrawing the whole note every frame. The same release cut input latency from 0.46 s to 0.01 s and launch from 2.7 s to 1.0 s on the Mac; on Windows, memory after 10 minutes went from 692 MB to 457 MB.</span></li>
-        <li><strong>Not done yet</strong><span>The Windows version has only run in Electron on macOS, never on a real Windows PC. Neither app is code-signed.</span></li>
+        <li class="reveal"><strong>Case tables come first</strong><span>How “meeting tomorrow 3pm” is read, down to the words on the chip, is one row. The Swift and TypeScript tests must both produce that exact string.</span></li>
+        <li class="reveal"><strong>Screens are checked by rendering them</strong><span>About 1,500 real Mac screens in 3 languages, day and night. Every Windows window is resized and redrawn at different scale factors and fonts to catch clipped text.</span></li>
+        <li class="reveal"><strong>Where the 61% CPU came from</strong><span>A blinking “now” line was redrawing the whole note every frame. The same release cut input latency from 0.46 s to 0.01 s and launch from 2.7 s to 1.0 s on the Mac; on Windows, memory after 10 minutes went from 692 MB to 457 MB.</span></li>
+        <li class="reveal"><strong>Not done yet</strong><span>The Windows version has only run in Electron on macOS, never on a real Windows PC. Neither app is code-signed.</span></li>
       </ul>
-      <div class="docs">
-        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/README.en.md">Repository overview</a>
-        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/one-pager-en.md">One-pager</a>
-        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/troubleshooting.en.md">Troubleshooting log</a>
-        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/ai-collaboration.md#english">How I worked with AI</a>
+      <div class="more">
+        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/README.en.md">Repository overview <span class="ext" aria-hidden="true">↗</span></a>
+        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/one-pager-en.md">One-pager <span class="ext" aria-hidden="true">↗</span></a>
+        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/troubleshooting.en.md">Troubleshooting log <span class="ext" aria-hidden="true">↗</span></a>
+        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/ai-collaboration.md#english">How I worked with AI <span class="ext" aria-hidden="true">↗</span></a>
       </div>
     </div>
   </section>
 
-  <section id="download" aria-labelledby="download-title">
+  <section id="faq" aria-labelledby="faq-title">
     <div class="wrap">
-      <div class="section-head">
-        <h2 id="download-title">Download</h2>
-        <p>Free. The builds aren't code-signed, so allow them once on first launch.</p>
+      <div class="head reveal">
+        <p class="eyebrow">FAQ</p>
+        <h2 id="faq-title">Questions, answered</h2>
+      </div>
+      <div class="faq reveal">
+        <details><summary>Is it really free?</summary><p>Yes. No payments and no locked features. The source code is on GitHub under the Apache License 2.0.</p></details>
+        <details><summary>Do I need an account? Where are my notes kept?</summary><p>No account and no server. Everything is saved as files in a folder you choose. Change it under Desk → Storage &amp; backup.</p></details>
+        <details><summary>Can I use it on a Mac and a Windows PC together?</summary><p>Choose a folder both computers can see, such as iCloud Drive, OneDrive or Dropbox, as the storage location and they share one list. Edits made at nearly the same time both survive.</p></details>
+        <details><summary>Does it connect to Google Calendar?</summary><p>No. It once did, and it worked, but I wanted to keep personal plans and work apart, and the people testing it said the same. The reasoning is in the <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/decisions.md">decision log</a> (Korean).</p></details>
+        <details><summary>Why is it blocked the first time I open it?</summary><p>The builds aren't code-signed. On the Mac, right-click the app in Applications and choose Open. On Windows, choose More info → Run anyway in SmartScreen.</p></details>
+        <details><summary>Which languages and systems?</summary><p>Korean, English and Dutch. macOS 14 or later on Apple Silicon; Windows 10/11 x64. The Windows version was checked in Electron on macOS and hasn't been tested on a real Windows PC yet.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section id="download" class="final" aria-labelledby="download-title">
+    <div class="wrap">
+      <div class="reveal">
+        <h2 id="download-title">Today's to-dos,<br><span class="hand">written down now.</span></h2>
+        <p class="lede">Free. The builds aren't code-signed, so allow them once on first launch.</p>
       </div>
       <div class="downloads">
-        <div class="dl">
+        <div class="dl reveal">
           <h3>Mac</h3>
           <p class="meta">1.41.0 · macOS 14 or later · Apple Silicon · DMG</p>
           <ol>
@@ -195,7 +333,7 @@
           </ol>
           <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0">Download for Mac</a>
         </div>
-        <div class="dl">
+        <div class="dl reveal">
           <h3>Windows</h3>
           <p class="meta">1.26.0 · Windows 10/11 x64 · installer or portable zip</p>
           <ol>
@@ -211,11 +349,41 @@
 
 <footer>
   <div class="wrap">
-    <img src="../assets/cat.webp" alt="" width="40" height="40" loading="lazy">
-    <span>© 2026 leeAhwi · Source code under the <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/LICENSE">Apache License 2.0</a></span>
-    <a href="https://github.com/leeahwi/jongi-nyang-app">GitHub repository</a>
-    <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/CHANGELOG.en.md">Changelog</a>
-    <a href="../" hreflang="ko" lang="ko">한국어</a>
+    <div class="foot">
+      <div class="about">
+        <a class="brand" href="./"><img src="../assets/cat.webp" alt="" width="30" height="30" loading="lazy">Jongi-nyang</a>
+        <p>A to-do app you take out like a sheet of paper, with a paper cat. For macOS and Windows.</p>
+      </div>
+      <div>
+        <h4>App</h4>
+        <ul>
+          <li><a href="#tour">Tour</a></li>
+          <li><a href="#features">Features</a></li>
+          <li><a href="#download">Download</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/CHANGELOG.en.md">Changelog</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Read</h4>
+        <ul>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/README.en.md">Overview</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/one-pager-en.md">One-pager</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/troubleshooting.en.md">Troubleshooting log</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Elsewhere</h4>
+        <ul>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app">GitHub repository</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/releases">Releases</a></li>
+          <li><a href="../" hreflang="ko" lang="ko">한국어</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="legal">
+      <span>© 2026 leeAhwi · Source code under the <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/LICENSE">Apache License 2.0</a></span>
+      <span>Mac 1.41.0 · Windows 1.26.0</span>
+    </div>
   </div>
 </footer>
 </body>
