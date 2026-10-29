@@ -67,6 +67,9 @@ PAIRS = [
     ('ink2', 'paper', 'large', 'day ribbon ring: the next thing more than an hour away (1.40)'),
     ('sage', 'card', 'large', 'timetable: the grab bar on a to-do block\'s edge (1.41)'),
     ('toastText', 'toastBack', 'text', 'timetable: the time label on a dragged block (1.41)'),
+    ('stamp', 'paper', 'text', 'AI stamp on a row Claude touched today (1.42)'),
+    ('stamp', 'paper2', 'text', 'AI stamp on a sunken row (1.42)'),
+    ('stamp', 'card', 'text', 'AI stamp in a card (1.42)'),
     ('onSage', 'clayText', 'text', 'delete button (clay fill)'),
     ('switchKnob', 'sage', 'note', 'switch knob on (shape, with a shadow)'),
     ('ink', 'raised', 'text', 'selected pane, segmented pick'),
@@ -133,6 +136,96 @@ def event_tints(table):
     return out
 
 
+# 메모 서랍 (1.43): its four papers are fixed colours in MemoDrawerTheme.swift (`name: pair("#hex")` per palette, and
+# the folder colours' table). Each pair must pass in every paper.
+DRAWER = os.path.join(ROOT, 'Sources/PaperTodo/MemoDrawerTheme.swift')
+DRAWER_PAIRS = [
+    ('ink', 'paper', 'text', 'drawer: text on the paper'),
+    ('title', 'paper', 'large', 'drawer: the folder\'s handwritten name'),
+    ('label', 'paper', 'text', 'drawer: the small 메모 서랍 line'),
+    ('faint', 'paper', 'text', 'drawer: footer'),
+    ('icon', 'paper', 'large', 'drawer: header icons'),
+    ('ink', 'sheet', 'text', 'memo sheet (B2): memo text'),
+    ('secondary', 'sheet', 'text', 'memo sheet: lines under the title'),
+    ('faint', 'sheet', 'text', 'memo sheet: time, 2/4'),
+    ('icon', 'sheet', 'large', 'memo sheet: action icons'),
+    ('box', 'sheet', 'large', 'memo sheet: open checkbox'),
+    ('check', 'sheet', 'large', 'memo sheet: ticked box, progress bar'),
+    ('ink', 'slip', 'text', 'slip: memo text'),
+    ('secondary', 'slip', 'text', 'slip: preview lines'),
+    ('faint', 'slip', 'text', 'slip: time, 2/4'),
+    ('placeholder', 'slip', 'text', 'quick-write placeholder'),
+    ('icon', 'slip', 'large', 'slip: action icons'),
+    ('box', 'slip', 'large', 'slip: open checkbox'),
+    ('check', 'slip', 'large', 'slip: ticked box, progress bar'),
+    ('checkOn', 'check', 'large', 'slip: tick on its box'),
+    ('toastText', 'toast', 'text', 'drawer toast'),
+    ('pinTabInk', 'pinTabA', 'large', 'paw bookmark and handle'),
+    ('slipEdge', 'paper', 'note', 'slip edge (decorative)'),
+    ('sheet', 'paper', 'note', 'a memo sheet against the drawer (decorative, 1.43.1)'),
+    # 1.44 (메모 서랍을 더 쉽게)
+    ('groupHeader', 'paper', 'text', 'date group header (1.44)'),
+    ('faint', 'paper', 'text', 'date group count (1.44)'),
+    ('slipEdge', 'sheet', 'note', 'sheet edge, 1 pt (decorative, 1.44)'),
+    ('openLine', 'sheet', 'large', 'open memo line, 3 pt, when the folder colour is not used (1.44)'),
+    ('secondary', 'chip', 'text', 'kind chip: link, phone, 2/4 (ink 6 % over the sheet, 1.44)'),
+    ('icon', 'chip', 'large', 'bar pills: icons (1.44)'),
+    ('danger', 'chip', 'large', 'bar pills: 지우기 (1.44)'),
+    ('faint', 'chip', 'text', 'footer key hint on its box (1.44)'),
+]
+
+# The folder colours' edge as the open line (DrawerPalette.openLine): scaled toward black (toward white on a dark
+# sheet) in 5 % steps until 3:1 on the sheet. Same rule as the Windows app.
+SHEET_HEX = {'day': '#fffdf7', 'night': '#3d3a34', 'kraft': '#fbf6ea', 'grid': '#ffffff'}
+
+
+def open_line(edge, sheet):
+    start = [int(edge[i:i + 2], 16) for i in (1, 3, 5)]
+    dark = luminance(sheet) < 0.2
+    colour = start
+    step = 0
+    hexed = lambda c: '#' + ''.join(f'{int(v):02x}' for v in c)
+    while ratio(hexed(colour), sheet) < 3 and step < 20:
+        step += 1
+        k = 1 - step * 0.05
+        colour = [round(255 - (255 - v) * k) for v in start] if dark else [round(v * k) for v in start]
+    return hexed(colour)
+
+
+# 반투명 / 강하게 (1.44): the drawer paper at 82 % / 62 % over the system's popover material (which itself sits over
+# the desktop). The material is approximated by #ececec (light papers) / #2a2a2a (night). Sheets stay opaque.
+MATERIAL = {'day': '#ececec', 'night': '#2a2a2a', 'kraft': '#ececec', 'grid': '#ececec'}
+SEE_THROUGH = [('ink', 'text'), ('label', 'text'), ('faint', 'text'), ('secondary', 'text'), ('icon', 'large')]
+
+
+def drawer_rows():
+    """(paper, fg, bg, kind, where, ratio) for every pair in the four papers, plus each folder colour's ink on its bookmark."""
+    text = open(DRAWER, encoding='utf-8').read()
+    rows = []
+    for paper in ('day', 'night', 'kraft', 'grid'):
+        block = re.search(r'static let %s = DrawerPalette\((.*?)scheme:' % paper, text, re.S).group(1)
+        colours = {k: v.lower() for k, v in re.findall(r'(\w+): pair\("(#[0-9a-fA-F]{6})"\)', block)}
+        tab = re.search(r'pinTab: \(Color\(drawerHex: "(#[0-9a-fA-F]{6})"\)', block)
+        colours['pinTabA'] = tab.group(1).lower()
+        colours['chip'] = blend(colours['ink'], 0.07 if paper == 'night' else 0.06, colours['sheet'])
+        for fg, bg, kind, where in DRAWER_PAIRS:
+            rows.append((paper, fg, bg, kind, where, ratio(colours[fg], colours[bg])))
+        for alpha, mode in ((0.82, '반투명'), (0.62, '강하게')):
+            back = blend(colours['paper'], alpha, MATERIAL[paper])
+            for fg, kind in SEE_THROUGH:
+                rows.append((paper, fg, f'paper {int(alpha * 100)}%', kind, f'{mode}: on the see-through paper (1.44)', ratio(colours[fg], back)))
+        table = re.search(r'\.%s: \[(.*?)\]' % paper, text, re.S).group(1)
+        for name, a, b, ink, edge, tape in re.findall(r'\.(\w+): \("(#\w+)", "(#\w+)", "(#\w+)", "(#\w+)", "(#\w+)"\)', table):
+            worst = min(ratio(ink, a), ratio(ink, b))
+            rows.append((paper, f'{name} ink', f'{name} tab', 'text', 'drawer: bookmark name / first letter', worst))
+            rows.append((paper, f'{name} edge', 'paper', 'note', 'bookmark edge, 1 pt (decorative, 1.44)', ratio(edge, colours['paper'])))
+            rows.append((paper, f'{name} line', 'sheet', 'large', 'open memo line in the folder colour (1.44)', ratio(open_line(edge, SHEET_HEX[paper]), colours['sheet'])))
+        picked = re.search(r'pickedTab: \(Color\(drawerHex: "(#\w+)"\), Color\(drawerHex: "(#\w+)"\)', block)
+        if picked:
+            rows.append((paper, 'picked ink', 'picked tab', 'text', 'drawer: picked bookmark (kraft, grid)', ratio(picked.group(2), picked.group(1))))
+    return rows
+
+
 def main():
     markdown = '--markdown' in sys.argv
     table = tokens()
@@ -158,6 +251,10 @@ def main():
         if night < NEED['text']:
             failures.append(f'night {where}: {night:.2f} < 4.5')
         rows.append(('ink/ink2', 'event tint', 'text', where, day, day >= 4.5, night, night >= 4.5))
+    drawer = drawer_rows()
+    for paper, fg, bg, kind, where, value in drawer:
+        if value < NEED[kind]:
+            failures.append(f'drawer {paper} {fg} on {bg}: {value:.2f} < {NEED[kind]}')
     if markdown:
         print('| foreground | background | kind | used for | day | night |')
         print('| --- | --- | --- | --- | --- | --- |')
@@ -169,12 +266,16 @@ def main():
         for fg, bg, kind, where, day, day_ok, night, night_ok in rows:
             mark = lambda ok, k: ' ' if k == 'note' else ('✓' if ok else '✗')
             print(f'{fg:<12} {bg:<10} {kind:<6} {day:6.2f}{mark(day_ok, kind)} {night:6.2f}{mark(night_ok, kind)}  {where}')
+        print('\n메모 서랍 (four papers):')
+        for paper, fg, bg, kind, where, value in drawer:
+            mark = ' ' if kind == 'note' else ('✓' if value >= NEED[kind] else '✗')
+            print(f'  {paper:<6} {fg:<14} {bg:<12} {kind:<6} {value:6.2f}{mark}  {where}')
         print('\nAA: text 4.5:1, large/UI 3:1, note = decorative (not checked).')
     if failures:
         print('\n'.join(failures))
         print(f'{len(failures)} pair(s) below AA')
         sys.exit(1)
-    print(f'Day and night: all {sum(1 for r in rows if r[2] != "note")} checked pairs pass AA.')
+    print(f'Day and night: all {sum(1 for r in rows if r[2] != "note")} checked pairs pass AA; 메모 서랍: all {sum(1 for r in drawer if r[3] != "note")} in its four papers.')
 
 
 if __name__ == '__main__':

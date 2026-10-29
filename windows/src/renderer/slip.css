@@ -127,6 +127,7 @@ button.chip:hover { background: color-mix(in srgb, var(--sage) 9%, var(--paper-2
 .toast .icon { flex: none; color: var(--toast-strong); }
 .toast .toast-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .toast .toast-text b { color: var(--toast-strong); font-weight: 600; }
+.toast .toast-text.two-lines { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.35; overflow-wrap: anywhere; }
 .toast .toast-act { flex: none; height: 22px; padding: 0 6px; border-radius: 6px; color: var(--toast-action); font: 600 12.5px var(--ui); white-space: nowrap; }
 .toast .toast-act:hover { background: color-mix(in srgb, var(--paper) 12%, transparent); }
 .toast .toast-act:focus-visible { outline: 2px solid var(--toast-action); outline-offset: 1px; }

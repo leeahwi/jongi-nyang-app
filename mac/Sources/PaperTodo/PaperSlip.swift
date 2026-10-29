@@ -486,33 +486,43 @@ class SlipPanel: NSPanel {
     }
 
     /// Puts a slip in the window (with its margins) and sizes the window to it; when the slip
-    /// grows or shrinks (chips appear, a hint shows) the window follows, its top edge staying put.
+    /// grows or shrinks (chips appear, a hint shows, a card's line wraps) the window follows, the
+    /// slip's top edge and its middle staying put.
+    ///
+    /// The slip tells its own size as it is laid out (the geometry callback → `fit`), so it is laid
+    /// out where it will live: in this window, first at a roomy provisional size. 1.42.1: it used to be
+    /// measured on its own before going in. That first size came back while the old content was still
+    /// in the window, and the provisional size set after it replaced it; the slip reports again only
+    /// when its size changes, so a slip that kept its size stayed centred in a 520 × 420 window — a
+    /// short one sat low, and a tall 오늘 창 (a running timer, a wrapped card, two lists) lost the top
+    /// and the bottom of its paper. (The hosting view's own fitting size is always 0 × 0 here: it is
+    /// told not to size itself.)
     func show<V: View>(_ view: V) {
         let root = view
             .padding(SlipMetrics.margin)
             .fixedSize()
             .onGeometryChange(for: CGSize.self) { $0.size } action: { [weak self] size in self?.fit(size) }
         let hosting = NSHostingView(rootView: AnyView(root))
+        // The window follows the slip (fit), not the other way round.
         hosting.sizingOptions = []
-        var size = hosting.fittingSize
-        // Shown from inside a SwiftUI action (a button in another window), the hosting view can't measure yet and
-        // reports 0×0: the slip then stayed an invisible zero-size window — and a modal one blocked every click
-        // (1.40.0, the focus card's ×). Start from a roomy provisional size; the geometry callback fits it at once.
-        if size.width < 2 || size.height < 2 {
-            hosting.frame = NSRect(x: 0, y: 0, width: 520, height: 420)
-            hosting.layoutSubtreeIfNeeded()
-            size = hosting.fittingSize
-            if size.width < 2 || size.height < 2 { size = NSSize(width: 520, height: 420) }
-        }
-        hosting.frame = NSRect(origin: .zero, size: size)
+        // Shown from inside a SwiftUI action (a button in another window), the slip may report only a moment
+        // later; till then the provisional size keeps the window visible and clickable — a zero-size modal
+        // one blocked every click (1.40.0, the focus card's ×).
+        let provisional = NSSize(width: 520, height: 420)
+        setContentSize(provisional)
+        hosting.frame = NSRect(origin: .zero, size: provisional)
         contentView = hosting
-        setContentSize(size)
+        hosting.layoutSubtreeIfNeeded()
     }
 
+    /// The window takes the slip's size: the top edge and the middle stay where they were (where
+    /// `placeSlip` put them, under the menu bar item for the 오늘 창), and a slip on screen stays
+    /// inside the screen's visible frame.
     private func fit(_ size: CGSize) {
         guard size.width > 1, size.height > 1, abs(size.height - frame.height) > 0.5 || abs(size.width - frame.width) > 0.5 else { return }
-        let top = frame.maxY
-        setFrame(NSRect(x: frame.minX, y: top - size.height, width: size.width, height: size.height), display: true)
+        var next = NSRect(x: frame.midX - size.width / 2, y: frame.maxY - size.height, width: size.width, height: size.height)
+        if isVisible, let area = screen?.visibleFrame { next.origin = Self.kept(next, in: area) }
+        setFrame(next, display: true)
         contentView?.frame = NSRect(origin: .zero, size: size)
     }
 
@@ -523,16 +533,23 @@ class SlipPanel: NSPanel {
                       width: frame.width - m.leading - m.trailing, height: frame.height - m.top - m.bottom)
     }
 
-    /// Places the slip (not the window) with its top-left at `point`, kept on that screen.
+    /// Places the slip (not the window) with the middle of its top edge at `point`, kept on that screen.
     func placeSlip(topCenter point: NSPoint) {
         let m = SlipMetrics.margin
         let slipWidth = frame.width - m.leading - m.trailing
         var origin = NSPoint(x: point.x - slipWidth / 2 - m.leading, y: point.y - frame.height + m.top)
         if let area = (NSScreen.screens.first { $0.frame.contains(point) } ?? NSScreen.main)?.visibleFrame {
-            origin.x = min(max(origin.x, area.minX - m.leading + 8), area.maxX - frame.width + m.trailing - 8)
-            origin.y = min(max(origin.y, area.minY - m.bottom + 8), area.maxY - frame.height + m.top - 8)
+            origin = Self.kept(NSRect(origin: origin, size: frame.size), in: area)
         }
         setFrameOrigin(origin)
+    }
+
+    /// Where a slip window goes so the slip (not its margins) stays 8 pt inside `area`; when it
+    /// can't, its top edge does.
+    static func kept(_ window: NSRect, in area: NSRect) -> NSPoint {
+        let m = SlipMetrics.margin
+        return NSPoint(x: min(max(window.minX, area.minX - m.leading + 8), area.maxX - window.width + m.trailing - 8),
+                       y: min(max(window.minY, area.minY - m.bottom + 8), area.maxY - window.height + m.top - 8))
     }
 }
 

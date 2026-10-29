@@ -3,7 +3,7 @@
 in Korean, English and Dutch.
 
 Add or change lines in chatter_lines.py (in every language: the tables must keep the same shape), then run:
-    python3 scripts/chatter/generate.py [path to the Windows checkout, default ../windows]
+    python3 scripts/chatter/generate.py [path to the Windows app, default ../windows]
 and update the expected picks in CoreTests.swift / chatter.test.ts if they moved."""
 import json
 import os
@@ -486,5 +486,5 @@ open(MAC, "w").write(swift())
 if os.path.isdir(os.path.dirname(WIN)):
     open(WIN, "w").write(ts())
 else:
-    print(f"Windows checkout not found ({WIN}); wrote the macOS table only")
+    print(f"Windows app not found ({WIN}); wrote the macOS table only")
 print(f"lines {SIZE}, questions {len(QUESTIONS)}, petted {len(PETTED)} — in {', '.join(LANGS)}")

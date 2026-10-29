@@ -30,6 +30,8 @@
 - [Events & calendar](#events--calendar)
 - [Alarms · Quick note · Custom timer](#alarms--quick-note--custom-timer)
 - [Backup & move](#backup--move)
+- [종이냥 for Claude · AI connection](#종이냥-for-claude--ai-connection)
+- [Notes drawer](#notes-drawer)
 - [Screens](#screens)
 - [Install and run](#install-and-run)
 - [Shortcuts](#shortcuts)
@@ -102,7 +104,7 @@ Stage two of the new design (1.20). The **Due** and **Later** tabs become one **
 
 - **Ahead**: from tomorrow, each day of this week and next week with its **events** (color bar · time · title) and the **to-dos** due that day; later due dates **by month** (with the year when it isn’t this year); undated things in **Someday** at the bottom. The header says ‘This week · Oct 4 – 10’ and ‘6 to-dos · 3 events’. Weeks start on Sunday (in Dutch, Monday); days turn at 4 a.m.
 - **Drag to move**: drop a to-do on another day to make that its due date, on Someday to take the date away, on the Today tab to do it today. The day lights up green, and a toast says ‘Moved to Oct 9 · Undo’ (`Ctrl+Z` too). Inside a day it changes the order.
-- On the Ahead tab, the input line puts a to-do with a date on that day and one without in Someday. A window that was showing the old Due or Later tab opens on Ahead. Tab shortcuts: `Ctrl+1` Today · `Ctrl+2` Ahead · `Ctrl+3` Notes.
+- On the Ahead tab, the input line puts a to-do with a date on that day and one without in Someday. A window that was showing the old Due or Later tab opens on Ahead. Tab shortcuts: `Ctrl+1` Today · `Ctrl+2` Ahead · `Ctrl+3` Notes drawer (instead of the Notes tab since 1.28).
 - **Today window**: click the tray icon and it opens beside the taskbar (wherever the taskbar is) — three cards for the next event · the timer · the next alarm (red within the hour or while the timer runs), ‘Next’ and a few of today’s to-dos (check them right there), the input line, and Open the notepad · Desk · Hide the cat. Click elsewhere or press `Esc` to close it. Double-click the icon to open the notepad straight away; the right-click menu is unchanged.
 - Hover the icon to see what’s within the hour (‘Jongi-nyang · Dentist 40 min’) or, while a timer runs, the time left (‘Jongi-nyang · 12:30’).
 
@@ -194,7 +196,7 @@ Jongi-nyang keeps its own events (no Google Calendar or Google Tasks since 1.16.
 - Alarms live in `alarms.json` in the storage folder (the Mac’s format; a shared folder shares them), and **every device that’s on rings on its own** (which rings it handled is kept per device in `settings.json` → `alarmHandled`, for 3 days). If the computer was asleep and wakes within 15 minutes it still rings; later than that it’s skipped. Backup & move and moving the storage folder include them.
 
 ### ✍️ Quick note
-- **`Ctrl+Alt+M`** from anywhere: write a few lines on a small sheet and press `Ctrl+Enter` to add them **at the top of Notes** as a new note. `Esc` or clicking elsewhere closes it and keeps your text (even across a restart). It also opens from the cat’s right-click menu, the ⋯ menu and the tray menu; turn it off in Desk → Appearance → Quick add (you’re told if another app holds the shortcut).
+- **`Ctrl+Alt+M`** from anywhere: write a few lines on a small sheet and press `Ctrl+Enter` to add them **at the top of the Notes drawer** (the folder you last looked at) as a new note. `Esc` or clicking elsewhere closes it and keeps your text (even across a restart). It also opens from the cat’s right-click menu, the ⋯ menu and the tray menu; turn it off in Desk → Appearance → Quick add (you’re told if another app holds the shortcut).
 
 ### ⏱ Custom timer
 - Every timer menu lists your **recent custom times** (up to 3, like ‘40-min timer’) and **Custom…** after 5 · 15 · 25 · 50 min. Type `40`, `1:30`, `1h 30m`, `1.5h`, `1시간 30분` or `anderhalf uur` on the small sheet by the pointer (any language, 1 minute to 3 hours); it shows what it understood, and `Enter` starts. The **Custom** field in Desk → Clock → Start a timer works the same.
@@ -211,6 +213,36 @@ A **one-time move** to another computer (Mac ↔ Windows works too). To keep sha
   - Either way, **how things are now is saved first** to `backups\가져오기-전-YYYYMMDD-HHmmss.jongi` in the settings folder (the last 10), and every new file is written to a temporary file and swapped in. Afterwards the list · notes · repeats · events · history are read again (the undo history starts over).
 
 A `.jongi` file is JSON: `{ "format": "jongi-nyang-backup", "version": 1, "exportedAt", "from": "Windows 1.18.0", "files": { "todos.json": "…", "archive/2026-10.jsonl": "…" } }`.
+
+## 종이냥 for Claude · AI connection
+
+Since 1.27, Claude (Claude Desktop · Claude Code) can look at your to-dos, events and notes, add to them, and change them after you say yes, while you talk. The same extension, files and test cases (M1–M18) as the Mac's 1.42.
+
+- **Turning it on**: Desk → **AI connection** → ‘Let Claude see and write in Jongi-nyang’ (off at first). **Connect to Claude Desktop** opens the bundled `jongi-nyang.mcpb` and Claude Desktop asks whether to install it. **Copy Claude Code command** gives a command that runs the server with Jongi-nyang’s own executable instead of Node (`claude mcp add jongi-nyang -e ELECTRON_RUN_AS_NODE=1 -- "…\종이냥.exe" "…\resources\mcp\server\index.js"`), so no Node is needed.
+- **What it can do**: today at a glance; to-dos, events, notes, focus time and finished to-dos; add to-dos (up to 20 at a time), one-off events and notes; change to-dos and one-off events. A change is first shown before and after in the conversation and applied only after a yes (the confirmation lasts 10 minutes). Nothing is deleted; repeating events, alarms and notes are never changed.
+- **No server keeps running**: Claude starts it when a conversation needs it, and it stops with Claude. Turned off, Claude can’t read anything.
+- **In the app**: ‘Claude added 2 tasks · Undo’ under the notepad; if the app was closed, ‘While you were away, Claude made 3 changes · Show’ next time. Undo only takes back what hasn’t changed since (else ‘It changed since, so it can’t be undone’), and `Ctrl+Z` works right after. Rows Claude added or changed today carry a small ‘Claude’ stamp; Desk → AI connection lists today’s and yesterday’s work with Undo per entry.
+- **Nothing lost**: the extension reads a file again just before writing (and redoes its change on newer text, up to three times), and the app and the extension hold `ai-write.lock` in the settings folder for the few milliseconds of a write. A test with the app writing every few milliseconds while the extension adds 100 times keeps both (without the lock it loses some). The app’s undo history carries on when Claude’s change comes in.
+
+| Stamp · notice | AI connection |
+| --- | --- |
+| ![Claude stamp and notice](../docs/screenshots/windows/en/ai-toast.png) | ![Desk AI connection](../docs/screenshots/windows/en/ai-settings.png) |
+
+## Notes drawer
+
+In 1.28 the notepad’s Notes tab became the **Notes drawer**: pull your notes out from the edge of the screen, jot things down and edit them right there. Every note from the Notes tab is in the drawer’s ‘Notes’ folder (no file is changed), and the first launch says so once. 1.29 has the same behaviour, files and test cases (D1–D29) as Mac 1.44.
+
+- **Open · close**: `Ctrl+Shift+D` from any app (change or turn it off in Desk → Notes drawer), the paw bookmark at the screen’s edge (the handle — today’s count in small type; drag it up or down), ⋯ → Notes drawer, right-clicking the cat, the drawer button above the notepad, `Ctrl+3` or the notification area menu. It slides out over 180 ms, the full height above the taskbar of the screen your mouse is on, and clicking another app doesn’t close it. The same shortcut, `Esc` or × do.
+- **The drawer**: one sheet of paper with paper cat ears on its top edge (a step darker than the notes). The header shows the folder’s name (handwritten) ▾ — click it or press `Ctrl+L` for the folder list —, search, keep-on-top and close. Write on the taped slip and press `Enter` for a new note at the top of the folder. At the bottom: ⚙ · ‘Work · 5 notes’ · the shortcut.
+- **Note cards (1.29)**: grouped by date like Apple Notes — Pinned · Today · Yesterday · This week · Last week · October · September 2025 (weeks start on Monday). Each card has a strip of tape in its folder’s colour, a handwritten title, one line of preview and a short time (`6:02 PM` · `Tuesday` · `Oct 13`). What a note is gets a small chip, found in its words: a link (`youtube.com/watch`, click to open — a title that is only the address reads ‘youtube.com link’), a phone number (`010-1234-5678`, click to copy), a checklist (2/4 and a bar). Hover for Copy · Pin · ⋯; an open note has [Larger view · Copy · ⚙] ‘Edited 5:38 PM’ [Move to folder · Delete] under it. A folder with more than 20 notes gets a little denser.
+- **Menus**: everything has a right-click menu too (icons, the shortcuts that exist, delete last) — an empty spot (= the ⚙ at the bottom: New note · New note from clipboard · paper · backdrop · left/right · settings · help · quit), a note (Open and edit · Larger view · Copy · Duplicate · Pin · Move to folder ▸ Recent · This note’s paper · Remove ticked lines · Delete), text you’re editing (Cut · Copy · Paste · Select all + This note), a bookmark (New note here · Rename · Color · Sort · Duplicate · Delete folder) and Pinned (Sort · Unpin all). `Shift+F10` and the Menu key open them as well.
+- **Folders**: the bookmarks at the side. The chosen one shows its name, the others their first letter; hover for ‘Shopping · 3 notes · Ctrl+3’. `+` for a new folder (a name, eight colours), drag to reorder or drop a note on a bookmark to move it; the paw bookmark is ‘Pinned’. Sort by last edited · date created · title (per folder). `Ctrl+1`–`9` · `Ctrl+0`; `Ctrl+F` searches every folder.
+- **Paper and backdrop**: Day paper · Night paper · Kraft · Grid notebook, plus Auto, which follows the notepad’s day or night (1.29: each paper a step darker behind the notes, a 1 px edge on every note, darker grey text). One note can have its own paper (This note’s paper). Backdrop: Solid · Frosted · Strong (the screen behind shows through, blurred, on Windows 11) · None (only the notes, floating). Right or left, 260–480 wide (drag its inner edge).
+- **Data**: the notes stay in `memos.json`; folders and places go in a new file beside it, `memo-folders.json`, so an older version saving the notes never wipes them. Changes on two devices merge entry by entry (the later one wins); backups and shared folders take it along. Quick note and `/note` go to the folder you last looked at.
+
+![Notes drawer — Day paper · Night paper · Kraft · Grid notebook](../docs/screenshots/windows/en/drawer-themes.png)
+
+![Backdrop — Solid · Frosted · Strong · None](../docs/screenshots/windows/en/drawer-backdrops.png)
 
 ## Screens
 
@@ -249,11 +281,12 @@ npm start            # build, then run
 | `Ctrl+Alt+N` | Quick add from anywhere |
 | `Ctrl+Alt+M` | Quick note from anywhere |
 | `Ctrl+Alt+J` | Show · hide the notepad from anywhere |
+| `Ctrl+Shift+D` | Open · close the Notes drawer from anywhere (change it in Desk → Notes drawer) |
 | `Ctrl+F` | Search |
 | `Alt+→` · `Alt+←` · `Alt+↓` · `F` | Selected line a day later · earlier · to Someday · focus |
 | `Space` · `Ctrl+Enter` · `Ctrl+=` · `Esc` | Focus card: pause · done · 5 more min · stop |
 | `Enter` · `S` / `Space` | Stop · snooze a ringing alarm |
-| `Ctrl+1`–`Ctrl+3` | Today · Ahead · Notes |
+| `Ctrl+1` · `Ctrl+2` · `Ctrl+3` | Today · Ahead · open the Notes drawer |
 | `↑` `↓` · `Space` · `Enter` · `Delete` | Select a line · check off · edit · delete |
 | `Ctrl+↑` `Ctrl+↓` | Reorder |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / Redo |
@@ -263,7 +296,7 @@ npm start            # build, then run
 | `Ctrl+D` | Desk · Calendar |
 | `Ctrl+1`–`Ctrl+9` · `↑` `↓` | Inside the desk: the panes in the list (Calendar … Storage & backup) |
 | `←` `→` · `↑` `↓` · `T` · `Enter` · `Ctrl+[` `Ctrl+]` | In the desk’s calendar: a day · a week · today · new event · previous/next month (week) |
-| `Ctrl+Shift+N` | New note |
+| `Ctrl+Shift+N` | The Notes drawer’s quick-write slip |
 | `Ctrl+,` | Desk · Appearance |
 | `F1` | Desk · Help |
 
@@ -272,6 +305,7 @@ npm start            # build, then run
 ```text
 %APPDATA%\PaperTodo\todos.json              to-dos (since 1.23 with `todaySince`, the day one came to Today; since 1.24 with a time, `timeStart` · `timeEnd` — as on the Mac)
 %APPDATA%\PaperTodo\memos.json              notes
+%APPDATA%\PaperTodo\memo-folders.json       the Notes drawer’s folders and each note’s place (1.28, same as the Mac)
 %APPDATA%\PaperTodo\repeats.json            repeating to-dos
 %APPDATA%\PaperTodo\events.json             events
 %APPDATA%\PaperTodo\alarms.json             alarms
@@ -279,6 +313,8 @@ npm start            # build, then run
 %APPDATA%\PaperTodo\focus.jsonl            focus sessions (one per line)
 %APPDATA%\PaperTodo\settings.json           settings · window positions · language (per device)
 %APPDATA%\PaperTodo\storage.json            the chosen shared folder
+%APPDATA%\PaperTodo\ai-link.json            AI connection: on · data folder · language (read by the extension, per device)
+%APPDATA%\PaperTodo\ai-log.jsonl            what Claude added and changed, and undos (notices, stamps and undo come from it)
 %APPDATA%\PaperTodo\backups\               automatic backups before an import (*.jongi, the last 10, per device)
 ```
 
@@ -300,6 +336,10 @@ npm run snapshot -- stage3     # only the desk’s panes and night paper (snapsh
 npm run snapshot -- convenience # only 1.23’s new screens (day and night, conv-*.png)
 npm run snapshot -- timeblock # only 1.24’s to-do times and snooze Off (day and night, tb-*.png)
 npm run snapshot -- strip # only 1.25’s day ribbon, Your day and the timer width check (day and night, strip-*.png)
+npm run snapshot -- ai # only 1.27’s AI connection (stamps, notices, away, the desk pane; day and night, ai-*.png)
+npm run snapshot -- drawer # only the Notes drawer (the handle, date groups and cards on four papers, the open note, every menu, the four backdrops, a note’s own paper, a dense list, widths, sides, settings, the two-tab notepad, the move notice; snapshots/drawer/)
+npm run mcp:build    # 종이냥 for Claude: mcp/dist/server/index.js (one file) and mcp/dist/jongi-nyang.mcpb
+npm run mcp:test     # the bundled server driven with the SDK client: M1–M12 · M16–M18 · 100 rounds of writing at once
 npm run perf         # a --demo run on a heavy sample data set: start time, idle CPU, input latency… (--quick · --long)
 npm run snapshot -- lang=en    # the same in English (snapshots/en/), or lang=nl (snapshots/nl/)
 ```
@@ -322,7 +362,7 @@ assets/         the cat · paper texture · handwriting fonts
 tools/          build · snapshot · font scripts
 ```
 
-The **Cat talk** tables (`src/core/chatter.ts`) are generated by `generate.py` from `mac/scripts/chatter/chatter_lines.py`, in all three languages. To change a line, edit that file so both apps change together.
+The **Cat talk** tables (`src/core/chatter.ts`) are generated by `generate.py` from [`mac/scripts/chatter/chatter_lines.py`](../mac/scripts/chatter/chatter_lines.py), in all three languages. To change a line, edit that file so both apps change together.
 
 ## Differences from the macOS version
 

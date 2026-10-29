@@ -14,6 +14,7 @@ import type { Alarm } from "./alarm";
 import type { IntentKind, IntentPrefer } from "./intent";
 import type { AheadTarget } from "./ahead";
 import type { DeskPane, PaperSetting } from "./desk";
+import type { DrawerBackdrop, DrawerSide, DrawerTheme, FolderSort, MemoFolders, MemoPaper } from "./memoDrawer";
 
 export type NotebookFont = "pen" | "brush" | "clean";
 export type TextSize = "small" | "regular" | "large" | "extraLarge";
@@ -105,6 +106,30 @@ export interface Prefs {
   /** Launches by hand (not at sign-in), for the cat's one-time question about opening with the computer. */
   manualLaunches: number;
   loginAsked: boolean;
+  /** AI 연결 (1.27): Claude may read and write the list through 종이냥 for Claude (written to ai-link.json). */
+  aiEnabled: boolean;
+  /** The last ai-log.jsonl entry dealt with ("seen until"): later ones are new (a toast, or 자리 비운 사이 at launch). */
+  aiSeenId: string;
+  aiSeenAt: string;
+  /** When the cat last said something about Claude (ms; at most once in two hours). */
+  aiCatSaid: number;
+  /** 메모 서랍 (1.28), this device's: the shortcut (an Electron accelerator; "" = off), the side, the width (260–480),
+   *  the edge handle and its place (0 top … 1 bottom of the work area), the look, the last folder shown, 위에 고정. */
+  drawerShortcut: string;
+  drawerSide: DrawerSide;
+  drawerWidth: number;
+  drawerHandle: boolean;
+  drawerHandleY: number;
+  drawerTheme: DrawerTheme;
+  drawerLastFolder: string;
+  drawerPinned: boolean;
+  /** 1.28: the one-time slip saying the memo tab's memos are in the drawer was dealt with on this device (M1–M3). */
+  drawerMoveNoticeShown: boolean;
+  /** 1.29: the drawer's 바탕 (불투명 · 반투명 · 강하게 · 바탕 없음), the 고정 bookmark's 정렬 (고정 isn't a folder), and the
+   *  last two folders a memo was moved to (폴더로 옮기기 ▸ 최근), newest first. */
+  drawerBackdrop: DrawerBackdrop;
+  drawerPinnedSort: FolderSort;
+  drawerRecentMoves: string[];
 }
 
 export type SystemNotify = "missed" | "always" | "off";
@@ -176,7 +201,23 @@ export const defaultPrefs: Prefs = {
   taskbarBadge: false,
   manualLaunches: 0,
   loginAsked: false,
-};
+  aiEnabled: false,
+  aiSeenId: "",
+  aiSeenAt: "",
+  aiCatSaid: 0,
+  drawerShortcut: "Control+Shift+D",
+  drawerSide: "right",
+  drawerWidth: 300,
+  drawerHandle: true,
+  drawerHandleY: 0.42,
+  drawerTheme: "auto",
+  drawerLastFolder: "",
+  drawerPinned: true,
+  drawerMoveNoticeShown: false,
+  drawerBackdrop: "solid",
+  drawerPinnedSort: "edited",
+  drawerRecentMoves: [],
+}
 
 export function pomodoroSettings(prefs: Prefs): PomodoroSettings {
   return {
@@ -249,6 +290,12 @@ export interface AppState {
   memoShortcutProblem?: string;
   /** The same for Ctrl+Alt+J (노트 보이기 · 숨기기). */
   noteShortcutProblem?: string;
+  /** The same for 메모 서랍's shortcut. */
+  drawerShortcutProblem?: string;
+  /** 반투명 · 강하게 drawn as 불투명 on this PC, and why (Windows 10, transparency effects off); none when they work. */
+  drawerBackdropNote?: string;
+  /** 메모 서랍: the folders and each memo's place (memo-folders.json). */
+  memoFolders: MemoFolders;
   /** Where the list lives: "이 PC (기본)" or the shared folder (home shortened to ~). */
   /** Where everything is kept: the folder (todos, memos, repeats) and its archive folder for the record. */
   storage: { label: string; custom: boolean; path: string; archivePath: string };
@@ -262,6 +309,24 @@ export interface AppState {
   timer?: TimerView;
   /** 집중: a focus session on a task, while one is on (the note turns into the focus card). */
   focus?: FocusView;
+  /** AI 연결: on or off, the rows Claude touched today, its recent work, the Claude Code command. */
+  ai: AiView;
+}
+
+/** One entry of 설정 › AI 연결 › 최근 AI 작업: when, what (the toast's words), and whether it was undone. */
+export interface AiRecent { id: string; day: "today" | "yesterday"; time: string; text: string; undone: boolean }
+
+export interface AiView {
+  enabled: boolean;
+  /** Ids of the to-dos and events Claude added or changed today and nobody changed since (the small stamp). */
+  marks: string[];
+  recent: AiRecent[];
+  /** The line to paste into a terminal for Claude Code. */
+  command: string;
+  /** The command was copied a moment ago (the button says so). */
+  copied: boolean;
+  /** How the last 되돌리기 went (shown under its entry for a few seconds). */
+  undoNote?: { id: string; text: string };
 }
 
 /** A running (`endsAt`) or paused (`pausedRemainingMs`) timer, and its caption ("집중 1/4", "타이머"). */
@@ -314,10 +379,11 @@ export interface ParsedWhen {
 }
 
 /**
- * A toast on the note for something done elsewhere (a menu, a bubble, the cat): its words and how its
- * 되돌리기 undoes it — "history" (Ctrl+Z), "memo" (지운 메모 되돌리기), "unfile" (완료한 일 정리 taken back).
+ * A toast on the note for something done elsewhere (a menu, a bubble, the cat, Claude): its words and how its
+ * 되돌리기 undoes it — "history" (Ctrl+Z), "memo" (지운 메모 되돌리기), "unfile" (완료한 일 정리 taken back),
+ * "ai" (Claude's entry `entry`); or `show`: a 보기 that opens 설정 › AI 연결 (자리 비운 사이).
  */
-export interface NoteNotice { icon: string; text: string; undo?: "history" | "memo" | "unfile" }
+export interface NoteNotice { icon: string; text: string; undo?: "history" | "memo" | "unfile" | "ai"; entry?: string; /** 보기 → 설정 › AI 연결, or 열기 → the drawer on memo `entry`. */ show?: "ai" | "drawer"; /** A sentence (AI 연결's): up to two lines, a little longer up. */ long?: boolean }
 
 export interface PopupTask {
   id: string;
@@ -406,11 +472,16 @@ export type Action =
   | { type: "setPref"; key: keyof Prefs; value: Prefs[keyof Prefs] }
   | { type: "collapse"; anchor?: { x: number; y: number } }
   /** Settings' panes on the desk ("calendar" is the old name of 일정, "events"). */
-  | { type: "openSettings"; tab?: "calendar" | "clock" | "events" | "storage" }
+  | { type: "openSettings"; tab?: "calendar" | "clock" | "events" | "storage" | "drawer" | "ai" }
+  /** 설정 › AI 연결: the switch, 되돌리기 on an entry (or its toast), Claude 데스크톱에 연결, Claude Code 명령 복사. */
+  | { type: "aiEnable"; on: boolean }
+  | { type: "aiUndo"; id: string }
+  | { type: "aiConnectDesktop" }
+  | { type: "aiCopyCommand" }
   | { type: "openHistory"; day?: string }
   /** 검색: the note's search slip (from the desk's sidebar). */
   | { type: "openSearch" }
-  | { type: "openHelp" }
+  | { type: "openHelp"; topic?: string }
   /** 책상's sidebar: a pane chosen (a click, ↑ ↓). */
   | { type: "deskPane"; pane: DeskPane }
   /** 사용 안내 (the first-launch cards) on the note, from the desk's sidebar. */
@@ -444,4 +515,41 @@ export type Action =
   | { type: "alarmSave"; alarm: Alarm }
   | { type: "alarmDelete"; id: string }
   /** The footer's 저장 확인 필요: what went wrong, on a slip. */
-  | { type: "showStorageProblem" };
+  | { type: "showStorageProblem" }
+  /** 메모 서랍: open (the note's drawer button, the ⋯ menu, the cat), close, or either; opened on a memo (expanded), or at its slip. */
+  | { type: "drawer"; command: "open" | "close" | "toggle"; memo?: string; write?: boolean }
+  /** 메모 서랍's folders: a new one, a new name or colour, deleted (its memos to 메모), a new order. */
+  | { type: "folderAdd"; id: string; name: string; color: string }
+  | { type: "folderRename"; id: string; name: string }
+  | { type: "folderColor"; id: string; color: string }
+  | { type: "folderDelete"; id: string }
+  /** 되돌리기 on a deleted folder's toast: the folder back with the memos it had. */
+  | { type: "folderRestore"; id: string; memos: string[] }
+  | { type: "folderOrder"; ids: string[] }
+  /** A memo to another folder (폴더 옮기기, dropped on a bookmark), pinned or not (고정). */
+  | { type: "memoMove"; id: string; folder: string }
+  | { type: "memoPin"; id: string; pinned: boolean }
+  /** A checklist line's box (`- [ ]` ↔ `- [x]`), line counted from 0. */
+  | { type: "memoCheck"; id: string; line: number }
+  /** The drawer's slip (Enter): a new memo in the folder shown (고정: 메모, pinned). */
+  | { type: "drawerWrite"; text: string; view: string }
+  /** The folder the drawer shows now (remembered: 빠른 메모 and /메모 go there; 고정 isn't remembered). */
+  | { type: "drawerView"; view: string }
+  /** 1.29: 정렬 (고정's is a device setting), 복제 of a folder (its memos copied), a memo's own paper (none: 서랍 따라). */
+  | { type: "folderSort"; id: string; sort: FolderSort }
+  | { type: "folderDuplicate"; id: string; newID: string }
+  | { type: "memoPaper"; id: string; paper?: MemoPaper }
+  /** 고정 모두 풀기 and its 되돌리기. */
+  | { type: "memoPinMany"; ids: string[]; pinned: boolean }
+  /** A memo's whole text at once (체크한 줄 지우기 and its 되돌리기), saved now. */
+  | { type: "memoSetText"; id: string; text: string }
+  /** 복제 of one memo: the same text, folder, pin and paper, now. */
+  | { type: "memoDuplicate"; id: string }
+  /** 복사한 글로 새 메모: the clipboard's text as a new memo where the drawer is (answers whether there was any). */
+  | { type: "drawerPaste"; view: string }
+  /** A link chip: the URL in the default browser (http and https only). */
+  | { type: "openLink"; url: string }
+  /** The drawer's text menu: 오려 두기 · 복사하기 · 붙여넣기 · 모두 선택 in the page that asked. */
+  | { type: "editCommand"; command: "cut" | "copy" | "paste" | "selectAll" }
+  /** Text to the clipboard (a memo's 복사). */
+  | { type: "copyText"; text: string };

@@ -14,6 +14,8 @@ export function paneTitle(pane: DeskPane): string {
     case "pet": return t("종이냥", undefined, "pane");
     case "events": return t("일정");
     case "storage": return t("저장과 백업");
+    case "drawer": return t("메모 서랍");
+    case "ai": return t("AI 연결");
     case "help": return t("도움말");
   }
 }
@@ -29,7 +31,7 @@ export function sectionTitle(section: DeskSection): string {
 /** Each pane's line icon in the sidebar (icons.ts). */
 export const paneIcon: Record<DeskPane, string> = {
   calendar: "calendar", history: "sprout", clock: "alarm", appearance: "gear", notifications: "bell", repeat: "repeat",
-  pet: "paw", events: "calendarDot", storage: "box", help: "help",
+  pet: "paw", events: "calendarDot", storage: "box", drawer: "drawer", ai: "chat", help: "help",
 };
 
 /** "책상 — 달력": the window's title for the pane it shows. */

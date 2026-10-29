@@ -95,6 +95,8 @@ export interface SearchInput {
   archive: readonly ArchiveEntry[];
   events: readonly LocalEvent[];
   dueStyle?: "dday" | "date";
+  /** 메모 서랍 (1.28): a memo's folder name (none for 메모), so a memo in a folder whose name matches is found too. */
+  memoFolder?: (id: string) => string | undefined;
 }
 
 const pad = (value: number) => String(value).padStart(2, "0");
@@ -133,6 +135,9 @@ export function search(input: SearchInput, query: string, now: Date, lang: Lang 
       const range = matchRange(line, query);
       if (range) return [{ kind: "memos" as const, id: memo.id, text: line.trim() ? line : title, range: line.trim() ? range : [0, 0] as [number, number], meta }];
     }
+    // In a drawer folder whose name matches: the memo's title, nothing marked, the folder in the meta.
+    const folder = input.memoFolder?.(memo.id);
+    if (folder && matchRange(folder, query)) return [{ kind: "memos" as const, id: memo.id, text: title, range: [0, 0] as [number, number], meta: `${folder} · ${meta}` }];
     return [];
   }));
   const seen = new Set<string>();

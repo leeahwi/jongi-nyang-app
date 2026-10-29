@@ -68,13 +68,13 @@ struct SlipAlertView: View {
                 SlipHeader(kind: .confirm, symbol: symbol, title: title)
                 HStack(alignment: .top, spacing: 8) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(message)
+                        Text(message.keepingParticles)
                             .font(.system(size: 15))
                             .lineSpacing(3)
                             .foregroundStyle(PaperTheme.ink)
                             .fixedSize(horizontal: false, vertical: true)
                         if let detail, !detail.isEmpty {
-                            Text(detail)
+                            Text(detail.keepingParticles)
                                 .font(.system(size: 12.5, weight: .medium))
                                 .lineSpacing(2)
                                 .foregroundStyle(PaperTheme.ink2)

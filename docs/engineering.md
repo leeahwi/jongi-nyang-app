@@ -8,13 +8,14 @@
 
 | | macOS | Windows |
 | --- | --- | --- |
-| 코어 로직 | Swift 35개 파일, 약 8,000줄 | TypeScript 44개 파일, 약 8,000줄 |
-| 앱과 화면 | Swift 64개 파일, 약 21,000줄 | main 약 8,400줄, renderer 약 7,700줄, CSS 2,100줄 |
-| 시험 코드 | 약 6,100줄 | 31개 파일, 약 4,600줄 |
-| 자동 시험 | 시험 스크립트 15개, 검사 약 300개 | `node:test` 471개 |
+| 코어 로직 | Swift 39개 파일, 약 9,700줄 | TypeScript 47개 파일, 약 9,600줄 |
+| 앱과 화면 | Swift 77개 파일, 약 27,000줄 | main 약 10,000줄, renderer 약 9,500줄, CSS 2,600줄 |
+| Claude 확장 | (Windows의 것을 그대로 넣음) | `mcp/` 약 1,000줄 |
+| 시험 코드 | 약 7,600줄 | 37개 파일, 약 5,800줄 (확장 시험 약 400줄 따로) |
+| 자동 시험 | 시험 스크립트 17개, 검사 약 360개 | `node:test` 534개, 확장 16개 |
 | 외부 런타임 의존성 | 없음 (Apple 프레임워크만) | Electron 하나 |
 
-Mac 검사 수는 `mac/scripts/test*.sh` 각각이 마지막에 출력하는 수를 더한 것이다(54 + 6 + 7 + 11 + 19 + 4 + 7 + 13 + 9 + 언어마다 9 + 44 + 13 + 14 + 21 + 58). Windows는 `npm test` 결과다.
+Mac 검사 수는 `mac/scripts/test*.sh` 각각이 마지막에 출력하는 수를 더한 것이다(55 + 6 + 16 + 7 + 11 + 19 + 4 + 7 + 13 + 9 + 언어마다 9 + 38 + 46 + 13 + 14 + 21 + 58). Windows는 `npm test`와 `npm run mcp:test` 결과다.
 
 ## 1. 공유 시험 사례
 
@@ -50,6 +51,9 @@ Mac 검사 수는 `mac/scripts/test*.sh` 각각이 마지막에 출력하는 수
 | 편의 기능 | §1–§6 | 내일로, 저녁 정리, 다시 알림, 초성 검색 | `ConvenienceTests.swift` | `convenience.test.ts` |
 | 알람과 타이머 길이 | — | 다음 울림, 시간대(로스앤젤레스, 채텀), '1시간 반', `anderhalf uur` | `AlarmTests.swift`, `DurationTests.swift` | `alarm.test.ts`, `duration.test.ts` |
 | 백업 | B0–B5 | 내보낸 뒤 빈 폴더로 바꾸면 같은 파일, 합치기 개수, 쓰다 실패하면 원래대로 | `CoreTests.swift` | `backup.test.ts` |
+| 메모 서랍 | D1–D16 (1.43/1.28) | 폴더 파일 읽고 쓰기, 두 기기 합치기, `- [ ]` 체크 줄, 폴더 이름까지 찾기 (메모 탭에서 옮겨 왔다는 안내는 M 사례) | `MemoDrawerTests.swift`, `test-memo-drawer.sh` | `memoDrawer.test.ts`, `memoDrawerStore.test.ts` |
+| 메모 서랍: 카드 | D17–D29 (1.44/1.29) | 정렬, 메모의 종이, 모르는 항목 그대로 두기, 폴더 복제, 날짜 묶음 경계(주는 월요일부터), 짧은 시간, 링크 · 전화 · 체크 목록 표시 | `MemoDrawerTests.swift` | `memoCards.test.ts` |
+| AI 연결 | 18줄 | 꺼져 있을 때의 답, 넣기, 같은 날 같은 제목 두 번 넣지 않기, 미리 보기와 확인, 그새 바뀐 항목 지키기, 되돌리기, 기록 | `AIConnectTests.swift`, `test-ai.sh` | `ai.test.ts`, `aiConnect.test.ts`, `mcp/test/server.test.ts` |
 
 입력 줄 사례만 136줄이다. 표를 먼저 쓰니 "Windows에서는 다르게 읽힌다" 같은 차이가 구현 전에 드러났다. 한쪽에서 버그를 찾으면 표에 한 줄을 더하고, 그 줄이 다른 쪽에서도 실패하는지 본다.
 
@@ -59,7 +63,7 @@ Mac 검사 수는 `mac/scripts/test*.sh` 각각이 마지막에 출력하는 수
 
 UI 시험은 버튼이 있는지보다 그려진 화면을 본다.
 
-macOS에서는 `mac/scripts/render-design.sh`가 실제 SwiftUI 뷰에 예시 데이터를 넣어 PNG로 저장한다(`Tests/PaperTodoTests/DesignSnapshots.swift`). 한국어, 영어, 네덜란드어와 낮/밤을 모두 그리면 약 1,500장이다. 사용자 목록이나 설정은 읽지도 쓰지도 않는다. `scripts/test-presentation.sh`(44개)는 화면 상태, 키보드, 공유 폴더, 메모 합치기, 백업, 책상, 종이 색, 집중을 확인하고, 손글씨 제목의 마지막 글자가 잘리는지 픽셀로 본다('Ahead', 'coffee', '커피 coffee'). 시험용 앱은 다른 번들 ID와 저장 폴더를 쓰고, 알림은 화면 밖(`PAPERTODO_OFFSCREEN=1`)에 그린다.
+macOS에서는 `mac/scripts/render-design.sh`가 실제 SwiftUI 뷰에 예시 데이터를 넣어 PNG로 저장한다(`Tests/PaperTodoTests/DesignSnapshots.swift`). 한국어, 영어, 네덜란드어와 낮/밤을 모두 그리면 약 1,900장이다(메모 서랍의 네 종이, 메뉴, 바탕 포함). 사용자 목록이나 설정은 읽지도 쓰지도 않는다. `scripts/test-presentation.sh`(46개)는 화면 상태, 키보드, 공유 폴더, 메모 합치기, 백업, 책상, 종이 색, 집중, 실제 창으로 연 쪽지의 크기(1.42.1)를 확인하고, 손글씨 제목의 마지막 글자가 잘리는지 픽셀로 본다('Ahead', 'coffee', '커피 coffee'). 시험용 앱은 다른 번들 ID와 저장 폴더를 쓰고, 알림은 화면 밖(`PAPERTODO_OFFSCREEN=1`)에 그린다.
 
 Windows에서는 `npm run snapshot`이 모든 창을 화면 밖에서 그리고 크기 훑기(size sweep)를 돌린다.
 
@@ -101,8 +105,9 @@ Windows에서는 `npm run snapshot`이 모든 창을 화면 밖에서 그리고 
 
 색은 모두 이름 붙은 토큰(종이, 먹 세 단계, 줄, 세이지, 점토, 탭, 테이프)이고 낮과 밤 두 벌이 있다. 두 앱의 최종 색표는 같다.
 
-- macOS `scripts/check-contrast.py`는 낮과 밤의 글자/바탕 38쌍을 표로 출력하고, 하나라도 WCAG AA(본문 4.5:1, 큰 글씨와 UI 3:1)에 못 미치면 실패한다.
-- Windows `test/contrast.test.ts`는 같은 표를 같은 기준으로 검사한다.
+- macOS `scripts/check-contrast.py`는 낮과 밤의 글자/바탕 61쌍과 메모 서랍 네 종이(낮, 밤, 크라프트, 모눈)의 218쌍을 표로 출력하고, 하나라도 WCAG AA(본문 4.5:1, 큰 글씨와 UI 3:1)에 못 미치면 실패한다.
+- Windows `test/contrast.test.ts`, `test/drawerContrast.test.ts`는 같은 표를 같은 기준으로 검사한다.
+- 쪽지와 서랍 종이의 차이처럼 장식이라 기준이 없는 쌍은 숫자만 출력한다. 기준을 넘어도 잘 안 읽힌 일(밤 종이 서랍, 1.43.1)이 있어서다. [문제 해결 기록 6번](../portfolio/troubleshooting.md#6-밤-종이-서랍의-글자가-눈에-안-들어옴-mac-1430--1431-windows-1280--1281)
 
 밤 종이를 넣은 3단계(Mac 1.36.0, Windows 1.21.0)에서는 밤 색만 AA로 검사했고, 낮 색은 4단계(1.37.0, 1.22.0)에서야 맞췄다. 그때 고친 색이다.
 
@@ -114,6 +119,15 @@ Windows에서는 `npm run snapshot`이 모든 창을 화면 밖에서 그리고 
 | 낮 빈 체크 칸 테두리 | #b5b0a2 | #908a7b | 2.06 → 3.27 (Windows에서 잰 값) |
 | 밤 옅은 먹 | #8a8577 | #9f9989 | 3.96 → 5.13 |
 | 밤 체크 칸 테두리 | #77725f | #837e69 | 3.02 → 3.58 |
+
+메모 서랍에서 고친 색이다.
+
+| 쌍 | 전 | 후 | 판 |
+| --- | --- | --- | --- |
+| 밤 서랍: 쪽지와 서랍 종이 (장식) | #36332e / #2e2c28, 1.11 | #3b3832 / #262420, 1.33 | Mac 1.43.1, Windows 1.28.1 |
+| 밤 서랍: 시간, 빈칸 안내 | #a39d90, 4.53 | #bfb8a8, 5.92 | 같음 |
+| 메모지 위 시간 · 안내 (낮, 모눈, 크라프트) | 4.98, 4.91, 5.17 | 6.16, 6.14, 8.58 | Mac 1.44.0, Windows 1.29.0 |
+| 펼친 메모의 왼쪽 줄 (여덟 폴더 색) | 폴더 잉크색 | 폴더 테두리색을 3:1이 될 때까지 진하게 | 같음 |
 
 예전 옅은 먹 #a5a195는 `faint`라는 토큰으로 떼어 장식에만 쓴다. 글자에 잘못 쓰이지 않게 하려고 이름을 따로 붙였다. macOS의 움직임 줄이기와 대비 증가, Windows의 forced-colors도 따른다.
 
@@ -163,6 +177,21 @@ Windows에도 같은 종류의 문제가 있었다. 하루 띠의 '지금' 점�
 
 > 숫자는 모두 내 Mac 한 대에서 잰 값이고, 그날 컴퓨터가 얼마나 바빴는지에 따라 조금씩 달라진다. Windows 빌드의 숫자도 macOS 위 Electron에서 쟀다. 실제 Windows PC에서 잰 숫자는 없다.
 
+### 메모 서랍과 AI 연결 (Mac 1.42–1.44, Windows 1.27–1.29)
+
+새 창이 늘어도 쉴 때 CPU가 오르지 않게 했다. 서랍은 처음 열 때 만들고 그다음부터는 숨겼다 보여 주며, 닫혀 있는 동안 메모가 바뀌어도 다시 그리지 않고 열 때 바뀐 것만 반영한다. 손잡이는 바뀔 때만 그린다.
+
+| 항목 | 값 |
+| --- | --- |
+| Mac 서랍 처음 열기 / 다시 열기 (1.43) | 0.11–0.13초 / 0.03초, 메모 200장도 같음 |
+| Mac 서랍을 열어 두고 쉴 때 (1.44) | 불투명 0.41–0.50%, 반투명 0.41–0.46% |
+| Windows 서랍 처음 열기 (1.28.1 → 1.29) | 186ms → 137ms |
+| Windows 서랍 다시 열기 | 17ms → 3ms (닫혀 있는 동안 바뀐 게 없으면 다시 그리지 않음) |
+| Windows 서랍을 열어 두고 쉴 때 | 0.91% → 0.22% |
+| Mac AI 연결 끔 → 켬, 노트를 띄워 두고 쉴 때 (1.42) | 0.59–0.93% → 0.47–0.63% (같은 수준) |
+
+Mac 1.44에서 카드에 머리말, 종류 표시, 테이프가 늘어 서랍 열기가 조금 느려졌다(처음 87–94ms → 96–99ms, 다시 19–22ms → 23–26ms). 카드 글 분석은 글이 바뀔 때만 하고 그림자를 단순한 사각형에만 그려서 이 정도로 줄였다.
+
 ### 그 전의 성능 작업 (macOS)
 
 | 버전 | 문제 | 결과 |
@@ -187,14 +216,15 @@ python3 scripts/check-contrast.py
 cd windows
 npm ci
 npx tsc --noEmit -p .
-npm test                          # 471
+npm test                          # 534
+npm run mcp:test                  # Claude 확장 16
 npm run dist                      # Windows 설치 파일 (macOS에서도 만들 수 있다)
 ```
 
-GitHub Actions 워크플로는 두 개다. `.github/workflows/ci.yml`(README 배지)은 Windows 앱의 타입 검사와 시험 471개를 macOS 러너에서 돌린다. `.github/workflows/mac.yml`은 Xcode 26 러너에서 Mac 앱을 빌드하고 코어 시험, 대비 검사, 번역 검사를 돌린다. Xcode 26 이미지가 없으면 이 워크플로만 실패하도록 둘을 나눴다.
+GitHub Actions 워크플로는 두 개다. `.github/workflows/ci.yml`(README 배지)은 Windows 앱의 타입 검사와 시험 534개를 macOS 러너에서 돌린다. `.github/workflows/mac.yml`은 Xcode 26 러너에서 Mac 앱을 빌드하고 코어 시험, 대비 검사, 번역 검사를 돌린다. Xcode 26 이미지가 없으면 이 워크플로만 실패하도록 둘을 나눴다.
 
 ## 아직 못 한 것
 
-- Windows 앱은 macOS 위의 Electron에서 모든 화면과 동작을 확인하고 설치 파일을 만들었다. 실제 Windows PC에서는 한 번도 돌려 보지 않았다. 설치 과정, 알림 영역, 클릭 통과, `Ctrl+Alt+N` 포커스, AltGr 키보드는 확인하지 못했다.
+- Windows 앱은 macOS 위의 Electron에서 모든 화면과 동작을 확인하고 설치 파일을 만들었다. 실제 Windows PC에서는 한 번도 돌려 보지 않았다. 설치 과정, 알림 영역, 클릭 통과, `Ctrl+Alt+N` 포커스, AltGr 키보드, 메모 서랍의 반투명 · 강하게 바탕(Windows 11 아크릴)은 확인하지 못했다.
 - 두 앱 모두 코드 서명과 공증이 없다. 처음 열 때 macOS Gatekeeper나 Windows SmartScreen을 넘겨야 한다.
 - 사례 표는 두 시험 파일에 같은 내용으로 옮겨 적혀 있다. 표를 JSON 같은 파일 하나로 두고 두 시험이 읽게 했으면 옮겨 적는 실수를 막을 수 있었다.

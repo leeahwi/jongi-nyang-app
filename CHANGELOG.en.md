@@ -8,6 +8,9 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 
 | Phase | Milestone | Mac | Windows |
 | --- | --- | --- | --- |
+| Polish | [An easier notes drawer](#an-easier-notes-drawer) | 1.44.0 | 1.29.0 |
+| Widen | [Notes drawer](#notes-drawer) | 1.43.0 – 1.43.1 | 1.28.0 – 1.28.1 |
+| Widen | [Jongi-nyang for Claude](#jongi-nyang-for-claude) | 1.42.0 – 1.42.1 | 1.27.0 |
 | Polish | [Timetable drag · Stretch](#timetable-drag--stretch) | 1.41.0 | 1.26.0 |
 | Polish | [Focus fixes](#focus-fixes) | 1.40.1 | 1.25.1 |
 | Polish | [New day strip · Day timetable](#new-day-strip--day-timetable) | 1.40.0 | 1.25.0 |
@@ -33,6 +36,44 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 | Mac | [From a first notepad to the cat](#from-a-first-notepad-to-the-cat) | 1.0 – 1.10 | — |
 
 ---
+
+## An easier notes drawer
+
+**Mac 1.44.0 · Windows 1.29.0** — shared cases: notes drawer D17–D29
+
+![The notes drawer grouped by date](docs/screenshots/mac/en/drawer-list-day.png)
+
+- With more notes it got hard to tell where you were in the drawer, and what you could do with a note was hidden behind small buttons. After drawing several mock-ups, the drawer now uses patterns people already know from other apps: notes grouped by date, small kind labels, right-click menus.
+- Notes sit under headings such as Pinned, Today, Yesterday, This week, Last week, October, September 2025 (weeks start on Monday). Every card keeps its title, time and one-line preview in the same place and carries a scrap of tape in the folder's colour. Cards are 16 pt apart and at least 68 pt tall, even with only a title.
+- Links, phone numbers and checklists show as small labels on the card (`youtube.com/watch`, `010-1234-5678`, `2/4`). The note's text isn't changed.
+- New right-click menus: on a note (copy, duplicate, pin, move to folder, this note's paper, remove ticked lines, delete), on a bookmark (new note, rename, colour, sort, duplicate, delete), and on empty drawer space (paper and backdrop swatches, settings). On the Mac they are native menus, so they work with the keyboard and VoiceOver.
+- A single note can have its own paper, and the backdrop can be Solid (default), Frosted, Strong or None. Frosted and Strong on Windows haven't been checked on a real Windows PC yet.
+- On all four papers the drawer paper is a step darker and every sheet has a 1 pt edge, so notes stand apart from each other. Grey text such as times is above 6:1 on all four (day 4.98:1 → 6.16:1, grid 4.91:1 → 6.14:1).
+- `memo-folders.json` gains a folder `sort` and a note `paper`. Fields this version doesn't know are kept when the file is read and written.
+- Reopening the drawer: Mac 19–22 ms → 23–26 ms (cards draw more), Windows 17 ms → 3 ms. Idle with the drawer open: Mac 0.41–0.50 %, Windows 0.91 % → 0.22 %, and Frosted didn't raise it.
+
+## Notes drawer
+
+**Mac 1.43.0 – 1.43.1 · Windows 1.28.0 – 1.28.1** — shared cases: notes drawer D1–D16, move notice M1–M5
+
+![The notes drawer on night paper](docs/screenshots/mac/en/night/drawer-night.png)
+
+- Notes moved out of the notebook's Notes tab into a **notes drawer** at the edge of the screen. From any app, pull it out with `⇧⌘D` (Windows `Ctrl+Shift+D`) or the cat-paw handle at the edge to read notes one sheet at a time, jot one down, or edit in place. The notebook now has two tabs, Today and Ahead.
+- No existing note was moved or changed. They are all in the drawer's Notes folder, and `memos.json` is unchanged, so an older version on another device can share the same files. Folders and pins live in a new file, `memo-folders.json`; in a shared folder, folders merge by id and placements by whichever was changed last.
+- Each bookmark at the drawer's side is a folder (a name and one of eight colours, reorder by dragging; deleting one sends its notes to Notes). The paw bookmark, Pinned, gathers pinned notes. A `- [ ] milk` line shows as a checkbox and is saved as `- [x] milk` when ticked.
+- Four papers (day, night, kraft, grid) plus Auto, which follows the notebook. In 1.43.1, after using it, night paper was hard to read, so the sheets now stand apart from the drawer paper (1.11:1 → 1.33:1) and grey text is lighter (times and 2/4: 4.53:1 → 5.92:1). Drawer settings moved to their own **Notes drawer** pane on the Desk.
+- At rest the handle only draws, with no clock or animation, and a closed drawer doesn't redraw when notes change; it catches up when opened.
+
+## Jongi-nyang for Claude
+
+**Mac 1.42.0 – 1.42.1 · Windows 1.27.0** — one shared extension, `Jongi-nyang for Claude` (built in the Windows folder's `mcp/` and bundled with both apps)
+
+![The AI connection pane on the Desk](docs/screenshots/mac/en/desk-ai.png)
+
+- While chatting with Claude Desktop or Claude Code, Claude can look at and add tasks, events and notes, and change them after you confirm. It must be turned on under Desk → **AI connection** and is off by default; when it's off, every tool only answers that it needs to be turned on.
+- `Connect to Claude Desktop` opens the `.mcpb` file inside the app, and Claude Desktop asks whether to install it. Claude Code connects with a command, and from Mac 1.43 with a `Connect to Claude Code` button (Node is required).
+- There is no background server. Claude starts the extension only when a chat needs it and it stops with Claude. What Claude did is logged in `ai-log.jsonl` on that device.
+- 1.42.1: the top of the menu-bar Today window was cut off when a timer was running and the next-event card wrapped to two lines. The window now measures the card after it is in place.
 
 ## Timetable drag · Stretch
 

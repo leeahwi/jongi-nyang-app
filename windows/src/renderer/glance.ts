@@ -48,10 +48,19 @@ window.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !event.defaultPrevented) { event.preventDefault(); close(); }
 });
 
-/** The window's size follows the slip (with its shadow and the room around it). */
+/**
+ * The window's size follows the slip (with its shadow and the room around it). Measured after every
+ * redraw too: a hidden window gets no ResizeObserver callbacks, so a slip that grew while it was hidden (a
+ * timer started, a card's line wrapping to two) would otherwise first show cut off in the old size.
+ */
+let reported = "";
 const report = () => {
   const rect = stage.getBoundingClientRect();
-  api.send("glance:size", { width: Math.ceil(rect.width), height: Math.ceil(rect.height) });
+  const size = { width: Math.ceil(rect.width), height: Math.ceil(rect.height) };
+  const key = `${size.width}x${size.height}`;
+  if (key === reported || size.width === 0) return;
+  reported = key;
+  api.send("glance:size", size);
 };
 new ResizeObserver(report).observe(stage);
 
@@ -170,6 +179,7 @@ function render(): void {
     link(t("책상"), "desk", () => { void api.act({ type: "openCalendar" }); close(); }),
     link(state.prefs.petVisible ? t("종이냥 숨기기") : t("종이냥 보이기"), "paw", () => api.act({ type: "setPref", key: "petVisible", value: !state!.prefs.petVisible })),
   );
+  report();
 }
 
 /** The cards count down while the window is up. */

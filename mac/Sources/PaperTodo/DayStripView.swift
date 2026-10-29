@@ -328,6 +328,9 @@ struct DayStripView: View {
                     } else {
                         Text(item.title.handwritten).font(model.notebookFont.font(points: 19)).lineLimit(1).padding(.trailing, 2)
                     }
+                    if let id = item.taskID ?? item.event?.eventId, model.isAIMarked(id) {
+                        AIStamp().alignmentGuide(.firstTextBaseline) { d in d[.bottom] - 2 }
+                    }
                 }
                 .foregroundStyle(PaperTheme.ink)
                 Spacer(minLength: 6)

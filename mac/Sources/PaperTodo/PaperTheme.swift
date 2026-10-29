@@ -61,6 +61,8 @@ enum PaperTheme {
     /// Memo purple on a light tint (the quick-memo badge).
     static let memoPurple = token("#7a6aae", night: "#bcb0e2")
     static let memoTint = token("#ebe6f6", night: "#3a3548")
+    /// AI 연결's stamp on a row Claude added or changed today (1.42): blue-grey stamp ink.
+    static let stamp = token("#4d5b86", night: "#a9b6dc")
     /// The toast: an ink pill with paper text (so at night a light pill with dark text); its
     /// action and the kind word in it.
     static let toastBack = token("#2f2e2a", night: "#ece6d6")

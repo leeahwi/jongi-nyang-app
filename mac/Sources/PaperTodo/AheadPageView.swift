@@ -207,6 +207,7 @@ struct AheadPageView: View {
                     .foregroundStyle(PaperTheme.ink)
                     .lineLimit(1)
                     .truncationMode(.tail)
+                if model.isAIMarked(event.eventId) { AIStamp() }
             }
             // The colour bar sits under the checkboxes' middle.
             .padding(.leading, TaskRowStyle.inset.handle + TaskRowStyle.inset.checkColumn / 2 - 2)

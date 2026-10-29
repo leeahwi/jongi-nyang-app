@@ -7,8 +7,12 @@ struct HelpView: View {
     @State private var selected: String
     @State private var query: String
 
-    init(topic: String = HelpTopic.all[0].id, query: String = "") {
-        _selected = State(initialValue: topic)
+    /// Set before the desk opens 도움말 (the drawer's ⚙ → 도움말): the topic to open on, once.
+    static var requestedTopic: String?
+
+    init(topic: String? = nil, query: String = "") {
+        _selected = State(initialValue: topic ?? HelpView.requestedTopic ?? HelpTopic.all[0].id)
+        HelpView.requestedTopic = nil
         _query = State(initialValue: query)
     }
 
@@ -127,7 +131,7 @@ struct HelpView: View {
                 Label(topic.title, systemImage: topic.symbol)
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(PaperTheme.ink2)
-                Text(topic.headline.handwritten)
+                Text(topic.headline.keepingParticles.handwritten)
                     .font(Font(HandwritingFont.native(face: .pen, size: 28)))
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -307,8 +311,8 @@ private struct HelpEntryCard: View {
                     .accessibilityHidden(true)
             }
             VStack(alignment: .leading, spacing: 6) {
-                Text(entry.title).font(.system(size: 13.5, weight: .semibold))
-                Text(entry.body)
+                Text(entry.title.keepingParticles).font(.system(size: 13.5, weight: .semibold))
+                Text(entry.body.keepingParticles)
                     .font(.system(size: 12.5))
                     .foregroundStyle(PaperTheme.secondary)
                     .lineSpacing(3.5)
@@ -361,7 +365,7 @@ struct HelpTopic: Identifiable {
     var group: HelpGroup {
         switch id {
         case "start", "tasks", "tabs", "alerts": .basics
-        case "window", "memo", "history", "calendar": .screens
+        case "window", "drawer", "history", "calendar": .screens
         case "pet", "timer", "alarm": .cat
         default: .more
         }
@@ -400,7 +404,7 @@ struct HelpTopic: Identifiable {
             HelpEntry(title: L("지우기와 되돌리기"), body: L("줄에 마우스를 올리면 오른쪽 끝에 휴지통이 나타나요. 지우면 아래에 ‘지웠어요 · 되돌리기’가 잠깐 떠요. ⌘Z로도 되돌리고, ⇧⌘Z로 다시 실행해요. 메모를 지울 때, 알림의 ‘모두 끝냄’, 완료한 일 정리도 같은 안내로 되돌릴 수 있어요."), keys: ["⌘Z", "⇧⌘Z"]),
             HelpEntry(title: L("내일로 · 날짜 바꾸기"), body: L("오늘 탭의 줄에 마우스를 올리면 ‘→ 내일’로 내일 할 일로 옮겨요. 우클릭 → 날짜 바꾸기에서 내일 · 이번 주 금요일(월–목요일에만) · 다음 주 월요일 · 언젠가 · 날짜 고르기…를 골라요. 줄을 고른 뒤 ⌥→는 하루 뒤로, ⌥←는 하루 앞으로(오늘보다 앞으로는 안 가요), ⌥↓는 언젠가로. 옮기면 ‘내일로 옮겼어요 · 되돌리기’가 떠요."), keys: ["⌥→", "⌥←", "⌥↓"]),
             HelpEntry(title: L("어제부터 · 3일째"), body: L("날짜 없이 오늘 탭에 있던 할 일이 하루를 넘기면 줄 끝에 ‘어제부터’, 더 오래면 ‘3일째’처럼 작게 적혀요. 마감을 정하거나, 끝내거나, 언젠가로 옮기면 사라져요. 이 날짜는 할 일과 함께 저장돼서 다른 기기(Windows 포함)에서도 같아요.")),
-            HelpEntry(title: L("검색"), body: L("⌘F(⋯ → 검색…, 책상 왼쪽 위 ‘검색’)를 누르면 노트 위에 검색 쪽지가 떠요. 오늘 · 앞으로 · 메모 · 완료 기록 · 일정에서 찾고, 맞는 글자는 연한 초록으로 칠해져요. ‘ㅂㄱㅅ’처럼 초성으로도 찾고, 영어와 네덜란드어는 대소문자와 악센트를 가리지 않아요. ↑↓로 고르고 Return으로 열어요 — 할 일은 그 탭에서, 메모는 열리고, 완료 기록은 그날이, 일정은 고치기 쪽지가 떠요."), keys: ["⌘F", "↑↓", "Return", "Esc"]),
+            HelpEntry(title: L("검색"), body: L("⌘F(⋯ → 검색…, 책상 왼쪽 위 ‘검색’)를 누르면 노트 위에 검색 쪽지가 떠요. 오늘 · 앞으로 · 메모 · 완료 기록 · 일정에서 찾고, 맞는 글자는 연한 초록으로 칠해져요. ‘ㅂㄱㅅ’처럼 초성으로도 찾고, 영어와 네덜란드어는 대소문자와 악센트를 가리지 않아요. ↑↓로 고르고 Return으로 열어요 — 할 일은 그 탭에서, 메모는 메모 서랍에서 펼쳐지고, 완료 기록은 그날이, 일정은 고치기 쪽지가 떠요."), keys: ["⌘F", "↑↓", "Return", "Esc"]),
             HelpEntry(title: L("완료한 일 숨기기·정리"), body: L("아래쪽 ‘완료 숨기기’를 누르면 끝낸 일이 목록에서 잠시 숨겨져요. ⋯ → 완료한 일 정리를 누르면 오늘 끝낸 일을 바로 완료 기록으로 옮겨요.")),
             HelpEntry(title: L("다음 · 그 밖에"), body: L("오늘 안에 알림이나 정한 시간이 남은 할 일과 시간이 정해진 반복은 위쪽 ‘다음’에 시간순으로 세 개까지 모여요. 나머지는 아래 ‘그 밖에’에 있어요. 순서는 각 묶음 안에서 바꿔요.")),
             HelpEntry(title: L("진행 표시"), body: L("제목 옆 작은 원과 ‘2 / 5 끝냈어요’가 오늘 할 일 중 끝낸 개수예요. 끝낼수록 원이 초록으로 차요.")),
@@ -414,10 +418,9 @@ struct HelpTopic: Identifiable {
             HelpEntry(title: L("몇 분 뒤 알림"), body: L("‘30분 뒤 빨래 꺼내기’, ‘2시간 뒤 회의 준비’, ‘1시간 반 후 약 먹기’처럼 적으면 지금부터 그만큼 뒤에 알림이 울리는 할 일이 돼요.")),
             HelpEntry(title: L("넣은 뒤 바꾸기"), body: L("넣고 나면 아래에 ‘일정으로 넣었어요 · 할 일로 바꾸기’ 같은 안내가 4초 떠요. ‘바꾸기’를 누르면 방금 것은 흔적 없이 지우고 다른 뜻으로 다시 넣어요. 같은 말을 두 번 바꾸면 다음부터 그쪽으로 먼저 알아들어요. 바로 ⌘Z를 누르면 넣은 것을 되돌려요."), keys: ["⌘Z"]),
             HelpEntry(title: L("어디서든 ⌃⌥N"), body: L("다른 앱을 쓰다가 ⌃⌥N을 누르면 같은 입력 줄이 쪽지로 떠요. ⌘Return은 일정으로 넣어요. 책상 → 꾸미기 → 빠른 입력에서 끌 수 있어요."), keys: ["⌃⌥N", "⌘↩", "Esc"]),
-            HelpEntry(title: L("메모 탭에서는"), body: L("메모 탭의 입력 줄은 적은 글을 바로 새 메모로 넣어요.")),
         ]),
         HelpTopic(id: "tabs", title: L("앞으로"), symbol: "arrow.forward.circle", pose: .curious, headline: L("이번 주 · 다음 주 · 언젠가"), entries: [
-            HelpEntry(title: L("세 개의 탭"), body: L("위쪽 색 탭 오늘 · 앞으로 · 메모를 누르거나 ⌘1–⌘3으로 옮겨 다녀요. 탭 옆 숫자는 아직 안 끝낸 개수예요(창이 좁으면 숨겨져요)."), keys: [L("⌘1 오늘"), L("⌘2 앞으로"), L("⌘3 메모")]),
+            HelpEntry(title: L("두 개의 탭과 메모 서랍"), body: L("위쪽 색 탭 오늘 · 앞으로를 누르거나 ⌘1 · ⌘2로 옮겨 다녀요. 탭 옆 숫자는 아직 안 끝낸 개수예요(창이 좁으면 숨겨져요). 메모는 노트 위의 발 버튼이나 ⌘3으로 여는 메모 서랍에 있어요(1.42까지의 메모 탭)."), keys: [L("⌘1 오늘"), L("⌘2 앞으로"), L("⌘3 메모 서랍")]),
             HelpEntry(title: L("오늘"), body: L("오늘 할 일이에요. 알림·주기 알림·접은 포스트잇은 모두 오늘 탭의 할 일만 세어요.")),
             HelpEntry(title: L("앞으로"), body: L("내일부터 이번 주와 다음 주의 날마다 그날 일정(색 막대 · 시간 · 제목)과 그날 마감인 할 일이 함께 있어요. 다음 주 뒤의 마감은 ‘그 뒤’에 달별로, 날짜 없는 일은 맨 아래 ‘언젠가’에 모여요. 마감 날이 되면 저절로 오늘 탭으로 올라와요(새벽 4시 기준). 일정을 누르면 고치고, 우클릭하면 메뉴가 나와요.")),
             HelpEntry(title: L("다른 날로 끌어 옮기기"), body: L("앞으로 탭에서 줄 왼쪽 손잡이를 잡고 다른 날에 놓으면 마감이 그날로 바뀌어요. 끄는 동안은 빈 날도 보이고, 놓을 날이 초록으로 표시돼요. ‘언젠가’에 놓으면 날짜가 빠지고, 위쪽 ‘오늘’ 탭에 놓으면 오늘 할 일이 돼요. 같은 날 안에서는 순서를 바꿔요. 아래 안내의 ‘되돌리기’나 ⌘Z로 되돌려요."), keys: ["⌘Z"]),
@@ -449,11 +452,15 @@ struct HelpTopic: Identifiable {
             HelpEntry(title: L("창이 낮을 때"), body: L("노트 높이가 480 이하이면 제목 줄이 한 줄로 줄어 목록이 더 많이 보여요.")),
             HelpEntry(title: L("크기와 위치"), body: L("창 가장자리를 끌어 크기를 바꿔요(최소 350 × 400). 크기·위치·탭·완료 숨김·핀 상태는 다음에 켤 때도 기억해요. 창이 좁으면 탭 숫자가 숨어요. 위쪽 오른쪽에는 핀 · 책상 · ⋯ 세 버튼이 있어요.")),
         ]),
-        HelpTopic(id: "memo", title: L("메모"), symbol: "note.text", pose: .tea, headline: L("떠오른 생각은 메모에"), entries: [
-            HelpEntry(title: L("메모 쓰기"), body: L("메모 탭에서 ‘새 메모’를 누르거나 ⇧⌘N. 첫 줄이 제목이 되고, 쓰는 대로 자동 저장돼요. Esc나 ‘메모 목록’으로 돌아가요."), keys: ["⇧⌘N", "Esc"]),
-            HelpEntry(title: L("빠른 메모"), body: L("다른 앱을 쓰다가도 ⌃⌥M을 누르면 메모 칸이 떠요. 여러 줄을 적고 ⌘Return이면 메모 탭 맨 위에 새 메모로 들어가요. Esc나 다른 곳을 누르면 닫히고, 쓰던 글은 다음에 열 때 그대로 있어요. 펫 우클릭 → 빠른 메모, ⋯ → 빠른 메모…, 파일 메뉴에서도 열려요. 책상 → 꾸미기 → 빠른 입력에서 끌 수 있어요."), keys: ["⌃⌥M", "⌘↩", "Esc"]),
+        HelpTopic(id: "drawer", title: L("메모 서랍"), symbol: "sidebar.right", pose: .curious, headline: L("화면 끝에서 꺼내 보는 메모"), entries: [
+            HelpEntry(title: L("열고 닫기"), body: L("어디서든 ⇧⌘D를 누르거나, 화면 끝의 고양이 발 손잡이를 누르면 서랍이 나와요. 노트 위의 발 버튼, ⌘3, ⋯ → 메모 서랍 열기, 펫 우클릭으로도 열려요. 1.42까지 메모 탭에 있던 메모는 모두 ‘메모’ 폴더에 있어요. 다른 앱을 눌러도 닫히지 않고, 같은 단축키 · Esc · ×로 닫혀요. 손잡이는 위아래로 끌어 옮겨요."), keys: ["⇧⌘D", "Esc"]),
+            HelpEntry(title: L("폴더와 책갈피"), body: L("옆 책갈피 하나가 폴더 하나예요. 고른 책갈피에는 이름이, 나머지에는 첫 글자가 있고, 마우스를 올리면 ‘장보기 · 세 장 · ⌘3’처럼 알려 줘요. 머리말의 폴더 이름(▾)이나 ⌘L을 누르면 폴더 목록이 떠요. 맨 아래 +로 폴더를 만들어요. 책갈피 우클릭으로 여기에 새 메모 · 이름 바꾸기 · 색 · 정렬(고친 순 · 만든 순 · 제목 순) · 복제 · 폴더 지우기(안의 메모는 ‘메모’ 폴더로 가고 되돌릴 수 있어요). 책갈피를 끌어 순서를 바꾸고, 메모를 책갈피 위로 끌어 놓으면 그 폴더로 옮겨져요. 발 모양 책갈피 ‘고정’에는 고정한 메모가 모이고, 우클릭으로 정렬 · 고정 모두 풀기."), keys: ["⌘1–⌘9", "⌘0"]),
+            HelpEntry(title: L("바로 적고, 그 자리에서 고치기"), body: L("맨 위 쪽지에 적고 ↩를 누르면 지금 폴더에 새 메모가 생겨요(⇧↩는 줄 바꿈). 메모는 ‘고정 · 오늘 · 어제 · 이번 주 · 지난주 · 10월’ 머리말 아래 카드로 모여 있고, 카드에는 짧은 시간만 있어요. 마우스를 올리면 복사 · 고정 · ⋯가 떠요. 누르면 그 자리에서 펼쳐져 바로 고치고, 아래 두 묶음에 크게 보기 · 복사 · ⚙(고정 · 이 메모의 종이 · 체크한 줄 지우기)와 폴더로 옮기기 · 지우기, 가운데에 언제 고쳤는지가 있어요. 메모를 우클릭하면 할 수 있는 일이 모두 있어요. ↑↓로 고르고 ↩로 펼쳐요."), keys: ["⌘N", "↩", "⇧↩", "↑↓", "⇧⌘C", "⌘⌫"]),
+            HelpEntry(title: L("빠른 메모"), body: L("다른 앱을 쓰다가도 ⌃⌥M을 누르면 메모 칸이 떠요. 여러 줄을 적고 ⌘Return이면 메모 서랍에서 마지막으로 본 폴더 맨 위에 새 메모로 들어가요. Esc나 다른 곳을 누르면 닫히고, 쓰던 글은 다음에 열 때 그대로 있어요. 펫 우클릭 → 빠른 메모, ⋯ → 빠른 메모…, 파일 메뉴에서도 열려요. 책상 → 꾸미기 → 빠른 입력에서 끌 수 있어요."), keys: ["⌃⌥M", "⌘↩", "Esc"]),
             HelpEntry(title: L("복사한 글 넣기"), body: L("책상 → 꾸미기 → 빠른 입력의 ‘빠른 메모를 열 때 복사한 글 넣기’를 켜면, 빈 빠른 메모를 열 때 지난번 이후 2분 안에 복사한 글이 골라진 채로 들어가요. 그대로 ⌘Return으로 넣거나, 그냥 적으면 바뀌어요.")),
-            HelpEntry(title: L("지우기와 되돌리기"), body: L("메모 줄에 마우스를 올리면 시간 자리에 휴지통이 나타나요. 지우면 ‘메모를 지웠어요 · 되돌리기’가 잠깐 뜨고, 아래쪽 ‘지운 메모 되돌리기’로도 살려요. 아무것도 안 쓴 메모는 닫으면 저절로 사라져요.")),
+            HelpEntry(title: L("체크 목록"), body: L("‘- [ ] 우유’처럼 적은 줄은 체크 상자로 보여요. 누르면 체크되고 메모에는 ‘- [x] 우유’로 저장돼요. 접힌 메모에는 ‘2/4’와 진행 막대가 보여요. 링크가 있는 메모에는 주소(누르면 브라우저로 열려요), 전화번호가 있으면 번호(누르면 복사)가 작게 붙어요. 메모 글은 바뀌지 않아요. 다 한 줄은 ⚙나 우클릭의 ‘체크한 줄 지우기’로 한 번에 지워요(되돌리기도 돼요).")),
+            HelpEntry(title: L("검색"), body: L("⌘F로 모든 폴더에서 찾아요. 초성으로도 찾고, 결과마다 폴더 이름이 작게 보여요. 노트의 검색도 폴더 이름으로 메모를 찾아요."), keys: ["⌘F"]),
+            HelpEntry(title: L("종이와 자리"), body: L("서랍 아래 ⚙(빈 곳 우클릭과 같아요)에서 새 메모 · 복사한 글로 새 메모, 종이(자동 · 낮 · 밤 · 크라프트 · 모눈), 바탕(불투명 · 반투명 · 강하게 · 바탕 없음), 왼쪽 · 오른쪽을 바로 바꿔요. 반투명 · 강하게는 뒤 화면이 흐리게 비치고(투명도 줄이기를 켜면 불투명), 바탕 없음은 메모만 화면 위에 떠요. 메모 한 장만 다른 종이로 하려면 우클릭 → 이 메모의 종이. 책상 → 메모 서랍(⌘,)에서는 단축키, 손잡이, 다른 창 위에 띄우기, 폭(260–480)도 정해요. 서랍 안쪽 끝을 끌어도 폭이 바뀌어요. 빠른 메모 ⌃⌥M과 입력 줄의 /메모는 서랍에서 마지막으로 본 폴더에 들어가요.")),
         ]),
         HelpTopic(id: "history", title: L("완료 기록"), symbol: "leaf", pose: .cheer, headline: L("한 일은 잔디로 남아요"), entries: [
             HelpEntry(title: L("끝낸 일은 어디로 가나요?"), body: L("완료한 일은 그날까지 목록에 남았다가 다음 날 새벽 4시가 지나면 완료 기록으로 옮겨져요. 새벽 4시 전에 끝낸 일은 전날 한 일로 쳐요. 책상 → 저장과 백업 → 완료한 일에서 다음 날 / 3일 뒤 / 7일 뒤 / 보관 안 함을 골라요.")),
@@ -500,7 +507,7 @@ struct HelpTopic: Identifiable {
         ]),
         HelpTopic(id: "look", title: L("꾸미기·설정"), symbol: "paintbrush.pointed", pose: .groom, headline: L("내 손에 맞게"), entries: [
             HelpEntry(title: L("글꼴과 글자 크기"), body: L("손글씨 펜 · 손글씨 붓 · 기본 글씨 중에 고르고, 글자 크기는 작게 · 보통 · 크게 · 아주 크게. 책상 → 꾸미기, ⋯ 메뉴, ⌘= / ⌘−로 바꿔요."), keys: ["⌘=", "⌘−"]),
-            HelpEntry(title: L("설정 열기"), body: L("⋯ → 설정…이나 ⌘,로 책상의 꾸미기가 열려요. 설정은 꾸미기 · 알림 · 반복 · 종이냥 · 일정 · 저장과 백업 여섯 칸이에요."), keys: ["⌘,"]),
+            HelpEntry(title: L("설정 열기"), body: L("⋯ → 설정…이나 ⌘,로 책상의 꾸미기가 열려요. 설정은 꾸미기 · 알림 · 반복 · 종이냥 · 일정 · 저장과 백업 · 메모 서랍 · AI 연결 여덟 칸이에요."), keys: ["⌘,"]),
             HelpEntry(title: L("책상"), body: L("달력 · 완료 기록 · 시계 · 설정 · 도움말이 한 창에 있어요. 노트 위쪽의 책상 버튼이나 ⌘D로 열고, 왼쪽 목록이나 ⌘1–⌘9로 칸을 골라요(목록에서 ↑↓도 돼요). 창이 좁으면 목록이 아이콘만 남아요."), keys: ["⌘D", "⌘1–⌘9"]),
             HelpEntry(title: L("밤 종이"), body: L("책상 → 꾸미기 → 종이 색에서 자동 · 낮 · 밤을 골라요. 자동이면 Mac이 어두운 모드일 때 노트 · 쪽지 · 책상 · 오늘 창이 모두 어두운 밤 종이로 바뀌어요. 바꾸면 열린 창이 바로 따라 바뀌어요.")),
         ]),
@@ -508,12 +515,21 @@ struct HelpTopic: Identifiable {
             HelpEntry(title: L("할 일"), body: L("새 할 일 ⌘N · 어디서든 빠른 입력 ⌃⌥N · 빠른 메모 ⌃⌥M · 노트 보이기 · 숨기기 ⌃⌥J · 검색 ⌘F · 되돌리기 ⌘Z · 다시 실행 ⇧⌘Z · 전체 복사 ⇧⌘C · 텍스트로 내보내기 ⌘E"), keys: ["⌘N", "⌃⌥N", "⌃⌥M", "⌃⌥J", "⌘F", "⌘Z", "⇧⌘Z", "⇧⌘C", "⌘E"]),
             HelpEntry(title: L("줄 다루기"), body: L("줄 고르기 ↑↓ · 완료 Space · 고치기 Return · 지우기 ⌫ · 순서 바꾸기 ⌘↑↓ · 고르기 풀기 Esc · 하루 뒤로 ⌥→ · 하루 앞으로 ⌥← · 언젠가로 ⌥↓ · 집중 F"), keys: ["↑↓", "Space", "Return", "⌫", "⌘↑↓", "Esc", "⌥→", "⌥←", "⌥↓", "F"]),
             HelpEntry(title: L("집중 카드"), body: L("멈춤 · 계속 Space · 다 했어요 ⌘↩ · 5분 더 ⌘= · 그만두기 Esc(먼저 물어봐요)"), keys: ["Space", "⌘↩", "⌘=", "Esc"]),
-            HelpEntry(title: L("탭과 메모"), body: L("오늘 ⌘1 · 앞으로 ⌘2 · 메모 ⌘3 · 새 메모 ⇧⌘N"), keys: ["⌘1–⌘3", "⇧⌘N"]),
+            HelpEntry(title: L("탭과 메모"), body: L("오늘 ⌘1 · 앞으로 ⌘2 · 메모 서랍 ⌘3 · 서랍에 새 메모 ⇧⌘N"), keys: ["⌘1–⌘3", "⇧⌘N"]),
+            HelpEntry(title: L("메모 서랍"), body: L("어디서든 열고 닫기 ⇧⌘D · 바로 적기 ⌘N · 검색 ⌘F · 폴더 ⌘1–⌘9 · 고정 ⌘0 · 고르기 ↑↓ · 펼치기 ↩ · 접기 · 닫기 Esc · 복사 ⇧⌘C · 지우기 ⌘⌫"), keys: ["⇧⌘D", "⌘N", "⌘F", "⌘0", "⇧⌘C", "⌘⌫"]),
             HelpEntry(title: L("창과 앱"), body: L("노트 열기 ⌘0 · 접기 ⌘M · 완료 기록 ⌘Y · 달력 ⌘D · 설정 ⌘, · 펫 보이기 ⇧⌘P · 도움말 ⌘? · 책상의 칸 ⌘1–⌘9 · 창 닫기 ⌘W · 종료 ⌘Q"), keys: ["⌘0", "⌘M", "⌘Y", "⌘D", "⌘,", "⇧⌘P", "⌘?"]),
             HelpEntry(title: L("글자 크기"), body: L("크게 ⌘= · 작게 ⌘−"), keys: ["⌘=", "⌘−"]),
         ]),
+        HelpTopic(id: "ai", title: L("AI 연결"), symbol: "text.bubble", pose: .curious, headline: L("Claude와 이야기하며 정리해요"), entries: [
+            HelpEntry(title: L("무엇을 할 수 있나요"), body: L("Claude 데스크톱이나 Claude Code와 이야기하면서 할 일 · 일정 · 메모를 보고, 새로 넣고, 할 일과 반복하지 않는 일정을 고쳐요. 예: “내일 3시~4시 보고서 쓰기 넣어줘”, “이번 주 뭐 했는지 정리해줘”. 지우기, 반복 일정 · 알람 고치기, 메모 고치기는 하지 않아요.")),
+            HelpEntry(title: L("켜고 연결하기"), body: L("책상 → AI 연결에서 ‘Claude가 종이냥을 보고 쓸 수 있게 하기’를 켜요(처음에는 꺼져 있어요). ‘Claude 데스크톱에 연결’을 누르면 Claude 데스크톱이 ‘종이냥 for Claude’를 설치할지 물어보고, Claude Code가 있으면 같이 연결해요. Claude Code만 쓴다면 ‘Claude Code에 연결’을 눌러요. 터미널과 Claude 데스크톱의 Code 탭 모두에서 보여요(Node가 필요해요). 끄면 Claude는 아무것도 읽거나 쓰지 못해요.")),
+            HelpEntry(title: L("고치기 전에 물어봐요"), body: L("Claude는 고치기 전에 바뀌기 전과 후를 대화에 먼저 보여 주고, ‘응’이라는 답을 받은 뒤에 고쳐요. 그사이 종이냥에서 그 항목을 바꿨으면 고치지 않고 다시 보여 줘요.")),
+            HelpEntry(title: L("알림과 되돌리기"), body: L("Claude가 넣거나 고치면 노트 아래에 ‘Claude가 할 일 2개를 넣었어요 · 되돌리기’가 떠요. 그 뒤로 여기서 아무것도 바꾸지 않았다면 ⌘Z로도 되돌려요. 그사이 바뀐 항목은 그대로 둬요. 책상 → AI 연결 → 최근 AI 작업에서 오늘과 어제 한 일을 하나씩 되돌릴 수도 있어요. Claude가 넣거나 고친 할 일과 일정에는 그날 동안 작은 ‘Claude’ 도장이 찍혀요."), keys: ["⌘Z"]),
+            HelpEntry(title: L("종이냥이 꺼져 있을 때"), body: L("종이냥을 꺼 둬도 Claude는 넣고 고칠 수 있어요. 다음에 종이냥을 켜면 ‘자리 비운 사이 Claude가 3가지를 했어요’로 알려 주고, ‘보기’를 누르면 무엇을 했는지 보여요.")),
+            HelpEntry(title: L("따로 도는 프로그램은 없어요"), body: L("종이냥 for Claude는 Claude가 대화에 필요할 때만 실행되고, Claude를 끄면 같이 꺼져요. 목록은 이 Mac의 파일에서 바로 읽고 써요. Claude가 읽은 내용은 대화의 일부로 Claude에게 가요.")),
+        ]),
         HelpTopic(id: "data", title: L("저장과 옮기기"), symbol: "externaldrive", pose: .sleep, headline: L("내 Mac에만 저장돼요"), entries: [
-            HelpEntry(title: L("저장 위치"), body: L("~/Library/Application Support/com.noa.PaperTodo/ 안에 할 일(todos.json), 메모(memos.json), 반복(repeats.json), 일정(events.json), 알람(alarms.json), 집중 기록(focus.jsonl), 완료 기록(archive 폴더)이 있어요. 바뀔 때마다 바로 저장돼요.")),
+            HelpEntry(title: L("저장 위치"), body: L("~/Library/Application Support/com.noa.PaperTodo/ 안에 할 일(todos.json), 메모(memos.json), 반복(repeats.json), 일정(events.json), 알람(alarms.json), 집중 기록(focus.jsonl), 완료 기록(archive 폴더)이 있어요. 바뀔 때마다 바로 저장돼요.") + " " + L("메모 서랍의 폴더와 고정은 memo-folders.json에 따로 있어요(백업에도 들어가요).") + " " + L("AI 연결의 설정(ai-link.json)과 Claude가 한 일의 기록(ai-log.jsonl)도 여기 있어요. 공유 폴더를 골라도 이 둘은 이 Mac의 이 폴더에 남아요.")),
             HelpEntry(title: L("다른 기기와 함께 쓰기"), body: L("책상 → 저장과 백업 → 저장 위치에서 iCloud Drive · Dropbox · OneDrive 같은 폴더를 고르면, 같은 폴더를 고른 다른 Mac이나 Windows의 종이냥과 같은 목록을 써요. 다른 기기에서 바꾸면 몇 초 안에 이쪽에도 반영돼요. 폴더를 바꾸면 종이냥이 다시 시작돼요.")),
             HelpEntry(title: L("두 기기에서 동시에 고치면"), body: L("거의 같은 때 고쳐도 양쪽 변경이 다 남아요. 같은 메모를 함께 고치면 두 글을 합치고, 같은 자리를 서로 다르게 고친 줄은 둘 다 남겨요. 할 일 알림은 켜져 있는 기기마다 울리고, 꺼져 있던 기기는 다른 기기가 이미 알린 지난 알림을 다시 띄우지 않아요. 글꼴·알림 같은 설정은 기기마다 따로예요.")),
             HelpEntry(title: L("Windows와 같은 형식"), body: L("Windows용 종이냥과 같은 파일 형식이에요. 파일을 옮겨도 그대로 이어서 쓸 수 있어요.")),

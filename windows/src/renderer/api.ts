@@ -68,9 +68,13 @@ export function scrollFade(element: HTMLElement): void {
 }
 
 function fadeNow(element: HTMLElement): void {
-  element.classList.add("scroll-fade");
-  element.classList.toggle("fade-top", element.scrollTop > 2);
-  element.classList.toggle("fade-bottom", element.scrollTop + element.clientHeight < element.scrollHeight - 2);
+  // Only real changes touch the class: classList.add of a class already there still counts as a change
+  // to a MutationObserver, and scrollFade's own observer would then draw again on every frame.
+  const top = element.scrollTop > 2;
+  const bottom = element.scrollTop + element.clientHeight < element.scrollHeight - 2;
+  if (!element.classList.contains("scroll-fade")) element.classList.add("scroll-fade");
+  if (element.classList.contains("fade-top") !== top) element.classList.toggle("fade-top", top);
+  if (element.classList.contains("fade-bottom") !== bottom) element.classList.toggle("fade-bottom", bottom);
 }
 
 /**

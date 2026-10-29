@@ -218,8 +218,6 @@ private enum PresentationTests {
             model.handleListKey(.up)
             try expect(model.selectedTaskID == model.visibleItems.last?.id, "↑ from nothing picks the last row")
             try expect(model.handleListKey(.clear) && model.selectedTaskID == nil, "Esc lets go")
-            model.page = .memos
-            try expect(!model.handleListKey(.down), "Memos are left alone")
         }
 
         try await test("typed dates become alerts or deadlines; dropping on a tab moves a task") {
@@ -311,7 +309,7 @@ private enum PresentationTests {
             model.commitIntent(text: "금요일까지 보고서", candidates: model.intentCandidates("금요일까지 보고서"), index: 0, page: .ahead)
             try expect(model.items.last?.shelf == nil && model.items.last?.dueDate != nil, "A date → its day")
             try expect(AppModel.Page(saved: "deadlines") == .ahead && AppModel.Page(saved: "later") == .ahead
-                       && AppModel.Page(saved: "todos") == .todos && AppModel.Page(saved: "memos") == .memos, "마감 and 나중에 open 앞으로")
+                       && AppModel.Page(saved: "todos") == .todos && AppModel.Page(saved: "memos") == .todos, "마감 and 나중에 open 앞으로; the 메모 tab (until 1.42) opens 오늘")
             model.reveal(model.items.first!.id)
             try expect(model.page == .ahead, "Revealing a task that isn't for today opens 앞으로")
         }
@@ -444,7 +442,7 @@ private enum PresentationTests {
             defer { fixture.cleanup() }
             let model = fixture.model()
             let blank = model.newMemo()
-            try expect(model.page == .memos && model.openMemoID == blank, "New memo opens on the memo page")
+            try expect(model.page == .todos && model.openMemoID == blank, "New memo is open for typing (the note stays on its page)")
             model.closeMemo()
             try expect(model.memos.isEmpty, "A blank memo disappears when closed")
             let first = model.newMemo()
@@ -463,6 +461,27 @@ private enum PresentationTests {
             try expectEqual(model.memos.count, 2, "Deleted memo restored")
             model.saveMemosNow()
             try expectEqual(fixture.model().memos.map(\.title), ["장보기", "회의 메모"], "Memos persist in memos.json")
+        }
+
+        try await test("M4 /메모 goes to the drawer's last folder, its toast opens the drawer on it (1.43)") {
+            let fixture = try Fixture(items: [])
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            let work = model.addMemoFolder(name: "회사", color: .pink)!
+            model.drawer.lastFolder = work
+            var revealed: String?
+            model.onRevealMemo = { revealed = $0 }
+            let candidates = model.intentCandidates("/메모 우유")
+            guard let commit = model.commitIntent(text: "/메모 우유", candidates: candidates, index: 0, page: .todos),
+                  case .memo(let id) = commit.made else { throw TestFailure(description: "no memo made") }
+            try expectEqual(model.memoFolders.folderID(of: id), work, "in the last folder")
+            let toast = model.makeToast(for: commit, onChange: { _ in })
+            try expectEqual(toast.text, "메모 서랍에 넣었어요", "toast")
+            try expectEqual(toast.action, "열기", "its action")
+            toast.perform?()
+            try expectEqual(revealed, id, "열기 opens the drawer on it")
+            model.revealMemo("x")
+            try expectEqual(revealed, "x", "M5 a search hit opens the drawer with it (SearchSlip → revealMemo)")
         }
 
         try await test("memos: changes from another device and from here both survive") {
@@ -553,11 +572,15 @@ private enum PresentationTests {
 
         try await test("the desk: one window, its panes in sidebar order, ⌘1…⌘9 and the old entry points") {
             try expectEqual(DeskPane.allCases.map(\.rawValue),
-                            ["calendar", "history", "clock", "appearance", "notifications", "repeating", "pet", "events", "storage", "help"], "Sidebar order")
+                            ["calendar", "history", "clock", "appearance", "notifications", "repeating", "pet", "events", "storage", "drawer", "ai", "help"], "Sidebar order")
             try expectEqual(DeskPane.Section.view.panes, [.calendar, .history, .clock], "보기")
-            try expectEqual(DeskPane.Section.settings.panes, [.appearance, .notifications, .repeating, .pet, .events, .storage], "설정")
+            try expectEqual(DeskPane.Section.settings.panes, [.appearance, .notifications, .repeating, .pet, .events, .storage, .drawer, .ai], "설정")
             try expectEqual(DeskPane.Section.help.panes, [.help], "도움")
             try expectEqual(DeskPane.allCases.compactMap(\.shortcut), Array(1...9), "⌘1…⌘9 for the first nine")
+            // 1.43.1: 메모 서랍 joined after 저장과 백업, so ⌘1…⌘9 still open the same panes as before (and as on Windows).
+            try expectEqual((1...9).map { number in DeskPane.allCases.first { $0.shortcut == number }! },
+                            [.calendar, .history, .clock, .appearance, .notifications, .repeating, .pet, .events, .storage], "⌘1…⌘9 unchanged")
+            try expect(DeskPane.drawer.shortcut == nil && DeskPane.ai.shortcut == nil, "메모 서랍 and AI 연결 have no number")
             try expect(DeskPane.help.shortcut == nil, "도움말 is ⌘? instead")
             let fixture = try Fixture(items: [])
             defer { fixture.cleanup() }
@@ -969,6 +992,50 @@ private enum PresentationTests {
             let menu = [600, 599, 71, 8, 3599].map { bar(TimeInterval($0)) }
             try expect(Set(menu).count == 1, "menu bar widths differ: \(menu)")
             try expect(Set([3600, 7199, 4271].map { bar(TimeInterval($0)) }).count == 1, "menu bar hour form")
+        }
+
+        // 1.42.1: a slip's window is the slip's size from the start (not the provisional 520 × 420 with the slip
+        // centred in it — a tall 오늘 창 lost its top), and as the slip grows its top edge and middle stay put.
+        try await test("a slip window takes the slip's size at once and keeps its top as the slip grows") {
+            _ = NSApplication.shared
+            SlipMotion.enabled = false
+            defer { SlipMotion.enabled = true }
+            let fixture = try Fixture(items: [("장보기", false), ("보고서 마무리", false)])
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            model.calendar.showForSnapshot([])
+            model.alarms.showForSnapshot([])
+            defer { model.calendar.showForSnapshot([]); model.alarms.showForSnapshot([]) }
+            let timer = FocusTimerState()
+            let now = Date()
+            @MainActor func view() -> TodayWindowView {
+                TodayWindowView(model: model, timer: timer, alarms: model.alarms, calendar: model.calendar, now: now)
+            }
+            // The slip's own size, measured apart from any window.
+            @MainActor func slipSize() -> NSSize { NSHostingView(rootView: view().padding(SlipMetrics.margin).fixedSize()).fittingSize }
+            func same(_ a: NSSize, _ b: NSSize) -> Bool { abs(a.width - b.width) < 0.5 && abs(a.height - b.height) < 0.5 }
+            let panel = TodayPanel(nonactivating: true)
+            defer { panel.orderOut(nil) }
+            panel.show(view())
+            try expect(same(panel.frame.size, slipSize()), "window \(panel.frame.size) is not the slip's \(slipSize())")
+            panel.placeSlip(topCenter: NSPoint(x: 600, y: 700))
+            let top = panel.frame.maxY, middle = panel.frame.midX
+            // A running timer, an event whose line wraps (in 1시간 46분), and more tasks than fit: a taller slip.
+            let start = now.addingTimeInterval(106 * 60)
+            model.calendar.showForSnapshot([LocalEvent(id: "wrap", title: "일정 45", date: CalendarDraft.day(start),
+                                                       start: CalendarDraft.minutes(start), end: CalendarDraft.minutes(start) + 30)])
+            timer.timer = FocusTimer.countdown(minutes: 25, now: now)
+            for title in ["회의 자료 보내기", "약 챙겨 먹기", "산책", "메일 정리", "빨래", "책 읽기"] { model.add(title, literal: true) }
+            model.setTaskReminder(model.items[2].id, at: now.addingTimeInterval(40 * 60))
+            model.setTaskReminder(model.items[3].id, at: now.addingTimeInterval(50 * 60))
+            let grown = slipSize()
+            try expect(grown.height > 420, "the grown 오늘 창 should be taller than the old provisional window (\(grown.height))")
+            for _ in 0..<30 where !same(panel.frame.size, grown) { try await Task.sleep(for: .milliseconds(50)) }
+            try expect(same(panel.frame.size, grown), "window \(panel.frame.size) didn't follow the slip to \(grown)")
+            try expect(abs(panel.frame.maxY - top) < 0.5 && abs(panel.frame.midX - middle) < 0.5, "the top edge and the middle stay put")
+            // A slip shown again in the same window starts from its own size too.
+            panel.show(view())
+            try expect(same(panel.frame.size, grown), "shown again: window \(panel.frame.size), slip \(grown)")
         }
 
         print("\n\(count) checks passed.")

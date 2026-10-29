@@ -52,7 +52,7 @@ extension AppModel {
             let asksForPick = page == .todos && asksForDailyPick
             let id: UUID? = switch page {
             case .ahead: addParsed(parsed, shelf: .later, now: now)
-            case .todos, .memos: addParsed(parsed, now: now)
+            case .todos: addParsed(parsed, now: now)
             }
             guard let id else { return nil }
             // 오늘 꼭 하나: the first to-do written while the line asked becomes the day's one thing.
@@ -130,6 +130,15 @@ extension AppModel {
                                emphasis: Intent.addedEmphasis(candidate, language: language))
         toast.commit = commit
         switch candidate {
+        case .memo where commit.nextIndex == nil:
+            // 1.43: memos live in 메모 서랍 — 열기 opens it on the new memo (⌘Z still takes it back).
+            let added = MemoMove.addedToast(language)
+            toast.text = added.text
+            toast.emphasis = nil
+            if case .memo(let id) = commit.made {
+                toast.action = added.action
+                toast.perform = { [weak self] in self?.revealMemo(id); onChange(nil) }
+            }
         case .timer:
             toast.action = L("멈추기")
             toast.perform = { [weak self] in self?.takeBack(commit); onChange(nil) }
@@ -183,6 +192,8 @@ struct PaperToast: Identifiable {
     var undoable = false
     /// A change outside the list (an event moved or stretched in the timetable, 1.41): ⌘Z runs this while the toast is up.
     var takeBack: (() -> Void)?
+    /// How long it stays (4 s when nil): Claude's work a little longer, the away notice longer still (1.42).
+    var seconds: Double?
 }
 
 struct ToastView: View {
@@ -239,7 +250,7 @@ struct ToastView: View {
     }
 
     private var styled: AttributedString {
-        var text = AttributedString(toast.text)
+        var text = AttributedString(toast.text.keepingParticles)
         if let emphasis = toast.emphasis, let range = text.range(of: emphasis) {
             text[range].foregroundColor = PaperTheme.toastKind
             text[range].font = .system(size: 12.5, weight: .semibold)
@@ -509,10 +520,9 @@ struct IntentLineView: View {
     @State private var reading = IntentReading()
 
     private var typing: Bool { !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    private var makesMemos: Bool { page == .memos }
     /// Read once per text (and minute): the body is drawn more than once per key press (1.39).
-    private var candidates: [Intent.Candidate] { makesMemos || !typing ? [] : reading.candidates(text, model: model) }
-    private var problem: Intent.Problem? { makesMemos ? nil : Intent.problem(text, language: .current) }
+    private var candidates: [Intent.Candidate] { !typing ? [] : reading.candidates(text, model: model) }
+    private var problem: Intent.Problem? { Intent.problem(text, language: .current) }
     private var active: Bool { focused || previewFocused }
 
     var body: some View {
@@ -537,7 +547,7 @@ struct IntentLineView: View {
                     .frame(height: compact ? 22 : 26)
                     .accessibilityHint(L("할 일, 일정, 타이머, 알람이나 메모를 적어요. Tab으로 다른 뜻을 골라요."))
                 // No fade between the shortcut chip and the ↩ hint: a half-faded chip lingered while typing.
-                trailing(readable: makesMemos || !candidates.isEmpty)
+                trailing(readable: !candidates.isEmpty)
                     .transaction { $0.animation = nil }
             }
             if let problem {
@@ -573,7 +583,6 @@ struct IntentLineView: View {
     }
 
     private var placeholder: String {
-        if makesMemos { return L("한 줄 메모를 적어요") }
         // 오늘 꼭 하나 (1.38): the day's first line asks for the one thing.
         if page == .todos && !compact && model.asksForDailyPick {
             let long = L("오늘 꼭 하나만 고른다면?")
@@ -593,13 +602,13 @@ struct IntentLineView: View {
         if typing {
             HStack(spacing: 4) {
                 KeyCap("↩")
-                Text(makesMemos ? L("메모에 넣기") : L("넣기"))
+                Text(L("넣기"))
             }
             .font(.system(size: 10.5, weight: .semibold))
             .foregroundStyle(PaperTheme.ink3)
             .fixedSize()
             .opacity(readable ? 1 : 0.35)
-        } else if model.quickEntryEnabled && !makesMemos && !compact && width >= 260 {
+        } else if model.quickEntryEnabled && !compact && width >= 260 {
             KeyCap("⌃⌥N")
                 .help(L("어디서든 ⌃⌥N으로 빠른 입력"))
         }
@@ -608,14 +617,6 @@ struct IntentLineView: View {
     private func submit(literal: Bool, asEvent: Bool) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        if makesMemos {
-            if let id = model.addMemo(text: trimmed) {
-                let commit = IntentCommit(text: trimmed, candidates: [.memo(trimmed)], index: 0, key: nil, made: .memo(id), page: page)
-                shownToast = model.makeToast(for: commit, onChange: { shownToast = $0 })
-            }
-            text = ""
-            return
-        }
         var list = model.intentCandidates(trimmed)
         var index = min(picked, max(0, list.count - 1))
         if literal {
@@ -670,14 +671,14 @@ final class IntentReading {
     }
 }
 
-/// The toast over the bottom of a sheet's list (오늘 · 앞으로 · 메모).
+/// The toast over the bottom of a sheet's list (오늘 · 앞으로).
 struct ToastHost: View {
     @ObservedObject var model: AppModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         if let toast = model.toast {
-            ToastView(toast: toast) { if model.toast?.id == toast.id { model.toast = nil } }
+            ToastView(toast: toast, seconds: toast.seconds ?? 4) { if model.toast?.id == toast.id { model.toast = nil } }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 8)
                 .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))

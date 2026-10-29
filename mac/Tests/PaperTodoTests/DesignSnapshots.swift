@@ -285,7 +285,6 @@ enum DesignSnapshots {
                     HStack(alignment: .bottom, spacing: 4) {
                         IndexTab(title: L("오늘"), count: counts ? 6 : nil, color: IndexTab.color(.todos), font: font, active: true) {}
                         IndexTab(title: L("앞으로"), count: counts ? 12 : nil, color: IndexTab.color(.ahead), font: font, active: false, previewHover: true) {}
-                        IndexTab(title: L("메모"), count: counts ? 3 : nil, color: IndexTab.color(.memos), font: font, active: false, targeted: true) {}
                     }
                     .padding(.horizontal, 8)
                     .background(alignment: .bottom) { Rectangle().fill(IndexTab.color(.todos)).frame(height: 3) }
@@ -385,7 +384,7 @@ enum DesignSnapshots {
         model.page = .todos
         try render(PaperView(model: model), size: NSSize(width: 420, height: 560),
                    to: output.appendingPathComponent("today-with-shelf.png"))
-        // Memos on the back of the sheet.
+        // Memos (in 메모 서랍 from 1.43; the search snapshots find them).
         for text in [t("장보기\n우유, 달걀, 사과", "Groceries\nmilk, eggs, apples", "Boodschappen\nmelk, eieren, appels"),
                      t("회의 메모\n다음 주까지 시안 2개, 금요일 공유", "Meeting notes\ntwo drafts by next week, share on Friday", "Notities overleg\ntwee ontwerpen voor volgende week, vrijdag delen"),
                      t("읽고 싶은 책\n작은 것들의 신 · 아무튼 산책", "Books to read\nThe God of Small Things · Wanderlust", "Boeken om te lezen\nDe god van kleine dingen · Wandelen")] {
@@ -393,12 +392,6 @@ enum DesignSnapshots {
             model.updateMemo(id, text: text)
             model.closeMemo()
         }
-        try render(PaperView(model: model), size: NSSize(width: 420, height: 560),
-                   to: output.appendingPathComponent("memo-list.png"))
-        model.openMemoID = model.memos.first?.id
-        try render(PaperView(model: model), size: NSSize(width: 420, height: 560),
-                   to: output.appendingPathComponent("memo-editor.png"))
-        model.closeMemo()
         model.page = .todos
         let repeating = model.items[3]
         try render(TaskReminderEditorView(item: repeating, model: model, onSave: { _ in }, onRemove: {}, onCancel: {}, startOnRepeat: true),
@@ -485,6 +478,69 @@ enum DesignSnapshots {
             try desk(pane, "desk-\(pane.rawValue)")
             try desk(pane, "desk-\(pane.rawValue)-full", size: full)
         }
+        // 1.43.1: 메모 서랍 has its own pane (it was a group at the bottom of 꾸미기).
+        try desk(.drawer, "desk-drawer-pane")
+        try desk(.drawer, "desk-drawer-pane-full", size: full)
+        // 1.42 종이냥 for Claude: AI 연결 off, then on with today's and yesterday's work (one taken back); the
+        // toast, the away notice, the stamp on tasks (wide and narrow), and the slip when Claude Desktop isn't there.
+        let ai = AIConnection(model: model, settingsFolder: folder, dataFolder: folder, live: false)
+        model.ai = ai
+        let aiNow = Date()
+        let open = model.todayItems.filter { !$0.isCompleted && $0.seriesID == nil }
+        let added = Array(open.dropFirst().prefix(2))
+        func aiChange(_ item: TodoItem, before: TodoItem? = nil) -> AIConnect.Change {
+            AIConnect.Change(file: "todos.json", id: item.id.uuidString, before: before.flatMap(AIConnect.json), after: AIConnect.json(item))
+        }
+        var moved = open[0]
+        moved.timeStart = "15:00"; moved.timeEnd = "16:00"
+        var earlier = moved
+        earlier.timeStart = "14:00"; earlier.timeEnd = "15:00"
+        let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Archive.logicalDayStart(aiNow))!
+        let addEntry = AIConnect.Entry(id: "ai1", at: aiNow.addingTimeInterval(-60), kind: .add, target: .todos, title: added[0].title,
+                                       changes: added.map { aiChange($0) })
+        let entries = [
+            AIConnect.Entry(id: "ai4", at: Calendar.current.date(bySettingHour: 20, minute: 5, second: 0, of: yesterday)!, kind: .add, target: .memos, count: 1),
+            AIConnect.Entry(id: "u4", at: Calendar.current.date(bySettingHour: 20, minute: 7, second: 0, of: yesterday)!, client: "app", tool: "undo",
+                            kind: .undo, target: .memos, count: 1, undoes: "ai4"),
+            AIConnect.Entry(id: "ai3", at: Calendar.current.date(bySettingHour: 21, minute: 10, second: 0, of: yesterday)!, kind: .add, target: .events, count: 1,
+                            title: t("치과", "Dentist", "Tandarts")),
+            AIConnect.Entry(id: "ai2", at: aiNow.addingTimeInterval(-3600), kind: .change, target: .todos, title: moved.title,
+                            changes: [aiChange(moved, before: earlier)]),
+            addEntry,
+        ]
+        ai.show(entries, now: aiNow)
+        try desk(.ai, "desk-ai-off")
+        ai.setEnabled(true)
+        try desk(.ai, "desk-ai")
+        try desk(.ai, "desk-ai-full", size: full)
+        try desk(.ai, "desk-narrow-ai", size: DeskMetrics.minimum)
+        // The shortest window with the full sidebar: twelve panes (메모 서랍 since 1.43.1) and 사용 안내 still all reachable.
+        try desk(.ai, "desk-short-ai", size: NSSize(width: DeskMetrics.compactBelow, height: DeskMetrics.minimum.height))
+        ai.show([], now: aiNow)
+        try desk(.ai, "desk-ai-empty")
+        ai.show(entries, now: aiNow)
+        model.page = .todos
+        var aiToast = PaperToast(symbol: "text.bubble", text: AIText.toast(addEntry, .current))
+        aiToast.action = AIText.undoAction(.current)
+        aiToast.perform = {}
+        model.toast = aiToast
+        try render(PaperView(model: model), size: NSSize(width: 420, height: 640), to: output.appendingPathComponent("note-ai-toast.png"))
+        try render(PaperView(model: model), size: NSSize(width: 350, height: 560), to: output.appendingPathComponent("note-ai-toast-narrow.png"))
+        var awayToast = PaperToast(symbol: "text.bubble", text: AIText.away(3, .current))
+        awayToast.action = AIText.showAction(.current)
+        awayToast.perform = {}
+        model.toast = awayToast
+        try render(PaperView(model: model), size: NSSize(width: 420, height: 640), to: output.appendingPathComponent("note-ai-away.png"))
+        try render(PaperView(model: model), size: NSSize(width: 350, height: 560), to: output.appendingPathComponent("note-ai-away-narrow.png"))
+        model.toast = PaperToast(symbol: "exclamationmark.circle", text: AIText.undoResult(.init(undone: 0, left: 1), .current))
+        try render(PaperView(model: model), size: NSSize(width: 350, height: 560), to: output.appendingPathComponent("note-ai-undo-failed.png"))
+        model.toast = nil
+        try render(PaperView(model: model), size: NSSize(width: 420, height: 640), to: output.appendingPathComponent("note-ai-marked.png"))
+        try render(PaperView(model: model), size: NSSize(width: 350, height: 560), to: output.appendingPathComponent("note-ai-marked-narrow.png"))
+        try slip(AIConnection.missingDesktop, to: output.appendingPathComponent("ai-no-desktop.png"))
+        ai.setEnabled(false)
+        ai.show([], now: aiNow)
+        model.ai = nil
         // 시계: the alarms (three, one open for editing, none), and the timer groups under them.
         let morning = Date(timeIntervalSince1970: 1_791_000_000)
         let sampleAlarms = [
@@ -734,6 +790,8 @@ enum DesignSnapshots {
         try desk(.help, "desk-help", help: ("window", ""))
         try desk(.help, "desk-help-tasks", help: ("tasks", ""))
         try desk(.help, "desk-help-calendar", help: ("calendar", ""))
+        try desk(.help, "desk-help-ai", help: ("ai", ""))
+        try desk(.help, "desk-help-ai-full", size: full, help: ("ai", ""))
         try desk(.help, "desk-narrow-help", size: DeskMetrics.minimum, help: ("calendar", ""))
         try desk(.help, "desk-wide-help", size: NSSize(width: 1600, height: 1000), help: ("calendar", ""))
         try desk(.help, "desk-help-search", help: ("start", t("접기", "fold", "inklappen")))
@@ -752,7 +810,7 @@ enum DesignSnapshots {
         try NotebookFile(url: emptyStorage).save(Notebook())
         let emptyModel = AppModel(storageURL: emptyStorage, isolated: true, preferences: preferences)
         emptyModel.paperColor = night ? .night : .day
-        for page in [AppModel.Page.todos, .ahead, .memos] {
+        for page in [AppModel.Page.todos, .ahead] {
             emptyModel.page = page
             for width: CGFloat in [350, 420, 720] {
                 try render(PaperView(model: emptyModel), size: NSSize(width: width, height: 560),
@@ -831,6 +889,8 @@ enum DesignSnapshots {
         }
         // 1.38: 편의 기능.
         try await renderConveniences(folder: folder, preferences: preferences, history: samples, output: output)
+        // 1.43: 메모 서랍.
+        try renderMemoDrawer(folder: folder, output: output)
         // 1.35: the menu bar item (its words in each state) and the 오늘 창 below it.
         try renderTodayWindow(model: model, alarms: sampleAlarms, events: snapshotEvents, output: output)
         print("Rendered note (3 fonts + minimum size), editor, settings and 3 reminders to \(output.path)")
@@ -895,8 +955,6 @@ enum DesignSnapshots {
         }
         model.page = .ahead
         try render(PaperView(model: model), size: NSSize(width: 350, height: 400), to: output.appendingPathComponent("conv-header-compact-ahead.png"))
-        model.page = .memos
-        try render(PaperView(model: model), size: NSSize(width: 350, height: 400), to: output.appendingPathComponent("conv-header-compact-memos.png"))
         model.page = .todos
         // Toasts with 되돌리기.
         for (name, text) in [("deleted", L("지웠어요")), ("done", L("\(3)개 끝냈어요")), ("tomorrow", DateMove.movedText(DateMove.tomorrow(now: now), now: now, language: .current)),
@@ -976,9 +1034,11 @@ enum DesignSnapshots {
         model.calendar.showForSnapshot([])
         model.alarms.showForSnapshot([])
         let timer = FocusTimerState()
-        func window(_ name: String, toast: PaperToast? = nil, hover: Bool = false) throws {
-            try slip(TodayWindowView(model: model, timer: timer, alarms: model.alarms, calendar: model.calendar, now: now,
-                                     previewToast: toast, previewTimerHover: hover), to: output.appendingPathComponent("today-window-\(name).png"))
+        func window(_ name: String, toast: PaperToast? = nil, hover: Bool = false, inPanel: Bool = false) throws {
+            let view = TodayWindowView(model: model, timer: timer, alarms: model.alarms, calendar: model.calendar, now: now,
+                                       previewToast: toast, previewTimerHover: hover)
+            let url = output.appendingPathComponent("today-window-\(name).png")
+            if inPanel { try panelSlip(view, to: url) } else { try slip(view, to: url) }
         }
         // The menu bar's words, each state on its own strip.
         func strip(_ state: MenuBarState, dark: Bool) -> some View {
@@ -992,6 +1052,9 @@ enum DesignSnapshots {
         }
         var states: [(String, MenuBarState)] = [("nothing", MenuBarState.current(model: model, timer: nil, now: now))]
         try window("nothing")
+        // 1.42.1: through the real window too — the window is the slip's size (it used to start 520 × 420 with the
+        // slip centred in it: a short slip sat low under the menu bar, a tall one lost its top).
+        try window("panel-nothing", inPanel: true)
         model.add(t("장보기", "Groceries", "Boodschappen"), literal: true)
         model.add(t("보고서 마무리", "Finish the report", "Rapport afmaken"), literal: true)
         model.setTaskReminder(model.items.last!.id, at: now.addingTimeInterval(95 * 60))
@@ -1032,10 +1095,20 @@ enum DesignSnapshots {
         timer.timer = nil
         let focusCommit = IntentCommit(text: "", candidates: model.intentCandidates(t("보고서 25분 집중", "focus 25 report", "focus 25 rapport")), index: 0, key: nil, made: .nothing, page: .todos)
         try window("toast-focus", toast: model.makeToast(for: focusCommit, onChange: { _ in }))
+        // 1.42.1: everything at once, as it was found cut off at the top: an event in 1시간 46분 (its line wraps), a
+        // timer running, two under 다음 and more than fit — drawn as usual and through the real window.
+        let later = now.addingTimeInterval(106 * 60)
+        model.calendar.showForSnapshot([LocalEvent(id: "later", title: t("팀 회의", "Team sync", "Teamoverleg"), date: CalendarDraft.day(later),
+                                                   start: CalendarDraft.minutes(later), end: CalendarDraft.minutes(later.addingTimeInterval(45 * 60)))])
+        timer.timer = FocusTimer.countdown(minutes: 25, now: now.addingTimeInterval(-(4 * 60 + 10)))
+        try window("full")
+        try window("panel-full", inPanel: true)
+        timer.timer = nil
         // A long title is cut at 12 characters.
         model.calendar.showForSnapshot([LocalEvent(id: "long", title: t("치과 정기 검진과 스케일링 예약", "Dental checkup and cleaning", "Tandartscontrole en gebitsreiniging"),
                                                    date: CalendarDraft.day(now.addingTimeInterval(25 * 60)), start: CalendarDraft.minutes(now.addingTimeInterval(25 * 60)),
                                                    end: CalendarDraft.minutes(now.addingTimeInterval(85 * 60)))])
+        try window("long-event")
         states.append(("long", MenuBarState.current(model: model, timer: nil, now: now)))
         model.menuBarText = .hide
         states.append(("hidden", MenuBarState.current(model: model, timer: nil, now: now)))
@@ -1071,6 +1144,35 @@ enum DesignSnapshots {
     /// A slip as it floats on screen: with its margins (tape, shadow) on the desk colour.
     static func slip<V: View>(_ view: V, to url: URL) throws {
         try render(view.padding(SlipMetrics.margin).background(PaperTheme.desk), size: nil, to: url)
+    }
+
+    /// A slip through its real window (SlipPanel, as the app shows it): what the window holds, on the desk
+    /// colour — the window must be the slip's size, with its top edge and its shadow whole (1.42.1).
+    static func panelSlip<V: View>(_ view: V, to url: URL) throws {
+        guard wanted(url) else { return }
+        let panel = SlipPanel(nonactivating: true)
+        panel.appearance = NSAppearance(named: night ? .darkAqua : .aqua)
+        panel.show(view)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+        guard let hosting = panel.contentView else { throw CocoaError(.fileWriteUnknown) }
+        // The desk under the window's clear corners, behind the slip (the window itself is clear).
+        let desk = DeskBackdrop(frame: NSRect(origin: .zero, size: panel.frame.size))
+        panel.contentView = desk
+        hosting.frame = desk.bounds
+        desk.addSubview(hosting)
+        desk.layoutSubtreeIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.15))
+        guard let bitmap = desk.bitmapImageRepForCachingDisplay(in: desk.bounds) else { throw CocoaError(.fileWriteUnknown) }
+        desk.cacheDisplay(in: desk.bounds, to: bitmap)
+        try bitmap.representation(using: .png, properties: [:])!.write(to: url)
+        panel.close()
+    }
+
+    private final class DeskBackdrop: NSView {
+        override func draw(_ dirtyRect: NSRect) {
+            NSColor(PaperTheme.desk).setFill()
+            dirtyRect.fill()
+        }
     }
 
     /// The top of a view (`height` points of a `size` view), drawn at twice the size for checking edges

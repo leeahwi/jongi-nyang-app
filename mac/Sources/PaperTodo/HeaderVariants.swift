@@ -11,7 +11,6 @@ struct PageTab {
         [
             PageTab(page: .todos, short: L("오늘"), symbol: "sun.max"),
             PageTab(page: .ahead, short: L("앞으로"), symbol: "calendar"),
-            PageTab(page: .memos, short: L("메모"), symbol: "note.text"),
         ]
     }
 
@@ -19,7 +18,6 @@ struct PageTab {
         switch page {
         case .todos: L("오늘 할 일")
         case .ahead: L("앞으로")
-        case .memos: L("메모")
         }
     }
 }
@@ -211,7 +209,6 @@ extension PaperView {
         switch page {
         case .todos: model.remainingCount > 0 ? model.remainingCount : nil
         case .ahead: model.aheadCount.nonZero
-        case .memos: model.memos.count.nonZero
         }
     }
 }
@@ -314,7 +311,6 @@ struct IndexTab: View {
         switch page {
         case .todos: PaperTheme.tabToday
         case .ahead: PaperTheme.tabAhead
-        case .memos: PaperTheme.tabMemo
         }
     }
 

@@ -35,6 +35,7 @@
     <nav class="nav" aria-label="주요 메뉴">
       <a href="#tour">둘러보기</a>
       <a href="#features">기능</a>
+      <a href="#drawer">메모 서랍</a>
       <a href="#built">만든 방식</a>
       <a href="#faq">질문</a>
       <a href="https://github.com/leeahwi/jongi-nyang-app">GitHub</a>
@@ -54,13 +55,13 @@
 <main id="main">
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap">
-      <a class="badge" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0"><span class="dot" aria-hidden="true"></span>새 버전 · 일정표 블록을 끌어 시간을 바꿔요<span class="go" aria-hidden="true">→</span></a>
+      <a class="badge" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.44.0"><span class="dot" aria-hidden="true"></span>새 버전 · 메모가 화면 끝 서랍으로 옮겨 갔어요<span class="go" aria-hidden="true">→</span></a>
       <h1 id="hero-title">오늘 할 일,<br><span class="hand">종이 한 장</span>에.</h1>
       <p class="lede">할 일을 적고 체크하는 노트예요. 맨 위에는 지금 하는 일과 남은 시간이 보이고, 알림은 종이 고양이가 들고 와요. 계정 없이 내 컴퓨터에 파일로 저장해요.</p>
       <div class="cta">
-        <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0">
+        <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.44.0">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
-          Mac용 내려받기 <small>1.41.0</small>
+          Mac용 내려받기 <small>1.44.0</small>
         </a>
         <div class="line" role="img" aria-label="입력 줄 예: ‘내일 3시 회의’라고 적으면 ‘일정 · 내일 15:00’으로 알아들어요" data-line='[["내일 3시 회의","일정 · 내일 15:00"],["금요일까지 보고서","할 일 · 마감 금요일"],["타이머 40","40분 타이머"],["알람 7시 평일","알람 · 평일 오전 7:00","clay"]]'>
           <span class="pen" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg></span>
@@ -68,7 +69,7 @@
           <span class="chip" aria-hidden="true">일정 · 내일 15:00</span>
         </div>
       </div>
-      <p class="alt">Windows 10/11에서도 써요. <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.26.0">Windows용 내려받기 1.26.0</a></p>
+      <p class="alt">Windows 10/11에서도 써요. <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.29.0">Windows용 내려받기 1.29.0</a></p>
     </div>
   </section>
 
@@ -95,7 +96,7 @@
             <div>
               <p class="kicker">01 · 노트</p>
               <h3>지금 하는 일이 먼저 보이는 노트</h3>
-              <p>오늘, 앞으로, 메모 탭이 달린 종이 한 장이에요. 맨 위 하루 띠에 지금 하는 일이 손글씨로 크게 적히고, 남은 시간은 옆 동그라미에 보여요. 그 아래로 다음 일정과 오늘 할 일이 이어져요.</p>
+              <p>오늘, 앞으로 탭이 달린 종이 한 장이에요. 맨 위 하루 띠에 지금 하는 일이 손글씨로 크게 적히고, 남은 시간은 옆 동그라미에 보여요. 그 아래로 다음 일정과 오늘 할 일이 이어져요.</p>
             </div>
             <figure class="shot" style="margin:0"><img src="assets/note-ko.webp" width="640" height="976" alt="Mac의 종이냥 노트: 하루 띠에 지금 하는 일 ‘팀 회의’와 30분 남음, 그 아래 다음 일과 오늘 할 일 목록"></figure>
           </article>
@@ -270,6 +271,28 @@
     </div>
   </section>
 
+  <section id="drawer" aria-labelledby="drawer-title">
+    <div class="wrap">
+      <div class="head reveal">
+        <p class="eyebrow">메모 서랍</p>
+        <h2 id="drawer-title">메모는 화면 끝 서랍에</h2>
+        <p>1.43부터 노트의 메모 탭이 화면 끝의 서랍으로 옮겨 갔어요. 어떤 앱을 쓰다가도 꺼내서 보고, 바로 적고, 그 자리에서 고쳐요. 그동안 쓴 메모는 서랍의 ‘메모’ 폴더에 그대로 있어요.</p>
+      </div>
+      <div class="stage reveal">
+        <div class="film-frame">
+          <video class="film-video" data-film data-film-lazy src="assets/drawer-ko.mp4" poster="assets/drawer-ko.jpg" width="1280" height="720" muted loop playsinline preload="none" aria-label="15초 영상: 메모 서랍이 화면 오른쪽 끝에서 나오고, 메모가 고정 · 오늘 · 어제 · 지난주로 묶여 보여요. 이어서 우클릭 메뉴의 폴더로 옮기기, 메모 한 장만 밤 종이로 바꾸기, 불투명 · 반투명 · 바탕 없음을 차례로 보여 줘요. 소리는 없어요."></video>
+          <button class="film-toggle" type="button" data-film-toggle aria-label="영상 멈추기" data-label-pause="영상 멈추기" data-label-play="영상 재생"><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><rect x="4" y="3" width="3" height="10" rx="1"/><rect x="9" y="3" width="3" height="10" rx="1"/></svg><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M5 3.2v9.6a.6.6 0 0 0 .9.5l7.6-4.8a.6.6 0 0 0 0-1L5.9 2.7a.6.6 0 0 0-.9.5z"/></svg></button>
+        </div>
+      </div>
+      <ul class="points">
+        <li class="reveal"><strong>어디서든 꺼내요</strong><span><kbd>⇧⌘D</kbd>(Windows는 <kbd>Ctrl+Shift+D</kbd>)를 누르거나 화면 끝의 고양이 발 손잡이를 눌러요. 다른 앱을 눌러도 서랍은 닫히지 않아요.</span></li>
+        <li class="reveal"><strong>폴더는 옆 책갈피</strong><span>책갈피 하나가 폴더 하나예요. 메모는 고정, 오늘, 어제, 지난주, 달별로 묶여 보이고, 링크나 전화번호가 있으면 카드에 작게 표시돼요.</span></li>
+        <li class="reveal"><strong>우클릭으로 정리해요</strong><span>메모, 책갈피, 서랍 빈 곳마다 메뉴가 있어요. 폴더로 옮기기, 복제, 정렬을 여기서 하고, 메모 한 장만 다른 종이로 바꿀 수도 있어요.</span></li>
+        <li class="reveal"><strong>종이와 바탕</strong><span>종이는 낮, 밤, 크라프트지, 모눈 노트 네 가지예요. 바탕은 불투명이 기본이고 반투명, 강하게, 바탕 없음도 골라요. Windows의 반투명은 아직 실제 PC에서 보지 못했어요.</span></li>
+      </ul>
+    </div>
+  </section>
+
   <section id="design" aria-labelledby="design-title">
     <div class="wrap">
       <div class="head reveal">
@@ -341,21 +364,21 @@
       <div class="downloads">
         <div class="dl reveal">
           <h3>Mac</h3>
-          <p class="meta">1.41.0 · macOS 14 이상 · Apple Silicon · DMG</p>
+          <p class="meta">1.44.0 · macOS 14 이상 · Apple Silicon · DMG</p>
           <ol>
             <li>DMG를 열고 <strong>종이냥</strong>을 응용 프로그램 폴더로 끌어 놓아요.</li>
             <li>응용 프로그램 폴더에서 종이냥을 <strong>우클릭 → 열기</strong>. 막히면 시스템 설정 → 개인정보 보호 및 보안 → <strong>그래도 열기</strong>.</li>
           </ol>
-          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0">Mac용 내려받기</a>
+          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.44.0">Mac용 내려받기</a>
         </div>
         <div class="dl reveal">
           <h3>Windows</h3>
-          <p class="meta">1.26.0 · Windows 10/11 x64 · 설치 파일 또는 무설치 zip</p>
+          <p class="meta">1.29.0 · Windows 10/11 x64 · 설치 파일 또는 무설치 zip</p>
           <ol>
-            <li><code>JongiNyang-1.26.0-x64.exe</code>를 실행해요.</li>
+            <li><code>JongiNyang-1.29.0-x64.exe</code>를 실행해요.</li>
             <li>SmartScreen이 뜨면 <strong>추가 정보 → 실행</strong>.</li>
           </ol>
-          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.26.0">Windows용 내려받기</a>
+          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.29.0">Windows용 내려받기</a>
         </div>
       </div>
     </div>
@@ -374,6 +397,7 @@
         <ul>
           <li><a href="#tour">둘러보기</a></li>
           <li><a href="#features">기능</a></li>
+          <li><a href="#drawer">메모 서랍</a></li>
           <li><a href="#download">내려받기</a></li>
           <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/CHANGELOG.md">변경 기록</a></li>
         </ul>
@@ -398,7 +422,7 @@
     </div>
     <div class="legal">
       <span>© 2026 leeAhwi · 소스 코드는 <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/LICENSE">Apache License 2.0</a></span>
-      <span>Mac 1.41.0 · Windows 1.26.0</span>
+      <span>Mac 1.44.0 · Windows 1.29.0</span>
     </div>
   </div>
 </footer>

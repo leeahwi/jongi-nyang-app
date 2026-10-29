@@ -20,6 +20,7 @@ swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/Duration.swift \
     Sources/PaperCore/Alarm.swift \
     Sources/PaperCore/Memo.swift \
+    Sources/PaperCore/MemoFolders.swift \
     Sources/PaperCore/TextMerge.swift \
     Sources/PaperCore/CalendarDay.swift \
     Sources/PaperCore/CalendarDraft.swift \

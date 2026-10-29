@@ -85,8 +85,7 @@
 - Windows는 실제 Windows PC, 고배율, 터치·펜 입력에서 확인하지 못했다.
 - 03:30 이후에 시작하는 시작 시간만 있는 할 일의 위 끝을 늘리면 04:00 끝이 저장되지 않는다(할 일의 끝은 04:00을 저장하지 않음).
 
-## 관련 파일
+## 관련 커밋
 
-- Mac: [`Sources/PaperCore/DayStrip.swift`](../Sources/PaperCore/DayStrip.swift) · [`Sources/PaperTodo/TimetableDrag.swift`](../Sources/PaperTodo/TimetableDrag.swift) · [`scripts/drag-check.sh`](../scripts/drag-check.sh)
-- Windows: [`src/core/dayStrip.ts`](../../windows/src/core/dayStrip.ts) · [`src/renderer/dayStrip.ts`](../../windows/src/renderer/dayStrip.ts) · [`tools/drag-probe.mjs`](../../windows/tools/drag-probe.mjs)
-- 두 앱을 함께 본 기록: [저장소의 `docs/postmortem-timetable-drag.md`](../../docs/postmortem-timetable-drag.md)
+- Mac: `e63b7e5` 공유 계산과 R1–R8 · `e1ec51f` 포인터 따라가기와 위아래 늘리기 · `9620e49` drag-check · `8bc40db` 1.41.0 · 병합 `2c72a6a`
+- Windows: `37d50da` 공유 계산 · `5cf057b` 포인터 따라가기와 늘리기 · `94fced1` 놓은 지점에 놓기 · `27818d8` 1.26.0 · 병합 `517f3e4`

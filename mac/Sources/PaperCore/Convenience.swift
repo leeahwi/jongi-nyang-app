@@ -320,8 +320,11 @@ public enum Search {
     /// Every group with something, in order: 오늘 (the sheet's order, open first), 앞으로 (dated by
     /// date, then 언젠가 in the list's order), 메모 (newest first; the first matching line), 완료 기록
     /// (newest first), 일정 (coming ones soonest first, then past ones latest first). At most `limit` each.
+    /// `memoFolders` (1.43, 메모 서랍): memo id → its folder's name (memos in 메모 left out). A memo whose words don't match
+    /// but whose folder's name does comes too (its title, nothing marked), and every memo hit names its folder.
     public static func find(_ query: String, items: [TodoItem], memos: [Memo], history: [ArchiveEntry], events: [EventEntry],
-                            now: Date, calendar: Calendar = .paper, language: AppLanguage = .ko, limit: Int = Search.limit) -> [(group: Group, hits: [Hit])] {
+                            now: Date, calendar: Calendar = .paper, language: AppLanguage = .ko, limit: Int = Search.limit,
+                            memoFolders: [String: String] = [:]) -> [(group: Group, hits: [Hit])] {
         guard !cleanQuery(query).isEmpty else { return [] }
         let todayKey = Archive.dayKey(now, calendar: calendar)
         let thisYear = calendar.component(.year, from: Archive.logicalDayStart(now, calendar: calendar))
@@ -363,12 +366,17 @@ public enum Search {
         add(.ahead, (dated + someday).compactMap { taskHit($0.element, .ahead) })
 
         add(.memos, memos.sorted { $0.updatedAt > $1.updatedAt }.compactMap { memo in
+            let folder = memoFolders[memo.id]
+            let detail = folder.map { $0 + " · " + dayText(memo.updatedAt) } ?? dayText(memo.updatedAt)
             // The title line if it matches, else the first line that does.
             for line in memo.text.split(whereSeparator: \.isNewline) {
                 let text = line.trimmingCharacters(in: .whitespaces)
                 if let range = match(query, in: text) {
-                    return Hit(group: .memos, id: memo.id, text: text, range: range, detail: dayText(memo.updatedAt), done: false, day: nil)
+                    return Hit(group: .memos, id: memo.id, text: text, range: range, detail: detail, done: false, day: nil)
                 }
+            }
+            if let folder, match(query, in: folder) != nil {
+                return Hit(group: .memos, id: memo.id, text: memo.title(language), range: 0..<0, detail: detail, done: false, day: nil)
             }
             return nil
         })

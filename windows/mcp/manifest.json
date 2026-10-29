@@ -1,0 +1,90 @@
+{
+  "manifest_version": "0.3",
+  "name": "jongi-nyang",
+  "display_name": "종이냥 for Claude",
+  "version": "1.27.0",
+  "description": "Claude가 종이냥의 할 일 · 일정 · 메모를 보고, 넣고, 확인받은 뒤 고쳐요.",
+  "long_description": "**먼저 종이냥에서 켜 주세요**\n\n종이냥 › 책상 › AI 연결 › ‘Claude가 종이냥을 보고 쓸 수 있게 하기’\n\n**Claude가 할 수 있는 것**\n\n- **보기** — 오늘 할 일과 일정, 메모, 집중 기록, 끝낸 일\n- **넣기** — 할 일 · 일정 · 메모\n- **고치기** — 바뀌기 전과 후를 먼저 보여 주고, ‘응’이라고 하면 그때 고쳐요\n- **지우기는 하지 않아요**\n\n\n**종이냥에서 보이는 것**\n\n- Claude가 넣거나 고치면 알림이 뜨고, 바로 되돌릴 수 있어요.\n- 책상 › AI 연결 › 최근 AI 작업에서 Claude가 한 일을 다시 볼 수 있어요.\n\n**가볍고 조용하게**\n\n- 따로 켜 두는 서버가 없어요. Claude가 필요할 때 켜고, Claude를 끄면 같이 꺼져요.\n- 이 확장은 이 컴퓨터의 종이냥 저장 폴더만 읽고 써요. 다른 곳으로 파일을 보내지 않아요.\n- 종이냥에서 AI 연결을 끄면 아무것도 읽지 못해요.",
+  "author": {
+    "name": "leeAhwi"
+  },
+  "icon": "icon.png",
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/index.js"
+      ]
+    }
+  },
+  "tools": [
+    {
+      "name": "get_today",
+      "description": "Today's tasks, events, alarms and focus time"
+    },
+    {
+      "name": "list_todos",
+      "description": "Open tasks: today, ahead and someday"
+    },
+    {
+      "name": "list_events",
+      "description": "Events over up to 31 days"
+    },
+    {
+      "name": "list_memos",
+      "description": "Memos, newest first"
+    },
+    {
+      "name": "get_focus",
+      "description": "Focus time over a period"
+    },
+    {
+      "name": "search_history",
+      "description": "Finished tasks"
+    },
+    {
+      "name": "add_todos",
+      "description": "Add up to 20 tasks"
+    },
+    {
+      "name": "add_event",
+      "description": "Add a one-off event"
+    },
+    {
+      "name": "add_memo",
+      "description": "Add a memo"
+    },
+    {
+      "name": "preview_changes",
+      "description": "Show before → after for changes, nothing written"
+    },
+    {
+      "name": "apply_changes",
+      "description": "Apply a preview after the user says yes"
+    }
+  ],
+  "keywords": [
+    "todo",
+    "tasks",
+    "calendar",
+    "memo",
+    "focus",
+    "종이냥"
+  ],
+  "license": "Proprietary",
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32"
+    ],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  },
+  "localization": {
+    "resources": "mcpb-resources/${locale}.json",
+    "default_locale": "ko-KR"
+  }
+}

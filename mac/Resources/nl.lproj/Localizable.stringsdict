@@ -34,22 +34,6 @@
 			<string>Langste: %lld dagen</string>
 		</dict>
 	</dict>
-	<key>메모 %lld개</key>
-	<dict>
-		<key>NSStringLocalizedFormatKey</key>
-		<string>%#@count@</string>
-		<key>count</key>
-		<dict>
-			<key>NSStringFormatSpecTypeKey</key>
-			<string>NSStringPluralRuleType</string>
-			<key>NSStringFormatValueTypeKey</key>
-			<string>lld</string>
-			<key>one</key>
-			<string>%lld notitie</string>
-			<key>other</key>
-			<string>%lld notities</string>
-		</dict>
-	</dict>
 	<key>오늘 할 일 %lld개 모두 마침</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>
@@ -96,6 +80,22 @@
 			<string>%lld taak die is afgevinkt voordat datums werden bewaard, staat niet in de kalender.</string>
 			<key>other</key>
 			<string>%lld taken die zijn afgevinkt voordat datums werden bewaard, staan niet in de kalender.</string>
+		</dict>
+	</dict>
+	<key>오늘 고친 메모 %lld장</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld notitie vandaag gewijzigd</string>
+			<key>other</key>
+			<string>%lld notities vandaag gewijzigd</string>
 		</dict>
 	</dict>
 </dict>

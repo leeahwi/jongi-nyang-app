@@ -35,7 +35,7 @@
 - Schrijf alles op de ene **invoerregel** onderaan. Klik op het vakje en het kleurt salie terwijl er een potloodstreep door de taak gaat. Een dag eindigt om **4 uur ’s nachts**.
 - Onder de titel de **dagbalk**: groot in handschrift wat er nu is, de resterende tijd in de ring ernaast (‘40 min over’), daaronder de volgende twee dingen (‘14:00 Rapport afmaken · over 40 min’) en bovenaan een dunne balk van de hele dag. ‘Hele dag ›’ klapt hem op zijn plek open tot het **dagschema**. Taken met een herinnering die vandaag nog komt staan bovenaan onder **Volgende**.
 - Pen, Stift of Strak, in vier tekstgroottes. Sleep regels aan hun handvat; haal verwijderde terug met `⌘Z`.
-- Tabbladen bovenaan: **Vandaag · Vooruit · Notities**. **Vooruit** toont vanaf morgen elke dag van deze en volgende week, met de afspraken en de taken die die dag af moeten; latere deadlines staan per maand en taken zonder datum bij **Ooit**. Sleep een taak naar een andere dag om de deadline te verzetten.
+- Tabbladen bovenaan: **Vandaag · Vooruit**. Notities staan in de [notitielade](#-notitielade-143--144) aan de rand van het scherm. **Vooruit** toont vanaf morgen elke dag van deze en volgende week, met de afspraken en de taken die die dag af moeten; latere deadlines staan per maand en taken zonder datum bij **Ooit**. Sleep een taak naar een andere dag om de deadline te verzetten.
 - In de menubalk een klein **kattengezichtje**: ‘12:30’ terwijl een timer loopt, ‘Tandarts 40 min’ als er binnen het uur iets begint. Klik erop voor het **Vandaag-venster** (volgende afspraak · timer · volgende wekker, een paar taken van vandaag, de invoerregel).
 - Dubbelklik bovenaan of druk op `⌘M` en het notitieblok klapt in tot een **klein briefje** waar Jongi-nyang overheen gluurt.
 
@@ -44,7 +44,7 @@
 - Dezelfde regel begrijpt ook afspraken, timers, wekkers en notities: `morgen om 3 uur overleg` → een afspraak, `timer 40` · `focus 25` → een timer, `wekker 7 uur doordeweeks` → een wekker, meerdere regels → een notitie. **Chips** boven de regel laten zien hoe hij het leest; met **Tab** kies je een andere betekenis, en `/taak /afspraak /notitie /timer /wekker` kiezen de soort. `Shift+Return` maakt er een taak van, precies zoals je hem schreef.
 - Na het toevoegen biedt de melding onderaan **Maak er een … van** (bijv. afspraak → taak): dat wisselt spoorloos, en woorden die je vaak omzet leest hij de volgende keer meteen zo. Met `⌘Z` draai je het terug.
 - **Overal snel toevoegen `⌃⌥N`** (Windows `Ctrl+Alt+N`): dezelfde invoerregel verschijnt op een briefje boven elke app.
-- **Snelle notitie `⌃⌥M`** (Windows `Ctrl+Alt+M`): een briefje voor een paar regels. `⌘Return` zet het als nieuwe notitie bovenaan in Notities; Esc sluit het en je tekst blijft.
+- **Snelle notitie `⌃⌥M`** (Windows `Ctrl+Alt+M`): een briefje voor een paar regels. `⌘Return` zet het als nieuwe notitie bovenaan in de notitielade; Esc sluit het en je tekst blijft.
 
 ### 🔔 Herinneringen · herhalingen · deadlines
 - Per taak: een eenmalige herinnering (over 10 min · morgen 09:00 · een kalender), een **herhaling** (elke dag · werkdagen · dagen van de week · elke maand) of een **deadline** (vandaag · deze week · deze maand · een datum).
@@ -103,6 +103,23 @@
 - Bureau → Weergave → **Taal**: Automatisch · 한국어 · English · Nederlands. Automatisch volgt de taalvolgorde van je Mac (Engels als geen van de drie erin staat); na een wijziging start Jongi-nyang opnieuw.
 - Menu’s, instellingen, help, herinneringen, kattenpraat, datums en tijden: alles in die taal. Engels en Nederlands handschrift gebruikt Caveat (pen) en Kalam (stift); titels die je in het Koreaans schrijft, blijven in Koreaans handschrift.
 
+### 🗄 Notitielade (1.43 – 1.44)
+![De notitielade: groepen op datum en kaarten](../docs/screenshots/mac/en/drawer-list-day.png)
+
+- Notities staan niet meer in een tabblad maar in de **notitielade** aan de rand van het scherm. Trek hem vanuit elke app tevoorschijn met `⇧⌘D`, het kattenpootje aan de rand, de ladeknop op het notitieblok of `⌘3`; lees notities vel voor vel, schrijf er meteen een op het briefje bovenaan, of klap er een open om hem ter plekke aan te passen. Klikken in een andere app sluit hem niet; dezelfde sneltoets, `Esc` of × wel. Notities uit het oude tabblad Notities staan ongewijzigd in de map Notities.
+- Elke **bladwijzer** opzij is een map (een naam en een van acht kleuren; sleep om de volgorde te wijzigen). Zet een notitie op een bladwijzer om hem te verplaatsen; de pootjesbladwijzer **Vastgezet** verzamelt vastgezette notities. De mapnaam ▾ bovenaan of `⌘L` opent de lijst met mappen.
+- Een regel `- [ ] melk` wordt een selectievakje en wordt als `- [x] melk` bewaard als je hem afvinkt. `⌘F` zoekt in alle mappen.
+- **Kaarten op datum** (1.44): notities staan onder kopjes `Vastgezet · Vandaag · Gisteren · Deze week · Vorige week · oktober`; elke kaart heeft een handgeschreven titel, een korte tijd, een voorbeeldregel en, als die er is, een klein label voor een link (opent in de browser), een telefoonnummer (klik om te kopiëren) of een checklist `2/4`. Er zit meer ruimte tussen de kaarten en elk heeft een stukje plakband in de kleur van de map.
+- **Rechtsklikmenu’s** (1.44): een notitie (= `⋯`) — bewerken, groot bekijken, kopiëren, dupliceren, vastzetten, Naar map verplaatsen, Papier van deze notitie, Afgevinkte regels verwijderen, verwijderen. Een bladwijzer — nieuwe notitie hier, naam wijzigen, kleur, Sorteren (Laatst bewerkt · Aanmaakdatum · Titel), dupliceren, map verwijderen. De ⚙ onderaan (= rechtsklik op een lege plek) — nieuwe notitie, stalen voor papier en achtergrond, links/rechts, instellingen. Alles uit de menu’s kan ook met knoppen, toetsen of slepen.
+- **Papier**: dag, nacht, kraft, ruitjes, of Automatisch (volgt het notitieblok). Vanaf 1.44 kan één notitie haar eigen papier hebben. Alle vier de papiersoorten halen de contrastcontrole (tekst 4,5:1, markeringen 3:1).
+- **Achtergrond** (1.44): Dekkend (standaard) · Mat · Sterk · Geen. De notitievellen zelf blijven dekkend, dus het tekstcontrast verandert niet. Met Verminder transparantie aan worden Mat en Sterk dekkend getoond.
+- De instellingen staan onder Bureau → **Notitielade** (sneltoets, hoe hij opengaat, uiterlijk). Mappen en vastgezette notities staan in `memo-folders.json` en `memos.json` blijft hetzelfde, dus een oudere versie op een ander apparaat ziet dezelfde notities.
+
+### 🤖 Jongi-nyang for Claude (1.42)
+- Tijdens een gesprek met Claude Desktop of Claude Code kan Claude taken, afspraken en notities bekijken en toevoegen, en ze na je bevestiging wijzigen. Het staat eerst uit: zet `Claude Jongi-nyang laten lezen en schrijven` aan onder Bureau → **AI-koppeling**.
+- `Verbinden met Claude Desktop` opent de `.mcpb`-extensie in de app en Claude Desktop vraagt of je hem wilt installeren. `Verbinden met Claude Code` (1.43) voegt hem toe aan de terminal en aan het Code-tabblad van Claude Desktop (Node is nodig).
+- Er draait geen server op de achtergrond. Claude start de extensie alleen als een gesprek hem nodig heeft, en wat Claude deed wordt bijgehouden in `ai-log.jsonl` op dit apparaat.
+
 ### ↕ Slepen en oprekken in het dagschema (1.41)
 | Slepen |
 | --- |
@@ -136,7 +153,7 @@
 - **Sinds gisteren · 3 dagen**: een klein teken bij taken zonder datum die op Vandaag blijven staan (een optionele `todaySince` in het takenbestand, hetzelfde op Windows).
 - **Avondopruiming**: ’s avonds (standaard 20:00) ‘Nog 3 taken voor vandaag. Naar morgen schuiven?’ — Naar morgen · Naar Ooit · Zo laten; gemist, dan komt hij als ochtendopruiming. Met **Het ene ding van vandaag** aan vraagt de eerste regel van de dag naar dat ene ding en zet het met een ster bovenaan.
 - **Sluimeren**: 5 · 10 · 30 min · 1 uur · vanavond om 19:00 · morgen om 09:00 · naar morgen; afspraken krijgen ‘5 min van tevoren opnieuw’. Gemiste herinneringen kunnen ook naar **macOS-meldingen** (Klaar · Over 10 min).
-- **Zoeken `⌘F`**: Vandaag · Vooruit · Notities · Geschiedenis · Afspraken tegelijk, zonder op hoofdletters en accenten te letten (en Koreaanse beginmedeklinkers).
+- **Zoeken `⌘F`**: Vandaag · Vooruit · de notitielade · Geschiedenis · Afspraken tegelijk (notities ook op mapnaam), zonder op hoofdletters en accenten te letten (en Koreaanse beginmedeklinkers).
 - De invoerregel: `elke dag water drinken` · `elke maandag 9 uur overleg` → **herhalingen**, `over 30 min was ophalen` → een herinnering over 30 minuten. Klik op een lege plek in het dagschema voor een nieuwe taak of afspraak op die tijd; `F` op een regel start een focus.
 - **`⌃⌥J`** toont of verbergt het notitieblok vanuit elke app; ⋯ → **aan de rand van het scherm zetten**; het menu van het Dock-symbool (Snel toevoegen · Snelle notitie · Bureau · 25 min focussen · Timer van 5 min) met het aantal; een timerring rond het gezichtje in de menubalk; **gekopieerde tekst** in een snelle notitie; **Herstel**-meldingen bij verwijderen · alles klaar · opruimen; focuskaart `Spatie` · `⌘↩` · `⌘=`.
 
@@ -187,13 +204,14 @@ Je kunt het Windows-installatieprogramma ook op macOS bouwen. Het is niet ondert
 | `⌘N` | `Ctrl+N` | Nieuwe taak |
 | `⌃⌥N` | `Ctrl+Alt+N` | Overal snel toevoegen |
 | `⌃⌥M` | `Ctrl+Alt+M` | Overal een snelle notitie |
-| `⌘1`–`⌘3` | `Ctrl+1`–`Ctrl+3` | Vandaag · Vooruit · Notities |
+| `⌘1` · `⌘2` | `Ctrl+1` · `Ctrl+2` | Vandaag · Vooruit |
+| `⇧⌘D` · `⌘3` | `Ctrl+Shift+D` · `Ctrl+3` | Notitielade openen of sluiten |
 | `↑` `↓` · `Spatie` · `Return` · `⌫` | hetzelfde | Regel kiezen · afvinken · bewerken · verwijderen |
 | `⌘↑` `⌘↓` | `Ctrl+↑` `Ctrl+↓` | Regel verplaatsen |
 | `⌘Z` / `⇧⌘Z` | `Ctrl+Z` / `Ctrl+Y` | Herstel / opnieuw |
 | `⌘M` | `Ctrl+M` | Inklappen tot briefje |
 | `⌘Y` | `Ctrl+H` | Bureau — Geschiedenis |
-| `⇧⌘N` | `Ctrl+Shift+N` | Nieuwe notitie |
+| `⇧⌘N` | `Ctrl+Shift+N` | Nieuwe notitie in de notitielade |
 | `⇧⌘P` | — | Kat tonen · verbergen |
 | `⌘D` | `Ctrl+D` | Bureau — Kalender |
 | `⌘1`–`⌘9` (in het bureau) | `Ctrl+1`–`Ctrl+9` (in het bureau) | Onderdeel van het bureau kiezen |
@@ -213,12 +231,14 @@ Je kunt het Windows-installatieprogramma ook op macOS bouwen. Het is niet ondert
 | Standaardmap | `~/Library/Application Support/com.noa.PaperTodo/` | `%APPDATA%\PaperTodo\` |
 | Taken | `todos.json` | `todos.json` |
 | Notities | `memos.json` | `memos.json` |
+| Mappen · vastgezet · sortering · papier per notitie in de notitielade | `memo-folders.json` | `memo-folders.json` |
 | Herhalende taken | `repeats.json` | `repeats.json` |
 | Geschiedenis | `archive/2026-10.jsonl` (een bestand per maand, een taak per regel) | hetzelfde |
 | Instellingen | systeemvoorkeuren (`com.noa.PaperTodo`) | `settings.json` |
 | Afspraken | `events.json` | `events.json` |
 | Wekkers | `alarms.json` (wat al is afgegaan, per apparaat in de instellingen) | `alarms.json` |
 | Focusgeschiedenis | `focus.jsonl` (focussessies en timers van een minuut of langer, één per regel) | `focus.jsonl` |
+| AI-koppeling en wat Claude deed | `ai-link.json` · `ai-log.jsonl` (in de instellingenmap van dit apparaat, ook bij een gedeelde map) | hetzelfde |
 | Automatische back-up vóór importeren | `backups/` (standaardmap, de 10 nieuwste) | `backups\` (instellingenmap, de 10 nieuwste) |
 
 - Bureau → Opslag & back-up → **Opslag** toont de map die in gebruik is; **Map openen** opent hem. **Afgevinkte taken → Geschiedenismap** werkt net zo.

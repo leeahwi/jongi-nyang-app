@@ -13,7 +13,7 @@ const size = { width: 420 + 48, height: 300 };
 
 /**
  * 빠른 메모: Ctrl+Alt+M anywhere (or the tray, the pet, the note's ⋯) opens a small paper card with
- * a few lines to write in. Ctrl+Enter puts the text at the top of 메모 and closes; Esc or clicking
+ * a few lines to write in. Ctrl+Enter puts the text in the 메모 서랍 (its last folder) and closes; Esc or clicking
  * elsewhere closes and keeps the text for next time (prefs `quickMemoDraft`, so it survives a
  * restart). `live` is false in tests and snapshots, so no real shortcut is taken there.
  */
@@ -25,7 +25,8 @@ export class QuickMemo {
   /** 복사한 글 넣기: the clipboard's text when the memo last opened (or the setting was turned on); only kept in memory. */
   private lastSeen?: string;
 
-  constructor(private readonly store: Store, private readonly rendererDirectory: string, private readonly live: boolean) {
+  /** `saved`: a memo was put in (the note says so, with 열기 for the 메모 서랍). */
+  constructor(private readonly store: Store, private readonly rendererDirectory: string, private readonly live: boolean, private readonly saved: (id: string) => void = () => undefined) {
     const fromCard = (event: Electron.IpcMainEvent) => this.window !== undefined && !this.window.isDestroyed() && event.sender === this.window.webContents;
     ipcMain.on("quickMemo:draft", (event, text: unknown) => { if (fromCard(event) && typeof text === "string") this.keepDraft(text); });
     ipcMain.on("quickMemo:close", (event, text: unknown) => {
@@ -36,8 +37,9 @@ export class QuickMemo {
     ipcMain.on("quickMemo:save", (event, text: unknown) => {
       if (!fromCard(event) || typeof text !== "string") return;
       if (text.trim()) {
-        store.addMemoText(text.replace(/\s+$/, ""));
+        const id = store.addMemoText(text.replace(/\s+$/, ""));
         this.keepDraft("");
+        if (id) this.saved(id);
       }
       this.hide();
     });

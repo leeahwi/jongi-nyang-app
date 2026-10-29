@@ -10,7 +10,7 @@
 | ![Vandaag](../docs/screenshots/windows/en/strip.png) |
 
 - **Windows 10/11 (x64)** — deze map (`windows/`). Electron 44 + TypeScript, geen externe UI-bibliotheken.
-- De **macOS-versie** staat in de [map `mac/`](../mac). Hetzelfde ontwerp, dezelfde functies en hetzelfde bestandsformaat, dus met één gedeelde map heb je dezelfde lijst op een Mac.
+- De **macOS-versie** staat in de map [`mac/`](../mac). Hetzelfde ontwerp, dezelfde functies en hetzelfde bestandsformaat, dus met één gedeelde map heb je dezelfde lijst op een Mac.
 - Geen internet, account of server: alles blijft op deze pc (of in een gesynchroniseerde map die je zelf kiest). Ook [afspraken](#afspraken-en-kalender) bewaart Jongi-nyang zelf, en met één [back-upbestand](#back-up--verhuizen) verhuis je alles naar een andere computer.
 - **Koreaans, Engels en Nederlands.** Bureau → Weergave → **Taal**: Automatisch (de taal van het systeem) · 한국어 · English · Nederlands. Na een wijziging start de app opnieuw.
 - **Nachtpapier**: staat Windows in de donkere modus, dan krijgt het papier de kleur van papier in een kamer met het licht uit (Bureau → Weergave → Papier: Automatisch · Dag · Nacht).
@@ -30,6 +30,8 @@
 - [Afspraken en kalender](#afspraken-en-kalender)
 - [Wekkers · Snelle notitie · Timer zelf instellen](#wekkers--snelle-notitie--timer-zelf-instellen)
 - [Back-up & verhuizen](#back-up--verhuizen)
+- [종이냥 for Claude · AI-koppeling](#종이냥-for-claude--ai-koppeling)
+- [Notitielade](#notitielade)
 - [Schermen](#schermen)
 - [Installeren en starten](#installeren-en-starten)
 - [Sneltoetsen](#sneltoetsen)
@@ -102,7 +104,7 @@ Stap twee van het nieuwe ontwerp (1.20). De tabbladen **Deadline** en **Later** 
 
 - **Vooruit**: vanaf morgen elke dag van deze week en volgende week met zijn **afspraken** (kleurstreep · tijd · titel) en de **taken** met die deadline; latere deadlines **per maand** (met het jaar als het niet dit jaar is); dingen zonder datum onderaan bij **Ooit**. Bovenaan ‘Deze week · 5 – 11 okt’ en ‘6 taken · 3 afspraken’. Een week begint op maandag; de dag wisselt om 4 uur ’s nachts.
 - **Slepen**: laat een taak los op een andere dag en dat wordt de deadline, op Ooit om de datum weg te halen, op het tabblad Vandaag om hem vandaag te doen. De dag licht groen op en er verschijnt ‘Verplaatst naar 9 okt · Ongedaan maken’ (`Ctrl+Z` kan ook). Binnen een dag verander je de volgorde.
-- Op Vooruit zet de invoerregel een taak met een datum op die dag en een taak zonder datum bij Ooit. Een venster dat het oude tabblad Deadline of Later toonde, opent op Vooruit. Sneltoetsen: `Ctrl+1` Vandaag · `Ctrl+2` Vooruit · `Ctrl+3` Notities.
+- Op Vooruit zet de invoerregel een taak met een datum op die dag en een taak zonder datum bij Ooit. Een venster dat het oude tabblad Deadline of Later toonde, opent op Vooruit. Sneltoetsen: `Ctrl+1` Vandaag · `Ctrl+2` Vooruit · `Ctrl+3` notitielade (sinds 1.28 in plaats van het tabblad Notities).
 - **Vandaag-venster**: klik op het systeemvakpictogram en het opent naast de taakbalk (waar de taakbalk ook staat) — drie kaartjes voor de volgende afspraak · de timer · de volgende wekker (rood binnen het uur of als de timer loopt), ‘Volgende’ en een paar taken van vandaag (meteen af te vinken), de invoerregel, en Notitieblok openen · Bureau · Kat verbergen. Klik ergens anders of druk op `Esc` om te sluiten. Dubbelklik op het pictogram om meteen het notitieblok te openen; het rechtsklikmenu blijft hetzelfde.
 - Beweeg over het pictogram en je ziet wat er binnen het uur komt (‘Jongi-nyang · Tandarts 40 min’) of, terwijl een timer loopt, de resterende tijd (‘Jongi-nyang · 12:30’).
 
@@ -194,7 +196,7 @@ Jongi-nyang bewaart zijn eigen afspraken (sinds 1.16.0 zonder Google Agenda of G
 - Wekkers staan in `alarms.json` in de opslagmap (hetzelfde formaat als op de Mac; een gedeelde map deelt ze), en **elk apparaat dat aanstaat gaat apart af** (welke keren al zijn afgehandeld, bewaart elk apparaat 3 dagen in `settings.json` → `alarmHandled`). Sliep de computer en wordt hij binnen 15 minuten wakker, dan gaat de wekker alsnog af; later wordt hij overgeslagen. Back-up & verhuizen en het verhuizen van de opslagmap nemen ze mee.
 
 ### ✍️ Snelle notitie
-- **`Ctrl+Alt+M`**, waar je ook bent: schrijf een paar regels op een klein briefje en druk op `Ctrl+Enter` om ze als nieuwe notitie **bovenaan Notities** te zetten. `Esc` of ergens anders klikken sluit het briefje en je tekst blijft bewaard (ook na een herstart). Ook te openen via rechtsklik op de kat, het ⋯-menu en het systeemvakmenu; uitzetten kan bij Bureau → Weergave → Snel toevoegen (je hoort het als een andere app de sneltoets al gebruikt).
+- **`Ctrl+Alt+M`**, waar je ook bent: schrijf een paar regels op een klein briefje en druk op `Ctrl+Enter` om ze als nieuwe notitie **bovenaan de notitielade** (de map die je het laatst bekeek) te zetten. `Esc` of ergens anders klikken sluit het briefje en je tekst blijft bewaard (ook na een herstart). Ook te openen via rechtsklik op de kat, het ⋯-menu en het systeemvakmenu; uitzetten kan bij Bureau → Weergave → Snel toevoegen (je hoort het als een andere app de sneltoets al gebruikt).
 
 ### ⏱ Timer zelf instellen
 - Elk timermenu toont na 5 · 15 · 25 · 50 min je **recente eigen tijden** (maximaal 3, zoals ‘Timer van 40 min’) en **Zelf instellen…**. Typ `40`, `1:30`, `1u 30m`, `anderhalf uur`, `1h 30m` of `1시간 30분` op het briefje bij de muisaanwijzer (elke taal, 1 minuut tot 3 uur); je ziet meteen wat er begrepen is, en `Enter` start. Het veld **Zelf** bij Bureau → Klok → Timer starten werkt net zo.
@@ -211,6 +213,36 @@ Een **eenmalige verhuizing** naar een andere computer (Mac ↔ Windows kan ook).
   - Hoe dan ook wordt **de huidige stand eerst bewaard** in `backups\가져오기-전-JJJJMMDD-UUmmss.jongi` in de instellingenmap (de laatste 10), en elk nieuw bestand wordt eerst naar een tijdelijk bestand geschreven en dan omgewisseld. Daarna worden lijst · notities · herhalingen · afspraken · geschiedenis opnieuw gelezen (de ongedaan-maakgeschiedenis begint opnieuw).
 
 Een `.jongi`-bestand is JSON: `{ "format": "jongi-nyang-backup", "version": 1, "exportedAt", "from": "Windows 1.18.0", "files": { "todos.json": "…", "archive/2026-10.jsonl": "…" } }`.
+
+## 종이냥 for Claude · AI-koppeling
+
+Sinds 1.27 kan Claude (Claude Desktop · Claude Code) tijdens een gesprek je taken, afspraken en notities bekijken, aanvullen en na je ja wijzigen. Dezelfde extensie, bestanden en testgevallen (M1–M18) als de Mac-versie 1.42.
+
+- **Aanzetten**: Bureau → **AI-koppeling** → ‘Claude Jongi-nyang laten lezen en schrijven’ (staat eerst uit). **Verbinden met Claude Desktop** opent het meegeleverde `jongi-nyang.mcpb` en Claude Desktop vraagt of het geïnstalleerd mag worden. **Claude Code-opdracht kopiëren** geeft een opdracht die de server met Jongi-nyang zelf start in plaats van Node (`claude mcp add jongi-nyang -e ELECTRON_RUN_AS_NODE=1 -- "…\종이냥.exe" "…\resources\mcp\server\index.js"`), dus Node is niet nodig.
+- **Wat het kan**: vandaag in één oogopslag; taken, afspraken, notities, focustijd en afgeronde taken; taken (tot 20 tegelijk), eenmalige afspraken en notities toevoegen; taken en eenmalige afspraken wijzigen. Een wijziging wordt eerst als voor en na in het gesprek getoond en pas na een ja toegepast (de bevestiging geldt 10 minuten). Er wordt niets verwijderd; herhalende afspraken, wekkers en notities worden nooit gewijzigd.
+- **Er draait niets apart**: Claude start het als een gesprek het nodig heeft, en het stopt met Claude. Staat het uit, dan kan Claude niets lezen.
+- **In de app**: ‘Claude heeft 2 taken toegevoegd · Ongedaan maken’ onder het notitieblok; was de app dicht, dan de volgende keer ‘Terwijl je weg was, heeft Claude 3 dingen gedaan · Bekijken’. Ongedaan maken herstelt alleen wat sindsdien niet is gewijzigd (anders ‘Het is intussen gewijzigd, dus ongedaan maken lukt niet’), en direct erna werkt `Ctrl+Z` ook. Regels die Claude vandaag toevoegde of wijzigde, krijgen een klein ‘Claude’-stempel; Bureau → AI-koppeling toont het werk van vandaag en gisteren met Ongedaan maken per regel.
+- **Niets kwijt**: de extensie leest een bestand vlak voor het schrijven opnieuw (en doet zijn wijziging op nieuwere tekst opnieuw, tot drie keer), en de app en de extensie houden `ai-write.lock` in de instellingenmap vast tijdens de paar milliseconden van een schrijfactie. Een test waarin de app om de paar milliseconden schrijft terwijl de extensie 100 keer toevoegt, houdt beide (zonder het slot gaat er iets verloren). De ongedaan-maakgeschiedenis van de app loopt door als Claudes wijziging binnenkomt.
+
+| Stempel · melding | AI-koppeling |
+| --- | --- |
+| ![Claude-stempel en melding](../docs/screenshots/windows/nl/ai-toast.png) | ![Bureau AI-koppeling](../docs/screenshots/windows/nl/ai-settings.png) |
+
+## Notitielade
+
+In 1.28 werd het tabblad Notities de **notitielade**: haal je notities uit de rand van het scherm, schrijf meteen en bewerk ze ter plekke. Alle notities van het tabblad staan in de map ‘Notities’ van de lade (geen bestand verandert), en de eerste start zegt dat één keer. 1.29 heeft hetzelfde gedrag, dezelfde bestanden en testgevallen (D1–D29) als Mac 1.44.
+
+- **Openen · sluiten**: `Ctrl+Shift+D` vanuit elke app (wijzigen of uitzetten in Bureau → Notitielade), de pootjesbladwijzer aan de schermrand (het handvat — het aantal van vandaag klein erbij; sleep hem omhoog of omlaag), ⋯ → Notitielade, rechtsklikken op de kat de ladeknop boven het notitieblok, `Ctrl+3` of het menu in het systeemvak. Hij schuift in 180 ms uit, zo hoog als het scherm boven de taakbalk waar je muis is, en een andere app aanklikken sluit hem niet. Dezelfde sneltoets, `Esc` of × wel.
+- **De lade**: één vel papier met papieren kattenoortjes aan de bovenrand (een tint donkerder dan de notities). In de kop de naam van de map (handgeschreven) ▾ — klik erop of druk op `Ctrl+L` voor de mappenlijst —, zoeken, bovenop houden en sluiten. Schrijf op het briefje met plakband en druk op `Enter` voor een nieuwe notitie bovenaan de map. Onderaan: ⚙ · ‘Werk · 5 notities’ · de sneltoets.
+- **Notitiekaarten (1.29)**: per datum gegroepeerd zoals in Apple Notities — Vastgezet · Vandaag · Gisteren · Deze week · Vorige week · oktober · september 2025 (weken beginnen op maandag). Elke kaart heeft een stukje plakband in de kleur van de map, een handgeschreven titel, één regel voorproefje en een korte tijd (`18:02` · `dinsdag` · `13 okt`). Wat een notitie is krijgt een klein label, gevonden in de tekst: een link (`youtube.com/watch`, klik om te openen — een titel die alleen het adres is heet ‘youtube.com-link’), een telefoonnummer (`010-1234-5678`, klik om te kopiëren), een checklist (2/4 en een balkje). Beweeg erover voor Kopiëren · Vastzetten · ⋯; onder een open notitie [Groter bekijken · Kopiëren · ⚙] ‘Bewerkt 18:02’ [Naar map verplaatsen · Verwijderen]. Een map met meer dan 20 notities wordt iets compacter.
+- **Menu’s**: alles heeft ook een rechtsklikmenu (pictogrammen, de sneltoetsen die er zijn, verwijderen onderaan) — een lege plek (= de ⚙ onderaan: Nieuwe notitie · Nieuwe notitie van klembord · papier · achtergrond · links/rechts · instellingen · help · afsluiten), een notitie (Openen en bewerken · Groter bekijken · Kopiëren · Dupliceren · Vastzetten · Naar map verplaatsen ▸ Recent · Papier van deze notitie · Afgevinkte regels verwijderen · Verwijderen), tekst die je bewerkt (Knippen · Kopiëren · Plakken · Alles selecteren + Deze notitie), een bladwijzer (Nieuwe notitie hier · Hernoemen · Kleur · Sorteren · Dupliceren · Map verwijderen) en Vastgezet (Sorteren · Alles losmaken). `Shift+F10` en de menutoets openen ze ook.
+- **Mappen**: de bladwijzers opzij. De gekozen toont zijn naam, de andere hun eerste letter; beweeg erover voor ‘Boodschappen · 3 notities · Ctrl+3’. `+` voor een nieuwe map (naam, acht kleuren), sleep om te ordenen of zet een notitie op een bladwijzer; de pootjesbladwijzer is ‘Vastgezet’. Sorteren op laatst bewerkt · aanmaakdatum · titel (per map). `Ctrl+1`–`9` · `Ctrl+0`; `Ctrl+F` zoekt in alle mappen.
+- **Papier en achtergrond**: Dagpapier · Nachtpapier · Kraftpapier · Ruitjesschrift, en Automatisch, dat dag of nacht van het notitieblok volgt (1.29: elk papier een tint donkerder achter de notities, een rand van 1 px om elke notitie, donkerder grijze tekst). Eén notitie kan eigen papier krijgen (Papier van deze notitie). Achtergrond: Dekkend · Mat · Sterk (het scherm erachter schemert wazig door, in Windows 11) · Geen (alleen de notities zweven). Rechts of links, 260–480 breed (sleep de binnenrand).
+- **Gegevens**: de notities blijven in `memos.json`; mappen en plaatsen staan in een nieuw bestand ernaast, `memo-folders.json`, zodat een oudere versie die de notities bewaart ze nooit wist. Wijzigingen op twee apparaten worden per item samengevoegd (de laatste wint); back-ups en gedeelde mappen nemen het mee. Snelle notitie en `/notitie` gaan naar de map die je het laatst bekeek.
+
+![Notitielade — dagpapier · nachtpapier · kraftpapier · ruitjesschrift](../docs/screenshots/windows/nl/drawer-themes.png)
+
+![Achtergrond — dekkend · mat · sterk · geen](../docs/screenshots/windows/nl/drawer-backdrops.png)
 
 ## Schermen
 
@@ -249,11 +281,12 @@ npm start            # bouwen en starten
 | `Ctrl+Alt+N` | Overal snel toevoegen |
 | `Ctrl+Alt+M` | Overal een snelle notitie |
 | `Ctrl+Alt+J` | Overal het notitieblok tonen · verbergen |
+| `Ctrl+Shift+D` | Overal de notitielade openen · sluiten (wijzigen in Bureau → Notitielade) |
 | `Ctrl+F` | Zoeken |
 | `Alt+→` · `Alt+←` · `Alt+↓` · `F` | Geselecteerde regel een dag later · eerder · naar Ooit · focussen |
 | `Spatie` · `Ctrl+Enter` · `Ctrl+=` · `Esc` | Focuskaart: pauzeren · klaar · 5 min extra · stoppen |
 | `Enter` · `S` / `Spatie` | Een afgaande wekker uitzetten · laten sluimeren |
-| `Ctrl+1`–`Ctrl+3` | Vandaag · Vooruit · Notities |
+| `Ctrl+1` · `Ctrl+2` · `Ctrl+3` | Vandaag · Vooruit · notitielade openen |
 | `↑` `↓` · `Spatie` · `Enter` · `Delete` | Regel selecteren · afvinken · bewerken · verwijderen |
 | `Ctrl+↑` `Ctrl+↓` | Volgorde wijzigen |
 | `Ctrl+Z` / `Ctrl+Y` | Ongedaan maken / Opnieuw |
@@ -263,7 +296,7 @@ npm start            # bouwen en starten
 | `Ctrl+D` | Bureau · Kalender |
 | `Ctrl+1`–`Ctrl+9` · `↑` `↓` | Op het bureau: de vakken in de lijst (Kalender … Opslag & back-up) |
 | `←` `→` · `↑` `↓` · `T` · `Enter` · `Ctrl+[` `Ctrl+]` | In de kalender op het bureau: een dag · een week · vandaag · nieuwe afspraak · vorige/volgende maand (week) |
-| `Ctrl+Shift+N` | Nieuwe notitie |
+| `Ctrl+Shift+N` | Het briefje van de notitielade |
 | `Ctrl+,` | Bureau · Weergave |
 | `F1` | Bureau · Help |
 
@@ -272,6 +305,7 @@ npm start            # bouwen en starten
 ```text
 %APPDATA%\PaperTodo\todos.json              taken (sinds 1.23 met `todaySince`, de dag waarop een taak op Vandaag kwam; sinds 1.24 met een tijd, `timeStart` · `timeEnd` — net als op de Mac)
 %APPDATA%\PaperTodo\memos.json              notities
+%APPDATA%\PaperTodo\memo-folders.json       mappen van de notitielade en de plaats van elke notitie (1.28, zoals op de Mac)
 %APPDATA%\PaperTodo\repeats.json            herhalende taken
 %APPDATA%\PaperTodo\events.json             afspraken
 %APPDATA%\PaperTodo\alarms.json             wekkers
@@ -279,6 +313,8 @@ npm start            # bouwen en starten
 %APPDATA%\PaperTodo\focus.jsonl            focussessies (één per regel)
 %APPDATA%\PaperTodo\settings.json           instellingen · vensterposities · taal (per apparaat)
 %APPDATA%\PaperTodo\storage.json            de gekozen gedeelde map
+%APPDATA%\PaperTodo\ai-link.json            AI-koppeling: aan · gegevensmap · taal (de extensie leest het, per apparaat)
+%APPDATA%\PaperTodo\ai-log.jsonl            wat Claude toevoegde en wijzigde, en ongedaan gemaakte stappen (bron van meldingen, stempels en ongedaan maken)
 %APPDATA%\PaperTodo\backups\               automatische back-ups vóór een import (*.jongi, de laatste 10, per apparaat)
 ```
 
@@ -300,6 +336,10 @@ npm run snapshot -- stage3     # alleen de vakken van het bureau en nachtpapier 
 npm run snapshot -- convenience # alleen de nieuwe schermen van 1.23 (dag en nacht, conv-*.png)
 npm run snapshot -- timeblock # alleen de tijden van taken en sluimeren Uit van 1.24 (dag en nacht, tb-*.png)
 npm run snapshot -- strip # alleen de dagbalk, Je dag en de breedtecontrole van de timer van 1.25 (dag en nacht, strip-*.png)
+npm run snapshot -- ai # alleen de AI-koppeling van 1.27 (stempels, meldingen, weg geweest, het bureauvak; dag en nacht, ai-*.png)
+npm run snapshot -- drawer # alleen de notitielade (het handvat, datumgroepen en kaarten op vier papiersoorten, de open notitie, elk menu, de vier achtergronden, eigen papier van een notitie, een compacte lijst, breedtes, kanten, instellingen, het notitieblok met twee tabbladen, de verhuismelding; snapshots/drawer/)
+npm run mcp:build    # 종이냥 for Claude: mcp/dist/server/index.js (één bestand) en mcp/dist/jongi-nyang.mcpb
+npm run mcp:test     # de gebundelde server aangestuurd met de SDK-client: M1–M12 · M16–M18 · 100 rondes tegelijk schrijven
 npm run perf         # een --demo-run met zware voorbeeldgegevens: starttijd, CPU in rust, invoervertraging… (--quick · --long)
 npm run snapshot -- lang=nl    # hetzelfde in het Nederlands (snapshots/nl/), of lang=en (snapshots/en/)
 ```
@@ -322,7 +362,7 @@ assets/         de kat · papierstructuur · handschriftlettertypen
 tools/          scripts voor bouwen · snapshots · lettertypen
 ```
 
-De tabellen van **Kattenpraat** (`src/core/chatter.ts`) worden door `generate.py` gemaakt uit `mac/scripts/chatter/chatter_lines.py`, in alle drie de talen. Wil je een zinnetje wijzigen, pas dan dat bestand aan zodat beide apps samen veranderen.
+De tabellen van **Kattenpraat** (`src/core/chatter.ts`) worden door `generate.py` gemaakt uit [`mac/scripts/chatter/chatter_lines.py`](../mac/scripts/chatter/chatter_lines.py), in alle drie de talen. Wil je een zinnetje wijzigen, pas dan dat bestand aan zodat beide apps samen veranderen.
 
 ## Verschillen met de macOS-versie
 

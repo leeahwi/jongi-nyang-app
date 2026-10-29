@@ -5,17 +5,22 @@ import { dayKey, logicalDayStart } from "../core/archive";
 import { UndoableNotebook, isoDate, newID, parseNotebook, serializeNotebook, type TodoItem } from "../core/notebook";
 import { alertOn, isValidRule, occursOn, parseSeries, planToday, serializeSeries, type RepeatRule, type Series } from "../core/repeat";
 import { isBlank, mergeMemos, newMemo, parseMemos, serializeMemos, type Memo } from "../core/memo";
+import {
+  clampDrawerWidth, duplicateFolder, emptyMemoFolders, lastFolderOf, memosIn, placementOf, readMemoPaper, setMemoPaper, visibleFolders, memoFoldersFileName, mergeMemoFolders, parseMemoFolders, placeNew, pruneMemoFolders, readDrawerShortcut,
+  readDrawerBackdrop, readDrawerTheme, readSort, serializeMemoFolders, toggleChecklist, type MemoFolders, type MemoPlacement,
+} from "../core/memoDrawer";
 import { mergeText } from "../core/textMerge";
 import { pageOf } from "../core/shelf";
 import { todaySinceUpdates } from "../core/carry";
 import { sharedFiles, type SharedFile } from "../core/storage";
-import { defaultPrefs, type AppState, type FocusView, type Prefs, type TimerView } from "../core/types";
+import { defaultPrefs, type AiView, type AppState, type FocusView, type Prefs, type TimerView } from "../core/types";
 import type { CalendarView } from "../core/calendar";
 import { readPaper } from "../core/desk";
 import { parseEvents, serializeEvents, type LocalEvent } from "../core/events";
 import { parseAlarms, serializeAlarms, type Alarm } from "../core/alarm";
 import { lang, t } from "../i18n";
 import { exportRange } from "../core/timeRange";
+import { takeLock } from "./aiLock";
 
 export interface WindowMemory {
   bounds?: { x: number; y: number; width: number; height: number };
@@ -83,6 +88,11 @@ export class Store extends EventEmitter {
   /** Newest first. */
   memos: Memo[] = [];
   lastDeletedMemo?: Memo;
+  /** 메모 서랍 (memo-folders.json): the folders and each memo's place; read with the memos, merged like them. */
+  memoFolders: MemoFolders = emptyMemoFolders(lang());
+  /** The deleted memo's place, put back with 되돌리기. */
+  private lastDeletedPlacement?: MemoPlacement;
+  private readonly memoFoldersPath: string;
   private memoTimer?: NodeJS.Timeout;
   private memoChangeTimer?: NodeJS.Timeout;
   history = new UndoableNotebook();
@@ -99,6 +109,9 @@ export class Store extends EventEmitter {
   memoShortcutProblem?: string;
   /** The same for Ctrl+Alt+J (노트 보이기 · 숨기기). */
   noteShortcutProblem?: string;
+  /** The same for 메모 서랍's shortcut (Ctrl+Shift+D unless changed). */
+  drawerShortcutProblem?: string;
+  drawerBackdropNote?: string;
   storage = { label: t("이 PC (기본)"), custom: false, path: "", archivePath: "" };
   /** The focus timer as the windows draw it (set by main). */
   timerView: () => TimerView | undefined = () => undefined;
@@ -106,6 +119,8 @@ export class Store extends EventEmitter {
   focusView: () => FocusView | undefined = () => undefined;
   /** 일정 as the windows draw it (set by main/calendar.ts). */
   calendarView: () => CalendarView = () => ({ today: [], hasEvents: this.events.length > 0, withEvents: [] });
+  /** AI 연결 as the windows draw it (set by main/aiConnect.ts). */
+  aiView: () => AiView = () => ({ enabled: this.prefs.aiEnabled, marks: [], recent: [], command: "", copied: false });
   /** The text this app last read or wrote for each shared file; undefined while the file is absent. */
   private readonly known = new Map<SharedFile, string | undefined>();
   private readonly stamps = new Map<SharedFile, string | undefined>();
@@ -118,9 +133,16 @@ export class Store extends EventEmitter {
   private poll?: NodeJS.Timeout;
   private readonly syncTimers = new Map<SharedFile, NodeJS.Timeout>();
   private readonly failedReads = new Map<SharedFile, number>();
+  /**
+   * AI 연결 on: ai-write.lock in the settings folder, held from catching up to writing so the extension
+   * (mcp/) and this app never write todos.json, events.json or memos.json from the same stale copy.
+   */
+  aiLock?: string;
+  private lockDepth = 0;
 
   constructor(directory: string, demo = false, settingsDirectory = directory) {
     super();
+    this.setMaxListeners(40); // every window class listens for its settings
     fs.mkdirSync(directory, { recursive: true });
     fs.mkdirSync(settingsDirectory, { recursive: true });
     this.dataDirectory = directory;
@@ -130,12 +152,14 @@ export class Store extends EventEmitter {
     this.memosPath = path.join(directory, "memos.json");
     this.eventsPath = path.join(directory, "events.json");
     this.alarmsPath = path.join(directory, "alarms.json");
+    this.memoFoldersPath = path.join(directory, memoFoldersFileName);
     const memos = this.readDisk("memos.json");
     this.noteKnown("memos.json", memos);
     if (memos !== undefined) {
       try { this.memos = parseMemos(memos).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); } catch { this.keepUnreadable(this.memosPath, "memos"); }
     }
     this.loadSettings();
+    this.loadMemoFolders();
     this.loadRepeats();
     this.loadEvents();
     this.loadAlarms();
@@ -173,17 +197,25 @@ export class Store extends EventEmitter {
       shortcutProblem: this.shortcutProblem,
       memoShortcutProblem: this.memoShortcutProblem,
       noteShortcutProblem: this.noteShortcutProblem,
+      drawerShortcutProblem: this.drawerShortcutProblem,
+      drawerBackdropNote: this.drawerBackdropNote,
+      memoFolders: { ...this.memoFolders, folders: this.memoFolders.folders.map((folder) => ({ ...folder })), placement: { ...this.memoFolders.placement } },
       storage: { ...this.storage },
       calendar: this.calendarView(),
       events: this.events.map((event) => ({ ...event, skip: [...event.skip] })),
       alarms: this.alarms.map((alarm) => ({ ...alarm, days: [...alarm.days] })),
       timer: this.timerView(),
       focus: this.focusView(),
+      ai: this.aiView(),
     };
   }
 
   /** Runs a notebook mutation, saves if it changed anything, and tells every window. */
   mutate(action: (history: UndoableNotebook) => unknown): void {
+    this.locked(() => this.mutateNow(action));
+  }
+
+  private mutateNow(action: (history: UndoableNotebook) => unknown): void {
     this.catchUp(["todos.json"]);
     const before = serializeNotebook(this.history.notebook);
     const undoBefore = this.history.canUndo;
@@ -247,21 +279,168 @@ export class Store extends EventEmitter {
     this.memos = this.memos.filter((entry) => entry.id !== id);
     this.memoDeletions.add(id);
     if (this.typedOpenMemo === id) this.typedOpenMemo = undefined;
-    if (!isBlank(memo)) this.lastDeletedMemo = memo;
+    if (!isBlank(memo)) {
+      this.lastDeletedMemo = memo;
+      this.lastDeletedPlacement = this.memoFolders.placement[id];
+    }
     this.saveMemos();
     this.changed();
   }
 
-  /** 빠른 메모: a new memo with this text at the top of 메모, saved at once. Blank text adds nothing. */
-  addMemoText(text: string): string | undefined {
+  /**
+   * 빠른 메모 · /메모 · 메모 서랍's slip: a new memo with this text at the top, saved at once, in `target`
+   * (빠른 메모 and /메모: the drawer's last folder). Blank text adds nothing.
+   */
+  addMemoText(text: string, target: { folder: string; pinned: boolean } = this.lastFolderTarget()): string | undefined {
     if (!text.trim()) return undefined;
     this.catchUp(["memos.json"]);
     const memo = { ...newMemo(), text };
     this.memoEdits.add(memo.id);
     this.memos.unshift(memo);
     this.saveMemos();
+    this.changeFolders((data) => placeNew(data, memo.id, target));
     this.changed();
     return memo.id;
+  }
+
+  /** 빠른 메모 and /메모 go to the folder last shown in the drawer (never opened, or gone: 메모). */
+  lastFolderTarget(): { folder: string; pinned: boolean } {
+    return { folder: lastFolderOf(this.memoFolders, this.prefs.drawerLastFolder), pinned: false };
+  }
+
+  // ─── 메모 서랍 (memo-folders.json) ───────────────────────────────────────────
+
+  /**
+   * A change to the folders or a memo's place: caught up with the disk first (another device's copy is
+   * merged in), then saved at once and every window told. `change` returns the same value for nothing.
+   */
+  changeFolders(change: (data: MemoFolders) => MemoFolders): void {
+    this.locked(() => {
+      this.catchUp(["memos.json", memoFoldersFileName]);
+      const next = change(this.memoFolders);
+      if (next === this.memoFolders) return;
+      this.memoFolders = next;
+      this.saveMemoFolders();
+      this.changed();
+    });
+  }
+
+  private loadMemoFolders(): void {
+    const text = this.readDisk(memoFoldersFileName);
+    this.noteKnown(memoFoldersFileName, text);
+    if (text === undefined) { this.memoFolders = emptyMemoFolders(lang()); return; }
+    try {
+      this.memoFolders = parseMemoFolders(text, lang());
+    } catch {
+      this.memoFolders = emptyMemoFolders(lang());
+      this.keepFoldersAside();
+    }
+  }
+
+  /**
+   * D15: an unreadable memo-folders.json is moved aside as memo-folders.unreadable-<UTC stamp>.json and the
+   * drawer starts afresh (every memo in 메모); said once.
+   */
+  private keepFoldersAside(): void {
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/T/, "-").replace(/\..*$/, "").replace(/Z$/, "");
+    const aside = path.join(this.dataDirectory, `memo-folders.unreadable-${stamp}.json`);
+    try {
+      fs.renameSync(this.memoFoldersPath, aside);
+      this.noteKnown(memoFoldersFileName, undefined);
+      this.storageError = `${t("메모 서랍의 폴더 정보를 읽지 못해 처음부터 시작해요. 메모는 모두 ‘메모’ 폴더에 있어요.")} ${t("원본은 {file}에 남겨 뒀어요.", { file: path.basename(aside) })}`;
+    } catch {
+      this.storageError = `${t("메모 서랍의 폴더 정보를 읽지 못해 처음부터 시작해요. 메모는 모두 ‘메모’ 폴더에 있어요.")}\n${this.memoFoldersPath}`;
+    }
+  }
+
+  private saveMemoFolders(): void {
+    if (!this.mayWrite(memoFoldersFileName)) return;
+    // D6: places of memos that are gone are dropped — not those set in the last hour (a cloud folder may
+    // bring the two files separately, the memo still on its way).
+    const recent = new Date(Date.now() - 3_600_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+    const keep = new Set([...this.memos.map((memo) => memo.id), ...Object.entries(this.memoFolders.placement).filter(([, entry]) => entry.at > recent).map(([id]) => id)]);
+    if (this.lastDeletedMemo) keep.add(this.lastDeletedMemo.id);
+    this.memoFolders = pruneMemoFolders(this.memoFolders, keep);
+    const contents = serializeMemoFolders(this.memoFolders);
+    if (contents === this.known.get(memoFoldersFileName)) return;
+    try {
+      this.writeAtomically(this.memoFoldersPath, contents);
+      this.noteKnown(memoFoldersFileName, contents);
+      this.clearError(t("메모 서랍을 저장하지 못했어요."));
+    } catch {
+      this.reportError(`${t("메모 서랍을 저장하지 못했어요.")}\n${this.memoFoldersPath}`);
+    }
+  }
+
+  /** 메모 서랍: a checklist line's box turned over (D7, D8), saved at once. */
+  toggleMemoLine(id: string, line: number): void {
+    this.catchUp(["memos.json"]);
+    const index = this.memos.findIndex((memo) => memo.id === id);
+    if (index < 0) return;
+    const text = toggleChecklist(this.memos[index].text, line);
+    if (text === this.memos[index].text) return;
+    const memo = { ...this.memos[index], text, updatedAt: new Date().toISOString().replace(/\.\d{3}Z$/, "Z") };
+    this.memoEdits.add(id);
+    this.memos.splice(index, 1);
+    this.memos.unshift(memo);
+    this.saveMemos();
+    this.changed();
+  }
+
+  /** 메모 서랍: a memo's whole text at once (체크한 줄 지우기, its 되돌리기), saved now; the memo goes to the top as any edit. */
+  setMemoText(id: string, text: string): void {
+    this.catchUp(["memos.json"]);
+    const index = this.memos.findIndex((memo) => memo.id === id);
+    if (index < 0 || this.memos[index].text === text) return;
+    const memo = { ...this.memos[index], text, updatedAt: new Date().toISOString().replace(/\.\d{3}Z$/, "Z") };
+    this.memoEdits.add(id);
+    this.memos.splice(index, 1);
+    this.memos.unshift(memo);
+    this.saveMemos();
+    this.changed();
+  }
+
+  /** 복제 of one memo: a new memo on top with the same text, in the same folder, pinned and papered as it (now). */
+  duplicateMemo(id: string): string | undefined {
+    this.catchUp(["memos.json"]);
+    const original = this.memos.find((memo) => memo.id === id);
+    if (!original) return undefined;
+    const copy = { ...newMemo(), text: original.text };
+    this.memoEdits.add(copy.id);
+    this.memos.unshift(copy);
+    this.saveMemos();
+    const place = placementOf(this.memoFolders, id);
+    const paper = this.memoFolders.placement[id]?.paper;
+    this.changeFolders((data) => {
+      const placed = placeNew(data, copy.id, place);
+      return paper ? setMemoPaper(placed, copy.id, readMemoPaper(paper) ?? undefined) : placed;
+    });
+    this.changed();
+    return copy.id;
+  }
+
+  /**
+   * 복제 of a folder (D21): its memos copied in memos.json (new ids, the same text and times, each right after
+   * its original) and a new folder after it holding the copies.
+   */
+  duplicateFolder(id: string, newFolderID: string): void {
+    this.catchUp(["memos.json", memoFoldersFileName]);
+    if (!visibleFolders(this.memoFolders).some((folder) => folder.id === id) || this.memoFolders.folders.some((folder) => folder.id === newFolderID)) return;
+    const originals = memosIn(this.memoFolders, this.memos, id);
+    const copies: [string, string][] = [];
+    const memos: Memo[] = [];
+    for (const memo of this.memos) {
+      memos.push(memo);
+      if (!originals.includes(memo)) continue;
+      const copy = { ...memo, id: newID() };
+      copies.push([memo.id, copy.id]);
+      this.memoEdits.add(copy.id);
+      memos.push(copy);
+    }
+    this.memos = memos;
+    if (copies.length) this.saveMemos();
+    this.changeFolders((data) => duplicateFolder(data, id, newFolderID, copies, lang()));
+    this.changed();
   }
 
   /** A memo just made from the 입력 줄, taken back: gone without "지운 메모 되돌리기". */
@@ -290,13 +469,22 @@ export class Store extends EventEmitter {
     if (!this.lastDeletedMemo) return;
     this.memoDeletions.delete(this.lastDeletedMemo.id);
     this.memoEdits.add(this.lastDeletedMemo.id);
-    this.memos = [this.lastDeletedMemo, ...this.memos.filter((memo) => memo.id !== this.lastDeletedMemo!.id)].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    const restored = this.lastDeletedMemo;
+    const place = this.lastDeletedPlacement;
+    this.memos = [restored, ...this.memos.filter((memo) => memo.id !== restored.id)].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     this.lastDeletedMemo = undefined;
+    this.lastDeletedPlacement = undefined;
     this.saveMemos();
+    // Back in its folder (with a new time, so the place dropped meanwhile elsewhere doesn't win).
+    if (place) this.changeFolders((data) => placeNew(data, restored.id, place));
     this.changed();
   }
 
   saveMemos(): void {
+    this.locked(() => this.saveMemosNow());
+  }
+
+  private saveMemosNow(): void {
     clearTimeout(this.memoTimer);
     // Another device wrote memos while an edit here waited: take theirs, keeping what changed here.
     if (this.differs("memos.json")) {
@@ -422,24 +610,30 @@ export class Store extends EventEmitter {
 
   /** Adds an event, or replaces the one with its id; saved at once. */
   putEvent(event: LocalEvent): void {
-    this.catchUp(["events.json"]);
-    const index = this.events.findIndex((entry) => entry.id === event.id);
-    if (index >= 0) this.events[index] = event; else this.events.push(event);
-    this.eventsChanged();
+    this.locked(() => {
+      this.catchUp(["events.json"]);
+      const index = this.events.findIndex((entry) => entry.id === event.id);
+      if (index >= 0) this.events[index] = event; else this.events.push(event);
+      this.eventsChanged();
+    });
   }
 
   removeEvent(id: string): void {
-    this.catchUp(["events.json"]);
-    if (!this.events.some((entry) => entry.id === id)) return;
-    this.events = this.events.filter((entry) => entry.id !== id);
-    this.eventsChanged();
+    this.locked(() => {
+      this.catchUp(["events.json"]);
+      if (!this.events.some((entry) => entry.id === id)) return;
+      this.events = this.events.filter((entry) => entry.id !== id);
+      this.eventsChanged();
+    });
   }
 
-  /** Every event at once (snapshots' sample days). */
+  /** Every event at once (snapshots' sample days, an undo of Claude's). */
   replaceEvents(events: LocalEvent[]): void {
-    this.catchUp(["events.json"]);
-    this.events = events;
-    this.eventsChanged();
+    this.locked(() => {
+      this.catchUp(["events.json"]);
+      this.events = events;
+      this.eventsChanged();
+    });
   }
 
   private eventsChanged(): void {
@@ -526,6 +720,7 @@ export class Store extends EventEmitter {
     this.memoDeletions.clear();
     this.typedOpenMemo = undefined;
     this.lastDeletedMemo = undefined;
+    this.lastDeletedPlacement = undefined;
     this.memos = [];
     this.series = [];
     this.events = [];
@@ -538,6 +733,7 @@ export class Store extends EventEmitter {
     if (memos !== undefined) {
       try { this.memos = parseMemos(memos).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); } catch { this.keepUnreadable(this.memosPath, "memos"); }
     }
+    this.loadMemoFolders();
     this.loadRepeats();
     this.loadEvents();
     this.loadAlarms();
@@ -587,6 +783,17 @@ export class Store extends EventEmitter {
   remember(memory: Partial<WindowMemory>): void {
     this.memory = { ...this.memory, ...memory };
     this.saveSettingsSoon();
+  }
+
+  /** Runs `work` holding AI 연결's write lock when it is on (briefly: after 300 ms it goes on without). */
+  locked<T>(work: () => T): T {
+    if (!this.aiLock || this.lockDepth > 0) {
+      this.lockDepth += 1;
+      try { return work(); } finally { this.lockDepth -= 1; }
+    }
+    const release = takeLock(this.aiLock, { waitMs: 300 });
+    this.lockDepth += 1;
+    try { return work(); } finally { this.lockDepth -= 1; release?.(); }
   }
 
   changed(): void {
@@ -653,7 +860,8 @@ export class Store extends EventEmitter {
   // ─── Sharing a folder with other computers ──────────────────────────────────
 
   private pathOf(file: SharedFile): string {
-    return file === "todos.json" ? this.notebookPath : file === "memos.json" ? this.memosPath : file === "events.json" ? this.eventsPath : file === "alarms.json" ? this.alarmsPath : this.repeatsPath;
+    return file === "todos.json" ? this.notebookPath : file === "memos.json" ? this.memosPath : file === "events.json" ? this.eventsPath : file === "alarms.json" ? this.alarmsPath
+      : file === memoFoldersFileName ? this.memoFoldersPath : this.repeatsPath;
   }
 
   private readDisk(file: SharedFile): string | undefined {
@@ -733,7 +941,11 @@ export class Store extends EventEmitter {
     }
     try {
       if (file === "todos.json") {
-        this.history = new UndoableNotebook(parseNotebook(text));
+        const theirs = parseNotebook(text);
+        const known = this.known.get(file);
+        // AI 연결 on: Claude's change comes in without wiping the undo history (when nothing here is unsaved).
+        if (this.aiLock && known !== undefined && this.canSave && serializeNotebook(this.history.notebook) === known) this.history.absorb(parseNotebook(known), theirs);
+        else this.history = new UndoableNotebook(theirs);
         this.canSave = true;
       } else if (file === "repeats.json") {
         this.series = parseSeries(text);
@@ -742,6 +954,9 @@ export class Store extends EventEmitter {
         this.eventsVersion += 1;
       } else if (file === "alarms.json") {
         this.alarms = parseAlarms(text);
+      } else if (file === memoFoldersFileName) {
+        // Another device's folders: merged entry by entry (D13, D14), so nothing changed here is lost.
+        this.memoFolders = mergeMemoFolders(this.memoFolders, parseMemoFolders(text, lang()));
       } else {
         const mine = new Set(this.memoEdits);
         if (this.typedOpenMemo) mine.add(this.typedOpenMemo);
@@ -757,6 +972,13 @@ export class Store extends EventEmitter {
         return false;
       }
       this.failedReads.delete(file);
+      if (file === memoFoldersFileName) {
+        // Kept aside; this device's folders are written in its place.
+        this.keepFoldersAside();
+        this.saveMemoFolders();
+        this.changed();
+        return false;
+      }
       this.keepUnreadable(this.pathOf(file), file === "todos.json" ? "list" : file === "memos.json" ? "memos" : file === "events.json" ? "events" : file === "alarms.json" ? "alarms" : "repeats");
       this.noteKnown(file, text);
       this.changed();
@@ -815,7 +1037,15 @@ export class Store extends EventEmitter {
       const saved = JSON.parse(fs.readFileSync(this.settingsPath, "utf8")) as { prefs?: Partial<Prefs>; memory?: WindowMemory };
       // Settings this version no longer has (Google 캘린더 · Tasks before 1.16.0) are left behind.
       const known = Object.fromEntries(Object.entries(saved.prefs ?? {}).filter(([key]) => key in defaultPrefs)) as Partial<Prefs>;
-      this.prefs = { ...defaultPrefs, ...known, paper: readPaper(known.paper) };
+      this.prefs = {
+        ...defaultPrefs, ...known, paper: readPaper(known.paper),
+        // 메모 서랍's device settings, kept within what the drawer can take.
+        drawerShortcut: readDrawerShortcut(known.drawerShortcut), drawerWidth: clampDrawerWidth(known.drawerWidth), drawerTheme: readDrawerTheme(known.drawerTheme),
+        drawerSide: known.drawerSide === "left" ? "left" : "right",
+        drawerBackdrop: readDrawerBackdrop(known.drawerBackdrop), drawerPinnedSort: readSort(known.drawerPinnedSort),
+        drawerRecentMoves: Array.isArray(known.drawerRecentMoves) ? known.drawerRecentMoves.filter((id): id is string => typeof id === "string").slice(0, 2) : [],
+        drawerHandleY: typeof known.drawerHandleY === "number" && known.drawerHandleY >= 0 && known.drawerHandleY <= 1 ? known.drawerHandleY : defaultPrefs.drawerHandleY,
+      };
       this.memory = saved.memory ?? {};
     } catch {
       // First launch or unreadable settings: defaults are fine.

@@ -44,15 +44,15 @@ const launchFlags: Record<LaunchCommand, string> = {
 };
 const taskTitles: Record<Lang, Record<Exclude<LaunchCommand, "search">, [string, string]>> = {
   ko: {
-    "quick-entry": ["빠른 입력", "어디서든 한 줄로 할 일 · 일정 · 타이머를 적어요"], "quick-memo": ["빠른 메모", "몇 줄을 바로 메모 탭에 넣어요"],
+    "quick-entry": ["빠른 입력", "어디서든 한 줄로 할 일 · 일정 · 타이머를 적어요"], "quick-memo": ["빠른 메모", "몇 줄을 바로 메모 서랍에 넣어요"],
     desk: ["책상", "달력 · 완료 기록 · 설정"], "focus-25": ["25분 집중", "할 일을 하나 골라 25분 집중해요"], "timer-5": ["5분 타이머", "5분을 재요"],
   },
   en: {
-    "quick-entry": ["Quick add", "Write a to-do, an event or a timer from anywhere"], "quick-memo": ["Quick note", "Put a few lines straight into Notes"],
+    "quick-entry": ["Quick add", "Write a to-do, an event or a timer from anywhere"], "quick-memo": ["Quick note", "Put a few lines straight into the Notes drawer"],
     desk: ["Desk", "Calendar · History · Settings"], "focus-25": ["Focus 25 min", "Pick a to-do and focus for 25 minutes"], "timer-5": ["5 min timer", "Time 5 minutes"],
   },
   nl: {
-    "quick-entry": ["Snel toevoegen", "Schrijf overal een taak, afspraak of timer"], "quick-memo": ["Snelle notitie", "Zet een paar regels meteen in Notities"],
+    "quick-entry": ["Snel toevoegen", "Schrijf overal een taak, afspraak of timer"], "quick-memo": ["Snelle notitie", "Zet een paar regels meteen in de notitielade"],
     desk: ["Bureau", "Kalender · Geschiedenis · Instellingen"], "focus-25": ["25 min focussen", "Kies een taak en focus 25 minuten"], "timer-5": ["Timer van 5 min", "5 minuten timen"],
   },
 };

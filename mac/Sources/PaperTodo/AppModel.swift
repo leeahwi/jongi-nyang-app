@@ -157,13 +157,14 @@ final class AppModel: ObservableObject {
 
     // MARK: Memos — the back of the sheet
 
-    /// 오늘 · 앞으로 · 메모 (앞으로 took over 마감 and 나중에 in 1.35).
-    enum Page: String, Hashable { case todos, ahead, memos
+    /// 오늘 · 앞으로 (앞으로 took over 마감 and 나중에 in 1.35; the 메모 tab became 메모 서랍 in 1.43).
+    enum Page: String, Hashable { case todos, ahead
 
-        /// A page as an older version or another place names it: 마감 and 나중에 open 앞으로.
+        /// A page as an older version or another place names it: 마감 and 나중에 open 앞으로; 메모 opens 오늘.
         init?(saved: String) {
             switch saved {
             case "deadlines", "deadline", "later": self = .ahead
+            case "memos": self = .todos
             default: self.init(rawValue: saved)
             }
         }
@@ -171,6 +172,7 @@ final class AppModel: ObservableObject {
     @Published var page: Page = .todos { didSet { if page != oldValue { selectedTaskID = nil } } }
     /// Newest first.
     @Published private(set) var memos: [Memo] = []
+    /// The memo open in 메모 서랍 (its slip expanded): kept even blank while open, and its typing wins over a late arrival.
     @Published var openMemoID: String? { didSet { if openMemoID != oldValue { openMemoTyped = false } } }
     /// Typed in since it was opened: another device's edit of the open memo is then joined with
     /// this Mac's, rather than taken as it is.
@@ -184,29 +186,100 @@ final class AppModel: ObservableObject {
     private var memoEdits: Set<String> = []
     private var memoDeletions: Set<String> = []
     private var memosURL: URL { file.url.deletingLastPathComponent().appendingPathComponent("memos.json") }
+    /// 메모 서랍 (1.43): folders and pins, in memo-folders.json next to memos.json (MemoDrawerModel.swift).
+    @Published var memoFolders = MemoFolders.fresh(language: .current)
+    /// memo-folders.json as this Mac last read or wrote it.
+    var knownFoldersData: Data?
+    /// The drawer: its settings (this Mac's), what it shows, its window (set by the app).
+    private(set) lazy var drawer = MemoDrawer(model: self)
+    /// Set by the app: opens or closes the drawer (the note's paw button, the cat, ⋯, 윈도우 메뉴, ⌘3).
+    var onMemoDrawer: (() -> Void)?
+    func toggleMemoDrawer() { onMemoDrawer?() }
+    /// 책상 → 메모 서랍 → 서랍 열기: opens it (never closes it, unlike the toggle).
+    var onOpenMemoDrawer: (() -> Void)?
+    func openMemoDrawer() { onOpenMemoDrawer?() }
+    /// Set by the app: the drawer opens on this memo, expanded (a search result, a toast's 열기).
+    var onRevealMemo: ((String) -> Void)?
+    func revealMemo(_ id: String) { onRevealMemo?(id) }
+    /// Set by the app: the drawer opens with the keyboard in its quick-write slip (⇧⌘N 새 메모).
+    var onWriteMemo: (() -> Void)?
+    func writeMemo() { onWriteMemo?() }
+    /// Set by the app: the recorder in Settings pauses the drawer's shortcut while a key is recorded.
+    var onPauseDrawerShortcut: ((Bool) -> Void)?
 
+    /// A blank memo, open for typing (it goes away when closed blank).
     @discardableResult
     func newMemo() -> String {
         if openMemoID != nil { closeMemo() }
         let memo = Memo()
         memos.insert(memo, at: 0)
         memoEdits.insert(memo.id)
-        page = .memos
         openMemoID = memo.id
         return memo.id
     }
 
     /// 빠른 메모: a new memo at the top of 메모 with this text, saved right away (the memo tab
     /// isn't opened).
+    /// From 1.43 it goes into the drawer's last folder (메모 when the drawer was never opened); the drawer's
+    /// quick-write slip gives its own folder (and 고정 a pin).
     @discardableResult
-    func addMemo(text: String) -> String? {
+    func addMemo(text: String, folder: String? = nil, pinned: Bool = false) -> String? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         let memo = Memo(text: text)
         memos.insert(memo, at: 0)
         memoEdits.insert(memo.id)
         saveMemosNow()
+        let target = folder ?? memoFolders.lastFolder(drawer.lastFolder)
+        if target != MemoFolders.inbox || pinned {
+            changeMemoFolders { folders, now in
+                folders.place(memo.id, in: target, now: now)
+                if pinned { folders.setPinned(memo.id, true, now: now) }
+            }
+        }
         return memo.id
+    }
+
+    /// 복제 of a folder (D21): the copies keep their originals' times, so the copy's list looks the same.
+    @discardableResult
+    func duplicateMemoFolder(_ id: String) -> String? {
+        guard memoFolders.folder(id) != nil else { return nil }
+        let originals = memos.filter { memoFolders.folderID(of: $0.id) == id }
+        var copies: [(String, String)] = []
+        for memo in originals {
+            let copy = Memo(text: memo.text, createdAt: memo.createdAt, updatedAt: memo.updatedAt)
+            copies.append((memo.id, copy.id))
+            memos.append(copy)
+            memoEdits.insert(copy.id)
+        }
+        if !copies.isEmpty {
+            // Newest first, as the memos are kept (stable: equal times keep their order).
+            memos = memos.enumerated().sorted { $0.element.updatedAt != $1.element.updatedAt ? $0.element.updatedAt > $1.element.updatedAt : $0.offset < $1.offset }.map(\.element)
+            saveMemosNow()
+        }
+        let newID = UUID().uuidString.lowercased()
+        var made: String?
+        changeMemoFolders { folders, now in made = folders.duplicateFolder(id, as: newID, copies: copies, now: now, language: .current) }
+        return made
+    }
+
+    /// 복제 of one memo: a new memo now, in the same folder with the same pin and paper.
+    @discardableResult
+    func duplicateMemo(_ id: String) -> String? {
+        guard let memo = memos.first(where: { $0.id == id }) else { return nil }
+        let copy = Memo(text: memo.text)
+        memos.insert(copy, at: 0)
+        memoEdits.insert(copy.id)
+        saveMemosNow()
+        let folder = memoFolders.folderID(of: id), pinned = memoFolders.isPinned(id), paper = memoFolders.paper(of: id)
+        if folder != MemoFolders.inbox || pinned || paper != nil {
+            changeMemoFolders { folders, now in
+                folders.place(copy.id, in: folder, now: now)
+                if pinned { folders.setPinned(copy.id, true, now: now) }
+                if let paper { folders.setPaper(copy.id, paper, now: now) }
+            }
+        }
+        return copy.id
     }
 
     /// 바꾸기 / ⌘Z right after the line made a memo: it goes without a trace (no 되살리기).
@@ -276,6 +349,10 @@ final class AppModel: ObservableObject {
     func saveMemosNow() {
         memoSaveTask?.cancel()
         guard !savingStopped else { return }
+        AIWriteLock.with { saveMemosHeld() }
+    }
+
+    private func saveMemosHeld() {
         catchUpMemos()
         let started = PerfProbe.now
         defer { PerfProbe.io("memos", since: started) }
@@ -420,6 +497,7 @@ final class AppModel: ObservableObject {
         } catch {
             keepUnreadable(memosFile, what: .memos)
         }
+        loadMemoFolders()
         do {
             history = UndoableNotebook(notebook: try file.load())
         } catch NotebookFileError.missing {
@@ -761,10 +839,10 @@ final class AppModel: ObservableObject {
     /// open memo keep this Mac's text.
     func reloadFromDisk() {
         if !hasUnsavedChanges, editingTaskReminderID == nil, let notebook = try? file.load(), notebook != history.notebook {
-            history.replaceNotebook(notebook)
-            objectWillChange.send()
+            takeFromDisk(notebook)
         }
         catchUpMemos()
+        catchUpMemoFolders()
         calendar.reloadIfChanged()
         alarms.reloadIfChanged()
         let decoder = JSONDecoder()
@@ -779,9 +857,57 @@ final class AppModel: ObservableObject {
     /// seconds): take its list first, so the change about to be made lands on top of it instead
     /// of writing over it. Everything here is saved right away, so a file that differs is newer.
     private func catchUpWithDisk() {
-        guard sharedFolder != nil, !hasUnsavedChanges, let notebook = try? file.load(), notebook != history.notebook else { return }
-        history.replaceNotebook(notebook)
+        guard sharedFolder != nil || aiWatching, !hasUnsavedChanges, let notebook = try? file.load(), notebook != history.notebook else { return }
+        takeFromDisk(notebook)
+    }
+
+    /// Another writer's list. With AI 연결 on (1.42) its changes go into the undo history too, so ⌘Z still takes
+    /// back this Mac's own steps; otherwise (another device in a shared folder) the history starts over, as before.
+    private func takeFromDisk(_ notebook: Notebook) {
+        if aiWatching { history.adopt(notebook) } else { history.replaceNotebook(notebook) }
         objectWillChange.send()
+    }
+
+    // MARK: AI 연결 (1.42)
+
+    /// Settings › AI 연결 (nil in previews and snapshots until one is made for them).
+    var ai: AIConnection?
+    /// While AI 연결 is on, the folder is watched and caught up with before every change even when it is this
+    /// Mac's own: the extension writes it (Claude can add while the app is open).
+    var aiWatching = false
+    /// To-dos and events Claude added or changed today (the small stamp on their rows).
+    @Published var aiMarks = AIMarks()
+
+    func isAIMarked(_ id: String) -> Bool {
+        guard !aiMarks.ids.isEmpty, aiMarks.ids.contains(id) else { return false }
+        return aiMarks.day == Archive.dayKey(Date())
+    }
+
+    /// An undo of Claude's work, written like Claude's own changes: not an undo step here (⌘Z after it goes to
+    /// this Mac's previous step, not back to Claude's version).
+    func adoptExternal(_ notebook: Notebook) {
+        AIWriteLock.with {
+            history.adopt(notebook)
+            history.stampToday(now: Date())
+            hasUnsavedChanges = true
+            retrySave()
+        }
+    }
+
+    /// Rows edited here lose their stamp (bookkeeping — 어제부터, a delivered alert — isn't an edit).
+    private func clearAIMarks(from before: Notebook, to after: Notebook) {
+        let old = Dictionary(before.items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        func plain(_ item: TodoItem) -> TodoItem {
+            var item = item
+            item.todaySince = nil
+            item.reminderLastDeliveredAt = nil
+            return item
+        }
+        var edited = Set<String>()
+        for item in after.items where aiMarks.ids.contains(item.id.uuidString) {
+            if let was = old[item.id], plain(was) != plain(item) { edited.insert(item.id.uuidString) }
+        }
+        if !edited.isEmpty { ai?.clearMarks(edited) }
     }
 
     /// Another device may have saved memos since this Mac last read them (a shared folder is
@@ -850,7 +976,6 @@ final class AppModel: ObservableObject {
                 move(id, to: .someday, now: now)
             }
         case .todos: move(id, to: .today, now: now)
-        case .memos: break
         }
     }
 
@@ -866,7 +991,6 @@ final class AppModel: ObservableObject {
         switch page {
         case .todos: todayDisplayOrder
         case .ahead: aheadItems
-        case .memos: []
         }
     }
 
@@ -1044,7 +1168,7 @@ final class AppModel: ObservableObject {
     }
 
     func showShortcuts() {
-        SlipAlert.run(symbol: "keyboard", title: L("종이냥 단축키"), message: L("⌘N     입력 줄로 가기\n⌘1–3     오늘 · 앞으로 · 메모\n⌘F     검색\n⌘M     포스트잇으로 접기\n⌘D     책상\nReturn     넣기 · 고치기 끝\nEsc     고치기 취소\n⌘Z     되돌리기\n⇧⌘Z     다시 하기\n⇧⌘C     목록 복사\n⌘E     텍스트로 내보내기\n⌥→ · ⌥←     고른 할 일 하루 뒤로 · 앞으로\n⌥↓     고른 할 일 언젠가로\nF     고른 할 일에 집중\n⌃⌥N     빠른 입력 (어디서든)\n⌃⌥M     빠른 메모 (어디서든)\n⌃⌥J     노트 보이기 · 숨기기 (어디서든)\n\n집중하는 동안: Space 일시정지 · ⌘↩ 다 했어요 · ⌘= 5분 더 · Esc 그만두기\n할 일을 누르면 바로 고칠 수 있어요. 줄 왼쪽 손잡이를 끌거나 우클릭 메뉴로 순서를 바꿔요.\n목록은 이 Mac에 저절로 저장돼요."),
+        SlipAlert.run(symbol: "keyboard", title: L("종이냥 단축키"), message: L("⌘N     입력 줄로 가기\n⌘1 · ⌘2     오늘 · 앞으로\n⌘3     메모 서랍\n⌘F     검색\n⌘M     포스트잇으로 접기\n⌘D     책상\nReturn     넣기 · 고치기 끝\nEsc     고치기 취소\n⌘Z     되돌리기\n⇧⌘Z     다시 하기\n⇧⌘C     목록 복사\n⌘E     텍스트로 내보내기\n⌥→ · ⌥←     고른 할 일 하루 뒤로 · 앞으로\n⌥↓     고른 할 일 언젠가로\nF     고른 할 일에 집중\n⌃⌥N     빠른 입력 (어디서든)\n⌃⌥M     빠른 메모 (어디서든)\n⌃⌥J     노트 보이기 · 숨기기 (어디서든)\n\n집중하는 동안: Space 일시정지 · ⌘↩ 다 했어요 · ⌘= 5분 더 · Esc 그만두기\n할 일을 누르면 바로 고칠 수 있어요. 줄 왼쪽 손잡이를 끌거나 우클릭 메뉴로 순서를 바꿔요.\n목록은 이 Mac에 저절로 저장돼요."),
                       choices: [.init(title: L("확인"), role: .primary, isDefault: true, isCancel: true)], cat: nil, width: .medium)
     }
 
@@ -1063,6 +1187,7 @@ final class AppModel: ObservableObject {
         defer { PerfProbe.io("todos", since: started) }
         do {
             try file.save(history.notebook)
+            ai?.noteSave(history.notebook)
             hasUnsavedChanges = false
             storageError = nil
         } catch {
@@ -1096,9 +1221,14 @@ final class AppModel: ObservableObject {
     }
 
     func mutate<T>(_ action: (inout UndoableNotebook) -> T) {
+        AIWriteLock.with { mutateHeld(action) }
+    }
+
+    private func mutateHeld<T>(_ action: (inout UndoableNotebook) -> T) {
         catchUpWithDisk()
         let before = history.notebook
         _ = action(&history)
+        if !aiMarks.ids.isEmpty { clearAIMarks(from: before, to: history.notebook) }
         history.stampToday(now: Date())
         guard history.notebook != before else { return }
         hasUnsavedChanges = true

@@ -362,6 +362,36 @@ export class UndoableNotebook {
     return true;
   }
 
+  /** The whole list replaced (an undo of Claude's work, see ai.ts), as one undo step. */
+  replaceItems(items: readonly TodoItem[]): boolean {
+    return this.perform((notebook) => { notebook.items = items.map((item) => ({ ...item })); });
+  }
+
+  /**
+   * AI 연결: the file changed by another program (Claude through the extension), taken in without losing the
+   * undo history. The list becomes `theirs`; every undo/redo copy gets the same change item by item — a new
+   * item joins at the end, a removed one goes, a changed one takes the new version where the copy still had
+   * the old (`base`: the file as this app last read or wrote it). Bookkeeping, like placeRecurring.
+   */
+  absorb(base: NotebookData, theirs: NotebookData): void {
+    const canon = (item: TodoItem) => JSON.stringify(Object.keys(item).sort().map((key) => [key, item[key as keyof TodoItem]]));
+    const was = new Map(base.items.map((item) => [item.id, item]));
+    const now = new Map(theirs.items.map((item) => [item.id, item]));
+    const apply = (notebook: NotebookData): NotebookData => {
+      const items = notebook.items
+        .filter((item) => !(was.has(item.id) && !now.has(item.id)))
+        .map((item) => (was.has(item.id) && now.has(item.id) && canon(was.get(item.id)!) === canon(item) ? { ...now.get(item.id)! } : item));
+      for (const item of theirs.items) if (!was.has(item.id) && !items.some((entry) => entry.id === item.id)) items.push({ ...item });
+      return { items };
+    };
+    this.undoStack = this.undoStack.map(apply);
+    this.redoStack = this.redoStack.map(apply);
+    this.current = clone(theirs);
+  }
+
+  /** How many steps Ctrl+Z can take back (whether the person changed anything since a moment). */
+  get undoDepth(): number { return this.undoStack.length; }
+
   /** Tasks put back on the list as they were (완료한 일 정리 taken back), as one undo step; ids already there are left. */
   restore(items: readonly TodoItem[]): boolean {
     return this.perform((notebook) => {

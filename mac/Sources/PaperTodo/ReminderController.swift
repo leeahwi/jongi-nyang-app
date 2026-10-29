@@ -239,6 +239,9 @@ struct SettingsPaneView: View {
             StorageSettingsGroup(model: model)
             CompletedSettingsGroup(model: model)
             BackupSettingsGroup(model: model)
+        case .drawer: MemoDrawerSettingsGroup(drawer: model.drawer)
+        case .ai:
+            if let ai = model.ai { AISettingsPanel(ai: ai) }
         case .calendar, .history, .help: EmptyView()
         }
     }
@@ -320,7 +323,7 @@ struct SettingsPaneView: View {
                     ? L("다른 앱을 쓰다가도 ⌃⌥N을 누르면 작은 입력 칸이 떠요. ‘내일 3시 엄마께 전화’, ‘금요일까지 보고서’처럼 적으면 알림·마감을 알아서 정해요. ‘내일 3시 회의’는 일정이 돼요.")
                     : L("다른 앱이 ⌃⌥N을 쓰고 있어서 켜지 못했어요."),
                 model.quickMemoRegistered
-                    ? L("⌃⌥M은 빠른 메모예요. 적고 ⌘Return이면 메모 탭 맨 위에 들어가요.")
+                    ? L("⌃⌥M은 빠른 메모예요. 적고 ⌘Return이면 메모 서랍에서 마지막으로 본 폴더 맨 위에 들어가요.")
                     : L("다른 앱이 ⌃⌥M을 쓰고 있어서 켜지 못했어요."),
                 model.noteHotKeyRegistered
                     ? L("⌃⌥J는 노트를 불러오거나 넣어 둬요.")
@@ -622,7 +625,7 @@ struct SettingsGroup<Content: View>: View {
                 .background(PaperTheme.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay { RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(PaperTheme.rule, lineWidth: 1) }
             if let footer {
-                Text(footer)
+                Text(footer.keepingParticles)
                     .font(.system(size: 11))
                     .foregroundStyle(PaperTheme.ink2)
                     .fixedSize(horizontal: false, vertical: true)
@@ -1106,7 +1109,7 @@ struct SettingsLabel: View {
     var body: some View {
         HStack(spacing: 10) {
             SettingsTile(systemImage: systemImage)
-            Text(title).font(.system(size: 13))
+            Text(title.keepingParticles).font(.system(size: 13))
         }
     }
 }

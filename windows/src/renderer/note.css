@@ -3,9 +3,8 @@
 /* Top row: washi index tabs for the three pages (오늘 · 앞으로 · 메모), the tools on the right; the rest of the row and
    the header below drag the window (double-click folds it). The active tab joins the sheet through
    a 3px band of its colour under the row; the others stand a little lower. */
-:root { --tab-today: var(--tab-1); --tab-ahead: var(--tab-2); --tab-memos: var(--tab-3); --band: var(--tab-today); }
+:root { --tab-today: var(--tab-1); --tab-ahead: var(--tab-2); --band: var(--tab-today); }
 :root[data-page="ahead"] { --band: var(--tab-ahead); }
-:root[data-page="memos"] { --band: var(--tab-memos); }
 .tabs-row { height: 40px; flex: none; display: flex; align-items: flex-end; padding: 0 8px 0 12px; -webkit-app-region: drag; position: relative; border-bottom: 3px solid var(--band); }
 .index-tabs { display: flex; align-items: flex-end; gap: 4px; -webkit-app-region: no-drag; flex: none; }
 .index-tab {
@@ -22,7 +21,6 @@
 .index-tab.drop-target .tab-label { color: var(--ink); }
 .tab-today { --tab-color: var(--tab-today); }
 .tab-ahead { --tab-color: var(--tab-ahead); }
-.tab-memos { --tab-color: var(--tab-memos); }
 .tab-label { position: relative; font-family: var(--title-font); font-size: 19px; line-height: 1.15; color: var(--tab-ink); white-space: nowrap; padding-top: 1px; }
 :root[data-font="clean"] .tab-label { font-size: 12.5px; }
 .index-tab[aria-selected="true"] .tab-label { color: var(--ink); }
@@ -164,6 +162,10 @@
 .star { display: inline-flex; vertical-align: middle; margin-right: 5px; color: var(--sage-text); position: relative; top: -1px; }
 .star .icon { fill: currentColor; }
 .star:not([hidden]) + .label { max-width: calc(100% - 17px); }
+/* AI 연결: the stamp follows the title; a long title gives way to it. */
+.text:has(> .ai-stamp:not([hidden])) > .label { max-width: calc(100% - 52px); }
+.text:has(> .ai-stamp:not([hidden])) > .star:not([hidden]) + .label { max-width: calc(100% - 69px); }
+.row.done .ai-stamp { opacity: 0.6; }
 .row.done .star { display: none; }
 .move .icon { flex: none; }
 /* Put in the calendar: a small, faint sage calendar at the end of the row. */
@@ -236,27 +238,6 @@
 .footer-hint { color: var(--ink-3); display: inline-flex; align-items: center; gap: 6px; }
 .footer-hint > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
-/* Memos */
-.memo-new { width: 100%; text-align: left; }
-.memo-new-label { margin-left: 17px; font-family: var(--body-font); font-size: var(--body-size); color: var(--faded); }
-.memo-row { cursor: default; }
-.memo-icon { width: var(--margin); display: flex; justify-content: center; color: color-mix(in srgb, var(--secondary) 60%, transparent); z-index: 1; }
-.memo-row .text { display: flex; align-items: baseline; gap: 8px; }
-.memo-row .label { flex: none; max-width: 60%; }
-.memo-preview { font-size: 11px; color: var(--secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-inline-end: 2px; }
-.memo-date { font-size: 11px; color: var(--faded); font-variant-numeric: tabular-nums; white-space: nowrap; margin-right: 6px; z-index: 1; }
-/* Like the task rows: the time at rest, and the trash in that spot on hover. */
-.memo-row .trash { display: none; }
-.memo-row:hover .trash, .memo-row .trash:focus-visible { display: inline-flex; }
-.memo-row:hover .memo-date { display: none; }
-.memo-editor { display: flex; flex-direction: column; height: 100%; }
-.memo-bar { height: 34px; display: flex; align-items: center; gap: 6px; padding: 0 16px 0 22px; }
-.memo-back { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--sage-text); }
-.memo-back .icon { transform: rotate(90deg); }
-.memo-text { flex: 1; resize: none; border: 0; outline: none; background: transparent; padding: 6px 18px 20px calc(var(--margin) + 17px); font-family: var(--body-font); font-size: var(--body-size); line-height: 1.55; color: var(--ink); user-select: text;
-  background-image: linear-gradient(to right, transparent calc(var(--margin) - 0.3px), color-mix(in srgb, var(--accent) 22%, transparent) calc(var(--margin) - 0.3px), color-mix(in srgb, var(--accent) 22%, transparent) calc(var(--margin) + 0.3px), transparent calc(var(--margin) + 0.3px)); }
-.memo-text::placeholder { color: var(--faded); }
-.restore { font-size: 11px; font-weight: 600; color: var(--sage-text); }
 
 .editor .alert-row input[type="time"] { height: 28px; border-radius: 7px; border: 1px solid var(--rule); background: var(--card); color: var(--ink); padding: 0 6px; font: 12.5px var(--ui); }
 
@@ -385,6 +366,8 @@
 .sr-mark.reminder { border: 1.5px solid var(--ink-3); }
 .sr-title { flex: 0 1 auto; min-width: 0; font: 400 12.5px/22px var(--ui); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .strip-row.task .sr-title, .strip-row.reminder .sr-title { padding-right: var(--ink-over); font: 400 19px/22px var(--body-font); }
+.strip-row .ai-stamp { margin-left: 0; top: -2px; }
+.lead-row .ai-stamp { margin-left: 0; top: 1px; }
 .sr-away { flex: none; margin-left: auto; padding-left: 6px; font: 500 10.5px/22px var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-3); white-space: nowrap; }
 .sr-away.soon { font-weight: 600; color: var(--clay-text); }
 

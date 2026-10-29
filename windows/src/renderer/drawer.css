@@ -1,0 +1,459 @@
+/*
+ * 메모 서랍 (1.28, 1.29): the drawer at the screen's edge and its handle, in four papers — 낮 종이, 밤 종이, 크라프트지
+ * and 모눈 노트. `<html data-look>` picks one (자동 = 낮 or 밤 with the note); a memo with its own paper (이 메모의
+ * 종이) carries `data-sheet` and takes that paper's sheet, ink, rules and edge while the drawer stays as it is.
+ * 1.29 (the user's choices from the mocks): the drawer paper a step darker than the sheets, each sheet with a
+ * 1 px edge and a soft shadow, a strip of tape on every memo, date groups, kinds as chips, the open memo's two
+ * pills, and four 바탕 (`<html data-backdrop>`: solid · frost · strong · none).
+ * Every text colour here passes 4.5:1 on what it sits on, every mark 3:1 (test/drawerContrast.test.ts).
+ */
+
+:root {
+  --d-hand: var(--title-font);
+  --d-mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, Menlo, monospace;
+  --d-tabs: 34px;
+  --d-top: 24px;
+}
+
+/* ─── 낮 종이 ─── */
+:root[data-look="day"], .it[data-sheet="day"], .big[data-sheet="day"] {
+  --d-paper: #e6dbc3; --d-edge: #c9bb9b; --d-line: rgba(170, 150, 110, 0.35); --d-ink: #2a2925; --d-title: #2a2925;
+  --d-sub: #42603c; --d-icon: #55504a; --d-card: #fffdf7; --d-card-edge: #d0c2a3; --d-shadow: rgba(60, 50, 30, 0.12); --d-meta: #646057; --d-preview: #5c584f; --d-grp: #5c584f;
+  --d-check: #5f7a5a; --d-on-check: #fffdf8; --d-box: #8a8374; --d-done: #646057; --d-select: #6f63b8; --d-open: #8d82cf;
+  --d-bar: #5f7a5a; --d-bar-track: #e6dfcf; --d-foot-rule: #c9bb9b; --d-foot: #646057; --d-foot-paw: #c98a8f;
+  --d-hover: rgba(70, 60, 40, 0.07); --d-mark: rgba(233, 207, 122, 0.55); --d-menu: #fffdf8; --d-menu-edge: #d0c2a3;
+  --d-qk: #fffdf7; --d-qk-edge: #d0c2a3; --d-radius: 10px;
+  --d-chip: #f3efe6; --d-pill: #f5f2ea; --d-pill-edge: rgba(70, 60, 40, 0.14); --d-pin: #7f6418; --d-danger: #a4472f;
+  --d-slip-rule: #ece4d2; --d-slip-margin: #efc4c0; --d-slip-bottom: #e0d7c4; --d-ear: #e6dbc3; --d-ear-in: rgba(242, 201, 198, 0.8);
+  --c-lavender-a: #dcd8f3; --c-lavender-b: #d3cef0; --c-lavender-ink: #3f3a73; --c-lavender-tape: #d3cef0; --c-lavender-edge: #9d92d8; --c-lavender-line: #8e84c8;
+  --c-pink-a: #f2d3d6; --c-pink-b: #eccacd; --c-pink-ink: #6f3239; --c-pink-tape: #ecc6ca; --c-pink-edge: #d79aa2; --c-pink-line: #b87b82;
+  --c-mint-a: #cfe6d6; --c-mint-b: #c4dfcc; --c-mint-ink: #2d5638; --c-mint-tape: #c4dfcc; --c-mint-edge: #86b896; --c-mint-line: #689776;
+  --c-yellow-a: #f3e3a0; --c-yellow-b: #efdc90; --c-yellow-ink: #66531a; --c-yellow-tape: #efdc90; --c-yellow-edge: #c3b273; --c-yellow-line: #9e8c4f;
+  --c-sky-a: #d6e5f4; --c-sky-b: #cbdcef; --c-sky-ink: #2c4c70; --c-sky-tape: #cbdcef; --c-sky-edge: #8fb0da; --c-sky-line: #6d8eb6;
+  --c-peach-a: #f6dccb; --c-peach-b: #f1d1bc; --c-peach-ink: #6f4026; --c-peach-tape: #f1d1bc; --c-peach-edge: #c8a793; --c-peach-line: #aa846e;
+  --c-sand-a: #ebe2cf; --c-sand-b: #e3d8c1; --c-sand-ink: #574629; --c-sand-tape: #e3d8c1; --c-sand-edge: #b6aa94; --c-sand-line: #988a72;
+  --c-gray-a: #e2e0da; --c-gray-b: #d9d6cf; --c-gray-ink: #47453f; --c-gray-tape: #d9d6cf; --c-gray-edge: #aeaca6; --c-gray-line: #8f8d87;
+}
+
+/* ─── 밤 종이 (the folder colours as in 1.28.1) ─── */
+:root[data-look="night"], .it[data-sheet="night"], .big[data-sheet="night"] {
+  --d-paper: #1c1a17; --d-edge: #4a463f; --d-line: rgba(255, 255, 255, 0.04); --d-ink: #f6f1e6; --d-title: #f7f2e7;
+  --d-sub: #b3cbad; --d-icon: #cdc6b7; --d-card: #3d3a34; --d-card-edge: #5a554b; --d-shadow: rgba(0, 0, 0, 0.45); --d-meta: #c4bdad; --d-preview: #dad3c3; --d-grp: #c4bdad;
+  --d-check: #b3cbad; --d-on-check: #1f2a1e; --d-box: #a39d90; --d-done: #c4bdad; --d-select: #b0a8e0; --d-open: #9d95d6;
+  --d-bar: #b3cbad; --d-bar-track: #524e46; --d-foot-rule: #4a463f; --d-foot: #c4bdad; --d-foot-paw: #d39a9e;
+  --d-hover: rgba(255, 255, 255, 0.06); --d-mark: rgba(190, 168, 90, 0.5); --d-menu: #45423b; --d-menu-edge: #5a554b;
+  --d-qk: #3d3a34; --d-qk-edge: #5a554b; --d-radius: 10px;
+  --d-chip: #4a4740; --d-pill: #46433c; --d-pill-edge: rgba(255, 255, 255, 0.12); --d-pin: #d9c47a; --d-danger: #eaa58a;
+  --d-slip-rule: #4a463f; --d-slip-margin: #9a6266; --d-slip-bottom: #1d1c19; --d-ear: #1c1a17; --d-ear-in: #7d555a;
+  --c-lavender-a: #5e5888; --c-lavender-b: #575181; --c-lavender-ink: #f1edff; --c-lavender-tape: #7d75ad; --c-lavender-edge: #8f87c4; --c-lavender-line: #8f87c4;
+  --c-pink-a: #74545a; --c-pink-b: #6c4e54; --c-pink-ink: #ffe4e8; --c-pink-tape: #8a666c; --c-pink-edge: #a8797f; --c-pink-line: #ad7f85;
+  --c-mint-a: #4b6a55; --c-mint-b: #46634f; --c-mint-ink: #e2f5e7; --c-mint-tape: #5f8269; --c-mint-edge: #719a7e; --c-mint-line: #719a7e;
+  --c-yellow-a: #716641; --c-yellow-b: #6a603c; --c-yellow-ink: #fff1bf; --c-yellow-tape: #85794f; --c-yellow-edge: #9d9168; --c-yellow-line: #9d9168;
+  --c-sky-a: #4a5d78; --c-sky-b: #455770; --c-sky-ink: #e3eeff; --c-sky-tape: #5d7090; --c-sky-edge: #7189ad; --c-sky-line: #738baf;
+  --c-peach-a: #765b49; --c-peach-b: #6e5544; --c-peach-ink: #ffe8d8; --c-peach-tape: #8b6d58; --c-peach-edge: #a08675; --c-peach-line: #a08675;
+  --c-sand-a: #6a644f; --c-sand-b: #635d4a; --c-sand-ink: #f5ecd4; --c-sand-tape: #7b745d; --c-sand-edge: #958c6e; --c-sand-line: #958c6e;
+  --c-gray-a: #5d5a55; --c-gray-b: #57544f; --c-gray-ink: #f0ede6; --c-gray-tape: #6e6b65; --c-gray-edge: #8a8782; --c-gray-line: #8c8984;
+}
+
+/* ─── 크라프트지 ─── */
+:root[data-look="kraft"], .it[data-sheet="kraft"], .big[data-sheet="kraft"] {
+  --d-paper: #cdb187; --d-edge: #a98d63; --d-line: transparent; --d-ink: #33281d; --d-title: #33281d;
+  --d-sub: #4a3a22; --d-icon: #5a4732; --d-card: #fbf6ea; --d-card-edge: #a98d63; --d-shadow: rgba(60, 50, 30, 0.12); --d-meta: #54452f; --d-preview: #574a39; --d-grp: #4a3a22;
+  --d-check: #5f7f4e; --d-on-check: #fbf6ea; --d-box: #8f7a5a; --d-done: #54452f; --d-select: #6b4f2b; --d-open: #8a6a40;
+  --d-bar: #5a7a4b; --d-bar-track: #ece2cd; --d-foot-rule: #a98d63; --d-foot: #4a3a22; --d-foot-paw: #8f4f3e;
+  --d-hover: rgba(90, 64, 30, 0.08); --d-mark: rgba(241, 211, 122, 0.7); --d-menu: #fbf6ea; --d-menu-edge: #c9b08a;
+  --d-qk: #fbf6ea; --d-qk-edge: #a98d63; --d-radius: 4px;
+  --d-chip: #f1e9d8; --d-pill: #f3ecde; --d-pill-edge: rgba(90, 60, 20, 0.16); --d-pin: #5f4712; --d-danger: #8f3a22;
+  --d-slip-rule: #e8dcc3; --d-slip-margin: #d79a8a; --d-slip-bottom: #c9b08a; --d-ear: #cdb187; --d-ear-in: rgba(227, 160, 142, 0.7);
+  --c-lavender-a: #f4ecdc; --c-lavender-b: #f4ecdc; --c-lavender-ink: #5c4228; --c-lavender-tape: #9cc2a6; --c-lavender-edge: #a3927d; --c-lavender-line: #98856f;
+  --c-pink-a: #e9a38f; --c-pink-b: #e9a38f; --c-pink-ink: #4f2418; --c-pink-tape: #e9a38f; --c-pink-edge: #c27a66; --c-pink-line: #bd7763;
+  --c-mint-a: #9cc2a6; --c-mint-b: #9cc2a6; --c-mint-ink: #203d2a; --c-mint-tape: #9cc2a6; --c-mint-edge: #6f9a7b; --c-mint-line: #679173;
+  --c-yellow-a: #f1d37a; --c-yellow-b: #f1d37a; --c-yellow-ink: #5c4512; --c-yellow-tape: #f1d37a; --c-yellow-edge: #ab9049; --c-yellow-line: #a08641;
+  --c-sky-a: #a9c6e3; --c-sky-b: #a9c6e3; --c-sky-ink: #1f3a58; --c-sky-tape: #a9c6e3; --c-sky-edge: #7598ba; --c-sky-line: #698bac;
+  --c-peach-a: #f0b98c; --c-peach-b: #f0b98c; --c-peach-ink: #573016; --c-peach-tape: #f0b98c; --c-peach-edge: #ba8963; --c-peach-line: #ae7e5a;
+  --c-sand-a: #eadbb5; --c-sand-b: #eadbb5; --c-sand-ink: #4c3c1e; --c-sand-tape: #eadbb5; --c-sand-edge: #a39371; --c-sand-line: #978765;
+  --c-gray-a: #cfc8bb; --c-gray-b: #cfc8bb; --c-gray-ink: #3c3832; --c-gray-tape: #cfc8bb; --c-gray-edge: #999388; --c-gray-line: #8e887e;
+}
+
+/* ─── 모눈 노트 ─── */
+:root[data-look="grid"], .it[data-sheet="grid"], .big[data-sheet="grid"] {
+  --d-paper: #dde6f0; --d-edge: #b3c2d4; --d-line: #c9d5e3; --d-ink: #1f2a35; --d-title: #1f2a35;
+  --d-sub: #2f5793; --d-icon: #4f5c69; --d-card: #ffffff; --d-card-edge: #bccadb; --d-shadow: rgba(30, 50, 80, 0.13); --d-meta: #57636f; --d-preview: #4b5865; --d-grp: #4b5865;
+  --d-check: #3f6aa8; --d-on-check: #ffffff; --d-box: #7c8a99; --d-done: #57636f; --d-select: #3f6aa8; --d-open: #6f8fc4;
+  --d-bar: #3f6aa8; --d-bar-track: #e3e9f0; --d-foot-rule: #b3c2d4; --d-foot: #57636f; --d-foot-paw: #c98a8f;
+  --d-hover: rgba(40, 70, 110, 0.07); --d-mark: rgba(246, 231, 176, 0.9); --d-menu: #ffffff; --d-menu-edge: #bccadb;
+  --d-qk: #ffffff; --d-qk-edge: #bccadb; --d-radius: 10px;
+  --d-chip: #eff2f6; --d-pill: #f1f4f7; --d-pill-edge: rgba(40, 70, 110, 0.14); --d-pin: #806516; --d-danger: #a4472f;
+  --d-slip-rule: #d8e2ee; --d-slip-margin: #f0b8b4; --d-slip-bottom: #d8e0e8; --d-ear: #dde6f0; --d-ear-in: #f6d6d2;
+  --c-lavender-a: #e4ebf8; --c-lavender-b: #e4ebf8; --c-lavender-ink: #2f4a7a; --c-lavender-tape: #f6d6d2; --c-lavender-edge: #b3c0d6; --c-lavender-line: #7c8eaf;
+  --c-pink-a: #f6d6d2; --c-pink-b: #f6d6d2; --c-pink-ink: #6e2f28; --c-pink-tape: #f6d6d2; --c-pink-edge: #e0aaa3; --c-pink-line: #b98079;
+  --c-mint-a: #d3eadf; --c-mint-b: #d3eadf; --c-mint-ink: #24533c; --c-mint-tape: #d3eadf; --c-mint-edge: #a4c1b3; --c-mint-line: #719583;
+  --c-yellow-a: #f6e7b0; --c-yellow-b: #f6e7b0; --c-yellow-ink: #614f17; --c-yellow-tape: #f6e7b0; --c-yellow-edge: #cebe87; --c-yellow-line: #9e8d56;
+  --c-sky-a: #d6e6f5; --c-sky-b: #d6e6f5; --c-sky-ink: #24496f; --c-sky-tape: #d6e6f5; --c-sky-edge: #9fb6dc; --c-sky-line: #738fb5;
+  --c-peach-a: #f8dfca; --c-peach-b: #f8dfca; --c-peach-ink: #6a3d20; --c-peach-tape: #f8dfca; --c-peach-edge: #d4b6a0; --c-peach-line: #aa866d;
+  --c-sand-a: #ece4d0; --c-sand-b: #ece4d0; --c-sand-ink: #54442a; --c-sand-tape: #ece4d0; --c-sand-edge: #c3b9a3; --c-sand-line: #998d75;
+  --c-gray-a: #e2e5e9; --c-gray-b: #e2e5e9; --c-gray-ink: #3b434c; --c-gray-tape: #e2e5e9; --c-gray-edge: #b8bcc2; --c-gray-line: #888e95;
+}
+
+.c-lavender { --a: var(--c-lavender-a); --b: var(--c-lavender-b); --k: var(--c-lavender-ink); --tp: var(--c-lavender-tape); --e: var(--c-lavender-edge); --ln: var(--c-lavender-line); }
+.c-pink { --a: var(--c-pink-a); --b: var(--c-pink-b); --k: var(--c-pink-ink); --tp: var(--c-pink-tape); --e: var(--c-pink-edge); --ln: var(--c-pink-line); }
+.c-mint { --a: var(--c-mint-a); --b: var(--c-mint-b); --k: var(--c-mint-ink); --tp: var(--c-mint-tape); --e: var(--c-mint-edge); --ln: var(--c-mint-line); }
+.c-yellow { --a: var(--c-yellow-a); --b: var(--c-yellow-b); --k: var(--c-yellow-ink); --tp: var(--c-yellow-tape); --e: var(--c-yellow-edge); --ln: var(--c-yellow-line); }
+.c-sky { --a: var(--c-sky-a); --b: var(--c-sky-b); --k: var(--c-sky-ink); --tp: var(--c-sky-tape); --e: var(--c-sky-edge); --ln: var(--c-sky-line); }
+.c-peach { --a: var(--c-peach-a); --b: var(--c-peach-b); --k: var(--c-peach-ink); --tp: var(--c-peach-tape); --e: var(--c-peach-edge); --ln: var(--c-peach-line); }
+.c-sand { --a: var(--c-sand-a); --b: var(--c-sand-b); --k: var(--c-sand-ink); --tp: var(--c-sand-tape); --e: var(--c-sand-edge); --ln: var(--c-sand-line); }
+.c-gray { --a: var(--c-gray-a); --b: var(--c-gray-b); --k: var(--c-gray-ink); --tp: var(--c-gray-tape); --e: var(--c-gray-edge); --ln: var(--c-gray-line); }
+
+/* A memo's tape stays its folder's colour as the drawer draws it, whatever paper the memo has: the colours are
+   taken here, at the drawer, before a memo's own paper can change them. */
+.dr {
+  --tape-lavender: var(--c-lavender-tape); --tape-pink: var(--c-pink-tape); --tape-mint: var(--c-mint-tape); --tape-yellow: var(--c-yellow-tape);
+  --tape-sky: var(--c-sky-tape); --tape-peach: var(--c-peach-tape); --tape-sand: var(--c-sand-tape); --tape-gray: var(--c-gray-tape);
+  --drawer-paper: var(--d-paper);
+}
+.it.c-lavender > .tp { background: var(--tape-lavender); } .it.c-pink > .tp { background: var(--tape-pink); }
+.it.c-mint > .tp { background: var(--tape-mint); } .it.c-yellow > .tp { background: var(--tape-yellow); }
+.it.c-sky > .tp { background: var(--tape-sky); } .it.c-peach > .tp { background: var(--tape-peach); }
+.it.c-sand > .tp { background: var(--tape-sand); } .it.c-gray > .tp { background: var(--tape-gray); }
+
+/* ─── The window ─── */
+body.drawer-window { background: transparent; overflow: hidden; color: var(--d-ink); }
+.stage { position: absolute; inset: 0; transition: transform 0.18s cubic-bezier(0.2, 0.7, 0.3, 1); will-change: auto; }
+.stage.away.side-right { transform: translateX(100%); }
+.stage.away.side-left { transform: translateX(-100%); }
+.stage.still { transition: none; }
+
+/* The paper: against the screen's edge, rounded on the inner side, from under the cat to the bottom. */
+.dr {
+  position: absolute; top: var(--d-top); bottom: 0; display: flex; flex-direction: column; min-width: 0;
+  background-color: var(--d-paper); border: 1px solid var(--d-edge); font-size: 12.5px;
+  box-shadow: 0 0 24px -8px rgba(60, 48, 24, 0.28);
+}
+.side-right .dr { left: var(--d-tabs); right: 0; border-right: none; border-radius: 14px 0 0 14px; }
+.side-left .dr { left: 0; right: var(--d-tabs); border-left: none; border-radius: 0 14px 14px 0; }
+:root[data-look="grid"] .dr { background-image: linear-gradient(var(--d-line) 1px, transparent 1px), linear-gradient(90deg, var(--d-line) 1px, transparent 1px); background-size: 14px 14px; }
+:root[data-look="night"] .dr { box-shadow: 0 0 24px -6px rgba(0, 0, 0, 0.6); }
+/* 낮 · 밤: ruled lines across the paper (under everything on it). */
+.dr::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: repeating-linear-gradient(transparent 0 21px, var(--d-line) 21px 22px); }
+:root[data-look="grid"] .dr::before { display: none; }
+.dr > * { position: relative; }
+.dr > .ears, .dr > .grip, .dr > .big, .dr > .menu, .dr > .toast-host, .dr > .tip { position: absolute; }
+
+/* The inner edge: drag to make the drawer wider or narrower (260–480). */
+.grip { top: 14px; bottom: 14px; width: 6px; cursor: ew-resize; z-index: 2; }
+.side-right .grip { left: 0; }
+.side-left .grip { right: 0; }
+
+/* ─── The header: 메모 서랍, the folder's name ▾ (the folder list), 검색 · 위에 고정 · 닫기 ─── */
+.hd { padding: 10px 9px 6px 14px; flex: none; }
+.sub { font-size: 11px; font-weight: 600; color: var(--d-sub); letter-spacing: 0.02em; padding-left: 2px; }
+.ttl { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 38px; }
+.fname { display: flex; align-items: center; gap: 4px; min-width: 0; padding: 0 6px 0 4px; margin-left: -2px; border-radius: 8px; color: var(--d-title); }
+.fname:hover, .fname[aria-expanded="true"] { background: var(--d-pill); box-shadow: inset 0 0 0 0.5px var(--d-pill-edge); }
+.fname .hw { font-family: var(--d-hand); font-size: 30px; line-height: 1.15; color: var(--d-title); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding-right: var(--ink-over); }
+:root[data-font="clean"] .fname .hw { font-size: 21px; font-weight: 600; }
+.fname .chev { flex: none; color: var(--d-meta); margin-top: 6px; }
+.ic { display: flex; gap: 2px; flex: none; }
+.ib { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; color: var(--d-icon); }
+.ib:hover { background: var(--d-hover); color: var(--d-ink); }
+.ib[aria-pressed="true"] { color: var(--d-sub); }
+.ib[aria-pressed="true"] .icon path:first-child { fill: currentColor; fill-opacity: 0.22; }
+.ib:focus-visible, .dr button:focus-visible { outline: 2px solid var(--d-select); outline-offset: 1px; }
+
+/* Search: the title gives way to a field. */
+.find { display: flex; align-items: center; gap: 6px; height: 38px; min-width: 0; flex: 1; }
+.find[hidden] { display: none; }
+.find input { flex: 1; min-width: 0; height: 30px; border: 0; border-bottom: 1px solid var(--d-card-edge); background: transparent; color: var(--d-ink); font: 15px var(--ui); padding: 0 2px; outline: none; }
+.find input::placeholder { color: var(--d-foot); }
+.find input:focus { border-bottom-color: var(--d-select); }
+
+/* ─── The quick-write slip: a sheet under a strip of tape ─── */
+.qk { margin: 4px 14px 12px; border-radius: 8px; padding: 9px 11px 6px; background: var(--d-qk); box-shadow: 0 0 0 1px var(--d-qk-edge), 0 1px 4px var(--d-shadow); flex: none; }
+:root[data-look="kraft"] .qk { border-radius: var(--d-radius); }
+.tape { position: absolute; top: -6px; left: 50%; margin-left: -26px; width: 52px; height: 12px; transform: rotate(-2deg); background: var(--tp); opacity: 0.88; }
+.qk textarea {
+  display: block; width: 100%; resize: none; border: 0; outline: none; background: transparent; color: var(--d-ink); padding: 0; margin: 0;
+  font-family: var(--d-hand); font-size: 19px; line-height: 24px; min-height: 26px; max-height: 146px; overflow-y: auto; user-select: text;
+}
+:root[data-font="clean"] .qk textarea { font-size: 13.5px; line-height: 21px; }
+.qk textarea::placeholder { color: var(--d-meta); opacity: 1; }
+.qk-hint { display: flex; justify-content: flex-end; gap: 10px; font-size: 10.5px; color: var(--d-meta); margin-top: 3px; white-space: nowrap; overflow: hidden; }
+.qk-hint[hidden] { display: none; }
+
+/* ─── The memos: date groups of cards ─── */
+.list { --gap: 16px; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 8px 12px 14px; display: flex; flex-direction: column; gap: var(--gap); scrollbar-gutter: stable; }
+.list.dense { --gap: 12px; }
+.list::-webkit-scrollbar-thumb { background-color: color-mix(in srgb, var(--d-meta) 35%, transparent); }
+/* A group's header: a small label, its count, a hairline to the edge. */
+.grp { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--d-grp); margin: 2px 2px calc(4px - var(--gap)); letter-spacing: 0.02em; white-space: nowrap; flex: none; min-width: 0; }
+.grp + .grp { margin-top: 0; }
+.grp .lbl { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.grp .lbl > span { overflow: hidden; text-overflow: ellipsis; }
+.grp .n { font-weight: 400; color: var(--d-meta); }
+.grp::after { content: ""; flex: 1; min-width: 12px; height: 1px; background: var(--d-edge); opacity: 0.7; }
+.grp .icon { color: var(--d-pin); fill: currentColor; stroke-width: 0.6; flex: none; }
+.it:not(:first-child) { margin-top: 0; }
+.list > .grp:not(:first-child) { margin-top: 6px; }
+
+/* ─── A MEMO CARD — one block, swapped as a whole (drawer.ts slipShell). A sheet of ruled paper: square corners,
+   a red margin line, rules every 22px (the first under the title), a 1 px edge and a soft shadow, a strip of
+   tape across its top. The open or picked memo's margin line is 3 px in its folder's colour; the picked one
+   is ringed in it too. ─── */
+.it {
+  --margin-line: var(--d-slip-margin); --margin-width: 1px; --pad-top: 13px; --min: 68px;
+  position: relative; flex: none; border-radius: 0; padding: var(--pad-top) 12px 10px 22px; min-height: var(--min);
+  background-color: var(--d-card); color: var(--d-ink);
+  background-image: repeating-linear-gradient(transparent 0 21px, var(--d-slip-rule) 21px 22px);
+  background-position: 0 calc(var(--pad-top) + 1px); background-size: 100% calc(100% - var(--pad-top) - 1px); background-repeat: no-repeat;
+  box-shadow: 0 1px 0 var(--d-slip-bottom), 0 4px 10px var(--d-shadow), 0 0 0 1px var(--d-card-edge);
+}
+.list.dense .it { --pad-top: 9px; --min: 56px; padding-bottom: 6px; }
+/* The perforation along the top edge: small half holes of the drawer's paper. */
+.it::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; pointer-events: none; background: radial-gradient(circle at 3.5px 0, var(--drawer-paper) 1.3px, transparent 1.6px) 0 0 / 7px 3px repeat-x; }
+/* The margin line, over the rules. */
+.it::after { content: ""; position: absolute; top: 0; bottom: 0; left: 15px; width: var(--margin-width); margin-left: calc((1px - var(--margin-width)) / 2); background: var(--margin-line); pointer-events: none; }
+.it.open, .it.selected { --margin-line: var(--ln); --margin-width: 3px; }
+.it.selected { box-shadow: 0 1px 0 var(--d-slip-bottom), 0 4px 10px var(--d-shadow), 0 0 0 2px var(--ln); }
+.it.dragging { opacity: 0.45; }
+.it > .tp { position: absolute; top: -5px; width: 30px; height: 10px; margin-left: -15px; opacity: 0.88; pointer-events: none; z-index: 1; }
+.it .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-width: 0; min-height: 22px; }
+.it .row .hw { font-family: var(--d-hand); font-size: 20px; line-height: 22px; color: var(--d-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding-right: var(--ink-over); }
+:root[data-font="clean"] .it .row .hw { font-size: 14px; font-weight: 600; }
+.it .row .right { display: flex; align-items: center; gap: 5px; flex: none; }
+.m { font-size: 10.5px; color: var(--d-meta); white-space: nowrap; flex: none; font-variant-numeric: tabular-nums; }
+.it .paw { color: var(--d-pin); display: flex; }
+.it .paw .icon, .acts .ib.on .icon, .hov .ib.on .icon { fill: currentColor; stroke-width: 0.6; }
+.p { margin: 0; font-size: 11.5px; line-height: 22px; color: var(--d-preview); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.code { font-family: var(--d-mono); font-size: 11px; letter-spacing: 0; }
+/* The kind row: a chip on the left (a link's address, a phone number, a checklist's count and bar), the time on the right. */
+.kind { display: flex; align-items: center; gap: 6px; min-height: 22px; min-width: 0; }
+.kind .m { margin-left: auto; }
+.kchip { display: inline-flex; align-items: center; gap: 4px; padding: 0 7px; border-radius: 999px; background: var(--d-chip); color: var(--d-preview); font: 10.5px/18px var(--ui); min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; flex: 0 1 auto; }
+.kchip > span { overflow: hidden; text-overflow: ellipsis; }
+.kchip .icon { flex: none; }
+button.kchip:hover { color: var(--d-ink); box-shadow: inset 0 0 0 0.5px var(--d-pill-edge); }
+.kind .bar { flex: 0 0 46px; height: 4px; border-radius: 2px; background: var(--d-bar-track); overflow: hidden; }
+.bar > i { display: block; height: 100%; border-radius: 2px; background: var(--d-bar); }
+/* The hover pill: 복사 · 고정 · ⋯ at a collapsed memo's top right (not while dragging). */
+.hov { position: absolute; right: 8px; top: 7px; display: none; gap: 1px; padding: 2px 3px; border-radius: 999px; background: var(--d-card); box-shadow: 0 0 0 0.5px var(--d-pill-edge), 0 2px 6px var(--d-shadow); z-index: 2; }
+.hov .ib { width: 24px; height: 22px; border-radius: 999px; }
+.hov .ib.on { color: var(--d-pin); }
+.it:not(.open):hover > .hov, .it.preview-hover > .hov { display: flex; }
+body.dragging-memo .it > .hov { display: none !important; }
+
+/* An open memo: every line, checklist boxes that work, and its bar under it. */
+.body { margin-top: 0; }
+.ln { font-size: 12px; line-height: 22px; margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; color: var(--d-ink); cursor: text; min-height: 22px; }
+.ck { display: flex; gap: 7px; align-items: flex-start; }
+.bx { width: 12px; height: 12px; border-radius: 3px; margin-top: 5px; flex: none; border: 1.2px solid var(--d-box); display: grid; place-items: center; color: var(--d-on-check); cursor: default; }
+.bx .icon { opacity: 0; }
+.bx.on { background: var(--d-check); border-color: var(--d-check); }
+.bx.on .icon { opacity: 1; }
+button.bx:hover { border-color: var(--d-ink); }
+.ck.done .ckt { color: var(--d-done); text-decoration: line-through; }
+.ckt { min-width: 0; }
+.editor { display: block; width: 100%; resize: none; border: 0; outline: none; background-color: transparent; color: var(--d-ink); font: 12.5px/22px var(--ui); padding: 0; margin: 0; min-height: 44px; overflow: hidden; user-select: text; }
+/* The open memo's bar: [크게 보기 · 복사 · ⚙] · `오후 5:38 고침` · [폴더로 옮기기 · 지우기]. */
+.acts { display: flex; align-items: center; gap: 6px; margin-top: 8px; min-width: 0; }
+.pill { display: flex; align-items: center; gap: 1px; padding: 2px 4px; border-radius: 999px; background: var(--d-pill); box-shadow: inset 0 0 0 0.5px var(--d-pill-edge); flex: none; }
+.pill .ib { width: 25px; height: 22px; border-radius: 999px; }
+.pill .ib.danger { color: var(--d-danger); }
+.acts .when { flex: 1; min-width: 0; text-align: center; font-size: 10.5px; color: var(--d-meta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Too narrow for the time between the pills (260 wide, a long date): it goes under them. */
+.acts.stack { flex-wrap: wrap; justify-content: space-between; row-gap: 2px; }
+.acts.stack .when { order: 3; flex-basis: 100%; }
+
+/* 크게 보기: the open memo over the whole list. */
+.big { left: 10px; right: 10px; top: var(--big-top, 120px); bottom: 50px; z-index: 4; display: flex; flex-direction: column; padding: 12px 12px 10px 22px; color: var(--d-ink);
+  background-color: var(--d-card); box-shadow: 0 1px 0 var(--d-slip-bottom), 0 10px 30px -10px var(--d-shadow), 0 0 0 1px var(--d-card-edge); }
+.big::after { content: ""; position: absolute; top: 0; bottom: 0; left: 14px; width: 3px; background: var(--ln); pointer-events: none; }
+.big .row { display: flex; align-items: center; gap: 8px; }
+.big .editor { flex: 1; overflow-y: auto; font-size: 13px; background-image: repeating-linear-gradient(transparent 0 21px, var(--d-slip-rule) 21px 22px); background-attachment: local; }
+.it .p, .it .body, .it .editor { line-height: 22px; }
+
+/* ─── Menus (the ⚙ menu, a memo's ⋯ / right-click, the folder list, a bookmark's, the text menu) and their
+   submenus — HTML, inside the paper. Icons on every row, shortcuts where they exist, destructive last. ─── */
+.menu { z-index: 8; min-width: 176px; max-width: calc(100% - 16px); max-height: calc(100% - 16px); overflow-y: auto; overflow-x: hidden; padding: 5px; border-radius: 10px; background: var(--d-menu); border: 0.5px solid var(--d-menu-edge); box-shadow: 0 12px 30px -10px rgba(40, 30, 10, 0.45); display: flex; flex-direction: column; color: var(--d-ink); scrollbar-width: thin; }
+.menu.submenu { z-index: 9; }
+.menu button.mi { height: 28px; padding: 0 8px; border-radius: 6px; text-align: left; font: 500 12.5px var(--ui); color: var(--d-ink); white-space: nowrap; display: flex; align-items: center; gap: 8px; min-width: 0; flex: none; }
+.menu button.mi > .t { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.menu button.mi > .k { margin-left: auto; padding-left: 12px; font-size: 11px; font-weight: 400; color: var(--d-meta); flex: none; }
+.menu button.mi > .ico { width: 16px; display: flex; flex: none; color: var(--d-icon); }
+.menu button.mi > .ico:empty:has(+ .sq, + .sq-paper) { display: none; }
+.menu button.mi > .sq, .menu button.mi > .sq-paper { margin: 0 2px; }
+.menu button.mi:hover, .menu button.mi:focus-visible, .menu button.mi.open { background: var(--d-hover); outline: none; }
+.menu button.mi.danger, .menu button.mi.danger > .ico { color: var(--d-danger); }
+.menu button.mi[aria-checked="true"] > .tick { color: var(--d-sub); }
+.menu button.mi > .tick { margin-left: auto; padding-left: 10px; display: flex; flex: none; }
+.menu .sep { height: 0.5px; margin: 4px 6px; background: var(--d-menu-edge); flex: none; }
+.menu .label { margin: 5px 8px 2px; font-size: 11px; font-weight: 600; color: var(--d-meta); flex: none; white-space: nowrap; }
+.menu .mh { display: flex; align-items: center; gap: 7px; padding: 4px 8px 4px; min-width: 0; flex: none; color: var(--d-meta); font-size: 11px; }
+.menu .mh .icon { color: var(--d-icon); flex: none; }
+.menu .mh b { font-family: var(--d-hand); font-size: 18px; line-height: 22px; font-weight: 400; color: var(--d-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding-right: var(--ink-over); }
+:root[data-font="clean"] .menu .mh b { font: 600 13px var(--ui); }
+.menu .mh .c { margin-left: auto; padding-left: 10px; white-space: nowrap; }
+.menu .sq { width: 12px; height: 12px; border-radius: 3px; background: var(--a); box-shadow: inset 0 0 0 1px var(--e); flex: none; }
+.menu .cnt { margin-left: auto; padding-left: 10px; font-size: 11px; color: var(--d-meta); font-variant-numeric: tabular-nums; flex: none; }
+.menu .cnt + .k { margin-left: 0; padding-left: 10px; }
+/* A row of swatches (종이 · 바탕 · 이 메모의 종이): a small sample over its name. */
+.swrow { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 4px; padding: 3px 4px 6px; flex: none; }
+.swrow button { display: flex; flex-direction: column; align-items: center; gap: 3px; font: 10px/12px var(--ui); color: var(--d-preview); min-width: 0; padding: 2px 0; border-radius: 7px; }
+.swrow button:hover, .swrow button:focus-visible { background: var(--d-hover); outline: none; }
+.swrow button > span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.swrow i { display: block; width: 100%; max-width: 44px; height: 26px; border-radius: 6px; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.22); }
+.swrow button[aria-checked="true"] { color: var(--d-ink); font-weight: 600; }
+.swrow button[aria-checked="true"] i { box-shadow: 0 0 0 2px var(--d-select); }
+.swrow i.s-auto { background: linear-gradient(135deg, #efe7d6 50%, #1e1c19 50%); }
+.swrow i.s-follow { background: linear-gradient(135deg, var(--d-card) 50%, var(--d-paper) 50%); }
+.swrow i.s-day { background: #fffdf7; } .swrow i.s-day.s-drawer { background: #e6dbc3; }
+.swrow i.s-night { background: #3d3a34; } .swrow i.s-night.s-drawer { background: #1c1a17; }
+.swrow i.s-kraft { background: #fbf6ea; box-shadow: inset 0 0 0 3px #cdb187; } .swrow i.s-kraft.s-drawer { background: #cdb187; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.22); }
+.swrow i.s-grid { background: #fff linear-gradient(#d8e2ee 1px, transparent 1px) 0 0 / 6px 6px, #fff linear-gradient(90deg, #d8e2ee 1px, transparent 1px) 0 0 / 6px 6px; background-color: #fff; }
+.swrow i.s-grid.s-drawer { background-color: #dde6f0; background-image: linear-gradient(#c9d5e3 1px, transparent 1px), linear-gradient(90deg, #c9d5e3 1px, transparent 1px); background-size: 6px 6px; }
+.menu .sq-paper { display: block; width: 12px; height: 12px; border-radius: 3px; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.3); flex: none; }
+.sq-paper.s-day { background: #fffdf7; } .sq-paper.s-night { background: #3d3a34; } .sq-paper.s-kraft { background: #fbf6ea; box-shadow: inset 0 0 0 2px #cdb187; }
+.sq-paper.s-grid { background-color: #fff; background-image: linear-gradient(#d8e2ee 1px, transparent 1px), linear-gradient(90deg, #d8e2ee 1px, transparent 1px); background-size: 4px 4px; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.3); }
+.swrow i.s-solid { background: var(--d-paper); }
+.swrow i.s-frost { background: linear-gradient(135deg, color-mix(in srgb, var(--d-paper) 85%, transparent), rgba(159, 184, 232, 0.75)); }
+.swrow i.s-strong { background: linear-gradient(135deg, rgba(243, 169, 107, 0.55), rgba(91, 139, 214, 0.6)); }
+.swrow i.s-none { background: linear-gradient(135deg, #f3a96b, #9fb8e8); }
+/* Folder colours (a bookmark's 색 ▸). */
+.swatches { display: flex; gap: 6px; padding: 6px 8px 4px; flex-wrap: wrap; flex: none; }
+.swatch { width: 18px; height: 18px; border-radius: 50%; background: var(--a); box-shadow: inset 0 0 0 1px var(--e); }
+.swatch[aria-checked="true"] { box-shadow: 0 0 0 2px var(--d-menu), 0 0 0 3.5px var(--k); }
+.menu .name { margin: 6px 6px 2px; height: 30px; border-radius: 7px; border: 1px solid var(--d-menu-edge); background: var(--d-card); color: var(--d-ink); font: 13px var(--ui); padding: 0 8px; outline: none; user-select: text; flex: none; }
+.menu .name:focus { border-color: var(--d-select); }
+.menu .row-btns { display: flex; justify-content: flex-end; gap: 6px; padding: 8px 6px 4px; flex: none; }
+.menu .btn { height: 28px; padding: 0 12px; border-radius: 8px; font: 600 12px var(--ui); color: var(--d-ink); white-space: nowrap; }
+.menu .btn:hover { background: var(--d-hover); }
+.menu .btn.go { background: var(--d-check); color: var(--d-on-check); }
+.menu .btn.go:disabled { opacity: 0.45; }
+
+/* A bookmark's small label, beside it over the paper: `장보기 · 세 장 · Ctrl+3`. */
+.tip { z-index: 7; pointer-events: none; padding: 4px 9px; border-radius: 8px; background: var(--d-menu); border: 0.5px solid var(--d-menu-edge); box-shadow: 0 6px 16px -6px rgba(40, 30, 10, 0.35); font-size: 11.5px; color: var(--d-ink); white-space: nowrap; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; }
+.tip[hidden] { display: none; }
+.tip b { font-weight: 600; }
+.tip span { color: var(--d-meta); }
+
+/* Nothing in the folder yet. */
+.empty { margin: 22px 16px 0; text-align: center; color: var(--d-foot); }
+.empty img { display: block; width: 64px; height: 64px; margin: 0 auto 4px; opacity: 0.95; }
+.empty .hw { font-family: var(--d-hand); font-size: 20px; line-height: 1.3; color: var(--d-foot); }
+:root[data-font="clean"] .empty .hw { font-size: 14px; }
+.empty p { margin: 6px 0 0; font-size: 11.5px; line-height: 1.5; text-wrap: balance; }
+
+/* Search results: the folder's name small, the matched words marked. */
+.it .where { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--d-meta); min-height: 22px; white-space: nowrap; overflow: hidden; max-width: 100%; }
+.it .where .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--a); box-shadow: inset 0 0 0 1px var(--e); flex: none; }
+.it .where .m { margin-left: auto; }
+mark { background: var(--d-mark); color: inherit; border-radius: 2px; padding: 0 1px; }
+
+/* ─── The footer: ⚙ · the folder and its count · the shortcut ─── */
+.ft { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 12px 10px 12px; border-top: 0.5px solid var(--d-foot-rule); font-size: 11px; color: var(--d-foot); min-width: 0; }
+.ft .gear { width: 26px; height: 26px; border-radius: 999px; display: grid; place-items: center; color: var(--d-icon); background: var(--d-pill); box-shadow: inset 0 0 0 0.5px var(--d-pill-edge); flex: none; }
+.ft .gear:hover, .ft .gear[aria-expanded="true"] { background: var(--d-hover); color: var(--d-ink); }
+.ft .count { display: flex; align-items: center; gap: 5px; min-width: 0; flex: 1; white-space: nowrap; overflow: hidden; }
+.ft .count .icon { color: var(--d-foot-paw); flex: none; fill: currentColor; stroke-width: 0.6; }
+.ft .count span { overflow: hidden; text-overflow: ellipsis; }
+.ft .key { flex: none; font-size: 10.5px; color: var(--d-foot); border: 0.5px solid var(--d-pill-edge); border-radius: 5px; padding: 1px 5px; white-space: nowrap; }
+.ft .key[hidden] { display: none; }
+.toast-host { left: 10px; right: 10px; bottom: 50px; display: flex; justify-content: center; pointer-events: none; z-index: 9; }
+.toast-host:empty { display: none; }
+
+/* ─── THE CAT — one block, swapped as a whole (its shape is drawerCat.ts). Design B2: the drawer's paper
+   is the cat — two ears of the same paper on its top edge, toward the screen's edge, a pink inner ear. ─── */
+.ears { position: absolute; top: -17px; width: 76px; height: 18px; overflow: visible; pointer-events: auto; z-index: 3; }
+.side-right .ears { right: 16px; }
+.side-left .ears { left: 16px; transform: scaleX(-1); }
+.ears .ear { fill: var(--d-ear); }
+.ears .ear-edge { fill: none; stroke: var(--d-edge); stroke-width: 1; }
+.ears .ear-in { fill: var(--d-ear-in); }
+
+/* ─── The bookmarks: a 1 px edge in the folder's colour; an un-picked one shows its name's first character ─── */
+.tabs { position: absolute; top: calc(var(--d-top) + 118px); bottom: 20px; width: calc(var(--d-tabs) + 1px); display: flex; flex-direction: column; gap: 6px; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; z-index: 2; padding: 0 0 8px; }
+.tabs::-webkit-scrollbar { display: none; }
+.side-right .tabs { left: 0; align-items: flex-end; }
+.side-left .tabs { right: 0; align-items: flex-start; }
+.bk {
+  flex: none; width: 24px; height: 42px; display: flex; align-items: center; justify-content: center;
+  background: repeating-linear-gradient(135deg, var(--a) 0 5px, var(--b) 5px 10px); color: var(--k);
+  border: 1px solid var(--e); padding: 0; font-family: var(--d-hand); font-size: 15px; line-height: 1; overflow: hidden;
+}
+:root[data-font="clean"] .bk { font: 600 11px var(--ui); }
+.side-right .bk { border-radius: 9px 0 0 9px; border-right: none; margin-right: 1px; }
+.side-left .bk { border-radius: 0 9px 9px 0; border-left: none; margin-left: 1px; }
+.bk:hover { width: 28px; }
+.bk.on { width: 30px; height: auto; min-height: 64px; max-height: 150px; padding: 9px 0; font-size: 18px; line-height: 30px; writing-mode: vertical-rl; text-orientation: mixed; white-space: nowrap; text-overflow: ellipsis; }
+.side-right .bk.on { margin-right: 0; }
+:root[data-font="clean"] .bk.on { font-size: 13px; font-weight: 600; }
+:root:lang(en) .bk.on, :root:lang(nl) .bk.on { font-size: 17px; }
+.bk.paw .icon { flex: none; fill: currentColor; stroke-width: 0.6; }
+.bk.paw.on { writing-mode: horizontal-tb; padding: 0; height: 64px; }
+.bk.add { background: transparent; border: 1px dashed color-mix(in srgb, var(--d-icon) 60%, transparent); color: var(--d-icon); height: 26px; }
+.side-right .bk.add { border-right: none; }
+.side-left .bk.add { border-left: none; }
+.bk.add:hover { background: var(--d-hover); color: var(--d-ink); }
+.bk.drop { filter: brightness(0.94) saturate(1.2); width: 30px; }
+:root[data-look="night"] .bk.drop { filter: brightness(1.25); }
+.bk.lifted { opacity: 0.5; }
+.bk:focus-visible { outline: 2px solid var(--d-select); outline-offset: -2px; }
+
+/* ─── 바탕 (1.29): 반투명 · 강하게 — the paper lets the desktop through, blurred (Windows 11: the window's
+   acrylic under it; here a backdrop blur stands in where something is behind the page). The sheets stay
+   opaque, and what sits on the paper itself is set in the ink colour. ─── */
+:root[data-backdrop="frost"] .dr { background-color: color-mix(in srgb, var(--d-paper) 82%, transparent); backdrop-filter: blur(18px) saturate(1.2); }
+:root[data-backdrop="strong"] .dr { background-color: color-mix(in srgb, var(--d-paper) 62%, transparent); backdrop-filter: blur(22px) saturate(1.3); }
+:root[data-backdrop="frost"] .ears .ear, :root[data-backdrop="strong"] .ears .ear { fill: color-mix(in srgb, var(--d-ear) 82%, transparent); }
+:root[data-backdrop="frost"] :is(.sub, .grp, .grp .n, .ft, .ft .key, .empty, .empty .hw),
+:root[data-backdrop="strong"] :is(.sub, .grp, .grp .n, .ft, .ft .key, .empty, .empty .hw) { color: var(--d-ink); }
+
+/* 바탕 없음: no paper — the header on a floating pill, the slip, the cards, the group headers on small pills and
+   the footer's pieces float on the desktop. The bookmarks stay; the mouse goes through everywhere else. */
+:root[data-backdrop="none"] .dr { background: transparent; border-color: transparent; box-shadow: none; }
+:root[data-backdrop="none"] .dr::before, :root[data-backdrop="none"] .ears, :root[data-backdrop="none"] .it::before { display: none; }
+:root[data-backdrop="none"] .hd { margin: 6px 10px 6px; padding: 6px 6px 4px 12px; border-radius: 14px; background: var(--d-card); box-shadow: 0 0 0 1px var(--d-card-edge), 0 2px 8px rgba(0, 0, 0, 0.18); }
+:root[data-backdrop="none"] .qk { box-shadow: 0 0 0 1px var(--d-qk-edge), 0 4px 14px rgba(0, 0, 0, 0.22); }
+:root[data-backdrop="none"] .it { box-shadow: 0 1px 0 var(--d-slip-bottom), 0 4px 14px rgba(0, 0, 0, 0.22), 0 0 0 1px var(--d-card-edge); }
+:root[data-backdrop="none"] .it.selected { box-shadow: 0 1px 0 var(--d-slip-bottom), 0 4px 14px rgba(0, 0, 0, 0.22), 0 0 0 2px var(--ln); }
+:root[data-backdrop="none"] .grp { align-self: flex-start; padding: 2px 9px; border-radius: 999px; background: var(--d-card); box-shadow: 0 0 0 1px var(--d-card-edge), 0 2px 6px rgba(0, 0, 0, 0.16); color: var(--d-preview); }
+:root[data-backdrop="none"] .grp::after { display: none; }
+:root[data-backdrop="none"] .ft { border-top: none; background: transparent; }
+:root[data-backdrop="none"] .ft .count { flex: 0 1 auto; padding: 4px 10px; border-radius: 999px; background: var(--d-card); box-shadow: 0 0 0 1px var(--d-card-edge), 0 2px 6px rgba(0, 0, 0, 0.16); color: var(--d-meta); }
+:root[data-backdrop="none"] .ft .gear { background: var(--d-card); box-shadow: 0 0 0 1px var(--d-card-edge), 0 2px 6px rgba(0, 0, 0, 0.16); }
+:root[data-backdrop="none"] .ft .key { margin-left: auto; background: var(--d-card); border-color: var(--d-card-edge); color: var(--d-meta); }
+:root[data-backdrop="none"] .empty { padding: 12px; border-radius: 12px; background: var(--d-card); box-shadow: 0 0 0 1px var(--d-card-edge), 0 4px 14px rgba(0, 0, 0, 0.22); }
+:root[data-backdrop="none"] .tabs { top: calc(var(--d-top) + 128px); }
+
+/* ─── The handle (a window of its own) ─── */
+body.handle-window { background: transparent; overflow: hidden; }
+.handle {
+  position: absolute; top: 2px; width: 30px; height: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+  background: repeating-linear-gradient(135deg, var(--a) 0 5px, var(--b) 5px 10px); color: var(--k); border: 1px solid var(--e);
+  box-shadow: 0 2px 6px rgba(60, 48, 24, 0.22); transition: transform 0.12s ease-out; cursor: default; padding: 0;
+}
+.handle.side-right { right: 0; border-radius: 10px 0 0 10px; border-right: none; transform: translateX(6px); padding-right: 6px; }
+.handle.side-left { left: 0; border-radius: 0 10px 10px 0; border-left: none; transform: translateX(-6px); padding-left: 6px; }
+.handle:hover, .handle.peek { transform: translateX(0); }
+.handle .n { font: 700 9.5px/11px var(--ui); font-variant-numeric: tabular-nums; }
+.handle .icon { fill: currentColor; stroke-width: 0.6; }
+.handle:focus-visible { outline: 2px solid var(--k); outline-offset: -3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .stage, .handle { transition: none; }
+}
+@media (forced-colors: active) {
+  .dr, .it, .bk, .qk, .menu, .handle, .grp, .pill, .kchip { border: 1px solid CanvasText; }
+  .it.selected { outline: 2px solid Highlight; }
+}
+
+/* Handwriting overhangs its first letter (Caveat's y, J): a little room on the left that the layout doesn't see. */
+.it .row .hw, .fname .hw, .menu .mh b { padding-left: 2px; margin-left: -2px; }
+
+/* The open memo's first line, edited in handwriting where its title stands. */
+.hw-field { flex: 1; min-width: 0; height: 22px; border: 0; outline: none; background: transparent; color: var(--d-ink); padding: 0 var(--ink-over) 0 0; margin: 0;
+  font-family: var(--d-hand); font-size: 20px; line-height: 22px; user-select: text; }
+.hw-field::placeholder { color: var(--d-meta); }
+:root[data-font="clean"] .hw-field { font: 600 14px var(--ui); }
+.big .hw-field { font-size: 22px; height: 30px; }
+:root[data-font="clean"] .big .hw-field { font-size: 15px; }
+.editor::placeholder { color: var(--d-meta); }

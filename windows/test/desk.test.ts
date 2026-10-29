@@ -5,9 +5,9 @@ import {
   settingsTabs, shortcutForPane, stepPane, themeSource,
 } from "../src/core/desk";
 
-test("desk: the sidebar's order — 보기 · 설정 · 도움, ten panes", () => {
+test("desk: the sidebar's order — 보기 · 설정 · 도움, twelve panes (AI 연결 since 1.27, 메모 서랍 since 1.28)", () => {
   assert.deepEqual(deskSections.map((entry) => entry.section), ["view", "settings", "help"]);
-  assert.deepEqual(deskPanes, ["calendar", "history", "clock", "appearance", "notifications", "repeat", "pet", "events", "storage", "help"]);
+  assert.deepEqual(deskPanes, ["calendar", "history", "clock", "appearance", "notifications", "repeat", "pet", "events", "storage", "drawer", "ai", "help"]);
 });
 
 test("desk: Ctrl+1…9 go down the sidebar; 도움말 has none (F1)", () => {
@@ -19,6 +19,8 @@ test("desk: Ctrl+1…9 go down the sidebar; 도움말 has none (F1)", () => {
   assert.equal(paneForShortcut(10), undefined);
   assert.equal(shortcutForPane("clock"), 3);
   assert.equal(shortcutForPane("help"), undefined);
+  assert.equal(shortcutForPane("ai"), undefined);
+  assert.equal(shortcutForPane("drawer"), undefined);
   for (let digit = 1; digit <= 9; digit += 1) assert.equal(shortcutForPane(paneForShortcut(digit)!), digit);
 });
 
@@ -27,7 +29,9 @@ test("desk: ↑ ↓ step through the panes and stop at the ends", () => {
   assert.equal(stepPane("clock", 1), "appearance");
   assert.equal(stepPane("calendar", -1), "calendar");
   assert.equal(stepPane("help", 1), "help");
-  assert.equal(stepPane("help", -1), "storage");
+  assert.equal(stepPane("help", -1), "ai");
+  assert.equal(stepPane("storage", 1), "drawer");
+  assert.equal(stepPane("drawer", 1), "ai");
 });
 
 test("desk: the settings panes share one page; the old tab names still open the right pane", () => {

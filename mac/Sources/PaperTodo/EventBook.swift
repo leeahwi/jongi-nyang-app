@@ -77,11 +77,20 @@ final class EventBook: ObservableObject {
         case delete(String)
         /// 이 날만 지우기: one day out of a repeating event.
         case skip(String, day: String)
+        /// AI 연결's undo (1.42): an event put back as it was (replaced, or added again).
+        case put(LocalEvent)
     }
+
+    /// Set by the app: an event changed here (not by Claude's undo) loses its AI stamp.
+    var onEdited: ((String) -> Void)?
 
     /// Returns the new event's id when one was made.
     @discardableResult
     func perform(_ change: Change, now: Date = Date()) -> String? {
+        AIWriteLock.with { performHeld(change, now: now) }
+    }
+
+    private func performHeld(_ change: Change, now: Date) -> String? {
         reloadIfChanged()
         var made: String?
         switch change {
@@ -94,12 +103,17 @@ final class EventBook: ObservableObject {
             guard let index = events.firstIndex(where: { $0.id == id }) else { return nil }
             events[index] = draft.event(id: id, now: now, existing: events[index])
             preferences.set(draft.color.rawValue, forKey: "calendar.lastColor")
+            onEdited?(id)
         case .delete(let id):
             events.removeAll { $0.id == id }
+            onEdited?(id)
         case .skip(let id, let day):
             guard let index = events.firstIndex(where: { $0.id == id }), !events[index].skip.contains(day) else { return nil }
             events[index].skip.append(day)
             events[index].updatedAt = now
+            onEdited?(id)
+        case .put(let event):
+            if let index = events.firstIndex(where: { $0.id == event.id }) { events[index] = event } else { events.append(event) }
         }
         save()
         return made

@@ -247,7 +247,7 @@ test("intent toast: the shared table", () => {
     ["ko", "타이머 40", 0, "40분 타이머를 시작했어요"], ["en", "timer 40", 0, "Started a 40 min timer"], ["nl", "timer 40", 0, "Timer van 40 min gestart"],
     ["ko", "알람 오전 7:30 평일", 0, "알람을 맞췄어요 · 평일 오전 7:30"],
     ["en", "alarm 7:30 weekdays", 0, "Alarm set · weekdays 7:30 AM"],
-    ["ko", "장보기\n우유", 0, "메모로 남겼어요"], ["en", "buy milk", 1, "Saved as a note"], ["nl", "boodschappen", 1, "Bewaard als notitie"],
+    ["ko", "장보기\n우유", 0, "메모 서랍에 넣었어요"], ["en", "buy milk", 1, "Added to the notes drawer"], ["nl", "boodschappen", 1, "In de notitielade gezet"],
     ["ko", "금요일까지 보고서", 1, "일정으로 넣었어요 · 10월 9일 종일"],
     ["en", "report by friday", 1, "Added as an event · Oct 9 all day"],
     ["ko", "내일 3시 장보기", 0, "할 일로 넣었어요 · 내일 15:00"],
@@ -294,7 +294,7 @@ test("intent toast: what was made and the switch, in three languages", () => {
   assert.equal(addedText(read("알람 오전 7:30 평일", "ko")[0], now, "ko"), "알람을 맞췄어요 · 평일 오전 7:30");
   assert.equal(addedText(read("alarm 7:30 weekdays", "en")[0], now, "en"), "Alarm set · weekdays 7:30 AM");
   assert.equal(addedText(read("wekker 7 uur doordeweeks", "nl")[0], now, "nl"), "Wekker gezet · doordeweeks 07:00");
-  assert.equal(addedText(read("장보기\n우유", "ko")[0], now, "ko"), "메모로 남겼어요");
+  assert.equal(addedText(read("장보기\n우유", "ko")[0], now, "ko"), "메모 서랍에 넣었어요");
   assert.equal(addedText(read("15:30 치과", "ko")[0], now, "ko"), "일정으로 넣었어요 · 오늘 15:30");
   assert.equal(addedText(read("금요일까지 보고서", "ko")[1], now, "ko"), "일정으로 넣었어요 · 10월 9일 종일");
   const kinds: IntentKind[] = ["event", "memo", "timer", "alarm"];

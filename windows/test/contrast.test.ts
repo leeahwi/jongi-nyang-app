@@ -32,6 +32,7 @@ const pairs: Pair[] = [
     { fg: "check-border", bg, need: "ui" as Need, where: "empty checkbox edge" },
     { fg: "sage", bg, need: "ui" as Need, where: "focus ring, rings, switch on" },
     { fg: "clay", bg, need: "ui" as Need, where: "now line, the focus card's ring" },
+    { fg: "stamp", bg, need: "text" as Need, where: "AI 연결's stamp on a row" },
   ]),
   { fg: "sage-text", bg: "sage-2", need: "text", where: "selected chip, now pill, pick bar" },
   { fg: "ink", bg: "sage-2", need: "text", where: "text on a selected row" },

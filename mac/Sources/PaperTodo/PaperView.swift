@@ -25,7 +25,7 @@ struct PaperView: View {
     @State private var listHeight: CGFloat = 0
     /// The header's tools (pin, 책상, ⋯) as drawn, so the tab row's variants are measured against a stand-in of the
     /// same width rather than four copies of the tools (1.39: the ⋯ menu measured four times on every redraw).
-    @State var toolbarWidth: CGFloat = 82
+    @State var toolbarWidth: CGFloat = 110
     /// The narrowest variant is showing: the tools leave out 책상.
     @State var headerSmall = false
     /// 1.38: a short note keeps a one-line header.
@@ -46,9 +46,7 @@ struct PaperView: View {
         VStack(spacing: 0) {
             // Above what follows: the cat's paws hang over the edge onto the ribbon or the list.
             header.zIndex(1)
-            if model.page == .memos {
-                MemoPageView(model: model)
-            } else if model.page == .ahead {
+            if model.page == .ahead {
                 AheadPageView(model: model, previewDrag: previewAheadDrag, previewLine: previewLine)
             } else {
                 DayStripView(model: model, calendar: model.calendar, noteHeight: height, compact: height < 470, now: previewNow)
@@ -168,6 +166,14 @@ struct PaperView: View {
                 .accessibilityLabel("항상 위에 두기")
                 .accessibilityValue(model.alwaysOnTop ? L("켬") : L("끔"))
 
+                // 1.43: 메모 서랍 (where the 메모 tab's memos went).
+                Button(action: model.toggleMemoDrawer) {
+                    Image(systemName: "pawprint").font(.system(size: 12.5, weight: .regular))
+                }
+                .buttonStyle(QuietButtonStyle(size: 26))
+                .help(model.drawer.shortcut.map { L("메모 서랍 (\($0.text))") } ?? L("메모 서랍"))
+                .accessibilityLabel(L("메모 서랍"))
+
                 if desk {
                 Button { model.showDesk(.calendar) } label: {
                     Image(systemName: "sidebar.left").font(.system(size: 12.5, weight: .regular))
@@ -198,6 +204,7 @@ struct PaperView: View {
                     Button("달력…", action: model.showCalendar)
                     Button("반복 할 일…", action: model.showRepeatSettings)
                     Button("빠른 메모…", action: model.showQuickMemo)
+                    Button("메모 서랍 열기", action: model.toggleMemoDrawer)
                     Button("알람…", action: model.showAlarmSettings)
                     Button("사용 안내", action: model.showGuide)
                     Button("도움말…", action: model.showHelp)
@@ -938,14 +945,19 @@ struct TaskRow: View {
                     .help(L("오늘 꼭 하나"))
                     .accessibilityLabel(L("오늘 꼭 하나"))
             }
-            Text(item.title.handwritten)
-                .foregroundStyle(item.isCompleted ? PaperTheme.faded : PaperTheme.ink)
-                .lineLimit(1)
-                .overlay {
-                    PencilStrike().trim(from: 0, to: strikeProgress)
-                        .stroke(PaperTheme.ink.opacity(0.62), style: StrokeStyle(lineWidth: 1.25, lineCap: .round, lineJoin: .round))
-                        .allowsHitTesting(false)
+            Group {
+                // AI 연결 (1.42): Claude added or changed it today — the stamp, or its small seal when the title
+                // would otherwise be squeezed.
+                if model.isAIMarked(item.id.uuidString) {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 6) { titleText; AIStamp() }
+                        HStack(spacing: 6) { titleText.frame(minWidth: 110, idealWidth: 110, alignment: .leading); AIStamp() }
+                        HStack(spacing: 5) { titleText; AIStamp(compact: true) }
+                    }
+                } else {
+                    titleText
                 }
+            }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
                 .onTapGesture(perform: beginEdit)
@@ -954,6 +966,17 @@ struct TaskRow: View {
                 .help(item.title + " — " + L("눌러서 고치기"))
             }
         }
+    }
+
+    private var titleText: some View {
+        Text(item.title.handwritten)
+            .foregroundStyle(item.isCompleted ? PaperTheme.faded : PaperTheme.ink)
+            .lineLimit(1)
+            .overlay {
+                PencilStrike().trim(from: 0, to: strikeProgress)
+                    .stroke(PaperTheme.ink.opacity(0.62), style: StrokeStyle(lineWidth: 1.25, lineCap: .round, lineJoin: .round))
+                    .allowsHitTesting(false)
+            }
     }
 
     /// After a keyboard edit the row stays picked, so ↑↓ and Space carry on from it.

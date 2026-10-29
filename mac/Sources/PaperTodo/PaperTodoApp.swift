@@ -29,11 +29,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private var focusTimer: FocusTimerController!
     private var quickEntry: QuickEntryController!
     private var quickMemo: QuickMemoController!
+    /// 메모 서랍 (1.43).
+    private var memoDrawer: MemoDrawerController!
+    private let drawerMenuItem = NSMenuItem(title: L("메모 서랍"), action: nil, keyEquivalent: "")
     private var alarms: AlarmController!
     /// 보기 → 다음 알람 오전 7:00 (hidden when no alarm is on).
     private let nextAlarmMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
     private var viewMenu: NSMenu?
     private var storageWatcher: StorageWatcher?
+    /// Settings › AI 연결 (1.42).
+    private var ai: AIConnection!
     private var weeklyTimer: Timer?
     private var subscriptions = Set<AnyCancellable>()
     private let timerMenuItem = NSMenuItem(title: L("타이머"), action: nil, keyEquivalent: "")
@@ -85,8 +90,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 guard let self else { return }
                 StorageFolder.switchTo(nil, defaultFolder: directory, current: current, model: self.model, preferences: .standard)
             }
-            if let shared { storageWatcher = StorageWatcher(folder: shared, model: model) }
         }
+        // AI 연결: ai-link.json and ai-log.jsonl in this app's settings folder (its own bundle id's), never in a
+        // preview's or a snapshot's.
+        ai = AIConnection(model: model, settingsFolder: directory, dataFolder: storage.deletingLastPathComponent(), live: !isolated)
+        model.ai = ai
+        ai.checkLog = argument(after: "--ai-check-log").map { URL(fileURLWithPath: $0) }
+        if let log = argument(after: "--ai-open-log") {
+            ai.opener = .recording(to: URL(fileURLWithPath: log), noHandler: arguments.contains("--ai-no-handler"))
+        }
+        if let log = argument(after: "--ai-code-log") {
+            ai.codeLinker = .recording(to: URL(fileURLWithPath: log), noClaude: arguments.contains("--ai-no-code"))
+        }
+        ai.onEnabledChange = { [weak self] _ in self?.updateStorageWatcher() }
+        model.calendar.onEdited = { [weak self] id in self?.ai.clearMarks([id]) }
+        if !isolated { updateStorageWatcher() }
         buildMenu()
 
         window = NoteWindow(
@@ -153,6 +171,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
         quickMemo = QuickMemoController(model: model)
         model.onQuickMemo = { [weak self] in self?.quickMemo.show() }
+        // 메모 서랍: its shortcut only in the real app; the handle in every run but snapshots.
+        memoDrawer = MemoDrawerController(model: model, live: !isolated)
+        memoDrawer.offscreen = arguments.contains("--offscreen")
+        model.onMemoDrawer = { [weak self] in self?.memoDrawer.toggle() }
+        model.onOpenMemoDrawer = { [weak self] in self?.memoDrawer.open() }
+        model.onPauseDrawerShortcut = { [weak self] paused in self?.memoDrawer.pauseShortcut(paused) }
+        model.onRevealMemo = { [weak self] id in self?.memoDrawer.reveal(id) }
+        model.onWriteMemo = { [weak self] in self?.memoDrawer.write() }
+        memoDrawer.onShortcutChange = { [weak self] in self?.updateDrawerMenuItem() }
+        if !arguments.contains("--snapshot") { memoDrawer.start() }
+        if arguments.contains("--open-drawer") { DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.memoDrawer.open() } }
+        // 1.43: the 메모 tab became the drawer — once per Mac, where the memos went.
+        if !isolated || arguments.contains("--move-notice") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.showMoveNotice() }
+        }
         model.onAlarmSettings = { [weak self] in self?.desk.show(.clock) }
         alarms = AlarmController(book: model.alarms)
         alarms.petAnchor = { [weak self] in self?.pet.anchorFrame }
@@ -216,8 +249,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         model.onChatterPreview = { [weak self] in self?.pet.speakUp() }
         installConveniences(isolated: isolated)
         installHeaderDoubleClick()
+        installAI()
         PerfProbe.mark("controllers")
         window.level = model.alwaysOnTop ? .floating : .normal
+        // `--offscreen` (the performance check): the note far off every screen, out of the user's way.
+        if arguments.contains("--offscreen") { window.setFrameOrigin(NSPoint(x: -40_000, y: 200)) }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         PerfProbe.mark("ordered front")
@@ -319,7 +355,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         view.addItem(.separator())
         view.addItem(item(L("오늘 할 일"), #selector(showTodos), "1"))
         view.addItem(item(L("앞으로"), #selector(showAhead), "2"))
-        view.addItem(item(L("메모"), #selector(showMemos), "3"))
+        view.addItem(item(L("메모 서랍"), #selector(showMemos), "3"))
         let newMemo = item(L("새 메모"), #selector(newMemo), "n")
         newMemo.keyEquivalentModifierMask = [.command, .shift]
         view.addItem(newMemo)
@@ -351,6 +387,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         windowMenu.addItem(toggle)
         windowMenu.addItem(item(L("포스트잇으로 접기"), #selector(collapseToIcon), "m"))
         windowMenu.addItem(item(L("책상"), #selector(openCalendar), ""))
+        drawerMenuItem.action = #selector(toggleMemoDrawer)
+        drawerMenuItem.target = self
+        windowMenu.addItem(drawerMenuItem)
         windowMenu.addItem(.separator())
         windowMenu.addItem(item(L("화면 오른쪽에 붙이기"), #selector(dockRight), ""))
         windowMenu.addItem(item(L("화면 왼쪽에 붙이기"), #selector(dockLeft), ""))
@@ -418,7 +457,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         if menuItem.action == #selector(dockRight) { menuItem.state = NoteDocking.side(of: window, preferences: model.preferences) == .right ? .on : .off }
         if menuItem.action == #selector(dockLeft) { menuItem.state = NoteDocking.side(of: window, preferences: model.preferences) == .left ? .on : .off }
         return switch menuItem.action {
-        case #selector(undo): model.canUndo || model.toast?.commit != nil || (window?.firstResponder as? NSTextView)?.undoManager?.canUndo == true
+        case #selector(undo): model.canUndo || model.toast?.commit != nil || model.toast?.takeBack != nil || ai?.canUndoLatest == true
+            || (window?.firstResponder as? NSTextView)?.undoManager?.canUndo == true
         case #selector(redo): model.canRedo || (window?.firstResponder as? NSTextView)?.undoManager?.canRedo == true
         case #selector(copyList), #selector(export): !model.items.isEmpty
         case #selector(largerText): model.textSize.larger != nil
@@ -437,6 +477,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         let menu = NSMenu()
         menu.addItem(item(L("빠른 입력"), #selector(showQuickEntry), ""))
         menu.addItem(item(L("빠른 메모"), #selector(showQuickMemo), ""))
+        menu.addItem(item(L("메모 서랍"), #selector(toggleMemoDrawer), ""))
         menu.addItem(item(L("책상"), #selector(openCalendar), ""))
         menu.addItem(item(L("25분 집중"), #selector(dockFocus), ""))
         menu.addItem(item(L("5분 타이머"), #selector(dockTimer), ""))
@@ -646,9 +687,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     @objc private func showTodos() { if typedInDesk { desk.select(shortcut: 1) } else { showWindow(); model.page = .todos } }
     @objc private func showGuide() { showWindow(); model.showGuide() }
     @objc private func showAhead() { if typedInDesk { desk.select(shortcut: 2) } else { showWindow(); model.page = .ahead } }
-    @objc private func showMemos() { if typedInDesk { desk.select(shortcut: 3) } else { showWindow(); model.page = .memos } }
-    @objc private func newMemo() { showWindow(); model.newMemo() }
+    /// ⌘3 (the 메모 tab's until 1.43) and ⇧⌘N: 메모 서랍.
+    @objc private func showMemos() { if typedInDesk { desk.select(shortcut: 3) } else { memoDrawer.toggle() } }
+    @objc private func newMemo() { memoDrawer.write() }
+
+    /// "메모가 서랍으로 옮겨 갔어요": the first launch of 1.43 on a Mac that has memos (M1–M3).
+    private func showMoveNotice() {
+        let key = "memoDrawer.moveNoticeShown"
+        let decision = MemoMove.notice(memoCount: model.memos.count, shown: model.preferences.bool(forKey: key))
+        if decision.markShown { model.preferences.set(true, forKey: key) }
+        guard decision.show, NSApp.modalWindow == nil, !model.showsGuide else { return }
+        let answer = SlipAlert.run(symbol: "pawprint", title: L("메모 서랍"), message: MemoMove.title(.current),
+                                   detail: MemoMove.body(count: model.memos.count, shortcut: model.drawer.shortcut?.text, language: .current),
+                                   choices: [.init(title: L("나중에"), isCancel: true), .init(title: L("서랍 열기"), role: .primary, isDefault: true)],
+                                   cat: .curious, width: .medium)
+        if answer == 1 {
+            model.drawer.show(.folder(MemoFolders.inbox))
+            memoDrawer.open()
+        }
+    }
     @objc private func showQuickMemo() { quickMemo.show() }
+    @objc private func toggleMemoDrawer() { memoDrawer.toggle() }
+
+    /// 윈도우 → 메모 서랍 shows the drawer's shortcut (none when it's off).
+    private func updateDrawerMenuItem() {
+        if let key = model.drawer.shortcut?.menuKey {
+            drawerMenuItem.keyEquivalent = key.0
+            drawerMenuItem.keyEquivalentModifierMask = key.1
+        } else {
+            drawerMenuItem.keyEquivalent = ""
+        }
+    }
     @objc private func showQuickEntry() { quickEntry.show() }
     /// Sunday evening, once a week: the cat cheers for the week's finished tasks.
     private func startWeeklyLookBack(preferences: UserDefaults) {
@@ -701,6 +770,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             editor.undoManager?.undo()
         } else if let takeBack = model.toast?.takeBack {
             takeBack()
+        } else if ai.undoLatestIfClean() {
+            // Claude's latest work, when nothing was changed here since it came in.
         } else {
             model.undo()
             // A move on 앞으로 taken back: its toast goes too.
@@ -717,6 +788,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             .applicationName: L("종이냥"), .applicationVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
             .credits: NSAttributedString(string: L("가볍게 적고, 하나씩 마치세요.\n이 Mac에만 저장되는 작은 할 일 노트."))
         ])
+    }
+
+    /// The data folder is watched when it's shared or while AI 연결 is on; the log only while AI 연결 is on.
+    private func updateStorageWatcher() {
+        storageWatcher?.stop()
+        storageWatcher = nil
+        model.aiWatching = ai.enabled && ai.live
+        AIWriteLock.folder = model.aiWatching ? ai.settingsFolder : nil
+        guard model.sharedFolder != nil || model.aiWatching else { return }
+        storageWatcher = StorageWatcher(folder: model.storageFolderURL, model: model, log: model.aiWatching ? ai.logURL : nil) { [weak self] in
+            self?.ai.logChanged()
+        }
+    }
+
+    private func installAI() {
+        ai.onShowList = { [weak self] in self?.desk.show(.ai) }
+        // The cat speaks only when it's out, may talk, and isn't busy.
+        ai.speak = { [weak self] line in
+            guard let self, self.pet.isVisible, self.model.chatterEnabled, !self.pet.isBusy(),
+                  !PetChatter.isQuietHour(Calendar.current.component(.hour, from: Date())) else { return false }
+            self.pet.say(line, for: 6)
+            return true
+        }
+        ai.launch()
     }
 
     private func argument(after flag: String) -> String? {

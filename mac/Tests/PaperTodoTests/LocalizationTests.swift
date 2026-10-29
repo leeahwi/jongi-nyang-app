@@ -49,8 +49,8 @@ private enum LocalizationTests {
             try expectEqual(L("새 할 일"), pick("새 할 일", "New to-do", "Nieuwe taak"), "new to-do")
             try expectEqual(L("종이냥 종료"), pick("종이냥 종료", "Quit Jongi-nyang", "Stop Jongi-nyang"), "quit")
             try expectEqual(PaperTheme.mascotName, pick("종이냥", "Jongi-nyang", "Jongi-nyang"), "app name")
-            try expectEqual(PageTab.all.map(\.short), [pick("오늘", "Today", "Vandaag"), pick("앞으로", "Ahead", "Vooruit"),
-                                                      pick("메모", "Notes", "Notities")], "tabs")
+            try expectEqual(PageTab.all.map(\.short), [pick("오늘", "Today", "Vandaag"), pick("앞으로", "Ahead", "Vooruit")], "tabs (메모 is the drawer from 1.43)")
+            try expectEqual(L("메모 서랍"), pick("메모 서랍", "Notes drawer", "Notitielade"), "the drawer")
             try expectEqual(NotebookFont.allCases.map(\.title), [pick("손글씨 펜", "Pen", "Pen"), pick("손글씨 붓", "Marker", "Stift"),
                                                                 pick("기본 글씨", "Clean", "Strak")], "fonts")
         }
@@ -64,8 +64,8 @@ private enum LocalizationTests {
         }
 
         try test("counts: one and more") {
-            try expectEqual(L("메모 \(1)개"), pick("메모 1개", "1 note", "1 notitie"), "one note")
-            try expectEqual(L("메모 \(3)개"), pick("메모 3개", "3 notes", "3 notities"), "three notes")
+            try expectEqual(L("오늘 고친 메모 \(1)장"), pick("오늘 고친 메모 1장", "1 note changed today", "1 notitie vandaag gewijzigd"), "one note (the drawer's handle)")
+            try expectEqual(L("오늘 고친 메모 \(3)장"), pick("오늘 고친 메모 3장", "3 notes changed today", "3 notities vandaag gewijzigd"), "notes")
             try expectEqual(L("\(1)시간마다"), pick("1시간마다", "Every hour", "Elk uur"), "every hour")
             try expectEqual(L("\(2)시간마다"), pick("2시간마다", "Every 2 hours", "Elke 2 uur"), "every 2 hours")
             try expectEqual(L("오늘 할 일 \(1)개 모두 마침"), pick("오늘 할 일 1개 모두 마침", "Today’s to-do is done", "De taak van vandaag is klaar"), "one done")
@@ -116,7 +116,8 @@ private enum LocalizationTests {
             var calendar = Calendar(identifier: .gregorian)
             calendar.timeZone = .current
             let september = calendar.date(from: DateComponents(year: 2025, month: 9, day: 28, hour: 14, minute: 39))!
-            try expectEqual(MemoDate.short(september, language: language), pick("9월 28일", "Sep 28", "28 sep"), "memo date")
+            let october = calendar.date(from: DateComponents(year: 2025, month: 10, day: 3, hour: 9))!
+            try expectEqual(MemoFolders.slipTime(september, now: october, calendar: calendar, language: language), pick("9월 28일", "Sep 28", "28 sep"), "memo date (메모 서랍's slip)")
             try expectEqual(TaskRow.repeatCaption(RepeatRule(kind: .weekly, weekdays: [1, 3, 5]), language: language),
                             pick("월·수·금", "Mon, Wed, Fri", "ma, wo, vr"), "weekly caption")
             try expectEqual(TaskRow.repeatCaption(RepeatRule(kind: .weekly, weekdays: [0, 1, 2, 3, 4, 5, 6]), language: language),

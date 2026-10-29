@@ -85,6 +85,8 @@ export interface ToastOptions {
   action?: { label: string; run: () => void };
   /** Shown this long (4 s), paused while the pointer is on it. */
   ms?: number;
+  /** Up to two lines before "…" (AI 연결's sentences are longer than the others' few words). */
+  twoLines?: boolean;
   onHide?: () => void;
 }
 
@@ -119,7 +121,7 @@ export function toaster(host: HTMLElement): { show(options: ToastOptions): void;
   return {
     show(options: ToastOptions): void {
       hide();
-      const text = h("span", { class: "toast-text" }, options.text);
+      const text = h("span", { class: `toast-text${options.twoLines ? " two-lines" : ""}` }, options.text);
       text.title = options.text;
       const action = options.action ? h("button", { class: "toast-act" }, options.action.label) : null;
       action?.addEventListener("click", () => { const run = options.action!.run; hide(); run(); });

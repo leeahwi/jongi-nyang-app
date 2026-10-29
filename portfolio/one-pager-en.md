@@ -6,14 +6,14 @@ A desktop to-do app for macOS and Windows. I built it separately on each platfor
 | --- | --- |
 | Team and role | Solo developer, pair programming with AI (Claude Code) |
 | Stack | Swift 6, SwiftUI + AppKit / Electron, TypeScript / GitHub Actions |
-| Versions | Mac 1.0 → 1.41.0, Windows 1.0 → 1.26.0 |
+| Versions | Mac 1.0 → 1.44.0, Windows 1.0 → 1.29.0 |
 | Links | Repository `github.com/leeahwi/jongi-nyang-app`, website `leeahwi.github.io/jongi-nyang-app/en/`, downloads under the repository's Releases |
 
 ## Why I built it
 
 To-dos kept piling up at work and at home, and no app made them easy to add and see. Plenty of to-do apps exist, but the features I needed were paid, and none was what I wanted: a sticky note that sits as a small icon and opens when I need it. I also wanted a timer or Pomodoro now and then, a calendar for events, and today's events and to-dos on one screen. That meant switching between two to four apps.
 
-So I started with a small Mac notepad for today's to-dos (Mac 1.0, then called 한 장, "one sheet"). Repeats, events, alarms and a focus timer came later. I started the Windows version around Mac 1.12–1.15 and gave it the Mac's file format from the start, so one shared folder gives both machines the same list. I built it to help with my own work, but beyond keeping it simple I designed it with other real users and AX (AI transformation) in mind.
+So I started with a small Mac notepad for today's to-dos (Mac 1.0, then called 한 장, "one sheet"). Repeats, events, alarms and a focus timer came later, and most recently a notes drawer that slides out from the screen edge and a connection that lets Claude work with my to-dos in a chat. I started the Windows version around Mac 1.12–1.15 and gave it the Mac's file format from the start, so one shared folder gives both machines the same list. I built it to help with my own work, but beyond keeping it simple I designed it with other real users and AX (AI transformation) in mind.
 
 ## Screens
 
@@ -24,17 +24,22 @@ From left: Mac day paper, Mac night paper, Windows. The same note design, implem
 ![Day strip, round 3](../docs/screenshots/process/daystrip-round3.png)
 The day strip in round 1 (Mac 1.34) and round 3 (Mac 1.40). A bar for the whole day became a view of what's on now and how long is left. (Korean interface.)
 
+![Notes drawer](../docs/screenshots/mac/en/drawer-list-day.png)
+The notes drawer (Mac 1.44). Notes are grouped by date, and links, phone numbers and checklists show as small labels on each card.
+
 ![Alarm slip, before and after](../docs/screenshots/process/modal-alarm-before-after.png)
 The alarm window before and after. It used to look like a system alert; now it's a paper slip like every other floating window. (Korean interface.)
 
 ## What I did
 
-- Wrote a case table for each feature, one input and its expected output per row, and made the Swift and TypeScript tests produce the same strings. The input line alone has 136 rows; the Windows suite has 471 tests.
+- Wrote a case table for each feature, one input and its expected output per row, and made the Swift and TypeScript tests produce the same strings. The input line alone has 136 rows, the notes drawer has cases D1–D29, and the Windows suite has 534 tests.
 - Built measurement scripts (`mac/scripts/perf.sh`, `windows/tools/perf.mjs`) and used them to find what was burning CPU at idle. Mac went from 61% to 0.7%, Windows from 5.7% to 1.5%.
-- Added snapshot rendering of real screens in 3 languages, day and night (about 1,500 images), and a layout sweep that resizes every Windows window across sizes, scale factors and fonts. A contrast check fails if any of 38 text/background pairs falls below WCAG AA.
+- Added snapshot rendering of real screens in 3 languages, day and night (about 1,900 images), and a layout sweep that resizes every Windows window across sizes, scale factors and fonts. A contrast check fails if any of the note's 61 text/background pairs, or 218 pairs across the notes drawer's four papers, falls below WCAG AA.
 - Picked and combined AI-generated design proposals into a redesign shipped in four stages (Mac 1.34–1.37, Windows 1.19–1.22). The day strip was redrawn three times.
 - Used the app every day and asked for what I found missing: time reminders on to-dos, moving a to-do to Someday and bringing it back to Today (the Later tab in Mac 1.17, with a button that brings an item back to Today; it is called Someday now), and a Memos tab (Mac 1.15), among others. Bugs I found in use were fixed the same way: tab edges cut off, a plain-looking alarm window, the app freezing after a focus session, a 30-minute task showing 29.
 - Removed a Google Calendar and Tasks integration that had taken five releases to build, and replaced it with in-app events and a `.jongi` backup file (Mac 1.31.0, Windows 1.16.0).
+- Moved the Memos tab into a notes drawer at the screen edge (Mac 1.43, Windows 1.28). Using it, I found night paper hard to read and fixed it in the next release; once notes piled up it was hard to tell where I was, so the drawer was reworked with date groups, kind labels and right-click menus (Mac 1.44, Windows 1.29). Folder data lives in a new file and `memos.json` is untouched, so an older version on another device can share the same folder without losing notes.
+- Built Jongi-nyang for Claude, an extension that lets Claude Desktop and Claude Code read and add to-dos, events and notes (Mac 1.42, Windows 1.27). It's off by default; before any change it shows the before and after and waits for a yes, and the app can undo it in one step. No background server.
 
 ## Problems I solved
 
@@ -54,12 +59,12 @@ Full write-ups: [Troubleshooting log](troubleshooting.en.md).
 
 | | |
 | --- | --- |
-| Shipped | Mac 1.41.0, Windows 1.26.0 (GitHub Releases) |
+| Shipped | Mac 1.44.0, Windows 1.29.0 (GitHub Releases) |
 | Performance (Mac 1.38 → 1.39) | idle CPU 61% → 0.7%, input latency 0.46 s → 0.01 s, launch 2.7 s → 1.0 s, memory 213 MB → 136 MB |
 | Performance (Windows 1.23 → 1.24) | idle CPU 5.7% → 1.5%, after an alarm 9.2% → 0.5%, memory 692 MB → 457 MB |
-| Tests | Mac: 15 test scripts, about 300 checks; Windows: 471 `node:test` tests |
+| Tests | Mac: 17 test scripts, about 360 checks; Windows: 534 `node:test` tests; Claude extension: 16 |
 | Languages | Korean, English, Dutch (Dutch for my friends in Belgium and the Netherlands; English and Dutch drafted by AI, not yet reviewed by a native speaker) |
-| Code | about 29k lines of Swift (zero dependencies), about 24k lines of TypeScript plus 2.1k lines of CSS |
+| Code | about 37k lines of Swift (zero dependencies), about 30k lines of TypeScript plus 2.6k lines of CSS |
 
 What changed day to day: I add things with a shortcut, see everything in one place and get a daily reminder. I forget fewer tasks and checking my schedule is much easier. I mostly add to-dos, then events. I rarely use the timer or Pomodoro, so I'm collecting feedback on them from a few people I've shared the app with.
 

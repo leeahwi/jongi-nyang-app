@@ -2,7 +2,7 @@
 """Writes the performance check's demo data set into a storage folder (scripts/perf.sh):
 about 150 open to-dos across 오늘 · 앞으로 · 언젠가, 60 events (some repeating), 2,000 lines in
 the record, 80 memos, 5 alarms, 300 focus sessions and a few repeating to-dos.
-Usage: perf-data.py <folder> [--ranges]   (--ranges also gives some to-dos a time range)"""
+Usage: perf-data.py <folder> [--ranges] [--memos N]   (--ranges also gives some to-dos a time range)"""
 import json, os, random, sys, uuid
 from datetime import datetime, timedelta, timezone
 
@@ -67,10 +67,13 @@ for month, entries in by_month.items():
         for e in sorted(entries, key=lambda e: e["completedAt"]):
             f.write(json.dumps(e, ensure_ascii=False, sort_keys=True) + "\n")
 
+# `--memos 200` (메모 서랍's 200-memo case); 80 by default. Every fifth is a checklist (the drawer draws its bar).
+memo_count = int(sys.argv[sys.argv.index("--memos") + 1]) if "--memos" in sys.argv else 80
 memos = []
-for n in range(80):
+for n in range(memo_count):
     at = now - timedelta(hours=n * 7)
-    memos.append({"id": str(uuid.uuid4()), "text": f"메모 {n}\n" + "\n".join(f"- {random.choice(words)}" for _ in range(random.randint(1, 8))),
+    box = "- [ ] " if n % 5 == 0 else "- "
+    memos.append({"id": str(uuid.uuid4()), "text": f"메모 {n}\n" + "\n".join(f"{box}{random.choice(words)}" for _ in range(random.randint(1, 8))),
                   "createdAt": utc(at), "updatedAt": utc(at)})
 json.dump({"memos": memos}, open(os.path.join(folder, "memos.json"), "w"), ensure_ascii=False, indent=2, sort_keys=True)
 

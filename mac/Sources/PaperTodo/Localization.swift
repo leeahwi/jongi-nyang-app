@@ -93,3 +93,15 @@ extension AppLanguage {
 func L(_ key: String.LocalizationValue) -> String {
     String(localized: key)
 }
+
+extension String {
+    /// A Latin word and the Korean particle after it stay on one line when the text wraps ("Claude는", not
+    /// "Claude" / "는"): a word joiner (U+2060) goes between them (and a no-break space inside "AI 연결"). Only for showing; the text itself, its
+    /// translation key and searches keep the plain string.
+    var keepingParticles: String {
+        guard contains(where: { $0.isASCII && ($0.isLetter || $0.isNumber) }) else { return self }
+        // …and "AI 연결" (the setting's name) isn't split at its space either.
+        return replacingOccurrences(of: "([A-Za-z0-9’”)\\]])(?=[가-힣])", with: "$1\u{2060}", options: .regularExpression)  // ko-only: a pattern, not text
+            .replacingOccurrences(of: "AI 연결", with: "AI\u{00A0}연결")  // ko-only: the setting's name, kept whole
+    }
+}

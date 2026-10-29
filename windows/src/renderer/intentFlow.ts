@@ -49,6 +49,8 @@ export function showMade(host: FlowHost, made: IntentMade, candidate: Candidate,
   };
   let action: ToastOptions["action"];
   if (candidate.kind === "timer") action = { label: t("멈추기"), run: () => void undo(false) };
+  // A memo (1.28): it is in the 메모 서랍's last folder; 열기 shows it there (Ctrl+Z still takes it back).
+  else if (candidate.kind === "memo" && made.id) action = { label: t("열기", undefined, "drawer"), run: () => void api.act({ type: "drawer", command: "open", memo: made.id }) };
   else if (candidate.kind === "alarm" || !next) action = { label: t("되돌리기"), run: () => void undo(true) };
   else {
     action = {

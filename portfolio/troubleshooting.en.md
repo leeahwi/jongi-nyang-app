@@ -2,7 +2,7 @@
 
 [한국어](troubleshooting.md)
 
-Four problems I ran into while building Jongi-nyang, each written as situation, how I traced it, options, what I chose and why, result, and what changed afterwards. The numbers match [`mac/CHANGELOG.md`](../mac/CHANGELOG.md) and [`windows/CHANGELOG.md`](../windows/CHANGELOG.md) (both in Korean).
+Six problems I ran into while building Jongi-nyang, each written as situation, how I traced it, options, what I chose and why, result, and what changed afterwards. The numbers match [`mac/CHANGELOG.md`](../mac/CHANGELOG.md) and [`windows/CHANGELOG.md`](../windows/CHANGELOG.md) (both in Korean).
 
 ## 1. 61% CPU while doing nothing (Mac 1.38.1 → 1.39.0)
 
@@ -46,3 +46,29 @@ Four problems I ran into while building Jongi-nyang, each written as situation, 
 | Choice and why | The second, the same way in both apps. Fixing only the math would have left the Mac measuring against the moving block, and Windows still jumping slot by slot. The pointer is measured against the timetable (screen position plus scroll), the snapped slot is shown separately as a dashed outline and a time tag, and data is written once, on release. On the Mac the drag state moved to an `@Observable` object read only by the dragged block and the outline, so other blocks aren't redrawn, and the block keeps its column and width during the drag. A start-only to-do gets the end it was drawn with when stretched, so the block doesn't jump. Both apps check the rules with the same cases (R1–R8, W3). |
 | Result | Largest gap to the pointer while dragging: Mac move, 118 ticks, 0.20 pt; top and bottom stretch 0.00 pt. Windows move 225 frames, top 75, bottom 180, all 0 px. No backward jumps. During a drag, the only redraws were the timetable once at the start and the dragged block. While auto-scrolling (Mac 236.7 pt, Windows 271 px) the block stayed with the pointer. Idle CPU unchanged. |
 | Afterwards | The measuring tools stay in the repository. On the Mac, synthetic mouse events sent to a test copy never reached `DragGesture`, so a debug-only replayer (`TimetableReplay.swift`) calls the gesture's own functions 60 times a second and `mac/scripts/drag-check.sh` checks every tick. On Windows, `windows/tools/drag-probe.mjs` sends real mouse events 1 px at a time over CDP and logs the block every frame. The rules — measure continuous input against a fixed container, not the thing that moves; keep the on-screen position apart from the saved value — are written down in the [postmortem](../docs/postmortem-timetable-drag.md) (in Korean). Real trackpad drags and cursor changes on the Mac, and a real Windows PC with touch and pen, are not checked yet. |
+
+## 5. The top of the menu-bar Today window was cut off (Mac 1.42.0 → 1.42.1)
+
+![The Today window after the fix](../docs/screenshots/mac/today-window-panel-full.png)
+
+| Step | What happened |
+| --- | --- |
+| Situation | I found it while using the app. With a timer running, the next-event card wrapping to two lines and several to-dos, the top border and margin of the Today window under the menu-bar icon were cut off and the card sat against the top edge. All tests and snapshots passed. The snapshots draw the slip, not the real window that holds it. |
+| Tracing | Since 1.40.1, slip windows (Today window, quick entry, quick note, search, confirmations, alarms, evening sweep, timer length, event slip) always opened at a provisional 520 × 420, the guard against the 0×0 slip in entry 2. The slip's own size report arrived before it was in the window and was overwritten by the provisional size. Slips only report again when their size changes, so with unchanged content the window stayed 520 × 420 and the slip was drawn in its middle. Today windows taller than 420 lost their top and bottom; small slips floated below where they belonged. |
+| Options | A bigger provisional size. Have slips re-report their size periodically. Put the slip in the window first and measure it there. |
+| Choice and why | The third. A bigger provisional size pushes small slips further down, and periodic re-measuring keeps a timer running while idle. Measured inside the window, the window opens at the slip's size and follows it when it grows or shrinks, keeping its top edge and centre (the Today window stays right under the menu-bar icon) and staying on screen. |
+| Result | The Today window and every other slip open at their real size. No extra timer, so idle CPU is unchanged. |
+| Afterwards | `scripts/test-presentation.sh` gained a check that opens real windows, not just slips: the window matches the slip as it opens, and keeps its top edge and centre as it grows. Entry 2's fix caused this one, so fixes now get a check with the real window too. |
+
+## 6. Text in the night-paper drawer was hard to read (Mac 1.43.0 → 1.43.1, Windows 1.28.0 → 1.28.1)
+
+![The night-paper drawer after the fix](../docs/screenshots/mac/en/night/drawer-night.png)
+
+| Step | What happened |
+| --- | --- |
+| Situation | 1.43.0 moved the Memos tab into a notes drawer at the screen edge. Using it at night, the text didn't stand out. The contrast check (text 4.5:1, icons 3:1) passed everywhere. |
+| Tracing | Measured again: a note sheet (#36332e) against the drawer paper (#2e2c28) was 1.11:1, so the sheets sank into the background. Grey text such as times, `2/4` and the placeholder (#a39d90) was 4.53–4.66:1, above the bar but faint in thin handwriting and small type. Passing the bar and being easy to read weren't the same thing. |
+| Options | Open the drawer on day paper at night. Lighten only the text. Separate sheet and paper and lighten the text. |
+| Choice and why | The third. The drawer paper went darker (#262420) and the sheets a step lighter (#3b3832), 1.33:1 apart, with an edge. Grey text went to #bfb8a8 (5.92:1), preview lines to 7.53:1. The eight bookmark colours got lighter, with the lowest text contrast still above 5.02:1. Both apps use the same colours. The same release moved the hard-to-find drawer settings into their own pane on the Desk. |
+| Result | The sheets lift off the paper, and times and hints read clearly. Sheet against paper is decorative and has no bar, so the contrast check now prints it as a number. |
+| Afterwards | Once notes piled up, the next problem was that notes didn't stand apart from each other. In 1.44 (Windows 1.29) all four papers got a darker drawer, an edge on every sheet and grey text above 6:1 (day 4.98 → 6.16, grid 4.91 → 6.14). The contrast check now covers 218 pairs across the drawer's four papers. |

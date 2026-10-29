@@ -27,10 +27,16 @@ checks=".build/checks/design"
 mkdir -p "$checks" "$output"
 rm -rf "$checks"/*.lproj
 cp -R Resources/*.lproj "$checks/"
+# The renderer is built again only when a source changed since the last build (each language and paper reuses it).
+renderer="$checks/PaperTodoDesignSnapshots"
+if [ -x "$renderer" ] && [ -z "$(find Sources Tests/PaperTodoTests/DesignSnapshots.swift Tests/PaperTodoTests/DrawerSnapshots.swift "$bin_path"/PaperCore.build -newer "$renderer" \( -name '*.swift' -o -name '*.o' \) -print -quit)" ]; then
+  echo "Renderer is up to date."
+else
 swiftc -warnings-as-errors -parse-as-library -I "$bin_path/Modules" \
   $(rg --files Sources/PaperTodo -g '*.swift' -g '!PaperTodoApp.swift' | sort) \
   "$bin_path/PaperTodo.build/DerivedSources/resource_bundle_accessor.swift" \
-  "$bin_path"/PaperCore.build/*.swift.o Tests/PaperTodoTests/DesignSnapshots.swift \
+  "$bin_path"/PaperCore.build/*.swift.o Tests/PaperTodoTests/DesignSnapshots.swift Tests/PaperTodoTests/DrawerSnapshots.swift \
   -o "$checks/PaperTodoDesignSnapshots"
+fi
 case "$output" in /*) ;; *) output="$PWD/$output" ;; esac
 PAPERTODO_LANG="$language" PAPERTODO_PAPER="$paper" "$checks/PaperTodoDesignSnapshots" "$output"

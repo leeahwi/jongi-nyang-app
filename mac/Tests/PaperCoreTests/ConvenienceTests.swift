@@ -240,6 +240,12 @@ private enum ConvenienceTests {
             let limited = Search.find("보고서", items: manyTasks, memos: [], history: many, events: [], now: now, calendar: seoul)
             try expect(limited.map(\.hits.count) == [20, 30], "\(limited.map(\.hits.count))")
             try expect(Search.find("  ", items: manyTasks, memos: [], history: [], events: [], now: now, calendar: seoul).isEmpty, "blank")
+            // 1.43: a memo's folder in 메모 서랍 is found by its name, and named with every memo hit.
+            let filed = Memo(id: "F1", text: "주간 회의\n시안 두 개", createdAt: now, updatedAt: now)
+            let byFolder = Search.find("회사", items: [], memos: [filed], history: [], events: [], now: now, calendar: seoul, memoFolders: ["F1": "회사"])
+            try expect(byFolder.first?.hits.first.map { $0.text == "주간 회의" && $0.range == 0..<0 && $0.detail.hasPrefix("회사 · ") } == true, "folder name: \(byFolder)")
+            let byWord = Search.find("시안", items: [], memos: [filed], history: [], events: [], now: now, calendar: seoul, memoFolders: ["F1": "회사"])
+            try expect(byWord.first?.hits.first?.detail.hasPrefix("회사 · ") == true, "folder named")
             let groupTitles: [String] = AppLanguage.allCases.map { language in Search.Group.allCases.map { $0.title(language) }.joined(separator: " · ") }
             try expect(groupTitles == ["오늘 · 앞으로 · 메모 · 완료 기록 · 일정", "Today · Ahead · Notes · History · Events", "Vandaag · Vooruit · Notities · Geschiedenis · Afspraken"], "titles")
         }

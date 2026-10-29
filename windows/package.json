@@ -1,7 +1,7 @@
 {
   "name": "paper-todo-windows",
   "productName": "종이냥",
-  "version": "1.26.0",
+  "version": "1.29.0",
   "description": "종이 한 장처럼 작게 꺼내 쓰는 Windows 할 일 앱",
   "author": "leeAhwi",
   "main": "out/main.js",
@@ -13,9 +13,11 @@
     "test": "node tools/build.mjs --tests && node --test out-test/",
     "snapshot": "npm run build && node tools/snapshot.mjs",
     "perf": "npm run build && node tools/perf.mjs",
+    "mcp:build": "node mcp/build.mjs",
+    "mcp:test": "node mcp/build.mjs --tests && node --test out-test-mcp/",
     "pet-art": "electron tools/pet-art.cjs",
     "tray-icon": "electron tools/tray-icon.cjs",
-    "dist": "npm run typecheck && npm test && node tools/build.mjs --production && electron-builder --win --x64"
+    "dist": "npm run typecheck && npm test && npm run mcp:test && node tools/build.mjs --production && electron-builder --win --x64"
   },
   "build": {
     "appId": "com.noa.PaperTodo",
@@ -31,6 +33,16 @@
       "assets/**",
       "!assets/pet/*.png",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "mcp/dist",
+        "to": "mcp",
+        "filter": [
+          "server/index.js",
+          "jongi-nyang.mcpb"
+        ]
+      }
     ],
     "win": {
       "target": [
@@ -48,11 +60,14 @@
     "copyright": "© 2026 leeAhwi. All rights reserved."
   },
   "devDependencies": {
+    "@anthropic-ai/mcpb": "^2.1.2",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "@types/node": "^20.19.43",
     "electron": "^44.4.5",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "zod": "^4.6.7"
   },
   "engines": {
     "node": ">=22"

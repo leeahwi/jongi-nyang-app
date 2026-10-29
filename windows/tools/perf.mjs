@@ -26,7 +26,7 @@ if (typeof globalThis.WebSocket !== "function") {
 
 const quick = flag("quick");
 const only = option("only")?.split(",");
-/** `--only=cold,idle,io,typing,tabs,check,search,desk,hidden,pet,timer,alarm,use` runs just those steps. */
+/** `--only=cold,idle,io,typing,tabs,check,search,desk,hidden,drawer,pet,timer,alarm,use` runs just those steps. */
 const want = (name) => !only || only.includes(name);
 const idleSeconds = quick ? 20 : 60;
 const useMinutes = flag("long") ? 10 : quick ? 1 : 3;
@@ -444,6 +444,48 @@ try {
   await showNote(false);
   await sleep(1500);
   await step("hidden", { key: "idleNoteHidden", text: "idle CPU note hidden (%)" }, () => cpuOver(run, idleSeconds));
+  // 메모 서랍 (1.28): open (the note hidden), its reopen time (second open on: show → the page's first frame), then
+  // closed with only the edge handle out.
+  await step("drawer", { key: "idleDrawerOpen", text: "idle CPU drawer open (%)" }, async () => {
+    const opened = await evaluate(run.main, `Date.now()`);
+    await act(run.note, { type: "drawer", command: "open" });
+    const page = await run.page((url) => url.endsWith("drawer.html"));
+    // First open (the window made, the page loaded and drawn): to the page's first contentful paint.
+    if (await until(page, `performance.getEntriesByName("first-contentful-paint").length > 0`)) {
+      results.drawerFirstOpenMs = round((await evaluate(page, `performance.timeOrigin + performance.getEntriesByName("first-contentful-paint")[0].startTime`)) - opened);
+      log("drawer first open (ms)", results.drawerFirstOpenMs);
+    }
+    await sleep(2500);
+    const reopen = [];
+    for (let index = 0; index < 3; index += 1) {
+      await act(run.note, { type: "drawer", command: "close" });
+      await sleep(1200);
+      await evaluate(page, `(window.__shown = undefined, document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") requestAnimationFrame(() => setTimeout(() => { window.__shown = performance.timeOrigin + performance.now(); }, 0)); }, { once: true }), true)`);
+      const started = await evaluate(run.main, `Date.now()`);
+      await act(run.note, { type: "drawer", command: "open" });
+      if (await until(page, "window.__shown !== undefined")) reopen.push((await evaluate(page, `window.__shown`)) - started);
+      await sleep(600);
+    }
+    await sleep(1500);
+    const cpu = await cpuOver(run, idleSeconds);
+    page.close();
+    results.drawerReopenMs = round(median(reopen));
+    log("drawer reopen (ms)", results.drawerReopenMs);
+    return cpu;
+  });
+  // 1.29: 반투명 (the paper at 82 % over a blur) open and idle — the blur must not make idle CPU climb.
+  await step("drawer", { key: "idleDrawerFrost", text: "idle CPU drawer open, 반투명 (%)" }, async () => {
+    await setPref(run, "drawerBackdrop", "frost");
+    await sleep(2500);
+    const cpu = await cpuOver(run, idleSeconds);
+    await setPref(run, "drawerBackdrop", "solid");
+    return cpu;
+  });
+  await step("drawer", { key: "idleDrawerClosed", text: "idle CPU drawer closed, handle out (%)" }, async () => {
+    await act(run.note, { type: "drawer", command: "close" });
+    await sleep(2000);
+    return cpuOver(run, idleSeconds);
+  });
   await step("pet", { key: "idlePet", text: "idle CPU pet out (%)" }, async () => {
     await setPref(run, "petVisible", true);
     await sleep(2000);

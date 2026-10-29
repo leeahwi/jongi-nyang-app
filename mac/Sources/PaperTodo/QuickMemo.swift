@@ -150,8 +150,16 @@ struct QuickMemoView: View {
 
     /// ⌘Return: a new memo with the text (blank just closes).
     private func add() {
-        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            model.addMemo(text: text)
+        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let id = model.addMemo(text: text) {
+            // 1.43: it went into 메모 서랍 — the note's toast offers 열기.
+            let added = MemoMove.addedToast(.current)
+            var toast = PaperToast(symbol: "note.text", text: added.text)
+            toast.action = added.action
+            toast.perform = { [weak model] in
+                model?.toast = nil
+                model?.revealMemo(id)
+            }
+            model.toast = toast
         }
         text = ""
         model.quickMemoDraft = ""

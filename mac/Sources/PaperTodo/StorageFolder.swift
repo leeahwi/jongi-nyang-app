@@ -7,7 +7,7 @@ import PaperCore
 @MainActor
 enum StorageFolder {
     static let preferenceKey = "storage.folder"
-    static let files = ["todos.json", "memos.json", "repeats.json", "events.json", "alarms.json"]
+    static let files = ["todos.json", "memos.json", "repeats.json", "events.json", "alarms.json", MemoFolders.fileName]
 
     /// The folder chosen in Settings, if it still exists.
     static func chosen(_ preferences: UserDefaults) -> URL? {
@@ -123,31 +123,82 @@ enum StorageFolder {
 
 /// Notices when another device changed the shared files and has the model reload them.
 /// Cloud folders replace files rather than editing them, so this checks modification dates
-/// every two seconds instead of watching a file handle.
+/// every two seconds instead of watching a file handle. With AI 연결 on (1.42) it also runs for this
+/// Mac's own folder (the extension writes it) and follows ai-log.jsonl in the settings folder: the log is only
+/// ever appended to, so the system tells as soon as a line comes (no waiting for the next check, nothing done
+/// in between); the two-second check stays as the fallback and re-arms it when the file was replaced.
 @MainActor
 final class StorageWatcher {
     private let folder: URL
     private let model: AppModel
+    private let log: URL?
+    private let onLog: () -> Void
     private var timer: Timer?
     private var seen: [String: Date] = [:]
+    private var seenLog: [Int] = []
+    private var logSource: DispatchSourceFileSystemObject?
 
-    init(folder: URL, model: AppModel) {
+    init(folder: URL, model: AppModel, log: URL? = nil, onLog: @escaping () -> Void = {}) {
         self.folder = folder
         self.model = model
+        self.log = log
+        self.onLog = onLog
         seen = Self.dates(in: folder)
+        seenLog = Self.stamp(log)
         let timer = Timer(timeInterval: 2, repeats: true) { _ in
             Task { @MainActor [weak self] in self?.check() }
         }
         timer.tolerance = 0.5
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
+        armLog()
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        logSource?.cancel()
+        logSource = nil
+    }
+
+    /// Told by the system when the log is written to (or replaced: then re-armed by the next check).
+    private func armLog() {
+        guard logSource == nil, let log else { return }
+        let descriptor = open(log.path, O_EVTONLY)
+        guard descriptor >= 0 else { return }
+        let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor, eventMask: [.write, .extend, .delete, .rename], queue: .main)
+        source.setEventHandler {
+            Task { @MainActor [weak self] in self?.logEvent() }
+        }
+        source.setCancelHandler { close(descriptor) }
+        source.resume()
+        logSource = source
+    }
+
+    private func logEvent() {
+        if Self.stamp(log).isEmpty || logSource?.data.contains(.delete) == true || logSource?.data.contains(.rename) == true {
+            logSource?.cancel()
+            logSource = nil
+        }
+        checkLog()
     }
 
     private func check() {
         let now = Self.dates(in: folder)
-        guard now != seen else { return }
-        seen = now
-        model.reloadFromDisk()
+        if now != seen {
+            seen = now
+            model.reloadFromDisk()
+        }
+        armLog()
+        checkLog()
+    }
+
+    private func checkLog() {
+        guard log != nil else { return }
+        let stamp = Self.stamp(log)
+        guard stamp != seenLog else { return }
+        seenLog = stamp
+        onLog()
     }
 
     private static func dates(in folder: URL) -> [String: Date] {
@@ -157,5 +208,11 @@ final class StorageWatcher {
             if let date = values?.contentModificationDate { result[name] = date }
         }
         return result
+    }
+
+    /// The log's size and modification time (an append changes both).
+    private static func stamp(_ url: URL?) -> [Int] {
+        guard let url, let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey]) else { return [] }
+        return [values.fileSize ?? 0, Int((values.contentModificationDate?.timeIntervalSince1970 ?? 0) * 1000)]
     }
 }

@@ -81,21 +81,32 @@
     }
   }
 
-  // The intro video loops silently; it waits for a click when the visitor asked for less motion.
-  const film = document.querySelector("[data-film]");
-  const filmToggle = document.querySelector("[data-film-toggle]");
-  if (film && filmToggle) {
-    const showFilm = () => {
+  // Videos loop silently; they wait for a click when the visitor asked for less motion. A lazy one
+  // (data-film-lazy, further down the page) loads and plays only while it is on screen.
+  document.querySelectorAll("[data-film]").forEach((film) => {
+    const toggle = film.parentElement.querySelector("[data-film-toggle]");
+    if (!toggle) return;
+    let chosen = false; // the visitor paused or played it by hand
+    const show = () => {
       const paused = film.paused;
-      filmToggle.classList.toggle("paused", paused);
-      filmToggle.setAttribute("aria-label", paused ? filmToggle.dataset.labelPlay : filmToggle.dataset.labelPause);
+      toggle.classList.toggle("paused", paused);
+      toggle.setAttribute("aria-label", paused ? toggle.dataset.labelPlay : toggle.dataset.labelPause);
     };
     if (calm) { film.removeAttribute("autoplay"); film.pause(); }
-    film.addEventListener("play", showFilm);
-    film.addEventListener("pause", showFilm);
-    filmToggle.addEventListener("click", () => (film.paused ? film.play().catch(() => {}) : film.pause()));
-    showFilm();
-  }
+    film.addEventListener("play", show);
+    film.addEventListener("pause", show);
+    toggle.addEventListener("click", () => {
+      chosen = true;
+      film.paused ? film.play().catch(() => {}) : film.pause();
+    });
+    if (!calm && film.hasAttribute("data-film-lazy") && "IntersectionObserver" in window) {
+      new IntersectionObserver((entries) => entries.forEach((e) => {
+        if (chosen) return;
+        if (e.isIntersecting) film.play().catch(() => {}); else film.pause();
+      }), { threshold: 0.35 }).observe(film);
+    }
+    show();
+  });
 
   // Sections fade in once as they scroll into view.
   const items = document.querySelectorAll(".reveal");

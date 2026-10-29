@@ -11,7 +11,7 @@ const listen = new Set([
   "state", "note:focus-new", "note:commit-editing", "note:row-command", "note:event-sheet", "calendar:event-sheet",
   "popup:show", "popup:retain", "popup:reset", "floating:summary", "history:changed", "pet:state", "timer:state", "timer:chime", "quick:open",
   "quickMemo:open", "quickMemo:blur", "timerSheet:open", "ring:show", "ring:hush", "note:toast", "confirm:show", "glance:open",
-  "desk:pane", "paper", "focus:chime", "note:notice",
+  "desk:pane", "paper", "focus:chime", "note:notice", "drawer:open", "drawer:shut", "drawer:look", "drawer:backdrop", "handle:state",
 ]);
 const send = new Set([
   "popup:interactive", "popup:complete", "popup:complete-all", "popup:snooze", "popup:snooze-until", "popup:tomorrow", "popup:event-again", "popup:sweep", "popup:open", "popup:open-event", "popup:closed",
@@ -21,6 +21,7 @@ const send = new Set([
   "timer:drag-start", "timer:drag", "timer:drag-end", "quick:close",
   "quickMemo:draft", "quickMemo:close", "quickMemo:save", "timerSheet:start", "timerSheet:close", "ring:ready", "ring:stop", "ring:snooze",
   "slip:size", "confirm:answer", "confirm:ready", "glance:close", "glance:size",
+  "drawer:close", "drawer:hidden", "drawer:interactive", "drawer:resize", "drawer:shape", "handle:open", "handle:drag",
 ]);
 
 /** The app's language, asked once as the page loads (the main process chose it at launch). */
@@ -51,7 +52,6 @@ const api = {
   onPaper: (callback: (night: boolean) => void): void => { paperListeners.push(callback); },
   getState: (): Promise<AppState> => ipcRenderer.invoke("state:get"),
   act: (action: Action): Promise<void> => ipcRenderer.invoke("act", action),
-  newMemo: (): Promise<string> => ipcRenderer.invoke("memo:new"),
   /** 완료 기록: the record of finished tasks and the focus sessions (focus.jsonl). */
   getHistory: (): Promise<{ entries: ArchiveEntry[]; focus: FocusRecord[]; now: number }> => ipcRenderer.invoke("history:get"),
   placePopup: (size: { width: number; height: number }): Promise<{ travel: number }> => ipcRenderer.invoke("popup:place", size),

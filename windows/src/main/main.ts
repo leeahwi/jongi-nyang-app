@@ -1,4 +1,4 @@
-import { BrowserWindow, Menu, Notification, Tray, app, clipboard, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, powerMonitor, screen, shell, type MenuItemConstructorOptions, type WebFrameMain } from "electron";
+import { BrowserWindow, Menu, Notification, Tray, app, clipboard, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, powerMonitor, screen, shell, systemPreferences, type MenuItemConstructorOptions, type WebFrameMain } from "electron";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -29,18 +29,22 @@ import { DesktopPet } from "./pet";
 import { ReminderPopup } from "./popup";
 import { QuickEntry } from "./quick";
 import { QuickMemo } from "./quickMemo";
+import { MemoDrawer } from "./drawer";
+import { addFolder, deleteFolder, restoreFolder, folderName, inboxID, moveNotice, placementOf, moveMemo, pinAll, pinnedView, recolorFolder, renameFolder, reorderFolders, setFolderSort, setMemoPaper, setPinned, targetOf } from "../core/memoDrawer";
 import { TimerSheet } from "./timerSheet";
 import { AlarmClock } from "./alarms";
 import { SlipConfirm, type ConfirmQuestion } from "./confirm";
 import { PeriodicReminders, TaskReminders } from "./reminders";
 import { backupsFolder, copyData, hasList, importInto, mergeArchive, readDataFiles, readDataFolder, removeLeftovers, usableFolder, writeDataFolder, writeFileAtomically } from "./storageFolder";
 import { Store } from "./store";
+import { AiConnection, type AiFiles } from "./aiConnect";
+import { aiAwayText, aiEntry, aiToastText, aiUndoText, type AiItem, type AiLogEntry } from "../core/ai";
 import { FocusTimerWidget } from "./timer";
 import { FocusLog } from "./focusLog";
 import { EveningSweep } from "./sweep";
 import { focusRecord, type FocusRecord } from "../core/focus";
 import { moveChoices, movedTomorrowText, tomorrowKey } from "../core/carry";
-import { search } from "../core/search";
+import { search, searchGroupTitle } from "../core/search";
 import { snoozeChoices } from "../core/snooze";
 import { badgeText, jumpTasks, launchCommand, loginFlag, shouldAskLogin, startedAtLogin, taskbarProgress, thumbButtons, type LaunchCommand, type TaskbarTimer, type ThumbButton } from "../core/taskbar";
 import { notifyButtons, notifyScheme, readNotifyLink, toastXml, wantsSystemNotice, type NotifyAction } from "../core/notify";
@@ -58,6 +62,8 @@ app.setAppUserModelId("com.noa.PaperTodo");
 if (!snapshotDirectory && !app.requestSingleInstanceLock()) app.quit();
 
 let store: Store;
+/** AI 연결 (종이냥 for Claude): ai-link.json, the log's toasts, undo and stamps. */
+let ai: AiConnection;
 let note: BrowserWindow;
 let desk: Desk;
 let archive: ArchiveStore;
@@ -72,6 +78,7 @@ let taskPopup: ReminderPopup;
 let periodic: PeriodicReminders;
 let quick: QuickEntry;
 let quickMemo: QuickMemo;
+let drawer: MemoDrawer;
 let timerSheet: TimerSheet;
 let alarmClock: AlarmClock;
 let calendar: CalendarService;
@@ -198,6 +205,7 @@ function refreshPaper(): void {
   if (note && !note.isDestroyed()) note.setBackgroundColor(color);
   desk?.setBackground(color);
   sendEverywhere("paper", night);
+  drawer?.sendLook();
 }
 
 function createNote(): BrowserWindow {
@@ -377,7 +385,8 @@ function moreMenu(): Menu {
     { label: t("검색…"), accelerator: "CmdOrCtrl+F", click: openSearch },
     { label: t("오늘"), accelerator: "CmdOrCtrl+1", click: () => note.webContents.send("note:row-command", { id: "", command: "page-today" }) },
     { label: t("앞으로"), accelerator: "CmdOrCtrl+2", click: () => note.webContents.send("note:row-command", { id: "", command: "page-ahead" }) },
-    { label: t("메모"), accelerator: "CmdOrCtrl+3", click: () => note.webContents.send("note:row-command", { id: "", command: "page-memos" }) },
+    // 1.28: the memo tab became the 메모 서랍 (Ctrl+3 in the note opens it too).
+    { label: t("메모 서랍"), ...(store.prefs.drawerShortcut ? { accelerator: store.prefs.drawerShortcut, registerAccelerator: false } : {}), click: () => drawer.show() },
     { label: t("포스트잇으로 접기"), accelerator: "CmdOrCtrl+M", click: () => collapse() },
     // 화면 오른쪽 · 왼쪽에 붙이기 (checked while docked there; again: back where it was).
     { label: t("화면 오른쪽에 붙이기"), type: "checkbox", checked: dockedSide() === "right", click: () => dockNote("right") },
@@ -426,9 +435,41 @@ function petMenu(): MenuItemConstructorOptions[] {
 }
 
 /** A toast on the note for something done from a menu, a bubble or the cat (see NoteNotice); only while the note is up. */
-function notice(value: NoteNotice): void {
-  if (!note || note.isDestroyed() || !note.isVisible() || note.isMinimized()) return;
+function notice(value: NoteNotice): boolean {
+  if (!note || note.isDestroyed() || !note.isVisible() || note.isMinimized()) return false;
   note.webContents.send("note:notice", value);
+  return true;
+}
+
+// ─── AI 연결 ──────────────────────────────────────────────────────────────────
+
+/** The bundled 종이냥 for Claude: resources\mcp in the installed app, mcp/dist while developing. */
+function aiFiles(): AiFiles {
+  // Snapshots show where the installed app keeps it (a per-user install), not this checkout.
+  if (snapshotDirectory) {
+    const installed = "C:\\Users\\me\\AppData\\Local\\Programs\\종이냥"; // i18n-ok: a folder name
+    return { server: `${installed}\\resources\\mcp\\server\\index.js`, mcpb: `${installed}\\resources\\mcp\\jongi-nyang.mcpb`, exe: `${installed}\\종이냥.exe` }; // i18n-ok
+  }
+  const folder = app.isPackaged ? path.join(process.resourcesPath, "mcp") : path.join(app.getAppPath(), "mcp", "dist");
+  return { server: path.join(folder, "server", "index.js"), mcpb: path.join(folder, "jongi-nyang.mcpb"), exe: process.execPath };
+}
+
+/**
+ * Claude 데스크톱에 연결: AI 연결 goes on and the bundled .mcpb opens with what handles it (Claude Desktop asks
+ * whether to install 종이냥 for Claude). Nothing handles it: a slip with the download page.
+ */
+async function connectClaudeDesktop(): Promise<void> {
+  ai.setEnabled(true);
+  const parent = dialogParent();
+  const problem = fs.existsSync(ai.files.mcpb) ? await shell.openPath(ai.files.mcpb) : "missing";
+  if (!problem) return;
+  const answer = await ask(parent, {
+    icon: "chat", title: t("Claude 데스크톱에 연결"), size: "m",
+    message: t("Claude 데스크톱이 있어야 연결할 수 있어요."),
+    detail: t("Claude 데스크톱을 설치한 뒤 다시 눌러 주세요. 설치하면 종이냥 for Claude가 바로 열려요."),
+    buttons: [{ label: t("닫기"), kind: "ghost" }, { label: t("내려받는 곳 열기"), kind: "primary" }], cancelId: 0,
+  });
+  if (answer === 1) void shell.openExternal("https://claude.ai/download");
 }
 
 /** The tasks 완료한 일 정리 put in the record last (its toast's 되돌리기 brings them back). */
@@ -725,6 +766,50 @@ function lookBack(): void {
 
 function handle(action: Action, sender: Electron.WebContents, frame?: WebFrameMain | null): void {
   switch (action.type) {
+    // ─── 메모 서랍 ───
+    case "drawer": { if (action.command === "open") drawer.show({ memo: action.memo, write: action.write }); else if (action.command === "close") drawer.close(); else drawer.toggle(); return; }
+    case "folderAdd": return store.changeFolders((data) => addFolder(data, action.name, action.color, action.id));
+    case "folderRename": return store.changeFolders((data) => renameFolder(data, action.id, action.name));
+    case "folderColor": return store.changeFolders((data) => recolorFolder(data, action.id, action.color));
+    case "folderDelete": return store.changeFolders((data) => deleteFolder(data, action.id));
+    case "folderRestore": return store.changeFolders((data) => restoreFolder(data, action.id, action.memos));
+    case "folderOrder": return store.changeFolders((data) => reorderFolders(data, action.ids));
+    case "memoMove": {
+      store.changeFolders((data) => moveMemo(data, action.id, action.folder));
+      // 폴더로 옮기기 ▸ 최근: the last two folders memos were moved to, newest first.
+      const recent = [action.folder, ...store.prefs.drawerRecentMoves.filter((id) => id !== action.folder)].slice(0, 2);
+      if (recent.join() !== store.prefs.drawerRecentMoves.join()) store.setPref("drawerRecentMoves", recent);
+      return;
+    }
+    case "folderSort": {
+      if (action.id === pinnedView) store.setPref("drawerPinnedSort", action.sort);
+      else store.changeFolders((data) => setFolderSort(data, action.id, action.sort));
+      return;
+    }
+    case "folderDuplicate": return store.duplicateFolder(action.id, action.newID);
+    case "memoPaper": return store.changeFolders((data) => setMemoPaper(data, action.id, action.paper));
+    case "memoPinMany": return store.changeFolders((data) => (action.pinned ? pinAll(data, action.ids) : action.ids.reduce((next, id) => setPinned(next, id, false), data)));
+    case "memoSetText": return store.setMemoText(action.id, action.text);
+    case "memoDuplicate": { store.duplicateMemo(action.id); return; }
+    case "drawerPaste": {
+      // Answers whether there was text (the page says so when there wasn't).
+      const added = Promise.resolve(clipboard.readText()).then((text) => Boolean(store.addMemoText(String(text).replace(/\r\n/g, "\n").trim(), targetOf(store.memoFolders, action.view))));
+      return added as unknown as void;
+    }
+    case "openLink": { if (/^https?:\/\//i.test(action.url)) void shell.openExternal(action.url); return; }
+    case "editCommand": {
+      if (action.command === "cut") sender.cut(); else if (action.command === "copy") sender.copy(); else if (action.command === "paste") sender.paste(); else sender.selectAll();
+      return;
+    }
+    case "memoPin": return store.changeFolders((data) => setPinned(data, action.id, action.pinned));
+    case "memoCheck": return store.toggleMemoLine(action.id, action.line);
+    case "drawerWrite": { store.addMemoText(action.text.trim(), targetOf(store.memoFolders, action.view)); return; }
+    case "drawerView": {
+      // 고정 isn't a folder: the last folder stays what it was.
+      if (action.view !== pinnedView) store.setPref("drawerLastFolder", action.view === inboxID ? "" : action.view);
+      return;
+    }
+    case "copyText": { clipboard.writeText(action.text); return; }
     case "add": {
       const { reminderAt, dueDate } = parsedWhen(action);
       return store.mutate((history) => history.addTo(action.title, undefined, new Date(), dueDate, reminderAt));
@@ -738,7 +823,8 @@ function handle(action: Action, sender: Electron.WebContents, frame?: WebFrameMa
     });
     case "clearCompleted": return clearCompleted();
     case "unfileCompleted": return unfileCompleted();
-    case "undo": return store.mutate((history) => history.undo());
+    // Ctrl+Z right after Claude's toast (nothing changed here since) takes Claude's entry back.
+    case "undo": return ai.undoLatest() ? undefined : store.mutate((history) => history.undo());
     case "redo": return store.mutate((history) => history.redo());
     case "setReminder": return store.mutate((history) => history.setReminder(action.id, action.at ? new Date(action.at) : undefined));
     case "setRange": {
@@ -782,6 +868,12 @@ function handle(action: Action, sender: Electron.WebContents, frame?: WebFrameMa
     case "setPref": return setPref(action.key, action.value);
     case "collapse": return collapse(action.anchor);
     case "openSettings": return openSettings(action.tab);
+    case "aiEnable": return ai.setEnabled(action.on);
+    case "aiUndo": return ai.undo(action.id);
+    case "aiConnectDesktop": void connectClaudeDesktop(); return;
+    case "aiCopyCommand":
+      clipboard.writeText(ai.command);
+      return ai.markCopied();
     case "deskPane": return desk.choose(action.pane);
     case "openGuide": return showGuide();
     case "timerCommand": return focusTimer.command(action.command);
@@ -793,7 +885,7 @@ function handle(action: Action, sender: Electron.WebContents, frame?: WebFrameMa
     case "exportBackup": void exportBackup(); return;
     case "importBackup": void importBackup(); return;
     case "calendarShowTask": return showTask(action.id);
-    case "openHelp": return openHelp();
+    case "openHelp": return openHelp(action.topic);
     case "openArchiveFolder": return openArchiveFolder();
     case "openDataFolder": return openDataFolder();
     case "previewReminder": return periodic.preview();
@@ -1280,10 +1372,34 @@ function startExtras(): void {
   const link = readNotifyLink(process.argv);
   const command = launchCommand(process.argv);
   if (link || command) setTimeout(() => (link ? runNotifyAction(link) : runLaunchCommand(command!)), 900);
+  // 1.28: where the memo tab's memos went — once, when the note is first up.
+  if (!demo && !store.prefs.drawerMoveNoticeShown) {
+    if (note.isVisible()) setTimeout(moveNoticeOnce, 1500); else note.once("show", () => setTimeout(moveNoticeOnce, 800));
+  }
   if (demo || startedAtLogin(process.argv)) return;
   // Counted only while 컴퓨터를 켤 때 같이 열기 is off (as on the Mac).
   if (!store.prefs.openAtLogin) store.setPref("manualLaunches", (store.prefs.manualLaunches ?? 0) + 1);
   setTimeout(askLogin, 25_000);
+}
+
+/** The move notice's slip (M1): 서랍 열기 (the drawer on 메모) · 나중에. Undefined without memos (M2). */
+function moveQuestion(): ConfirmQuestion | undefined {
+  const words = moveNotice(store.memos.length, false, store.prefs.drawerShortcut, lang());
+  if (!words) return undefined;
+  return { icon: "drawer", title: words.title, message: words.message, buttons: [{ label: words.later, kind: "ghost" }, { label: words.open, kind: "primary" }], cancelId: 0, cat: true };
+}
+
+/** M1–M3: the slip once per device, the flag set whichever way it goes (and when there are no memos). */
+function moveNoticeOnce(): void {
+  if (store.prefs.drawerMoveNoticeShown) return;
+  store.setPref("drawerMoveNoticeShown", true);
+  const question = moveQuestion();
+  if (!question) return;
+  void ask(note, question).then((answer) => {
+    if (answer !== 1) return;
+    store.setPref("drawerLastFolder", "");
+    drawer.show();
+  });
 }
 
 /** "저를 켤 때마다 불러 주셨네요. 컴퓨터 켤 때 같이 열까요?" — once, by the cat (when it is out). */
@@ -1331,6 +1447,7 @@ function trayMenu(): MenuItemConstructorOptions[] {
     { label: t("새 할 일"), click: () => { showNote(); note.webContents.send("note:focus-new"); } },
     { label: t("빠른 입력 (Ctrl+Alt+N)"), click: () => quick.open() },
     { label: t("빠른 메모 (Ctrl+Alt+M)"), click: () => quickMemo.open() },
+    { label: t("메모 서랍"), click: () => drawer.show() },
     { type: "separator" },
     ...nextAlarmItem(),
     { label: t("주기 알림"), type: "checkbox", checked: store.prefs.reminderEnabled, click: () => store.setPref("reminderEnabled", !store.prefs.reminderEnabled) },
@@ -1365,12 +1482,19 @@ function registerIPC(): void {
   // 밤 종이: asked by every page (and frame) as it loads, before it draws.
   ipcMain.on("paper:get", (event) => { event.returnValue = paperNight(); });
   ipcMain.handle("history:get", () => ({ entries: archive.all(), focus: focusLog.all(), now: Date.now() }));
-  ipcMain.handle("memo:new", () => store.addMemo());
   ipcMain.handle("calendar:write", (_event, request: CalendarWriteRequest) => calendar.write(request));
   ipcMain.handle("intent", (_event, request: IntentRequest) => intentRequest(request));
   ipcMain.handle("search", (_event, query: unknown) => (typeof query === "string" && query.length <= 200
-    ? search({ items: store.items, memos: store.memos, archive: archive.all(), events: store.events, dueStyle: store.prefs.dueStyle }, query, new Date(), lang())
+    ? search({ items: store.items, memos: store.memos, archive: archive.all(), events: store.events, dueStyle: store.prefs.dueStyle, memoFolder: memoFolderName }, query, new Date(), lang())
     : []));
+}
+
+/** 메모 서랍: a memo's folder name for the note (none for the inbox, 메모). */
+function memoFolderName(id: string): string | undefined {
+  const folder = placementOf(store.memoFolders, id).folder;
+  if (folder === inboxID) return undefined;
+  const entry = store.memoFolders.folders.find((candidate) => candidate.id === folder);
+  return entry ? folderName(entry, lang()) : undefined;
 }
 
 /** A believable year of finished tasks for the history snapshot (deterministic, never real data). */
@@ -1502,6 +1626,15 @@ async function runSnapshots(directory: string): Promise<void> {
     calendar.showSample();
     return finishSnapshots(await stripShots(directory, save, wait, settled));
   }
+  // `npm run snapshot -- drawer`: only 메모 서랍's shots (1.28).
+  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "drawer") {
+    return finishSnapshots(await drawerShots(directory, save, wait));
+  }
+  // `npm run snapshot -- ai`: only AI 연결's shots (1.27), day and night.
+  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "ai") {
+    calendar.showSample();
+    return finishSnapshots(await aiShots(directory, save, wait, settled));
+  }
   // `npm run snapshot -- stage2`: only 앞으로 and the 오늘 창.
   if (process.env.PAPERTODO_SNAPSHOT_ONLY === "stage2") {
     await stage2Shots(save, wait, settled);
@@ -1618,16 +1751,6 @@ async function runSnapshots(directory: string): Promise<void> {
   await wait(500);
   await save("note-deadline-editor", note.webContents.capturePage());
   note.webContents.send("note:row-command", { id: "", command: "close-editor" });
-  note.webContents.send("note:row-command", { id: "", command: "page-memos" });
-  await wait(400);
-  await save("memos", note.webContents.capturePage());
-  await note.webContents.executeJavaScript(`document.querySelector(".memo-row")?.click()`).catch(() => undefined);
-  await wait(400);
-  await save("memo-editor", note.webContents.capturePage());
-  note.webContents.send("note:row-command", { id: "", command: "page-today" });
-  await wait(150);
-  note.webContents.send("note:row-command", { id: "", command: "page-memos" });
-  await wait(150);
   note.webContents.send("note:row-command", { id: "", command: "page-today" });
   await wait(300);
   // The redesign's note, line, toast and 빠른 입력 shots; 앞으로 and the 오늘 창.
@@ -1752,9 +1875,13 @@ async function runSnapshots(directory: string): Promise<void> {
   const timeblockProblems = await timeblockShots(directory, save, wait, settled);
   // 하루 띠 · 하루 일정표 · the timer board's width (1.25), day and night.
   const stripProblems = await stripShots(directory, save, wait, settled);
+  // AI 연결 (1.27): stamps, toasts, the settings pane, day and night.
+  const aiProblems = await aiShots(directory, save, wait, settled);
+  // 메모 서랍 (1.28): the handle, the four papers, every state, widths, sides, screens, settings and the memo tab.
+  const drawerProblems = await drawerShots(directory, save, wait);
   // 밤 종이: every main screen and every slip again, in night paper (snapshots/night/).
   await nightShots(directory, save, wait, settled);
-  finishSnapshots(timeblockProblems + stripProblems + await sizeSweep(directory, save, wait, settled));
+  finishSnapshots(timeblockProblems + stripProblems + aiProblems + drawerProblems + await sizeSweep(directory, save, wait, settled));
 }
 
 /**
@@ -1909,6 +2036,7 @@ async function stage2Shots(save: Save, wait: Wait, settled: (window: BrowserWind
     await wait(700);
     await settled(window);
     console.log(`tray tooltip ${name}: ${trayTooltip()}`);
+    console.log(`glance fit ${name}: ${await glanceFit(window)}`);
     await save(`glance-${name}`, window.webContents.capturePage());
     if (name === "timer") {
       focusTimer.command({ kind: "togglePause" });
@@ -2944,16 +3072,6 @@ async function nightShots(directory: string, save: Save, wait: Wait, settled: (w
   store.mutate((history) => { for (; removed > 0; removed -= 1) history.undo(); });
   calendar.showSample();
   send("page-today");
-  await wait(150);
-  send("page-memos");
-  await shot("memos");
-  await run(`document.querySelector(".memo-row")?.click()`);
-  await shot("memo-editor");
-  send("page-today");
-  await wait(150);
-  send("page-memos");
-  await wait(150);
-  send("page-today");
   note.setSize(350, 520);
   await shot("note-350");
   note.setSize(420, 560);
@@ -3103,13 +3221,20 @@ async function nightShots(directory: string, save: Save, wait: Wait, settled: (w
   console.log(`day again: note ${await note.webContents.executeJavaScript(`document.documentElement.dataset.paper`)}, desk pane ${await inPane("calendar", `document.documentElement.dataset.paper`)}, background ${note.getBackgroundColor()}`);
 }
 
-const glanceStateNames = ["nothing", "event-soon", "timer", "alarm", "many"] as const;
+const glanceStateNames = ["nothing", "event-soon", "timer", "alarm", "many", "busy"] as const;
 type GlanceStateName = typeof glanceStateNames[number];
 
 /**
  * Snapshots: the app's data for a state of the 오늘 창 — nothing at all; an event within the hour; a
  * timer running; alarms on; many tasks (다음, three more, 외 N개). Returns what puts things back.
  */
+/** The 오늘 창's window holds all of its slip (nothing cut at the top or the bottom): "ok", or what is cut. */
+async function glanceFit(window: BrowserWindow): Promise<string> {
+  const [stageHeight, stageWidth] = await window.webContents.executeJavaScript(`(() => { const r = document.getElementById("stage").getBoundingClientRect(); return [Math.ceil(r.bottom), Math.ceil(r.right)]; })()`).catch(() => [0, 0]) as number[];
+  const [width, height] = window.getContentSize();
+  return stageHeight > height + 1 || stageWidth > width + 1 ? `CUT (slip ${stageWidth}×${stageHeight} in a ${width}×${height} window)` : `ok (${width}×${height})`;
+}
+
 function glanceState(name: GlanceStateName): () => void {
   const alarms = [...store.alarms];
   let undo = 0;
@@ -3120,6 +3245,12 @@ function glanceState(name: GlanceStateName): () => void {
   if (name === "event-soon") calendar.showSample();
   if (name === "timer") focusTimer.command({ kind: "countdown", minutes: 25 });
   if (name === "alarm") store.replaceAlarms(alarms.length ? alarms : sampleAlarms());
+  // A running timer with a long event and an alarm: every card's small line on two lines (the Mac's clipped 오늘 창).
+  if (name === "busy") {
+    calendar.showSample();
+    focusTimer.command({ kind: "countdown", minutes: 25 });
+    store.replaceAlarms((alarms.length ? alarms : sampleAlarms()).map((alarm) => ({ ...alarm, label: t("점심 먹고 약 먹기 · 물도 한 잔 꼭 마시기") })));
+  }
   if (name === "many") {
     const soon = (minutes: number) => isoDate(new Date(Math.min(Date.now() + minutes * 60_000, logicalDayStart(new Date()).getTime() + 24 * 3_600_000 - 60_000)));
     // Each task added is one undo step.
@@ -3152,6 +3283,8 @@ function confirmQuestions(): [string, ConfirmQuestion][] {
     ["confirm-storage", { icon: "folder", title: t("저장 위치"), size: "m", cancelId: 0, message: t("이 폴더에 이미 종이냥 목록이 있어요."),
       detail: t("‘그 목록 쓰기’는 폴더에 있던 목록을 그대로 쓰고, ‘지금 목록으로 바꾸기’는 지금 이 목록으로 덮어써요. 종이냥이 다시 시작돼요."),
       buttons: [{ label: t("취소"), kind: "ghost" }, { label: t("지금 목록으로 바꾸기"), kind: "ghost" }, { label: t("그 목록 쓰기"), kind: "primary" }] }],
+    // 1.28: where the memo tab's memos went (M1).
+    ...(moveQuestion() ? [["confirm-move-notice", moveQuestion()!] as [string, ConfirmQuestion]] : []),
   ];
 }
 
@@ -3191,6 +3324,467 @@ function openDay(open: boolean): void {
   store.setPref("dayOpen", open ? dayKey(new Date()) : "");
 }
 
+// ─── AI 연결's snapshots ─────────────────────────────────────────────────────
+
+/**
+ * Snapshots: Claude's work on the list as it stands — two to-dos it added today (one with hours), the time of
+ * one of today's events it changed, and yesterday's work (an event; a to-do taken back) for the recent list.
+ * The to-dos and the event are made here; the log says Claude made them, so they carry the stamp.
+ */
+function aiSample(onList = true): { entries: AiLogEntry[]; made: { tasks: string[]; event: string } } {
+  const now = Date.now();
+  const at = (minutes: number) => new Date(now - minutes * 60_000);
+  const loose = (title: string, id: string): TodoItem => ({ id, title, isCompleted: false, createdAt: isoDate(new Date(now)) });
+  let tasks: TodoItem[] = [loose(t("발표 자료 검토하기"), "AI-SAMPLE-1"), loose(t("치과 예약 전화"), "AI-SAMPLE-2")];
+  if (onList) store.mutate((history) => {
+    tasks = [history.addTo(t("발표 자료 검토하기"), undefined, new Date(), undefined, undefined, { start: 840, end: 900 })!, history.addTo(t("치과 예약 전화"), undefined, new Date())!];
+  });
+  const stamp = new Date(now - 86_400_000).toISOString().replace(/\.\d{3}Z$/, "Z");
+  const before: LocalEvent = { id: "AI-SAMPLE-EVENT", title: t("팀 회의"), date: dayKey(new Date()), allDay: false, days: 1, start: 720, end: 780, repeat: "none", skip: [], color: "sage", location: t("회의실 A"), createdAt: stamp, updatedAt: stamp };
+  const after: LocalEvent = { ...before, start: 780, end: 840, updatedAt: at(10).toISOString().replace(/\.\d{3}Z$/, "Z") };
+  if (onList) store.replaceEvents([...store.events.filter((event) => event.id !== before.id), after]);
+  const item = (value: object) => ({ ...value }) as AiItem;
+  const gone = { id: "AI-SAMPLE-GONE", title: t("책 반납하기"), isCompleted: false, createdAt: stamp };
+  const added = aiEntry({ client: "Claude", tool: "add_todos", kind: "add", target: "todos", title: tasks[0].title, changes: tasks.map((task) => ({ file: "todos.json", id: task.id, before: null, after: item(task) })) }, at(25));
+  const moved = aiEntry({ client: "Claude", tool: "apply_changes", kind: "change", target: "events", title: after.title, changes: [{ file: "events.json", id: after.id, before: item(before), after: item(after) }] }, at(10));
+  const yoga = aiEntry({ client: "Claude", tool: "add_event", kind: "add", target: "events", title: t("요가"), changes: [{ file: "events.json", id: "AI-SAMPLE-YOGA", before: null, after: item({ id: "AI-SAMPLE-YOGA", title: t("요가") }) }] }, at(60 * 26));
+  const book = aiEntry({ client: "Claude", tool: "add_todos", kind: "add", target: "todos", title: gone.title, changes: [{ file: "todos.json", id: gone.id, before: null, after: item(gone) }] }, at(60 * 25));
+  const undo = aiEntry({ client: "app", tool: "undo", kind: "undo", target: "todos", title: gone.title, undoes: book.id, changes: [{ file: "todos.json", id: gone.id, before: item(gone), after: null }], count: 1 }, at(60 * 25 - 2));
+  return { entries: [yoga, book, undo, added, moved], made: { tasks: tasks.map((task) => task.id), event: after.id } };
+}
+
+/** Snapshots: Claude's sample taken away again (its to-dos, its event and the log). */
+function aiSampleGone(made: { tasks: string[]; event: string }): void {
+  store.mutate((history) => { for (const id of made.tasks) history.delete(id); });
+  store.replaceEvents(store.events.filter((event) => event.id !== made.event));
+  ai.seedForSnapshots([]);
+}
+
+/** What the AI 연결 shots check in the note: every stamp shown whole inside its row, the toast's words not cut. */
+const aiNoteScript = `(() => {
+  const out = [];
+  const r = (element) => element.getBoundingClientRect();
+  const stamps = [...document.querySelectorAll(".ai-stamp")].filter((stamp) => !stamp.hidden && stamp.offsetParent);
+  for (const stamp of stamps) {
+    const row = stamp.closest(".row, .strip-row, .lead-row");
+    const box = r(stamp), outer = row ? r(row) : { left: 0, right: window.innerWidth, top: 0, bottom: window.innerHeight };
+    if (box.left < outer.left - 0.5 || box.right > outer.right + 0.5 || box.right > window.innerWidth) out.push("stamp outside its row: " + (row?.textContent ?? ""));
+    const neighbour = stamp.nextElementSibling;
+    if (neighbour && getComputedStyle(neighbour).display !== "none" && r(neighbour).width > 0 && box.right > r(neighbour).left + 1) out.push("stamp under " + neighbour.className);
+  }
+  const text = document.querySelector(".toast .toast-text");
+  if (text && text.scrollHeight > text.clientHeight + 1) out.push("toast cut: " + text.textContent);
+  if (text && text.scrollWidth > text.clientWidth + 1) out.push("toast cut: " + text.textContent);
+  const toast = document.querySelector(".toast");
+  if (toast && (r(toast).left < 0 || r(toast).right > window.innerWidth)) out.push("toast outside the note");
+  return (out.join("; ") || "ok") + " · " + stamps.length + " stamps";
+})()`;
+
+/** The settings pane's checks (the sweep's, and AI 연결's shots). */
+const settingsPaneChecks: LayoutCheckOptions = {
+  ignore: ".ph-cat",
+  inside: [".pane-head", ".bottom", ".bottom > *"],
+  oneLine: [".pane-head h1", ".segmented button", ".seg button", ".action", ".group > .label", ".tile .name", ".ai-time", ".ai-undone", ".ai-day"],
+  rows: [".pane-head", ".row", ".bottom", ".form-actions"],
+};
+
+/**
+ * `npm run snapshot -- ai` (and the full run): AI 연결 (1.27), day and night — the stamps on the list and the
+ * strip, the toast with 되돌리기, 자리 비운 사이, a partial undo, and 설정 › AI 연결 (on with work, after an
+ * undo, and off with nothing yet). Returns how many layout problems it found.
+ */
+async function aiShots(directory: string, save: Save, wait: Wait, settled: (window: BrowserWindow) => Promise<unknown>): Promise<number> {
+  let problems = 0;
+  const run = (script: string) => note.webContents.executeJavaScript(script).catch((error: Error) => `script failed: ${error.message}`);
+  floating.hide();
+  focusTimer.command({ kind: "stop" });
+  note.webContents.reload();
+  note.showInactive();
+  await wait(1200);
+  store.setPref("calendarStrip", true);
+  openDay(false);
+  ai.setEnabled(true);
+  const dayStart = logicalDayStart(new Date());
+  const tenAM = new Date(dayStart.getTime() + 6 * 3_600_000).toISOString();
+  for (const paper of ["day", "night"] as const) {
+    store.setPref("paper", paper);
+    const prefix = paper === "night" ? "night/" : "";
+    if (paper === "night") fs.mkdirSync(path.join(directory, "night"), { recursive: true });
+    const sample = aiSample();
+    ai.seedForSnapshots(sample.entries);
+    note.webContents.send("note:row-command", { id: "", command: "page-today" });
+    await wait(400);
+    // The strip at 10:00 of today, so the changed meeting and the to-do with hours are still ahead in it.
+    await run(`window.ribbonNow = ${JSON.stringify(tenAM)}; window.dispatchEvent(new Event("ribbon-now")); document.querySelector(".sheet").scrollTop = 0`);
+    const shot = async (name: string, checks = noteLayoutChecks) => {
+      await wait(450);
+      await settled(note);
+      const report = await note.webContents.executeJavaScript(layoutCheckScript(checks)).catch((error: Error) => ({ problems: [`check failed: ${error.message}`], truncated: [] })) as LayoutReport;
+      const own = await run(aiNoteScript) as string;
+      const found = [...report.problems, ...(own.startsWith("ok") ? [] : [own])];
+      console.log(`ai ${prefix}${name}: ${found.length ? found.join("; ") : "ok"} · ${own.replace(/^ok · /, "")}`);
+      problems += found.length;
+      await save(`${prefix}${name}`, note.webContents.capturePage());
+    };
+    await shot("ai-marked");
+    await run(`document.querySelector(".lines .ai-stamp:not([hidden])")?.closest(".row")?.scrollIntoView({ block: "center" })`);
+    // (The strip scrolled away above is meant.)
+    await shot("ai-marked-list", { ...noteLayoutChecks, inside: noteLayoutChecks.inside?.filter((selector) => !selector.startsWith(".strip")) });
+    await run(`document.querySelector(".sheet").scrollTop = 0`);
+    const [, , , added, moved] = sample.entries;
+    notice({ icon: "sparkles", text: aiToastText(added, lang()), undo: "ai", entry: added.id, long: true });
+    await shot("ai-toast");
+    notice({ icon: "sparkles", text: aiToastText(moved, lang()), undo: "ai", entry: moved.id, long: true });
+    await shot("ai-toast-time");
+    notice({ icon: "sparkles", text: aiAwayText(3, lang()), show: "ai", long: true });
+    await shot("ai-away");
+    notice({ icon: "warning", text: aiUndoText(1, 1, lang()), long: true });
+    await shot("ai-undo-partial");
+    await run(`document.querySelector(".toast")?.remove()`);
+
+    // 설정 › AI 연결: on, with today's and yesterday's work.
+    const pane = async (name: string) => {
+      await showDeskPane("ai", wait);
+      await wait(300);
+      const report = await inPane("settings", layoutCheckScript(settingsPaneChecks)) as LayoutReport | string | undefined;
+      const found = typeof report === "object" && report ? report.problems : [`check failed: ${String(report)}`];
+      const groups = await inPane("settings", `[...document.querySelectorAll(".group")].map((g) => g.querySelector(".label").textContent + " (" + g.querySelectorAll(".row").length + ")").join(" · ")`);
+      console.log(`ai ${prefix}${name}: ${found.length ? found.join("; ") : "ok"} · ${groups}`);
+      if (typeof report === "object" && report?.truncated.length) console.log(`  … truncated: ${report.truncated.join(" · ")}`);
+      problems += found.length;
+      await save(`${prefix}${name}`, captureDesk(wait));
+    };
+    await pane("ai-settings");
+    // 되돌리기 on Claude's two to-dos after one was changed here: the other goes, the entry says 되돌림 and how it went.
+    store.mutate((history) => history.edit(sample.made.tasks[1], t("치과 예약 전화 (오후)")));
+    ai.undo(added.id);
+    await pane("ai-settings-undone");
+    aiSampleGone(sample.made);
+    ai.setEnabled(false);
+    await pane("ai-settings-off");
+    ai.setEnabled(true);
+  }
+  store.setPref("paper", "day");
+  ai.setEnabled(false);
+  await run(`window.ribbonNow = undefined; window.dispatchEvent(new Event("ribbon-now"))`);
+  console.log(problems ? `AI PROBLEMS: ${problems}` : "AI OK");
+  return problems;
+}
+
+// ─── 메모 서랍's snapshots ───────────────────────────────────────────────────
+
+/**
+ * Snapshots: the drawer's sample — folders 메모 · 회사 · 집 · 공부 (empty), five memos in 회사 (a long one, a
+ * checklist half done, a command, a pinned one), a few in 메모 and 집. Times fixed relative to now.
+ */
+function drawerSample(): { ids: Record<string, string> } {
+  const now = new Date();
+  const at = (days: number, hour: number, minute: number) => { const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - days, hour, minute); return isoDate(date > now ? new Date(now.getTime() - 60_000) : date); };
+  const memo = (key: string, text: string, updatedAt: string) => ({ key, memo: { id: `DRAWER-${key.toUpperCase()}`, text, createdAt: updatedAt, updatedAt } });
+  const entries = [
+    memo("meeting", t("주간 회의\n시안 2개는 금요일까지. 디자인 리뷰는 목요일 3시, QA 일정은 다시 잡기로.\n발표 자료는 수요일 오전에 공유."), at(0, 10, 12)),
+    memo("release", t("배포 체크리스트\n- [x] 버전 올리기\n- [x] 변경 기록 쓰기\n- [ ] 설치 파일 만들고 열어 보기\n- [ ] 릴리스 노트 붙이기"), at(1, 18, 40)),
+    memo("video", "https://www.youtube.com/watch?v=dQw4w9WgXcQ", at(1, 15, 11)),
+    memo("command", t("자주 쓰는 명령\ngit log --oneline -5"), at(6, 9, 5)),
+    memo("contact", t("꽃집 전화 010 1234 5678"), at(9, 14, 30)),
+    memo("idea", t("다음 분기 아이디어\n작은 화면에서도 한눈에 보이게, 단축키 정리"), at(12, 11, 0)),
+    memo("usage", t("여행 준비물\n여권, 충전기, 우산"), at(40, 16, 20)),
+    memo("retro", t("작년 회고\n잘한 일 세 가지, 아쉬운 일 두 가지"), at(400, 20, 0)),
+    memo("shopping", t("장보기\n우유, 달걀, 사과"), at(0, 8, 30)),
+    memo("books", t("읽을 책\n- [ ] 작은 습관의 힘\n- [x] 데미안"), at(3, 21, 0)),
+    memo("thought", t("떠오른 생각\n주말에 화분 분갈이"), at(2, 13, 0)),
+    ...Array.from({ length: 24 }, (_, index) => memo(`log${index + 1}`, t("하루 기록 {n}\n오늘 한 일 짧게", { n: index + 1 }), at(index * 2, 21, 30))),
+  ];
+  const ids = Object.fromEntries(entries.map((entry) => [entry.key, entry.memo.id]));
+  store.memos = [...entries.map((entry) => entry.memo), ...store.memos.filter((existing) => !existing.id.startsWith("DRAWER-"))].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  store.saveMemos();
+  const stamp = isoDate(now);
+  const work = ["meeting", "release", "video", "command", "contact", "idea", "usage", "retro"];
+  store.changeFolders(() => ({
+    v: 1,
+    folders: [
+      { id: inboxID, name: t("메모"), color: "lavender", order: 0, updatedAt: stamp },
+      { id: "DRAWER-WORK", name: t("회사"), color: "pink", order: 1, updatedAt: stamp },
+      { id: "DRAWER-HOME", name: t("집"), color: "mint", order: 2, updatedAt: stamp },
+      { id: "DRAWER-STUDY", name: t("공부"), color: "sky", order: 3, updatedAt: stamp },
+      { id: "DRAWER-LOG", name: t("일기"), color: "peach", order: 4, updatedAt: stamp },
+    ],
+    placement: Object.fromEntries([
+      ...work.map((key) => [ids[key], { folder: "DRAWER-WORK", pinned: key === "meeting", at: stamp, ...(key === "idea" ? { paper: "night" } : {}) }]),
+      [ids.shopping, { folder: "DRAWER-HOME", pinned: true, at: stamp }], [ids.books, { folder: "DRAWER-HOME", pinned: false, at: stamp }],
+      ...Array.from({ length: 24 }, (_, index) => [ids[`log${index + 1}`], { folder: "DRAWER-LOG", pinned: false, at: stamp }]),
+    ]),
+    updatedAt: stamp,
+  }));
+  store.setPref("drawerRecentMoves", ["DRAWER-HOME"]);
+  return { ids };
+}
+
+/** What the drawer's shots check: nothing cut or spilling, one-line labels whole, rows not running into each other. */
+const drawerLayoutChecks: LayoutCheckOptions = {
+  ignore: ".ears, .tape, .tp, .bk, .swrow button > span", // bookmarks write a name sideways or one letter; swatch names may end in … (the swatch says it)
+  inside: [".dr", ".hd", ".ttl", ".ic", ".qk", ".ft", ".ft > *", ".menu", ".big", ".acts", ".pill", ".toast", ".tabs", ".tip"],
+  oneLine: [".sub", ".menu .mi > .t", ".menu .label", ".menu .btn", ".qk-hint span", ".where", ".m", ".grp .lbl", ".ft .key", ".tip", ".acts .when"],
+  rows: [".ttl", ".it .row", ".acts", ".ft", ".kind", ".row-btns", ".swatches", ".grp"],
+};
+
+/** A busy desktop behind the window (two app windows on a bright wallpaper), for the 바탕 shots. */
+const fakeDesktop = `(() => {
+  let desk = document.getElementById("fake-desktop");
+  if (!desk) {
+    desk = document.createElement("div");
+    desk.id = "fake-desktop";
+    desk.style.cssText = "position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(circle at 20% 25%,#f3a96b 0,transparent 42%),radial-gradient(circle at 80% 70%,#5b8bd6 0,transparent 45%),radial-gradient(circle at 30% 85%,#7cc39a 0,transparent 40%),linear-gradient(135deg,#e9d7f5,#9fb8e8)";
+    desk.innerHTML = '<div style="position:absolute;left:10px;top:70px;width:150px;height:300px;background:#fff;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.18);padding:22px 12px 0"><i style="display:block;height:8px;width:70%;border-radius:4px;background:#3b4452;margin-bottom:10px"></i><i style="display:block;height:8px;border-radius:4px;background:#c9ced8;margin-bottom:10px"></i><i style="display:block;height:8px;width:85%;border-radius:4px;background:#c9ced8;margin-bottom:10px"></i><i style="display:block;height:60px;border-radius:6px;background:#e94f4f;margin-bottom:10px"></i></div><div style="position:absolute;left:120px;top:460px;width:200px;height:220px;background:#1f2a35;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.25)"></div>';
+    document.body.prepend(desk);
+  }
+})()`;
+
+/**
+ * `npm run snapshot -- drawer` (and the full run): 메모 서랍 (1.28, 1.29) — the handle; the list in date groups with
+ * kinds (a link, a phone number, a checklist), the hover pill and the open memo's bar in each paper; the folder
+ * list, a memo's menu (and 폴더로 옮기기 ▸), the ⚙ menu, the text menu, a bookmark's menu (and 정렬 ▸), 고정's menu
+ * and a bookmark's label; the four 바탕 over a busy fake desktop (낮 · 밤); a night memo in a day drawer; a dense
+ * folder; editing, 크게 보기, a new folder, writing, an empty folder, 고정, search, 260 and 480 wide, the left side, and
+ * short and tall screens. Each shot is checked (layoutCheck plus the drawer's own: the cat whole, the title not
+ * under the icons, every bookmark inside the window). Returns how many problems it found.
+ */
+async function drawerShots(directory: string, save: Save, wait: Wait): Promise<number> {
+  let problems = 0;
+  const sample = drawerSample();
+  const id = (key: string) => JSON.stringify(sample.ids[key]);
+  store.setPref("drawerSide", "right");
+  store.setPref("drawerWidth", 300);
+  store.setPref("drawerShortcut", "Control+Shift+D");
+  store.setPref("drawerBackdrop", "solid");
+  const window = await drawer.showForSnapshot();
+  const run = (script: string) => window.webContents.executeJavaScript(script).catch((error: Error) => `script failed: ${error.message}`);
+  const own = `(() => {
+    const out = [];
+    const r = (el) => el.getBoundingClientRect();
+    const ears = document.querySelector(".ears");
+    if (ears && getComputedStyle(ears).display !== "none" && (r(ears).top < -0.5 || r(ears).right > window.innerWidth + 0.5 || r(ears).left < -0.5)) out.push("ears cut off");
+    const title = document.querySelector(".fname:not([hidden]) .hw"), icons = document.querySelector(".ttl .ic");
+    if (title && icons && r(title).right > r(icons).left + 0.5) out.push("title under the icons");
+    if (title && title.scrollWidth > title.clientWidth + 1) out.push("title clipped: " + title.textContent);
+    for (const tab of document.querySelectorAll(".bk")) { const b = r(tab); if (b.bottom > window.innerHeight || b.left < -0.5 || b.right > window.innerWidth + 0.5) out.push("bookmark outside: " + (tab.getAttribute("aria-label") || "")); }
+    const on = document.querySelector(".bk.on:not(.paw)");
+    if (on && on.scrollHeight > on.clientHeight + 1) out.push("bookmark name cut: " + on.textContent);
+    for (const hw of document.querySelectorAll(".it .row .hw")) if (hw.scrollWidth > hw.clientWidth + 1 && !hw.title) out.push("card title cut without a tooltip");
+    for (const menu of document.querySelectorAll(".menu")) { const m = r(menu); if (m.right > window.innerWidth + 0.5 || m.bottom > window.innerHeight + 0.5 || m.left < -0.5 || m.top < -0.5) out.push("menu outside the window"); if (menu.scrollHeight > menu.clientHeight + 1) out.push("menu scrolls"); }
+    for (const chip of document.querySelectorAll(".menu .swrow button > span:last-child")) if (chip.scrollWidth > chip.clientWidth + 1) out.push("swatch name cut: " + chip.textContent);
+    for (const card of document.querySelectorAll(".it:not(.open)")) { const h = r(card).height; if (h < (document.querySelector(".list.dense") ? 55.5 : 67.5)) out.push("card too short: " + Math.round(h)); }
+    const when = document.querySelector(".acts .when");
+    if (when && when.scrollWidth > when.clientWidth + 1) out.push("edited time cut: " + when.textContent);
+    return out;
+  })()`;
+  const backdrop = (look: string) => look === "night" ? "#1f1e1b" : look === "kraft" ? "#cfc8bb" : look === "grid" ? "#d3d7db" : "#d8d4cc";
+  const shot = async (name: string, prepare = "", desktop = false) => {
+    if (prepare) await run(prepare);
+    await wait(350);
+    await window.webContents.executeJavaScript(settledScript).catch(() => undefined);
+    const report = await window.webContents.executeJavaScript(layoutCheckScript(drawerLayoutChecks)).catch((error: Error) => ({ problems: [`check failed: ${error.message}`], truncated: [] })) as LayoutReport;
+    const mine = await run(own) as string[] | string;
+    const found = [...report.problems, ...(Array.isArray(mine) ? mine : [mine])];
+    console.log(`drawer ${name}: ${found.length ? found.join("; ") : "ok"}${report.truncated.length ? ` · truncated: ${report.truncated.join(" · ")}` : ""}`);
+    problems += found.length;
+    // A desktop behind it, as the mock has, so the transparent window reads in the picture (바탕: a busy one).
+    if (desktop) await run(fakeDesktop);
+    else await run(`document.body.style.background = ${JSON.stringify("")} || ({ night: "${backdrop("night")}", kraft: "${backdrop("kraft")}", grid: "${backdrop("grid")}" })[document.documentElement.dataset.look] || "${backdrop("day")}"`);
+    await wait(150);
+    await save(`drawer/${name}`, window.webContents.capturePage());
+    await run(`document.body.style.background = ""; document.getElementById("fake-desktop")?.remove()`);
+  };
+  fs.mkdirSync(path.join(directory, "drawer"), { recursive: true });
+  const reset = `window.drawerTest.reset()`;
+  // The list in date groups with its kinds and the hover pill, then the open checklist with its bar — each paper.
+  for (const theme of ["day", "night", "kraft", "grid"] as const) {
+    store.setPref("drawerTheme", theme);
+    await run(reset);
+    await run(`window.drawerTest.view("DRAWER-WORK")`);
+    await shot(`drawer-${theme}`, `window.drawerTest.hover(${id("command")})`);
+    await run(reset);
+    await shot(`drawer-${theme}-open`, `window.drawerTest.open(${id("release")}, false)`);
+    await run(reset);
+    await shot(`drawer-${theme}-scrolled`, `document.querySelector(".list").scrollTop = 10000`);
+  }
+  store.setPref("drawerTheme", "day");
+  await run(reset);
+  await shot("drawer-editing", `window.drawerTest.open(${id("meeting")}, true)`);
+  await run(reset);
+  await shot("drawer-memo-gear", `window.drawerTest.open(${id("release")}, false); window.drawerTest.memoGear()`);
+  await run(reset);
+  await shot("drawer-big", `window.drawerTest.select(${id("meeting")}); window.drawerTest.big()`);
+  await run(reset);
+  await shot("drawer-move-menu", `window.drawerTest.open(${id("release")}, false); window.drawerTest.moveMenu()`);
+  await run(reset);
+  await shot("drawer-folder-list", `window.drawerTest.folderList()`);
+  await run(reset);
+  await shot("drawer-memo-menu", `window.drawerTest.memoMenu(${id("command")})`);
+  await run(reset);
+  await shot("drawer-memo-menu-move", `window.drawerTest.memoMenu(${id("release")}, true)`);
+  await run(reset);
+  await shot("drawer-gear-menu", `window.drawerTest.gearMenu()`);
+  await run(reset);
+  await shot("drawer-text-menu", `window.drawerTest.textMenu(${id("release")})`);
+  await run(reset);
+  await shot("drawer-folder-menu", `window.drawerTest.folderMenu("DRAWER-WORK")`);
+  await run(reset);
+  await shot("drawer-sort-menu", `window.drawerTest.sortMenu("DRAWER-WORK")`);
+  await run(reset);
+  await shot("drawer-pinned-menu", `window.drawerTest.pinnedMenu()`);
+  await run(reset);
+  await shot("drawer-bookmark-tip", `window.drawerTest.tip("DRAWER-HOME")`);
+  await run(reset);
+  await shot("drawer-new-folder", `window.drawerTest.newFolder()`);
+  await run(reset);
+  await shot("drawer-typing", `window.drawerTest.type(${JSON.stringify(t("내일 아침에 우체국 들르기"))})`);
+  await run(reset);
+  // 이 메모의 종이: a night memo in a day drawer, closed and open.
+  await shot("drawer-own-paper", `document.querySelector('.it[data-id=${id("idea")}]')?.scrollIntoView({ block: "center" })`);
+  await run(reset);
+  await shot("drawer-own-paper-open", `window.drawerTest.open(${id("idea")}, true)`);
+  await run(reset);
+  // Many memos: a little denser (12 px apart, 56 px cards).
+  await shot("drawer-dense", `window.drawerTest.view("DRAWER-LOG")`);
+  await run(reset);
+  await shot("drawer-empty", `window.drawerTest.view("DRAWER-STUDY")`);
+  await shot("drawer-pinned", `window.drawerTest.view(${JSON.stringify(pinnedView)})`);
+  await run(`window.drawerTest.view("DRAWER-WORK")`);
+  await shot("drawer-search", `window.drawerTest.search(${JSON.stringify(t("회의"))})`);
+  await run(reset);
+  await shot("drawer-search-none", `window.drawerTest.search("zzz")`);
+  await run(reset);
+  // 바탕: 불투명 · 반투명 · 강하게 · 바탕 없음 over a busy desktop, day and night.
+  for (const theme of ["day", "night"] as const) {
+    store.setPref("drawerTheme", theme);
+    for (const mode of ["solid", "frost", "strong", "none"] as const) {
+      store.setPref("drawerBackdrop", mode);
+      await run(reset);
+      await run(`window.drawerTest.view("DRAWER-WORK")`);
+      await shot(`drawer-backdrop-${mode}-${theme}`, `window.drawerTest.open(${id("release")}, false)`, true);
+    }
+  }
+  store.setPref("drawerBackdrop", "solid");
+  store.setPref("drawerTheme", "day");
+  await run(reset);
+  await run(`window.drawerTest.view("DRAWER-WORK")`);
+  for (const width of [260, 480]) {
+    store.setPref("drawerWidth", width);
+    await shot(`drawer-${width}`, `window.drawerTest.open(${id("release")}, false)`);
+    await run(reset);
+  }
+  store.setPref("drawerWidth", 260);
+  await shot("drawer-260-menu", `window.drawerTest.memoMenu(${id("command")})`);
+  await run(reset);
+  await shot("drawer-260-gear", `window.drawerTest.gearMenu()`);
+  await run(reset);
+  store.setPref("drawerWidth", 300);
+  store.setPref("drawerSide", "left");
+  await shot("drawer-left", `window.drawerTest.open(${id("release")}, false)`);
+  await run(reset);
+  await shot("drawer-left-tip", `window.drawerTest.tip("DRAWER-HOME")`);
+  store.setPref("drawerSide", "right");
+  await run(reset);
+  // Short and tall screens (a 768-pixel laptop under the taskbar; a 1440 monitor).
+  for (const height of [560, 1340]) {
+    await drawer.showForSnapshot(height);
+    await shot(`drawer-height-${height}`, `window.drawerTest.view("DRAWER-WORK")`);
+  }
+  await drawer.showForSnapshot();
+  // Windows' own UI face (Noto Sans KR standing in for Malgun Gothic: taller lines, wider Hangul), narrowest.
+  const notoCSS = await window.webContents.insertCSS(`:root { --ui: "Noto Sans KR", "Malgun Gothic", sans-serif !important; }`);
+  store.setPref("drawerWidth", 260);
+  await shot("drawer-260-noto", `window.drawerTest.view("DRAWER-WORK"); window.drawerTest.open(${id("release")}, false)`);
+  await run(reset);
+  await shot("drawer-260-noto-menu", `window.drawerTest.folderMenu("DRAWER-WORK")`);
+  await run(reset);
+  await shot("drawer-260-noto-memo-menu", `window.drawerTest.memoMenu(${id("command")})`);
+  await run(reset);
+  store.setPref("drawerWidth", 300);
+  await window.webContents.removeInsertedCSS(notoCSS);
+  store.setPref("drawerTheme", "night");
+  await shot("drawer-night-search", `window.drawerTest.search(${JSON.stringify(t("ㅎㅇ"))})`);
+  store.setPref("drawerTheme", "auto");
+  await run(reset);
+  // 설정 › 메모 서랍, and the note's memo tab with each memo's folder.
+  const pane = await showDeskPane("drawer", wait);
+  void pane;
+  const paneReport = await inPane("settings", layoutCheckScript(settingsPaneChecks)) as LayoutReport | string | undefined;
+  const paneFound = typeof paneReport === "object" && paneReport ? paneReport.problems : [`check failed: ${String(paneReport)}`];
+  console.log(`drawer drawer-settings: ${paneFound.length ? paneFound.join("; ") : "ok"}`);
+  problems += paneFound.length;
+  await save("drawer/drawer-settings", captureDesk(wait));
+  await inPane("settings", `document.querySelector(".keyfield")?.click()`);
+  await wait(300);
+  await save("drawer/drawer-settings-recording", captureDesk(wait));
+  await inPane("settings", `document.querySelector(".keyfield")?.click()`);
+  // The note without its memo tab (two tabs, the drawer button by the pin), and where memos open from it now:
+  // a search hit opens the drawer on that memo (M5); /메모 says so with 열기 (M4).
+  note.showInactive();
+  note.webContents.send("note:row-command", { id: "", command: "page-today" });
+  await wait(500);
+  const noteReport = await note.webContents.executeJavaScript(layoutCheckScript(noteLayoutChecks)).catch((error: Error) => ({ problems: [`check failed: ${error.message}`], truncated: [] })) as LayoutReport;
+  const tabsReport = await note.webContents.executeJavaScript(`(() => { const tabs = [...document.querySelectorAll(".index-tab")]; const drawer = document.querySelector(".tools .drawer-open"); return tabs.length + " tabs · " + tabs.map((tab) => tab.textContent).join(" | ") + " · drawer button " + (drawer && drawer.getBoundingClientRect().width > 0 ? "shown" : "MISSING"); })()`);
+  console.log(`drawer note-two-tabs: ${noteReport.problems.length ? noteReport.problems.join("; ") : "ok"} · ${tabsReport}`);
+  problems += noteReport.problems.length;
+  await save("drawer/note-two-tabs", note.webContents.capturePage());
+  // Two tabs, narrow and wide, day and night: the row balanced, nothing cut (the header check's own words).
+  for (const paper of ["day", "night"] as const) {
+    store.setPref("paper", paper);
+    for (const width of [350, 720]) {
+      note.setSize(width, 560);
+      await wait(400);
+      const header = await note.webContents.executeJavaScript(`(() => {
+        const r = (el) => el.getBoundingClientRect();
+        const out = [];
+        const tabs = [...document.querySelectorAll(".index-tab")], tools = document.querySelector(".tools");
+        if (tabs.length !== 2) out.push(tabs.length + " tabs");
+        if (r(tabs[tabs.length - 1]).right > r(tools).left - 16) out.push("tabs run into the tools");
+        for (const tab of tabs) { const label = tab.querySelector(".tab-label"); if (label.scrollWidth > label.clientWidth + 1) out.push("label cut: " + label.textContent); }
+        for (const button of tools.querySelectorAll("button")) if (r(button).right > window.innerWidth + 0.5) out.push("tool cut");
+        return out.join("; ");
+      })()`);
+      console.log(`drawer note-tabs-${paper}-${width}: ${header || "ok"}`);
+      if (header) problems += 1;
+      await save(`drawer/note-tabs-${paper}-${width}`, note.webContents.capturePage());
+    }
+  }
+  store.setPref("paper", "day");
+  note.setSize(420, 560);
+  await note.webContents.executeJavaScript(`window.showSearch(${JSON.stringify(t("회의"))})`).catch(() => undefined);
+  await wait(500);
+  await save("drawer/note-search-memo", note.webContents.capturePage());
+  await note.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(`.search-group[aria-label="${searchGroupTitle("memos", lang())}"] .search-row`)})?.click()`).catch(() => undefined);
+  await wait(700);
+  const opened = await window.webContents.executeJavaScript(`document.querySelector(".it.open")?.dataset.id ?? ""`).catch(() => "");
+  console.log(`drawer search-opens-memo: ${opened ? `ok (${opened})` : "NOT OPENED"}`);
+  if (!opened) problems += 1;
+  await shot("drawer-from-search");
+  await run(`window.drawerTest.reset()`);
+  note.webContents.send("note:row-command", { id: "", command: "page-today" });
+  await note.webContents.executeJavaScript(`(() => { const field = document.querySelector("textarea.typed"); field.focus(); field.value = ${JSON.stringify(t("/메모 우유 사기"))}; field.dispatchEvent(new Event("input")); field.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); })()`).catch(() => undefined);
+  await wait(700);
+  const toastText = await note.webContents.executeJavaScript(`document.querySelector(".toast")?.textContent ?? ""`).catch(() => "");
+  console.log(`drawer memo-line-toast: ${toastText}`);
+  await save("drawer/note-memo-toast", note.webContents.capturePage());
+  // 1.28's one-time slip: where the memo tab's memos went (M1).
+  const question = moveQuestion();
+  if (question) {
+    await confirmSlip.showForSnapshot(question);
+    await wait(800);
+    await save("drawer/move-notice", confirmSlip.capture());
+    confirmSlip.hide();
+  }
+  // The handle, closed: today's number under the paw.
+  const handle = await drawer.handleForSnapshot();
+  await wait(400);
+  if (handle) await save("drawer/drawer-handle", handle.webContents.capturePage());
+  drawer.hideForSnapshot();
+  console.log(problems ? `DRAWER PROBLEMS: ${problems}` : "DRAWER OK");
+  return problems;
+}
+
 /** The run's exit code says whether the size sweep found layout problems. */
 function finishSnapshots(problems: number): void {
   quitting = true;
@@ -3213,7 +3807,7 @@ async function checkHeader(save: (name: string, image?: Promise<Electron.NativeI
     store.setPref("font", font);
     for (const width of [350, 380, 420, 520, 720]) {
       note.setSize(width, 560);
-      for (const command of ["page-today", "page-ahead", "page-memos"]) {
+      for (const command of ["page-today", "page-ahead"]) {
         note.webContents.send("note:row-command", { id: "", command });
         await wait(160);
         const report = await note.webContents.executeJavaScript(`(() => {
@@ -3302,15 +3896,15 @@ const aheadDragScript = `(() => {
 /** What the size sweep (and the 1.24 shots) check in the note. */
 const noteLayoutChecks: LayoutCheckOptions = {
   ignore: ".peek, .strike, .guide, .scrim",
-  inside: [".tabs-row", ".tools button", ".index-tab", ".title-row", ".footer", ".footer > *", ".editor", ".event-sheet", ".event-sheet .tape", ".editor .actions .action", ".memo-bar > *", ".dock", ".inp", ".strip-top", ".strip-lead", ".tt-scroll", ".sheet-pop", ".slip-foot .sbtn",
+  inside: [".tabs-row", ".tools button", ".index-tab", ".title-row", ".footer", ".footer > *", ".editor", ".event-sheet", ".event-sheet .tape", ".editor .actions .action", ".dock", ".inp", ".strip-top", ".strip-lead", ".tt-scroll", ".sheet-pop", ".slip-foot .sbtn",
     ".focus-card", ".fc-top", ".fc-close", ".fc-ring", ".fc-btn", ".fc-foot", ".fc-cat", ".pick-bar", ".pick-cancel", ".focus-pick",
     ".search-slip", ".search-line", ".search-foot", ".row.preview-hover .actions", ".fc-play"],
-  oneLine: [".fc-kicker", ".fc-next", ".fc-btn", ".fc-rest", ".fc-row-title", ".pick-text", ".pick-cancel", ".focus-pick", ".group-name", ".group-count", ".footer > *", ".tab-label", ".editor .actions .action", ".seg button", ".quick button:not(.two-line)", ".choice-title", ".choice-sub", ".memo-back", ".move", ".due", ".time",
+  oneLine: [".fc-kicker", ".fc-next", ".fc-btn", ".fc-rest", ".fc-row-title", ".pick-text", ".pick-cancel", ".focus-pick", ".group-name", ".group-count", ".footer > *", ".tab-label", ".editor .actions .action", ".seg button", ".quick button:not(.two-line)", ".choice-title", ".choice-sub", ".move", ".due", ".time",
     ".carry", ".search-head", ".search-meta", ".search-foot .keys > span", ".slip-title",
     ".date-line", ".prog", ".group-head span", ".group-mark span", ".chip", ".sbtn", ".kbd", ".slip-title", ".sheet-toggle", ".range-length",
     ".strip-link", ".ad-pill", ".ad-more", ".tt-title", ".strip-hours span", ".lead-kicker", ".lead-sub", ".strip-nothing", ".rc-text b", ".rc-text small", ".sr-time", ".sr-away",
     ".tt-hour span", ".tb-time", ".tb-title", ".tt-more", ".ttn-when", ".ttn-chip", ".tml-time"],
-  rows: [".tabs-row", ".tools", ".index-tabs", ".title-row", ".footer", ".lines > .row", ".editor .actions", ".memo-bar", ".memo-row .text", ".quick", ".custom", ".alert-row", ".month-row", ".time-line", ".search-row", ".search-head", ".actions",
+  rows: [".tabs-row", ".tools", ".index-tabs", ".title-row", ".footer", ".lines > .row", ".editor .actions", ".quick", ".custom", ".alert-row", ".month-row", ".time-line", ".search-row", ".search-head", ".actions",
     ".inp-row", ".strip-top", ".strip-lead", ".lead-row", ".strip-row", ".ttn-foot", ".tt-more-list button", ".slip-head", ".slip-foot", ".sheet-row", ".sheet-line", ".prog", ".fc-top", ".fc-btns", ".fc-foot", ".fc-row", ".pick-bar", ".group-head", ".group-mark"],
   // The focus card's column never needs to scroll (only its list does).
   noScroll: [".fc-body"],
@@ -3402,6 +3996,8 @@ async function sizeSweep(directory: string, save: Save, wait: Wait, settled: (wi
     if (after !== heldBefore) { console.log(`sweep: the held block wasn't put back (${heldBefore} → ${after})`); problems += 1; }
   };
   const closeCards = async () => { send("close-editor"); await wait(200); };
+  let aiMade: ReturnType<typeof aiSample> | undefined;
+  let aiProblems = 0;
   const noteStates: NoteState[] = [
     { name: "today", open: async () => send("page-today") },
     // 하루 띠 (1.25): the whole day opened (scrolled to an hour before now), then a block picked with ↓.
@@ -3422,6 +4018,21 @@ async function sizeSweep(directory: string, save: Save, wait: Wait, settled: (wi
       await run(`document.querySelectorAll(".preview-hover").forEach((row) => row.classList.remove("preview-hover")); document.querySelector(".sheet").scrollTop = 0`);
       store.setPref("calendarStrip", true);
     } },
+    // AI 연결 (1.27): Claude's to-dos and event stamped on the list and the strip, its toast up (two lines at most).
+    { name: "ai", open: async () => {
+      ai.setEnabled(true);
+      aiMade = aiSample();
+      ai.seedForSnapshots(aiMade.entries);
+      await wait(250);
+      notice({ icon: "sparkles", text: aiToastText(aiMade.entries[4], lang()), undo: "ai", entry: aiMade.entries[4].id, long: true });
+      await wait(300);
+      const own = await run(aiNoteScript) as string;
+      if (!own.startsWith("ok")) { console.log(`sweep ai: ${own}`); aiProblems += 1; }
+    }, close: async () => {
+      await run(`document.querySelector(".toast")?.remove()`);
+      if (aiMade) aiSampleGone(aiMade.made);
+      ai.setEnabled(false);
+    } },
     { name: "search", open: () => run(`window.showSearch()?.set(${JSON.stringify(searchQuery)})`), close: () => run(`document.querySelector(".search-field")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`) },
     { name: "reminder", open: async () => send("reminder", scheduled.id), close: closeCards },
     { name: "reminder-other", open: async () => { send("reminder", scheduled.id); await wait(300); await run(`document.querySelector(".editor .other-toggle")?.click()`); }, close: closeCards },
@@ -3438,9 +4049,8 @@ async function sizeSweep(directory: string, save: Save, wait: Wait, settled: (wi
     { name: "deadline-editor", open: async () => send("deadline", dated.id), close: closeCards },
     // A task dragged over a day: the day lit up, the line where it lands, an empty 언젠가 to drop on.
     { name: "ahead-drag", open: () => run(aheadDragScript), close: async () => { send("page-today"); await wait(150); send("page-ahead"); } },
-    { name: "ahead-end", open: () => run(`document.querySelector(".sheet").scrollTop = 1e6`) },
-    { name: "memos", open: async () => send("page-memos") },
-    { name: "memo-editor", open: () => run(`document.querySelector(".memo-row")?.click()`), close: async () => { send("page-today"); await wait(150); send("page-memos"); } },
+    // (Back to the top of 오늘 after: the memo states used to do that on the way, before the memo tab went.)
+    { name: "ahead-end", open: () => run(`document.querySelector(".sheet").scrollTop = 1e6`), close: async () => { await run(`document.querySelector(".sheet").scrollTop = 0`); send("page-today"); await wait(150); } },
     // 집중: the card running, its list opened, a Pomodoro's time up (four buttons), and the pick state.
     { name: "focus", open: async () => { focusCommand({ kind: "start", taskId: scheduled.id, minutes: 25 }); focusTimer.elapseForSnapshot(12.5); } },
     { name: "focus-expanded", open: () => run(`document.querySelector(".fc-rest")?.click()`), close: async () => { focusTimer.focus({ kind: "later" }); } },
@@ -3479,12 +4089,12 @@ async function sizeSweep(directory: string, save: Save, wait: Wait, settled: (wi
   };
   const noteSizes: [number, number][] = [[350, 400], [420, 560], [560, 800], [720, 1200]];
   await sweepNote(noteSizes, 1, "");
-  const scaledStates = ["today", "row-hover", "search", "reminder", "repeat", "time-editor", "time-list", "range-chips", "event-new", "ahead", "ahead-drag", "memos", "memo-editor", "focus", "focus-expanded", "focus-pomodoro-up", "pick"];
+  const scaledStates = ["today", "row-hover", "search", "reminder", "repeat", "time-editor", "time-list", "range-chips", "event-new", "ahead", "ahead-drag", "focus", "focus-expanded", "focus-pomodoro-up", "pick"];
   await sweepNote([[420, 560]], 1.25, "@125", scaledStates);
   await sweepNote([[420, 560]], 1.5, "@150", scaledStates);
   note.webContents.setZoomFactor(1);
   const fontKey = await note.webContents.insertCSS(windowsFont);
-  await sweepNote([[350, 400], [420, 560]], 1, "-noto", ["today", "today-open", "today-open-drag", "today-open-stretch", "today-open-picked", "row-hover", "search", "reminder", "reminder-other", "repeat", "time-editor", "time-list", "range-chips", "event-new", "ahead", "ahead-drag", "memos", "focus", "focus-expanded", "focus-pomodoro-up", "pick"]);
+  await sweepNote([[350, 400], [420, 560]], 1, "-noto", ["today", "today-open", "today-open-drag", "today-open-stretch", "today-open-picked", "row-hover", "search", "reminder", "reminder-other", "repeat", "time-editor", "time-list", "range-chips", "event-new", "ahead", "ahead-drag", "focus", "focus-expanded", "focus-pomodoro-up", "pick"]);
   // 집중 and the 하루 띠 in the other two fonts (the task's and the strip's titles are in the hand).
   for (const font of ["brush", "clean"] as const) {
     store.setPref("font", font);
@@ -3497,12 +4107,7 @@ async function sizeSweep(directory: string, save: Save, wait: Wait, settled: (wi
   // ─── 책상: every pane at the desk's sizes (the sidebar folded under 820), scaled, and with the other font ───
   // Each pane is checked inside its own frame (its viewport is the pane), and the sidebar in the desk's page.
   const paneChecks: Record<DeskPage, LayoutCheckOptions> = {
-    settings: {
-      ignore: ".ph-cat",
-      inside: [".pane-head", ".bottom", ".bottom > *"],
-      oneLine: [".pane-head h1", ".segmented button", ".seg button", ".action", ".group > .label", ".tile .name"],
-      rows: [".pane-head", ".row", ".bottom", ".form-actions"],
-    },
+    settings: settingsPaneChecks,
     history: {
       ignore: "#tooltip",
       inside: [".pane-head", ".ranges", ".foot", ".foot button"],
@@ -3538,6 +4143,8 @@ async function sizeSweep(directory: string, save: Save, wait: Wait, settled: (wi
     { name: "pet", pane: "pet" },
     { name: "events", pane: "events" },
     { name: "storage", pane: "storage" },
+    // AI 연결 (1.27): on, with today's and yesterday's work in the list (log only: nothing on the note).
+    { name: "ai", pane: "ai", open: async () => { ai.setEnabled(true); ai.seedForSnapshots(aiSample(false).entries); await wait(200); } },
     { name: "help", pane: "help", open: async () => { openHelp("window"); await wait(300); } },
     { name: "help-end", pane: "help", open: async () => { openHelp("tasks"); await wait(300); await inPane("help", `document.querySelector(".content").scrollTop = 1e6`); } },
     { name: "help-search", pane: "help", open: async () => { openHelp(undefined, t("알림")); await wait(300); }, close: () => inPane("help", `(() => { const input = document.querySelector(".search input"); input.value = ""; input.dispatchEvent(new Event("input")); })()`) },
@@ -3714,6 +4321,7 @@ async function sizeSweep(directory: string, save: Save, wait: Wait, settled: (wi
   glance.snapshotWindow?.hide();
   store.setPref("paper", "day");
 
+  problems += aiProblems;
   console.log(problems ? `SWEEP PROBLEMS: ${problems}` : "SWEEP OK");
   return problems;
 }
@@ -3753,7 +4361,7 @@ function toggleNote(): void {
 
 app.on("second-instance", (_event, argv) => secondLaunch(argv));
 app.on("before-quit", () => { quitting = true; store?.flush(); });
-app.on("will-quit", () => { quick?.dispose(); quickMemo?.dispose(); if (noteHotkeyHeld) globalShortcut.unregister(noteAccelerator); globalShortcut.unregisterAll(); store?.unwatch(); });
+app.on("will-quit", () => { quick?.dispose(); quickMemo?.dispose(); drawer?.dispose(); if (noteHotkeyHeld) globalShortcut.unregister(noteAccelerator); globalShortcut.unregisterAll(); store?.unwatch(); ai?.stop(); });
 app.on("window-all-closed", () => undefined);
 
 app.whenReady().then(() => {
@@ -3769,6 +4377,14 @@ app.whenReady().then(() => {
     path: place.data, archivePath: path.join(place.data, "archive"),
   };
   if (place.unavailable) store.storageError = `${t("저장 폴더를 열 수 없어 이 PC의 기본 위치에 저장하고 있어요. 폴더가 다시 보이면 종이냥을 다시 시작하세요.")}\n${place.unavailable}`;
+  ai = new AiConnection(store, place.settings, {
+    toast: notice,
+    noteVisible: () => Boolean(note && !note.isDestroyed() && note.isVisible() && !note.isMinimized()),
+    // The cat's line about Claude: only when it is out and nothing else holds its attention.
+    say: (line) => { if (pet?.isShown && !focusTimer?.isRunning && !periodicPopup?.isVisible && !taskPopup?.isVisible) pet.say(line, 8); },
+    changed: () => store.changed(),
+  }, aiFiles(), `windows ${app.getVersion()}`);
+  store.aiView = () => ai.view();
   // Another computer may change the shared files; snapshots work in a throwaway folder and don't watch.
   if (!snapshotDirectory) store.watch();
   archive = new ArchiveStore(store, place.data);
@@ -3823,7 +4439,9 @@ app.whenReady().then(() => {
   for (const event of ["show", "hide", "minimize", "restore"] as const) note.on(event as "show", () => setTimeout(() => focusTimer.noteShown(), 50));
   glance = new GlanceWindow(rendererDirectory, live);
   timerSheet = new TimerSheet(rendererDirectory, live, (minutes) => focusTimer.command({ kind: "countdown", minutes }));
-  quickMemo = new QuickMemo(store, rendererDirectory, live);
+  quickMemo = new QuickMemo(store, rendererDirectory, live, (id) => notice({ icon: "note", text: t("메모 서랍에 넣었어요"), show: "drawer", entry: id }));
+  // 메모 서랍: its shortcut and its handle at the screen's edge (tests and snapshots take neither).
+  drawer = new MemoDrawer(store, rendererDirectory, live, { night: paperNight, reduceMotion: () => !systemPreferences.getAnimationSettings().shouldRenderRichAnimation });
   pet = new DesktopPet(store, rendererDirectory, {
     openNote: showNote, changed: updateTray, timerMenu: () => focusTimer.timerMenu(),
     // 종이냥 한마디 waits while the timer runs or a reminder is up; ‘쉴래요’ starts five minutes.
@@ -3833,6 +4451,7 @@ app.whenReady().then(() => {
     // Created after the pet; asked only when the cat speaks up.
     calendar: () => calendar?.chatter(),
     quickMemo: () => quickMemo.open(),
+    drawer: () => drawer.show(),
     alarms: () => openSettings("clock"),
   });
   // 시계 알람: every device rings its own; snapshots never ring.
@@ -3874,6 +4493,11 @@ app.whenReady().then(() => {
     openSheet: openEventSheet, showCalendar: openCalendar,
   }, { alerts: !snapshotDirectory });
   store.on("change", broadcast);
+  // AI 연결: the link at launch (on or off), and while on, what Claude did while the app was closed.
+  // `npm run perf` with PAPERTODO_DEMO_AI=1 measures the app idle with it on.
+  if (demo && !snapshotDirectory && process.env.PAPERTODO_DEMO_AI === "1") store.setPref("aiEnabled", true);
+  ai.start();
+  for (const event of ["show", "restore"] as const) note.on(event as "show", () => setTimeout(() => ai.noteShown(), 300));
   store.on("prefs", (key: keyof Prefs) => {
     if (key === "alwaysOnTop") note.setAlwaysOnTop(store.prefs.alwaysOnTop, "floating");
     // Started at sign-in with --at-login, so a launch by hand can be told apart (the cat's question).
@@ -3884,6 +4508,7 @@ app.whenReady().then(() => {
   store.on("prefs", (key: keyof Prefs) => { if (key === "noteHotkey") updateNoteHotkey(); });
   updateNoteHotkey();
   if (!snapshotDirectory && !offscreenEnabled) createTray();
+  drawer.start();
   if (!snapshotDirectory) startExtras();
   // --demo: what the taskbar shows and the last system notice, for checking on any system (nothing else uses these).
   if (demo && !snapshotDirectory) {

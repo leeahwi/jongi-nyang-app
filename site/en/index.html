@@ -36,6 +36,7 @@
     <nav class="nav" aria-label="Main">
       <a href="#tour">Tour</a>
       <a href="#features">Features</a>
+      <a href="#drawer">Notes drawer</a>
       <a href="#built">How it's built</a>
       <a href="#faq">FAQ</a>
       <a href="https://github.com/leeahwi/jongi-nyang-app">GitHub</a>
@@ -55,13 +56,13 @@
 <main id="main">
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap">
-      <a class="badge" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0"><span class="dot" aria-hidden="true"></span>New · drag timetable blocks to change times<span class="go" aria-hidden="true">→</span></a>
+      <a class="badge" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.44.0"><span class="dot" aria-hidden="true"></span>New · notes in a drawer at the screen edge<span class="go" aria-hidden="true">→</span></a>
       <h1 id="hero-title">Today's to-dos,<br>on <span class="hand">one sheet of paper.</span></h1>
       <p class="lede">A note for writing down to-dos and ticking them off. The top shows what's on now and how long is left, and a paper cat brings your reminders. There's no account; everything is saved as files on your computer.</p>
       <div class="cta">
-        <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0">
+        <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.44.0">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
-          Download for Mac <small>1.41.0</small>
+          Download for Mac <small>1.44.0</small>
         </a>
         <div class="line" role="img" aria-label="Input line example: ‘meeting tomorrow 3pm’ is read as ‘Event · tomorrow 3:00 PM’" data-line='[["meeting tomorrow 3pm","Event · tomorrow 3:00 PM"],["report by Friday","To-do · due Friday"],["timer 40","40-minute timer"],["alarm 7am weekdays","Alarm · weekdays 7:00 AM","clay"]]'>
           <span class="pen" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg></span>
@@ -69,7 +70,7 @@
           <span class="chip" aria-hidden="true">Event · tomorrow 3:00 PM</span>
         </div>
       </div>
-      <p class="alt">Also for Windows 10/11: <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.26.0">Download for Windows 1.26.0</a> · <span lang="ko">종이냥</span> (<i>jongi-nyang</i>) means “paper cat”.</p>
+      <p class="alt">Also for Windows 10/11: <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.29.0">Download for Windows 1.29.0</a> · <span lang="ko">종이냥</span> (<i>jongi-nyang</i>) means “paper cat”.</p>
     </div>
   </section>
 
@@ -96,7 +97,7 @@
             <div>
               <p class="kicker">01 · The note</p>
               <h3>A note that puts now first</h3>
-              <p>One sheet of paper with Today, Ahead and Memo tabs. The day strip at the top writes what's on now in large handwriting, with the time left in a ring beside it. What's next and today's list follow below.</p>
+              <p>One sheet of paper with Today and Ahead tabs. The day strip at the top writes what's on now in large handwriting, with the time left in a ring beside it. What's next and today's list follow below.</p>
             </div>
             <figure class="shot" style="margin:0"><img src="../assets/note-en.webp" width="640" height="976" alt="The Jongi-nyang note on a Mac: the day strip shows ‘Team meeting’ now with 30 minutes left, then what's next and today's list"></figure>
           </article>
@@ -271,6 +272,28 @@
     </div>
   </section>
 
+  <section id="drawer" aria-labelledby="drawer-title">
+    <div class="wrap">
+      <div class="head reveal">
+        <p class="eyebrow">Notes drawer</p>
+        <h2 id="drawer-title">Notes live in a drawer at the screen’s edge</h2>
+        <p>Since 1.43, the notebook’s Memo tab is a drawer at the edge of the screen. Pull it out from any app to read a note, jot one down, or edit it in place. Every note you already had is in the drawer’s Notes folder.</p>
+      </div>
+      <div class="stage reveal">
+        <div class="film-frame">
+          <video class="film-video" data-film data-film-lazy src="../assets/drawer-en.mp4" poster="../assets/drawer-en.jpg" width="1280" height="720" muted loop playsinline preload="none" aria-label="A 15-second clip: the notes drawer slides out from the right edge of the screen, with notes grouped under Pinned, Today, Yesterday and Last week. Then the right-click menu’s Move to folder, one note switched to night paper, and the Solid, Frosted and None backdrops. No sound."></video>
+          <button class="film-toggle" type="button" data-film-toggle aria-label="Pause the video" data-label-pause="Pause the video" data-label-play="Play the video"><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><rect x="4" y="3" width="3" height="10" rx="1"/><rect x="9" y="3" width="3" height="10" rx="1"/></svg><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M5 3.2v9.6a.6.6 0 0 0 .9.5l7.6-4.8a.6.6 0 0 0 0-1L5.9 2.7a.6.6 0 0 0-.9.5z"/></svg></button>
+        </div>
+      </div>
+      <ul class="points">
+        <li class="reveal"><strong>Out from any app</strong><span>Press <kbd>⇧⌘D</kbd> (<kbd>Ctrl+Shift+D</kbd> on Windows) or click the cat-paw handle at the edge. Clicking another app doesn’t close it.</span></li>
+        <li class="reveal"><strong>Folders are bookmarks</strong><span>Each bookmark beside the drawer is a folder. Notes are grouped into Pinned, Today, Yesterday, Last week and then by month, and a link or phone number shows as a small label on the card.</span></li>
+        <li class="reveal"><strong>Right-click to sort</strong><span>A note, a bookmark and empty drawer space each have a menu. Move to a folder, duplicate and sort from there, or give a single note its own paper.</span></li>
+        <li class="reveal"><strong>Paper and backdrop</strong><span>Four papers: day, night, kraft and grid. The backdrop is Solid by default, with Frosted, Strong and None to choose from. Frosted on Windows hasn’t been seen on a real PC yet.</span></li>
+      </ul>
+    </div>
+  </section>
+
   <section id="design" aria-labelledby="design-title">
     <div class="wrap">
       <div class="head reveal">
@@ -341,21 +364,21 @@
       <div class="downloads">
         <div class="dl reveal">
           <h3>Mac</h3>
-          <p class="meta">1.41.0 · macOS 14 or later · Apple Silicon · DMG</p>
+          <p class="meta">1.44.0 · macOS 14 or later · Apple Silicon · DMG</p>
           <ol>
             <li>Open the DMG and drag <strong>Jongi-nyang</strong> into Applications.</li>
             <li>In Applications, <strong>right-click → Open</strong>. If it's blocked: System Settings → Privacy &amp; Security → <strong>Open Anyway</strong>.</li>
           </ol>
-          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.41.0">Download for Mac</a>
+          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.44.0">Download for Mac</a>
         </div>
         <div class="dl reveal">
           <h3>Windows</h3>
-          <p class="meta">1.26.0 · Windows 10/11 x64 · installer or portable zip</p>
+          <p class="meta">1.29.0 · Windows 10/11 x64 · installer or portable zip</p>
           <ol>
-            <li>Run <code>JongiNyang-1.26.0-x64.exe</code>.</li>
+            <li>Run <code>JongiNyang-1.29.0-x64.exe</code>.</li>
             <li>If SmartScreen appears: <strong>More info → Run anyway</strong>.</li>
           </ol>
-          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.26.0">Download for Windows</a>
+          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.29.0">Download for Windows</a>
         </div>
       </div>
     </div>
@@ -374,6 +397,7 @@
         <ul>
           <li><a href="#tour">Tour</a></li>
           <li><a href="#features">Features</a></li>
+          <li><a href="#drawer">Notes drawer</a></li>
           <li><a href="#download">Download</a></li>
           <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/CHANGELOG.en.md">Changelog</a></li>
         </ul>
@@ -397,7 +421,7 @@
     </div>
     <div class="legal">
       <span>© 2026 leeAhwi · Source code under the <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/LICENSE">Apache License 2.0</a></span>
-      <span>Mac 1.41.0 · Windows 1.26.0</span>
+      <span>Mac 1.44.0 · Windows 1.29.0</span>
     </div>
   </div>
 </footer>

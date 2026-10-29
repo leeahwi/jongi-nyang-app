@@ -43,6 +43,8 @@
   --memo-2: #ebe6f6;
   --toast-action: #f6d9c7;
   --toast-strong: #cfe3c9;
+  /* AI 연결's stamp on a row Claude added or changed today: blue-grey stamp ink (the Mac's PaperTheme.stamp). */
+  --stamp: #4d5b86;
   --shadow-float: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 18px 40px -18px rgba(70, 58, 30, 0.35), 0 2px 6px rgba(70, 58, 30, 0.08);
   --shadow-slip: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 16px 30px -16px rgba(70, 58, 30, 0.45), 0 2px 6px rgba(70, 58, 30, 0.1);
   /* Text and marks on a sage fill (the primary button, a checked box, today's date). */
@@ -110,6 +112,7 @@
   /* The toast is a light pill at night (ink on paper turned round): its action and strong words dark. */
   --toast-action: #8f4a30;
   --toast-strong: #3d6639;
+  --stamp: #a9b6dc;
   /* A faint light edge too: dark paper on a dark screen would otherwise lose its outline. */
   --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 18px 40px -18px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.3);
   --shadow-slip: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 16px 30px -16px rgba(0, 0, 0, 0.75), 0 2px 6px rgba(0, 0, 0, 0.35);
@@ -236,3 +239,9 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .tclock { display: inline-grid; justify-items: start; font-variant-numeric: tabular-nums; }
 .tclock > span { grid-area: 1 / 1; white-space: nowrap; }
 .tclock > .tc-size { visibility: hidden; }
+
+/* AI 연결: the small stamp after a title Claude added or changed today — a rubber stamp pressed a little
+   crooked by hand, in blue-grey ink (the Mac's AIStamp). */
+.ai-stamp { display: inline-block; flex: none; margin-left: 6px; padding: 0 4px; border: 1px solid color-mix(in srgb, var(--stamp) 80%, transparent); border-radius: 3px;
+  font: 600 9px/13px var(--ui); letter-spacing: 0.3px; color: var(--stamp); white-space: nowrap; transform: rotate(-4deg); vertical-align: middle; position: relative; top: -1px; }
+.ai-stamp[hidden] { display: none; }

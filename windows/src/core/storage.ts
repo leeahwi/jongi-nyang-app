@@ -3,10 +3,11 @@ import type { Lang } from "./lang";
 /**
  * Where the list lives. By default next to the settings (%APPDATA%\PaperTodo); a chosen folder
  * (OneDrive, Dropbox, iCloud Drive…) lets several computers share one list. Only the data moves
- * there — todos.json, memos.json, repeats.json, events.json, alarms.json and archive/ — settings stay on each device.
+ * there — todos.json, memos.json, repeats.json, events.json, alarms.json, memo-folders.json (메모 서랍, 1.28) and archive/ —
+ * settings stay on each device.
  * The chosen folder is kept in storage.json beside settings.json.
  */
-export const sharedFiles = ["todos.json", "memos.json", "repeats.json", "events.json", "alarms.json"] as const;
+export const sharedFiles = ["todos.json", "memos.json", "repeats.json", "events.json", "alarms.json", "memo-folders.json"] as const;
 export type SharedFile = typeof sharedFiles[number];
 export const storageFileName = "storage.json";
 

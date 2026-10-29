@@ -2,20 +2,39 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key><string>종이냥</string>
-    <key>CFBundleDisplayName</key><string>종이냥</string>
-    <key>CFBundleIdentifier</key><string>com.noa.PaperTodo</string>
-    <key>CFBundleDevelopmentRegion</key><string>ko</string>
-    <key>CFBundleLocalizations</key><array><string>ko</string><string>en</string><string>nl</string></array>
-    <key>LSHasLocalizedDisplayName</key><true/>
-    <key>CFBundleExecutable</key><string>PaperTodo</string>
-    <key>CFBundlePackageType</key><string>APPL</string>
-    <key>CFBundleVersion</key><string>66</string>
-    <key>CFBundleShortVersionString</key><string>1.41.0</string>
-    <key>CFBundleIconFile</key><string>AppIcon</string>
-    <key>LSMinimumSystemVersion</key><string>14.0</string>
-    <key>NSHighResolutionCapable</key><true/>
-    <key>NSPrincipalClass</key><string>NSApplication</string>
-    <key>NSHumanReadableCopyright</key><string>© 2026 leeAhwi. All rights reserved.</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>ko</string>
+	<key>CFBundleDisplayName</key>
+	<string>종이냥</string>
+	<key>CFBundleExecutable</key>
+	<string>PaperTodo</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.noa.PaperTodo</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>ko</string>
+		<string>en</string>
+		<string>nl</string>
+	</array>
+	<key>CFBundleName</key>
+	<string>종이냥</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.44.0</string>
+	<key>CFBundleVersion</key>
+	<string>71</string>
+	<key>LSHasLocalizedDisplayName</key>
+	<true/>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>© 2026 leeAhwi. All rights reserved.</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
 </dict>
 </plist>

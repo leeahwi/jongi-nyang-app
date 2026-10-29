@@ -416,6 +416,7 @@ final class DesktopPetController {
         timerItem.submenu = timerMenu()
         menu.addItem(timerItem)
         menu.addItem(PetMenuItem(L("빠른 메모")) { [weak self] in self?.model.showQuickMemo() })
+        menu.addItem(PetMenuItem(L("메모 서랍")) { [weak self] in self?.model.toggleMemoDrawer() })
         menu.addItem(PetMenuItem(L("알람…")) { [weak self] in self?.model.showAlarmSettings() })
         menu.addItem(PetMenuItem(L("설정…")) { [weak self] in self?.model.showDesk(.pet) })
         menu.addItem(.separator())

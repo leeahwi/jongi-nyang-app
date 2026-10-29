@@ -5,9 +5,9 @@ import SwiftUI
 
 /// 책상 (Desk): what used to be five windows — 달력, 완료 기록, 설정 (its tabs), 도움말 — as panes of one
 /// window with a sidebar. 보기: 달력 · 완료 기록 · 시계; 설정: 꾸미기 · 알림 · 반복 · 종이냥 · 일정 ·
-/// 저장과 백업; 도움: 도움말 (and 사용 안내, which opens the guide over the note).
+/// 저장과 백업 · 메모 서랍 · AI 연결; 도움: 도움말 (and 사용 안내, which opens the guide over the note).
 enum DeskPane: String, CaseIterable, Identifiable {
-    case calendar, history, clock, appearance, notifications, repeating, pet, events, storage, help
+    case calendar, history, clock, appearance, notifications, repeating, pet, events, storage, drawer, ai, help
 
     var id: String { rawValue }
 
@@ -28,7 +28,7 @@ enum DeskPane: String, CaseIterable, Identifiable {
     var section: Section {
         switch self {
         case .calendar, .history, .clock: .view
-        case .appearance, .notifications, .repeating, .pet, .events, .storage: .settings
+        case .appearance, .notifications, .repeating, .pet, .events, .storage, .drawer, .ai: .settings
         case .help: .help
         }
     }
@@ -46,6 +46,8 @@ enum DeskPane: String, CaseIterable, Identifiable {
         case .pet: String(localized: "종이냥", table: "Desk")
         case .events: L("일정")
         case .storage: L("저장과 백업")
+        case .drawer: L("메모 서랍")
+        case .ai: L("AI 연결")
         case .help: L("도움말")
         }
     }
@@ -62,6 +64,9 @@ enum DeskPane: String, CaseIterable, Identifiable {
         case .pet: "pawprint"
         case .events: "calendar.badge.clock"
         case .storage: "archivebox"
+        // A drawer pulled out (the Windows desk draws the same).
+        case .drawer: "tray"
+        case .ai: "text.bubble"
         case .help: "questionmark.circle"
         }
     }
@@ -78,6 +83,8 @@ enum DeskPane: String, CaseIterable, Identifiable {
         case .pet: L("종이냥을 보이거나 숨기고, 돌아다닐지, 말을 걸지 정해요.")
         case .events: L("일정을 적어 두면 오늘 할 일 위에 보이고, 시작 전에 알려 줘요.")
         case .storage: L("할 일과 기록이 저장되는 곳, 다른 컴퓨터로 옮기는 백업이에요.")
+        case .drawer: L("화면 끝에서 메모를 꺼내 보고, 바로 적고, 그 자리에서 고쳐요.")
+        case .ai: L("Claude와 이야기하면서 할 일과 일정을 보고, 넣고, 고쳐요.")
         case .help: L("궁금한 걸 찾아보세요")
         }
     }
@@ -87,15 +94,17 @@ enum DeskPane: String, CaseIterable, Identifiable {
         switch self {
         case .appearance: PaperTheme.tabToday
         case .notifications: PaperTheme.tabAhead
-        case .repeating, .calendar, .history, .help: PaperTheme.sage2
+        case .repeating, .calendar, .history, .help, .drawer: PaperTheme.sage2
         case .pet: PaperTheme.tabMemo
         case .clock: PaperTheme.clay2
         case .events: PaperTheme.eventTint
         case .storage: PaperTheme.paper2
+        case .ai: PaperTheme.tabAhead
         }
     }
 
-    /// ⌘1…⌘9 inside the desk: the first nine panes in sidebar order (도움말 is ⌘?).
+    /// ⌘1…⌘9 inside the desk: the first nine panes in sidebar order, 달력 to 저장과 백업 (메모 서랍 and AI 연결
+    /// after it have none, as on Windows; 도움말 is ⌘?).
     var shortcut: Int? {
         let index = Self.allCases.firstIndex(of: self)!
         return index < 9 ? index + 1 : nil
@@ -244,7 +253,13 @@ struct DeskView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            DeskSidebar(state: state, compact: compact, onGuide: onGuide, onSearch: { model.onSearch?() })
+            // 1.42: eleven panes (twelve since 1.43.1): in a short window the rows sit closer, and in a very short one the sidebar scrolls.
+            ViewThatFits(in: .vertical) {
+                DeskSidebar(state: state, compact: compact, onGuide: onGuide, onSearch: { model.onSearch?() })
+                DeskSidebar(state: state, compact: compact, tight: true, onGuide: onGuide, onSearch: { model.onSearch?() })
+                ScrollView { DeskSidebar(state: state, compact: compact, tight: true, onGuide: onGuide, onSearch: { model.onSearch?() }).padding(.bottom, 10) }
+                    .scrollIndicators(.never)
+            }
                 .padding(.top, titlebarInset)
                 .frame(width: compact ? DeskMetrics.compactSidebar : DeskMetrics.sidebar)
                 .frame(maxHeight: .infinity, alignment: .top)
@@ -282,20 +297,24 @@ struct DeskView: View {
 struct DeskSidebar: View {
     @ObservedObject var state: DeskState
     let compact: Bool
+    /// A short window (1.42): rows 26 pt instead of 30, less space between the groups.
+    var tight = false
     var onGuide: () -> Void = {}
     /// 1.38: 검색 at the top (the same slip as ⌘F in the note).
     var onSearch: (() -> Void)?
     @FocusState private var focused: Bool
 
+    private var rowHeight: CGFloat { tight ? 26 : 30 }
+
     var body: some View {
         VStack(alignment: compact ? .center : .leading, spacing: 2) {
             if let onSearch {
-                DeskSidebarRow(title: L("검색"), symbol: "magnifyingglass", selected: false, compact: compact, shortcut: "⌘F", action: onSearch)
-                    .padding(.bottom, compact ? 6 : 8)
+                DeskSidebarRow(title: L("검색"), symbol: "magnifyingglass", selected: false, compact: compact, shortcut: "⌘F", height: rowHeight, action: onSearch)
+                    .padding(.bottom, compact || tight ? 4 : 8)
             }
             ForEach(DeskPane.Section.allCases, id: \.self) { section in
                 if compact {
-                    if section != .view { Rectangle().fill(PaperTheme.rule).frame(width: 28, height: 1).padding(.vertical, 8) }
+                    if section != .view { Rectangle().fill(PaperTheme.rule).frame(width: 28, height: 1).padding(.vertical, tight ? 5 : 8) }
                 } else {
                     Text(section.title)
                         .font(.system(size: 10.5, weight: .semibold))
@@ -303,23 +322,23 @@ struct DeskSidebar: View {
                         .foregroundStyle(PaperTheme.ink3)
                         .lineLimit(1)
                         .padding(.horizontal, 10)
-                        .padding(.top, section == .view ? 0 : 12)
+                        .padding(.top, section == .view ? 0 : tight ? 7 : 12)
                         .padding(.bottom, 3)
                         .accessibilityAddTraits(.isHeader)
                 }
                 ForEach(section.panes) { pane in
                     DeskSidebarRow(title: pane.title, symbol: pane.symbol, selected: state.pane == pane, compact: compact,
-                                   shortcut: pane.shortcut.map { "⌘\($0)" } ?? "⌘?") {
+                                   shortcut: pane.shortcut.map { "⌘\($0)" } ?? (pane == .help ? "⌘?" : nil), height: rowHeight) {
                         state.pane = pane
                     }
                 }
                 if section == .help {
-                    DeskSidebarRow(title: L("사용 안내"), symbol: "sparkles", selected: false, compact: compact, shortcut: nil, action: onGuide)
+                    DeskSidebarRow(title: L("사용 안내"), symbol: "sparkles", selected: false, compact: compact, shortcut: nil, height: rowHeight, action: onGuide)
                 }
             }
         }
         .padding(.horizontal, compact ? 8 : 10)
-        .padding(.top, 12)
+        .padding(.top, tight ? 8 : 12)
         .frame(maxWidth: .infinity, alignment: compact ? .center : .leading)
         .focusable()
         .focusEffectDisabled()
@@ -342,6 +361,7 @@ private struct DeskSidebarRow: View {
     let selected: Bool
     let compact: Bool
     let shortcut: String?
+    var height: CGFloat = 30
     let action: () -> Void
     @State private var hovering = false
 
@@ -361,7 +381,7 @@ private struct DeskSidebarRow: View {
             }
             .foregroundStyle(selected ? PaperTheme.ink : PaperTheme.ink2)
             .padding(.horizontal, compact ? 0 : 9)
-            .frame(width: compact ? 40 : nil, height: 30)
+            .frame(width: compact ? 40 : nil, height: height)
             .frame(maxWidth: compact ? nil : .infinity, alignment: .leading)
             .background {
                 if selected {
@@ -398,7 +418,7 @@ struct DeskPaneHeader<Trailing: View>: View {
                     .minimumScaleFactor(0.8)
                     .accessibilityAddTraits(.isHeader)
                 if let subtitle {
-                    Text(subtitle)
+                    Text(subtitle.keepingParticles)
                         .font(.system(size: 12))
                         .foregroundStyle(PaperTheme.ink2)
                         .fixedSize(horizontal: false, vertical: true)

@@ -1,0 +1,3 @@
+/* 메모 서랍 (1.44): words that read differently as a menu action or a swatch than elsewhere. */
+"고정" = "Pin";
+"자동" = "Auto";

@@ -3,9 +3,10 @@
 # fills its own storage folder with the demo data set (scripts/perf-data.py), runs it, drives it by its
 # pid only, and prints the key numbers. The installed app and its data are never touched.
 #
-#   scripts/perf.sh [out-folder] [--quick] [--no-build]
+#   scripts/perf.sh [out-folder] [--quick] [--no-build]      (PERF_AI=1: with AI 연결 on)
 #
-# --quick skips the 10-minute use loop (memory after use). Everything the test copy wrote (storage
+# --quick skips the 10-minute use loop (memory after use). The last step (1.44) measures the drawer with its
+# backdrop 반투명. Everything the test copy wrote (storage
 # folder, preferences, saved state) is removed at the end.
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
@@ -67,16 +68,23 @@ fresh() {
     for key in quickEntry.enabled quickMemo.enabled noteHotKey.enabled pet.visible sweep.enabled chatter.enabled; do
         defaults write "$bundle_id" "$key" -bool false
     done
+    # 메모 서랍 (1.43): its shortcut off (the drawer opens from the 윈도우 menu here); no move notice.
+    defaults write "$bundle_id" drawer.shortcut -data ""
+    defaults write "$bundle_id" memoDrawer.moveNoticeShown -bool true
     defaults write "$bundle_id" guide.seen -bool true
     defaults write "$bundle_id" login.asked -bool true
     defaults write "$bundle_id" systemNotices off
     defaults write "$bundle_id" AppleLanguages -array ko
+    # PERF_AI=1: AI 연결 on (1.42) — the folder and ai-log.jsonl watched.
+    [ "${PERF_AI:-0}" = 1 ] && defaults write "$bundle_id" ai.enabled -bool true
+    return 0
 }
 
 launch() {
     : > "$log"
     # Through Launch Services, like a click in Finder: the note comes up in front.
-    open -n "$app" --args --perf-log "$log"
+    # --offscreen: the note, the drawer and its handle far off every screen, out of the user's way.
+    open -n "$app" --args --perf-log "$log" --offscreen
     for _ in $(seq 1 100); do pid=$(pgrep -f "$app/Contents/MacOS/PaperTodo" | head -1 || true); [ -n "$pid" ] && break; sleep 0.05; done
     for _ in $(seq 1 100); do grep -q '^noteVisible' "$log" 2>/dev/null && break; sleep 0.1; done
     sleep 1.5
@@ -136,13 +144,13 @@ echo "typing (app): per key median $(echo "$keys" | median) ms · max $(echo "$k
 "$probe" key "$pid" 53; sleep 0.4   # Esc clears the line
 "$probe" key "$pid" 53; sleep 0.4
 
-# 4. Tab switches ⌘2 ⌘3 ⌘1, three rounds.
+# 4. Tab switches ⌘2 ⌘1, three rounds (two tabs from 1.43: ⌘3 opens 메모 서랍, measured in 8b).
 mark tabs
-for _ in 1 2 3; do for code in 19 20 18; do "$probe" key "$pid" "$code" cmd; sleep 0.7; done; done
-settle tabs "key " 9
+for _ in 1 2 3; do for code in 19 18; do "$probe" key "$pid" "$code" cmd; sleep 0.7; done; done
+settle tabs "key " 6
 mark tabs-end
 tabs=$(vals tabs tabs-end key)
-echo "tab switch 오늘↔앞으로↔메모 (app): median $(echo "$tabs" | median) ms · max $(echo "$tabs" | max) ms · with delivery median $(totals tabs tabs-end key | median) ms"
+echo "tab switch 오늘↔앞으로 (app): median $(echo "$tabs" | median) ms · max $(echo "$tabs" | max) ms · with delivery median $(totals tabs tabs-end key | median) ms"
 
 # 5. Checking a task with the keyboard (↑ from the empty input line picks the last row, Space checks it), the
 # save after it; Space again puts it back.
@@ -189,6 +197,30 @@ echo "search ⌘F (app): open $(first search search-end "key 3 ") ms · per lett
 "$probe" key "$pid" 13 cmd; sleep 2
 mark idle-hidden
 echo "idle, note hidden (60 s): $("$probe" sample "$pid" 60)"
+# 8b. 메모 서랍 (1.43): idle with the note hidden is with its handle out (drawer closed); then the drawer from the 윈도우
+# menu (first time; closed; again: made once, hidden after), idle with it open, closed. Each toggle is logged
+# (`drawer` opening, `drawerclose` closing), so a missed one shows.
+drawer_menu() { "$probe" menu "$pid" "윈도우" "메모 서랍" >/dev/null 2>&1 || "$probe" menu "$pid" "Window" "Notes drawer" >/dev/null 2>&1 || true; }
+"$probe" front "$pid"; sleep 0.5
+mark drawer1
+drawer_menu
+settle drawer1 "drawer " 1 15
+mark drawer1-end
+echo "open drawer (first time, app): $(first drawer1 drawer1-end "drawer ") ms"
+drawer_menu; sleep 1.2
+mark drawer2
+drawer_menu
+settle drawer2 "drawer " 1 15
+mark drawer2-end
+echo "reopen drawer (app): $(first drawer2 drawer2-end "drawer ") ms"
+sleep 2
+echo "idle, drawer open (60 s): $("$probe" sample "$pid" 60)"
+mark drawer3
+drawer_menu
+settle drawer3 "drawerclose" 1 10
+mark drawer3-end
+echo "  (closed after: $(vals drawer3 drawer3-end drawerclose | wc -l | tr -d ' ') close logged — 1 means it was open while sampled)"
+sleep 1
 mark reopen
 "$probe" key "$pid" 29 cmd
 settle reopen "key " 1
@@ -212,7 +244,7 @@ sleep 1
 if [ "$quick" = 0 ]; then
     end=$((SECONDS + 600))
     while [ $SECONDS -lt $end ]; do
-        for code in 19 20 18; do "$probe" key "$pid" "$code" cmd; sleep 0.6; done
+        for code in 19 18; do "$probe" key "$pid" "$code" cmd; sleep 0.6; done
         "$probe" key "$pid" 45 cmd; sleep 0.3
         "$probe" type "$pid" "보고서 쓰기" 80; sleep 0.3
         "$probe" key "$pid" 53; sleep 0.2; "$probe" key "$pid" 53; sleep 0.3
@@ -223,3 +255,23 @@ if [ "$quick" = 0 ]; then
 fi
 echo "files written in the whole run: $(grep -c '^io' "$log" || true) (todos $(grep -c '^io todos' "$log" || true), memos $(grep -c '^io memos' "$log" || true))"
 cp "$log" "$out/perf-last.log"
+
+# 12. 메모 서랍 바탕 반투명 (1.44): a fresh start with the drawer's backdrop see-through (a behind-window blur under the
+# paper), the drawer opened from the 윈도우 menu, then idle. The blur itself is drawn by the window server, so this is
+# the app's own share; it must stay with "idle, drawer open" above. Skipped when Reduce transparency is on (it draws
+# 불투명 then).
+if [ "$(defaults read com.apple.universalaccess reduceTransparency 2>/dev/null || echo 0)" = 1 ]; then
+    echo "idle, drawer open, 반투명: skipped (Reduce transparency is on)"
+else
+    fresh
+    defaults write "$bundle_id" drawer.backdrop translucent
+    launch
+    "$probe" front "$pid"; sleep 0.5
+    mark drawer4
+    drawer_menu
+    settle drawer4 "drawer " 1 15
+    mark drawer4-end
+    echo "open drawer, 반투명 (first time, app): $(first drawer4 drawer4-end "drawer ") ms"
+    sleep 2
+    echo "idle, drawer open, 반투명 (60 s): $("$probe" sample "$pid" 60)"
+fi

@@ -28,7 +28,7 @@
  7   10.4    -2.1                                    0.0
 ```
 
-같은 포인터 경로(118틱)를 1.40의 계산에 넣으면 블록 위치가 114번 바뀌고, 그중 61번은 포인터와 반대 방향이었다. 이 표는 실제 측정이 아니라 옛 코드의 계산을 그대로 재현한 것이다([`mac/scripts/drag-sim-1.40.py`](../../mac/scripts/drag-sim-1.40.py)).
+같은 포인터 경로(118틱)를 1.40의 계산에 넣으면 블록 위치가 114번 바뀌고, 그중 61번은 포인터와 반대 방향이었다. 이 표는 실제 측정이 아니라 옛 코드의 계산을 그대로 재현한 것이다(Mac 저장소 `scripts/drag-sim-1.40.py`).
 
 덤으로, 끌고 있는 상태를 일정표의 `@State`에 두어서 한 칸 움직일 때마다 일정표 전체와 모든 블록을 다시 그렸다.
 
@@ -69,7 +69,7 @@
 
 ### 어떻게 쟀나
 
-- **Mac**: 테스트용 사본에 보낸 가짜 마우스 이벤트는 SwiftUI `DragGesture`까지 가지 않았다. 그래서 디버그 빌드에만 있는 재생 장치(`--timetable-replay`, `TimetableReplay.swift`, `#if DEBUG`)가 제스처와 같은 함수를 초당 60번 부르고, 매 틱 블록이 그려진 위치를 기록한다. [`mac/scripts/drag-check.sh`](../../mac/scripts/drag-check.sh)가 테스트용 사본을 만들어 재생하고 `drag-check.py`로 판정한다.
+- **Mac**: 테스트용 사본에 보낸 가짜 마우스 이벤트는 SwiftUI `DragGesture`까지 가지 않았다. 그래서 디버그 빌드에만 있는 재생 장치(`--timetable-replay`, `TimetableReplay.swift`, `#if DEBUG`)가 제스처와 같은 함수를 초당 60번 부르고, 매 틱 블록이 그려진 위치를 기록한다. Mac 저장소의 `scripts/drag-check.sh`가 테스트용 사본을 만들어 재생하고 `drag-check.py`로 판정한다.
 - **Windows**: CDP로 실제 마우스 이벤트를 1px씩 보내고, `requestAnimationFrame`마다 블록의 `top`을 기록했다(`tools/drag-probe.mjs`).
 
 ## 다시 생기지 않게
@@ -85,8 +85,7 @@
 - Windows는 실제 Windows PC, 고배율, 터치·펜 입력에서 확인하지 못했다.
 - 03:30 이후에 시작하는 시작 시간만 있는 할 일의 위 끝을 늘리면 04:00 끝이 저장되지 않는다(할 일의 끝은 04:00을 저장하지 않음).
 
-## 관련 파일
+## 관련 커밋
 
-- Mac: [`Sources/PaperCore/DayStrip.swift`](../../mac/Sources/PaperCore/DayStrip.swift) · [`Sources/PaperTodo/TimetableDrag.swift`](../../mac/Sources/PaperTodo/TimetableDrag.swift) · [`scripts/drag-check.sh`](../../mac/scripts/drag-check.sh)
-- Windows: [`src/core/dayStrip.ts`](../src/core/dayStrip.ts) · [`src/renderer/dayStrip.ts`](../src/renderer/dayStrip.ts) · [`tools/drag-probe.mjs`](../tools/drag-probe.mjs)
-- 두 앱을 함께 본 기록: [저장소의 `docs/postmortem-timetable-drag.md`](../../docs/postmortem-timetable-drag.md)
+- Mac: `e63b7e5` 공유 계산과 R1–R8 · `e1ec51f` 포인터 따라가기와 위아래 늘리기 · `9620e49` drag-check · `8bc40db` 1.41.0 · 병합 `2c72a6a`
+- Windows: `37d50da` 공유 계산 · `5cf057b` 포인터 따라가기와 늘리기 · `94fced1` 놓은 지점에 놓기 · `27818d8` 1.26.0 · 병합 `517f3e4`

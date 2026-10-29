@@ -77,6 +77,30 @@ export const iconPaths: Record<string, string> = {
   cup: '<path d="M4 9h13v3.5A5.5 5.5 0 0 1 11.5 18h-2A5.5 5.5 0 0 1 4 12.5z"/><path d="M17 10.5h1.2a2.3 2.3 0 0 1 0 4.6h-1.9"/><path d="M2.5 21h16"/><path d="M8.5 3.5c-.7.9-.7 1.9 0 2.8M12.5 3.5c-.7.9-.7 1.9 0 2.8"/>',
   bed: '<path d="M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8"/><path d="M4 10V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4"/><path d="M12 4v6"/><path d="M2 17h20"/>',
   bellDot: '<path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M13.9 2.3A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-1-.7-1.9-2.8"/><circle cx="18" cy="7.5" r="3"/>',
+  // 메모 서랍 (1.28): copy, 폴더 옮기기, 크게 보기 · 작게 보기.
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  folderMove: '<path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2l2 2h8.8A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/><path d="M9 13.5h6M13 11.5l2 2-2 2"/>',
+  expand: '<path d="M15 4h5v5M20 4l-6 6M9 20H4v-5M4 20l6-6"/>',
+  shrink: '<path d="M19 10h-5V5M14 10l6-6M5 14h5v5M10 14l-6 6"/>',
+  /** A paw print (the drawer's 고정 bookmark, its handle and footer; filled there). */
+  pawPrint: '<path d="M12 12.6c2.7 0 5 2.2 5 4.4 0 1.6-1.3 2.4-2.6 2.4-1 0-1.6-.4-2.4-.4s-1.4.4-2.4.4C8.3 19.4 7 18.6 7 17c0-2.2 2.3-4.4 5-4.4z"/><ellipse cx="6.1" cy="10.6" rx="1.7" ry="2.1" transform="rotate(-18 6.1 10.6)"/><ellipse cx="9.6" cy="6.9" rx="1.8" ry="2.3" transform="rotate(-6 9.6 6.9)"/><ellipse cx="14.4" cy="6.9" rx="1.8" ry="2.3" transform="rotate(6 14.4 6.9)"/><ellipse cx="17.9" cy="10.6" rx="1.7" ry="2.1" transform="rotate(18 17.9 10.6)"/>',
+  /** 메모 서랍: a drawer with a slip sticking out. */
+  // 1.29 (메모 서랍's menus and cards, drawn after the mocks' 16-grid shapes at 1.5×).
+  link: '<path d="M9.75 14.25l4.5-4.5M10.5 6.75l1.5-1.5a4.5 4.5 0 0 1 6.3 6.3l-1.5 1.5M13.5 17.25l-1.5 1.5a4.5 4.5 0 0 1-6.3-6.3l1.5-1.5"/>',
+  phone: '<path d="M4.5 3.75h4.5l1.8 4.5-2.55 1.5a10.5 10.5 0 0 0 6 6l1.5-2.55 4.5 1.8v4.5a1.5 1.5 0 0 1-1.5 1.5A16.5 16.5 0 0 1 3 5.25a1.5 1.5 0 0 1 1.5-1.5z"/>',
+  checkBox: '<rect x="3.75" y="3.75" width="16.5" height="16.5" rx="3"/><path d="M7.8 12.3l3 3 5.7-6"/>',
+  edit: '<path d="M15.75 3.75l4.5 4.5-12 12H3.75v-4.5z"/>',
+  duplicate: '<rect x="7.5" y="7.5" width="12.75" height="12.75" rx="2.25"/><path d="M13.9 11.25v5.25M11.25 13.9h5.25M16.5 7.5V5.25A2.25 2.25 0 0 0 14.25 3h-9A2.25 2.25 0 0 0 3 5.25v9a2.25 2.25 0 0 0 2.25 2.25H7.5"/>',
+  sheet: '<rect x="4.5" y="3" width="15" height="18" rx="1.5"/><path d="M8.25 8.25h7.5M8.25 12h7.5M8.25 15.75h4.5"/>',
+  cut: '<circle cx="6.75" cy="17.25" r="3"/><circle cx="17.25" cy="17.25" r="3"/><path d="M9 15 18.75 3.75M15 15 5.25 3.75"/>',
+  paste: '<rect x="5.25" y="4.5" width="13.5" height="16.5" rx="2.25"/><path d="M9 4.5V3h6v1.5"/>',
+  selectAll: '<path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3M8.5 12h7"/>',
+  sort: '<path d="M6 4.5v15M3 16.5l3 3 3-3M13.5 6h7.5M13.5 12h5.25M13.5 18h3"/>',
+  rename: '<path d="M3.75 18 7.5 6l3.75 12M5.1 14.25h4.8M16.5 4.5v15M14.25 4.5h4.5M14.25 19.5h4.5"/>',
+  colorWheel: '<circle cx="12" cy="12" r="8.25"/><path d="M12 3.75v16.5M3.75 12h16.5"/>',
+  panel: '<rect x="3" y="4.5" width="18" height="15" rx="2.25"/><path d="M15 4.5v15"/>',
+  clearChecked: '<path d="M4 7.5l2.2 2.2L10 5.8M4 16.5l2.2 2.2 3.8-3.9M13.5 7.5h6.5M13.5 16.5h6.5"/>',
+  drawer: '<rect x="4" y="9" width="16" height="11" rx="2"/><path d="M10 13.5h4"/><path d="M7 9V5.5A1.5 1.5 0 0 1 8.5 4h7A1.5 1.5 0 0 1 17 5.5V9"/>',
 };
 
 const madeIcons = new Map<string, SVGSVGElement>();

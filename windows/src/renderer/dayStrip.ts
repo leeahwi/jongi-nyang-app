@@ -118,7 +118,7 @@ export class DayStripView {
     const focusing = state.focus?.taskId && state.timer ? state.focus.taskId : undefined;
     const key = JSON.stringify([lang(), open, narrow, compact, open ? window.innerHeight : 0, ribbon.startHour, ribbon.endHour, ribbon.now, ribbon.hours, ribbon.bars, ribbon.blocks, ribbon.allDay, ribbon.more,
       strip.mode, strip.minutes, strip.lead && [strip.lead.id, strip.lead.title, strip.lead.start, strip.lead.end, strip.lead.event?.location], strip.rows.map((row) => [row.id, row.title, row.start, minutesUntil(now, row.start)]),
-      open ? items.map((item) => [item.id, item.title, item.start, item.end, item.done, item.event?.location, item.event?.color]) : 0, focusing, this.ticking, state.prefs.font]);
+      open ? items.map((item) => [item.id, item.title, item.start, item.end, item.done, item.event?.location, item.event?.color]) : 0, focusing, this.ticking, state.prefs.font, state.ai?.marks]);
     if (key === this.drawnKey && this.element.childElementCount > 0) return true;
     this.drawnKey = key;
     const keepScroll = open && this.scroller?.isConnected ? this.scroller.scrollTop : undefined;
@@ -266,7 +266,7 @@ export class DayStripView {
     title.addEventListener("click", (event) => { event.stopPropagation(); this.open(item); });
     title.addEventListener("contextmenu", (event) => this.menu(event, item));
     // The box only for a to-do going on now (tick it and the strip moves on).
-    const titleRow = h("div", { class: "lead-row" }, strip.mode === "now" && item.kind === "task" && item.taskId ? this.checkbox(item.taskId) : null, title);
+    const titleRow = h("div", { class: "lead-row" }, strip.mode === "now" && item.kind === "task" && item.taskId ? this.checkbox(item.taskId) : null, title, this.stamp(item));
     const column = h("div", { class: "lead-text" }, kick, titleRow, this.subLine(item, now));
     // The full kicker when it fits, else the short one ("지금 · ~14:00"); the caption a little smaller when it's long.
     requestAnimationFrame(() => {
@@ -308,11 +308,18 @@ export class DayStripView {
       const time = clockText(item.start, lang());
       const away = awayText(minutes, lang());
       const row = h("button", { class: `strip-row ${item.kind}`, title: this.tooltip(item), "aria-label": `${time} ${item.title}, ${away}` },
-        h("span", { class: "sr-time" }, time), this.mark(item), h("span", { class: "sr-title" }, item.title), h("span", { class: `sr-away${isSoon(minutes) ? " soon" : ""}` }, away));
+        h("span", { class: "sr-time" }, time), this.mark(item), h("span", { class: "sr-title" }, item.title), this.stamp(item), h("span", { class: `sr-away${isSoon(minutes) ? " soon" : ""}` }, away));
       row.addEventListener("click", (event) => { event.stopPropagation(); this.open(item); });
       row.addEventListener("contextmenu", (event) => this.menu(event, item));
       return row;
     }));
+  }
+
+  /** AI 연결: "Claude" after the title of an event or a to-do Claude added or changed today. */
+  private stamp(item: StripItem): HTMLElement | null {
+    const id = item.event?.eventId ?? item.taskId?.toUpperCase();
+    if (!id || !this.host.state().ai?.marks.includes(id)) return null;
+    return h("span", { class: "ai-stamp", title: t("Claude가 오늘 넣거나 고쳤어요"), role: "img", "aria-label": t("Claude가 오늘 넣거나 고쳤어요") }, "Claude");
   }
 
   /** A row's kind: an event's dot in its colour, a to-do's sage square, a reminder's ink3 ring. */

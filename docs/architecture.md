@@ -10,27 +10,29 @@
 flowchart TB
     subgraph SPEC["두 앱이 나누는 것"]
         direction LR
-        CASES["공유 시험 사례<br/>입력 줄 1–324, 하루 띠 R/K/G/N/T<br/>집중 F/FB, 앞으로, 편의 기능"]
-        FORMAT["파일 형식<br/>todos.json, events.json, focus.jsonl …"]
+        CASES["공유 시험 사례<br/>입력 줄 1–324, 하루 띠 R/K/G/N/T<br/>집중 F/FB, 앞으로, 편의 기능, 메모 서랍 D1–D29, AI 연결"]
+        FORMAT["파일 형식<br/>todos.json, memo-folders.json, events.json, focus.jsonl …"]
         TOKENS["디자인 토큰<br/>종이, 먹, 세이지, 점토 (낮/밤)"]
         CHATTER["종이냥 한마디<br/>chatter_lines.py → 두 앱의 표"]
     end
 
     subgraph MAC["mac/ (Swift Package)"]
         direction TB
-        MCORE["PaperCore<br/>화면과 무관한 로직<br/>(35개 파일, 약 8천 줄)"]
-        MAPP["PaperTodo<br/>SwiftUI + AppKit<br/>노트, 펫, 쪽지, 책상, 메뉴 막대"]
+        MCORE["PaperCore<br/>화면과 무관한 로직<br/>(39개 파일, 약 9,700줄)"]
+        MAPP["PaperTodo<br/>SwiftUI + AppKit<br/>노트, 메모 서랍, 펫, 쪽지, 책상, 메뉴 막대"]
         MAPP --> MCORE
     end
 
     subgraph WIN["windows/ (Electron)"]
         direction TB
-        WCORE["src/core<br/>화면과 무관한 로직<br/>(44개 파일, 약 8천 줄)"]
-        WMAIN["src/main<br/>창, 저장, 알림, 타이머, 알림 영역"]
+        WCORE["src/core<br/>화면과 무관한 로직<br/>(47개 파일, 약 9,600줄)"]
+        WMAIN["src/main<br/>창, 저장, 알림, 타이머, 알림 영역, 메모 서랍"]
+        MCP["mcp/<br/>종이냥 for Claude 확장<br/>(Mac 앱에도 그대로 넣음)"]
         WREND["src/renderer<br/>창마다 HTML, CSS, TS"]
         WMAIN --> WCORE
         WREND --> WCORE
         WREND <-->|preload IPC| WMAIN
+        MCP --> WCORE
     end
 
     CASES -.같은 사례로 검사.-> MCORE
@@ -58,6 +60,9 @@ flowchart TB
 | 알람, 타이머 길이 | `Alarm.swift`, `Duration.swift` | `alarm.ts`, `duration.ts` |
 | 반복, 마감, 보관 | `Repeat.swift`, `Deadline.swift`, `Archive.swift` | `repeat.ts`, `deadline.ts`, `archive.ts` |
 | 메모 합치기 | `TextMerge.swift` | `textMerge.ts` |
+| 메모 서랍: 폴더, 고정, 정렬, 메모의 종이 | `MemoFolders.swift`, `MemoFolderSearch.swift` | `memoDrawer.ts` |
+| 메모 서랍: 날짜 묶음, 종류 표시, 짧은 시간 | `MemoCards.swift` | `memoCards.ts` |
+| AI 연결: 연결 설정, 기록, 되돌리기 | `AIConnect.swift` | `ai.ts` (확장은 `windows/mcp/`) |
 | 백업 | `Backup.swift` | `backup.ts` |
 | 종이냥 한마디 | `PetChatter.swift` (생성됨) | `chatter.ts` (생성됨) |
 | 3개 언어의 말, 날짜, 시간 | `AppLanguage.swift` | `lang.ts` |
@@ -72,21 +77,23 @@ flowchart LR
         direction TB
         AM["AppModel<br/>(상태, 저장, 공유 폴더 확인)"]
         NW["NoteWindow / PaperView<br/>노트, 탭, 입력 줄, 하루 띠"]
+        DRW["MemoDrawerPanel<br/>화면 끝 메모 서랍, 손잡이, 메뉴"]
         PET["DesktopPet<br/>투명 패널, 고양이 위에서만 클릭"]
         SLIP["PaperSlip 가족<br/>울리는 쪽지, 일정 쪽지, 확인"]
         DESK["DeskWindow<br/>달력, 기록, 설정, 도움말"]
         MB["메뉴 막대 얼굴, 오늘 창"]
-        AM --> NW & PET & SLIP & DESK & MB
+        AM --> NW & DRW & PET & SLIP & DESK & MB
     end
     subgraph W["Windows (Electron)"]
         direction TB
         MAIN["main.ts, store.ts<br/>(상태, 저장, 공유 폴더 감시)"]
         NOTE["note.html<br/>노트, 탭, 입력 줄, 하루 띠"]
+        WDRW["drawer.html, handle.html<br/>메모 서랍, 손잡이, drawerMenu.ts"]
         WPET["pet.html<br/>투명 창, 고양이 위에서만 클릭"]
         WSLIP["slip.css / slipWindow.ts<br/>울리는 쪽지, 일정 쪽지, 확인"]
         WDESK["desk.html<br/>칸마다 원래 페이지를 프레임으로"]
         TRAY["알림 영역 얼굴, 오늘 창, 작업 표시줄"]
-        MAIN --> NOTE & WPET & WSLIP & WDESK & TRAY
+        MAIN --> NOTE & WDRW & WPET & WSLIP & WDESK & TRAY
     end
 ```
 
@@ -98,6 +105,8 @@ flowchart LR
 | 메뉴 막대 글자 | 메뉴 막대 아이템 | 알림 영역 툴팁 |
 | 밤 종이 | `PaperTheme` 토큰 두 벌 | `base.css`의 `:root[data-paper="night"]` |
 | 번역 | `.lproj` 문자열표, 한국어 원문이 키 | `t("한국어 원문")` + `en.ts`, `nl.ts` |
+| 메모 서랍 창 | 화면 끝에 붙는 `NSPanel`, 반투명 바탕은 시스템 흐림 | 투명 프레임 없는 `BrowserWindow`, 반투명은 Windows 11 아크릴(실제 PC에서 미확인) |
+| 우클릭 메뉴 | `NSMenu`(키보드, VoiceOver), 종이 견본 줄은 메뉴 안의 뷰 | HTML 메뉴(`drawerMenu.ts`), `Shift+F10`과 메뉴 키 |
 
 펫 창은 화면 아래쪽 넓은 영역을 덮는 투명한 창이라, 고양이 위에서만 마우스를 받고 나머지는 뒤의 앱으로 넘긴다. 그러지 않으면 투명한 창이 그 아래 앱의 클릭을 가로챈다.
 
@@ -111,6 +120,7 @@ flowchart LR
         direction TB
         T["todos.json<br/>할 일 (선택 항목: timeStart, timeEnd, todaySince)"]
         ME["memos.json<br/>메모"]
+        MF["memo-folders.json<br/>메모 서랍의 폴더, 고정, 정렬, 메모의 종이"]
         R["repeats.json<br/>반복 할 일"]
         E["events.json<br/>자체 일정"]
         A["alarms.json<br/>알람"]
@@ -119,6 +129,7 @@ flowchart LR
     end
     subgraph DEVICE["기기마다 따로"]
         S["설정<br/>Mac: UserDefaults, Windows: settings.json"]
+        AI["ai-link.json, ai-log.jsonl<br/>AI 연결 설정, Claude가 한 일의 기록"]
         H["울린 알람, 띄운 알림 기록"]
         B["backups/<br/>가져오기 전 자동 보관 (최근 10개)"]
     end
@@ -136,6 +147,8 @@ flowchart LR
 | 새 필드 | 선택 항목으로만 더한다. 옛 버전은 모르는 항목을 무시하고 연다. | 같음 |
 
 새 필드는 선택 항목으로만 더한다. 그래서 공유 폴더에서 한 기기만 새 버전이어도 다른 기기의 옛 버전이 같은 파일을 연다. 1.39/1.24의 `timeStart`, `timeEnd`가 그렇게 들어갔고, 알람의 '다시 울림 없음'은 `snooze: 0`으로 저장해 옛 버전에서는 10분으로 읽힌다.
+
+옛 버전이 저장하면서 모르는 항목을 지울 수 있는 곳은 새 파일로 뗐다. 메모 서랍(Mac 1.43, Windows 1.28)의 폴더와 고정은 `memos.json`에 칸을 더하지 않고 `memo-folders.json`에 둔다. 옛 버전이 `memos.json`을 저장해도 폴더 정보는 남고, 옛 버전이 만든 메모는 '메모' 폴더에 보인다. 1.44/1.29부터는 이 파일에서 모르는 항목을 읽은 그대로 다시 써서, 더 새 버전이 더한 칸도 지우지 않는다. 이유는 [결정 기록 ADR 7](decisions.md#adr-7-메모-폴더는-memosjson-밖의-새-파일에-둔다)에 있다.
 
 ## 공유 폴더로 함께 쓰기
 
@@ -161,8 +174,35 @@ sequenceDiagram
 - 메모: 마지막으로 함께 본 글을 기준으로 줄 단위로 합친다. 한 줄을 양쪽에서 고쳤으면 글자 단위로 합치고, 같은 자리에 서로 다른 글을 썼으면 둘 다 남긴다(`TextMerge.swift`, `textMerge.ts`). 한글을 조합하는 중이면 조합이 끝날 때까지 기다렸다가 합친다.
 - 알림과 알람: 목록은 함께 쓰고, 울리는 건 기기마다 따로 기억한다. 다른 기기가 10분 넘게 전에 띄운 할 일 알림은 늦게 켠 기기에서 다시 띄우지 않는다.
 - 완료 기록: 달마다 파일 하나에 한 줄씩 덧붙이는 형식이라, 폴더를 옮기거나 합쳐도 같은 항목은 한 번만 남는다.
+- 메모 서랍의 폴더: 폴더는 id로 합치고, 메모의 자리(폴더, 고정, 종이)는 나중에 고친 쪽이 이긴다. 지운 폴더는 30일 동안 지운 표시를 남겨 다른 기기가 되살리지 않게 한다.
 
 Windows가 공유 폴더를 확인할 때마다 파일을 통째로 읽던 것은 1.24에서 고쳤다. 쉬는 동안 분당 10번 읽던 것이 0번이 됐다.
+
+## 종이냥 for Claude
+
+Mac 1.42, Windows 1.27부터 Claude 데스크톱이나 Claude Code와 대화하면서 할 일, 일정, 메모를 보고 넣고, 확인을 받은 뒤 고칠 수 있다. 확장은 `windows/mcp/`에서 TypeScript로 만들어 `.mcpb` 파일로 묶고, Mac 앱은 같은 파일을 앱 안(`Contents/Resources/mcp/`)에 넣는다. 확장 하나를 두 앱이 함께 쓴다.
+
+```mermaid
+sequenceDiagram
+    participant C as Claude (데스크톱, Code)
+    participant X as 종이냥 for Claude (확장)
+    participant F as 저장 폴더 (todos.json …)
+    participant A as 종이냥 앱
+
+    C->>X: 도구 호출 (필요할 때만 실행)
+    X->>X: ai-link.json 확인 (꺼져 있으면 '설정에서 켜 주세요'만 답함)
+    X->>F: 읽기 / 넣기 (ai-write.lock을 잠깐 잡고)
+    Note over C,X: 고치기는 preview_changes로 전후를 보여 주고<br/>사용자가 "응" 하면 apply_changes
+    X->>F: 기록 한 줄 (ai-log.jsonl)
+    A->>F: 바뀐 파일 감지, 다시 읽기
+    A->>A: '되돌리기' 안내, Claude 도장, 최근 AI 작업
+```
+
+- 도구는 11개다. 보기 6개(오늘, 할 일, 일정, 메모, 집중, 끝낸 기록), 넣기 3개(할 일, 일정, 메모), 고치기 전 미리 보기와 확인 뒤 고치기. 지우기는 없다.
+- 따로 켜 두는 서버가 없다. Claude가 대화에 필요할 때 확장을 실행하고, Claude를 끄면 같이 꺼진다.
+- 확장과 앱이 같은 파일을 같은 순간에 쓰지 않게 설정 폴더에 `ai-write.lock`을 잠깐 잡는다. 앱은 AI 연결이 켜져 있으면 기본 폴더도 공유 폴더처럼 지켜보고, 고치기 직전에 다시 읽는다.
+- `ai-link.json`과 `ai-log.jsonl`은 공유 폴더를 써도 기기마다 설정 폴더에 둔다. 할 일 파일에는 새 칸을 만들지 않고, 'Claude' 도장은 기록 파일에서 읽는다.
+- 왜 이렇게 했는지는 [결정 기록 ADR 8](decisions.md#adr-8-claude-연결은-서버-없는-확장으로-기본은-꺼짐)에 있다.
 
 ## 저장소 구성
 
@@ -177,10 +217,11 @@ jongi-nyang-app/
 │  └─ art/                 고양이 그림 프롬프트와 검사 기록
 ├─ windows/              Windows 앱 (Electron + TypeScript)
 │  ├─ src/core, main, renderer, i18n
-│  ├─ test/                node:test 시험 (471개)
+│  ├─ test/                node:test 시험 (534개)
+│  ├─ mcp/                 종이냥 for Claude 확장 (Mac 앱에도 넣음)
 │  ├─ tools/               빌드, 스냅숏과 크기 훑기, 성능 측정, 끌기 측정, 아이콘
 │  └─ assets/              글꼴, 고양이 그림, 알림 영역과 작업 표시줄 아이콘
-├─ docs/                 이 문서들과 골라 둔 화면(screenshots/)
+├─ docs/                 이 문서들, 골라 둔 화면(screenshots/), README 그림(readme/)
 ├─ portfolio/            포트폴리오용 요약, 숫자, 질문과 답
 └─ site/                 GitHub Pages 소개 페이지
 ```

@@ -199,6 +199,24 @@ public struct Notebook: Codable, Equatable, Sendable {
         items.removeAll { ids.contains($0.id) }
     }
 
+    /// Another writer's changes laid over this copy (1.42, see UndoableNotebook.adopt): `changed` items replace
+    /// theirs here; `added` ones come in after the item before them in `order` (first when there's none);
+    /// `removed` ones go.
+    public mutating func merge(changed: [TodoItem], added: [TodoItem], removed: Set<TodoItem.ID>, order: [TodoItem.ID]) {
+        items.removeAll { removed.contains($0.id) }
+        for item in changed {
+            if let index = items.firstIndex(where: { $0.id == item.id }) { items[index] = item }
+        }
+        for item in added where !items.contains(where: { $0.id == item.id }) {
+            let position = order.firstIndex(of: item.id) ?? order.count
+            var index = 0
+            for id in order[..<position].reversed() {
+                if let found = items.firstIndex(where: { $0.id == id }) { index = found + 1; break }
+            }
+            items.insert(item, at: index)
+        }
+    }
+
     @discardableResult
     public mutating func setReminder(id: TodoItem.ID, at date: Date?) -> Bool {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return false }
@@ -500,6 +518,21 @@ public struct UndoableNotebook: Equatable, Sendable {
         self.notebook = notebook
         undoStack = []
         redoStack = []
+    }
+
+    /// Another writer changed the file — Claude through the extension (1.42), or another device: its version
+    /// becomes the list, and its changes go into every undo/redo copy too, so ⌘Z takes back this Mac's own
+    /// steps without taking the other writer's work with them. Not an undo step itself.
+    public mutating func adopt(_ incoming: Notebook) {
+        guard incoming != notebook else { return }
+        let old = Dictionary(notebook.items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let removed = Set(old.keys).subtracting(incoming.items.map(\.id))
+        let added = incoming.items.filter { old[$0.id] == nil }
+        let changed = incoming.items.filter { old[$0.id] != nil && old[$0.id] != $0 }
+        let order = incoming.items.map(\.id)
+        notebook = incoming
+        for index in undoStack.indices { undoStack[index].merge(changed: changed, added: added, removed: removed, order: order) }
+        for index in redoStack.indices { redoStack[index].merge(changed: changed, added: added, removed: removed, order: order) }
     }
 
     private mutating func perform<T: Equatable>(_ mutation: (inout Notebook) -> T) -> T {

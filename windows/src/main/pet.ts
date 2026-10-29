@@ -28,6 +28,8 @@ export interface PetHooks {
   calendar(): ChatterEvents | undefined;
   /** 빠른 메모 from the cat's menu. */
   quickMemo(): void;
+  /** 메모 서랍 from the cat's menu. */
+  drawer(): void;
   /** 알람…: Settings → 시계. */
   alarms(): void;
 }
@@ -432,6 +434,7 @@ export class DesktopPet {
     return [
       { label: t("타이머"), submenu: this.hooks.timerMenu() },
       { label: t("빠른 메모"), click: () => this.hooks.quickMemo() },
+      { label: t("메모 서랍"), click: () => this.hooks.drawer() },
       { label: t("알람…"), click: () => this.hooks.alarms() },
       { type: "separator" },
       { label: t("노트 열기"), click: () => this.hooks.openNote() },

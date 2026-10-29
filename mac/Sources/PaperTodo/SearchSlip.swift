@@ -3,7 +3,7 @@ import PaperCore
 import SwiftUI
 
 /// 검색 (1.38): ⌘F in the note, ⋯ → 검색…, the desk's sidebar. A slip over the note with a field and the
-/// results grouped 오늘 · 앞으로 · 메모 · 완료 기록 · 일정 (Search.find): the matched part on sage2, the date at
+/// results grouped 오늘 · 앞으로 · 완료 기록 · 일정 (Search.find): the matched part on sage2, the date at
 /// the right. ↑↓ pick, Return opens (a to-do on its tab, picked; a memo opened; a record day on the desk; an
 /// event's sheet), Esc or clicking away closes.
 @MainActor
@@ -73,7 +73,10 @@ struct SearchView: View {
             let next = event.occurrences(from: today, to: Calendar.paper.date(byAdding: .day, value: 400, to: today)!, language: .current).first
             return Search.EventEntry(id: event.id, title: event.title, date: next.map { Archive.dayKey($0.start) } ?? event.date, location: event.location)
         }
-        return Search.find(query, items: model.items, memos: model.memos, history: history, events: events, now: now, language: .current)
+        var folders: [String: String] = [:]
+        for memo in model.memos { if let name = model.memoFolderName(memo.id) { folders[memo.id] = name } }
+        return Search.find(query, items: model.items, memos: model.memos, history: history, events: events, now: now, language: .current,
+                           memoFolders: folders)
     }
 
     var body: some View {
@@ -176,10 +179,8 @@ struct SearchView: View {
         case .today, .ahead:
             if let id = UUID(uuidString: hit.id) { model.reveal(id) }
         case .memos:
-            model.onShowNote?()
-            if model.openMemoID != nil { model.closeMemo() }
-            model.page = .memos
-            model.openMemoID = hit.id
+            // 1.43: in 메모 서랍, opened at it.
+            model.revealMemo(hit.id)
         case .history:
             model.historyDay = hit.day
             model.showHistory()

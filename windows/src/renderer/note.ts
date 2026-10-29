@@ -1,7 +1,7 @@
+import { shortcutLabel } from "../core/memoDrawer";
 import { logicalDayStart } from "../core/archive";
 import { dayFor, deadlineChoiceTitles, key as dueKey, fromKey, label as dueLabel, sentence as dueSentence, urgency, type DeadlineChoice } from "../core/deadline";
-import { clock, dayMonth, dayWord, longDate, minutesAway, spokenTime, weekdayShort } from "../core/lang";
-import { memoPreview, memoTitle, type Memo } from "../core/memo";
+import { clock, dayWord, longDate, minutesAway, weekdayShort } from "../core/lang";
 import type { TodoItem } from "../core/notebook";
 import { describe } from "../core/repeat";
 import { afterRemoval, fromInput, reorder, step } from "../core/keyboard";
@@ -17,7 +17,6 @@ import { paperCalendar } from "./calendar";
 import { openEventSheet, type EventSheet } from "./eventSheet";
 import type { CalendarSheetRequest } from "../core/calendar";
 import { repeatFields } from "./repeatFields";
-import { movedCaret } from "../core/textMerge";
 import { InputLine } from "./inputLine";
 import { commitReading, fromWire, showMade, undoLast, type FlowHost } from "./intentFlow";
 import { toaster } from "./slip";
@@ -30,8 +29,9 @@ import { clockKey, logicalMinutes, rangeDay, rangeOf, rangeText, rangeTimes, ran
 import { durationText } from "../core/duration";
 import { timeList, timeOf } from "./timePick";
 
-type Page = NoteTab;
-const pages: Page[] = ["today", "ahead", "memos"];
+/** 오늘 · 앞으로 (1.28: the memo tab became the 메모 서랍). */
+type Page = Exclude<NoteTab, "memos">;
+const pages: Page[] = ["today", "ahead"];
 
 const api = paper();
 let state: AppState;
@@ -42,17 +42,23 @@ let editingID: string | undefined;
 const savedPage = localStorage.getItem("page");
 // The 마감 and 나중에 pages (and the older 마감 "shelf") are 앞으로 now.
 let page: Page = savedPage === "shelf" || savedPage === "deadlines" || savedPage === "later" ? "ahead" : pages.includes(savedPage as Page) ? savedPage as Page : "today";
-let openMemoID: string | undefined;
 
-const pageTitle: Record<Page, string> = { today: t("오늘 할 일"), ahead: t("앞으로"), memos: t("메모") };
-const tabLabel: Record<Page, string> = { today: t("오늘"), ahead: t("앞으로"), memos: t("메모") };
+const pageTitle: Record<Page, string> = { today: t("오늘 할 일"), ahead: t("앞으로") };
+const tabLabel: Record<Page, string> = { today: t("오늘"), ahead: t("앞으로") };
+
+/** 메모 서랍: opened (on a memo, or at its quick-write slip). */
+const openDrawer = (extra: { memo?: string; write?: boolean } = {}) => void api.act({ type: "drawer", command: "open", ...extra });
 
 // ─── Frame: washi index tabs and the tools, then the header with the peeking cat ─
 
 const pinButton = h("button", { class: "quiet pin", title: t("항상 위에 두기"), "aria-label": t("항상 위에 두기") }, icon("pin", 16));
 const tabs = h("div", { class: "index-tabs", role: "tablist" });
+// 메모 서랍 (1.28): where the memos live now, a button beside the pin (its shortcut in the tooltip).
+const drawerButton = h("button", { class: "quiet drawer-open", "aria-label": t("메모 서랍") }, icon("drawer", 16));
+drawerButton.addEventListener("click", () => openDrawer());
 const tools = h("div", { class: "tools" },
   pinButton,
+  drawerButton,
   optional(button("desk", t("책상 (Ctrl+D)"), () => api.act({ type: "openCalendar" }), 16)),
   button("more", t("더 보기"), (event) => {
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -145,7 +151,6 @@ function setPage(next: Page): void {
   if (next === page) return;
   commitEditing();
   editor?.close();
-  if (page === "memos" && openMemoID) closeMemo();
   // The rows stay made (updated on the next draw): switching back doesn't build a long list again.
   selectedID = undefined;
   page = next;
@@ -161,7 +166,6 @@ function renderHeader(): void {
   const counts: Record<Page, number> = {
     today: todayItems().filter((item) => !item.isCompleted).length,
     ahead: aheadCount(ahead),
-    memos: state.memos.length,
   };
   // The three tabs are made once; a redraw only changes what they say.
   if (tabs.childElementCount === 0) {
@@ -287,14 +291,11 @@ const flow: FlowHost = {
 };
 const line = new InputLine({
   variant: "note",
-  placeholder: () => page === "memos"
-    ? { long: t("한 줄 메모를 적어요"), short: t("한 줄 메모를 적어요") }
-    : askingPick ? { long: t("오늘 꼭 하나만 고른다면?"), short: t("오늘 꼭 하나만?") }
+  placeholder: () => askingPick ? { long: t("오늘 꼭 하나만 고른다면?"), short: t("오늘 꼭 하나만?") }
     : { long: t("무엇이든 적어요 — 할 일, 일정, 타이머 40…"), short: t("무엇이든 적어요") },
-  mode: () => (page === "memos" ? "memo" : "intent"),
+  mode: () => "intent",
   prefer: () => state?.prefs.intentPrefer ?? {},
-  // Ctrl+Alt+N reads any kind; on 메모 the line only makes memos, so no chip there (as on the Mac).
-  shortcut: () => (state?.prefs.quickEntry && page !== "memos" ? "Ctrl+Alt+N" : undefined),
+  shortcut: () => (state?.prefs.quickEntry ? "Ctrl+Alt+N" : undefined),
   commit: async (candidate, candidates, text) => {
     const result = await commitReading(flow, candidate, candidates, text, "note");
     // 오늘 꼭 하나: the first to-do written after the question gets the day's star.
@@ -303,7 +304,7 @@ const line = new InputLine({
       void api.act({ type: "setPref", key: "starredTask", value: result.made.id });
       line.refresh();
     }
-    if (result.made?.kind === "todo" || result.made?.kind === "memo") requestAnimationFrame(() => sheet.scrollTo({ top: candidate.kind === "memo" && page === "memos" ? 0 : sheet.scrollHeight, behavior: reduceMotion() ? "auto" : "smooth" }));
+    if (result.made?.kind === "todo") requestAnimationFrame(() => sheet.scrollTo({ top: sheet.scrollHeight, behavior: reduceMotion() ? "auto" : "smooth" }));
     return Boolean(result.made);
   },
   onArrowUp: (event) => enterList(event, -1),
@@ -313,7 +314,8 @@ line.field.addEventListener("keydown", (event) => {
   // Ctrl+Z right after putting a line in takes it back (the field's own undo otherwise).
   if ((event.ctrlKey || event.metaKey) && !event.shiftKey && event.key.toLowerCase() === "z" && toast.visible && !line.value) {
     event.preventDefault();
-    void undoLast(flow);
+    // Claude's toast up: Ctrl+Z is for Claude's entry (the main process decides), not the last line put in.
+    if (aiToastUp) void api.act({ type: "undo" }); else void undoLast(flow);
   }
 });
 // The pick state's bar takes the line's place while picking.
@@ -328,7 +330,6 @@ function emptyNote(pose: string, text: string): HTMLElement {
 const emptyToday = emptyNote("happy", t("오늘 할 일을 한 줄 적어 볼까요?"));
 
 function focusNew(): void {
-  if (page === "memos") setPage("today");
   line.focus();
 }
 
@@ -677,120 +678,6 @@ function isStarred(item: TodoItem): boolean {
   return Boolean(state?.prefs.starredTask) && state.prefs.starredTask === item.id && state.prefs.morningPickDay === dayKey(new Date()) && !item.isCompleted;
 }
 
-// ─── Memo page ──────────────────────────────────────────────────────────────
-
-let memoText: HTMLTextAreaElement | undefined;
-/** Texts this editor sent (the store echoes them back, sometimes a step behind) since it last took one from elsewhere. */
-let memoSent = new Set<string>();
-/** Korean input mid-syllable: the text isn't touched until the syllable is done. */
-let memoComposing = false;
-/** The editor's text as last sent or shown, sent along as `from` with the next change. */
-let memoValue = "";
-
-async function newMemo(): Promise<void> {
-  closeMemo(); // Ctrl+Shift+N inside a memo: put the old one away first
-  setPage("memos");
-  openMemoID = await api.newMemo();
-  render();
-}
-
-/** A memo's trash: gone, with 메모를 지웠어요 · 되돌리기 (the footer's 지운 메모 되돌리기 stays too). */
-function deleteMemo(id: string): void {
-  const memo = state.memos.find((entry) => entry.id === id);
-  void api.act({ type: "memoDelete", id });
-  // A blank memo just goes (there is nothing to bring back).
-  if (memo?.text.trim()) toast.show({ icon: "trash", text: t("메모를 지웠어요"), action: { label: t("되돌리기"), run: () => void api.act({ type: "memoRestore" }) } });
-}
-
-function closeMemo(): void {
-  if (!openMemoID) return;
-  void api.act({ type: "memoClose", id: openMemoID });
-  openMemoID = undefined;
-  memoText = undefined;
-}
-
-function shortDate(iso: string): string {
-  const date = new Date(iso);
-  const now = new Date();
-  if (date.toDateString() === now.toDateString()) return spokenTime(date.getHours(), date.getMinutes(), lang());
-  return dayMonth(date.getMonth() + 1, date.getDate(), undefined, lang());
-}
-
-function renderMemos(): void {
-  const memo = openMemoID ? state.memos.find((entry) => entry.id === openMemoID) : undefined;
-  if (memo) return renderMemoEditor(memo);
-  openMemoID = undefined;
-  const list = h("div", { class: "lines", role: "list" });
-  const add = h("button", { class: "new memo-new" }, h("span", { class: "plus" }, icon("plus", 14)), h("span", { class: "memo-new-label" }, state.memos.length === 0 ? t("첫 메모를 적어 보세요") : t("새 메모")));
-  add.title = t("새 메모 (Ctrl+Shift+N)");
-  add.addEventListener("click", () => void newMemo());
-  list.append(add);
-  for (const entry of state.memos) list.append(memoRow(entry));
-  if (state.memos.length === 0) list.append(emptyNote("tea", t("떠오른 생각을 가볍게 적어 두세요")));
-  sheet.classList.remove("with-strip");
-  reconcile(sheet, [list]);
-  const restore = state.lastDeletedMemo ? h("button", { class: "restore" }, t("지운 메모 되돌리기")) : null;
-  restore?.addEventListener("click", () => api.act({ type: "memoRestore" }));
-  footer.replaceChildren(h("span", {}, icon("note", 13)), h("span", {}, state.memos.length === 0 ? t("생각나는 걸 가볍게 적어 두세요") : t("메모 {n}개", { n: state.memos.length })), h("span", { class: "spacer" }), ...(restore ? [restore] : []));
-}
-
-function memoRow(memo: Memo): HTMLElement {
-  const trash = h("button", { class: "row-icon trash", title: t("메모 지우기 (아래에서 되돌릴 수 있어요)"), "aria-label": t("{title} 지우기", { title: memoTitle(memo, lang()) }) }, icon("trash", 15));
-  const row = h("div", { class: "row memo-row", role: "listitem", tabindex: "0" },
-    h("span", { class: "memo-icon" }, icon("note", 14)),
-    h("div", { class: "text" }, h("span", { class: "label" }, memoTitle(memo, lang())), memoPreview(memo) ? h("span", { class: "memo-preview" }, memoPreview(memo)) : null),
-    h("span", { class: "memo-date" }, shortDate(memo.updatedAt)), trash, h("span", { class: "end" }));
-  row.addEventListener("click", (event) => {
-    if ((event.target as HTMLElement).closest(".trash")) return;
-    openMemoID = memo.id;
-    render();
-  });
-  row.addEventListener("keydown", (event) => { if (event.key === "Enter") { openMemoID = memo.id; render(); } });
-  trash.addEventListener("click", () => deleteMemo(memo.id));
-  return row;
-}
-
-function renderMemoEditor(memo: Memo): void {
-  if (memoText && sheet.contains(memoText)) {
-    // Another device's edit, joined into this memo: show it, keeping the caret where it was.
-    if (!memoComposing && memo.text !== memoText.value && !memoSent.has(memo.text)) replaceKeepingCaret(memoText, memo.text);
-    return;
-  }
-  const back = h("button", { class: "memo-back" }, icon("chevron", 13, 2), t("메모 목록"));
-  back.addEventListener("click", () => { closeMemo(); render(); });
-  const remove = h("button", { class: "quiet", title: t("메모 지우기"), "aria-label": t("메모 지우기") }, icon("trash", 15));
-  remove.addEventListener("click", () => { deleteMemo(memo.id); openMemoID = undefined; memoText = undefined; });
-  const text = h("textarea", { class: "memo-text", placeholder: t("생각나는 걸 적어 보세요"), "aria-label": t("메모 내용"), spellcheck: "false" });
-  text.value = memo.text;
-  text.addEventListener("input", () => {
-    if (memoSent.size > 200) memoSent = new Set([text.value]);
-    memoSent.add(text.value);
-    const from = memoValue;
-    memoValue = text.value;
-    void api.act({ type: "memoUpdate", id: memo.id, text: text.value, from });
-  });
-  text.addEventListener("compositionstart", () => { memoComposing = true; });
-  text.addEventListener("compositionend", () => { memoComposing = false; });
-  text.addEventListener("keydown", (event) => { if (event.key === "Escape") { closeMemo(); render(); } });
-  memoText = text;
-  memoSent = new Set([memo.text]);
-  memoComposing = false;
-  memoValue = memo.text;
-  sheet.classList.remove("with-strip");
-  sheet.replaceChildren(h("div", { class: "memo-editor" }, h("div", { class: "memo-bar" }, back, h("span", { class: "spacer" }), h("span", { class: "memo-date" }, shortDate(memo.updatedAt)), remove), text));
-  footer.replaceChildren(h("span", {}, icon("note", 13)), h("span", {}, t("자동으로 저장돼요 · Esc로 목록")));
-  requestAnimationFrame(() => text.focus());
-}
-
-/** New text in the editor; the caret keeps its place relative to the text around it. */
-function replaceKeepingCaret(area: HTMLTextAreaElement, next: string): void {
-  const moved = movedCaret(area.selectionStart, area.value, next);
-  area.value = next;
-  memoSent = new Set([next]);
-  memoValue = next;
-  area.setSelectionRange(moved, moved);
-}
-
 // ─── Rows ─────────────────────────────────────────────────────────────────────
 
 const STRIKE_PATH = "M0 0.56 C0.12 0.5 0.22 0.6 0.34 0.54 S0.58 0.5 0.7 0.57 S0.9 0.52 1 0.55";
@@ -813,6 +700,8 @@ class Row {
   private readonly focusButton: HTMLButtonElement;
   private readonly carry: HTMLSpanElement;
   private readonly star: HTMLSpanElement;
+  /** AI 연결: "Claude" stamped after the title, the day Claude added or changed it. */
+  private readonly stamp: HTMLSpanElement;
   private item: TodoItem;
 
   /** `onShelf`: a row of 앞으로 (with `meta`), else of 오늘. */
@@ -832,7 +721,8 @@ class Row {
     this.label.append(strike);
     // 오늘 꼭 하나: the day's one thing, starred.
     this.star = h("span", { class: "star", title: t("오늘 꼭 하나"), role: "img", "aria-label": t("오늘 꼭 하나") }, icon("star", 12, 1.6));
-    this.textCell = h("div", { class: "text" }, this.star, this.label);
+    this.stamp = h("span", { class: "ai-stamp", title: t("Claude가 오늘 넣거나 고쳤어요"), role: "img", "aria-label": t("Claude가 오늘 넣거나 고쳤어요") }, "Claude");
+    this.textCell = h("div", { class: "text" }, this.star, this.label, this.stamp);
     this.due = h("button", { class: "due" });
     this.time = h("button", { class: "time" });
     // Put in the calendar (a copy: changing the task later doesn't change the event).
@@ -899,7 +789,7 @@ class Row {
   private key(item: TodoItem): string {
     const series = item.seriesID ? state.series.find((entry) => entry.id === item.seriesID) : undefined;
     return JSON.stringify([item, this.next, this.onShelf, this.meta, state.prefs.dueStyle, editingID === item.id, series?.rule, series?.remindAt,
-      isStarred(item), Boolean(state.calendar?.withEvents?.includes(item.id)), Math.floor(Date.now() / 60_000)]);
+      isStarred(item), Boolean(state.calendar?.withEvents?.includes(item.id)), aiMarked(item.id), Math.floor(Date.now() / 60_000)]);
   }
 
   /** Updated, and moved in or out of 다음 (its rows don't drag: their order is the time's). */
@@ -969,6 +859,7 @@ class Row {
     this.carry.textContent = carried ?? "";
     this.carry.title = carried ? t("{text} 오늘 할 일에 있어요", { text: carried }) : "";
     this.star.hidden = !isStarred(item);
+    this.stamp.hidden = !aiMarked(item.id);
     this.bell.setAttribute("aria-label", t("{title} 알림·반복·마감 설정", { title: item.title }));
     this.flag.hidden = !this.onShelf || item.isCompleted;
     this.flag.title = item.dueDate ? t("마감 날짜 바꾸기") : t("마감 정하기");
@@ -1043,6 +934,11 @@ class Row {
   }
 }
 
+/** AI 연결: Claude added or changed this to-do today (and nobody changed it since). */
+function aiMarked(id: string): boolean {
+  return Boolean(state.ai?.marks.includes(id.toUpperCase()));
+}
+
 function rowFor(id: string): Row | undefined {
   return (page === "ahead" ? aheadRows : todayRows).get(id);
 }
@@ -1096,7 +992,7 @@ function startDrag(event: PointerEvent, id: string, grip: HTMLElement): void {
     const over = tabAt(rects, moveEvent.clientX, moveEvent.clientY);
     tabTarget = over && dropTabs.includes(over) ? over : undefined;
     if (tabTarget) {
-      tabElements()[pages.indexOf(tabTarget)]?.classList.add("drop-target");
+      tabElements()[pages.indexOf(tabTarget as Page)]?.classList.add("drop-target");
       source.classList.add("to-tab");
     }
     if (over) return;
@@ -1534,11 +1430,10 @@ function render(): void {
   root.style.setProperty("--body-size", `${bodyFontSize(state.prefs.font, state.prefs.textSize)}px`);
   pinButton.classList.toggle("on", state.prefs.alwaysOnTop);
   pinButton.title = state.prefs.alwaysOnTop ? t("항상 위에 두기 해제") : t("항상 위에 두기");
+  drawerButton.title = state.prefs.drawerShortcut ? `${t("메모 서랍")} (${shortcutLabel(state.prefs.drawerShortcut)})` : t("메모 서랍");
   renderHeader();
   if (page === "today") renderToday();
-  else if (page === "ahead") renderAhead();
-  else renderMemos();
-  dock.hidden = page === "memos" && openMemoID !== undefined;
+  else renderAhead();
   focusCard.update(state);
   paintSelection();
   eventSheet?.refresh();
@@ -1562,7 +1457,7 @@ new ResizeObserver(fadeEdges).observe(sheet);
 /** Five paper cards the cat walks you through; shown once, and again from ⋯ → 사용 안내. */
 const guideCards: { pose: string; title: string; body: string; keys: [string, string][]; login?: boolean }[] = [
   { pose: "happy", title: t("종이냥에 오신 걸 환영해요"), body: t("하루에 한 장, 오늘 할 일만 가볍게 적는\n종이 노트예요. 적고, 체크하고, 끝!"), keys: [[t("입력 줄"), "Ctrl+N"], [t("완료"), t("네모 칸 누르기")], [t("어디서든 빠른 입력"), "Ctrl+Alt+N"]] },
-  { pose: "curious", title: t("탭으로 나눠 두어요"), body: t("마감이 있는 일은 ‘앞으로’에서 날짜별로 기다리다\n그날이 되면 오늘로 올라와요.\n날짜 없는 일은 맨 아래 ‘언젠가’, 생각은 ‘메모’에."), keys: [[t("오늘 · 앞으로 · 메모"), "Ctrl+1–3"], [t("내일로 미루기"), "Alt+→"]] },
+  { pose: "curious", title: t("탭으로 나눠 두어요"), body: t("마감이 있는 일은 ‘앞으로’에서 날짜별로 기다리다\n그날이 되면 오늘로 올라와요.\n날짜 없는 일은 맨 아래 ‘언젠가’, 생각은 메모 서랍에."), keys: [[t("오늘 · 앞으로"), "Ctrl+1–2"], [t("메모 서랍"), "Ctrl+Shift+D"], [t("내일로 미루기"), "Alt+→"]] },
   { pose: "stretch", title: t("아래 입력 줄에 무엇이든"), body: t("‘내일 3시 회의’, ‘30분 뒤 빨래’, ‘매일 물 마시기’처럼\n적으면 칩으로 알아들은 뜻을 보여 줘요.\n‘3시부터 5시까지 보고서’면 할 일에 시간도 붙어요.\nTab으로 다른 뜻, Enter로 넣기."), keys: [[t("다른 뜻"), "Tab"], [t("되돌리기"), "Ctrl+Z"], [t("검색"), "Ctrl+F"]] },
   { pose: "tea", title: t("종이냥과 집중"), body: t("할 일에서 F를 누르면 바로 집중을 시작해요.\n화면 아래의 종이냥은 저녁이 되면\n남은 일을 내일로 넘길지 물어봐요."), keys: [[t("이거 집중"), "F"], [t("설정"), "Ctrl+,"]] },
   { pose: "cheer", title: t("준비 끝!"), body: t("필요 없을 땐 작은 포스트잇으로 접어 두세요.\n어디서든 Ctrl+Alt+J로 다시 불러요."), keys: [[t("작게 접기"), "Ctrl+M"], [t("노트 보이기 · 숨기기"), "Ctrl+Alt+J"]], login: true },
@@ -1653,7 +1548,8 @@ function showSearch(query = ""): SearchSlip | undefined {
     closed: () => { searchSlip = undefined; },
     open: (row) => {
       if (row.kind === "today" || row.kind === "ahead") showTask(row.id, true);
-      else if (row.kind === "memos") { setPage("memos"); openMemoID = row.id; render(); }
+      // A memo: the 메모 서랍, on its folder with the memo open (M5).
+      else if (row.kind === "memos") { searchSlip?.close(); openDrawer({ memo: row.id }); }
       else if (row.kind === "history") void api.act({ type: "openHistory", day: row.day });
       else if (row.kind === "events" && row.key) void api.act({ type: "calendarEditEvent", key: row.key });
     },
@@ -1706,7 +1602,7 @@ function focusInput(): void {
 
 /** ↑↓ · Space · Enter · Delete · Esc · Ctrl+↑↓ on the task pages; never while typing or with a card open. */
 function listKey(event: KeyboardEvent): boolean {
-  if (!state || page === "memos" || guide || editor || eventSheet || searchSlip || event.isComposing) return false;
+  if (!state || guide || editor || eventSheet || searchSlip || event.isComposing) return false;
   if (event.altKey) return dateKey(event);
   if (event.key === "Escape" && toast.visible) return false;
   const target = event.target as HTMLElement;
@@ -1802,8 +1698,9 @@ window.addEventListener("keydown", (event) => {
   if (key === "f" && !event.shiftKey && !event.altKey) return act(() => showSearch());
   if (key === "1") return act(() => setPage("today"));
   if (key === "2") return act(() => setPage("ahead"));
-  if (key === "3") return act(() => setPage("memos"));
-  if (key === "n" && event.shiftKey) return act(() => void newMemo());
+  // The memo tab's keys open the 메모 서랍 now (Ctrl+Shift+N at its quick-write slip).
+  if (key === "3") return act(() => openDrawer());
+  if (key === "n" && event.shiftKey) return act(() => openDrawer({ write: true }));
   if (key === "n") return act(focusNew);
   if (key === "m") return act(() => api.act({ type: "collapse" }));
   if (key === ",") return act(() => api.act({ type: "openSettings" }));
@@ -1833,7 +1730,6 @@ api.on("note:commit-editing", () => {
   commitEditing();
   // A line still being typed is put in as read (no toast: the note is going away).
   if (line.value.trim()) void line.submit();
-  if (openMemoID) closeMemo();
 });
 // 빠른 입력 while the note is up: its toast (with the switch) shows here.
 api.on("note:toast", (payload) => {
@@ -1851,7 +1747,8 @@ api.on("note:row-command", (payload) => {
   if (command === "close-editor") { editor?.close(); eventSheet?.close(); }
   // 마감 · 나중에 (older menus, snapshots) are 앞으로.
   if (command === "page-ahead" || command === "page-deadlines" || command === "page-shelf" || command === "page-later") setPage("ahead");
-  if (command === "page-memos") setPage("memos");
+  // The memo tab is the 메모 서랍 now (older menus and commands).
+  if (command === "page-memos") openDrawer();
   if (command === "page-today") setPage("today");
   if (command === "guide") openGuide();
   if (command === "select-task") showTask(id);
@@ -1862,11 +1759,19 @@ api.on("note:row-command", (payload) => {
   if (command === "search") showSearch();
 });
 api.on("focus:chime", () => { if (state?.prefs.timerSound) chime(); });
+/** Claude's toast (AI 연결) is the one up: Ctrl+Z goes to the main process, which takes Claude's entry back. */
+let aiToastUp = false;
 // Something done from a menu, the reminder bubble or the cat: its toast here, with 되돌리기.
 api.on("note:notice", (payload) => {
   const notice = payload as NoteNotice;
-  const undo = notice.undo === "history" ? () => api.act({ type: "undo" }) : notice.undo === "memo" ? () => api.act({ type: "memoRestore" }) : notice.undo === "unfile" ? () => api.act({ type: "unfileCompleted" }) : undefined;
-  toast.show({ icon: notice.icon, text: notice.text, ...(undo ? { action: { label: t("되돌리기"), run: () => void undo() } } : {}) });
+  const undo = notice.undo === "history" ? () => api.act({ type: "undo" }) : notice.undo === "memo" ? () => api.act({ type: "memoRestore" }) : notice.undo === "unfile" ? () => api.act({ type: "unfileCompleted" })
+    : notice.undo === "ai" && notice.entry ? () => api.act({ type: "aiUndo", id: notice.entry! }) : undefined;
+  // AI 연결's 자리 비운 사이: 보기 opens 설정 › AI 연결 (the recent list), and it stays a little longer.
+  // 빠른 메모's: 열기 opens the 메모 서랍 on the memo just put in.
+  const show = notice.show === "ai" ? () => api.act({ type: "openSettings", tab: "ai" }) : notice.show === "drawer" ? () => openDrawer(notice.entry ? { memo: notice.entry } : {}) : undefined;
+  const action = undo ? { label: t("되돌리기"), run: () => void undo() } : show ? { label: notice.show === "drawer" ? t("열기", undefined, "drawer") : t("보기", undefined, "ai"), run: () => void show() } : undefined;
+  toast.show({ icon: notice.icon, text: notice.text, ...(action ? { action } : {}), ...(notice.long ? { ms: 7000, twoLines: true } : {}), onHide: () => { aiToastUp = false; } });
+  aiToastUp = notice.undo === "ai"; // after show: the toast it replaced has said its onHide
 });
 
 /** A task chosen in the 달력 window (or a ring on the ribbon): its page, with the row selected (and flashed). */

@@ -723,6 +723,20 @@ private enum CoreTests {
             try expect(ids == ["A1 07:00", "A2 22:00", "A3 06:00"], "merge keeps what's here: \(ids)")
         }
 
+        try test("백업: memo-folders.json goes along and merges by id and time (메모 서랍, D13 · D14)") {
+            let mine = ##"{"v":1,"folders":[{"id":"inbox","name":"메모","color":"lavender","order":0,"updatedAt":"1970-01-01T00:00:00Z"},{"id":"a","name":"회사","color":"pink","order":1,"updatedAt":"2026-10-27T05:00:00Z"}],"placement":{"m1":{"folder":"a","pinned":false,"at":"2026-10-27T05:00:00Z"}},"updatedAt":"2026-10-27T05:00:00Z"}"##
+            let theirs = ##"{"v":1,"folders":[{"id":"inbox","name":"메모","color":"lavender","order":0,"updatedAt":"1970-01-01T00:00:00Z"},{"id":"b","name":"집","color":"mint","order":1,"updatedAt":"2026-10-27T05:00:00Z"}],"placement":{"m1":{"folder":"b","pinned":true,"at":"2026-10-27T06:00:00Z"}},"updatedAt":"2026-10-27T06:00:00Z"}"##
+            try expect(Backup.dataFiles.contains("memo-folders.json"), "a data file")
+            do { _ = try Backup.parse(Backup.make(files: ["memo-folders.json": "{ not json"], exportedAt: Date(), from: "x")); try expect(false, "bad folders accepted") } catch let problem as Backup.Problem {
+                try expect(problem == .unreadable("memo-folders.json"), "unreadable folders")
+            }
+            let merged = try MemoFolders.decode(Data(Backup.merge(current: ["memo-folders.json": mine], imported: ["memo-folders.json": theirs])["memo-folders.json"]!.utf8))
+            try expect(merged.visible.map(\.id) == ["inbox", "a", "b"], "both folders: \(merged.visible.map(\.id))")
+            try expect(merged.folderID(of: "m1") == "b" && merged.isPinned("m1"), "the newer placement")
+            try expect(Backup.merge(current: [:], imported: ["memo-folders.json": theirs])["memo-folders.json"] == theirs, "taken as is when missing here")
+            try expect(Backup.summary(["memo-folders.json": theirs]).text == "비어 있는 백업이에요.", "no count of its own")
+        }
+
         try test("달력: month and week pages (same cases as calendar.test.ts)") {
             func at(_ day: Int, _ hour: Int, _ minute: Int = 0, month: Int = 10) -> Date {
                 seoul.date(from: DateComponents(year: 2026, month: month, day: day, hour: hour, minute: minute))!

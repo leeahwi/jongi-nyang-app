@@ -40,6 +40,10 @@
 | `mac/pet-question-many.png` | 종이냥이 말풍선으로 묻고 답 단추를 보여 주는 모습 | README, 한 장 |
 | `mac/quick-entry.png` | 어디서든 부르는 빠른 입력 창. `내일 3시 회의`의 두 뜻 후보가 칩으로 보인다 | README |
 | `mac/calendar-edit.png` | 일정 고치기 쪽지 | 사례 글 |
+| `mac/drawer-list-day.png` | 메모 서랍(1.44): 고정 · 오늘 · 어제 · 지난주로 묶인 메모 카드, 폴더 책갈피 | README, 한 장 |
+| `mac/drawer-day.png` | 메모 서랍 첫 판(1.43): 펼친 체크 목록 메모 | 사례 글 |
+| `mac/desk-ai.png` | 책상의 AI 연결 칸: 켜기, Claude 데스크톱 · Claude Code 연결, 최근 AI 작업 | README, 사례 글 |
+| `mac/today-window-panel-full.png` | 1.42.1에서 고친 메뉴 막대 오늘 창(위가 잘리지 않음) | 사례 글 |
 
 ## 영어와 밤 종이 (Mac)
 
@@ -49,6 +53,8 @@
 | `mac/en/focus-running.png`, `alarm-ring.png`, `desk-calendar.png`, `conv-sweep-evening.png` | 집중, 알람, 책상, 저녁 정리의 영어판 | README.en |
 | `mac/night/note-today.png` | 밤 종이의 오늘 노트 | README, 한 장 |
 | `mac/night/focus-running.png`, `alarm-ring.png`, `desk-calendar.png` | 밤 종이의 집중, 알람, 책상 | 사례 글 |
+| `mac/night/drawer-night.png`, `mac/en/night/drawer-night.png` | 1.43.1에서 또렷하게 고친 밤 종이 메모 서랍 | 사례 글 |
+| `mac/en/drawer-list-day.png`, `mac/en/desk-ai.png` | 메모 서랍과 AI 연결의 영어판 | README.en |
 
 ## Windows
 
@@ -63,6 +69,17 @@
 | `windows/desk-calendar.png` | Windows 책상 창의 달력 | 사례 글 |
 | `windows/glance-event-soon.png` | 알림 영역에서 여는 오늘 창: 다음 일정이 44분 뒤라 붉게 표시됨 | 사례 글 |
 | `windows/night-note.png` | Windows 밤 종이 | 사례 글 |
+| `windows/drawer-themes.png` (+ `en/`, `nl/`) | Windows 메모 서랍의 네 종이(낮, 밤, 크라프트, 모눈) | README, 사례 글 |
+| `windows/drawer-backdrops.png` (+ `en/`, `nl/`) | 서랍 바탕 네 가지(불투명, 반투명, 강하게, 없음). 반투명은 macOS 위 Electron에서 그린 그림 | 사례 글 |
+| `windows/drawer-night.png` | Windows 1.28.1의 밤 종이 서랍 | 사례 글 |
+| `windows/ai-settings.png`, `windows/ai-toast.png` (+ `en/`, `nl/`) | Windows의 AI 연결 칸과 'Claude가 넣었어요 · 되돌리기' 안내 | 사례 글 |
+
+## README용 그림
+
+| 파일 | 한 줄 설명 | 자리 |
+| --- | --- | --- |
+| `../readme/cat.png` | README 머리의 고양이 | README |
+| `../readme/input-line-ko.gif`, `input-line-en.gif` | 입력 줄에 세 줄을 차례로 적자 알람, 할 일, 일정 칩이 쌓이는 움직이는 그림 | README, 링크 |
 
 ## 다시 그리는 방법
 
@@ -70,11 +87,10 @@ Mac은 `cd mac && ./scripts/render-design.sh [ko|en|nl] [night]`로 `mac/docs/de
 
 ## 만들면 좋을 GIF
 
-움직임을 봐야 하는 기능은 5–10초 GIF가 잘 읽힌다. 아직 만들지 않았다.
+움직임을 봐야 하는 기능은 5–10초 GIF가 잘 읽힌다. 입력 줄 GIF(`docs/readme/`)와 소개 페이지의 메모 서랍 영상(`site/assets/drawer-*.mp4`)은 만들었고, 나머지는 아직이다.
 
 | 아이디어 | 보여 줄 것 | 만드는 법 |
 | --- | --- | --- |
-| 입력 줄 | `내일 3시 회의` 입력 → '일정' 칩 → `Tab`으로 '할 일' → Return → 안내의 '바꾸기' | 화면 녹화 6–8초, 노트 창만 자르기 |
 | 하루 일정표 | `하루 전체 ›` → 일정표가 펼쳐짐 → 블록이 마우스를 따라오고 놓으면 15분 칸에 → 아래 끝을 끌어 늘리기 | 화면 녹화 6–8초 |
 | 체크 | 네모가 세이지색으로 톡 커지고 연필 선이 그어짐 | 2–3초 반복 GIF |
 | 고양이가 알림을 가져옴 | 화면 오른쪽에서 걸어 들어와 말풍선을 열고 인사 | 화면 녹화, 데스크톱 배경은 단색 |

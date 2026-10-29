@@ -35,7 +35,7 @@
 - Write anything on the one **input line** at the bottom. Click the square and it fills with sage while a pencil line crosses the to-do out. A day ends at **4 a.m.**
 - Under the title, the **day ribbon**: what’s on now in large handwriting, the time left in the ring beside it (‘40 min left’), the next two things under it (‘2:00 PM Finish the report · in 40 min’), and a thin bar of the whole day on top. ‘Whole day ›’ opens it in place into the **day’s timetable**. To-dos with a reminder still to come today gather at the top under **Next**.
 - Pen, Marker or Clean lettering in four text sizes. Drag rows by their handle; bring back deleted ones with `⌘Z`.
-- Tabs at the top: **Today · Ahead · Notes**. **Ahead** shows each day of this week and next week from tomorrow, with its events and the to-dos due that day; later deadlines sit by month and undated to-dos under **Someday**. Drag a to-do to another day to move its due date.
+- Tabs at the top: **Today · Ahead**. Notes live in the [notes drawer](#-notes-drawer-143--144) at the edge of the screen. **Ahead** shows each day of this week and next week from tomorrow, with its events and the to-dos due that day; later deadlines sit by month and undated to-dos under **Someday**. Drag a to-do to another day to move its due date.
 - In the menu bar, a small **cat face**: ‘12:30’ while a timer runs, ‘Dentist 40 min’ when something starts within the hour. Click it for the **Today window** (next event · timer · next alarm, a few of today’s to-dos, the input line).
 - Double-click the top or press `⌘M` and the notepad folds into a **little sticky note** with Jongi-nyang peeking over it.
 
@@ -44,7 +44,7 @@
 - The same line understands events, timers, alarms and notes: `meeting tomorrow 3pm` → an event, `timer 40` · `25 min focus` → a timer, `alarm 7am weekdays` → an alarm, several lines → a note. **Chips** above the line show how it's read; **Tab** picks another meaning, and `/todo /event /note /timer /alarm` pick the kind. `Shift+Return` adds the text exactly as typed, as a to-do.
 - Right after adding, the notice at the bottom offers **Make it a …** (say, event → to-do), which swaps it without a trace; words you switch often are read that way first next time. `⌘Z` takes it back.
 - **Quick add from anywhere `⌃⌥N`** (Windows `Ctrl+Alt+N`): the same input line pops up on a slip over any app.
-- **Quick note `⌃⌥M`** (Windows `Ctrl+Alt+M`): a slip for a few lines. `⌘Return` puts it at the top of Notes as a new note; Esc closes it and your text stays.
+- **Quick note `⌃⌥M`** (Windows `Ctrl+Alt+M`): a slip for a few lines. `⌘Return` puts it at the top of the notes drawer as a new note; Esc closes it and your text stays.
 
 ### 🔔 Reminders · repeats · due dates
 - Per to-do: a reminder once (in 10 min · tomorrow 9 AM · a calendar), a **repeat** (every day · weekdays · days of the week · every month) or a **due date** (today · this week · this month · a date).
@@ -103,6 +103,23 @@
 - Desk → Appearance → **Language**: Automatic · 한국어 · English · Nederlands. Automatic follows your Mac's language order (English when none of the three is there); changing it restarts Jongi-nyang.
 - Menus, settings, help, reminders, cat talk, dates and times are all in that language. English and Dutch handwriting uses Caveat (pen) and Kalam (marker); titles written in Korean still show in Korean handwriting.
 
+### 🗄 Notes drawer (1.43 – 1.44)
+![The notes drawer: date groups and cards](../docs/screenshots/mac/en/drawer-list-day.png)
+
+- Notes no longer live in a notebook tab but in the **notes drawer** at the edge of the screen. From any app, pull it out with `⇧⌘D`, the cat-paw handle at the edge, the drawer button on the notebook or `⌘3`; read notes one sheet at a time, jot one down on the slip at the top, or unfold one to edit in place. Clicking another app doesn't close it; the same shortcut, `Esc` or × does. Notes from the old Notes tab are in the Notes folder, unchanged.
+- Each **bookmark** at the side is a folder (a name and one of eight colours; drag to reorder). Drop a note on a bookmark to move it; the paw bookmark, **Pinned**, gathers pinned notes. The folder name ▾ in the header or `⌘L` opens the folder list.
+- A `- [ ] milk` line shows as a checkbox and is saved as `- [x] milk` when ticked. `⌘F` searches every folder.
+- **Cards grouped by date** (1.44): notes sit under `Pinned · Today · Yesterday · This week · Last week · October` headers; each card has a handwritten title, a short time, a one-line preview and, when there is one, a small link (opens in the browser), phone number (click to copy) or checklist `2/4` label. Cards have more room between them and a scrap of tape in the folder's colour.
+- **Right-click menus** (1.44): a note (= `⋯`) — edit, view large, copy, duplicate, pin, Move to folder, This note’s paper, Remove ticked lines, delete. A bookmark — new note here, rename, colour, Sort (Last edited · Date created · Title), duplicate, delete folder. The ⚙ at the bottom (= right-click on empty space) — new note, paper and backdrop swatches, left/right side, settings. Everything in the menus can also be done with buttons, keys or dragging.
+- **Paper**: day, night, kraft, grid, or Auto (follows the notebook). From 1.44 a single note can have its own paper. All four papers pass the contrast check (text 4.5:1, marks 3:1).
+- **Backdrop** (1.44): Solid (default) · Frosted · Strong · None. The note sheets themselves stay opaque, so text contrast doesn't change. With Reduce transparency on, Frosted and Strong show as Solid.
+- Settings are under Desk → **Notes drawer** (shortcut, how it opens, look). Folders and pins are kept in `memo-folders.json` and `memos.json` is unchanged, so an older version on another device still sees the same notes.
+
+### 🤖 Jongi-nyang for Claude (1.42)
+- While chatting with Claude Desktop or Claude Code, Claude can look at and add to-dos, events and notes, and change them after you confirm. It's off at first: turn on `Let Claude see and write in Jongi-nyang` under Desk → **AI connection**.
+- `Connect to Claude Desktop` opens the `.mcpb` extension inside the app and Claude Desktop asks whether to install it. `Connect to Claude Code` (1.43) adds it to the terminal and to the Code tab of Claude Desktop (Node is required).
+- There's no background server. Claude starts the extension only when a chat needs it, and what Claude did is logged in `ai-log.jsonl` on this device.
+
 ### ↕ Dragging and stretching in the timetable (1.41)
 | Dragging |
 | --- |
@@ -136,7 +153,7 @@
 - **Since yesterday · 3 days**: a small mark on undated to-dos that stay on Today (an optional `todaySince` in the to-do file, the same on Windows).
 - **Evening tidy-up**: in the evening (8 PM by default) ‘3 to-dos left today. Move them to tomorrow?’ — To tomorrow · To Someday · Leave as is; missed, it comes as a morning tidy-up. With **Today’s one thing** on, the day’s first line asks for the one thing and stars it at the top.
 - **Snooze**: 5 · 10 · 30 min · 1 hour · tonight at 7 PM · tomorrow at 9 AM · move to tomorrow; events get ‘Again 5 min before’. Missed reminders can also go to **macOS notifications** (Done · In 10 min).
-- **Search `⌘F`**: Today · Ahead · Notes · History · Events at once, case and accents ignored (Korean first consonants too).
+- **Search `⌘F`**: Today · Ahead · the notes drawer · History · Events at once (notes by folder name too), case and accents ignored (Korean first consonants too).
 - The input line: `every day drink water` · `every Monday 9am team meeting` → **repeats**, `take out laundry in 30 min` → a reminder in 30 minutes. Click an empty spot in the day’s timetable for a new to-do or event at that time; `F` on a row starts a focus.
 - **`⌃⌥J`** shows or hides the notepad from anywhere; ⋯ → **dock to the screen edge**; the Dock icon’s menu (Quick add · Quick note · Desk · Focus 25 min · 5 min timer) and count; a timer ring around the menu-bar face; **copied text** in a quick note; **Undo** toasts for delete · all done · clear; focus card `Space` · `⌘↩` · `⌘=`.
 
@@ -187,13 +204,14 @@ You can build the Windows installer on macOS too. It isn't code-signed, so Smart
 | `⌘N` | `Ctrl+N` | New to-do |
 | `⌃⌥N` | `Ctrl+Alt+N` | Quick add from anywhere |
 | `⌃⌥M` | `Ctrl+Alt+M` | Quick note from anywhere |
-| `⌘1`–`⌘3` | `Ctrl+1`–`Ctrl+3` | Today · Ahead · Notes |
+| `⌘1` · `⌘2` | `Ctrl+1` · `Ctrl+2` | Today · Ahead |
+| `⇧⌘D` · `⌘3` | `Ctrl+Shift+D` · `Ctrl+3` | Open or close the notes drawer |
 | `↑` `↓` · `Space` · `Return` · `⌫` | same | Pick a row · mark done · edit · delete |
 | `⌘↑` `⌘↓` | `Ctrl+↑` `Ctrl+↓` | Move a row |
 | `⌘Z` / `⇧⌘Z` | `Ctrl+Z` / `Ctrl+Y` | Undo / redo |
 | `⌘M` | `Ctrl+M` | Fold to a sticky note |
 | `⌘Y` | `Ctrl+H` | Desk — History |
-| `⇧⌘N` | `Ctrl+Shift+N` | New note |
+| `⇧⌘N` | `Ctrl+Shift+N` | New note in the notes drawer |
 | `⇧⌘P` | — | Show · hide the desktop cat |
 | `⌘D` | `Ctrl+D` | Desk — Calendar |
 | `⌘1`–`⌘9` (in the desk) | `Ctrl+1`–`Ctrl+9` (in the desk) | Pick a desk pane |
@@ -213,12 +231,14 @@ You can build the Windows installer on macOS too. It isn't code-signed, so Smart
 | Default folder | `~/Library/Application Support/com.noa.PaperTodo/` | `%APPDATA%\PaperTodo\` |
 | To-dos | `todos.json` | `todos.json` |
 | Notes | `memos.json` | `memos.json` |
+| Notes drawer folders · pins · sort · a note's paper | `memo-folders.json` | `memo-folders.json` |
 | Repeating to-dos | `repeats.json` | `repeats.json` |
 | History | `archive/2026-10.jsonl` (a file per month, a to-do per line) | same |
 | Focus history | `focus.jsonl` (focus sessions and timers of a minute or more, one per line) | `focus.jsonl` |
 | Settings | system defaults (`com.noa.PaperTodo`) | `settings.json` |
 | Events | `events.json` | `events.json` |
 | Alarms | `alarms.json` (what has rung is kept per device, in the settings) | `alarms.json` |
+| AI connection settings · what Claude did | `ai-link.json` · `ai-log.jsonl` (in this device's settings folder, even with a shared folder) | same |
 | Automatic backup before importing | `backups/` (default folder, 10 most recent) | `backups\` (settings folder, 10 most recent) |
 
 - Desk → Storage & backup → **Storage** shows the folder in use; **Open folder** opens it. **Done to-dos → History folder** works the same way.

@@ -701,7 +701,7 @@ function madeWhen(at: Date, now: Date, lang: Lang): string {
 
 /**
  * The toast after a candidate was put in: "일정으로 넣었어요 · 내일 15:00", "할 일로 넣었어요", "40분 타이머를 시작했어요",
- * "알람을 맞췄어요 · 평일 오전 7:00", "메모로 남겼어요"; en "Added as an event · tomorrow 3:00 PM"…; nl "Toegevoegd als afspraak · morgen 15:00"….
+ * "알람을 맞췄어요 · 평일 오전 7:00", "메모 서랍에 넣었어요"; en "Added as an event · tomorrow 3:00 PM"…; nl "Toegevoegd als afspraak · morgen 15:00"….
  */
 export function addedText(candidate: Candidate, now = new Date(), lang: Lang = "ko"): string {
   const i = index(lang);
@@ -733,7 +733,8 @@ export function addedText(candidate: Candidate, now = new Date(), lang: Lang = "
       return [`${length} 타이머를 시작했어요`, `Started a ${length} timer`, `Timer van ${length} gestart`][i];
     }
     case "alarm": return `${["알람을 맞췄어요", "Alarm set", "Wekker gezet"][i]} · ${alarmWhen(candidate, now, lang)}`;
-    case "memo": return ["메모로 남겼어요", "Saved as a note", "Bewaard als notitie"][i];
+    // 1.28: memos live in the 메모 서랍 (the note's memo tab is gone).
+    case "memo": return ["메모 서랍에 넣었어요", "Added to the notes drawer", "In de notitielade gezet"][i];
     case "repeat": return `${["반복 할 일로 넣었어요", "Added as a repeating to-do", "Toegevoegd als herhalende taak"][i]} · ${repeatWhen(candidate.rule, candidate.time, lang)}`;
   }
 }
