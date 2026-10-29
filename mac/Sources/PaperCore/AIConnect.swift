@@ -387,7 +387,7 @@ public enum AIText {
         case (_, .ko): return "할 일"
         case (.events, .en): return one ? "event" : "events"
         case (.memos, .en): return one ? "note" : "notes"
-        case (_, .en): return one ? "task" : "tasks"
+        case (_, .en): return one ? "to-do" : "to-dos"
         case (.events, .nl): return one ? "afspraak" : "afspraken"
         case (.memos, .nl): return one ? "notitie" : "notities"
         case (_, .nl): return one ? "taak" : "taken"
@@ -427,9 +427,9 @@ public enum AIText {
     /// 자리 비운 사이 (once, at launch).
     public static func away(_ count: Int, _ language: AppLanguage) -> String {
         switch language {
-        case .ko: "자리 비운 사이 Claude가 \(count)가지를 했어요"
+        case .ko: "자리를 비운 사이 Claude가 \(count)개를 넣거나 고쳤어요"
         case .en: "While you were away, Claude made \(count) \(count == 1 ? "change" : "changes")"
-        case .nl: "Terwijl je weg was, heeft Claude \(count) \(count == 1 ? "ding" : "dingen") gedaan"
+        case .nl: "Terwijl je weg was, heeft Claude \(count) \(count == 1 ? "ding" : "dingen") toegevoegd of gewijzigd"
         }
     }
 
@@ -439,13 +439,14 @@ public enum AIText {
     /// After 되돌리기: all back, some back (partial), or nothing (M14).
     public static func undoResult(_ outcome: AIConnect.UndoOutcome, _ language: AppLanguage) -> String {
         if outcome.undone == 0 {
-            return ["그새 바뀌어서 되돌리지 못했어요", "It changed since, so it can’t be undone", "Het is intussen gewijzigd, dus herstellen lukt niet"][language.index]
+            // Not a failure: what was changed since is kept as it is (#36).
+            return ["그사이 직접 고친 항목이라 그대로 뒀어요", "You changed it since, so it stays as you left it", "Je hebt het intussen aangepast, dus het blijft zo"][language.index]
         }
         if outcome.isComplete { return ["되돌렸어요", "Undone", "Hersteld"][language.index] }
         let (done, left) = (outcome.undone, outcome.left)
-        return ["\(done)개는 되돌리고, 그새 바뀐 \(left)개는 그대로 뒀어요",
-                "Undid \(done); \(left) changed since, so \(left == 1 ? "it stays" : "they stay")",
-                "\(done) hersteld; \(left) intussen gewijzigd, \(left == 1 ? "die blijft" : "die blijven") staan"][language.index]
+        return ["\(done)개를 되돌렸어요. 그사이 고친 \(left)개는 그대로 뒀어요",
+                "Undid \(done). The \(left) you changed since \(left == 1 ? "stays as it is" : "stay as they are")",
+                "\(done) hersteld. \(left == 1 ? "Die ene die je intussen aanpaste, blijft zo" : "De \(left) die je intussen aanpaste, blijven zo")"][language.index]
     }
 
     /// The recent-work list's mark on an entry that was taken back.

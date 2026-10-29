@@ -25,12 +25,14 @@ swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/LocalEvent.swift \
     Sources/PaperCore/Memo.swift \
     Sources/PaperCore/MemoFolders.swift \
+    Sources/PaperCore/TodoSpaces.swift \
     Sources/PaperCore/Alarm.swift \
     Sources/PaperCore/Duration.swift \
     Sources/PaperCore/Backup.swift \
     Sources/PaperCore/FocusTimer.swift \
     Sources/PaperCore/Focus.swift \
     Sources/PaperCore/DayRibbon.swift \
+    Sources/PaperCore/FolderPlace.swift \
     Tests/PaperCoreTests/CoreTests.swift \
     -o .build/checks/PaperCoreTests
 .build/checks/PaperCoreTests

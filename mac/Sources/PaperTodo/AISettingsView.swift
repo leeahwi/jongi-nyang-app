@@ -1,3 +1,4 @@
+import AppKit
 import PaperCore
 import SwiftUI
 
@@ -5,12 +6,13 @@ import SwiftUI
 /// 되돌리기 per entry. The same cards and rows as every other settings pane.
 struct AISettingsPanel: View {
     @ObservedObject var ai: AIConnection
+    @State private var copied = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            SettingsGroup(title: L("AI 연결"), footer: L("켜 두면 Claude가 할 일 · 일정 · 메모를 보고, 새로 넣고, 바꾸기 전과 후를 먼저 보여 준 뒤 ‘응’을 받으면 고쳐요. 지우지는 못해요. 끄면 Claude는 아무것도 읽지 못해요.")) {
+            SettingsGroup(title: L("AI 연결"), more: "ai", footer: L("켜면 Claude가 할 일 · 일정 · 메모를 보고 새로 넣어요. 고칠 땐 먼저 물어보고, 지우지는 못해요. 읽은 내용은 대화와 함께 Claude로 가요.")) {
                 HStack(spacing: 12) {
-                    SettingsLabel(L("Claude가 종이냥을 보고 쓸 수 있게 하기"), systemImage: "text.bubble")
+                    SettingsLabel(L("Claude가 종이냥을 보고 쓸 수 있게 하기"), systemImage: "bubble.left")
                     Spacer(minLength: 8)
                     Toggle(L("Claude가 종이냥을 보고 쓸 수 있게 하기"), isOn: Binding(get: { ai.enabled }, set: { ai.setEnabled($0) }))
                         .toggleStyle(PaperToggleStyle())
@@ -19,7 +21,7 @@ struct AISettingsPanel: View {
                 .settingsRow()
             }
 
-            SettingsGroup(title: L("연결하기"), footer: L("따로 켜 두는 프로그램은 없어요. Claude가 대화에 필요할 때만 종이냥 for Claude를 실행하고, Claude를 끄면 같이 꺼져요. 연결하면 AI 연결이 켜져요.")) {
+            SettingsGroup(title: L("연결하기"), footer: L("따로 켜 두는 프로그램은 없어요. 연결하면 위 스위치도 켜져요.")) {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 10) {
                         SettingsLabel(L("Claude 데스크톱"), systemImage: "macwindow")
@@ -41,22 +43,24 @@ struct AISettingsPanel: View {
                             .disabled(ai.codeBusy)
                     }
                     note(ai.codeLinked ? L("연결했어요. 새로 여는 Claude Code 세션부터 종이냥이 보여요.")
-                                       : L("터미널과 Claude 데스크톱의 Code 탭 모두에 연결돼요. Node가 필요해요."))
-                    Text(ai.codeCommand)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(PaperTheme.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .textSelection(.enabled)
-                        .help(ai.codeCommand)
-                        .padding(.leading, FolderPath.indent)
-                        .padding(.top, 2)
+                                       : L("터미널과 Claude 데스크톱의 Code 탭에서 써요. Node.js가 필요해요."))
+                    // #36: the command itself isn't for reading — copied, not shown.
+                    Button(copied ? L("복사했어요") : L("명령 복사")) {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(ai.codeCommand, forType: .string)
+                        copied = true
+                    }
+                    .buttonStyle(.link)
+                    .font(.system(size: 11))
+                    .help(ai.codeCommand)
+                    .padding(.leading, FolderPath.indent)
+                    .padding(.top, 2)
                 }
                 .padding(.vertical, 9)
                 .settingsRow()
             }
 
-            SettingsGroup(title: L("최근 AI 작업"), footer: L("오늘과 어제 Claude가 한 일이에요. 되돌리기는 그 뒤로 바뀌지 않은 항목만 되돌려요. Claude가 넣거나 고친 할 일과 일정에는 그날 동안 작은 도장이 찍혀요.")) {
+            SettingsGroup(title: L("최근 AI 작업"), footer: L("되돌리기는 그 뒤로 바뀌지 않은 항목만 되돌려요. Claude가 넣거나 고친 줄에는 그날 동안 작은 도장이 찍혀요.")) {
                 if ai.recent.isEmpty {
                     Text(L("아직 없어요"))
                         .font(.system(size: 13))

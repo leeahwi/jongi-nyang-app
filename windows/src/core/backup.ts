@@ -4,6 +4,7 @@ import { parseMemos } from "./memo";
 import { emptyMemoFolders, mergeMemoFolders, parseMemoFolders, serializeMemoFolders } from "./memoDrawer";
 import { isoDate, parseNotebook } from "./notebook";
 import { parseSeries } from "./repeat";
+import { emptyTodoSpaces, mergeTodoSpaces, parseTodoSpaces, serializeTodoSpaces } from "./todoSpaces";
 import { clock, dayMonth, langIndex, plural, type Lang } from "./lang";
 import { focusFileName } from "./focus";
 
@@ -27,8 +28,8 @@ export type BackupFiles = Record<string, string>;
 
 export interface Backup { exportedAt?: string; from?: string; files: BackupFiles }
 
-/** The data files (메모 서랍's folders since 1.28); the record is archive/<month>.jsonl beside them, and the focus record focus.jsonl. */
-export const dataFiles = ["todos.json", "memos.json", "repeats.json", "events.json", "alarms.json", "memo-folders.json"] as const;
+/** The data files (메모 서랍's folders since 1.28, 할 일 스페이스 since 1.30); the record is archive/<month>.jsonl beside them, and the focus record focus.jsonl. */
+export const dataFiles = ["todos.json", "memos.json", "repeats.json", "events.json", "alarms.json", "memo-folders.json", "todo-spaces.json"] as const;
 export type DataFile = typeof dataFiles[number];
 /** A month of the record ("2026-10", "undated"): nothing that could reach outside the archive folder. */
 export const isArchiveName = (name: string) => /^archive\/[0-9A-Za-z_-]+\.jsonl$/.test(name);
@@ -91,6 +92,7 @@ export function readable(name: string, text: string): boolean {
     else if (name === "events.json") parseEvents(text);
     else if (name === "alarms.json") parseAlarms(text);
     else if (name === "memo-folders.json") parseMemoFolders(text);
+    else if (name === "todo-spaces.json") parseTodoSpaces(text);
     else return false;
     return true;
   } catch {
@@ -187,7 +189,8 @@ export function exportedText(exportedAt: string | undefined, lang: Lang = "ko"):
 
 // ─── 합치기 · 바꾸기 ──────────────────────────────────────────────────────────
 
-const arrayKey: Record<Exclude<DataFile, "memo-folders.json">, string> = { "todos.json": "items", "memos.json": "memos", "repeats.json": "series", "events.json": "events", "alarms.json": "alarms" };
+type ListFile = Exclude<DataFile, "memo-folders.json" | "todo-spaces.json">;
+const arrayKey: Record<ListFile, string> = { "todos.json": "items", "memos.json": "memos", "repeats.json": "series", "events.json": "events", "alarms.json": "alarms" };
 
 /** Entries of both by id: every one here as it is, then the imported ones this side lacks (in their order). */
 function mergeList(current: string, imported: string, key: string): string {
@@ -242,9 +245,16 @@ export function mergeFiles(current: BackupFiles, imported: BackupFiles): BackupF
         const merged = serializeMemoFolders(mergeMemoFolders(parseMemoFolders(mine), parseMemoFolders(text)));
         result[name] = merged === serializeMemoFolders(parseMemoFolders(mine)) ? mine : merged;
       } catch { result[name] = text; }
+    } else if (name === "todo-spaces.json") {
+      // 할 일 스페이스: entry by entry (S18), the backup's winning only where newer; this side's unreadable: the backup's.
+      try {
+        const kept = parseTodoSpaces(mine);
+        const merged = serializeTodoSpaces(mergeTodoSpaces(kept, parseTodoSpaces(text)));
+        result[name] = merged === serializeTodoSpaces(kept) ? mine : merged;
+      } catch { result[name] = text; }
     } else if ((dataFiles as readonly string[]).includes(name)) {
       // This side's file can't be read (the app has already kept it aside): the backup's is taken.
-      try { result[name] = mergeList(mine, text, arrayKey[name as Exclude<DataFile, "memo-folders.json">]); } catch { result[name] = text; }
+      try { result[name] = mergeList(mine, text, arrayKey[name as ListFile]); } catch { result[name] = text; }
     }
   }
   return result;
@@ -258,6 +268,7 @@ export const emptyFile: Record<DataFile, string> = {
   "events.json": JSON.stringify({ events: [] }, null, 2) + "\n",
   "alarms.json": JSON.stringify({ alarms: [] }, null, 2) + "\n",
   "memo-folders.json": serializeMemoFolders(emptyMemoFolders("ko")),
+  "todo-spaces.json": serializeTodoSpaces(emptyTodoSpaces()),
 };
 
 /**

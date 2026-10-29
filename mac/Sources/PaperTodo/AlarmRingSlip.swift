@@ -77,27 +77,25 @@ struct AlarmRingView: View {
         .frame(maxWidth: .infinity)
     }
 
-    /// A small `오전` before `7:00` (Korean puts the period first); en `7:00` then `AM`; Dutch `07:00` alone.
+    /// On the 12-hour clock a small `오전` before `7:00` (Korean puts the period first), `7:00` then `AM` · `a.m.`;
+    /// on the 24-hour clock `07:00` alone (the app's clock, AppLanguage.cycle).
     private func bigTime(_ alarm: Alarm, language: AppLanguage) -> some View {
         let clock = alarm.clock ?? (hour: 0, minute: 0)
         let twelve = clock.hour % 12 == 0 ? 12 : clock.hour % 12
-        let main = language == .nl ? Alarm.clockText(alarm, language: language) : "\(twelve):" + String(format: "%02d", clock.minute)
-        let suffix: String? = switch language {
-        case .ko: clock.hour < 12 ? "오전" : "오후" // ko-only: the Korean clock's own words
-        case .en: clock.hour < 12 ? "AM" : "PM"
-        case .nl: nil
-        }
+        let h12 = language.cycle == .h12
+        let main = h12 ? "\(twelve):" + String(format: "%02d", clock.minute) : String(format: "%02d:%02d", clock.hour, clock.minute)
+        let suffix: String? = h12 ? language.period(hour: clock.hour) : nil
         let period = suffix.map {
             Text($0)
                 .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(PaperTheme.ink2)
         }
         return HStack(alignment: .lastTextBaseline, spacing: 4) {
-            if language == .ko { period }
+            if language.periodFirst { period }
             Text(main)
                 .font(.system(size: 52, weight: .semibold).monospacedDigit())
                 .tracking(-1.5)
-            if language != .ko { period }
+            if !language.periodFirst { period }
         }
         .foregroundStyle(PaperTheme.ink)
         .lineLimit(1)

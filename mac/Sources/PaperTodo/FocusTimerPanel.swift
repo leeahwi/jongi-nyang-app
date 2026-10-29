@@ -127,7 +127,7 @@ final class FocusTimerController {
         case .pomodoro:
             end(at: now)
             setSession(FocusSession(timer: .pomodoro(model.pomodoroSettings, now: now), segmentStart: now))
-            say(L("\(model.pomodoroSettings.focusMinutes)분 집중해요. 화이팅!"), for: 3)
+            say(L("\(model.pomodoroSettings.focusMinutes)분 집중해요. 응원할게요!"), for: 3)
         case .togglePause:
             guard var session = state.session else { return }
             if session.timer.isPaused { session.resume(at: now) } else { session.pause(at: now) }

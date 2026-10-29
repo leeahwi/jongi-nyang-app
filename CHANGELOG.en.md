@@ -8,6 +8,7 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 
 | Phase | Milestone | Mac | Windows |
 | --- | --- | --- | --- |
+| Widen | [To-do spaces · a clearer notes drawer](#to-do-spaces--a-clearer-notes-drawer) | 1.45.0 | 1.30.0 |
 | Polish | [An easier notes drawer](#an-easier-notes-drawer) | 1.44.0 | 1.29.0 |
 | Widen | [Notes drawer](#notes-drawer) | 1.43.0 – 1.43.1 | 1.28.0 – 1.28.1 |
 | Widen | [Jongi-nyang for Claude](#jongi-nyang-for-claude) | 1.42.0 – 1.42.1 | 1.27.0 |
@@ -36,6 +37,21 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 | Mac | [From a first notepad to the cat](#from-a-first-notepad-to-the-cat) | 1.0 – 1.10 | — |
 
 ---
+
+## To-do spaces · a clearer notes drawer
+
+**Mac 1.45.0 · Windows 1.30.0** — shared cases: spaces S1–S22 (both apps read the same `docs/plans/spaces-cases.json`)
+
+![Two Today sheets: space colour bands, and the same sheet showing Work only](docs/readme/cards/spaces-en-light.png)
+
+- I wanted to split to-dos into work, home and study, without losing the one sheet that shows all of today. So spaces divide without breaking the sheet apart: a small colour band at the left of a row and a filter for the day, nothing more. With no spaces, nothing on screen changes because of them.
+- To see one space, use `All spaces ▾` in the header or `⌥⌘1`–`9` (Windows `Ctrl+Shift+1`–`9`). It clears at 4 a.m. the next day, and reminders, alarms and the cat still count hidden to-dos.
+- Add `#work` on the input line and the to-do goes into that space. The start of a name works too (`#wo`), and a new name makes a new space. `C#` and `#12` stay as text.
+- Older Windows versions drop unknown fields from a to-do when they save, so `todos.json` is left as it was and spaces live in a new file beside it, `todo-spaces.json`. Both apps write the same bytes, and in a shared folder the later change wins for each to-do.
+- The notes drawer's card text is larger and darker (previews up to three lines), and the ruled lines are gone from the sheets so the writing comes first. Pins are a pin now, and tabs, bookmarks and the handle are plain colours without stripes.
+- A timer's time left reads ‘21 min left’ instead of ‘20:50’, so it isn't mistaken for the clock time next to it. Error messages, confirmations and help got another pass.
+- Fixed on the Mac: with about 2,000 to-dos, typing the first letter on an empty input line froze for seconds (1.44 had it too). Fixed on Windows: a to-do reminder's checkbox didn't respond if the mouse was already where the slip appeared.
+- On the Mac, measuring again with many to-dos found three slow spots. With 2,000, a tick takes 0.05–0.1 s instead of 0.1–2 s, and ↑ to the last row about 0.3 s instead of 3.5–6.9 s. History no longer rebuilds in full on every tick once it has been opened, even with the desk closed, and adding or finishing no longer slows down as undo steps pile up.
 
 ## An easier notes drawer
 

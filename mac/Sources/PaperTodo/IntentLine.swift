@@ -21,6 +21,10 @@ struct IntentCommit {
     var key: String?
     var made: Made
     var page: AppModel.Page
+    /// 할 일 스페이스 (1.45): the space a to-do from the line goes into (a new one is made first).
+    var space: SpaceToken.Choice?
+    /// A space the line made for it (it goes again when the commit is taken back).
+    var madeSpace: String?
 
     var candidate: Intent.Candidate { candidates[index] }
 
@@ -36,17 +40,19 @@ struct IntentCommit {
 }
 
 extension AppModel {
-    /// The line's guesses for this text (with what 바꾸기 taught it).
+    /// The line's guesses for this text (with what 바꾸기 taught it), read without its `#스페이스` (1.45).
     func intentCandidates(_ text: String, now: Date = Date()) -> [Intent.Candidate] {
-        Intent.read(text, now: now, language: .current, prefer: intentMemory.prefer)
+        Intent.read(spaceReading(text, lens: false).text, now: now, language: .current, prefer: intentMemory.prefer)
     }
 
     /// Makes the picked candidate. A to-do gets the sheet's defaults: on 앞으로 one without a date
     /// goes to 언젠가 (the later shelf), one with a date to its day.
     @discardableResult
-    func commitIntent(text: String, candidates: [Intent.Candidate], index: Int, page: Page, now: Date = Date()) -> IntentCommit? {
+    func commitIntent(text: String, candidates: [Intent.Candidate], index: Int, page: Page, space: SpaceToken.Choice? = nil,
+                      now: Date = Date()) -> IntentCommit? {
         guard candidates.indices.contains(index) else { return nil }
         let made: IntentCommit.Made
+        var madeSpace: String?
         switch candidates[index] {
         case .todo(let parsed):
             let asksForPick = page == .todos && asksForDailyPick
@@ -57,6 +63,8 @@ extension AppModel {
             guard let id else { return nil }
             // 오늘 꼭 하나: the first to-do written while the line asked becomes the day's one thing.
             if asksForPick && Shelf.page(of: items.first { $0.id == id } ?? TodoItem(title: ""), now: now) == .today { setDailyPick(id) }
+            // M4: only a to-do takes the line's space.
+            madeSpace = placeMadeTodo(id, choice: space)
             made = .todo(id)
         case .event(let guess):
             let draft = CalendarDraft(title: guess.title, date: guess.date, allDay: guess.allDay, startMinutes: guess.start,
@@ -89,7 +97,7 @@ extension AppModel {
             made = .series(id)
         }
         return IntentCommit(text: text, candidates: candidates, index: index,
-                            key: Intent.key(text, now: now, language: .current), made: made, page: page)
+                            key: Intent.key(text, now: now, language: .current), made: made, page: page, space: space, madeSpace: madeSpace)
     }
 
     /// Takes back what a commit made, leaving no trace (no 되살리기, no line in the record).
@@ -107,6 +115,7 @@ extension AppModel {
         case .series(let id): removeSeriesQuietly(id)
         case .nothing: break
         }
+        if let space = commit.madeSpace { takeBackMadeSpace(space) }
     }
 
     /// 바꾸기: the made thing goes and the next kind is made instead; the line learns from it.
@@ -118,7 +127,7 @@ extension AppModel {
             memory.switched(key: key, from: commit.candidate.kind, to: commit.candidates[next].kind)
             intentMemory = memory
         }
-        return commitIntent(text: commit.text, candidates: commit.candidates, index: next, page: commit.page, now: now)
+        return commitIntent(text: commit.text, candidates: commit.candidates, index: next, page: commit.page, space: commit.space, now: now)
     }
 
     /// The toast for a commit: what was made, and its action (바꾸기, 멈추기 or 되돌리기).
@@ -397,6 +406,10 @@ struct IntentChips: View {
     let picked: Int
     var now = Date()
     var onPick: (Int) -> Void = { _ in }
+    /// 할 일 스페이스 (1.45): the space chip beside the to-do's (`● 회사`, `+ 새 스페이스 ‘회사’`), when the picked
+    /// meaning is a to-do; a click goes to the next choice (⇧Tab with a `#` token).
+    var space: SpaceChoiceChip?
+    var onSpace: () -> Void = {}
 
     var body: some View {
         FlowLayout(spacing: 5, lineSpacing: 5) {
@@ -410,12 +423,73 @@ struct IntentChips: View {
                 .accessibilityLabel(title)
                 .accessibilityAddTraits(index == picked ? .isSelected : [])
             }
+            if let space {
+                Button(action: onSpace) { SpaceChip(chip: space) }
+                    .buttonStyle(.plain)
+                    .help(space.cycles ? L("⇧Tab: 다른 스페이스로") : space.title)
+                    .accessibilityLabel(L("스페이스") + " " + space.title)
+            }
             if candidates.count > 1 {
                 IntentChip(title: "Tab", symbol: nil, picked: false, faint: true)
                     .help(L("Tab: 다른 뜻으로"))
                     .accessibilityHidden(true)
             }
+            if space?.cycles == true {
+                IntentChip(title: "⇧Tab", symbol: nil, picked: false, faint: true)
+                    .help(L("⇧Tab: 다른 스페이스로"))
+                    .accessibilityHidden(true)
+            }
         }
+    }
+}
+
+/// What the space chip says.
+struct SpaceChoiceChip: Equatable {
+    var title: String
+    /// nil: a new space (`+`) or 스페이스 없음.
+    var color: TodoSpaces.Color?
+    var new = false
+    /// More than one choice and a `#` token: ⇧Tab goes through them.
+    var cycles = false
+
+    @MainActor
+    static func make(_ choice: SpaceToken.Choice, model: AppModel, cycles: Bool) -> SpaceChoiceChip {
+        switch choice {
+        case .space(let id):
+            let space = model.todoSpaces.space(id)
+            return SpaceChoiceChip(title: space?.name ?? "", color: space?.colorKey, cycles: cycles)
+        case .new(let name): return SpaceChoiceChip(title: SpaceWords.newSpace(name, language: .current), new: true, cycles: cycles)
+        case .noSpace: return SpaceChoiceChip(title: SpaceWords.noSpace(.current), cycles: cycles)
+        }
+    }
+}
+
+/// `● 회사` on a light tint of the space's colour; `+ 새 스페이스 ‘회사’`; `스페이스 없음`.
+struct SpaceChip: View {
+    let chip: SpaceChoiceChip
+
+    var body: some View {
+        HStack(spacing: 5) {
+            if let color = chip.color {
+                Circle().fill(PaperTheme.space(color)).frame(width: 7, height: 7)
+            } else if chip.new {
+                Image(systemName: "plus").font(.system(size: 9.5, weight: .bold))
+            }
+            Text(chip.title).lineLimit(1)
+        }
+        .font(.system(size: 11, weight: .medium))
+        .foregroundStyle(PaperTheme.ink)
+        .padding(.horizontal, 7)
+        .padding(.vertical, 3)
+        .frame(minHeight: 21)
+        .background {
+            RoundedRectangle(cornerRadius: 8, style: .continuous).fill(PaperTheme.paper2)
+            if let color = chip.color { RoundedRectangle(cornerRadius: 8, style: .continuous).fill(PaperTheme.space(color).opacity(0.16)) }
+        }
+        .overlay {
+            if chip.new { RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(PaperTheme.rule, style: StrokeStyle(lineWidth: 1, dash: [3, 2])) }
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
@@ -513,6 +587,8 @@ struct IntentLineView: View {
     @State private var localFocus = 0
     @State private var text = ""
     @State private var picked = 0
+    /// 할 일 스페이스 (1.45): which of the line's space choices (⇧Tab with a `#`, or a click on the chip).
+    @State private var spacePick = 0
     @State private var focused = false
     @State private var width: CGFloat = 400
     @Environment(\.colorSchemeContrast) private var contrast
@@ -524,18 +600,31 @@ struct IntentLineView: View {
     private var candidates: [Intent.Candidate] { !typing ? [] : reading.candidates(text, model: model) }
     private var problem: Intent.Problem? { Intent.problem(text, language: .current) }
     private var active: Bool { focused || previewFocused }
+    /// The note's 오늘 line writes into the space shown (S7); 앞으로 and the 오늘 창 don't filter (M16).
+    private var usesLens: Bool { page == .todos && !compact }
+    private var spaceReading: SpaceToken.Reading { model.spaceReading(text, lens: usesLens) }
 
     var body: some View {
         let candidates = self.candidates
+        let reading = spaceReading
+        let index = min(picked, max(0, candidates.count - 1))
+        let spaceChoice = SpaceLine.choice(reading, pick: spacePick, candidates: candidates, index: index)
         VStack(alignment: .leading, spacing: 6) {
             if !candidates.isEmpty {
-                IntentChips(candidates: candidates, picked: min(picked, candidates.count - 1)) { picked = $0 }
+                IntentChips(candidates: candidates, picked: index, onPick: { picked = $0 },
+                            space: spaceChoice.map { SpaceChoiceChip.make($0, model: model, cycles: SpaceLine.hintsCycling(reading)) },
+                            onSpace: { spacePick = SpaceLine.next(spacePick, reading) })
             }
             HStack(spacing: 8) {
                 IntentField(text: $text, placeholder: placeholder, font: model.notebookFont.handNSFont(compact ? 18 : 20),
                             focusRequest: (focusRequest ?? model.focusRequest) + localFocus,
                             onFocus: { focused = $0; model.inputLineFocused = $0 },
                             onTab: { step in
+                                // W7: ⇧Tab goes through the spaces while the line has a `#` token.
+                                if step < 0, SpaceLine.cycles(spaceReading) {
+                                    spacePick = SpaceLine.next(spacePick, spaceReading)
+                                    return true
+                                }
                                 guard candidates.count > 1 else { return false }
                                 picked = (picked + step + candidates.count) % candidates.count
                                 return true
@@ -555,6 +644,12 @@ struct IntentLineView: View {
                     .font(.system(size: 11.5, weight: .medium))
                     .foregroundStyle(PaperTheme.clayText)
                     .transition(.opacity)
+            } else if SpaceLine.needsTitle(reading) {
+                // S5: only the `#스페이스`.
+                Text(SpaceWords.needsTitle(.current))
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(PaperTheme.clayText)
+                    .transition(.opacity)
             }
         }
         .padding(.horizontal, 10)
@@ -571,7 +666,7 @@ struct IntentLineView: View {
             }
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
-        .onChange(of: text) { picked = 0 }
+        .onChange(of: text) { picked = 0; spacePick = 0 }
         .onChange(of: prefill?.wrappedValue) { _, words in
             guard let words else { return }
             text = words
@@ -589,9 +684,15 @@ struct IntentLineView: View {
             let needed = (long as NSString).size(withAttributes: [.font: model.notebookFont.handNSFont(20)]).width
             return needed > width - 84 ? L("오늘 꼭 하나만?") : long
         }
-        let long = L("무엇이든 적어요 — 할 일, 일정, 타이머 40…")
+        let room = width - 20 - (width >= 260 ? 48 : 0)
+        // 한 스페이스만 보기 (1.45): "회사 스페이스에 넣어요: 할 일, 일정", or "회사 스페이스에 넣어요" when that doesn't fit.
+        if usesLens, case .space = model.spaceShown, let name = model.spaceName(model.spaceShown) {
+            let long = SpaceWords.writeIn(name, language: .current)
+            let needed = (long as NSString).size(withAttributes: [.font: model.notebookFont.handNSFont(20)]).width
+            return needed > room ? SpaceWords.writeInShort(name, language: .current) : long
+        }
+        let long = L("무엇이든 적어요: 할 일, 일정, ‘타이머 40’")
         // The long one only when all of it fits beside the shortcut chip (English and Dutch run wider).
-        let room = width - 20 - (model.quickEntryEnabled && width >= 260 ? 64 : 0)
         let needed = (long as NSString).size(withAttributes: [.font: model.notebookFont.handNSFont(20)]).width
         return compact || width < 370 || needed > room ? L("무엇이든 적어요") : long
     }
@@ -608,9 +709,11 @@ struct IntentLineView: View {
             .foregroundStyle(PaperTheme.ink3)
             .fixedSize()
             .opacity(readable ? 1 : 0.35)
-        } else if model.quickEntryEnabled && !compact && width >= 260 {
-            KeyCap("⌃⌥N")
-                .help(L("어디서든 ⌃⌥N으로 빠른 입력"))
+        } else if !compact && width >= 260 {
+            // #55 D-4: the key that brings you to this line (the guide teaches 입력 줄 ⌘N), not the quick entry's ⌃⌥N —
+            // that one is on the quick entry slip's own head. Same as Windows (Ctrl+N).
+            KeyCap("⌘N")
+                .help(L("입력 줄로 가기"))
         }
     }
 
@@ -619,17 +722,21 @@ struct IntentLineView: View {
         guard !trimmed.isEmpty else { return }
         var list = model.intentCandidates(trimmed)
         var index = min(picked, max(0, list.count - 1))
+        let reading = model.spaceReading(trimmed, lens: usesLens)
+        var space = SpaceLine.pickedChoice(reading, pick: spacePick)
         if literal {
-            // ⇧Return: the text as it is, a to-do.
+            // ⇧Return: the text as it is, a to-do (in the space shown, a `#` kept as written).
             list = [.todo(QuickParse(title: trimmed))]
             index = 0
+            space = reading.token == nil ? reading.choices.first : nil
         } else if asEvent, let event = list.firstIndex(where: { $0.kind == .event }) {
             index = event
         }
-        guard !list.isEmpty else { return } // a slash line that can't be read: the hint says why
-        guard let commit = model.commitIntent(text: trimmed, candidates: list, index: index, page: page) else { return }
+        guard !list.isEmpty else { return } // a slash line that can't be read (the hint says why), or only `#회사` (S5)
+        guard let commit = model.commitIntent(text: trimmed, candidates: list, index: index, page: page, space: space) else { return }
         text = ""
         picked = 0
+        spacePick = 0
         shownToast = model.makeToast(for: commit, onChange: { shownToast = $0 })
     }
 
@@ -658,16 +765,45 @@ struct IntentLineView: View {
 /// The line's last reading, kept while the text (and the minute, and what 바꾸기 taught) stay the same.
 @MainActor
 final class IntentReading {
-    private var key: (text: String, minute: Int, memory: Intent.Memory)?
+    private var key: (text: String, minute: Int, memory: Intent.Memory, spaces: Int)?
     private var list: [Intent.Candidate] = []
 
     func candidates(_ text: String, model: AppModel, now: Date = Date()) -> [Intent.Candidate] {
         let minute = Int(now.timeIntervalSince1970 / 60)
         let memory = model.intentMemory
-        if let key, key.text == text, key.minute == minute, key.memory == memory { return list }
+        let spaces = model.spacesRevision
+        if let key, key.text == text, key.minute == minute, key.memory == memory, key.spaces == spaces { return list }
         list = model.intentCandidates(text, now: now)
-        key = (text, minute, memory)
+        key = (text, minute, memory, spaces)
         return list
+    }
+}
+
+/// The line's space (1.45), shared by the note's line and 빠른 입력.
+enum SpaceLine {
+    /// W7: ⇧Tab is the spaces' only with a `#` token and more than one choice.
+    static func cycles(_ reading: SpaceToken.Reading) -> Bool { reading.token != nil && reading.choices.count > 1 }
+
+    /// The `⇧Tab` hint chip: only when more than one space matches (not just the space and 스페이스 없음).
+    static func hintsCycling(_ reading: SpaceToken.Reading) -> Bool { reading.token != nil && reading.choices.count > 2 }
+
+    static func next(_ pick: Int, _ reading: SpaceToken.Reading) -> Int {
+        reading.choices.isEmpty ? 0 : (pick + 1) % reading.choices.count
+    }
+
+    static func pickedChoice(_ reading: SpaceToken.Reading, pick: Int) -> SpaceToken.Choice? {
+        reading.choices.isEmpty ? nil : reading.choices[pick % reading.choices.count]
+    }
+
+    /// The chip's choice: only while the picked meaning is a to-do (M4).
+    static func choice(_ reading: SpaceToken.Reading, pick: Int, candidates: [Intent.Candidate], index: Int) -> SpaceToken.Choice? {
+        guard candidates.indices.contains(index), candidates[index].kind == .todo else { return nil }
+        return pickedChoice(reading, pick: pick)
+    }
+
+    /// S5: the line is only its `#스페이스`.
+    static func needsTitle(_ reading: SpaceToken.Reading) -> Bool {
+        reading.token != nil && reading.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 

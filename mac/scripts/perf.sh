@@ -3,7 +3,13 @@
 # fills its own storage folder with the demo data set (scripts/perf-data.py), runs it, drives it by its
 # pid only, and prints the key numbers. The installed app and its data are never touched.
 #
-#   scripts/perf.sh [out-folder] [--quick] [--no-build]      (PERF_AI=1: with AI 연결 on)
+#   scripts/perf.sh [out-folder] [--quick] [--no-build] [--spaces]      (PERF_AI=1: with AI 연결 on)
+#
+# --spaces (1.45, 할 일 스페이스): 2,000 to-dos and 9 spaces; cold start, typing (also a `#` line), the tab switch and
+# one space shown (⌘⌥1–9 · ⌘⌥0), then it stops. A 1.44 build ignores todo-spaces.json, so the same run times it
+# against 1.44 (copy this script and perf-data.py into a 1.44 tree). PERF_BUNDLE_ID: another test copy's id (two
+# checks at once must not share one; the default is com.noa.PaperTodo.LiveTest). Another size with --spaces:
+# PERF_DATA_ARGS="--todos 500" (perf-data.py takes the first --todos).
 #
 # --quick skips the 10-minute use loop (memory after use). The last step (1.44) measures the drawer with its
 # backdrop 반투명. Everything the test copy wrote (storage
@@ -12,12 +18,14 @@ set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 out="${1:-$repo/.build/perf}"
 case "$out" in --*) out="$repo/.build/perf";; esac
-quick=0; build=1
+quick=0; build=1; spaces=0
 for arg in "$@"; do
     [ "$arg" = "--quick" ] && quick=1
     [ "$arg" = "--no-build" ] && build=0
+    [ "$arg" = "--spaces" ] && spaces=1
 done
-bundle_id=com.noa.PaperTodo.LiveTest
+[ "$spaces" = 1 ] && PERF_DATA_ARGS="${PERF_DATA_ARGS:-} --todos 2000 --spaces 9"
+bundle_id=${PERF_BUNDLE_ID:-com.noa.PaperTodo.LiveTest}
 mkdir -p "$out"
 app="$out/PerfTest.app"
 probe="$out/perf-probe"
@@ -125,6 +133,49 @@ done
 # The first launch after a build also pays for the system's first look at the new binary.
 printf 'cold start → note visible (ms): %s (median of the last three %s)\n' "${starts[*]}" "$(printf '%s\n' "${starts[@]:1}" | median)"
 echo "memory after start: $("$probe" mem "$pid")"
+
+if [ "$spaces" = 1 ]; then
+    "$probe" front "$pid"; sleep 2
+    # Drawing 오늘: the tab switch 앞으로 → 오늘 (⌘2 ⌘1), five rounds; the second key of each is 오늘's.
+    mark tabs
+    for _ in 1 2 3 4 5; do for code in 19 18; do "$probe" key "$pid" "$code" cmd; sleep 0.8; done; done
+    settle tabs "key " 10
+    mark tabs-end
+    today=$(between tabs tabs-end | awk 'index($0, "key 18") == 1 {print $NF}')
+    echo "draw 오늘 (⌘1 from 앞으로, app): median $(echo "$today" | median) ms · max $(echo "$today" | max) ms"
+    # A line typed, then cleared: each key's frame. The first key (the line going from empty to written: the chips
+    # come, the list's room changes) and Esc (back to empty) are shown apart — with 2,000 rows they took
+    # 4–14 s in 1.44 and before 1.45's fix (the list's height fed back into the sheet), so the next step waits.
+    typed() {  # typed <name> <text> <keys>
+        mark "$1-open"; "$probe" key "$pid" 45 cmd; settle "$1-open" "key 45" 1 60
+        mark "$1"
+        "$probe" type "$pid" "$2" 150
+        settle "$1" "key 0 " "$3" 90
+        mark "$1-end"
+        local keys; keys=$(vals "$1" "$1-end" key)
+        echo "typing ‘$2’ (app): first key $(echo "$keys" | head -1) ms · the rest median $(echo "$keys" | tail -n +2 | median) ms · max $(echo "$keys" | tail -n +2 | max) ms ($(echo "$keys" | wc -l | tr -d ' ') keys)"
+        mark "$1-esc"; "$probe" key "$pid" 53; "$probe" key "$pid" 53; settle "$1-esc" "key 53" 2 90
+        mark "$1-esc-end"
+        echo "  Esc (clear the line, app): $(vals "$1-esc" "$1-esc-end" "key 53" | head -1) ms"
+    }
+    typed typing "내일 3시 회의 준비하기" 13
+    typed hash "보고서 쓰기 #ㅎㅅ" 10
+    # One space shown and back (⌘⌥1 ⌘⌥2 ⌘⌥0; nothing happens in a build without spaces).
+    "$probe" front "$pid"; sleep 0.5
+    mark lens
+    for _ in 1 2 3; do for code in 18 19 29; do "$probe" key "$pid" "$code" cmd+opt; sleep 0.8; done; done
+    settle lens "key " 9
+    mark lens-end
+    lens=$(vals lens lens-end key)
+    echo "one space shown ⌘⌥1/2/0 (app): median $(echo "$lens" | median) ms · max $(echo "$lens" | max) ms"
+    sleep 3
+    echo "idle, note open (30 s): $("$probe" sample "$pid" 30)"
+    # The note with one space shown, drawn into the out folder (kill -USR1: PerfProbe's pictures) — to see the lens took.
+    "$probe" key "$pid" 18 cmd+opt; sleep 3; kill -USR1 "$pid" 2>/dev/null || true; sleep 3
+    echo "files written in the whole run: $(grep -c '^io' "$log" || true)"
+    cp "$log" "$out/perf-last.log"
+    exit 0
+fi
 
 # 2. Idle with the note open (day ribbon showing).
 "$probe" front "$pid"; sleep 2

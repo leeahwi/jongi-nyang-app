@@ -19,6 +19,18 @@ enum SlipKind {
         }
     }
 
+    /// The tape's 1 pt edge.
+    var tapeEdge: Color {
+        switch self {
+        case .todo: PaperTheme.tapeHoneyEdge
+        case .memo: PaperTheme.tapeLavenderEdge
+        case .event: PaperTheme.tapeSkyEdge
+        case .timer: PaperTheme.tapeMintEdge
+        case .alarm: PaperTheme.tapeRoseEdge
+        case .confirm: PaperTheme.tapeNeutralEdge
+        }
+    }
+
     /// The header badge's background and icon colour.
     var badge: (background: Color, foreground: Color) {
         switch self {
@@ -79,7 +91,7 @@ struct PaperSlip<Content: View>: View {
             .slipShadow()
             .overlay(alignment: .topLeading) {
                 GeometryReader { geometry in
-                    if taped { WashiTape(color: kind.tape)
+                    if taped { WashiTape(kind: kind)
                         .frame(width: 74, height: 20)
                         .position(x: geometry.size.width * tapeAt, y: 1) }
                 }
@@ -127,25 +139,17 @@ private struct SlipAppear: ViewModifier {
     }
 }
 
-/// A piece of washi tape: 74 × 20, turned −2.5°, white stripes over the colour, zig-zag ends.
+/// A piece of washi tape: 74 × 20, turned −2.5°, its kind's colour solid with a 1 pt edge (1.45, like the note's
+/// tabs — no stripes), zig-zag ends.
 struct WashiTape: View {
-    let color: Color
-    @Environment(\.colorScheme) private var scheme
+    let kind: SlipKind
 
     var body: some View {
-        ZStack {
-            color
-            Canvas { context, size in
-                var x: CGFloat = 0
-                while x < size.width {
-                    context.fill(Path(CGRect(x: x, y: 0, width: 3, height: size.height)), with: .color(.white.opacity(scheme == .dark ? 0.12 : 0.28)))
-                    x += 8
-                }
-            }
-        }
-        .clipShape(TapeShape())
-        .opacity(0.88)
-        .rotationEffect(.degrees(-2.5))
+        kind.tape
+            // A 2 pt stroke clipped to the outline: 1 pt inside, along the zig-zag ends too.
+            .overlay { TapeShape().stroke(kind.tapeEdge, lineWidth: 2) }
+            .clipShape(TapeShape())
+            .rotationEffect(.degrees(-2.5))
     }
 }
 

@@ -5,9 +5,9 @@ import SwiftUI
 
 /// 책상 (Desk): what used to be five windows — 달력, 완료 기록, 설정 (its tabs), 도움말 — as panes of one
 /// window with a sidebar. 보기: 달력 · 완료 기록 · 시계; 설정: 꾸미기 · 알림 · 반복 · 종이냥 · 일정 ·
-/// 저장과 백업 · 메모 서랍 · AI 연결; 도움: 도움말 (and 사용 안내, which opens the guide over the note).
+/// 저장과 백업 · 메모 서랍 · 스페이스 · AI 연결; 도움: 도움말 (and 사용 안내, which opens the guide over the note).
 enum DeskPane: String, CaseIterable, Identifiable {
-    case calendar, history, clock, appearance, notifications, repeating, pet, events, storage, drawer, ai, help
+    case calendar, history, clock, appearance, notifications, repeating, pet, events, storage, drawer, spaces, ai, help
 
     var id: String { rawValue }
 
@@ -28,7 +28,7 @@ enum DeskPane: String, CaseIterable, Identifiable {
     var section: Section {
         switch self {
         case .calendar, .history, .clock: .view
-        case .appearance, .notifications, .repeating, .pet, .events, .storage, .drawer, .ai: .settings
+        case .appearance, .notifications, .repeating, .pet, .events, .storage, .drawer, .spaces, .ai: .settings
         case .help: .help
         }
     }
@@ -47,12 +47,14 @@ enum DeskPane: String, CaseIterable, Identifiable {
         case .events: L("일정")
         case .storage: L("저장과 백업")
         case .drawer: L("메모 서랍")
+        // 할 일 스페이스 (1.45).
+        case .spaces: L("스페이스")
         case .ai: L("AI 연결")
         case .help: L("도움말")
         }
     }
 
-    /// One line icon per pane (SF Symbols, regular).
+    /// One line icon per pane (SF Symbols, regular): the same shapes as the Windows desk (docs/icons.md).
     var symbol: String {
         switch self {
         case .calendar: "calendar"
@@ -61,12 +63,14 @@ enum DeskPane: String, CaseIterable, Identifiable {
         case .appearance: "paintbrush"
         case .notifications: "bell"
         case .repeating: "repeat"
-        case .pet: "pawprint"
+        // The cat is 종이냥 (the pet); the paw is the memo drawer.
+        case .pet: "cat"
         case .events: "calendar.badge.clock"
         case .storage: "archivebox"
-        // A drawer pulled out (the Windows desk draws the same).
-        case .drawer: "tray"
-        case .ai: "text.bubble"
+        // The drawer's handle is a cat's paw bookmark (the Windows desk draws the same).
+        case .drawer: "pawprint"
+        case .spaces: "square.stack"
+        case .ai: "bubble.left"
         case .help: "questionmark.circle"
         }
     }
@@ -77,41 +81,43 @@ enum DeskPane: String, CaseIterable, Identifiable {
         switch self {
         case .calendar, .history: nil
         case .clock: L("알람을 맞추고, 뽀모도로 시간과 소리를 정해 바로 시작해요.")
-        case .appearance: L("언어와 종이 색, 글꼴과 글자 크기를 내 손에 맞게 정해요.")
+        case .appearance: L("언어와 종이 색, 글꼴과 글자 크기를 정해요.")
         case .notifications: L("주기 알림과 알림 모양을 정하고, 미리보기로 확인해요.")
         case .repeating: L("반복하는 날마다 목록에 한 줄씩 놓여요.")
         case .pet: L("종이냥을 보이거나 숨기고, 돌아다닐지, 말을 걸지 정해요.")
         case .events: L("일정을 적어 두면 오늘 할 일 위에 보이고, 시작 전에 알려 줘요.")
         case .storage: L("할 일과 기록이 저장되는 곳, 다른 컴퓨터로 옮기는 백업이에요.")
         case .drawer: L("화면 끝에서 메모를 꺼내 보고, 바로 적고, 그 자리에서 고쳐요.")
+        case .spaces: L("할 일에 색을 붙여 나눠요. 오늘 한 장은 그대로예요.")
         case .ai: L("Claude와 이야기하면서 할 일과 일정을 보고, 넣고, 고쳐요.")
         case .help: L("궁금한 걸 찾아보세요")
         }
     }
 
-    /// The tint behind the row icons of a settings pane.
+    /// The tint behind the row icons of a settings pane, and (#30) behind the pane's icon in the sidebar, so the colour
+    /// says which pane a row belongs to (the Windows desk uses the same tiles).
     var tint: Color {
         switch self {
-        case .appearance: PaperTheme.tabToday
-        case .notifications: PaperTheme.tabAhead
-        case .repeating, .calendar, .history, .help, .drawer: PaperTheme.sage2
+        case .appearance: PaperTheme.tintToday
+        case .notifications: PaperTheme.tintAhead
+        case .repeating, .calendar, .history, .help, .drawer, .spaces: PaperTheme.sage2
         case .pet: PaperTheme.tabMemo
         case .clock: PaperTheme.clay2
         case .events: PaperTheme.eventTint
         case .storage: PaperTheme.paper2
-        case .ai: PaperTheme.tabAhead
+        case .ai: PaperTheme.tintAhead
         }
     }
 
-    /// ⌘1…⌘9 inside the desk: the first nine panes in sidebar order, 달력 to 저장과 백업 (메모 서랍 and AI 연결
+    /// ⌘1…⌘9 inside the desk: the first nine panes in sidebar order, 달력 to 저장과 백업 (메모 서랍, 스페이스 and AI 연결
     /// after it have none, as on Windows; 도움말 is ⌘?).
     var shortcut: Int? {
         let index = Self.allCases.firstIndex(of: self)!
         return index < 9 ? index + 1 : nil
     }
 
-    /// The title bar: "책상 — 달력".
-    var windowTitle: String { L("책상") + " — " + title }
+    /// The title bar: the pane's own name, nothing joined to it ("알림", not "책상 — 알림") (#73).
+    var windowTitle: String { title }
 }
 
 /// Which pane is open (the app moves it from menus, the note, the 오늘 창 …).
@@ -148,6 +154,8 @@ final class DeskWindowController: NSObject, NSWindowDelegate {
     private var subscriptions = Set<AnyCancellable>()
     /// Test and preview runs don't keep the window's place.
     private let remembersFrame: Bool
+    /// `--offscreen` (the performance check): the desk far off every screen, out of the user's way (#62, #64).
+    var offscreen = false
 
     init(model: AppModel, archive: ArchiveStore, reminders: ReminderController, remembersFrame: Bool = true) {
         self.model = model
@@ -155,6 +163,8 @@ final class DeskWindowController: NSObject, NSWindowDelegate {
         self.reminders = reminders
         self.remembersFrame = remembersFrame
         super.init()
+        // 완료 기록 follows the model only while the desk is open (#62).
+        archive.paused = true
     }
 
     /// The desk is what the person is looking at: the key window, or (no key window, say while
@@ -168,6 +178,7 @@ final class DeskWindowController: NSObject, NSWindowDelegate {
     func show(_ pane: DeskPane) {
         PerfProbe.begin("desk")
         state.pane = pane
+        archive.paused = false
         let window = window ?? makeWindow()
         window.level = model.window?.level ?? .normal
         if window.isMiniaturized { window.deminiaturize(nil) }
@@ -203,6 +214,10 @@ final class DeskWindowController: NSObject, NSWindowDelegate {
         window.setContentSize(DeskMetrics.size)
         window.center()
         if remembersFrame { window.setFrameAutosaveName("PaperTodoDesk") }
+        if offscreen {
+            window.keepsOffscreen = true
+            window.setFrameOrigin(NSPoint(x: -40_000, y: 200))
+        }
         window.delegate = self
         state.$pane.sink { [weak window] pane in window?.title = pane.windowTitle }.store(in: &subscriptions)
         self.window = window
@@ -212,12 +227,20 @@ final class DeskWindowController: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         // A field being typed in (an alarm's name, a repeat's title) keeps what was typed.
         window?.makeFirstResponder(nil)
+        // The closed desk keeps its view: 완료 기록 stops following the model until it opens again (#62).
+        archive.paused = true
     }
 }
 
 /// The desk's window: ⌘1…⌘9 pick a pane (before the menu's ⌘1–⌘3 for the note's tabs).
 final class DeskWindow: NSWindow {
     var onShortcut: (Int) -> Void = { _ in }
+    /// `--offscreen`: kept where it was put (a titled window is pulled back onto a screen as it comes up).
+    var keepsOffscreen = false
+
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        keepsOffscreen ? frameRect : super.constrainFrameRect(frameRect, to: screen)
+    }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if event.type == .keyDown, event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
@@ -233,7 +256,9 @@ final class DeskWindow: NSWindow {
 
 struct DeskView: View {
     @ObservedObject var state: DeskState
-    @ObservedObject var model: AppModel
+    /// Not watched here: each pane watches what it shows (#62 — every change to the model built the open pane anew,
+    /// 완료 기록 too, even with the desk closed).
+    let model: AppModel
     let archive: ArchiveStore
     let reminders: ReminderController
     var onGuide: () -> Void = {}
@@ -276,6 +301,10 @@ struct DeskView: View {
         }
         .foregroundStyle(PaperTheme.ink)
         .environment(\.locale, AppLanguage.current.locale)
+        .environment(\.openHelpTopic, { [state] topic in
+            HelpView.requestedTopic = topic
+            state.pane = .help
+        })
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }
 
@@ -328,7 +357,7 @@ struct DeskSidebar: View {
                 }
                 ForEach(section.panes) { pane in
                     DeskSidebarRow(title: pane.title, symbol: pane.symbol, selected: state.pane == pane, compact: compact,
-                                   shortcut: pane.shortcut.map { "⌘\($0)" } ?? (pane == .help ? "⌘?" : nil), height: rowHeight) {
+                                   shortcut: pane.shortcut.map { "⌘\($0)" } ?? (pane == .help ? "⌘?" : nil), height: rowHeight, tint: pane.tint) {
                         state.pane = pane
                     }
                 }
@@ -362,15 +391,27 @@ private struct DeskSidebarRow: View {
     let compact: Bool
     let shortcut: String?
     var height: CGFloat = 30
+    /// A pane's tile colour (its rows' tiles have the same), behind the icon only while the pane is chosen (#55 D-1:
+    /// plain icons elsewhere, like 검색 and 사용 안내 — the one tinted row says where you are; same as Windows).
+    var tint: Color?
     let action: () -> Void
     @State private var hovering = false
+
+    private var tiled: Bool { tint != nil && selected }
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 9) {
                 Image(systemName: symbol)
-                    .font(.system(size: 13, weight: .regular))
-                    .frame(width: 18)
+                    .font(.system(size: tiled ? 11.5 : 13, weight: .regular))
+                    .foregroundStyle(selected ? PaperTheme.ink : PaperTheme.ink2)
+                    .frame(width: 22, height: 22)
+                    .background {
+                        if let tint, selected {
+                            RoundedRectangle(cornerRadius: 6, style: .continuous).fill(tint)
+                                .overlay { RoundedRectangle(cornerRadius: 6, style: .continuous).stroke(PaperTheme.rule, lineWidth: 0.5) }
+                        }
+                    }
                 if !compact {
                     Text(title)
                         .font(.system(size: 12.5, weight: selected ? .semibold : .regular))

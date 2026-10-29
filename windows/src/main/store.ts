@@ -10,6 +10,7 @@ import {
   readDrawerBackdrop, readDrawerTheme, readSort, serializeMemoFolders, toggleChecklist, type MemoFolders, type MemoPlacement,
 } from "../core/memoDrawer";
 import { mergeText } from "../core/textMerge";
+import { emptyTodoSpaces, mergeTodoSpaces, packSpaceOf, parseTodoSpaces, pruneTodoSpaces, readLens, serializeTodoSpaces, todoSpacesFileName, type TodoSpaces } from "../core/todoSpaces";
 import { pageOf } from "../core/shelf";
 import { todaySinceUpdates } from "../core/carry";
 import { sharedFiles, type SharedFile } from "../core/storage";
@@ -70,6 +71,19 @@ export interface TimerMemory {
  * changed elsewhere and is read back in (debounced, from `watch`), and every change first catches
  * up with the disk, so a newer file is never overwritten with stale data.
  */
+/**
+ * A failed save, the way every file says it (#34): what didn't happen, what's still safe, the next try, what to do.
+ * Every file here is written whole on each change, so the next change really is the next try.
+ */
+export function saveProblem(what: string): string {
+  return [what, t("앱을 끄기 전까지 적은 글은 화면에 그대로 있어요."), t("다음에 바뀔 때 다시 저장해 볼게요."), t("저장 폴더가 열리는지 확인해 주세요.")].join(" ");
+}
+
+/** An unreadable file copied aside: its name only — the storage folder button shows where (#25). */
+function keptAside(copy: string): string {
+  return t("원래 파일은 저장 폴더에 ‘{file}’ 이름으로 남겨 뒀어요.", { file: path.basename(copy) });
+}
+
 export class Store extends EventEmitter {
   readonly dataDirectory: string;
   readonly notebookPath: string;
@@ -93,6 +107,9 @@ export class Store extends EventEmitter {
   /** The deleted memo's place, put back with 되돌리기. */
   private lastDeletedPlacement?: MemoPlacement;
   private readonly memoFoldersPath: string;
+  /** 할 일 스페이스 (todo-spaces.json): the spaces and each to-do's; merged with another device's like the folders. */
+  todoSpaces: TodoSpaces = emptyTodoSpaces();
+  private readonly todoSpacesPath: string;
   private memoTimer?: NodeJS.Timeout;
   private memoChangeTimer?: NodeJS.Timeout;
   history = new UndoableNotebook();
@@ -112,7 +129,7 @@ export class Store extends EventEmitter {
   /** The same for 메모 서랍's shortcut (Ctrl+Shift+D unless changed). */
   drawerShortcutProblem?: string;
   drawerBackdropNote?: string;
-  storage = { label: t("이 PC (기본)"), custom: false, path: "", archivePath: "" };
+  storage = { label: t("이 PC (기본)"), custom: false, path: "", archivePath: "", home: "" };
   /** The focus timer as the windows draw it (set by main). */
   timerView: () => TimerView | undefined = () => undefined;
   /** 집중 as the note draws it (set by main). */
@@ -153,6 +170,7 @@ export class Store extends EventEmitter {
     this.eventsPath = path.join(directory, "events.json");
     this.alarmsPath = path.join(directory, "alarms.json");
     this.memoFoldersPath = path.join(directory, memoFoldersFileName);
+    this.todoSpacesPath = path.join(directory, todoSpacesFileName);
     const memos = this.readDisk("memos.json");
     this.noteKnown("memos.json", memos);
     if (memos !== undefined) {
@@ -164,6 +182,7 @@ export class Store extends EventEmitter {
     this.loadEvents();
     this.loadAlarms();
     this.loadNotebook();
+    this.loadTodoSpaces();
     if (demo && this.history.items.length === 0) {
       const demoNotebook = new UndoableNotebook();
       for (const title of [t("창문 열고, 커피 한 잔"), t("오늘 꼭 해야 할 일 정리하기"), t("미뤄 둔 책 10쪽 읽기"), t("잠깐, 바깥 공기 쐬기"), t("내일의 나에게 메모 남기기")]) {
@@ -200,6 +219,8 @@ export class Store extends EventEmitter {
       drawerShortcutProblem: this.drawerShortcutProblem,
       drawerBackdropNote: this.drawerBackdropNote,
       memoFolders: { ...this.memoFolders, folders: this.memoFolders.folders.map((folder) => ({ ...folder })), placement: { ...this.memoFolders.placement } },
+      todoSpaces: { ...this.todoSpaces, spaces: this.todoSpaces.spaces.map((space) => ({ ...space })), items: {} },
+      spaceOf: this.packedSpaces(),
       storage: { ...this.storage },
       calendar: this.calendarView(),
       events: this.events.map((event) => ({ ...event, skip: [...event.skip] })),
@@ -237,6 +258,71 @@ export class Store extends EventEmitter {
     this.mutate((history) => {
       if (history.items.some((item) => item.id === id && !item.isCompleted)) history.toggle(id);
     });
+  }
+
+  // ─── 할 일 스페이스 (todo-spaces.json) ────────────────────────────────────────
+
+  private packed?: { data: TodoSpaces; text: string };
+  /** What the windows get of each to-do's space, worked out again only when the spaces changed. */
+  private packedSpaces(): string {
+    if (this.packed?.data !== this.todoSpaces) this.packed = { data: this.todoSpaces, text: packSpaceOf(this.todoSpaces) };
+    return this.packed.text;
+  }
+
+  /**
+   * A change to the spaces or a to-do's space: caught up with the disk first (another device's copy merged in),
+   * then saved at once and every window told. `change` returns the same value for nothing.
+   */
+  changeSpaces(change: (data: TodoSpaces) => TodoSpaces): void {
+    this.locked(() => {
+      this.catchUp(["todos.json", todoSpacesFileName]);
+      const next = change(this.todoSpaces);
+      if (next === this.todoSpaces) return;
+      this.todoSpaces = next;
+      this.saveTodoSpaces();
+      this.changed();
+    });
+  }
+
+  private loadTodoSpaces(): void {
+    const text = this.readDisk(todoSpacesFileName);
+    this.noteKnown(todoSpacesFileName, text);
+    if (text === undefined) return;
+    try {
+      this.todoSpaces = parseTodoSpaces(text);
+    } catch {
+      this.todoSpaces = emptyTodoSpaces();
+      this.keepSpacesAside();
+    }
+  }
+
+  /** S21: an unreadable todo-spaces.json is moved aside as todo-spaces.json.unreadable-<UTC stamp> and the spaces start empty. */
+  private keepSpacesAside(): void {
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/T/, "-").replace(/\..*$/, "").replace(/Z$/, "");
+    const aside = path.join(this.dataDirectory, `${todoSpacesFileName}.unreadable-${stamp}`);
+    const message = t("스페이스 파일을 읽지 못해서 스페이스 없이 시작했어요. 할 일은 모두 그대로예요.");
+    try {
+      fs.renameSync(this.todoSpacesPath, aside);
+      this.noteKnown(todoSpacesFileName, undefined);
+      this.storageError = `${message} ${keptAside(aside)}`;
+    } catch {
+      this.storageError = `${message} ${t("저장 폴더가 열리는지 확인해 주세요.")}`;
+    }
+  }
+
+  private saveTodoSpaces(): void {
+    if (!this.mayWrite(todoSpacesFileName)) return;
+    // S17, S22: entries of to-dos gone more than 30 days, and old tombstones, go.
+    this.todoSpaces = pruneTodoSpaces(this.todoSpaces, new Set(this.history.items.map((item) => item.id)));
+    const contents = serializeTodoSpaces(this.todoSpaces);
+    if (contents === this.known.get(todoSpacesFileName)) return;
+    try {
+      this.writeAtomically(this.todoSpacesPath, contents);
+      this.noteKnown(todoSpacesFileName, contents);
+      this.clearError(t("스페이스를 저장하지 못했어요."));
+    } catch {
+      this.reportError(saveProblem(t("스페이스를 저장하지 못했어요.")));
+    }
   }
 
   // ─── Memos ─────────────────────────────────────────────────────────────────
@@ -338,18 +424,20 @@ export class Store extends EventEmitter {
   }
 
   /**
-   * D15: an unreadable memo-folders.json is moved aside as memo-folders.unreadable-<UTC stamp>.json and the
-   * drawer starts afresh (every memo in 메모); said once.
+   * D15: an unreadable memo-folders.json is moved aside as memo-folders.unreadable-<UTC stamp>.json, said once the way
+   * every file says it (#34). At launch (`starting`) the drawer starts afresh (every memo in 메모); later (another
+   * device's file) this device's folders stay and are written in its place.
    */
-  private keepFoldersAside(): void {
+  private keepFoldersAside(starting = true): void {
     const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/T/, "-").replace(/\..*$/, "").replace(/Z$/, "");
     const aside = path.join(this.dataDirectory, `memo-folders.unreadable-${stamp}.json`);
+    const what = starting ? t("메모 폴더를 읽지 못해서 메모를 모두 ‘메모’ 폴더에 두고 시작했어요.") : t("메모 폴더를 읽지 못했어요. 여기 있던 폴더는 그대로예요.");
     try {
       fs.renameSync(this.memoFoldersPath, aside);
       this.noteKnown(memoFoldersFileName, undefined);
-      this.storageError = `${t("메모 서랍의 폴더 정보를 읽지 못해 처음부터 시작해요. 메모는 모두 ‘메모’ 폴더에 있어요.")} ${t("원본은 {file}에 남겨 뒀어요.", { file: path.basename(aside) })}`;
+      this.storageError = `${what} ${keptAside(aside)}`;
     } catch {
-      this.storageError = `${t("메모 서랍의 폴더 정보를 읽지 못해 처음부터 시작해요. 메모는 모두 ‘메모’ 폴더에 있어요.")}\n${this.memoFoldersPath}`;
+      this.storageError = `${what} ${t("저장 폴더가 열리는지 확인해 주세요.")}`;
     }
   }
 
@@ -366,9 +454,9 @@ export class Store extends EventEmitter {
     try {
       this.writeAtomically(this.memoFoldersPath, contents);
       this.noteKnown(memoFoldersFileName, contents);
-      this.clearError(t("메모 서랍을 저장하지 못했어요."));
+      this.clearError(t("메모 폴더를 저장하지 못했어요."));
     } catch {
-      this.reportError(`${t("메모 서랍을 저장하지 못했어요.")}\n${this.memoFoldersPath}`);
+      this.reportError(saveProblem(t("메모 폴더를 저장하지 못했어요.")));
     }
   }
 
@@ -499,7 +587,7 @@ export class Store extends EventEmitter {
       this.forgetMemoEdits();
       this.clearError(t("메모를 저장하지 못했어요."));
     } catch {
-      this.reportError(`${t("메모를 저장하지 못했어요.")}\n${this.memosPath}`);
+      this.reportError(saveProblem(t("메모를 저장하지 못했어요.")));
     }
   }
 
@@ -568,6 +656,19 @@ export class Store extends EventEmitter {
     this.saveRepeats();
     this.mutate((history) => {
       for (const item of history.items) if (item.seriesID === id && !item.isCompleted) history.setSeries(item.id, undefined);
+    });
+    this.changed();
+  }
+
+  /** 되돌리기 after 반복 그만하기 (#22): the rule as it was, its open copies in it again (unless it is back already). */
+  restoreSeries(entry: Series, todos: string[]): void {
+    this.catchUp(["repeats.json", "todos.json"]);
+    if (typeof entry?.id !== "string" || typeof entry.title !== "string" || !isValidRule(entry.rule) || this.series.some((candidate) => candidate.id === entry.id)) return;
+    this.series = [...this.series, entry];
+    this.saveRepeats();
+    const ids = new Set(todos);
+    this.mutate((history) => {
+      for (const item of history.items) if (ids.has(item.id) && !item.isCompleted && !item.seriesID) history.setSeries(item.id, entry.id);
     });
     this.changed();
   }
@@ -652,7 +753,7 @@ export class Store extends EventEmitter {
       this.noteKnown("events.json", contents);
       this.clearError(t("일정을 저장하지 못했어요."));
     } catch {
-      this.reportError(`${t("일정을 저장하지 못했어요.")}\n${this.eventsPath}`);
+      this.reportError(saveProblem(t("일정을 저장하지 못했어요.")));
     }
   }
 
@@ -706,7 +807,7 @@ export class Store extends EventEmitter {
       this.noteKnown("alarms.json", contents);
       this.clearError(t("알람을 저장하지 못했어요."));
     } catch {
-      this.reportError(`${t("알람을 저장하지 못했어요.")}\n${this.alarmsPath}`);
+      this.reportError(saveProblem(t("알람을 저장하지 못했어요.")));
     }
   }
 
@@ -745,17 +846,23 @@ export class Store extends EventEmitter {
   }
 
   /** An unreadable file is copied aside before anything is saved over it. */
-  private keepUnreadable(file: string, what: "list" | "memos" | "repeats" | "events" | "alarms"): void {
+  /** `starting`: read at launch, so that part starts empty; later (another device's file), what's here stays. */
+  private keepUnreadable(file: string, what: "list" | "memos" | "repeats" | "events" | "alarms", starting = true): void {
     const backup = file.replace(/\.json$/, `.unreadable-${Math.floor(Date.now() / 1000)}.json`);
-    const problem = {
-      list: t("전에 쓰던 목록을 읽지 못했어요."), memos: t("전에 쓰던 메모를 읽지 못했어요."),
-      repeats: t("전에 쓰던 반복 할 일을 읽지 못했어요."), events: t("전에 쓰던 일정을 읽지 못했어요."), alarms: t("전에 쓰던 알람을 읽지 못했어요."),
+    const unread = {
+      list: t("목록 파일을 읽지 못했어요."), memos: t("메모 파일을 읽지 못했어요."),
+      repeats: t("반복 할 일 파일을 읽지 못했어요."), events: t("일정 파일을 읽지 못했어요."), alarms: t("알람 파일을 읽지 못했어요."),
+    }[what];
+    const emptied = {
+      list: t("목록 파일을 읽지 못해서 빈 목록으로 시작했어요."), memos: t("메모 파일을 읽지 못해서 메모 없이 시작했어요."),
+      repeats: t("반복 할 일 파일을 읽지 못해서 반복 없이 시작했어요."), events: t("일정 파일을 읽지 못해서 일정 없이 시작했어요."),
+      alarms: t("알람 파일을 읽지 못해서 알람 없이 시작했어요."),
     }[what];
     try {
       fs.copyFileSync(file, backup);
-      this.storageError = `${problem} ${t("원본은 {file}에 남겨 뒀어요.", { file: path.basename(backup) })}`;
+      this.storageError = `${starting ? emptied : unread} ${keptAside(backup)}`;
     } catch {
-      this.storageError = `${problem}\n${file}`;
+      this.storageError = `${unread} ${t("저장 폴더가 열리는지 확인해 주세요.")}`;
     }
   }
 
@@ -768,7 +875,7 @@ export class Store extends EventEmitter {
       this.noteKnown("repeats.json", contents);
       this.clearError(t("반복 할 일을 저장하지 못했어요."));
     } catch {
-      this.reportError(`${t("반복 할 일을 저장하지 못했어요.")}\n${this.repeatsPath}`);
+      this.reportError(saveProblem(t("반복 할 일을 저장하지 못했어요.")));
     }
   }
 
@@ -837,10 +944,10 @@ export class Store extends EventEmitter {
       const backup = this.notebookPath.replace(/\.json$/, `.unreadable-${Math.floor(Date.now() / 1000)}.json`);
       try {
         fs.copyFileSync(this.notebookPath, backup);
-        this.storageError = `${t("전에 쓰던 목록을 읽지 못했어요.")} ${t("원본은 {file}에 남겨 뒀어요.", { file: path.basename(backup) })} ${t("새 목록은 그대로 잘 저장돼요.")}`;
+        this.storageError = `${t("목록 파일을 읽지 못해서 빈 목록으로 시작했어요.")} ${keptAside(backup)}`;
       } catch {
         this.canSave = false;
-        this.storageError = `${t("전에 쓰던 목록을 읽지 못했어요.")} ${t("원본을 지키려고 덮어쓰지 않아요. 지금 목록은 ‘텍스트로 내보내기’로 따로 남겨 두세요.")}\n${this.notebookPath}`;
+        this.storageError = t("목록 파일을 읽지 못했어요. 원래 파일을 지키려고 그 위에 저장하지 않아요. 여기 적은 건 ‘텍스트로 내보내기’로 따로 남겨 두세요.");
       }
     }
   }
@@ -851,9 +958,9 @@ export class Store extends EventEmitter {
     try {
       this.writeAtomically(this.notebookPath, contents);
       this.noteKnown("todos.json", contents);
-      if (this.storageError?.startsWith(t("목록을 저장하지 못했어요."))) this.storageError = undefined;
+      if (this.storageError?.startsWith(t("할 일을 저장하지 못했어요."))) this.storageError = undefined;
     } catch {
-      this.storageError = `${t("목록을 저장하지 못했어요.")} ${t("앱을 닫기 전에 텍스트로 내보내 주세요.")}\n${this.notebookPath}`;
+      this.storageError = saveProblem(t("할 일을 저장하지 못했어요."));
     }
   }
 
@@ -861,7 +968,7 @@ export class Store extends EventEmitter {
 
   private pathOf(file: SharedFile): string {
     return file === "todos.json" ? this.notebookPath : file === "memos.json" ? this.memosPath : file === "events.json" ? this.eventsPath : file === "alarms.json" ? this.alarmsPath
-      : file === memoFoldersFileName ? this.memoFoldersPath : this.repeatsPath;
+      : file === memoFoldersFileName ? this.memoFoldersPath : file === todoSpacesFileName ? this.todoSpacesPath : this.repeatsPath;
   }
 
   private readDisk(file: SharedFile): string | undefined {
@@ -954,6 +1061,9 @@ export class Store extends EventEmitter {
         this.eventsVersion += 1;
       } else if (file === "alarms.json") {
         this.alarms = parseAlarms(text);
+      } else if (file === todoSpacesFileName) {
+        // Another device's spaces (W3): the file's copy is the one already there; this device's wins only where newer.
+        this.todoSpaces = mergeTodoSpaces(parseTodoSpaces(text), this.todoSpaces);
       } else if (file === memoFoldersFileName) {
         // Another device's folders: merged entry by entry (D13, D14), so nothing changed here is lost.
         this.memoFolders = mergeMemoFolders(this.memoFolders, parseMemoFolders(text, lang()));
@@ -972,14 +1082,21 @@ export class Store extends EventEmitter {
         return false;
       }
       this.failedReads.delete(file);
+      if (file === todoSpacesFileName) {
+        // Kept aside; this device's spaces are written in its place.
+        this.keepSpacesAside();
+        this.saveTodoSpaces();
+        this.changed();
+        return false;
+      }
       if (file === memoFoldersFileName) {
         // Kept aside; this device's folders are written in its place.
-        this.keepFoldersAside();
+        this.keepFoldersAside(false);
         this.saveMemoFolders();
         this.changed();
         return false;
       }
-      this.keepUnreadable(this.pathOf(file), file === "todos.json" ? "list" : file === "memos.json" ? "memos" : file === "events.json" ? "events" : file === "alarms.json" ? "alarms" : "repeats");
+      this.keepUnreadable(this.pathOf(file), file === "todos.json" ? "list" : file === "memos.json" ? "memos" : file === "events.json" ? "events" : file === "alarms.json" ? "alarms" : "repeats", false);
       this.noteKnown(file, text);
       this.changed();
       return false;
@@ -1040,10 +1157,11 @@ export class Store extends EventEmitter {
       this.prefs = {
         ...defaultPrefs, ...known, paper: readPaper(known.paper),
         // 메모 서랍's device settings, kept within what the drawer can take.
-        drawerShortcut: readDrawerShortcut(known.drawerShortcut), drawerWidth: clampDrawerWidth(known.drawerWidth), drawerTheme: readDrawerTheme(known.drawerTheme),
+        drawerShortcut: readDrawerShortcut(known.drawerShortcut), drawerShortcutLast: readDrawerShortcut(known.drawerShortcutLast) || defaultPrefs.drawerShortcutLast, drawerWidth: clampDrawerWidth(known.drawerWidth), drawerTheme: readDrawerTheme(known.drawerTheme),
         drawerSide: known.drawerSide === "left" ? "left" : "right",
         drawerBackdrop: readDrawerBackdrop(known.drawerBackdrop), drawerPinnedSort: readSort(known.drawerPinnedSort),
         drawerRecentMoves: Array.isArray(known.drawerRecentMoves) ? known.drawerRecentMoves.filter((id): id is string => typeof id === "string").slice(0, 2) : [],
+        spaceLens: readLens(known.spaceLens) ?? null,
         drawerHandleY: typeof known.drawerHandleY === "number" && known.drawerHandleY >= 0 && known.drawerHandleY <= 1 ? known.drawerHandleY : defaultPrefs.drawerHandleY,
       };
       this.memory = saved.memory ?? {};

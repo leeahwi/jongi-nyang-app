@@ -103,7 +103,7 @@ test("D15: an unreadable folders file is moved aside, the drawer starts afresh, 
   assert.equal(aside.length, 1);
   assert.equal(fs.readFileSync(path.join(directory, aside[0]), "utf8"), "{ not json");
   assert.equal(fs.existsSync(path.join(directory, "memo-folders.json")), false);
-  assert.match(store.storageError ?? "", /메모 서랍의 폴더 정보를 읽지 못해/);
+  assert.match(store.storageError ?? "", /^메모 폴더를 읽지 못해서 메모를 모두 ‘메모’ 폴더에 두고 시작했어요\. 원래 파일은 저장 폴더에 ‘memo-folders\.unreadable-\d{8}-\d{6}\.json’ 이름으로 남겨 뒀어요\.$/);
 });
 
 test("backup: memo-folders.json travels, is checked, merged (D13/D14) and not counted", () => {

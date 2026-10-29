@@ -3,8 +3,9 @@ import PaperCore
 import SwiftUI
 
 /// 하루 띠 (1.40): a region on the paper under the 오늘 sheet's header, ruled above and below — no card. The top line
-/// has the all-day events and `하루 전체 ›`; under it a thin bar of the whole day (events in their colours, to-dos with
-/// a time in sage, the past a shade darker, now a short clay mark) with its hours; then what's on now in large, with a
+/// has the all-day events and `하루 전체 ›` (without any, the link sits at the bar's right end, 1.45); under it a thin
+/// bar of the whole day (events in their colours, to-dos with a time in sage, the past a shade darker, now a short clay
+/// mark) with its hours; then what's on now in large, with a
 /// ring of the time left (or, with nothing on, the next thing and the time until it), and the next few as rows.
 /// Clicking `하루 전체 ›`, the bar or the strip's empty space opens it in place into the day's timetable
 /// (DayTimetable). Redrawn once a minute and when the data changes — nothing moves in between (the 1.39 pulse of the
@@ -85,29 +86,25 @@ struct DayStripView: View {
 
     private func strip(_ layout: DayRibbon.Layout, state: DayStrip.State, now: Date) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 8) {
-                allDayEvents(layout.allDay, limit: narrow ? 1 : 2)
-                Spacer(minLength: 8)
-                Button { setOpen(true, now: now) } label: {
-                    Text(DayStrip.wholeDayLink(narrow: narrow, language: .current))
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(PaperTheme.sageText)
-                        .fixedSize()
-                        .frame(minHeight: 18)
-                        .contentShape(Rectangle())
+            if layout.allDay.isEmpty {
+                // No all-day event (1.45): the link sits at the bar's right end, so it doesn't take a line of its own;
+                // the bar and its hours stop short of it.
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        dayBar(layout, now: now).padding(.top, 3)
+                        if !compact { hourLabels(layout) }
+                    }
+                    wholeDayLink(now: now)
                 }
-                .buttonStyle(.plain)
-                .help(L("하루 전체 보기"))
-                .accessibilityLabel(L("하루 전체 보기"))
+            } else {
+                HStack(spacing: 8) {
+                    allDayEvents(layout.allDay, limit: narrow ? 1 : 2)
+                    Spacer(minLength: 8)
+                    wholeDayLink(now: now)
+                }
+                dayBar(layout, now: now).padding(.top, 4)
+                if !compact { hourLabels(layout) }
             }
-            Button { setOpen(true, now: now) } label: {
-                StripDayBar(layout: layout).frame(height: 12).contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 4)
-            .help(L("하루 전체 보기"))
-            .accessibilityLabel(L("하루 전체 보기"))
-            if !compact { hourLabels(layout) }
             lead(state, now: now).padding(.top, 9)
             if !state.rows.isEmpty {
                 VStack(alignment: .leading, spacing: 1) {
@@ -120,6 +117,30 @@ struct DayStripView: View {
         // The strip's empty space opens the whole day too.
         .contentShape(Rectangle())
         .onTapGesture { setOpen(true, now: now) }
+    }
+
+    /// `하루 전체 ›` (narrow: `전체 ›`).
+    private func wholeDayLink(now: Date) -> some View {
+        Button { setOpen(true, now: now) } label: {
+            Text(DayStrip.wholeDayLink(narrow: narrow, language: .current))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(PaperTheme.sageText)
+                .fixedSize()
+                .frame(minHeight: 18)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(L("하루 전체 보기"))
+        .accessibilityLabel(L("하루 전체 보기"))
+    }
+
+    private func dayBar(_ layout: DayRibbon.Layout, now: Date) -> some View {
+        Button { setOpen(true, now: now) } label: {
+            StripDayBar(layout: layout).frame(height: 12).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(L("하루 전체 보기"))
+        .accessibilityLabel(L("하루 전체 보기"))
     }
 
     /// Dot + `종일 · 엄마 생신`, at most `limit` (two, or one when they don't fit whole), then `+N`.
@@ -260,7 +281,8 @@ struct DayStripView: View {
         if item.kind == .event {
             if let place = item.event?.location, !place.isEmpty { subText(Text(place), bell: false) }
         } else if focusing, let timer = model.timerState.timer {
-            subText(Text(L("집중 중") + " " + FocusTimer.clock(timer.remaining(at: now))), bell: false)
+            // #46: "집중 중 · 21분 남음", a length (not "12:30" under the kicker's clock times).
+            subText(Text(L("집중 중") + " · " + TodayGlance.timerLeftText(timer.remaining(at: now), language: .current)), bell: false)
         } else {
             subText(Text(String(localized: "할 일", table: "Day")), bell: item.hasReminder)
         }
@@ -467,6 +489,8 @@ struct StripRing: View {
                     .font(.system(size: 13, weight: .semibold).monospacedDigit())
                     .foregroundStyle(valueColor)
                     .lineLimit(1)
+                    // "1시간" · "12 h" fit at 13 pt; "23시간" a little smaller.
+                    .minimumScaleFactor(0.8)
                 // Inside the ring's opening at its height (the chord there is about 38 pt): a long word gets a little
                 // smaller, and the longest ("min te gaan") takes two short lines.
                 let fit = Self.captionFit(caption)

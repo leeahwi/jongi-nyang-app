@@ -119,6 +119,32 @@ public struct FocusTimer: Codable, Equatable, Sendable {
         return hours > 0 ? String(format: "%d:%02d:%02d", hours, minutes, rest) : String(format: "%02d:%02d", minutes, rest)
     }
 
+    /// #46: the time left as a length, never in a clock's form ("20:50" beside "다음 일정 20:40" read as 8:50 PM).
+    /// Whole minutes rounded up ("21분" · "21 min" for 20:50), from an hour with its minutes ("1시간 5분" · "1 h 5 min" ·
+    /// "1 u 5 min", "1시간" on the hour), the last minute in seconds ("45초" · "45 sec"). The day strip's rule (#19).
+    /// Same as glance.ts `timerLength`.
+    public static func lengthText(_ seconds: TimeInterval, language: AppLanguage) -> String {
+        let total = Int(max(0, seconds).rounded(.up))
+        if total < 60 { return ["\(total)초", "\(total) sec", "\(total) sec"][language.index] }
+        let minutes = (total + 59) / 60
+        let h = minutes / 60, m = minutes % 60
+        let rest = ["\(m)분", "\(m) min", "\(m) min"][language.index]
+        if h == 0 { return rest }
+        let hours = ["\(h)시간", "\(h) h", "\(h) u"][language.index]
+        return m == 0 ? hours : hours + " " + rest
+    }
+
+    /// The small word beside the length on the timer card: "남음" · "left" after it, Dutch "nog" before it
+    /// ("nog 21 min" — "21 min te gaan" didn't fit a third of the 오늘 창).
+    public static func leftWord(_ language: AppLanguage) -> String { ["남음", "left", "nog"][language.index] }
+    public static func leftWordFirst(_ language: AppLanguage) -> Bool { language == .nl }
+
+    /// Said in full: "21분 남음" · "21 min left" · "nog 21 min".
+    public static func leftText(_ seconds: TimeInterval, language: AppLanguage) -> String {
+        let length = lengthText(seconds, language: language)
+        return leftWordFirst(language) ? leftWord(language) + " " + length : length + " " + leftWord(language)
+    }
+
     /// Board caption: "집중 2/4", "휴식", "긴 휴식", "타이머".
     public var caption: String { caption(.ko) }
 

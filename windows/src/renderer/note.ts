@@ -12,6 +12,7 @@ import { bodyFontSize, textSizes, type AppState, type IntentPage, type IntentToa
 import { expand } from "../core/events";
 import { dayRibbon, todayGroups as splitToday } from "../core/ribbon";
 import { DayStripView } from "./dayStrip";
+import { markWord } from "../core/dayStrip";
 import { h, icon, lang, paper, reduceMotion, scrollFade, t } from "./api";
 import { paperCalendar } from "./calendar";
 import { openEventSheet, type EventSheet } from "./eventSheet";
@@ -19,8 +20,9 @@ import type { CalendarSheetRequest } from "../core/calendar";
 import { repeatFields } from "./repeatFields";
 import { InputLine } from "./inputLine";
 import { commitReading, fromWire, showMade, undoLast, type FlowHost } from "./intentFlow";
-import { toaster } from "./slip";
+import { keyCap, toaster } from "./slip";
 import { FocusCard } from "./focusCard";
+import { focusNextLine } from "../core/focus";
 import { chime } from "./chime";
 import { openSearch, type SearchSlip } from "./search";
 import { carriedDays, carriedText, movedTomorrowText, shiftedDue, tomorrowKey } from "../core/carry";
@@ -28,6 +30,8 @@ import { dayKey } from "../core/archive";
 import { clockKey, logicalMinutes, rangeDay, rangeOf, rangeText, rangeTimes, rangeWhenText, reminderFor, validRange } from "../core/timeRange";
 import { durationText } from "../core/duration";
 import { timeList, timeOf } from "./timePick";
+import { activeLens, findSpace, inLens, lensForDigit, lensNone, liveSpaces, spaceColor, spaceIndexOf, type TodoSpace } from "../core/todoSpaces";
+import { closeMenus, menuOpen, openMenu, type MenuEntry, type MenuHost } from "./drawerMenu";
 
 /** 오늘 · 앞으로 (1.28: the memo tab became the 메모 서랍). */
 type Page = Exclude<NoteTab, "memos">;
@@ -54,7 +58,7 @@ const openDrawer = (extra: { memo?: string; write?: boolean } = {}) => void api.
 const pinButton = h("button", { class: "quiet pin", title: t("항상 위에 두기"), "aria-label": t("항상 위에 두기") }, icon("pin", 16));
 const tabs = h("div", { class: "index-tabs", role: "tablist" });
 // 메모 서랍 (1.28): where the memos live now, a button beside the pin (its shortcut in the tooltip).
-const drawerButton = h("button", { class: "quiet drawer-open", "aria-label": t("메모 서랍") }, icon("drawer", 16));
+const drawerButton = h("button", { class: "quiet drawer-open", "aria-label": t("메모 서랍") }, icon("pawPrint", 16));
 drawerButton.addEventListener("click", () => openDrawer());
 const tools = h("div", { class: "tools" },
   pinButton,
@@ -80,13 +84,22 @@ const cat = h("div", { class: "peek", title: t("노트 위의 작은 친구, 종
 cat.innerHTML = `<div class="peek-window"><img src="../../assets/cat.png" alt="" draggable="false"></div><div class="peek-edge"></div><div class="peek-paws">${paw}${paw}</div>`;
 const catImage = cat.querySelector("img")!;
 // The progress sits beside the title when there's room, else under it (as on the Mac).
-const titleRow = h("div", { class: "title-row" }, h("div", { class: "title-text" }, dateLine, h("div", { class: "title-line" }, title, progress)), cat);
+// 할 일 스페이스 (1.30): 모든 스페이스 ▾ at the end of the date line, over the title (hidden until there is a space), so
+// the header keeps its height and the title its room.
+const spaceButton = h("button", { class: "space-pick", "aria-haspopup": "menu", "aria-expanded": "false", hidden: "" },
+  h("span", { class: "space-dot" }), h("span", { class: "space-pick-label" }), icon("chevron", 11, 2));
+spaceButton.addEventListener("click", () => openSpacePicker());
+const titleRow = h("div", { class: "title-row" }, h("div", { class: "title-text" }, h("div", { class: "date-row" }, dateLine, spaceButton), h("div", { class: "title-line" }, title, progress)), cat);
 
 const sheet = h("div", { class: "sheet" });
+/** The paper menus (the row menu, 모든 스페이스 ▾, the editor's 스페이스): drawn over everything, inside the note. */
+const menuLayer = h("div", { class: "menu-layer" });
+const menuHost: MenuHost = { container: menuLayer };
 const toastHost = h("div", { class: "toast-host" });
 const dock = h("div", { class: "dock" }, toastHost);
 const footer = h("div", { class: "footer" });
 document.getElementById("app")!.append(tabsRow, titleRow, sheet, dock, footer);
+document.body.append(menuLayer);
 
 // ─── 집중 ─────────────────────────────────────────────────────────────────────
 
@@ -96,7 +109,7 @@ const focusCard = new FocusCard({
   next: () => {
     if (!state) return undefined;
     const next = dayRibbon(todayOccurrences(), state.items, new Date(), lang())?.next;
-    return next ? `${next.time} ${next.title}${next.away ? ` (${next.away})` : ""}` : undefined;
+    return next ? focusNextLine(next.title, next.time, next.minutes, lang()) : undefined;
   },
   closeOthers: () => {
     guide?.close();
@@ -206,8 +219,9 @@ function renderHeader(): void {
     donut.classList.toggle("full", done === today.length);
     progressText.textContent = t("{completed} / {total} 끝냈어요", { completed: done, total: today.length });
     progress.setAttribute("role", "img");
-    progress.setAttribute("aria-label", t("{total}개 중 {completed}개 완료, {remaining}개 남음", { total: today.length, completed: done, remaining: today.length - done }));
+    progress.setAttribute("aria-label", t("{total}개 중 {completed}개 끝냈어요, {remaining}개 남았어요", { total: today.length, completed: done, remaining: today.length - done }));
   }
+  renderSpaceButton();
   // The cat sleeps from 11 p.m. to 5 a.m.
   const hour = now.getHours();
   // (Snapshots draw the sleeping cat at any hour: `window.catSleeps`.)
@@ -269,7 +283,160 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden && mi
 const todayItems = () => state.items.filter((item) => pageOf(item, new Date()) === "today");
 
 function visibleToday(): TodoItem[] {
-  return todayItems().filter((item) => !state.prefs.hideCompleted || !item.isCompleted || finishing.has(item.id));
+  const lens = lensNow();
+  const spaces = spacesOf();
+  return todayItems().filter((item) => (!state.prefs.hideCompleted || !item.isCompleted || finishing.has(item.id)) && inLens(lens, spaces.get(item.id)?.id));
+}
+
+// ─── 할 일 스페이스 (1.30) ────────────────────────────────────────────────────
+
+/** Each to-do's live space, worked out once per state (2,000 rows look it up on every draw). */
+let spacesKept: { state: AppState; data: string; spaces: string; index: Map<string, TodoSpace> } | undefined;
+/** Counts each new reading of the spaces (a row with a space draws again when its name or colour may have changed). */
+let spacesVersion = 0;
+function spacesOf(): Map<string, TodoSpace> {
+  if (spacesKept?.state === state) return spacesKept.index;
+  // Read again only when a to-do moved or a space changed (the same text arrives with every other state).
+  const spaces = JSON.stringify(state.todoSpaces.spaces);
+  if (spacesKept?.data !== state.spaceOf || spacesKept.spaces !== spaces) {
+    spacesKept = { state, data: state.spaceOf, spaces, index: spaceIndexOf(state.todoSpaces.spaces, state.spaceOf) };
+    spacesVersion += 1;
+  }
+  else spacesKept.state = state;
+  return spacesKept.index;
+}
+const hasSpaces = () => liveSpaces(state.todoSpaces).length > 0;
+/** The space 오늘 shows alone, or none — the 4 a.m. day and a deleted space let it go (S11, S12). */
+const lensNow = (now = new Date()) => activeLens(state.prefs.spaceLens ?? undefined, state.todoSpaces, now);
+const bandStyle = (space: TodoSpace | undefined) => (space ? `var(--band-${spaceColor(space.color)})` : "");
+const setLens = (space: string | undefined) => {
+  if (space && page !== "today") setPage("today");
+  void api.act({ type: "spaceLens", ...(space ? { space } : {}) });
+};
+/** "Ctrl+Shift+1" for the nth space (W8). */
+const lensKey = (index: number) => (index < 9 ? `Ctrl+Shift+${index + 1}` : undefined);
+
+let spaceButtonDrawn = "";
+function renderSpaceButton(): void {
+  const show = page === "today" && hasSpaces();
+  spaceButton.hidden = !show;
+  if (!show) return;
+  const lens = lensNow();
+  const space = lens && lens !== lensNone ? findSpace(state.todoSpaces, lens) : undefined;
+  const colors = liveSpaces(state.todoSpaces).slice(0, 3).map((entry) => bandStyle(entry));
+  // Drawn again only when what it shows changed (a redraw of 2,000 rows touches nothing here).
+  const drawnKey = `${lens ?? ""}|${space?.name ?? ""}|${space?.color ?? ""}|${colors.join()}`;
+  if (drawnKey === spaceButtonDrawn) return;
+  spaceButtonDrawn = drawnKey;
+  const label = space ? t("{name}만", { name: space.name }) : lens === lensNone ? t("스페이스 없음") : t("모든 스페이스");
+  spaceButton.querySelector(".space-pick-label")!.textContent = label;
+  spaceButton.classList.toggle("on", lens !== undefined);
+  spaceButton.style.setProperty("--band", space ? bandStyle(space) : "var(--ink-3)");
+  const dot = spaceButton.querySelector<HTMLElement>(".space-dot")!;
+  dot.classList.toggle("all", !space);
+  dot.style.setProperty("--band", space ? bandStyle(space) : "var(--faint)");
+  if (!space && lens !== lensNone) dot.style.setProperty("background", colors.length > 1 ? `conic-gradient(${colors.map((color, index) => `${color} ${(index * 100) / colors.length}% ${((index + 1) * 100) / colors.length}%`).join(", ")})` : colors[0] ?? "");
+  else dot.style.removeProperty("background");
+  spaceButton.setAttribute("aria-label", t("스페이스: {name}", { name: label }));
+  spaceButton.title = t("한 스페이스만 보기 (Ctrl+Shift+1–9, 모두 보기 Ctrl+Shift+0)");
+}
+
+/** 모든 스페이스 ▾: 모든 스페이스 (N), the spaces with their open to-dos and keys, 스페이스 없음 (N), 스페이스 관리…. */
+function openSpacePicker(keyboard = false): void {
+  if (menuOpen() && spaceButton.getAttribute("aria-expanded") === "true") { closeMenus(); return; }
+  const lens = lensNow();
+  const spaces = spacesOf();
+  const open = todayItems().filter((item) => !item.isCompleted);
+  const count = (space: string | undefined) => String(open.filter((item) => spaces.get(item.id)?.id === space).length);
+  const dot = (band: string) => { const element = h("span", { class: "dot" }); element.style.setProperty("--band", band); return element; };
+  const all = h("span", { class: "dot all" });
+  const colors = liveSpaces(state.todoSpaces).slice(0, 3).map((entry) => bandStyle(entry));
+  all.style.background = colors.length > 1 ? `conic-gradient(${colors.map((color, index) => `${color} ${(index * 100) / colors.length}% ${((index + 1) * 100) / colors.length}%`).join(", ")})` : colors[0] ?? "";
+  const entries: MenuEntry[] = [
+    { kind: "item", label: t("모든 스페이스"), extra: [all], count: String(open.length), key: "Ctrl+Shift+0", checked: lens === undefined, run: () => setLens(undefined) },
+    { kind: "sep" },
+    ...liveSpaces(state.todoSpaces).map((space, index): MenuEntry => ({
+      kind: "item", label: space.name, extra: [dot(bandStyle(space))], count: count(space.id), key: lensKey(index), checked: lens === space.id, run: () => setLens(space.id),
+    })),
+    { kind: "item", label: t("스페이스 없음"), extra: [dot("var(--rule-strong)")], count: count(undefined), checked: lens === lensNone, run: () => setLens(lensNone) },
+    { kind: "sep" },
+    { kind: "item", label: t("스페이스 관리…"), icon: "gear", run: () => void api.act({ type: "openSpaces" }) },
+  ];
+  spaceButton.setAttribute("aria-expanded", "true");
+  openMenu({ ...menuHost, closed: () => spaceButton.setAttribute("aria-expanded", "false") }, entries, t("모든 스페이스"), spaceButton.getBoundingClientRect(), keyboard);
+}
+
+/** 스페이스로 옮기기 ▸: the spaces (✓ where it is), 스페이스 없음, 새 스페이스…. */
+function moveEntries(id: string): MenuEntry[] {
+  const current = spacesOf().get(id)?.id;
+  const dot = (band: string) => { const element = h("span", { class: "dot" }); element.style.setProperty("--band", band); return element; };
+  return [
+    ...liveSpaces(state.todoSpaces).map((space): MenuEntry => ({
+      kind: "item", label: space.name, extra: [dot(bandStyle(space))], checked: current === space.id, run: () => void api.act({ type: "todoSpace", ids: [id], space: space.id }),
+    })),
+    { kind: "sep" },
+    { kind: "item", label: t("스페이스 없음"), extra: [dot("var(--rule-strong)")], checked: current === undefined, run: () => { if (current) void api.act({ type: "todoSpace", ids: [id], space: null }); } },
+    { kind: "item", label: t("새 스페이스…"), icon: "plus", run: () => newSpaceSlip(id) },
+  ];
+}
+
+/** 새 스페이스…: a small slip that takes a name, makes the space and moves the to-do into it. */
+function newSpaceSlip(todo: string): void {
+  const row = rowFor(todo)?.element;
+  const field = h("input", { type: "text", maxlength: "40", spellcheck: "false", placeholder: t("이름"), "aria-label": t("새 스페이스 이름") });
+  const make = h("button", { class: "mi", disabled: "" }, h("span", { class: "ico" }, icon("plus", 15)), h("span", { class: "t" }, t("만들고 옮기기")));
+  const slip = h("div", { class: "space-new" }, h("div", { class: "label" }, t("새 스페이스")), field, make);
+  const go = () => {
+    const name = field.value.trim();
+    if (!name) return;
+    closeMenus();
+    void api.act({ type: "spaceAdd", id: `s-${Math.floor(Math.random() * 0x1000000).toString(16).padStart(6, "0")}`, name, todo });
+  };
+  field.addEventListener("input", () => { make.disabled = !field.value.trim(); });
+  field.addEventListener("keydown", (event) => {
+    if (event.isComposing) return;
+    if (event.key === "Enter") { event.preventDefault(); go(); }
+  });
+  make.addEventListener("click", go);
+  const at = row?.getBoundingClientRect() ?? titleRow.getBoundingClientRect();
+  openMenu(menuHost, [{ kind: "node", node: slip }], t("새 스페이스"), new DOMRect(at.left + 40, at.top, Math.min(220, at.width - 60), at.height));
+}
+
+/** The paper row menu the main process laid out (rowMenuTemplate), drawn here at the point or under the row. */
+interface PaperEntry { kind: "item" | "sub" | "sep" | "spaces"; label?: string; pick?: number; checked?: boolean; disabled?: boolean; danger?: boolean; icon?: string; key?: string; todo?: string; entries?: PaperEntry[] }
+function paperMenu(entries: PaperEntry[]): MenuEntry[] {
+  return entries.map((entry): MenuEntry => {
+    if (entry.kind === "sep") return { kind: "sep" };
+    if (entry.kind === "spaces") return { kind: "sub", label: entry.label!, icon: entry.icon, entries: () => moveEntries(entry.todo!) };
+    if (entry.kind === "sub") return { kind: "sub", label: entry.label!, icon: entry.icon, entries: () => paperMenu(entry.entries ?? []) };
+    return { kind: "item", label: entry.label!, icon: entry.icon ?? null, key: entry.key, danger: entry.danger, checked: entry.checked, disabled: entry.disabled, run: () => void api.act({ type: "rowMenuPick", pick: entry.pick! }) };
+  });
+}
+api.on("note:row-menu", (payload) => {
+  const { id, entries, x, y, keyboard } = payload as { id: string; entries: PaperEntry[]; x?: number; y?: number; keyboard?: boolean };
+  const row = rowFor(id)?.element;
+  const item = state?.items.find((entry) => entry.id === id);
+  const at = x !== undefined && y !== undefined ? { x, y } : row ? row.getBoundingClientRect() : titleRow.getBoundingClientRect();
+  openMenu(menuHost, paperMenu(entries), item?.title ?? "", "width" in at ? new DOMRect(at.left + 48, at.top + at.height - 6, 0, 0) : at, keyboard);
+});
+
+/** 회사만 보는 중 · 다른 할 일 4개는 숨겼어요 · 모두 보기 — over 오늘's list while one space is shown. */
+const lensText = h("span", { class: "lens-text" });
+const lensAll = h("button", { class: "lens-all" }, t("모두 보기"));
+lensAll.addEventListener("click", () => setLens(undefined));
+const lensBand = h("div", { class: "lens-band", role: "status" }, lensText, lensAll);
+function renderLensBand(): boolean {
+  const lens = lensNow();
+  if (lens === undefined) return false;
+  const space = lens === lensNone ? undefined : findSpace(state.todoSpaces, lens);
+  const spaces = spacesOf();
+  const hidden = todayItems().filter((item) => !item.isCompleted && !inLens(lens, spaces.get(item.id)?.id)).length;
+  const showing = space ? t("{name}만 보는 중", { name: space.name }) : t("스페이스 없는 할 일만 보는 중");
+  const text = hidden ? `${showing} · ${t("다른 할 일 {n}개는 숨겼어요", { n: hidden })}` : showing;
+  if (lensText.textContent !== text) lensText.textContent = text;
+  lensText.title = text;
+  lensBand.style.setProperty("--band", space ? bandStyle(space) : "var(--ink-3)");
+  return true;
 }
 
 /** 다음: today's reminders still ahead (at most three, by time), shown above the rest; and the rest. */
@@ -291,13 +458,22 @@ const flow: FlowHost = {
 };
 const line = new InputLine({
   variant: "note",
-  placeholder: () => askingPick ? { long: t("오늘 꼭 하나만 고른다면?"), short: t("오늘 꼭 하나만?") }
-    : { long: t("무엇이든 적어요 — 할 일, 일정, 타이머 40…"), short: t("무엇이든 적어요") },
+  placeholder: () => {
+    if (askingPick) return { long: t("오늘 꼭 하나만 고른다면?"), short: t("오늘 꼭 하나만?") };
+    // 한 스페이스만 보기: what is written goes into that space (S7).
+    const lens = state && page === "today" ? lensNow() : undefined;
+    const space = lens && lens !== lensNone ? findSpace(state.todoSpaces, lens) : undefined;
+    if (space) return { long: t("{name} 스페이스에 넣어요: 할 일, 일정", { name: space.name }), short: t("{name} 스페이스에 넣어요", { name: space.name }) };
+    return { long: t("무엇이든 적어요: 할 일, 일정, ‘타이머 40’"), short: t("무엇이든 적어요") };
+  },
   mode: () => "intent",
+  spaces: () => (state ? { data: state.todoSpaces, lens: page === "today" ? lensNow() : undefined } : undefined),
   prefer: () => state?.prefs.intentPrefer ?? {},
-  shortcut: () => (state?.prefs.quickEntry ? "Ctrl+Alt+N" : undefined),
-  commit: async (candidate, candidates, text) => {
-    const result = await commitReading(flow, candidate, candidates, text, "note");
+  // #55 D-4: the key that brings you to this line (the guide teaches 입력 줄 Ctrl+N), not the quick entry's
+  // Ctrl+Alt+N — that one is on the quick entry slip's own head. Same as the Mac (⌘N).
+  shortcut: () => "Ctrl+N",
+  commit: async (candidate, candidates, text, space) => {
+    const result = await commitReading(flow, candidate, candidates, text, "note", space);
     // 오늘 꼭 하나: the first to-do written after the question gets the day's star.
     if (askingPick && result.made?.kind === "todo" && result.made.id) {
       askingPick = false;
@@ -321,7 +497,7 @@ line.field.addEventListener("keydown", (event) => {
 // The pick state's bar takes the line's place while picking.
 dock.append(line.element, pickBar);
 
-const allDone = h("div", { class: "all-done", role: "status" }, icon("sprout", 15), t("오늘 한 장 끝! 수고했어요"));
+const allDone = h("div", { class: "all-done", role: "status" }, icon("leaf", 15), t("오늘 한 장 끝! 수고했어요"));
 
 /** What an empty page shows: one of the cat's poses, faint, and a short line of what goes here. */
 function emptyNote(pose: string, text: string): HTMLElement {
@@ -360,10 +536,20 @@ function renderToday(): void {
   const { next, rest } = todayGroups();
   // No headings when 다음 would hold every open task (or there is nothing up next).
   const grouped = next.length > 0 && rest.some((item) => !item.isCompleted);
-  const listed = new Set([...next, ...rest].map((item) => item.id));
+  // Rows of to-dos still on 오늘 are kept, shown or not (a space shown alone hides the others for a moment: they come back as they were).
+  const listed = new Set(today.map((item) => item.id));
   for (const id of [...todayRows.keys()]) if (!listed.has(id)) todayRows.delete(id);
-  const nextRows = next.map((item) => todayRows.get(item.id)?.updated(item, true) ?? newRow(item, true));
-  const restRows = rest.map((item) => todayRows.get(item.id)?.updated(item, false) ?? newRow(item, false));
+  // A kept row coming back into view (the lens let go, 완료 보기) is drawn as it is now, without playing a check.
+  const row = (item: TodoItem, up: boolean) => {
+    const kept = todayRows.get(item.id);
+    if (!kept) return newRow(item, up);
+    return shownToday.has(item.id) ? kept.updated(item, up) : kept.revived(item, up);
+  };
+  // The strip first: its 지금 · 다음 marks the rows below (#31).
+  const shown = strip.render();
+  const nextRows = next.map((item) => row(item, true));
+  const restRows = rest.map((item) => row(item, false));
+  shownToday = new Set([...next, ...rest].map((item) => item.id));
   nextHead.querySelector(".group-count")!.textContent = String(next.length);
   restHead.querySelector(".group-count")!.textContent = String(rest.length);
   lines.classList.toggle("grouped", grouped);
@@ -371,11 +557,14 @@ function renderToday(): void {
     ...(grouped ? [nextHead] : []), ...nextRows, ...(grouped ? [restHead] : []), ...restRows,
     ...(allFinished ? [allDone] : []), ...(today.length === 0 ? [emptyToday] : []), ...(grouped ? [linesFill] : []),
   ]);
-  const shown = strip.render();
-  reconcile(sheet, shown ? [strip.element, lines] : [lines]);
+  const lensed = renderLensBand();
+  reconcile(sheet, [...(lensed ? [lensBand] : []), ...(shown ? [strip.element] : []), lines]);
   sheet.classList.toggle("with-strip", shown);
   renderTodayFooter(today.length - remaining);
 }
+
+/** The rows 오늘 showed last time it was drawn. */
+let shownToday = new Set<string>();
 
 function newRow(item: TodoItem, next: boolean): HTMLElement {
   const row = new Row(item, false, next);
@@ -435,11 +624,11 @@ function showEventSheet(request: CalendarSheetRequest): void {
 function renderTodayFooter(completed: number): void {
   const parts: (Node | string)[] = [];
   if (state.storageError) {
-    const warning = h("button", { class: "warning", title: state.storageError }, icon("warning", 13), t("저장 확인 필요"));
+    const warning = h("button", { class: "warning", title: state.storageError }, icon("warning", 13), t("저장 폴더 확인"));
     warning.addEventListener("click", () => api.act({ type: "showStorageProblem" }));
     parts.push(warning);
   } else {
-    const history = h("button", { class: "history", title: t("완료 기록 (Ctrl+H)"), "aria-label": t("완료 기록 보기") }, icon("sprout", 14), t("완료 기록"));
+    const history = h("button", { class: "history", title: t("완료 기록 (Ctrl+H)"), "aria-label": t("완료 기록 보기") }, icon("leaf", 14), t("완료 기록"));
     history.addEventListener("click", () => api.act({ type: "openHistory" }));
     parts.push(history);
   }
@@ -469,7 +658,7 @@ function aheadNow(now = new Date()): AheadSection[] {
 
 const aheadList = h("div", { class: "ahead", role: "list" });
 // Two sentences, two lines (one long line would leave a word on its own).
-const emptyAhead = emptyNote("curious", t("앞으로 할 일이 없어요. 아래에 “금요일까지 보고서”처럼 적어 보세요.").replace(/([.!?]) /, "$1\n"));
+const emptyAhead = emptyNote("curious", t("앞으로 할 일이 없어요. 아래에 ‘금요일까지 보고서’처럼 적어 보세요.").replace(/([.!?]) /, "$1\n"));
 emptyAhead.classList.add("ahead-empty");
 /** Lasting section headings (new nodes would move the rows after them and drop the focus). */
 const sectionHeads = new Map<string, HTMLElement>();
@@ -504,7 +693,7 @@ function eventLine(day: string, event: { key: string; title: string; color: stri
   const line = h("button", { class: `aev${event.allDay ? " all-day" : ""}`, "data-key": event.key, title: `${event.time} · ${event.title}`, "aria-label": `${event.time} ${event.title}` },
     bar, h("span", { class: "aev-time" }, event.time), h("span", { class: "aev-title" }, event.title));
   line.addEventListener("click", () => api.act({ type: "calendarEditEvent", key: event.key }));
-  line.addEventListener("contextmenu", (contextEvent) => { contextEvent.preventDefault(); void api.act({ type: "showEventMenu", key: event.key }); });
+  line.addEventListener("contextmenu", (contextEvent) => { contextEvent.preventDefault(); void api.act({ type: "showEventMenu", key: event.key, x: contextEvent.clientX, y: contextEvent.clientY }); });
   eventLines.set(id, line);
   return line;
 }
@@ -650,7 +839,7 @@ window.addEventListener("snapshot-moved", (event) => movedToast((event as Custom
 /** The toast after a task was moved by dragging (or ↓ 언젠가, → 내일): where it went, with 되돌리기. */
 function movedToast(target: AheadTarget): void {
   const text = target.kind === "day" && target.day === tomorrowKey(new Date()) ? movedTomorrowText(lang()) : movedText(target, new Date(), lang());
-  toast.show({ icon: target.kind === "someday" ? "box" : target.kind === "today" ? "sun" : "calendar", text, action: { label: t("되돌리기"), run: () => void api.act({ type: "undo" }) } });
+  toast.show({ icon: target.kind === "someday" ? "later" : target.kind === "today" ? "sun" : "calendar", text, action: { label: t("되돌리기"), run: () => void api.act({ type: "undo" }) } });
 }
 
 /** → 내일 · Alt+→ / Alt+←: the task due on `day` (off any shelf), with the toast. */
@@ -662,7 +851,7 @@ function moveToDay(id: string, day: string): void {
 /** The trash (or Delete): gone, with 지웠어요 · 되돌리기 (Ctrl+Z still works). */
 function deleteTask(id: string): void {
   void api.act({ type: "delete", id });
-  toast.show({ icon: "trash", text: t("지웠어요"), action: { label: t("되돌리기"), run: () => void api.act({ type: "undo" }) } });
+  toast.show({ icon: "trash", text: t("할 일을 지웠어요"), action: { label: t("되돌리기"), run: () => void api.act({ type: "undo" }) } });
 }
 
 /** 집중 from a row (its button, F): a focus of the Pomodoro's length on that task. */
@@ -695,13 +884,13 @@ class Row {
   private readonly bell: HTMLButtonElement;
   private readonly flag: HTMLButtonElement;
   private readonly sun: HTMLButtonElement;
-  private readonly later: HTMLButtonElement;
   private readonly tomorrow: HTMLButtonElement;
-  private readonly focusButton: HTMLButtonElement;
   private readonly carry: HTMLSpanElement;
+  private readonly mark: HTMLSpanElement;
   private readonly star: HTMLSpanElement;
   /** AI 연결: "Claude" stamped after the title, the day Claude added or changed it. */
   private readonly stamp: HTMLSpanElement;
+  private readonly band: HTMLSpanElement;
   private item: TodoItem;
 
   /** `onShelf`: a row of 앞으로 (with `meta`), else of 오늘. */
@@ -729,23 +918,26 @@ class Row {
     this.sent = h("span", { class: "sent-mark", title: t("달력에 넣음"), "aria-label": t("달력에 넣음"), role: "img" }, icon("calendar", 13));
     this.bell = h("button", { class: "row-icon bell", title: t("알림 · 반복 · 마감 설정") }, icon("bell", 15));
     this.flag = h("button", { class: "row-icon", title: t("마감 날짜") }, icon("flag", 15));
-    // Moving between tabs is said in words: ↑ 오늘로 / ↓ 언젠가.
+    // Moving is said in words: ↑ 오늘로 / → 내일.
     this.sun = h("button", { class: "move", title: t("오늘 할 일로 옮겨요") }, icon("arrowUp", 11, 2.4), t("오늘로"));
-    this.later = h("button", { class: "move", title: t("앞으로 탭의 언젠가로 옮겨요 (Ctrl+Z로 되돌리기)") }, icon("arrowDown", 11, 2.4), h("span", { class: "move-label" }, t("언젠가")));
     // 내일 하기: due tomorrow (Alt+→ on a selected row).
     this.tomorrow = h("button", { class: "move", title: t("내일 할 일로 옮겨요 (Alt+→)") }, icon("arrowRight", 11, 2.4), h("span", { class: "move-label" }, t("내일")));
-    // 집중 from the row (F on a selected row).
-    this.focusButton = h("button", { class: "row-icon focus-row", title: t("이거 집중 (F)") }, icon("timer", 15));
-    const trash = h("button", { class: "row-icon trash", title: t("지우기 (Ctrl+Z로 되돌리기)") }, icon("trash", 15));
-    // The end of the row: the deadline and alert as quiet text; on hover that spot turns into the
-    // row's buttons. Nothing covers the title, and at rest it keeps the full width.
-    const actions = h("div", { class: "actions" }, this.sun, this.tomorrow, this.later, this.focusButton, this.bell, this.flag, trash);
+    // ⋯: the right-click menu (#17), under the button — 언젠가로 (Alt+↓), 이거 집중 (F), 지우기 (Del) and the rest.
+    const more = h("button", { class: "row-icon more", title: t("더 보기"), "aria-label": t("더 보기"), "aria-haspopup": "menu" }, icon("more", 15));
+    // The end of the row: the deadline and alert as quiet text; on hover that spot turns into the row's buttons —
+    // three at most (#55 D-3): 오늘 → 내일 · 알림 · ⋯, 앞으로 ↑ 오늘로 · 마감 · ⋯, done ⋯. Nothing covers the
+    // title, and at rest it keeps the full width. Same as the Mac.
+    const actions = h("div", { class: "actions" }, this.sun, this.tomorrow, this.bell, this.flag, more);
     // 어제부터 · 3일째: how long an undated task has stayed on 오늘.
     this.carry = h("span", { class: "carry" });
+    // #31: 지금 · 다음 on a row the 하루 띠 shows too.
+    this.mark = h("span", { class: "strip-mark", hidden: "" });
     // 할 일 골라 집중…: on hover, a small 집중 in place of the row's buttons.
     const pick = h("button", { class: "focus-pick", title: t("이 할 일에 집중") }, icon("timer", 13), t("집중"));
     pick.addEventListener("click", () => pickTask(this.item.id));
-    this.element = h("div", { class: "row", role: "listitem", "data-id": item.id }, grip, check, this.textCell, this.carry, this.due, this.time, this.sent, actions, pick, h("span", { class: "end" }));
+    // 할 일 스페이스: the space's band at the left edge (오늘 only), its name in the tooltip.
+    this.band = h("span", { class: "sband", hidden: "" });
+    this.element = h("div", { class: "row", role: "listitem", "data-id": item.id }, this.band, grip, check, this.textCell, this.mark, this.carry, this.due, this.time, this.sent, actions, pick, h("span", { class: "end" }));
 
     check.addEventListener("click", () => {
       commitEditing();
@@ -759,10 +951,12 @@ class Row {
     this.bell.addEventListener("click", () => openEditor(this.item.id));
     this.flag.addEventListener("click", () => openEditor(this.item.id, "deadline"));
     this.sun.addEventListener("click", () => { void api.act({ type: "dropAhead", id: this.item.id, target: { kind: "today" } }); movedToast({ kind: "today" }); });
-    this.later.addEventListener("click", () => { void api.act({ type: "moveToLater", id: this.item.id }); movedToast({ kind: "someday" }); });
     this.tomorrow.addEventListener("click", () => moveToDay(this.item.id, tomorrowKey(new Date())));
-    this.focusButton.addEventListener("click", () => startFocus(this.item.id));
-    trash.addEventListener("click", () => deleteTask(this.item.id));
+    more.addEventListener("click", () => {
+      commitEditing();
+      const rect = more.getBoundingClientRect();
+      void api.act({ type: "showRowMenu", id: this.item.id, x: Math.round(rect.left), y: Math.round(rect.bottom + 2) });
+    });
     // A click on the row's empty space selects it for the keyboard (↑↓ · Space · Enter · Delete).
     this.element.addEventListener("click", (event) => {
       if ((event.target as HTMLElement).closest("button, input, .label, .grip")) return;
@@ -771,7 +965,7 @@ class Row {
     this.element.addEventListener("contextmenu", (event) => {
       event.preventDefault();
       commitEditing();
-      void api.act({ type: "showRowMenu", id: this.item.id });
+      void api.act({ type: "showRowMenu", id: this.item.id, x: event.clientX, y: event.clientY });
     });
     this.render(item, false);
   }
@@ -788,8 +982,23 @@ class Row {
   private drawnKey = "";
   private key(item: TodoItem): string {
     const series = item.seriesID ? state.series.find((entry) => entry.id === item.seriesID) : undefined;
-    return JSON.stringify([item, this.next, this.onShelf, this.meta, state.prefs.dueStyle, editingID === item.id, series?.rule, series?.remindAt,
-      isStarred(item), Boolean(state.calendar?.withEvents?.includes(item.id)), aiMarked(item.id), Math.floor(Date.now() / 60_000)]);
+    // The space by id; its name and colour by the spaces' own version (one string per state, not one per row).
+    const space = this.onShelf ? undefined : spacesOf().get(item.id)?.id;
+    return JSON.stringify([item, this.next, this.onShelf, this.meta, state.prefs.dueStyle, editingID === item.id, series?.rule, series?.remindAt, space, space && spacesVersion,
+      isStarred(item), Boolean(state.calendar?.withEvents?.includes(item.id)), aiMarked(item.id), this.stripMark(item), Math.floor(Date.now() / 60_000)]);
+  }
+
+  /** Shown in the 하루 띠's 지금 · 다음 block too (오늘's open rows only). */
+  private stripMark(item: TodoItem): "now" | "next" | undefined {
+    return this.onShelf || item.isCompleted ? undefined : strip.marks.get(item.id);
+  }
+
+  /** Back in view after being hidden: drawn as the task is now (no check animation for one finished meanwhile). */
+  revived(item: TodoItem, next: boolean): HTMLElement {
+    this.next = next;
+    this.item = item;
+    if (this.drawnKey !== this.key(item)) this.render(item, false);
+    return this.element;
   }
 
   /** Updated, and moved in or out of 다음 (its rows don't drag: their order is the time's). */
@@ -848,17 +1057,24 @@ class Row {
     const showPill = Boolean(ranged) || hasReminder || Boolean(series && !item.isCompleted);
     this.time.hidden = !showPill;
     this.bell.hidden = this.onShelf || item.isCompleted;
-    this.later.hidden = this.onShelf || item.isCompleted || Boolean(item.dueDate);
-    this.later.setAttribute("aria-label", t("{title} 언젠가로 옮기기", { title: item.title }));
     this.tomorrow.hidden = this.onShelf || item.isCompleted;
     this.tomorrow.setAttribute("aria-label", t("{title} 내일 하기", { title: item.title }));
-    this.focusButton.hidden = item.isCompleted;
-    this.focusButton.setAttribute("aria-label", t("{title} 집중", { title: item.title }));
+    const mark = this.stripMark(item);
+    this.mark.hidden = !mark;
+    this.mark.textContent = mark ? markWord(mark, lang()) : "";
+    this.mark.title = mark === "now" ? t("하루 띠의 ‘지금’에도 있어요") : mark ? t("하루 띠의 ‘다음’에도 있어요") : "";
     const carried = this.onShelf || this.next || item.isCompleted ? undefined : carriedText(carriedDays(item, now), lang());
     this.carry.hidden = !carried;
     this.carry.textContent = carried ?? "";
     this.carry.title = carried ? t("{text} 오늘 할 일에 있어요", { text: carried }) : "";
     this.star.hidden = !isStarred(item);
+    const space = this.onShelf ? undefined : spacesOf().get(item.id);
+    this.band.hidden = !space;
+    if (space) {
+      this.band.style.setProperty("--band", bandStyle(space));
+      this.band.title = space.name;
+      this.band.setAttribute("aria-label", t("스페이스 {name}", { name: space.name }));
+    }
     this.stamp.hidden = !aiMarked(item.id);
     this.bell.setAttribute("aria-label", t("{title} 알림·반복·마감 설정", { title: item.title }));
     this.flag.hidden = !this.onShelf || item.isCompleted;
@@ -1140,7 +1356,7 @@ function startAheadDrag(event: PointerEvent, id: string, grip: HTMLElement): voi
 
 // ─── Editor: 한 번 알림 · 반복 · 마감 ─────────────────────────────────────────
 
-let editor: { close(): void } | undefined;
+let editor: { close(): void; refreshSpace?(): void } | undefined;
 type EditorMode = "once" | "repeat" | "deadline" | "time";
 
 function quickChoices(now = new Date()): { label: string; date: Date }[] {
@@ -1179,7 +1395,7 @@ function openEditor(id: string, startOn?: EditorMode): void {
   let chosen: Date | undefined = existing && existing.getTime() > Date.now() ? existing : undefined;
   let quickIndex: number | undefined;
   const summaryWhen = h("div", { class: "when" });
-  const summary = h("div", { class: "summary" }, icon("clock", 16), h("div", {}, h("div", { class: "hint" }, t("알림 시간")), summaryWhen, h("div", { class: "hint" }, t("앱이 켜져 있을 때 종이냥이 알려드려요."))));
+  const summary = h("div", { class: "summary" }, icon("clock", 16), h("div", {}, h("div", { class: "hint" }, t("알림 시간")), summaryWhen, h("div", { class: "hint" }, t("앱이 켜져 있을 때 종이냥이 알려 줘요."))));
   const quick = h("div", { class: "quick" });
   quickChoices(now).forEach((choice, index) => {
     const choiceButton = h("button", {}, choice.label);
@@ -1282,9 +1498,22 @@ function openEditor(id: string, startOn?: EditorMode): void {
   const save = h("button", { class: "action primary" });
   const cancel = h("button", { class: "action" }, t("취소"));
   const remove = h("button", { class: "action" });
+  // 할 일 스페이스 (1.30): the to-do's space, picked from a small menu (it moves at once, with its toast).
+  const spaceField = hasSpaces() ? h("button", { class: "space-field", "aria-haspopup": "menu" }) : undefined;
+  const drawSpaceField = () => {
+    if (!spaceField) return;
+    const space = spacesOf().get(id);
+    const dot = h("span", { class: "space-dot" });
+    dot.style.setProperty("--band", space ? bandStyle(space) : "var(--rule-strong)");
+    spaceField.replaceChildren(h("span", { class: "space-field-name" }, t("스페이스")), dot, h("span", { class: "space-field-value" }, space?.name ?? t("스페이스 없음")), icon("chevron", 11, 2));
+    spaceField.setAttribute("aria-label", t("스페이스: {name}", { name: space?.name ?? t("스페이스 없음") }));
+  };
+  drawSpaceField();
+  spaceField?.addEventListener("click", () => openMenu(menuHost, moveEntries(id).filter((entry) => !(entry.kind === "item" && entry.icon === "plus")), t("스페이스"), spaceField.getBoundingClientRect()));
   const body = h("div", { class: "body" },
     h("div", { class: "kicker" }, icon("bell", 12), rangeDayKey ? t("알림 · 반복 · 마감 · 시간") : t("알림 · 반복 · 마감")),
     h("div", { class: "task" }, item.title),
+    spaceField,
     tabBar, oncePanel, repeatPanel, deadlinePanel, timePanel,
   );
   scrollFade(body);
@@ -1347,7 +1576,7 @@ function openEditor(id: string, startOn?: EditorMode): void {
       const reminder = rangeOk ? reminderFor(item!, chosenRange(), new Date()) : undefined;
       const startAt = rangeTimes({ ...item!, timeStart: clockKey(rangeStart), timeEnd: undefined }, now)?.start;
       timeSummaryHint.textContent = !rangeOk ? "" : reminder && startAt && reminder.getTime() === startAt.getTime()
-        ? t("시작할 때 알려 드려요.")
+        ? t("시작할 때 알려 줘요.")
         : reminder ? t("알림은 그대로예요 · {time}", { time: scheduledTime(reminder, new Date(), lang()) }) : t("이미 지난 시간이라 알림은 없어요.");
     }
 
@@ -1416,9 +1645,9 @@ function openEditor(id: string, startOn?: EditorMode): void {
     if (mode === "time" && validRange(chosenRange())) void api.act({ type: "setRange", id, ...chosenRange() });
     close();
   });
-  card.addEventListener("keydown", (event) => { if (event.key === "Escape") close(); });
+  card.addEventListener("keydown", (event) => { if (event.key === "Escape" && !menuOpen()) close(); });
   (tabBar.querySelector('[aria-checked="true"]') as HTMLElement | null)?.focus();
-  editor = { close };
+  editor = { close, refreshSpace: drawSpaceField };
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────────
@@ -1432,6 +1661,11 @@ function render(): void {
   pinButton.title = state.prefs.alwaysOnTop ? t("항상 위에 두기 해제") : t("항상 위에 두기");
   drawerButton.title = state.prefs.drawerShortcut ? `${t("메모 서랍")} (${shortcutLabel(state.prefs.drawerShortcut)})` : t("메모 서랍");
   renderHeader();
+  editor?.refreshSpace?.();
+  // The line's placeholder says where a to-do goes (회사에 적어요…), and its chips read `#` against the spaces now.
+  // (A new page refreshes the line itself first, in setPage: one layout, not two.)
+  const lineKey = `${lensNow() ?? ""}|${JSON.stringify(liveSpaces(state.todoSpaces).map((space) => [space.id, space.name, space.color]))}`;
+  if (lineKey !== lineKeyDrawn) { lineKeyDrawn = lineKey; line.refresh(); }
   if (page === "today") renderToday();
   else renderAhead();
   focusCard.update(state);
@@ -1443,6 +1677,7 @@ function render(): void {
   if (!performance.getEntriesByName("paper:first-render").length) performance.mark("paper:first-render");
 }
 
+let lineKeyDrawn = "";
 let fadePending = false;
 /** Soft fades at the top and bottom of the scrolling sheet while there is more beyond. */
 function fadeEdges(): void {
@@ -1456,11 +1691,11 @@ new ResizeObserver(fadeEdges).observe(sheet);
 
 /** Five paper cards the cat walks you through; shown once, and again from ⋯ → 사용 안내. */
 const guideCards: { pose: string; title: string; body: string; keys: [string, string][]; login?: boolean }[] = [
-  { pose: "happy", title: t("종이냥에 오신 걸 환영해요"), body: t("하루에 한 장, 오늘 할 일만 가볍게 적는\n종이 노트예요. 적고, 체크하고, 끝!"), keys: [[t("입력 줄"), "Ctrl+N"], [t("완료"), t("네모 칸 누르기")], [t("어디서든 빠른 입력"), "Ctrl+Alt+N"]] },
-  { pose: "curious", title: t("탭으로 나눠 두어요"), body: t("마감이 있는 일은 ‘앞으로’에서 날짜별로 기다리다\n그날이 되면 오늘로 올라와요.\n날짜 없는 일은 맨 아래 ‘언젠가’, 생각은 메모 서랍에."), keys: [[t("오늘 · 앞으로"), "Ctrl+1–2"], [t("메모 서랍"), "Ctrl+Shift+D"], [t("내일로 미루기"), "Alt+→"]] },
-  { pose: "stretch", title: t("아래 입력 줄에 무엇이든"), body: t("‘내일 3시 회의’, ‘30분 뒤 빨래’, ‘매일 물 마시기’처럼\n적으면 칩으로 알아들은 뜻을 보여 줘요.\n‘3시부터 5시까지 보고서’면 할 일에 시간도 붙어요.\nTab으로 다른 뜻, Enter로 넣기."), keys: [[t("다른 뜻"), "Tab"], [t("되돌리기"), "Ctrl+Z"], [t("검색"), "Ctrl+F"]] },
+  { pose: "happy", title: t("종이냥에 오신 걸 환영해요"), body: t("할 일과 일정을 종이 한 장에 적는\n노트예요. 적고, 체크하고, 끝!"), keys: [[t("입력 줄"), "Ctrl+N"], [t("완료"), t("네모 칸 누르기")], [t("어디서든 빠른 입력"), "Ctrl+Alt+N"]] },
+  { pose: "curious", title: t("날짜에 맞춰 알아서 옮겨 가요"), body: t("마감이 있는 일은 ‘앞으로’에서 날짜별로 기다리다\n그날이 되면 오늘로 올라와요.\n날짜 없는 일은 맨 아래 ‘언젠가’, 생각은 ‘메모 서랍’에."), keys: [[t("오늘 · 앞으로"), "Ctrl+1–2"], [t("메모 서랍"), "Ctrl+Shift+D"], [t("내일 하기"), "Alt+→"]] },
+  { pose: "stretch", title: t("아래 입력 줄에 무엇이든"), body: t("‘내일 3시 회의’, ‘30분 뒤 빨래’, ‘매일 물 마시기’처럼\n적으면 칩으로 알아들은 뜻을 보여 줘요.\nTab으로 다른 뜻, Enter로 넣기."), keys: [[t("다른 뜻"), "Tab"], [t("되돌리기"), "Ctrl+Z"], [t("검색"), "Ctrl+F"]] },
   { pose: "tea", title: t("종이냥과 집중"), body: t("할 일에서 F를 누르면 바로 집중을 시작해요.\n화면 아래의 종이냥은 저녁이 되면\n남은 일을 내일로 넘길지 물어봐요."), keys: [[t("이거 집중"), "F"], [t("설정"), "Ctrl+,"]] },
-  { pose: "cheer", title: t("준비 끝!"), body: t("필요 없을 땐 작은 포스트잇으로 접어 두세요.\n어디서든 Ctrl+Alt+J로 다시 불러요."), keys: [[t("작게 접기"), "Ctrl+M"], [t("노트 보이기 · 숨기기"), "Ctrl+Alt+J"]], login: true },
+  { pose: "cheer", title: t("준비 끝!"), body: t("필요 없을 땐 작은 포스트잇으로 접어 둬요.\n어디서든 Ctrl+Alt+J로 다시 불러요.\n아래 스위치를 끄면 컴퓨터를 켤 때 열리지 않아요."), keys: [[t("작게 접기"), "Ctrl+M"], [t("노트 보이기 · 숨기기"), "Ctrl+Alt+J"]], login: true },
 ];
 let guide: { close(): void } | undefined;
 
@@ -1499,7 +1734,8 @@ function openGuide(): void {
     dots.setAttribute("aria-label", t("{total}장 중 {n}장", { total: guideCards.length, n: step + 1 }));
     skip.hidden = last;
     back.hidden = step === 0;
-    next.textContent = last ? t("시작하기") : t("다음");
+    // Enter presses it (onKey below): its keycap inside, like every slip's primary (the Mac's guide too).
+    next.replaceChildren(h("span", {}, last ? t("시작하기") : t("다음")), keyCap("↩"));
     card.classList.remove("turn");
     void card.offsetWidth; // restart the little page-turn animation
     card.classList.add("turn");
@@ -1689,6 +1925,21 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   if (picking && event.key === "Escape") { event.preventDefault(); setPicking(false); return; }
+  // A paper menu up: its own keys (drawerMenu.ts).
+  if (menuOpen()) return;
+  // Shift+F10 or the Menu key: the selected to-do's menu, under its row (as a right-click).
+  if (((event.key === "F10" && event.shiftKey) || event.key === "ContextMenu") && selectedID && !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)) {
+    event.preventDefault();
+    void api.act({ type: "showRowMenu", id: selectedID, keyboard: true });
+    return;
+  }
+  // W8: Ctrl+Shift+1–9 shows one space (in order), Ctrl+Shift+0 all of them (by the key's place, whatever the layout).
+  if (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && /^Digit[0-9]$/.test(event.code) && state && hasSpaces()) {
+    const lens = lensForDigit(state.todoSpaces, Number(event.code.slice(5)));
+    event.preventDefault();
+    if (lens !== null) setLens(lens);
+    return;
+  }
   if (picking && event.key === "Enter" && selectedID && !(event.target instanceof HTMLInputElement)) { event.preventDefault(); pickTask(selectedID); return; }
   if (listKey(event)) return;
   const typing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
@@ -1733,9 +1984,9 @@ api.on("note:commit-editing", () => {
 });
 // 빠른 입력 while the note is up: its toast (with the switch) shows here.
 api.on("note:toast", (payload) => {
-  const { made, candidates, index, text } = payload as IntentToast;
+  const { made, candidates, index, text, space } = payload as IntentToast;
   const readings = candidates.map(fromWire);
-  if (readings[index]) showMade(flow, made, readings[index], readings, text);
+  if (readings[index]) showMade(flow, made, readings[index], readings, text, space);
 });
 api.on("note:row-command", (payload) => {
   const { id, command } = payload as { id: string; command: string };
@@ -1765,7 +2016,8 @@ let aiToastUp = false;
 api.on("note:notice", (payload) => {
   const notice = payload as NoteNotice;
   const undo = notice.undo === "history" ? () => api.act({ type: "undo" }) : notice.undo === "memo" ? () => api.act({ type: "memoRestore" }) : notice.undo === "unfile" ? () => api.act({ type: "unfileCompleted" })
-    : notice.undo === "ai" && notice.entry ? () => api.act({ type: "aiUndo", id: notice.entry! }) : undefined;
+    : notice.undo === "ai" && notice.entry ? () => api.act({ type: "aiUndo", id: notice.entry! })
+    : notice.undo === "spaces" && notice.entry ? () => undoSpaceMove(notice.entry!) : undefined;
   // AI 연결's 자리 비운 사이: 보기 opens 설정 › AI 연결 (the recent list), and it stays a little longer.
   // 빠른 메모's: 열기 opens the 메모 서랍 on the memo just put in.
   const show = notice.show === "ai" ? () => api.act({ type: "openSettings", tab: "ai" }) : notice.show === "drawer" ? () => openDrawer(notice.entry ? { memo: notice.entry } : {}) : undefined;
@@ -1773,6 +2025,15 @@ api.on("note:notice", (payload) => {
   toast.show({ icon: notice.icon, text: notice.text, ...(action ? { action } : {}), ...(notice.long ? { ms: 7000, twoLines: true } : {}), onHide: () => { aiToastUp = false; } });
   aiToastUp = notice.undo === "ai"; // after show: the toast it replaced has said its onHide
 });
+
+/** 되돌리기 after 스페이스로 옮기기: each to-do back in the space it was in (`entry`: [id, space | null][]). */
+function undoSpaceMove(entry: string): void {
+  let moves: [string, string | null][] = [];
+  try { moves = JSON.parse(entry) as [string, string | null][]; } catch { return; }
+  const bySpace = new Map<string | null, string[]>();
+  for (const [id, space] of moves) bySpace.set(space, [...(bySpace.get(space) ?? []), id]);
+  for (const [space, ids] of bySpace) void api.act({ type: "todoSpace", ids, space });
+}
 
 /** A task chosen in the 달력 window (or a ring on the ribbon): its page, with the row selected (and flashed). */
 function showTask(id: string, flash = false): void {

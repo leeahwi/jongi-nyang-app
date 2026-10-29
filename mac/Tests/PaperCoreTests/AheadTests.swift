@@ -154,7 +154,7 @@ private enum AheadTests {
             ("M12", .nl, "today", "Verplaatst naar Vandaag"),
         ]
         let emptyRows: [(String, AppLanguage, String)] = [
-            ("E1", .ko, "앞으로 할 일이 없어요. 아래에 “금요일까지 보고서”처럼 적어 보세요."),
+            ("E1", .ko, "앞으로 할 일이 없어요. 아래에 ‘금요일까지 보고서’처럼 적어 보세요."),
             ("E2", .en, "Nothing ahead. Try typing ‘report by Friday’ below."),
             ("E3", .nl, "Niets vooruit. Typ hieronder bijv. ‘verslag voor vrijdag’."),
         ]
@@ -306,7 +306,18 @@ private enum AheadTests {
             let soon = TodayGlance.soon(events: [dentist], reminders: [], now: thursday)
             try expectEqual(AppLanguage.allCases.map { TodayGlance.menuBarText(timerRemaining: nil, soon: TodayGlance.Soon(title: ["치과", "Dentist", "Tandarts"][AppLanguage.allCases.firstIndex(of: $0)!], at: dentist.start, minutes: 40, isEvent: true), language: $0) },
                             ["치과 40분", "Dentist 40 min", "Tandarts 40 min"], "soon words")
-            try expectEqual(TodayGlance.menuBarText(timerRemaining: 750, soon: soon, language: .ko), "12:30", "a running timer comes first")
+            try expectEqual(TodayGlance.menuBarText(timerRemaining: 750, soon: soon, language: .ko), "13분", "a running timer comes first, as a length (#46)")
+            // #46: a timer's time left as a length, never a clock's form (the day strip's rule, #19).
+            try expectEqual(AppLanguage.allCases.map { TodayGlance.timerLength(20 * 60 + 50, language: $0) }, ["21분", "21 min", "21 min"], "rounded up")
+            try expectEqual(AppLanguage.allCases.map { TodayGlance.timerLength(65 * 60, language: $0) }, ["1시간 5분", "1 h 5 min", "1 u 5 min"], "an hour and more")
+            try expectEqual(AppLanguage.allCases.map { TodayGlance.timerLength(3600, language: $0) }, ["1시간", "1 h", "1 u"], "on the hour")
+            try expectEqual(AppLanguage.allCases.map { TodayGlance.timerLength(59 * 60 + 30, language: $0) }, ["1시간", "1 h", "1 u"], "59:30 rounds up to the hour")
+            try expectEqual(AppLanguage.allCases.map { TodayGlance.timerLength(44.2, language: $0) }, ["45초", "45 sec", "45 sec"], "the last minute in seconds")
+            try expectEqual(TodayGlance.timerLength(60, language: .ko), "1분", "a minute")
+            try expectEqual(TodayGlance.timerLength(0, language: .ko), "0초", "none left")
+            try expectEqual(AppLanguage.allCases.map { TodayGlance.timerLeftText(25 * 60, language: $0) }, ["25분 남음", "25 min left", "nog 25 min"], "said in full")
+            try expectEqual(AppLanguage.allCases.map { TodayGlance.timerLeftWord($0) }, ["남음", "left", "nog"], "the card's small word")
+            try expectEqual(AppLanguage.allCases.map { TodayGlance.timerLeftWordFirst($0) }, [false, false, true], "nl: nog before the length")
             try expectEqual(TodayGlance.menuBarText(timerRemaining: nil, soon: nil, language: .en), "", "nothing near: no words")
             try expectEqual(TodayGlance.shortTitle("치과 정기 검진과 스케일링 예약"), "치과 정기 검진과 스케…", "12 characters and …")
             try expectEqual(TodayGlance.shortTitle("Dentist"), "Dentist", "short titles stay")
@@ -316,7 +327,9 @@ private enum AheadTests {
                             ["내일\u{00A0}· 평일", "Tomorrow\u{00A0}· Weekdays", "Morgen\u{00A0}· Doordeweeks"], "alarm line")
             try expectEqual(TodayGlance.alarmLine(fire: at(2026, 10, 12, 7), days: [], now: thursday, calendar: seoul, language: .ko), "월\u{00A0}· 한 번", "a later day by its weekday")
             try expectEqual(TodayGlance.accessibilityText(appName: "종이냥", timerRemaining: 750, soon: soon, openTasks: 3, language: .ko),
-                            "종이냥 · 타이머 12:30 남음 · 치과 40분 뒤 · 오늘 할 일 3개 남음", "the full state for VoiceOver")
+                            "종이냥 · 타이머 13분 남음 · 치과 40분 뒤 · 오늘 할 일 3개 남음", "the full state for VoiceOver")
+            try expectEqual(TodayGlance.accessibilityText(appName: "Jongi-nyang", timerRemaining: 750, soon: nil, openTasks: 0, language: .nl),
+                            "Jongi-nyang · Timer: nog 13 min · Niets meer voor vandaag", "nl timer")
             try expectEqual(TodayGlance.accessibilityText(appName: "Jongi-nyang", timerRemaining: nil, soon: nil, openTasks: 1, language: .en),
                             "Jongi-nyang · 1 to-do left today", "en")
             try expectEqual(TodayGlance.accessibilityText(appName: "Jongi-nyang", timerRemaining: nil, soon: nil, openTasks: 0, language: .nl),

@@ -3,10 +3,9 @@ import type { CalendarEvent } from "../core/calendar";
 import {
   awayText, clockText, columns, dayEndMinutes, dayMinutes, draggedSpan, edgeBand, followedSpan, hourHeight, isSoon, kicker, leftText, minutesUntil, newCandidates,
   nothingLeftText, nudged, rangeText, ringText, rowLimit, scrollTop, slot, stretched, stripItems, stripSentence, stripSpans, stripState, wholeDayLink,
-  type DragEdge, type Span, type StripItem, type StripState,
-} from "../core/dayStrip";
+  stripMarks, type DragEdge, type Span, type StripItem, type StripState } from "../core/dayStrip";
 import { draftFromEvent } from "../core/events";
-import { clock as timerClock } from "../core/focusTimer";
+import { timerLeftText } from "../core/glance";
 import { hasEventWord } from "../core/intent";
 import { dayRibbon, hourLabel, type Ribbon } from "../core/ribbon";
 import { focusMinutes, rangeOf, rangeText as taskRangeText } from "../core/timeRange";
@@ -99,22 +98,26 @@ export class DayStripView {
   }
   private pendingHeight?: number;
 
+  /** #31: the to-dos the 지금 · 다음 block shows (stripMarks), for the list rows' small mark; none while closed or open. */
+  marks = new Map<string, "now" | "next">();
+
   /** Fills the strip; false when it isn't shown (the setting is off, or nothing has a time today). */
   render(): boolean {
     const state = this.host.state();
-    if (!state.prefs.calendarStrip) { this.drawnKey = ""; return false; }
+    if (!state.prefs.calendarStrip) { this.drawnKey = ""; this.marks = new Map(); return false; }
     if (this.dragging && this.element.childElementCount > 0) return true;
     const now = this.moment();
     this.now = now;
     const events = this.host.occurrences(now);
     const ribbon = dayRibbon(events, state.items, now, lang());
-    if (!ribbon) { this.drawnKey = ""; this.closePopover(); return false; }
+    if (!ribbon) { this.drawnKey = ""; this.marks = new Map(); this.closePopover(); return false; }
     const items = stripItems(events, state.items, now);
     this.items = items;
     const narrow = window.innerWidth <= 400;
     const compact = window.innerHeight < 470;
     const open = this.isOpen(now);
     const strip = stripState(items, now, rowLimit(window.innerWidth, window.innerHeight));
+    this.marks = open ? new Map() : stripMarks(strip);
     const focusing = state.focus?.taskId && state.timer ? state.focus.taskId : undefined;
     const key = JSON.stringify([lang(), open, narrow, compact, open ? window.innerHeight : 0, ribbon.startHour, ribbon.endHour, ribbon.now, ribbon.hours, ribbon.bars, ribbon.blocks, ribbon.allDay, ribbon.more,
       strip.mode, strip.minutes, strip.lead && [strip.lead.id, strip.lead.title, strip.lead.start, strip.lead.end, strip.lead.event?.location], strip.rows.map((row) => [row.id, row.title, row.start, minutesUntil(now, row.start)]),
@@ -136,9 +139,13 @@ export class DayStripView {
       this.selected = undefined;
       this.closePopover();
       this.element.setAttribute("aria-label", stripSentence(strip, lang()));
+      // No all-day event (1.30): 하루 전체 › sits at the bar's right end instead of taking a line of its own; the bar and
+      // its hours stop short of it (the Mac's DayStripView too).
+      const head = ribbon.allDay.length === 0
+        ? [h("div", { class: "strip-barline" }, h("div", { class: "strip-barcol" }, this.bar(ribbon), compact ? null : this.hours(ribbon)), this.wholeDayLink(narrow))]
+        : [this.top(ribbon, narrow, false), this.bar(ribbon), compact ? null : this.hours(ribbon)];
       this.element.replaceChildren(...[
-        this.top(ribbon, narrow, false), this.bar(ribbon), compact ? null : this.hours(ribbon),
-        this.lead(strip, now), strip.rows.length ? this.rows(strip.rows, now) : null,
+        ...head, this.lead(strip, now), strip.rows.length ? this.rows(strip.rows, now) : null,
       ].filter((child): child is HTMLElement => Boolean(child)));
     }
     this.animateHeight();
@@ -190,16 +197,19 @@ export class DayStripView {
       if (!counter) { counter = h("span", { class: "ad-more" }); pills.append(counter); }
       counter.textContent = `+${more + 1}`;
     });
-    if (!open) {
-      const link = h("button", { class: "strip-link", title: t("하루 전체 보기"), "aria-label": t("하루 전체 보기") }, wholeDayLink(narrow, lang()));
-      link.addEventListener("click", (event) => { event.stopPropagation(); this.setOpen(true); });
-      return h("div", { class: "strip-top" }, pills, h("span", { class: "spacer" }), link);
-    }
+    if (!open) return h("div", { class: "strip-top" }, pills, h("span", { class: "spacer" }), this.wholeDayLink(narrow));
     const title = h("button", { class: "tt-title", title: t("접기 (Esc)") }, t("오늘 하루"));
     title.addEventListener("click", (event) => { event.stopPropagation(); this.setOpen(false); });
     const fold = h("button", { class: "strip-link fold", title: t("접기 (Esc)"), "aria-label": t("하루 일정표 접기"), "aria-expanded": "true" }, t("접기", undefined, "strip"), icon("chevron", 10, 2.2));
     fold.addEventListener("click", (event) => { event.stopPropagation(); this.setOpen(false); });
     return h("div", { class: "strip-top" }, title, pills, h("span", { class: "spacer" }), fold);
+  }
+
+  /** 하루 전체 › (narrow: 전체 ›). */
+  private wholeDayLink(narrow: boolean): HTMLElement {
+    const link = h("button", { class: "strip-link", title: t("하루 전체 보기"), "aria-label": t("하루 전체 보기") }, wholeDayLink(narrow, lang()));
+    link.addEventListener("click", (event) => { event.stopPropagation(); this.setOpen(true); });
+    return link;
   }
 
   // ─── The day bar ──────────────────────────────────────────────────────────
@@ -254,7 +264,8 @@ export class DayStripView {
     ring.innerHTML = `<svg viewBox="0 0 52 52" aria-hidden="true"><circle class="rc-face" cx="26" cy="26" r="24"/><circle class="rc-track" cx="26" cy="26" r="${radius}"/>${strip.progress > 0
       ? `<circle class="rc-arc" cx="26" cy="26" r="${radius}" stroke-dasharray="${(length * Math.min(1, strip.progress)).toFixed(2)} ${length.toFixed(2)}" transform="rotate(-90 26 26)"/>` : ""}</svg>`;
     const caption = h("small", {}, text.caption);
-    ring.append(h("span", { class: "rc-text", "aria-hidden": "true" }, h("b", {}, text.value), caption));
+    const value = h("b", {}, text.value);
+    ring.append(h("span", { class: "rc-text", "aria-hidden": "true" }, value, caption));
     ring.addEventListener("click", (event) => {
       event.stopPropagation();
       if (focusable && item.taskId) this.focus(item.taskId);
@@ -271,7 +282,12 @@ export class DayStripView {
     // The full kicker when it fits, else the short one ("지금 · ~14:00"); the caption a little smaller when it's long.
     requestAnimationFrame(() => {
       if (kick.isConnected && kick.scrollWidth > kick.clientWidth + 0.5) kick.textContent = kicker(strip.mode, item, lang(), true);
-      for (let size = 8.5; caption.isConnected && caption.scrollWidth > caption.clientWidth + 0.5 && size > 6.5; size -= 0.5) caption.style.fontSize = `${size - 0.5}px`;
+      // As on the Mac (StripRing.captionFit): 8.5 px on one line, else 7.5 px, else two short lines at 8 px ("20 min te gaan").
+      // "1시간" · "12 h" fit at 13 px; "23시간" a little smaller (the Mac's minimumScaleFactor 0.8).
+      if (value.isConnected && value.getBoundingClientRect().width > 40) value.style.fontSize = "10.5px";
+      const over = () => caption.scrollWidth > caption.clientWidth + 0.5;
+      if (caption.isConnected && over()) caption.style.fontSize = "7.5px";
+      if (caption.isConnected && over()) { caption.style.fontSize = ""; caption.classList.add("two"); }
     });
     return h("div", { class: "strip-lead" }, ring, column);
   }
@@ -282,7 +298,8 @@ export class DayStripView {
     if (item.kind === "event") return item.event?.location ? h("div", { class: "lead-sub" }, item.event.location) : null;
     if (focusing && state.timer) {
       const left = state.timer.endsAt !== undefined ? state.timer.endsAt - now.getTime() : state.timer.pausedRemainingMs ?? 0;
-      return h("div", { class: "lead-sub" }, `${t("집중 중")} ${timerClock(left)}`);
+      // #46: "집중 중 · 21분 남음", a length (not "12:30" under the kicker's clock times).
+      return h("div", { class: "lead-sub" }, `${t("집중 중")} · ${timerLeftText(left, lang())}`);
     }
     return h("div", { class: "lead-sub" }, t("할 일", undefined, "strip"), item.hasReminder ? icon("bell", 10, 2) : null);
   }
@@ -339,8 +356,8 @@ export class DayStripView {
   private menu(event: MouseEvent, item: StripItem): void {
     event.preventDefault();
     event.stopPropagation();
-    if (item.event) void api.act({ type: "showEventMenu", key: item.event.key });
-    else if (item.taskId) void api.act({ type: "showRowMenu", id: item.taskId });
+    if (item.event) void api.act({ type: "showEventMenu", key: item.event.key, x: event.clientX, y: event.clientY });
+    else if (item.taskId) void api.act({ type: "showRowMenu", id: item.taskId, x: event.clientX, y: event.clientY });
   }
 
   private focus(id: string): void {

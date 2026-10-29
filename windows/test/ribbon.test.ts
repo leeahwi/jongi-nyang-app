@@ -32,7 +32,7 @@ test("ribbon: 8 to 24, now, bars, rings and the next thing", () => {
   assert.deepEqual(ribbon.rings.map((ring) => ring.title), ["보고서"]);
   assert.deepEqual(ribbon.allDay.map((pill) => pill.title), ["엄마 생신"]);
   assert.equal(ribbon.current, "팀 회의");
-  assert.deepEqual(ribbon.next, { title: "치과", time: "15:30", away: "40분 뒤" });
+  assert.deepEqual(ribbon.next, { title: "치과", time: "15:30", away: "40분 뒤", minutes: 40 });
   assert.equal(ribbon.sentence, "지금 팀 회의 · 다음 15:30 치과, 40분 뒤");
 });
 
@@ -123,7 +123,7 @@ test("ribbon blocks: RB3 done faded, overdue in clay, a start alone is 30 minute
   assert.ok(Math.abs(ribbon.blocks[2].to - ribbon.blocks[2].from - 0.5 / 16) < 1e-9);
   // Done and over blocks are neither now nor next.
   assert.equal(ribbon.current, undefined);
-  assert.deepEqual(ribbon.next, { title: "혼자", time: "4:00 PM", away: "in 1 h 10 min" });
+  assert.deepEqual(ribbon.next, { title: "혼자", time: "4:00 PM", away: "in 1 h 10 min", minutes: 70 });
 });
 
 test("ribbon blocks: RB4 only on its day; 언젠가 and other days draw nothing", () => {
@@ -136,7 +136,7 @@ test("ribbon blocks: RB5 an early block stretches the track; a reminder elsewher
   const ribbon = dayRibbon([], [ranged("요가", "06:30", "07:30", { reminderAt: at(6).toISOString(), isCompleted: false })], at(5, 50), "ko")!;
   assert.equal(ribbon.startHour, 5);
   assert.deepEqual(ribbon.rings.map((ring) => ring.title), ["요가"]);
-  assert.deepEqual(ribbon.next, { title: "요가", time: "06:00", away: "10분 뒤" });
+  assert.deepEqual(ribbon.next, { title: "요가", time: "06:00", away: "10분 뒤", minutes: 10 });
 });
 
 test("ribbon blocks: RB6 다음 orders ranged tasks by their start, with reminders", () => {

@@ -20,6 +20,9 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 THEME = os.path.join(ROOT, 'Sources/PaperTodo/PaperTheme.swift')
+# 할 일 스페이스 (1.45): the colour bands' tokens live beside the spaces' views (an extension of PaperTheme).
+SPACES = os.path.join(ROOT, 'Sources/PaperTodo/TodoSpacesModel.swift')
+SPACE_COLOURS = ['Lavender', 'Pink', 'Mint', 'Yellow', 'Sky', 'Peach', 'Sand', 'Gray']
 
 PAIRS = [
     # (foreground, background, kind, where)
@@ -35,11 +38,15 @@ PAIRS = [
     ('sage', 'paper', 'text', 'links on paper'),
     ('sage', 'card', 'text', 'segmented pick'),
     ('sageText', 'paper', 'text', 'eyebrow, sage words'),
-    ('sageText', 'sage2', 'text', 'picked chip, pick banner'),
+    ('sageText', 'sage2', 'text', 'picked chip, pick banner, the list row\'s 지금 · 다음 mark (#31)'),
     ('sageText', 'card', 'text', 'sage words on a card'),
     ('onSage', 'sage', 'text', 'primary button'),
+    ('onSage', 'spaceLavender', 'large', '저녁 정리: the → in a picked round pick (#32; the pick itself is the lavender band on paper and card)'),
     ('clayText', 'paper', 'text', 'late, soon'),
     ('clayText', 'card', 'text', 'late on a card'),
+    # 1.45 (#29): every text colour on all three surfaces, as the Windows app's test/contrast.test.ts checks them.
+    ('sageText', 'paper2', 'text', 'sage words on a sunken row or chip (1.45)'),
+    ('clayText', 'paper2', 'text', 'late on a sunken row (1.45)'),
     ('clayText', 'clay2', 'text', 'soon pill, urgent card'),
     ('clay', 'clay2', 'large', 'alarm badge icon'),
     ('clay', 'paper', 'large', 'now line, focus ring (time gone by)'),
@@ -47,10 +54,23 @@ PAIRS = [
     ('sage', 'paper2', 'large', 'focus ring when the time is up'),
     ('ink', 'sage2', 'text', 'text on a sage tint'),
     ('ink', 'clay2', 'text', 'urgent card'),
-    ('ink', 'tabToday', 'text', 'active tab'),
-    ('ink', 'tabAhead', 'text', 'active tab'),
-    ('ink', 'tabMemo', 'text', 'active tab'),
-    # (Tab names and counts are drawn in ink on the tab colours, day and night.)
+    ('tabInk', 'tabToday', 'text', '오늘 tab: name and count, picked or not (1.45)'),
+    ('tabInk', 'tabAhead', 'text', '앞으로 tab: name and count, picked or not (1.45)'),
+    # (1.45: the tabs are solid and lighter at night, so their names are in tabInk — dark ink at night too.
+    # The tabs' old colours live on as tint* under ink: the settings panes' icon tiles and the help's groups.)
+    ('tabTodayEdge', 'paper', 'note', '오늘 tab edge, 1 pt (decorative, 1.45)'),
+    ('tabAheadEdge', 'paper', 'note', '앞으로 tab edge, 1 pt (decorative, 1.45)'),
+    # (1.45: the slips' tape is solid with a 1 pt edge, like the tabs — a decorative edge, shown, never fails.)
+] + [
+    (f'tape{name}Edge', f'tape{name}', 'note', f'{name.lower()} tape edge on its tape, 1 pt (decorative, 1.45)')
+    for name in ('Honey', 'Lavender', 'Sky', 'Mint', 'Rose', 'Neutral')
+] + [
+    ('ink', 'tintToday', 'large', '꾸미기 pane icon tiles, 기본 help group icons'),
+    ('ink', 'tintAhead', 'large', '알림 · AI 연결 pane icon tiles, 더 알아보기 help group icons'),
+    ('ink', 'tabMemo', 'large', '종이냥 pane icon tiles, help group icons'),
+    ('ink', 'tintToday', 'text', 'help: the entry number on its 기본 dot (ink 70 %, checked at full ink)'),
+    ('ink', 'tintAhead', 'text', 'help: the entry number on its 더 알아보기 dot'),
+    ('ink', 'tabMemo', 'text', 'help: the entry number on its 종이냥 dot'),
     ('eventBlue', 'eventTint', 'large', 'event badge icon'),
     ('memoPurple', 'memoTint', 'large', 'memo badge icon'),
     ('toastText', 'toastBack', 'text', 'toast'),
@@ -75,18 +95,28 @@ PAIRS = [
     ('ink', 'raised', 'text', 'selected pane, segmented pick'),
     ('sage', 'raised', 'text', 'segmented pick'),
     ('raised', 'paper2', 'note', 'selected row on the sidebar (decorative)'),
-    ('faint', 'paper', 'note', 'decorative marks, disabled glyphs (not text)'),
+    # faint: never text, and no mark one needs to see to use the app — a switched-off stepper's −/+ and a day one can't
+    # pick (inactive controls, outside WCAG 1.4.3 and 1.4.11), the drag grips beside rows (the hand cursor and the
+    # tooltip say it too). Shown, never fails; a mark that must be seen uses checkBorder (3:1).
+    ('faint', 'paper', 'note', 'disabled glyphs, drag grips (inactive or redundant, not text)'),
+    ('faint', 'paper2', 'note', 'disabled glyphs on a sunken row (1.45)'),
+    ('faint', 'card', 'note', 'disabled stepper −/+ on a card (1.45)'),
+    ('desk', 'paper', 'note', 'the desk under the snapshots of slips (snapshots only)'),
     ('rule', 'paper', 'note', 'ruled lines (decorative)'),
     ('marginRule', 'paper', 'note', 'the margin line (decorative)'),
     ('paper2', 'paper', 'note', 'sunken areas (decorative)'),
     ('card', 'paper', 'note', 'cards on the sheet (bordered by rule)'),
+] + [
+    # 할 일 스페이스 (1.45): the band at a today row's left end (a UI mark, 3:1) on the sheet, and on a card (the
+    # popup's and chip's dot on the input line card).
+    (f'space{name}', bg, 'large', f'space band: {name.lower()} (1.45)') for name in SPACE_COLOURS for bg in ('paper', 'card')
 ]
 
 
 def tokens():
     found = {}
     pattern = re.compile(r'static let (\w+) = token\("(#[0-9a-fA-F]{6})", night: "(#[0-9a-fA-F]{6})"\)')
-    for name, day, night in pattern.findall(open(THEME, encoding='utf-8').read()):
+    for name, day, night in pattern.findall(open(THEME, encoding='utf-8').read() + open(SPACES, encoding='utf-8').read()):
         found[name] = (day.lower(), night.lower())
     return found
 
@@ -103,7 +133,10 @@ def ratio(a, b):
     return (la + 0.05) / (lb + 0.05)
 
 
-NEED = {'text': 4.5, 'large': 3.0, 'note': 0}
+NEED = {'text': 4.5, 'large': 3.0, 'note': 0, 'same': 1.0, 'gain': 0.01}
+# #14: a card's preview is the ink at this strength over its sheet (day 0.78, night 0.86 as the mock; kraft and grid a
+# little stronger so each paper reads better than the grey before). The Windows app's --d-peek is the same colour.
+PREVIEW_INK = {'day': 0.78, 'night': 0.86, 'kraft': 0.84, 'grid': 0.80}
 
 # 하루 일정표 (1.40): an event block is its colour at 14 % over the paper by day (24 % at night, the colour at 85 %
 # brightness as PaperTheme.event draws it); its title is ink and its time line ink2 (text).
@@ -146,7 +179,9 @@ DRAWER_PAIRS = [
     ('faint', 'paper', 'text', 'drawer: footer'),
     ('icon', 'paper', 'large', 'drawer: header icons'),
     ('ink', 'sheet', 'text', 'memo sheet (B2): memo text'),
-    ('secondary', 'sheet', 'text', 'memo sheet: lines under the title'),
+    ('secondary', 'sheet', 'text', 'memo sheet: search hints, chips'),
+    ('preview', 'sheet', 'text', "memo sheet (#14): a card's preview lines, 13 pt"),
+    ('preview', 'slip', 'text', "slip (#14): a search result's line"),
     ('faint', 'sheet', 'text', 'memo sheet: time, 2/4'),
     ('icon', 'sheet', 'large', 'memo sheet: action icons'),
     ('box', 'sheet', 'large', 'memo sheet: open checkbox'),
@@ -160,7 +195,8 @@ DRAWER_PAIRS = [
     ('check', 'slip', 'large', 'slip: ticked box, progress bar'),
     ('checkOn', 'check', 'large', 'slip: tick on its box'),
     ('toastText', 'toast', 'text', 'drawer toast'),
-    ('pinTabInk', 'pinTabA', 'large', 'paw bookmark and handle'),
+    ('pinTabInk', 'pinTab', 'large', '고정 bookmark: its paw (1.45 solid)'),
+    ('pinTabEdge', 'paper', 'note', '고정 bookmark edge, 1 pt (decorative, 1.45)'),
     ('slipEdge', 'paper', 'note', 'slip edge (decorative)'),
     ('sheet', 'paper', 'note', 'a memo sheet against the drawer (decorative, 1.43.1)'),
     # 1.44 (메모 서랍을 더 쉽게)
@@ -205,11 +241,17 @@ def drawer_rows():
     for paper in ('day', 'night', 'kraft', 'grid'):
         block = re.search(r'static let %s = DrawerPalette\((.*?)scheme:' % paper, text, re.S).group(1)
         colours = {k: v.lower() for k, v in re.findall(r'(\w+): pair\("(#[0-9a-fA-F]{6})"\)', block)}
-        tab = re.search(r'pinTab: \(Color\(drawerHex: "(#[0-9a-fA-F]{6})"\)', block)
-        colours['pinTabA'] = tab.group(1).lower()
+        tab = re.search(r'pinTab: Color\(drawerHex: "(#[0-9a-fA-F]{6})"\), pinTabEdge: Color\(drawerHex: "(#[0-9a-fA-F]{6})"\)', block)
+        colours['pinTab'] = tab.group(1).lower()
+        colours['pinTabEdge'] = tab.group(2).lower()
         colours['chip'] = blend(colours['ink'], 0.07 if paper == 'night' else 0.06, colours['sheet'])
         for fg, bg, kind, where in DRAWER_PAIRS:
             rows.append((paper, fg, bg, kind, where, ratio(colours[fg], colours[bg])))
+        # #14 (option B): the preview is the ink one step lighter over the sheet, and reads better than the grey it replaced.
+        made = blend(colours['ink'], PREVIEW_INK[paper], colours['sheet'])
+        rows.append((paper, 'preview', f'ink {int(PREVIEW_INK[paper] * 100)}%', 'same', f'preview is the ink at {int(PREVIEW_INK[paper] * 100)} % over the sheet ({made})', 1.0 if made == colours['preview'] else 0.0))
+        rows.append((paper, 'preview', 'sheet', 'gain', f'preview vs the old grey (secondary {ratio(colours["secondary"], colours["sheet"]):.2f}), #14',
+                     ratio(colours['preview'], colours['sheet']) - ratio(colours['secondary'], colours['sheet'])))
         for alpha, mode in ((0.82, '반투명'), (0.62, '강하게')):
             back = blend(colours['paper'], alpha, MATERIAL[paper])
             for fg, kind in SEE_THROUGH:
@@ -226,12 +268,70 @@ def drawer_rows():
     return rows
 
 
+# 1.45: an unpicked tab is drawn 2.5 % darker (SwiftUI .brightness(-0.025)); its name must still pass on it.
+def darker(colour, amount=0.025):
+    return '#' + ''.join(f'{max(0, round(int(colour[i:i + 2], 16) - amount * 255)):02x}' for i in (1, 3, 5))
+
+
+def unpicked_tabs(table):
+    out = []
+    for tab in ('tabToday', 'tabAhead'):
+        out.append((f'tabInk on the unpicked {tab} (2.5 % darker, 1.45)', ratio(table['tabInk'][0], darker(table[tab][0])), ratio(table['tabInk'][1], darker(table[tab][1]))))
+    return out
+
+
+# 1.45: the screen-edge handle is one pale cream on every paper, day and night (MemoDrawerPanel.swift, DrawerHandleView).
+PANEL = os.path.join(ROOT, 'Sources/PaperTodo/MemoDrawerPanel.swift')
+
+
+def handle_rows():
+    text = open(PANEL, encoding='utf-8').read()
+    colours = dict(re.findall(r'static let (fill|edge|paw) = Color\(drawerHex: "(#[0-9a-fA-F]{6})"\)', text))
+    return [('paw', 'fill', 'large', 'the handle\'s paw on its cream (1.45)', ratio(colours['paw'], colours['fill'])),
+            ('edge', 'fill', 'note', 'the handle\'s soft 1 pt edge (decorative, 1.45)', ratio(colours['edge'], colours['fill']))]
+
+
+# 1.45 (#29): the Windows app draws the same tokens (windows/src/renderer/base.css, its own test/contrast.test.ts). When
+# that file is beside this app (the repository), every shared token must have the same day and night colour.
+WINDOWS_CSS = os.path.join(os.path.dirname(ROOT), 'windows/src/renderer/base.css')
+SHARED = {
+    'paper': 'paper', 'paper2': 'paper-2', 'card': 'card', 'ink': 'ink', 'ink2': 'ink-2', 'ink3': 'ink-3', 'faint': 'faint',
+    'rule': 'rule', 'sage': 'sage', 'sage2': 'sage-2', 'clay': 'clay', 'clay2': 'clay-2', 'sageText': 'sage-text',
+    'clayText': 'clay-text', 'onSage': 'on-sage', 'checkBorder': 'check-border', 'stamp': 'stamp',
+    'tabToday': 'tab-1', 'tabAhead': 'tab-2', 'tabTodayEdge': 'tab-1-edge', 'tabAheadEdge': 'tab-2-edge', 'tabInk': 'tab-ink',
+    'tabMemo': 'tab-3', 'tintToday': 'tint-1', 'tintAhead': 'tint-2', 'eventBlue': 'event-blue', 'eventTint': 'event-blue-2',
+    'memoPurple': 'memo-ink', 'memoTint': 'memo-2', 'toastAction': 'toast-action', 'toastKind': 'toast-strong',
+    'tapeHoney': 'tape-todo', 'tapeLavender': 'tape-memo', 'tapeSky': 'tape-event', 'tapeMint': 'tape-timer',
+    'tapeRose': 'tape-alarm', 'tapeNeutral': 'tape-confirm', 'tapeHoneyEdge': 'tape-todo-edge',
+    'tapeLavenderEdge': 'tape-memo-edge', 'tapeSkyEdge': 'tape-event-edge', 'tapeMintEdge': 'tape-timer-edge',
+    'tapeRoseEdge': 'tape-alarm-edge', 'tapeNeutralEdge': 'tape-confirm-edge',
+}
+
+
+def windows_differences(table):
+    if not os.path.exists(WINDOWS_CSS):
+        return None
+    css = open(WINDOWS_CSS, encoding='utf-8').read()
+    day_block = css[css.index(':root {'):css.index('}', css.index(':root {'))]
+    start = css.index(':root[data-paper="night"] {')
+    night_block = css[start:css.index('}', start)]
+    grab = lambda block: {k: v.lower() for k, v in re.findall(r'--([\w-]+):\s*(#[0-9a-fA-F]{6})', block)}
+    day = grab(day_block)
+    night = {**day, **grab(night_block)}
+    return [f'{mac} {table[mac]} ≠ Windows --{win} ({day.get(win)}, {night.get(win)})'
+            for mac, win in SHARED.items() if table[mac] != (day.get(win), night.get(win))]
+
+
 def main():
     markdown = '--markdown' in sys.argv
     table = tokens()
     missing = sorted({name for pair in PAIRS for name in pair[:2]} - set(table))
     if missing:
         sys.exit(f'Tokens not found in PaperTheme.swift: {", ".join(missing)}')
+    # 1.45 (#29): every token is in the table, so a new colour can't go unchecked.
+    unchecked = sorted(set(table) - {name for pair in PAIRS for name in pair[:2]})
+    if unchecked:
+        sys.exit(f'Tokens in PaperTheme.swift that no pair checks (add them to PAIRS): {", ".join(unchecked)}')
     failures = []
     rows = []
     for fg, bg, kind, where in PAIRS:
@@ -251,6 +351,28 @@ def main():
         if night < NEED['text']:
             failures.append(f'night {where}: {night:.2f} < 4.5')
         rows.append(('ink/ink2', 'event tint', 'text', where, day, day >= 4.5, night, night >= 4.5))
+    # 할 일 스페이스 (1.45): words on a space's tint — the band over the list (12 % over paper2), the input line's chip
+    # (16 % over paper2) and the header's pill (16 % over card), all in ink.
+    for name in SPACE_COLOURS:
+        colour = table[f'space{name}']
+        for alpha, bg, where in ((0.12, 'paper2', 'lens band'), (0.16, 'paper2', 'space chip'), (0.16, 'card', 'header pill')):
+            day = ratio(table['ink'][0], blend(colour[0], alpha, table[bg][0]))
+            night = ratio(table['ink'][1], blend(colour[1], alpha, table[bg][1]))
+            if day < NEED['text']:
+                failures.append(f'day ink on the {name} {where}: {day:.2f} < 4.5')
+            if night < NEED['text']:
+                failures.append(f'night ink on the {name} {where}: {night:.2f} < 4.5')
+            rows.append(('ink', f'{name} tint', 'text', f'{where} (1.45)', day, day >= 4.5, night, night >= 4.5))
+    for where, day, night in unpicked_tabs(table):
+        if day < NEED['text']:
+            failures.append(f'day {where}: {day:.2f} < 4.5')
+        if night < NEED['text']:
+            failures.append(f'night {where}: {night:.2f} < 4.5')
+        rows.append(('tabInk', 'unpicked', 'text', where, day, day >= 4.5, night, night >= 4.5))
+    handle = handle_rows()
+    for fg, bg, kind, where, value in handle:
+        if value < NEED[kind]:
+            failures.append(f'handle {fg} on {bg}: {value:.2f} < {NEED[kind]}')
     drawer = drawer_rows()
     for paper, fg, bg, kind, where, value in drawer:
         if value < NEED[kind]:
@@ -270,12 +392,20 @@ def main():
         for paper, fg, bg, kind, where, value in drawer:
             mark = ' ' if kind == 'note' else ('✓' if value >= NEED[kind] else '✗')
             print(f'  {paper:<6} {fg:<14} {bg:<12} {kind:<6} {value:6.2f}{mark}  {where}')
+        print('\n메모 서랍 handle (every paper, day and night):')
+        for fg, bg, kind, where, value in handle:
+            mark = ' ' if kind == 'note' else ('✓' if value >= NEED[kind] else '✗')
+            print(f'  {fg:<6} {bg:<6} {kind:<6} {value:6.2f}{mark}  {where}')
         print('\nAA: text 4.5:1, large/UI 3:1, note = decorative (not checked).')
+    differences = windows_differences(table)
+    if differences:
+        failures += [f'not the Windows app\'s colour: {line}' for line in differences]
     if failures:
         print('\n'.join(failures))
         print(f'{len(failures)} pair(s) below AA')
         sys.exit(1)
-    print(f'Day and night: all {sum(1 for r in rows if r[2] != "note")} checked pairs pass AA; 메모 서랍: all {sum(1 for r in drawer if r[3] != "note")} in its four papers.')
+    same = '' if differences is None else f'; the {len(SHARED)} shared tokens are the Windows app\'s'
+    print(f'Day and night: all {sum(1 for r in rows if r[2] != "note")} checked pairs pass AA; 메모 서랍: all {sum(1 for r in drawer if r[3] != "note")} in its four papers{same}.')
 
 
 if __name__ == '__main__':

@@ -39,6 +39,7 @@ struct DesktopPetView: View {
         GeometryReader { geometry in
             // Only moving clips need frames; resting poses draw once.
             TimelineView(.animation(minimumInterval: 1.0 / 60, paused: state.activity.action.isResting || reduceMotion)) { context in
+                let _ = PerfProbe.count("petFrame")
                 let frame = PetMotion.frame(state.activity, homeX: state.homeX, at: reduceMotion ? state.activity.start : context.date)
                 pet(frame: frame, shift: PetBubble.shift(centerX: frame.x, width: bubbleWidth, stripWidth: geometry.size.width))
                     .position(x: frame.x, y: geometry.size.height - petHeight / 2 - 2)
@@ -330,7 +331,7 @@ private struct RoundDots: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(total)번 중 \(done)번 마침")
+        .accessibilityLabel("\(total)번 중 \(done)번 했어요")
     }
 }
 

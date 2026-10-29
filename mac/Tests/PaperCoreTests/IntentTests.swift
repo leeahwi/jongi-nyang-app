@@ -211,12 +211,12 @@ private enum IntentTests {
                                   "Toegevoegd als herhalende afspraak · elke ma 09:00"], "toasts \(toasts)")
             try expect(AppLanguage.allCases.map { Intent.switchText(.repeating, language: $0) } == ["반복 할 일로 바꾸기", "Make it a repeating to-do", "Maak er een herhalende taak van"]
                        && AppLanguage.allCases.map { Intent.kindName(.repeating, language: $0) } == ["반복 할 일", "Repeating to-do", "Herhalende taak"], "words")
-            try expect(AppLanguage.allCases.map { Intent.Problem.repeating.text($0) } == ["반복을 알아듣지 못했어요", "Couldn’t read the repeat", "Kon de herhaling niet lezen"], "hint")
+            try expect(AppLanguage.allCases.map { Intent.Problem.repeating.text($0) } == ["반복을 알아듣지 못했어요. ‘/반복 매일 물 마시기’처럼 적어 보세요.", "Couldn’t read the repeat. Try ‘/repeat every day drink water’.", "De herhaling is niet duidelijk. Probeer ‘/herhaal elke dag water drinken’."], "hint")
         }
 
         try test("read: the hint texts in every language") {
-            try expect(AppLanguage.allCases.map { Intent.Problem.alarmTime.text($0) } == ["알람 시간을 알아듣지 못했어요", "Couldn’t read the alarm time", "Kon de wektijd niet lezen"], "alarm")
-            try expect(AppLanguage.allCases.map { Intent.Problem.timerLength.text($0) } == ["타이머 길이를 알아듣지 못했어요", "Couldn’t read the timer length", "Kon de timerduur niet lezen"], "timer")
+            try expect(AppLanguage.allCases.map { Intent.Problem.alarmTime.text($0) } == ["알람 시간을 알아듣지 못했어요. ‘/알람 7시’처럼 적어 보세요.", "Couldn’t read the alarm time. Try ‘/alarm 7am’.", "De wektijd is niet duidelijk. Probeer ‘/wekker 7:00’."], "alarm")
+            try expect(AppLanguage.allCases.map { Intent.Problem.timerLength.text($0) } == ["타이머 길이를 알아듣지 못했어요. ‘/타이머 40’처럼 적어 보세요.", "Couldn’t read the timer length. Try ‘/timer 40’.", "De timerduur is niet duidelijk. Probeer ‘/timer 40’."], "timer")
             try expect(Intent.slashKind("/메모 a", language: .en) == .memo && Intent.slashKind("/note a", language: .ko) == nil && Intent.slashKind("/Wekker 7", language: .nl) == .alarm, "slash kinds")
         }
 

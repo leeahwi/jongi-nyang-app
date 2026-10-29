@@ -1,26 +1,25 @@
 import { icon, paper } from "./api";
 
 /**
- * 메모 서랍's handle: a paw bookmark at the screen's edge with the number of memos changed today under it
- * (none for 0). It peeks 6 more on hover; a click opens the drawer; dragged up or down it moves along the
- * edge (the main process keeps the place). It draws when told and never on its own.
+ * 메모 서랍's handle: a paw bookmark at the screen's edge, one pale cream on every paper (1.30). The number of memos
+ * changed today is in its tooltip (`메모 서랍 · 오늘 고친 메모 5장`) and its accessible description, not on its face.
+ * It peeks 6 more on hover; a click opens the drawer; dragged up or down it moves along the edge (the main process
+ * keeps the place). It draws when told and never on its own.
  */
 const api = paper();
 const handle = document.getElementById("handle")!;
-const number = document.createElement("span");
-number.className = "n";
-handle.append(icon("pawPrint", 13, 1.8), number);
+handle.append(icon("pawPrint", 13, 1.8));
 
-interface HandleState { count: number; side: "right" | "left"; look: string; label: string }
+interface HandleState { count: number; side: "right" | "left"; look: string; label: string; tip: string; detail: string }
 
 api.on("handle:state", (payload) => {
   const value = payload as HandleState;
   document.documentElement.dataset.look = value.look;
-  handle.className = `handle c-yellow side-${value.side}`;
-  number.textContent = value.count > 0 ? String(Math.min(value.count, 99)) : "";
-  number.hidden = value.count === 0;
+  handle.className = `handle side-${value.side}`;
   handle.setAttribute("aria-label", value.label);
-  handle.title = value.label;
+  if (value.detail) handle.setAttribute("aria-description", value.detail);
+  else handle.removeAttribute("aria-description");
+  handle.title = value.tip;
 });
 
 let press: { id: number; y: number; moved: boolean } | undefined;

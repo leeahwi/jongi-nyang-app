@@ -76,7 +76,21 @@ public enum Archive {
     /// "2026-09-28", using the same 4 a.m. boundary as archiving.
     public static func dayKey(_ date: Date, calendar: Calendar = .paper) -> String {
         let parts = calendar.dateComponents([.year, .month, .day], from: logicalDayStart(date, calendar: calendar))
-        return String(format: "%04d-%02d-%02d", parts.year!, parts.month!, parts.day!)
+        let year = parts.year!, month = parts.month!, day = parts.day!
+        guard (0...9999).contains(year) else { return String(format: "%04d-%02d-%02d", year, month, day) }
+        // "%04d-%02d-%02d" by hand (#62: String(format:) was half of a key, and 완료 기록 makes thousands).
+        var bytes: [UInt8] = [48, 48, 48, 48, 45, 48, 48, 45, 48, 48]
+        func put(_ value: Int, at end: Int, digits: Int) {
+            var value = value
+            for index in stride(from: end, to: end - digits, by: -1) {
+                bytes[index] = UInt8(48 + value % 10)
+                value /= 10
+            }
+        }
+        put(year, at: 3, digits: 4)
+        put(month, at: 6, digits: 2)
+        put(day, at: 9, digits: 2)
+        return String(decoding: bytes, as: UTF8.self)
     }
 
     /// The monthly file an entry belongs to; undated entries share one file.
@@ -151,12 +165,18 @@ public enum Archive {
         return dayKey(calendar.date(byAdding: .day, value: -((weekday + 5) % 7), to: today)!, calendar: calendar)
     }
 
+    /// Sunday from 18:00 (the logical day), and not yet shown this week: the look-back's time, before the record is read.
+    public static func isLookBackTime(now: Date, lastShownWeek: String?, calendar: Calendar = .paper) -> Bool {
+        let today = logicalDayStart(now, calendar: calendar)
+        return calendar.component(.weekday, from: today) == 1
+            && (calendar.component(.hour, from: now) >= 18 || now >= calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: today))!)
+            && weekKey(now, calendar: calendar) != lastShownWeek
+    }
+
     /// The Sunday-evening look-back: is it time (Sunday from 18:00, not yet shown this week), and
     /// how many tasks were finished Monday–Sunday. nil when there's nothing to say.
     public static func weeklyLookBack(_ entries: [ArchiveEntry], now: Date, lastShownWeek: String?, calendar: Calendar = .paper) -> Int? {
-        let today = logicalDayStart(now, calendar: calendar)
-        guard calendar.component(.weekday, from: today) == 1, calendar.component(.hour, from: now) >= 18 || now >= calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: today))!,
-              weekKey(now, calendar: calendar) != lastShownWeek else { return nil }
+        guard isLookBackTime(now: now, lastShownWeek: lastShownWeek, calendar: calendar) else { return nil }
         let week = weekKey(now, calendar: calendar)
         let count = entries.filter { entry in
             guard let completed = entry.completedAt, completed <= now else { return false }
@@ -177,19 +197,71 @@ public enum Archive {
         return streak
     }
 
+    /// The day a streak reaches 7, 30 or 100 days (#42): that count, for the cat's one cheer — nil before today's first
+    /// completion, for any other count, or once it was said today (`saidOn`, the day key it was said on). A streak that
+    /// breaks says nothing.
+    public static func streakMilestone(_ days: Set<String>, today: Date, saidOn: String?, calendar: Calendar = .paper) -> Int? {
+        let key = dayKey(logicalDayStart(today, calendar: calendar), calendar: calendar)
+        guard days.contains(key), saidOn != key else { return nil }
+        let streak = currentStreak(days, today: today, calendar: calendar)
+        return [7, 30, 100].contains(streak) ? streak : nil // PetChatter.milestoneDays (Archive is built without it in some checks)
+    }
+
     public static func longestStreak(_ days: Set<String>) -> Int {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        formatter.dateFormat = "yyyy-MM-dd"
+        // Day numbers from the keys themselves (#62: a DateFormatter read each key, 30–60 ms for three years); a key
+        // that isn't "yyyy-MM-dd" in digits still goes through the formatter.
+        var formatter: DateFormatter?
+        let numbers = days.compactMap { key -> Int? in
+            if let number = dayNumber(key) { return number }
+            if formatter == nil {
+                let made = DateFormatter()
+                made.calendar = Calendar(identifier: .gregorian)
+                made.timeZone = TimeZone(identifier: "UTC")
+                made.dateFormat = "yyyy-MM-dd"
+                formatter = made
+            }
+            return formatter!.date(from: key).map { Int(($0.timeIntervalSince1970 / 86_400).rounded(.down)) }
+        }
         var best = 0, run = 0
-        var previous: Date?
-        for date in days.compactMap({ formatter.date(from: $0) }).sorted() {
-            run = previous.map { date.timeIntervalSince($0) == 86_400 } == true ? run + 1 : 1
+        var previous: Int?
+        for number in numbers.sorted() {
+            run = previous.map { number - $0 == 1 } == true ? run + 1 : 1
             best = max(best, run)
-            previous = date
+            previous = number
         }
         return best
+    }
+
+    /// Days since 1970-01-01 for "yyyy-MM-dd" (proleptic Gregorian, as the formatter reads it); nil for anything else.
+    static func dayNumber(_ key: String) -> Int? {
+        let b = Array(key.utf8)
+        guard b.count == 10, b[4] == 45, b[7] == 45 else { return nil }
+        func number(_ from: Int, _ count: Int) -> Int? {
+            var value = 0
+            for byte in b[from..<(from + count)] {
+                guard (48...57).contains(byte) else { return nil }
+                value = value * 10 + Int(byte - 48)
+            }
+            return value
+        }
+        // From 1600 on: before the Gregorian calendar's start the formatter counts days its own way.
+        guard let year = number(0, 4), year >= 1600, let month = number(5, 2), let day = number(8, 2),
+              (1...12).contains(month), day >= 1, day <= daysIn(month: month, year: year) else { return nil }
+        // Howard Hinnant's days_from_civil.
+        let y = month <= 2 ? year - 1 : year
+        let era = (y >= 0 ? y : y - 399) / 400
+        let yoe = y - era * 400
+        let doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1
+        let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+        return era * 146_097 + doe - 719_468
+    }
+
+    private static func daysIn(month: Int, year: Int) -> Int {
+        switch month {
+        case 2: (year % 4 == 0 && year % 100 != 0) || year % 400 == 0 ? 29 : 28
+        case 4, 6, 9, 11: 30
+        default: 31
+        }
     }
 
     // Dates are whole-second ISO 8601; fractional seconds (from other writers) are still read.

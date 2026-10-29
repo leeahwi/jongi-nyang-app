@@ -101,7 +101,8 @@ final class AIConnection: ObservableObject {
             try FileManager.default.createDirectory(at: settingsFolder, withIntermediateDirectories: true)
             try link.encoded().write(to: linkURL, options: .atomic)
         } catch {
-            model.storageError = L("AI 연결 파일을 쓰지 못했어요.") + "\n\(linkURL.path)"
+            // Written again whenever the switch changes.
+            model.storageError = L("AI 연결 설정을 저장하지 못했어요. 스위치를 껐다 켜면 다시 저장해 볼게요.")
         }
     }
 
@@ -162,7 +163,7 @@ final class AIConnection: ObservableObject {
         guard count > 0 else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
             guard let self else { return }
-            var toast = PaperToast(symbol: "text.bubble", text: AIText.away(count, self.language))
+            var toast = PaperToast(symbol: "bubble.left", text: AIText.away(count, self.language))
             toast.action = AIText.showAction(self.language)
             toast.seconds = 8
             toast.perform = { [weak self] in
@@ -188,7 +189,7 @@ final class AIConnection: ObservableObject {
 
     private func announce(_ entry: AIConnect.Entry, now: Date) {
         latest = (entry.id, model.history.notebook, model.calendar.events)
-        var toast = PaperToast(symbol: "text.bubble", text: AIText.toast(entry, language))
+        var toast = PaperToast(symbol: "bubble.left", text: AIText.toast(entry, language))
         toast.action = AIText.undoAction(language)
         toast.seconds = 6
         let id = entry.id
@@ -336,7 +337,7 @@ final class AIConnection: ObservableObject {
 
     /// Nothing opens .mcpb files: Claude Desktop isn't installed (닫기 · 내려받는 곳 열기).
     static var missingDesktop: SlipAlertView {
-        SlipAlertView(symbol: "text.bubble", title: L("Claude 데스크톱이 필요해요"),
+        SlipAlertView(symbol: "bubble.left", title: L("Claude 데스크톱이 필요해요"),
                       message: L("이 Mac에 Claude 데스크톱이 없어서 연결 파일을 열 수 없어요."),
                       detail: L("claude.ai/download에서 Claude 데스크톱을 설치한 뒤 다시 눌러 주세요. 설치하면 종이냥 for Claude를 넣을지 물어봐요."),
                       choices: [.init(title: L("닫기"), isCancel: true), .init(title: L("내려받는 곳 열기"), role: .primary, isDefault: true)],

@@ -10,6 +10,7 @@
 .c3 small { font: 600 9.5px/13px var(--ui); letter-spacing: 0.04em; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .c3 b { font: 600 17px/22px var(--ui); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Up to two lines (between words), so "Tomorrow · Weekdays" or a title with its time keeps both. */
+.c3 .c3-unit { font: 500 10.5px var(--ui); color: inherit; }
 .c3-small { font: 500 10.5px/14px var(--ui); color: var(--ink-2); font-variant-numeric: tabular-nums; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
 .c3.empty b { color: var(--ink-3); font-weight: 500; }
 .c3.empty .c3-small { color: var(--ink-3); }

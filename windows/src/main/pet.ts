@@ -4,7 +4,7 @@ import {
   clampFloorX, clipMs, idleChoices, petFrame, petSize, pickWeighted, sleepAfterSeconds, stripHeight, wakeWithinSeconds,
   type PetAction, type PetPayload, type Rect,
 } from "../core/pet";
-import { logicalDayStart } from "../core/archive";
+import { dayKey, groupByDay, logicalDayStart, streakMilestone, type ArchiveEntry } from "../core/archive";
 import type { ChatterEvents } from "../core/calendar";
 import { isQuietHour, nextChatterDelay, pettedChatter, pickChatter, type ChatterContext, type ChatterLine, type ChatterPose } from "../core/chatter";
 import { key as dueKey } from "../core/deadline";
@@ -32,6 +32,8 @@ export interface PetHooks {
   drawer(): void;
   /** 알람…: Settings → 시계. */
   alarms(): void;
+  /** Everything finished (the record and the list), for the streak's cheer (#42). */
+  finished(): readonly ArchiveEntry[];
 }
 
 const defaultHomeFraction = 0.78;
@@ -323,6 +325,8 @@ export class DesktopPet {
     const prefs = this.store.prefs;
     const line = pickChatter(this.chatterContext(), prefs.chatterQuestions, prefs.chatterRecent ?? [], random, lang());
     this.store.setPref("chatterRecent", [line.id, ...(prefs.chatterRecent ?? []).filter((id) => id !== line.id)].slice(0, 12));
+    // A streak's cheer is said once, that day (#42).
+    if (line.id.startsWith("m.")) this.store.setPref("chatterMilestoneDay", dayKey(logicalDayStart(new Date())));
     this.nextChatter = Date.now() + nextChatterDelay(prefs.chatterFrequency, Math.random);
     if (line.answers.length > 0) {
       this.hush();
@@ -353,7 +357,14 @@ export class DesktopPet {
       dueSoon: waiting.filter((day) => day === todayKey || day === tomorrowKey).length,
       firstOpen: open[0]?.title, weekday: now.getDay(),
       ...this.eventContext(),
+      ...this.milestoneContext(now),
     };
+  }
+
+  /** A streak that reached 7, 30 or 100 days today, not yet cheered. */
+  private milestoneContext(now: Date): Partial<ChatterContext> {
+    const milestone = streakMilestone(groupByDay(this.hooks.finished()), now, this.store.prefs.chatterMilestoneDay || undefined);
+    return milestone === undefined ? {} : { milestone };
   }
 
   /** Today's events, when any are kept: the next one, the one going on, one that just ended. */

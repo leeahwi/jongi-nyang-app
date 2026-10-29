@@ -12,8 +12,11 @@ for file in server/index.js jongi-nyang.mcpb; do
         exit 1
     fi
 done
-swift build -c release -Xswiftc -warnings-as-errors
-binary_directory="$(swift build -c release --show-bin-path)"
+# Source paths end up in the binary (#file in assertions and logs); write them relative to the
+# package so the app doesn't carry this machine's home folder.
+prefix_map=(-Xswiftc -file-prefix-map -Xswiftc "$task_root=.")
+swift build -c release -Xswiftc -warnings-as-errors "${prefix_map[@]}"
+binary_directory="$(swift build -c release "${prefix_map[@]}" --show-bin-path)"
 bundle="$task_root/dist/종이냥.app"
 mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
 cp "$binary_directory/PaperTodo" "$bundle/Contents/MacOS/PaperTodo"

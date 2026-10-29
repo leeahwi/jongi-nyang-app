@@ -80,6 +80,8 @@
 | --- | --- | --- |
 | `../readme/cat.png` | README 머리의 고양이 | README |
 | `../readme/input-line-ko.gif`, `input-line-en.gif` | 입력 줄에 세 줄을 차례로 적자 알람, 할 일, 일정 칩이 쌓이는 움직이는 그림 | README, 링크 |
+| `../readme/cards/<기능>-<ko|en>-<light|dark>.png` (1600 × 900) | 기능 카드: 한 줄로 적기(GIF) · 하루 · 집중 · 고양이 · 메모 서랍 · 스페이스 · Claude. 종이색 판 위에 실제 화면을 같은 여백과 그림자로 놓았다. `python3 -I tools/readme-cards/make.py`로 다시 만든다 | README, 릴리스 노트 |
+| `../readme/cards/spaces-ko-light.png` (+ `en`, `dark`) | 할 일 스페이스(1.45): 색 띠가 붙은 오늘 한 장과 ‘회사만 보는 중’으로 거른 같은 노트 | README, 사례 글, 릴리스 노트 |
 
 ## 다시 그리는 방법
 

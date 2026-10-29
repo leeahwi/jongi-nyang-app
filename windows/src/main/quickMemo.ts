@@ -70,7 +70,7 @@ export class QuickMemo {
       globalShortcut.unregister(quickMemoAccelerator);
       this.registered = false;
     }
-    const problem = wanted && !this.registered ? t("다른 앱이 Ctrl+Alt+M을 쓰고 있어 켜지 못했어요. 그 앱의 단축키를 바꾸고 다시 켜 보세요.") : undefined;
+    const problem = wanted && !this.registered ? t("다른 앱이 Ctrl+Alt+M을 쓰고 있어요. 그 앱의 단축키를 바꾼 뒤 다시 켜 주세요.") : undefined;
     if (problem !== this.store.memoShortcutProblem) {
       this.store.memoShortcutProblem = problem;
       this.store.changed();

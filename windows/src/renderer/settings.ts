@@ -18,7 +18,11 @@ import { paneTitle } from "./deskPanes";
 import { chatterFrequencyTitles } from "../core/chatter";
 import { timerSizes, timerSizeTitles } from "../core/timerWidget";
 import { sweepTimes } from "../core/sweep";
-import { defaultDrawerShortcut, readShortcut, shortcutLabel, type DrawerBackdrop, type DrawerTheme } from "../core/memoDrawer";
+import { defaultDrawerShortcut, drawerWidth, readShortcut, shortcutLabel, type DrawerBackdrop, type DrawerTheme } from "../core/memoDrawer";
+import { liveSpaces, newSpaceID, nextSpaceColor, spaceColor, spaceColors, spaceIndexOf, spaceObjectWords, type SpaceColor, type TodoSpace } from "../core/todoSpaces";
+import { toaster } from "./slip";
+import { openMenu, type MenuHost } from "./drawerMenu";
+import { folderPlace, placeSeparator, placeText } from "../core/storage";
 
 const api = paper();
 let state: AppState;
@@ -37,7 +41,7 @@ const styles: ReminderStyle[] = ["compact", "paper", "character"];
 
 /** What each pane is for, under its name (the desk's pane header). */
 const subtitles: Record<Tab, string> = {
-  appearance: t("언어 · 종이 색 · 글꼴과 글자 크기를 정해요."),
+  appearance: t("언어와 종이 색, 글꼴과 글자 크기를 정해요."),
   notifications: t("주기 알림과 알림 모양을 정하고, 미리보기로 확인해요."),
   repeat: t("반복하는 날마다 목록에 한 줄씩 놓여요."),
   pet: t("종이냥을 보이거나 숨기고, 돌아다닐지, 말을 걸지 정해요."),
@@ -46,41 +50,34 @@ const subtitles: Record<Tab, string> = {
   storage: t("할 일과 기록이 저장되는 곳, 다른 컴퓨터로 옮기는 백업이에요."),
   ai: t("Claude와 이야기하면서 할 일과 일정을 보고, 넣고, 고쳐요."),
   drawer: t("화면 끝에서 메모를 꺼내 보고, 바로 적고, 그 자리에서 고쳐요."),
+  spaces: t("할 일을 회사 · 집처럼 나눠요. 오늘 한 장은 그대로예요."),
 };
 
 const set = <K extends keyof Prefs>(key: K, value: Prefs[K]) => api.act({ type: "setPref", key, value });
 
-function group(label: string, content: Node[], foot?: string, warn = false): HTMLElement {
-  return h("div", { class: "group" }, h("div", { class: "label" }, label), h("div", { class: "card" }, ...content), foot ? h("div", { class: `foot${warn ? " warn" : ""}` }, wrapText(foot)) : null);
+/** A titled card of rows, and its footnote; `more` (a 도움말 topic) ends the footnote in ‘자세히’, which opens it (#21). */
+function group(label: string, content: Node[], foot?: string, warn = false, more?: string): HTMLElement {
+  const footnote = foot ? h("div", { class: `foot${warn ? " warn" : ""}` }, wrapText(foot)) : null;
+  if (footnote && more) {
+    const link = h("button", { class: "textlink more" }, t("자세히"));
+    link.addEventListener("click", () => api.act({ type: "openHelp", topic: more }));
+    footnote.append(" ", link);
+  }
+  return h("div", { class: "group" }, h("div", { class: "label" }, label), h("div", { class: "card" }, ...content), footnote);
 }
 
-const pathMeasure = document.createElement("canvas").getContext("2d")!;
-
 /**
- * A folder's place on one line: the start and the end of the path with "…" between them when it is
- * longer than the row (as on the Mac); the whole path in the tooltip and when copied.
+ * A storage folder's place (1.30, core/storage.ts folderPlace): the places it is in faint and cut from the front when
+ * long, then its own name in full and a little bolder — "~ › AppData › Roaming › PaperTodo", "OneDrive › 종이냥" (as
+ * on the Mac). The whole path in the tooltip and when copied.
  */
-function folderPath(path: string): HTMLElement {
-  const element = h("div", { class: "folder-path", title: path, "aria-label": t("폴더 위치 {path}", { path }) }, path);
-  const fit = () => {
-    const width = element.clientWidth;
-    if (!width) return;
-    const style = getComputedStyle(element);
-    pathMeasure.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-    const fits = (text: string) => pathMeasure.measureText(text).width <= width - 2;
-    if (fits(path)) { element.textContent = path; return; }
-    // The most characters that fit, 40 % from the start and 60 % from the end (the folder's own name).
-    const shortened = (keep: number) => { const head = Math.ceil(keep * 0.4); return `${path.slice(0, head)}…${path.slice(path.length - (keep - head))}`; };
-    let low = 0, high = path.length - 1;
-    while (low < high) {
-      const middle = Math.ceil((low + high) / 2);
-      if (fits(shortened(middle))) low = middle; else high = middle - 1;
-    }
-    element.textContent = shortened(low);
-  };
-  new ResizeObserver(fit).observe(element);
-  void document.fonts.ready.then(fit);
-  element.addEventListener("copy", (event) => { event.preventDefault(); event.clipboardData?.setData("text/plain", path); });
+function folderPlaceLine(folder: string): HTMLElement {
+  // A drive letter or \\server: a Windows path (the snapshots, drawn on a Mac, have Mac ones).
+  const place = folderPlace(folder, state.storage.home, /^[a-z]:[\\/]|^\\\\/i.test(folder));
+  const lead = place.lead.length ? h("span", { class: "fp-lead" }, h("bdi", {}, `${place.lead.join(placeSeparator)} ›`)) : null;
+  const element = h("div", { class: "folder-place", title: folder, "aria-label": t("폴더 위치 {path}", { path: placeText(place) }) },
+    lead, h("span", { class: "fp-name" }, place.name));
+  element.addEventListener("copy", (event) => { event.preventDefault(); event.clipboardData?.setData("text/plain", folder); });
   return element;
 }
 
@@ -91,8 +88,12 @@ function glyph(name: string): HTMLElement {
 
 /** The pane's header: its name and what it is for (꾸미기 keeps one small cat). */
 function paneHead(): HTMLElement {
+  // 메모 서랍: 서랍 열기 in the header, not in a row about something else (#27).
+  const open = tab === "drawer" ? h("button", { class: "action primary ph-action" }, icon("pawPrint", 13), t("서랍 열기")) : null;
+  open?.addEventListener("click", () => api.act({ type: "drawer", command: "open" }));
   return h("header", { class: "pane-head" },
     h("div", { class: "ph-text" }, h("h1", {}, paneTitle(tab)), h("p", { class: "ph-sub" }, subtitles[tab])),
+    open,
     tab === "appearance" ? h("img", { class: "ph-cat", src: "../../assets/pet/256/groom.png", alt: "", draggable: "false" }) : null);
 }
 
@@ -119,8 +120,8 @@ function intervalTitle(minutes: number): string {
 
 function statusText(): string {
   const { prefs, nextPeriodicDue } = state;
-  if (!prefs.reminderEnabled) return t("꺼져 있어요. 켜면 노트를 쓰는 동안에는 잠시 기다렸다 알려줘요.");
-  if (!state.items.some((item) => !item.isCompleted && pageOf(item, new Date()) === "today")) return t("남은 할 일이 생기면 알려드려요.");
+  if (!prefs.reminderEnabled) return t("꺼져 있어요. 켜면 노트를 쓰는 동안에는 잠시 기다렸다 알려 줘요.");
+  if (!state.items.some((item) => !item.isCompleted && pageOf(item, new Date()) === "today")) return t("남은 할 일이 생기면 알려 줘요.");
   if (nextPeriodicDue) {
     const at = new Date(nextPeriodicDue);
     return t("다음 알림 {time} · 노트를 쓰는 동안은 잠시 기다려요.", { time: spokenTime(at.getHours(), at.getMinutes(), lang()) });
@@ -154,7 +155,7 @@ function appearance(): Node[] {
     h("span", { style: "font-size:17px;color:var(--secondary)" }, t("가")));
   sizeRow.children[1].classList.add("wide");
 
-  const startRow = h("div", { class: "row" }, glyph("power"), h("span", { class: "grow" }, t("Windows 시작 시 종이냥 실행")),
+  const startRow = h("div", { class: "row" }, glyph("power"), h("span", { class: "grow" }, t("컴퓨터를 켤 때 같이 열기")),
     toggle(prefs.openAtLogin, t("Windows 시작 시 실행"), (value) => set("openAtLogin", value)));
   // 작업 표시줄에 남은 개수: the taskbar button's small number (Windows).
   const badgeRow = h("div", { class: "row" }, glyph("bellDot"), h("span", { class: "grow" }, t("작업 표시줄에 남은 개수")),
@@ -168,36 +169,38 @@ function appearance(): Node[] {
     toggle(prefs.noteHotkey, t("어디서든 노트 보이기 · 숨기기"), (value) => set("noteHotkey", value)));
   // 빠른 메모를 열 때 복사한 글 넣기: the text copied since it last opened, ready (and selected) in the empty memo.
   const clipRow = h("div", { class: "row" }, glyph("share"),
-    h("div", { class: "grow" }, h("div", {}, t("빠른 메모를 열 때 복사한 글 넣기")), h("div", { class: "sub" }, t("빈 메모를 열면 방금 복사한 글이 골라진 채로 들어가요. 그냥 적으면 바뀌어요."))),
+    h("div", { class: "grow" }, h("div", {}, t("빠른 메모를 열 때 복사한 글 넣기")), h("div", { class: "sub" }, t("빈 메모를 열면 방금 복사한 글이 골라진 채로 들어가요."))),
     toggle(prefs.quickMemoClipboard, t("빠른 메모를 열 때 복사한 글 넣기"), (value) => set("quickMemoClipboard", value)));
   // Another app holding a shortcut is said in the foot, in the accent colour.
   const shortcutProblems = [prefs.quickEntry ? state.shortcutProblem : undefined, prefs.quickMemo ? state.memoShortcutProblem : undefined, prefs.noteHotkey ? state.noteShortcutProblem : undefined].filter(Boolean) as string[];
   const quickFoot = shortcutProblems.length > 0
     ? shortcutProblems.join(" ")
-    : `${t("어떤 앱을 쓰다가도 Ctrl+Alt+N을 누르면 작은 종이가 떠요. ‘내일 3시 엄마께 전화’, ‘금요일까지 보고서’처럼 적으면 알림·마감을 알아서 정해요. ‘내일 3시 회의’는 일정이 돼요.")} ${t("Ctrl+Alt+M은 몇 줄을 바로 메모 서랍에 넣는 빠른 메모예요.")} ${t("Ctrl+Alt+J는 노트를 불러오거나 넣어 둬요.")}`;
+    : `${t("어떤 앱을 쓰다가도 Ctrl+Alt+N을 누르면 작은 종이가 떠요. 적은 말에 맞춰 알림 · 마감 · 일정을 정해요.")} ${t("Ctrl+Alt+M은 몇 줄을 바로 메모 서랍에 넣는 빠른 메모예요.")} ${t("Ctrl+Alt+J는 노트를 불러오거나 넣어 둬요.")}`;
 
   // 언어: 자동 (the system's) or one of the three, each named in its own language; changing it restarts the app.
   const languages: { value: LanguageSetting; title: string }[] = [{ value: "auto", title: t("자동") }, ...(["ko", "en", "nl"] as const).map((value) => ({ value, title: nativeName[value] }))];
-  const languageRow = h("div", { class: "row language" }, glyph("globe"), h("span", { class: "grow" }, t("언어")),
+  const languageRow = h("div", { class: "row language" }, glyph("globe"), h("span", { class: "grow" }, t("앱 언어")),
     segmented(languages, prefs.language, (value) => set("language", value), t("언어")));
   // 종이 색: 자동 follows Windows' light or dark mode; 낮 and 밤 keep one.
   const papers: { value: PaperSetting; title: string }[] = [{ value: "auto", title: t("자동") }, { value: "day", title: t("낮") }, { value: "night", title: t("밤") }];
-  const paperRow = h("div", { class: "row paper" }, glyph(prefs.paper === "day" ? "sun" : "moon"), h("span", { class: "grow" }, t("종이 색")),
+  // The icon follows the choice: half and half for 자동, a sun for 낮, a moon for 밤 (as on the Mac).
+  const paperRow = h("div", { class: "row paper" }, glyph(prefs.paper === "day" ? "sun" : prefs.paper === "night" ? "moon" : "contrast"), h("span", { class: "grow" }, t("종이 색")),
     segmented(papers, prefs.paper, (value) => set("paper", value), t("종이 색")));
   // The due-style samples: a row's badge for a deadline three days off, as each style writes it (core label()).
   const [ddaySample, dateSample] = { ko: ["D-3", "~금"], en: ["3 days left", "by Fri"], nl: ["nog 3 dagen", "tot vr"] }[lang()]; // i18n-ok
 
   return [
     group(t("언어"), [languageRow]),
-    group(t("종이 색"), [paperRow], t("자동은 Windows의 밝게 · 어둡게 모드를 따라가요. 밤 종이는 불 끈 방의 종이 색이에요.")),
-    preview,
+    group(t("종이"), [paperRow], t("자동은 Windows의 밝게 · 어둡게 모드를 따라가요. 밤 종이는 불 끈 방의 종이 색이에요.")),
+    // The sample sheet, named like every other group (#21).
+    h("div", { class: "group" }, h("div", { class: "label" }, t("미리보기")), preview),
     group(t("글꼴"), fontRows),
     group(t("글자 크기"), [sizeRow], t("Ctrl + = 와 Ctrl + − 로도 바꿀 수 있어요.")),
     group(t("마감 표시"), [h("div", { class: "row" }, glyph("flag"), h("span", { class: "grow" }, t("마감을 이렇게 보여 주기")),
       segmented([{ value: "dday", title: ddaySample }, { value: "date", title: dateSample }], prefs.dueStyle, (style) => set("dueStyle", style), t("마감 표시 방식")))],
       t("할 일의 알림 → 마감에서 오늘까지·이번 주 안·이번 달 안·날짜를 정해요. 지난 마감은 붉게 표시돼요.")),
-    group(t("시작"), [startRow, badgeRow], t("작업 표시줄 단추에 오늘 남은 할 일 수를 작게 띄워요. 점프 목록(작업 표시줄 단추 우클릭)에는 빠른 입력 · 빠른 메모 · 책상 · 25분 집중 · 5분 타이머가 있어요.")),
-    group(t("빠른 입력"), [quickRow, memoRow, noteRow, clipRow], quickFoot, shortcutProblems.length > 0),
+    group(t("시작"), [startRow, badgeRow], t("작업 표시줄 단추를 우클릭하면 빠른 입력 · 빠른 메모 · 책상 · 타이머를 바로 열 수 있어요.")),
+    group(t("빠른 입력"), [quickRow, memoRow, noteRow, clipRow], quickFoot, shortcutProblems.length > 0, "quick"),
   ];
 }
 
@@ -212,15 +215,18 @@ function completedGroup(): HTMLElement {
   }
   archiveSelect.addEventListener("change", () => set("archiveAfterDays", Number(archiveSelect.value) as Prefs["archiveAfterDays"]));
   const archiveRow = h("div", { class: "row" }, glyph("calendar"), h("span", { class: "grow" }, t("완료한 일 기록으로 옮기기")), archiveSelect);
-  const historyButton = h("button", { class: "row choice" }, glyph("sparkles"), h("span", { class: "grow" }, t("완료 기록 보기")), h("span", { style: "color:var(--faded)" }, "Ctrl+H ›"));
-  const openArchive = h("button", { class: "action small", title: t("탐색기에서 완료 기록 폴더 열기 (월별 파일, 예: 2026-10.jsonl)") }, t("열기"));
+  // The desk's own 완료 기록 icon (1.30).
+  const historyButton = h("button", { class: "row choice" }, glyph("leaf"), h("span", { class: "grow" }, t("완료 기록 보기")), h("span", { style: "color:var(--faded)" }, "Ctrl+H ›"));
+  const openArchive = h("button", { class: "action small", title: t("탐색기에서 완료 기록 폴더 열기") }, t("열기"));
   openArchive.addEventListener("click", () => api.act({ type: "openArchiveFolder" }));
   const archiveFolderRow = h("div", { class: "row storage" }, glyph("folder"),
-    h("div", { class: "grow" }, h("div", {}, t("기록 폴더")), folderPath(state.storage.archivePath)), openArchive);
+    h("div", { class: "grow" }, h("div", {}, t("기록 폴더")), folderPlaceLine(state.storage.archivePath)), openArchive);
   historyButton.addEventListener("click", () => api.act({ type: "openHistory" }));
   const archiveFoot = prefs.archiveAfterDays === 0
     ? t("완료한 일이 목록에 계속 남아요. ⋯ → 완료한 일 정리로 직접 지울 수 있어요.")
-    : t("완료한 일은 그날(새벽 4시 기준)이 지나면 목록에서 빠져 월별 기록 파일로 옮겨져요. 기록은 책상 → 완료 기록에서 볼 수 있어요.");
+    : prefs.archiveAfterDays === 1 ? t("끝낸 일은 다음 날 새벽 4시에 완료 기록으로 옮겨요.")
+    : prefs.archiveAfterDays === 3 ? t("끝낸 일은 3일 뒤 새벽 4시에 완료 기록으로 옮겨요.")
+    : t("끝낸 일은 7일 뒤 새벽 4시에 완료 기록으로 옮겨요.");
 
   return group(t("완료한 일"), [archiveRow, historyButton, archiveFolderRow], archiveFoot);
 }
@@ -228,14 +234,14 @@ function completedGroup(): HTMLElement {
 /** 저장과 백업: where the list lives (this PC or a shared folder), and the .jongi backup to move it. */
 function storagePane(): Node[] {
   const { storage } = state;
-  const choose = h("button", { class: "action small" }, icon("folder", 13), t("다른 폴더…"));
+  const choose = h("button", { class: "action small", title: t("폴더를 고르면 종이냥이 다시 시작돼요") }, icon("folder", 13), t("다른 폴더…"));
   choose.addEventListener("click", () => api.act({ type: "chooseStorage" }));
-  const reset = h("button", { class: "action small", title: t("이 PC의 기본 위치(%APPDATA%\\PaperTodo)로 돌아가요") }, t("기본으로"));
+  const reset = h("button", { class: "action small", title: t("이 PC의 기본 위치로 돌아가요") }, t("기본으로"));
   reset.disabled = !storage.custom;
   reset.addEventListener("click", () => api.act({ type: "resetStorage" }));
   const whereRow = h("div", { class: "row storage" }, glyph("folder"),
     h("div", { class: "grow" }, h("div", { class: "where" }, h("span", {}, t("저장 폴더")), h("span", { class: "kind" }, storage.custom ? t("공유 폴더") : t("이 PC (기본)"))),
-      folderPath(storage.path)));
+      folderPlaceLine(storage.path)));
   const openFolder = h("button", { class: "action small", title: t("탐색기에서 저장 폴더 열기") }, icon("arrow", 13), t("폴더 열기"));
   openFolder.addEventListener("click", () => api.act({ type: "openDataFolder" }));
   const actionsRow = h("div", { class: "row storage-actions" }, openFolder, h("span", { class: "grow" }), reset, choose);
@@ -245,13 +251,13 @@ function storagePane(): Node[] {
   exportButton.addEventListener("click", () => api.act({ type: "exportBackup" }));
   const importButton = h("button", { class: "action small", title: t("내보낸 .jongi 파일을 합치거나 바꿔 넣기") }, icon("arrowDown", 13), t("가져오기…"));
   importButton.addEventListener("click", () => api.act({ type: "importBackup" }));
-  const backupRow = h("div", { class: "row storage-actions" }, glyph("share"), h("span", { class: "grow" }, t("모두 한 파일로")), exportButton, importButton);
+  const backupRow = h("div", { class: "row storage-actions" }, glyph("share"), h("span", { class: "grow" }, t("백업 파일")), exportButton, importButton);
 
   return [
-    group(t("저장 위치"), [whereRow, actionsRow], t("할 일 · 메모 · 반복 할 일 · 일정 · 알람과 완료 기록(archive 폴더) · 집중 기록(focus.jsonl)이 이 폴더에 저장돼요. iCloud Drive · OneDrive · Dropbox 같은 폴더를 고르면 다른 기기의 종이냥과 같은 목록을 써요. 다른 기기에서도 같은 폴더를 골라요.")),
+    group(t("저장 위치"), [whereRow, actionsRow], t("할 일 · 메모 · 일정 · 기록이 모두 이 폴더에 있어요. OneDrive 같은 공유 폴더를 고르면 다른 기기와 같은 목록을 써요."), false, "data"),
     completedGroup(),
     group(t("백업 · 옮기기"), [backupRow],
-      t("다른 컴퓨터로 옮길 때: 여기서 내보낸 .jongi 파일을 그 컴퓨터의 종이냥에서 가져오면 할 일 · 메모 · 반복 · 일정 · 알람 · 완료 기록 · 집중 기록이 그대로 옮겨져요. Mac과 Windows 사이도 돼요.")),
+      t("내보낸 백업 파일(.jongi)을 다른 컴퓨터의 종이냥에서 가져오면 모두 그대로 옮겨져요. Mac ↔ Windows도 돼요."), false, "backup"),
   ];
 }
 
@@ -272,7 +278,7 @@ function aiPane(): Node[] {
   const copy = h("button", { class: "action small" }, ai.copied ? icon("check", 13) : icon("keyboard", 13), ai.copied ? t("복사했어요") : t("Claude Code 명령 복사"));
   copy.addEventListener("click", () => api.act({ type: "aiCopyCommand" }));
   const codeRow = h("div", { class: "row ai-connect" }, glyph("keyboard"),
-    h("div", { class: "grow" }, h("div", {}, "Claude Code"), h("div", { class: "sub" }, t("명령을 복사해 터미널에 붙여 넣어요. 종이냥이 Node 대신 실행해요.")), folderPath(ai.command)), copy);
+    h("div", { class: "grow" }, h("div", {}, "Claude Code"), h("div", { class: "sub" }, t("복사한 명령을 터미널에 붙여 넣어요. Node.js는 없어도 돼요."))), copy);
 
   const rows: Node[] = [];
   if (ai.recent.length === 0) rows.push(h("div", { class: "row ai-empty" }, t("아직 없어요")));
@@ -294,9 +300,9 @@ function aiPane(): Node[] {
     }
   }
   return [
-    group(t("AI 연결"), [enabledRow], t("켜 두면 Claude가 할 일 · 일정 · 메모를 보고, 새로 넣고, 바꾸기 전과 후를 먼저 보여 준 뒤 ‘응’을 받으면 고쳐요. 지우지는 못해요. 끄면 Claude는 아무것도 읽지 못해요.")),
-    group(t("연결하기"), [desktopRow, codeRow], t("따로 켜 두는 프로그램은 없어요. Claude가 대화에 필요할 때만 종이냥 for Claude를 실행하고, Claude를 끄면 같이 꺼져요. 연결하면 AI 연결이 켜져요.")),
-    group(t("최근 AI 작업"), rows, t("오늘과 어제 Claude가 한 일이에요. 되돌리기는 그 뒤로 바뀌지 않은 항목만 되돌려요. Claude가 넣거나 고친 할 일과 일정에는 그날 동안 작은 도장이 찍혀요.")),
+    group(t("AI 연결"), [enabledRow], t("켜면 Claude가 할 일 · 일정 · 메모를 보고 새로 넣어요. 고칠 땐 먼저 물어보고, 지우지는 못해요. 읽은 내용은 대화와 함께 Claude로 가요."), false, "ai"),
+    group(t("연결하기"), [desktopRow, codeRow], t("따로 켜 두는 프로그램은 없어요. 연결하면 위 스위치도 켜져요.")),
+    group(t("최근 AI 작업"), rows, t("되돌리기는 그 뒤로 바뀌지 않은 항목만 되돌려요. Claude가 넣거나 고친 줄에는 그날 동안 작은 도장이 찍혀요.")),
   ];
 }
 
@@ -321,7 +327,7 @@ function styleTile(style: ReminderStyle): HTMLElement {
 function notifications(): Node[] {
   const { prefs } = state;
   const enabled = h("div", { class: "row", style: "padding-top:8px;padding-bottom:8px" }, glyph("bellDot"),
-    h("div", { class: "grow" }, h("div", {}, t("남은 할 일 알려주기")), h("div", { class: "sub" }, t("할 일이 남아 있을 때만 종이냥이 한 번에 모아서 알려줘요."))),
+    h("div", { class: "grow" }, h("div", {}, t("남은 할 일 알려주기")), h("div", { class: "sub" }, t("할 일이 남아 있을 때만 종이냥이 한 번에 모아서 알려 줘요."))),
     toggle(prefs.reminderEnabled, t("남은 할 일 알려주기"), (value) => set("reminderEnabled", value)));
 
   const interval = h("select", { "aria-label": t("간격") });
@@ -335,10 +341,6 @@ function notifications(): Node[] {
   const intervalRow = h("div", { class: `row${prefs.reminderEnabled ? "" : " disabled"}` }, glyph("timer"), h("span", { class: "grow" }, t("간격")), interval);
   const durationRow = h("div", { class: `row${prefs.reminderEnabled ? "" : " disabled"}` }, glyph("hourglass"), h("span", { class: "grow" }, t("화면에 머무는 시간")),
     segmented([10, 15, 25].map((seconds) => ({ value: seconds, title: t("{seconds}초", { seconds }) })), prefs.displaySeconds, (seconds) => set("displaySeconds", seconds), t("표시 시간")));
-
-  const perTask = h("div", { class: "row", style: "padding-top:10px;padding-bottom:10px" }, glyph("clock"),
-    h("span", { class: "grow", style: "font-size:12px;color:var(--secondary);line-height:1.5" },
-      t("할 일 줄의 알림 버튼에서 시각을 정해요. 같은 때 울릴 알림은 말풍선 하나에 모아 보여줘요.")));
 
   // 시스템 알림으로도 보내기: Windows' own notifications too — only what couldn't be shown here, always, or never.
   const systemRow = h("div", { class: "row" }, glyph("bell"), h("span", { class: "grow" }, t("시스템 알림으로도 보내기")),
@@ -363,10 +365,12 @@ function notifications(): Node[] {
     toggle(prefs.morningPick, t("오늘 꼭 하나"), (value) => set("morningPick", value)));
 
   return [
-    group(t("알림 모양"), [h("div", { class: "tiles", role: "radiogroup", "aria-label": t("알림 모양") }, ...styles.map(styleTile))]),
+    // 할 일별 알림 was a card of words only, like a row one could press (#21): now this group's footnote.
+    group(t("알림 모양"), [h("div", { class: "tiles", role: "radiogroup", "aria-label": t("알림 모양") }, ...styles.map(styleTile))],
+      t("할 일마다 알림은 할 일 줄의 알림 버튼에서 정해요. 같은 때 울릴 알림은 한 번에 모아 보여 줘요.")),
     group(t("주기 알림"), [enabled, intervalRow, durationRow], statusText()),
-    group(t("할 일별 알림"), [perTask, systemRow], t("놓친 것만: 고양이와 노트가 모두 숨어 있거나 화면이 잠겨 있을 때만 Windows 알림으로도 보내요. 알림에서 바로 끝냄 · 10분 뒤를 고를 수 있어요.")),
     group(t("하루 정리"), [sweepRow, sweepTimeRow, pickRow], t("저녁 정리는 하루 한 번 와요. 그날 저녁을 놓치면 다음 날 처음 노트를 열 때 물어봐요.")),
+    group(t("시스템 알림"), [systemRow], t("놓친 것만: 고양이와 노트가 모두 숨어 있거나 화면이 잠겨 있을 때만 Windows 알림으로도 보내요."), false, "alerts"),
   ];
 }
 
@@ -399,6 +403,47 @@ function seriesForm(entry: Series | undefined): HTMLElement {
   return h("div", { class: "series-form" }, title, fields.element, h("div", { class: "form-actions" }, h("span", { class: "spacer" }), cancel, save));
 }
 
+// #22: the list panes (반복 · 시계 · 스페이스) add and delete the same way, as on the Mac (DeskListRows.swift): `+ 새 …` is
+// the card's last row, a row's trash shows only under the pointer (or with the keyboard on it), a row's right-click
+// has 고치기 · 지우기, and a delete leaves 지웠어요 · 되돌리기.
+
+/** The list card's last row: + and the words in sage. */
+function addRow(label: string, run: () => void): HTMLElement {
+  const button = h("button", { class: "row choice list-add" }, icon("plus", 14), h("span", { class: "grow" }, label));
+  button.addEventListener("click", run);
+  return button;
+}
+
+const rowMenuHost: MenuHost = { container: document.body };
+
+/** A row's right-click: 고치기 · 지우기 (the same icons as a to-do's menu). */
+function rowMenu(row: HTMLElement, label: string, edit: (() => void) | undefined, remove: () => void): void {
+  row.addEventListener("contextmenu", (event) => {
+    if ((event.target as HTMLElement).closest("input, textarea")) return;
+    event.preventDefault();
+    openMenu(rowMenuHost, [
+      ...(edit ? [{ kind: "item" as const, label: t("고치기"), icon: "edit", run: edit }, { kind: "sep" as const }] : []),
+      { kind: "item", label: t("지우기"), icon: "trash", danger: true, run: remove },
+    ], label, { x: event.clientX, y: event.clientY });
+  });
+}
+
+/** 반복 그만하기: the rule goes (its open copies stay), with 지웠어요 · 되돌리기. */
+function deleteSeriesNow(entry: Series): void {
+  const todos = state.items.filter((item) => item.seriesID === entry.id && !item.isCompleted).map((item) => item.id);
+  void api.act({ type: "deleteSeries", id: entry.id });
+  toast.show({ icon: "trash", text: t("반복 할 일을 지웠어요"), action: { label: t("되돌리기"), run: () => void api.act({ type: "restoreSeries", series: entry, todos }) } });
+}
+
+/** An alarm gone (the row's menu or the editor's 지우기), with 지웠어요 · 되돌리기. */
+function deleteAlarmNow(alarm: Alarm): void {
+  if (editingAlarm?.id === alarm.id) editingAlarm = undefined;
+  state = { ...state, alarms: state.alarms.filter((entry) => entry.id !== alarm.id) };
+  void api.act({ type: "alarmDelete", id: alarm.id });
+  render();
+  toast.show({ icon: "trash", text: t("알람을 지웠어요"), action: { label: t("되돌리기"), run: () => void api.act({ type: "alarmSave", alarm }) } });
+}
+
 function repeats(): Node[] {
   const list = state.series;
   const rows: Node[] = list.length === 0
@@ -408,22 +453,18 @@ function repeats(): Node[] {
       if (openForm === entry.id) return [seriesForm(entry)];
       const editButton = h("button", { class: "quiet", title: t("고치기"), "aria-label": t("{title} 고치기", { title: entry.title }) }, icon("sliders", 14));
       const deleteButton = h("button", { class: "quiet danger", title: t("반복 그만하기 (목록의 할 일은 남아요)"), "aria-label": t("{title} 반복 그만하기", { title: entry.title }) }, icon("trash", 14));
-      editButton.addEventListener("click", () => { openForm = entry.id; render(); });
-      deleteButton.addEventListener("click", () => api.act({ type: "deleteSeries", id: entry.id }));
-      return [h("div", { class: "row series" }, glyph("repeat"),
+      const edit = () => { openForm = entry.id; render(); };
+      editButton.addEventListener("click", edit);
+      deleteButton.addEventListener("click", () => deleteSeriesNow(entry));
+      const row = h("div", { class: "row series hover-trash" }, glyph("repeat"),
         h("div", { class: "grow" }, h("div", { class: "series-title" }, entry.title), h("div", { class: "sub" }, `${describe(entry.rule, entry.remindAt, lang())} · ${nextLabel(entry)}`)),
-        editButton, deleteButton)];
+        editButton, deleteButton);
+      rowMenu(row, entry.title, edit, () => deleteSeriesNow(entry));
+      return [row];
     });
-  const add = openForm === "new"
-    ? seriesForm(undefined)
-    : (() => {
-      const button = h("button", { class: "row choice" }, glyph("plus"), h("span", { class: "grow" }, t("새 반복 할 일")));
-      button.addEventListener("click", () => { openForm = "new"; render(); });
-      return button;
-    })();
+  const add = openForm === "new" ? seriesForm(undefined) : addRow(t("새 반복 할 일"), () => { openForm = "new"; render(); });
   return [
-    group(t("반복 할 일"), rows, t("반복하는 날마다 목록에 하나씩 나타나요. 전날 것을 못 끝냈으면 새로 쌓지 않고 오늘로 옮겨요.")),
-    group(t("추가"), [add]),
+    group(t("반복 할 일"), [...rows, add], t("반복하는 날마다 목록에 하나씩 나타나요. 전날 것을 못 끝냈으면 새로 쌓지 않고 오늘로 옮겨요.")),
   ];
 }
 
@@ -463,7 +504,7 @@ function stepper(title: string, symbol: string, value: number, range: [number, n
 
 function pet(): Node[] {
   const { prefs } = state;
-  const showRow = h("div", { class: "row" }, glyph("paw"), h("span", { class: "grow" }, t("펫 보이기")),
+  const showRow = h("div", { class: "row" }, glyph("cat"), h("span", { class: "grow" }, t("펫 보이기")),
     toggle(prefs.petVisible, t("펫 보이기"), (value) => set("petVisible", value)));
   const wanderRow = h("div", { class: `row${prefs.petVisible ? "" : " disabled"}` }, glyph("footprints"), h("span", { class: "grow" }, t("돌아다니기")),
     toggle(prefs.petWanders, t("돌아다니기"), (value) => set("petWanders", value)));
@@ -479,12 +520,12 @@ function pet(): Node[] {
   const preview = h("button", { class: "action" }, t("들어 보기"));
   preview.disabled = !prefs.petVisible;
   preview.addEventListener("click", () => api.act({ type: "chatterPreview" }));
-  const previewRow = h("div", { class: "row" }, glyph("sparkles"), h("span", { class: "grow" }, t("지금 한마디 듣기")), preview);
+  const previewRow = h("div", { class: "row" }, glyph("quote"), h("span", { class: "grow" }, t("지금 한마디 듣기")), preview);
   return [
     group(t("종이냥 펫"), [showRow, wanderRow],
-      t("화면 아래(작업 표시줄 위)에 앉아 눈을 깜빡이고, 갸웃하고, 가끔 걸어 다녀요. 한동안 PC를 쓰지 않으면 졸고, 할 일을 끝내거나 타이머가 끝나면 축하해 줘요. 끌어서 자리를 옮기고, 우클릭하면 메뉴가 나와요.")),
+      t("작업 표시줄 위에 앉아 눈을 깜빡이고, 가끔 걸어 다녀요. 끌어서 옮기고, 우클릭하면 메뉴가 나와요.")),
     group(t("종이냥 한마디"), [chatterRow, frequencyRow, questionRow, previewRow],
-      t("오늘 남은 일, 시간대, 마감에 맞춰 응원하거나 가볍게 말을 걸어요. 물어볼 때는 말풍선의 버튼으로 답해요(‘쉴래요’를 누르면 5분 타이머가 켜져요). 집중 타이머가 도는 동안, 알림이 떠 있을 때, 밤 11시~아침 7시, PC를 쓰지 않는 동안에는 조용히 있어요. 고양이를 누르면 가끔 대답해요.")),
+      t("가끔 응원하거나 말을 걸어요. 집중할 때와 밤 11시–아침 7시에는 조용해요."), false, "pet"),
   ];
 }
 
@@ -520,6 +561,7 @@ function alarmRow(alarm: Alarm): HTMLElement {
   open.addEventListener("click", () => { closeAlarmEditor(); editingAlarm = { ...alarm, days: [...alarm.days] }; render(); });
   const row = h("div", { class: `row alarm${alarm.enabled ? "" : " off"}` }, open,
     toggle(alarm.enabled, t("{time} 알람 켜기", { time: timeText(alarm, lang()) }), (value) => { saveAlarm({ ...alarm, enabled: value }); render(); }));
+  rowMenu(row, timeText(alarm, lang()), () => { closeAlarmEditor(); editingAlarm = { ...alarm, days: [...alarm.days] }; render(); }, () => deleteAlarmNow(alarm));
   return row;
 }
 
@@ -589,12 +631,7 @@ function alarmEditor(draft: Alarm): HTMLElement {
   const snoozeRow = h("div", { class: "editor-row" }, h("span", { class: "editor-label" }, t("다시 알림")), snooze);
 
   const remove = h("button", { class: "action danger" }, icon("trash", 13), t("지우기"));
-  remove.addEventListener("click", () => {
-    editingAlarm = undefined;
-    state = { ...state, alarms: state.alarms.filter((entry) => entry.id !== draft.id) };
-    void api.act({ type: "alarmDelete", id: draft.id });
-    render();
-  });
+  remove.addEventListener("click", () => deleteAlarmNow(state.alarms.find((entry) => entry.id === draft.id) ?? draft));
   const done = h("button", { class: "action primary" }, icon("check", 13, 2.2), t("완료", undefined, "alarm"));
   done.addEventListener("click", () => { readTime(); closeAlarmEditor(); render(); });
   const editor = h("div", { class: "alarm-editor" }, timeRow, label, daysRow, days, soundRow, snoozeRow,
@@ -611,8 +648,7 @@ function alarmsGroup(): HTMLElement {
   const rows: Node[] = alarms.length === 0
     ? [h("div", { class: "row empty-alarms" }, h("span", { class: "grow sub" }, t("알람이 없어요. 아침 기상이나 약 먹을 시간을 맞춰 보세요.")))]
     : alarms.map((alarm) => (editingAlarm?.id === alarm.id ? alarmEditor(editingAlarm) : alarmRow(alarm)));
-  const add = h("button", { class: "row choice" }, glyph("plus"), h("span", { class: "grow" }, t("알람 추가")));
-  add.addEventListener("click", () => {
+  const add = addRow(t("알람 추가"), () => {
     closeAlarmEditor();
     const alarm = newAlarm();
     saveAlarm(alarm);
@@ -671,7 +707,7 @@ function clock(): Node[] {
       stepper(t("긴 휴식"), "bed", prefs.pomodoroLongRestMinutes, [1, 60], 1, minutes, (value) => set("pomodoroLongRestMinutes", value), 5),
       stepper(t("긴 휴식까지"), "repeat", prefs.pomodoroRounds, [2, 8], 1, (value) => t("{n}번", { n: value }), (value) => set("pomodoroRounds", value)),
       autoRow, soundRow,
-    ], t("집중과 휴식을 번갈아 해요. 빨간 원(집중)·초록 원(휴식)이 줄어드는 팻말이 화면에 따로 떠요. 끌어서 옮기고, 누르면 일시정지해요. 시간은 눌러서 직접 적을 수도 있어요(Shift를 누른 채 −·+는 5분씩).")),
+    ], t("집중과 휴식을 번갈아 해요. 시간은 −·+로 1분씩(Shift를 누르면 5분씩) 바꾸거나 눌러서 직접 적어요."), false, "timer"),
     group(t("타이머 크기"), [h("div", { class: "row" }, glyph("timer"), h("span", { class: "grow" }, t("크기")),
       segmented(timerSizes.map((value) => ({ value, title: timerSizeTitles[lang()][value] })), prefs.timerSize, (value) => set("timerSize", value), t("타이머 크기")))],
     t("화면에 뜨는 타이머(팻말을 든 고양이)의 크기예요. 타이머를 우클릭해 ‘크기’에서도 바꿀 수 있어요.")),
@@ -698,7 +734,7 @@ function calendarSettings(): Node[] {
       return select;
     })();
   const alertRow = h("div", { class: "row calendar-alert" }, glyph("bell"), h("span", { class: "grow" }, t("일정 알림")), alertChoice);
-  return [group(t("오늘 일정"), [stripRow, alertRow], t("일정은 할 일과 같은 저장 폴더의 events.json에 있어요. 공유 폴더를 쓰면 다른 기기와 함께 써요."))];
+  return [group(t("오늘 일정"), [stripRow, alertRow], t("하루 띠는 제목 아래에 지금 하는 일과 다음 일을 보여 줘요. 누르면 하루 일정표가 펼쳐져요."), false, "calendar")];
 }
 
 // ─── 메모 서랍 (1.28) ──────────────────────────────────────────────────────────
@@ -726,31 +762,47 @@ window.addEventListener("keydown", (event) => {
   render();
 }, true);
 
-/** 메모 서랍: the shortcut (record a key, 기본값으로, 끄기), the handle, the side, the paper, 위에 고정, and 열기. */
+/**
+ * 메모 서랍: the shortcut (the key, a small ‘기본값’ link once it differs, a switch), the handle, 다른 창 위에 띄우기, the
+ * side, the width, the paper and the backdrop. Each row's control changes only what its name says (#27); ‘서랍 열기’ is
+ * in the pane's header (as on the Mac).
+ */
 function drawerPane(): Node[] {
   const { prefs } = state;
   const current = prefs.drawerShortcut;
   const field = h("button", { class: `keyfield${recording ? " recording" : ""}`, "aria-label": t("메모 서랍 단축키"), title: t("누르고 원하는 키를 누르면 바뀌어요") },
     recording ? t("키를 눌러 주세요…") : current ? shortcutLabel(current) : t("꺼짐"));
   field.addEventListener("click", () => { recording = !recording; recordProblem = undefined; render(); });
-  const reset = h("button", { class: "action small" }, t("기본값으로"));
-  reset.disabled = current === defaultDrawerShortcut && !recording;
-  reset.addEventListener("click", () => { recording = false; recordProblem = undefined; void set("drawerShortcut", defaultDrawerShortcut); });
-  const off = h("button", { class: "action small" }, t("끄기", undefined, "shortcut"));
-  off.disabled = current === "" && !recording;
-  off.addEventListener("click", () => { recording = false; recordProblem = undefined; void set("drawerShortcut", ""); });
-  const keyRow = h("div", { class: "row drawer-key" }, glyph("keyboard"), h("span", { class: "grow" }, t("어디서든 열고 닫기")), field, reset, off);
+  const reset = current && current !== defaultDrawerShortcut && !recording
+    ? h("button", { class: "textlink", title: t("{key}로 되돌려요", { key: shortcutLabel(defaultDrawerShortcut) }) }, t("기본값"))
+    : null;
+  reset?.addEventListener("click", () => { recording = false; recordProblem = undefined; void set("drawerShortcut", defaultDrawerShortcut); });
+  // The switch: off keeps the key it had, so on brings that same key back.
+  const onOff = toggle(Boolean(current), t("어디서든 열고 닫기"), (value) => {
+    recording = false;
+    recordProblem = undefined;
+    if (value) { void set("drawerShortcut", prefs.drawerShortcutLast || defaultDrawerShortcut); return; }
+    void set("drawerShortcutLast", current);
+    void set("drawerShortcut", "");
+  });
+  const keyRow = h("div", { class: "row drawer-key" }, glyph("keyboard"), h("span", { class: "grow" }, t("어디서든 열고 닫기")), reset, field, onOff);
   const problem = recordProblem ?? (current ? state.drawerShortcutProblem : undefined);
   const keyFoot = problem ?? (current
-    ? t("어떤 앱을 쓰다가도 {key}를 누르면 서랍이 열리고, 한 번 더 누르면 닫혀요. 다른 앱의 같은 단축키보다 먼저 받아요(예: 브라우저의 ‘모든 탭 북마크’).", { key: shortcutLabel(current) })
+    ? t("어디서든 {key} 키를 누르면 서랍이 열리고, 한 번 더 누르면 닫혀요. 다른 앱이 같은 키를 써도 서랍이 먼저 열려요.", { key: shortcutLabel(current) })
     : t("단축키가 꺼져 있어요. 화면 끝 손잡이나 ⋯ 메뉴, 고양이 메뉴로 열 수 있어요."));
 
-  const handleRow = h("div", { class: "row" }, glyph("pawPrint"), h("div", { class: "grow" }, h("div", {}, t("화면 끝 손잡이")), h("div", { class: "sub" }, t("고양이 발 책갈피를 누르면 열려요. 위아래로 끌어 자리를 옮겨요."))),
-    toggle(prefs.drawerHandle, t("화면 끝 손잡이"), (value) => set("drawerHandle", value)));
-  const pinRow = h("div", { class: "row" }, glyph("pin"), h("div", { class: "grow" }, h("div", {}, t("다른 창 위에 고정")), h("div", { class: "sub" }, t("끄면 다른 앱을 눌렀을 때 그 창 뒤로 가요. 닫히지는 않아요."))),
-    toggle(prefs.drawerPinned, t("다른 창 위에 고정"), (value) => set("drawerPinned", value)));
-  const sideRow = h("div", { class: "row" }, glyph(prefs.drawerSide === "left" ? "dockLeft" : "dockRight"), h("span", { class: "grow" }, t("여는 쪽")),
-    segmented([{ value: "right", title: t("오른쪽") }, { value: "left", title: t("왼쪽") }], prefs.drawerSide, (value) => set("drawerSide", value), t("여는 쪽")));
+  const handleRow = h("div", { class: "row" }, glyph("pawPrint"), h("span", { class: "grow" }, t("화면 끝에 손잡이 두기")),
+    toggle(prefs.drawerHandle, t("화면 끝에 손잡이 두기"), (value) => set("drawerHandle", value)));
+  const pinRow = h("div", { class: "row" }, glyph("pin"), h("span", { class: "grow" }, t("다른 창 위에 띄우기")),
+    toggle(prefs.drawerPinned, t("다른 창 위에 띄우기"), (value) => set("drawerPinned", value)));
+  const sideRow = h("div", { class: "row" }, glyph(prefs.drawerSide === "left" ? "dockLeft" : "dockRight"), h("span", { class: "grow" }, t("화면 쪽")),
+    segmented([{ value: "left", title: t("왼쪽") }, { value: "right", title: t("오른쪽") }], prefs.drawerSide, (value) => set("drawerSide", value), t("화면 쪽")));
+  // 폭: a slider and its number (the drawer's inner edge drags it too, as the tooltip says).
+  const width = h("input", { type: "range", class: "width-slider", min: String(drawerWidth.min), max: String(drawerWidth.max), step: "10", value: String(prefs.drawerWidth), "aria-label": t("폭"), title: t("서랍 안쪽 끝을 끌어도 폭이 바뀌어요") });
+  const widthValue = h("span", { class: "width-value" }, String(prefs.drawerWidth));
+  width.addEventListener("input", () => { widthValue.textContent = width.value; });
+  width.addEventListener("change", () => set("drawerWidth", Number(width.value)));
+  const widthRow = h("div", { class: "row drawer-width" }, glyph("width"), h("span", { class: "grow" }, t("폭")), width, widthValue);
   const themes: { value: DrawerTheme; title: string }[] = [
     { value: "auto", title: t("자동") }, { value: "day", title: t("낮 종이") }, { value: "night", title: t("밤 종이") }, { value: "kraft", title: t("크라프트지") }, { value: "grid", title: t("모눈 노트") },
   ];
@@ -760,20 +812,160 @@ function drawerPane(): Node[] {
   const backdrops: { value: DrawerBackdrop; title: string }[] = [
     { value: "solid", title: t("불투명") }, { value: "frost", title: t("반투명") }, { value: "strong", title: t("강하게") }, { value: "none", title: t("바탕 없음") },
   ];
-  const backdropRow = h("div", { class: "row drawer-backdrop" }, glyph("sparkles"), h("span", { class: "grow" }, t("바탕")),
+  const backdropRow = h("div", { class: "row drawer-backdrop" }, glyph("backdrop"), h("span", { class: "grow" }, t("바탕")),
     segmented(backdrops, prefs.drawerBackdrop, (value) => set("drawerBackdrop", value), t("서랍 바탕")));
-  const open = h("button", { class: "action small primary" }, icon("drawer", 13), t("서랍 열기"));
-  open.addEventListener("click", () => api.act({ type: "drawer", command: "open" }));
-  const openRow = h("div", { class: "row storage-actions" }, glyph("drawer"), h("span", { class: "grow" }, t("폭은 서랍 안쪽 끝을 끌어서 바꿔요 ({width})", { width: prefs.drawerWidth })), open);
 
   return [
     group(t("단축키"), [keyRow], keyFoot, Boolean(problem)),
-    group(t("여는 방법"), [handleRow, pinRow], t("⋯ 메뉴, 고양이 메뉴, 노트 위 서랍 버튼, 알림 영역 메뉴에서도 열 수 있어요. 열린 서랍은 단축키 · Esc · 닫기로만 닫혀요.")),
-    group(t("모양"), [sideRow, themeRow, backdropRow, openRow], [
-      t("자동은 노트의 낮 · 밤 종이를 따라가요. 반투명 · 강하게는 서랍 바탕 뒤로 화면이 흐리게 비치고, 바탕 없음은 메모만 화면 위에 떠요(메모지는 늘 불투명해요)."),
+    group(t("여는 방법"), [handleRow, pinRow], t("노트 위의 발 버튼, Ctrl+3, ⋯ → 메모 서랍, 고양이 우클릭, 알림 영역 메뉴로도 열려요. 다른 앱을 눌러도 닫히지 않고, 같은 단축키 · Esc · ×로 닫혀요."), false, "drawer"),
+    group(t("모양"), [sideRow, widthRow, themeRow, backdropRow], [
+      t("자동 종이는 노트의 낮 · 밤을 따라요. 바탕은 서랍 종이를 비쳐 보이게 하거나(반투명 · 강하게) 걷어 내요(바탕 없음). 메모지는 늘 불투명해요."),
       state.drawerBackdropNote,
-      t("서랍은 마우스가 있는 화면에서, 작업 표시줄을 뺀 높이만큼 열려요."),
     ].filter(Boolean).join(" ")),
+  ];
+}
+
+// ─── 스페이스 (1.30) ───────────────────────────────────────────────────────────
+
+/** The colours' names (the swatches' tooltips), as the memo folders say them. */
+const colorNames = (): Record<SpaceColor, string> => ({
+  lavender: t("라벤더"), pink: t("분홍"), mint: t("민트"), yellow: t("노랑"), sky: t("하늘"), peach: t("살구"), sand: t("모래"), gray: t("회색"),
+});
+/** + 새 스페이스: the name row open (and what is typed in it). */
+let spaceDraft: string | undefined;
+/** The space whose eight colours are open under it. */
+let colorsOpen: string | undefined;
+/** A space's name being typed, or a row being dragged: redraws wait until it is done. */
+let spaceBusy = false;
+let spaceRedraw = false;
+const toastHost = h("div", { class: "toast-host settings-toast" });
+const toast = toaster(toastHost);
+
+/** S12: a space deleted (its to-dos to 스페이스 없음) with 되돌리기 bringing it back with them. */
+function deleteSpaceNow(space: TodoSpace): void {
+  const todos = [...spaceIndexOf(state.todoSpaces.spaces, state.spaceOf)].filter(([, entry]) => entry.id === space.id).map(([id]) => id);
+  void api.act({ type: "spaceDelete", id: space.id });
+  toast.show({ icon: "trash", text: t("스페이스 {what} 지웠어요", { what: spaceObjectWords(space.name, lang()) }), action: { label: t("되돌리기"), run: () => void api.act({ type: "spaceRestore", id: space.id, todos }) } });
+}
+
+function settleSpaces(): void {
+  spaceBusy = false;
+  if (spaceRedraw) { spaceRedraw = false; render(); }
+}
+
+/** A space's row: the grip, its colour, its name (typed over), how many to-dos are open in it, 지우기. */
+function spaceRow(space: TodoSpace, open: number): HTMLElement[] {
+  const grip = h("span", { class: "space-grip", title: t("끌어서 순서 바꾸기"), "aria-hidden": "true" }, icon("more", 14));
+  const swatch = h("button", { class: "space-swatch", "aria-label": t("{name} 색", { name: space.name }), "aria-expanded": String(colorsOpen === space.id), title: colorNames()[spaceColor(space.color)] });
+  swatch.style.setProperty("--band", `var(--band-${spaceColor(space.color)})`);
+  swatch.addEventListener("click", () => { colorsOpen = colorsOpen === space.id ? undefined : space.id; render(); });
+  const name = h("input", { class: "space-name", type: "text", value: space.name, maxlength: "40", spellcheck: "false", "aria-label": t("스페이스 이름"), "data-keep": `space-${space.id}` });
+  name.addEventListener("focus", () => { spaceBusy = true; });
+  name.addEventListener("keydown", (event) => {
+    if (event.isComposing) return;
+    if (event.key === "Enter") { event.preventDefault(); name.blur(); }
+    if (event.key === "Escape") { event.preventDefault(); name.value = space.name; name.blur(); }
+    // Ctrl+↑ / Ctrl+↓: the space a place up or down (as dragging does).
+    if ((event.key === "ArrowUp" || event.key === "ArrowDown") && event.ctrlKey) {
+      event.preventDefault();
+      const ids = liveSpaces(state.todoSpaces).map((entry) => entry.id);
+      const at = ids.indexOf(space.id);
+      const to = at + (event.key === "ArrowUp" ? -1 : 1);
+      if (to < 0 || to >= ids.length) return;
+      ids.splice(at, 1);
+      ids.splice(to, 0, space.id);
+      void api.act({ type: "spaceOrder", ids });
+    }
+  });
+  name.addEventListener("blur", () => {
+    if (name.value.trim() && name.value.trim() !== space.name) void api.act({ type: "spaceRename", id: space.id, name: name.value });
+    else name.value = space.name;
+    settleSpaces();
+  });
+  const count = h("span", { class: "space-count" }, open ? t("남은 할 일 {n}개", { n: open }) : "");
+  const remove = h("button", { class: "quiet space-delete", title: t("지우기"), "aria-label": t("{name} 지우기", { name: space.name }) }, icon("trash", 15));
+  remove.addEventListener("click", () => deleteSpaceNow(space));
+  const row = h("div", { class: "row space-row", "data-id": space.id }, grip, swatch, name, count, remove);
+  grip.addEventListener("pointerdown", (event) => dragSpace(event, row));
+  rowMenu(row, space.name, () => { name.focus(); name.select(); }, () => deleteSpaceNow(space));
+  if (colorsOpen !== space.id) return [row];
+  const colors = h("div", { class: "row space-colors", role: "radiogroup", "aria-label": t("{name} 색", { name: space.name }) },
+    ...spaceColors.map((color) => {
+      const chip = h("button", { role: "radio", "aria-checked": String(spaceColor(space.color) === color), title: colorNames()[color], "aria-label": colorNames()[color] });
+      chip.style.setProperty("--band", `var(--band-${color})`);
+      chip.addEventListener("click", () => { colorsOpen = undefined; void api.act({ type: "spaceColor", id: space.id, color }); });
+      return chip;
+    }));
+  return [row, colors];
+}
+
+/** Dragging a row by its grip: the rows reorder under the pointer, and the order is kept on letting go. */
+function dragSpace(event: PointerEvent, row: HTMLElement): void {
+  event.preventDefault();
+  const list = row.parentElement!;
+  spaceBusy = true;
+  colorsOpen = undefined;
+  list.querySelectorAll(".space-colors").forEach((element) => element.remove());
+  row.classList.add("dragging");
+  row.setPointerCapture(event.pointerId);
+  const move = (moveEvent: PointerEvent) => {
+    const rows = [...list.querySelectorAll<HTMLElement>(".space-row")].filter((entry) => entry !== row);
+    const after = rows.find((entry) => { const box = entry.getBoundingClientRect(); return moveEvent.clientY < box.top + box.height / 2; });
+    if (after) list.insertBefore(row, after); else rows.at(-1)?.after(row);
+  };
+  const up = () => {
+    row.removeEventListener("pointermove", move);
+    row.classList.remove("dragging");
+    const ids = [...list.querySelectorAll<HTMLElement>(".space-row")].map((entry) => entry.dataset.id!);
+    if (ids.join() !== liveSpaces(state.todoSpaces).map((entry) => entry.id).join()) void api.act({ type: "spaceOrder", ids });
+    settleSpaces();
+  };
+  row.addEventListener("pointermove", move);
+  row.addEventListener("pointerup", up, { once: true });
+  row.addEventListener("pointercancel", up, { once: true });
+}
+
+/** 책상 → 스페이스: the spaces in order (drag, name, colour, 지우기) and + 새 스페이스. */
+function spacesPane(): Node[] {
+  const spaces = liveSpaces(state.todoSpaces);
+  const index = spaceIndexOf(state.todoSpaces.spaces, state.spaceOf);
+  const open = new Map<string, number>();
+  for (const item of state.items) {
+    const space = !item.isCompleted ? index.get(item.id) : undefined;
+    if (space) open.set(space.id, (open.get(space.id) ?? 0) + 1);
+  }
+  const rows = spaces.flatMap((space) => spaceRow(space, open.get(space.id) ?? 0));
+  let lastRow: HTMLElement;
+  if (spaceDraft !== undefined) {
+    const color = nextSpaceColor(state.todoSpaces);
+    const field = h("input", { class: "space-name", type: "text", value: spaceDraft, maxlength: "40", spellcheck: "false", placeholder: t("이름"), "aria-label": t("새 스페이스 이름"), "data-keep": "space-new" });
+    const dot = h("span", { class: "space-swatch still", "aria-hidden": "true" });
+    dot.style.setProperty("--band", `var(--band-${color})`);
+    const make = () => {
+      const name = field.value.trim();
+      spaceDraft = undefined;
+      if (name) void api.act({ type: "spaceAdd", id: newSpaceID(state.todoSpaces), name, color });
+      settleSpaces();
+      render();
+    };
+    field.addEventListener("focus", () => { spaceBusy = true; });
+    field.addEventListener("input", () => { spaceDraft = field.value; });
+    field.addEventListener("keydown", (event) => {
+      if (event.isComposing) return;
+      if (event.key === "Enter") { event.preventDefault(); make(); }
+      if (event.key === "Escape") { event.preventDefault(); spaceDraft = undefined; settleSpaces(); render(); }
+    });
+    field.addEventListener("blur", () => { if (spaceDraft !== undefined) make(); });
+    lastRow = h("div", { class: "row space-row new" }, h("span", { class: "space-grip" }), dot, field);
+    requestAnimationFrame(() => field.focus());
+  } else {
+    lastRow = addRow(t("새 스페이스"), () => { spaceDraft = ""; render(); });
+  }
+  return [
+    group(t("스페이스"), [...rows, lastRow],
+      t("할 일을 회사 · 집처럼 나눠요. 오늘 한 장에는 그대로 모두 보이고, 머리말에서 한 스페이스만 볼 수 있어요. 입력 줄에 {tag}을 붙이면 그 스페이스로 들어가요.", { tag: `#${t("이름").toLowerCase()}` }), false, "spaces"),
+    group(t("한 스페이스만 보기"), [h("div", { class: "row" }, glyph("keyboard"), h("div", { class: "grow" }, h("div", {}, t("노트에서 Ctrl+Shift+1–9")), h("div", { class: "sub" }, t("스페이스 순서대로 골라요. Ctrl+Shift+0은 모두 보기예요."))))],
+      t("다음 날 아침 4시에 모든 스페이스로 돌아와요. 알림과 오늘 탭의 숫자는 숨긴 할 일도 그대로 셈해요.")),
   ];
 }
 
@@ -787,9 +979,9 @@ function render(): void {
   document.documentElement.dataset.pane = tab;
   document.documentElement.style.setProperty("--body-size", `${bodyFontSize(prefs.font, prefs.textSize)}px`);
   const scrollTop = app.querySelector(".content")?.scrollTop ?? 0;
-  const pages: Record<Tab, () => Node[]> = { appearance, notifications, repeat: repeats, pet, clock, events: calendarSettings, storage: storagePane, drawer: drawerPane, ai: aiPane };
+  const pages: Record<Tab, () => Node[]> = { appearance, notifications, repeat: repeats, pet, clock, events: calendarSettings, storage: storagePane, drawer: drawerPane, spaces: spacesPane, ai: aiPane };
   const content = h("div", { class: "content" }, ...pages[tab]());
-  const parts: Node[] = [paneHead(), content];
+  const parts: Node[] = [paneHead(), content, toastHost];
   if (tab === "notifications") {
     const preview = h("button", { class: "action primary", title: t("지금 알림을 한 번 띄워 봐요. 목록은 바뀌지 않아요.") }, icon("play", 12), t("미리보기"));
     preview.addEventListener("click", () => api.act({ type: "previewReminder" }));
@@ -820,14 +1012,18 @@ function showTab(next: Tab): void {
   openForm = undefined;
   recording = false;
   recordProblem = undefined;
+  spaceDraft = undefined;
+  colorsOpen = undefined;
+  spaceBusy = false;
   closeAlarmEditor();
   if (state) { render(); app.querySelector(".content")!.scrollTop = 0; }
 }
 
 api.on("state", (next) => {
   state = next as AppState;
-  // Don't wipe a half-filled form or an alarm being edited; redraw once it closes.
+  // Don't wipe a half-filled form or an alarm being edited; redraw once it closes. (A space's name being typed, too.)
   if (openForm || editingAlarm) return;
+  if (spaceBusy && tab === "spaces") { spaceRedraw = true; return; }
   render();
 });
 api.on("desk:pane", (payload) => {

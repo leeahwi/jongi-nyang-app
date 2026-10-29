@@ -114,6 +114,42 @@ public enum MemoCards {
         return nil
     }
 
+    /// A row of a card's preview: a line's words, or a checklist item (`checked` set).
+    public struct PreviewRow: Equatable, Sendable {
+        public var checked: Bool?
+        public var text: String
+        public init(checked: Bool? = nil, text: String) { self.checked = checked; self.text = text }
+    }
+
+    /// What a card shows under its title (D30, #14): a checklist memo its first `limit` items, ticked or not; any other
+    /// memo its first `limit` lines with words after the title, trimmed (the card wraps them into at most `limit` lines,
+    /// … at the end). Blank lines are skipped, so a short memo shows only what it has. Each row is cut at 300
+    /// characters (more never fits in three lines); a checklist stops reading at its `limit`-th item.
+    public static func previewRows(_ text: String, limit: Int = 3) -> [PreviewRow] {
+        guard limit > 0 else { return [] }
+        var items: [PreviewRow] = [], lines: [PreviewRow] = []
+        var titled = false
+        for line in text.unicodeScalars.split(separator: "\n", omittingEmptySubsequences: true).lazy.map({ String(String.UnicodeScalarView($0)) }) {
+            if let item = Checklist.parse(line) {
+                let words = item.text.trimmingCharacters(in: .whitespaces)
+                guard !words.isEmpty else { continue }
+                // A checklist title is its first item's words (Checklist.summary), not one of the rows.
+                if !titled { titled = true; continue }
+                items.append(PreviewRow(checked: item.checked, text: cut(words)))
+                if items.count == limit { return items }
+                continue
+            }
+            guard lines.count < limit || !titled else { continue }
+            let body = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !body.isEmpty else { continue }
+            if !titled { titled = true; continue }
+            lines.append(PreviewRow(text: cut(body)))
+        }
+        return items.isEmpty ? lines : items
+    }
+
+    private static func cut(_ text: String) -> String { text.count > 300 ? String(text.prefix(300)) : text }
+
     // MARK: Groups (D22–D24)
 
     public enum Group: Hashable, Sendable {

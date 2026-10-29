@@ -27,9 +27,15 @@
   /* Sage and clay as *text* (on paper, cards and their own tints); sage and clay stay for fills, bars, rings. */
   --sage-text: #546f52;
   --clay-text: #955842;
-  --tab-1: #f5e7b2;
-  --tab-2: #e3ddf2;
+  /* The note's tabs (1.30: solid, a 1 px edge): 오늘 honey, 앞으로 lavender. */
+  --tab-1: #f6dc7c;
+  --tab-2: #d6ccf6;
+  --tab-1-edge: #dcc062;
+  --tab-2-edge: #bdb0ea;
   --tab-3: #f3dbd7;
+  /* The tabs' old softer colours, for what wears them under ink: the settings panes' icon tiles, the help's groups. */
+  --tint-1: #f5e7b2;
+  --tint-2: #e3ddf2;
   /* The slips' washi tape, by kind. */
   --tape-todo: #e9cf7a;
   --tape-memo: #cfc6ea;
@@ -37,6 +43,13 @@
   --tape-timer: #c9dcc4;
   --tape-alarm: #ecc4bc;
   --tape-confirm: #d9d3c4;
+  /* Its 1 px edge (1.30: solid like the tabs, no stripes) — a step darker by day, lighter at night. */
+  --tape-todo-edge: #c8b269;
+  --tape-memo-edge: #b2aac9;
+  --tape-event-edge: #a2b3c9;
+  --tape-timer-edge: #adbda9;
+  --tape-alarm-edge: #cba9a2;
+  --tape-confirm-edge: #bbb5a9;
   --event-blue: #5585cc;
   --event-blue-2: #e2eaf6;
   --memo-ink: #7a6aae;
@@ -45,14 +58,24 @@
   --toast-strong: #cfe3c9;
   /* AI 연결's stamp on a row Claude added or changed today: blue-grey stamp ink (the Mac's PaperTheme.stamp). */
   --stamp: #4d5b86;
+  /* 할 일 스페이스 (1.30): a space's band at a row's left edge, its dot in menus and chips — the deep side of the memo
+     folders' eight colours, the Mac's own (spec M11), 3:1 or more on paper, paper-2 and card (test/contrast.test.ts). */
+  --band-lavender: #897ccf;
+  --band-pink: #d16776;
+  --band-mint: #54966a;
+  --band-yellow: #a78527;
+  --band-sky: #578bcd;
+  --band-peach: #d46b2b;
+  --band-sand: #9f8550;
+  --band-gray: #8c887e;
   --shadow-float: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 18px 40px -18px rgba(70, 58, 30, 0.35), 0 2px 6px rgba(70, 58, 30, 0.08);
   --shadow-slip: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 16px 30px -16px rgba(70, 58, 30, 0.45), 0 2px 6px rgba(70, 58, 30, 0.1);
   /* Text and marks on a sage fill (the primary button, a checked box, today's date). */
   --on-sage: #fffdf8;
   /* An empty checkbox's edge. */
   --check-border: #908a7b;
-  /* The tab names on the washi tabs: ink, day and night (as on the Mac; ink-2 on lavender and rose was under AA). */
-  --tab-ink: var(--ink);
+  /* The tab names and counts, picked or not: ink by day; a dark ink at night too, where the tabs are light (1.30). */
+  --tab-ink: #2f2e2a;
   /* A raised control's soft shadow and surface (a selected segment, the desk's chosen row). */
   --lift: 0 1px 2px rgba(0, 0, 0, 0.12);
   --raised: var(--card);
@@ -77,7 +100,7 @@
   color-scheme: light;
 }
 
-/* 밤 종이 (night paper): the same names, the paper of a room with the light off. Tab colours lowered,
+/* 밤 종이 (night paper): the same names, the paper of a room with the light off. Tab colours lighter than the paper (1.30),
    sage and clay lifted so they keep their contrast (test/contrast.test.ts checks every text pair).
    ink-3 and the checkbox edge are a step lighter than the mock (#8a8577 · #77725f) to pass AA. */
 :root[data-paper="night"] {
@@ -96,15 +119,25 @@
   --clay-2: #4a3630;
   --sage-text: #a3c49c;
   --clay-text: #e29a7c;
-  --tab-1: #6a5e35;
-  --tab-2: #4f4868;
+  --tab-1: #c4a245;
+  --tab-2: #9d92dc;
+  --tab-1-edge: #d6b65a;
+  --tab-2-edge: #b2a8ea;
   --tab-3: #63443f;
+  --tint-1: #6a5e35;
+  --tint-2: #4f4868;
   --tape-todo: #8a7a3f;
   --tape-memo: #5d5578;
   --tape-event: #4d5f7a;
   --tape-timer: #4f6650;
   --tape-alarm: #7a4f4a;
   --tape-confirm: #55524a;
+  --tape-todo-edge: #a19565;
+  --tape-memo-edge: #7d7793;
+  --tape-event-edge: #717f95;
+  --tape-timer-edge: #728573;
+  --tape-alarm-edge: #95726e;
+  --tape-confirm-edge: #77756e;
   --event-blue: #8fb1e3;
   --event-blue-2: #313b4a;
   --memo-ink: #bcb0e2;
@@ -113,12 +146,20 @@
   --toast-action: #8f4a30;
   --toast-strong: #3d6639;
   --stamp: #a9b6dc;
+  --band-lavender: #9a8fd6;
+  --band-pink: #d9828f;
+  --band-mint: #6fae84;
+  --band-yellow: #d1a93a;
+  --band-sky: #6f9bd4;
+  --band-peach: #e09466;
+  --band-sand: #b9a274;
+  --band-gray: #9a978e;
   /* A faint light edge too: dark paper on a dark screen would otherwise lose its outline. */
   --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 18px 40px -18px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.3);
   --shadow-slip: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 16px 30px -16px rgba(0, 0, 0, 0.75), 0 2px 6px rgba(0, 0, 0, 0.35);
   --on-sage: #1f2a1e;
   --check-border: #837e69;
-  --tab-ink: var(--ink);
+  --tab-ink: #1f1d18;
   --lift: 0 1px 2px rgba(0, 0, 0, 0.45);
   /* At night a card is darker than paper-2, so a chosen segment or row gets its own lighter surface. */
   --raised: #46433b;

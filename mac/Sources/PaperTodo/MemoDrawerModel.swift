@@ -20,25 +20,34 @@ extension AppModel {
             memoFolders = try MemoFolders.decode(data, language: .current)
             knownFoldersData = data
         } catch {
-            moveFoldersAside(now: now)
+            moveFoldersAside(now: now, starting: true)
             memoFolders = .fresh(language: .current)
             knownFoldersData = nil
         }
     }
 
-    private func moveFoldersAside(now: Date) {
+    /// The unreadable file moved aside, said the way every file says it (#34): what happened, what's safe, where the
+    /// original is (its name only — the storage folder button shows where). At launch every memo starts in 메모;
+    /// later (another device's file) the folders here stay and are written again on the next change.
+    private func moveFoldersAside(now: Date, starting: Bool) {
         let aside = memoFoldersURL.deletingLastPathComponent().appendingPathComponent(MemoFolders.asideName(now))
+        let what = starting ? L("메모 폴더를 읽지 못해서 메모를 모두 ‘메모’ 폴더에 두고 시작했어요.")
+                            : L("메모 폴더를 읽지 못했어요. 여기 있던 폴더는 그대로예요.")
         if (try? FileManager.default.moveItem(at: memoFoldersURL, to: aside)) != nil {
-            storageError = L("메모 폴더 정보를 읽지 못해서 처음처럼 시작했어요. 원본은 \(aside.lastPathComponent)에 남겨 뒀어요.")
+            storageError = what + " " + Self.keptAside(aside)
+        } else {
+            storageError = what + " " + L("저장 폴더가 열리는지 확인해 주세요.")
         }
     }
 
     /// Another device (or an older app's backup) changed the file: merged in, the newer side winning (D13, D14).
+    /// A write of this Mac's still under way is waited for first, so the file read is never this Mac's older one.
     func catchUpMemoFolders() {
+        finishMemoFolderWrites()
         guard let data = try? Data(contentsOf: memoFoldersURL), data != knownFoldersData else { return }
         knownFoldersData = data
         guard let theirs = try? MemoFolders.decode(data, language: .current) else {
-            moveFoldersAside(now: Date())
+            moveFoldersAside(now: Date(), starting: false)
             return
         }
         let merged = MemoFolders.merge(here: memoFolders, theirs: theirs)
@@ -58,14 +67,27 @@ extension AppModel {
             folders = folders.pruned(memoIDs: ids, now: now)
         }
         if folders != memoFolders { memoFolders = folders }
-        let started = PerfProbe.now
-        defer { PerfProbe.io("memo-folders", since: started) }
-        do {
-            try folders.save(to: memoFoldersURL)
-            knownFoldersData = try? Data(contentsOf: memoFoldersURL)
-        } catch {
-            storageError = L("메모 폴더 정보를 저장하지 못했어요.") + "\n\(memoFoldersURL.path)"
+        // Written off the main thread (tens of ms at thousands of memos); the next change, a check for another
+        // device's file, a backup and quitting all wait for it first.
+        let url = memoFoldersURL
+        folderWriter.write(folders, to: url) { [weak self] result in
+            guard let self else { return }
+            switch result {
+            case .success(let written):
+                if written.latest { self.knownFoldersData = written.data }
+                // A save that works again takes its own notice away (as on Windows).
+                if self.storageError?.hasPrefix(L("메모 폴더를 저장하지 못했어요.")) == true { self.storageError = nil }
+                PerfProbe.io("memo-folders", ms: written.ms)
+            case .failure:
+                // Every change writes the whole file again, so the next change really is the next try.
+                self.storageError = Self.saveProblem(L("메모 폴더를 저장하지 못했어요."))
+            }
         }
+    }
+
+    /// Every write of memo-folders.json asked for is on disk (and `knownFoldersData` is the last one).
+    func finishMemoFolderWrites() {
+        if let data = folderWriter.finish() { knownFoldersData = data }
     }
 
     func moveMemo(_ id: String, to folder: String) {
@@ -145,6 +167,51 @@ extension AppModel {
         let folder = memoFolders.folderID(of: id)
         guard folder != MemoFolders.inbox else { return nil }
         return memoFolders.folder(folder)?.displayName(.current)
+    }
+}
+
+/// memo-folders.json's writes, in order, on a queue of their own. `finish` waits for them and hands back the bytes of
+/// the last one when no newer write is still to come.
+final class MemoFoldersWriter: @unchecked Sendable {
+    struct Written: Sendable {
+        var data: Data
+        /// No write was asked for after this one.
+        var latest: Bool
+        var ms: Double
+    }
+    private let queue = DispatchQueue(label: "memo-folders.json", qos: .userInitiated)
+    private let lock = NSLock()
+    private var asked = 0
+    private var done: (number: Int, data: Data)?
+
+    func write(_ folders: MemoFolders, to url: URL, then: @escaping @MainActor @Sendable (Result<Written, Error>) -> Void) {
+        let number = lock.withLock { asked += 1; return asked }
+        queue.async { [self] in
+            let started = ProcessInfo.processInfo.systemUptime
+            let result = Result<Data, Error> {
+                let data = Data(folders.encoded().utf8)
+                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+                try data.write(to: url, options: .atomic)
+                return data
+            }
+            let ms = (ProcessInfo.processInfo.systemUptime - started) * 1000
+            let latest: Bool = lock.withLock {
+                if case .success(let data) = result { done = (number, data) }
+                return number == asked
+            }
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { then(result.map { Written(data: $0, latest: latest, ms: ms) }) }
+            }
+        }
+    }
+
+    /// Waits for the writes under way; the last one's bytes when it is the newest asked for.
+    func finish() -> Data? {
+        queue.sync {}
+        return lock.withLock {
+            guard let done, done.number == asked else { return nil }
+            return done.data
+        }
     }
 }
 
@@ -243,6 +310,21 @@ final class MemoDrawer: ObservableObject {
     @Published var shortcut: DrawerShortcut? {
         didSet {
             if let shortcut, let data = try? JSONEncoder().encode(shortcut) { preferences.set(data, forKey: "drawer.shortcut") } else { preferences.set(Data(), forKey: "drawer.shortcut") }
+            // The key turned off is kept, so the switch turns that same key back on (#27).
+            if shortcut == nil, let oldValue, let data = try? JSONEncoder().encode(oldValue) { preferences.set(data, forKey: "drawer.shortcutBeforeOff") }
+        }
+    }
+    /// The switch beside the key: on brings back the key last turned off (or ⇧⌘D).
+    var shortcutOn: Bool {
+        get { shortcut != nil }
+        set {
+            guard newValue != (shortcut != nil) else { return }
+            if newValue {
+                let kept = preferences.data(forKey: "drawer.shortcutBeforeOff").flatMap { try? JSONDecoder().decode(DrawerShortcut.self, from: $0) }
+                shortcut = kept.flatMap { $0.isReserved ? nil : $0 } ?? .standard
+            } else {
+                shortcut = nil
+            }
         }
     }
     /// Whether the shortcut could be claimed (another app may hold it).
@@ -282,7 +364,12 @@ final class MemoDrawer: ObservableObject {
         reduceTransparency && (backdrop == .translucent || backdrop == .strong) ? .opaque : backdrop
     }
     /// 고정's 정렬 (고정 isn't a folder, so it lives here, on this Mac).
-    @Published var pinnedSort: MemoFolders.Sort { didSet { preferences.set(pinnedSort.rawValue, forKey: "drawer.pinnedSort") } }
+    @Published var pinnedSort: MemoFolders.Sort {
+        didSet {
+            preferences.set(pinnedSort.rawValue, forKey: "drawer.pinnedSort")
+            listChanged()
+        }
+    }
     /// The last two folders memos were moved to (폴더로 옮기기 › 최근).
     var recentMoves: [String] {
         get { preferences.stringArray(forKey: "drawer.recentMoves") ?? [] }
@@ -296,9 +383,14 @@ final class MemoDrawer: ObservableObject {
     }
 
     // MARK: What it shows
-    @Published private(set) var memos: [Memo] = []
-    @Published private(set) var folders = MemoFolders.fresh()
-    @Published var tab: MemoFolders.Tab = .folder(MemoFolders.inbox)
+    @Published private(set) var memos: [Memo] = [] {
+        didSet {
+            listChanged()
+            forgetGoneCards()
+        }
+    }
+    @Published private(set) var folders = MemoFolders.fresh() { didSet { listChanged() } }
+    @Published var tab: MemoFolders.Tab = .folder(MemoFolders.inbox) { didSet { listChanged() } }
     @Published var expandedID: String?
     /// The open slip is being typed in (its raw text), not just shown with its boxes.
     @Published var editing = false
@@ -308,7 +400,14 @@ final class MemoDrawer: ObservableObject {
     /// 크게 보기: one memo the drawer's whole height.
     @Published var bigID: String?
     @Published var searching = false
-    @Published var query = ""
+    @Published var query = "" { didSet { if query != oldValue { searchSoon() } } }
+    /// What the results are for: `query` once its keys pause (80 ms), at once when it's emptied.
+    @Published private(set) var searchedQuery = ""
+    private var searchTask: Task<Void, Never>?
+    /// The memos' lines as the search reads them, kept per memo text between searches.
+    private let searchIndex = MemoFolders.SearchIndex()
+    /// The wait after the last key before searching (snapshots: none).
+    var searchPause: Duration = .milliseconds(80)
     @Published var quickText = ""
     /// The folder sheet (new, or name and colour of one).
     @Published var folderSheet: FolderSheet?
@@ -415,6 +514,7 @@ final class MemoDrawer: ObservableObject {
     private var openedOnce = false
 
     func didClose() {
+        sendTyped()
         isOpen = false
         commitOpenSlip()
         if expandedID != nil { expandedID = nil }
@@ -426,6 +526,7 @@ final class MemoDrawer: ObservableObject {
     /// For snapshots and the first draw: the model's data now.
     func refreshForSnapshot() {
         isOpen = true
+        searchPause = .zero
         memos = model.memos
         folders = model.memoFolders
         freezeOrder()
@@ -445,9 +546,53 @@ final class MemoDrawer: ObservableObject {
     var currentFolder: MemoFolders.Folder? { currentFolderID.flatMap { folders.folder($0) } }
 
     /// The memos under the bookmark, in the list's order (its sections, top to bottom).
-    var shown: [Memo] {
+    var shown: [Memo] { list.shown }
+
+    /// What the list draws, worked out once per change of the memos, the folders, the bookmark, the sort or the frozen
+    /// order (and again when the day turns, as the groups move): a redraw, and every card in it, reads it.
+    struct List {
+        var day: Date
+        var sections: [MemoCards.Section]
+        var byID: [String: Memo]
+        var shown: [Memo]
+        /// More than 20 memos shown: the cards a little closer (12 pt apart, at least 56 tall).
+        var dense: Bool
+    }
+    private var listCache: List?
+    private var folderCounts: [String: Int]?
+    private var hitsCache: (query: String, hits: [MemoFolders.Hit])?
+
+    private func listChanged() {
+        listCache = nil
+        folderCounts = nil
+        hitsCache = nil
+    }
+
+    var list: List {
+        let day = Calendar.current.startOfDay(for: now())
+        if let known = listCache, known.day == day { return known }
+        let inTab = tabMemos
+        let sort = sort
+        let entries = inTab.map { memo -> MemoCards.Entry in
+            let still = frozen[memo.id]
+            let updated = still?.updated ?? memo.updatedAt
+            return MemoCards.Entry(id: memo.id, date: sort == .created ? memo.createdAt : updated, updatedAt: updated,
+                                   title: still?.title ?? cardTitle(memo), pinned: folders.isPinned(memo.id))
+        }
+        let sections = MemoCards.sections(entries, sort: sort, pinnedGroup: tab != .pinned, now: now())
         let byID = Dictionary(memos.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        return sections.flatMap(\.ids).compactMap { byID[$0] }
+        let made = List(day: day, sections: sections, byID: byID, shown: sections.flatMap(\.ids).compactMap { byID[$0] }, dense: inTab.count > 20)
+        listCache = made
+        return made
+    }
+
+    /// A bookmark's count (its hover words): every folder's worked out once per change, not once per bookmark per redraw.
+    func folderCount(_ id: String) -> Int {
+        if let counts = folderCounts { return counts[id] ?? 0 }
+        var counts: [String: Int] = [:]
+        for memo in memos { counts[folders.folderID(of: memo.id), default: 0] += 1 }
+        folderCounts = counts
+        return counts[id] ?? 0
     }
 
     private var tabMemos: [Memo] {
@@ -475,30 +620,20 @@ final class MemoDrawer: ObservableObject {
 
     /// The list in its groups (D23, D24): 고정 first (not in 고정's own view), then by date — by the times frozen while
     /// a memo is open; a memo new since then goes on top.
-    var sections: [MemoCards.Section] {
-        let sort = sort
-        let entries = tabMemos.map { memo -> MemoCards.Entry in
-            let still = frozen[memo.id]
-            let updated = still?.updated ?? memo.updatedAt
-            return MemoCards.Entry(id: memo.id, date: sort == .created ? memo.createdAt : updated, updatedAt: updated,
-                                   title: still?.title ?? cardTitle(memo), pinned: folders.isPinned(memo.id))
-        }
-        return MemoCards.sections(entries, sort: sort, pinnedGroup: tab != .pinned, now: now())
-    }
+    var sections: [MemoCards.Section] { list.sections }
 
-    /// What a card says (its title, preview line, kind), worked out once per text: the list redraws on every open and
-    /// keystroke, and the kinds are found with regular expressions.
+    /// What a card says (its title, up to three preview rows, kind), worked out once per text: the list redraws on every
+    /// open and keystroke, and the kinds are found with regular expressions.
     struct Card {
         var title: String
-        var preview: String?
+        var rows: [MemoCards.PreviewRow]
         var kind: MemoCards.Kind?
     }
     private var cards: [String: (text: String, card: Card)] = [:]
 
     func card(_ memo: Memo) -> Card {
         if let known = cards[memo.id], known.text == memo.text { return known.card }
-        let made = Card(title: MemoCards.title(memo.text, language: .current), preview: MemoCards.preview(memo.text), kind: MemoCards.kind(memo.text))
-        if cards.count > 2000 { cards.removeAll() }
+        let made = Card(title: MemoCards.title(memo.text, language: .current), rows: MemoCards.previewRows(memo.text), kind: MemoCards.kind(memo.text))
         cards[memo.id] = (memo.text, made)
         return made
     }
@@ -508,11 +643,19 @@ final class MemoDrawer: ObservableObject {
         if let known = cards[memo.id], known.text == memo.text { return known.card.title }
         if let known = titles[memo.id], known.text == memo.text { return known.title }
         let title = MemoCards.title(memo.text, language: .current)
-        if titles.count > 2000 { titles.removeAll() }
         titles[memo.id] = (memo.text, title)
         return title
     }
     private var titles: [String: (text: String, title: String)] = [:]
+
+    /// The caches keep one entry per memo that still exists (a folder of 5,000 is never worked out again on each
+    /// redraw); those of memos gone are dropped once there are a few.
+    private func forgetGoneCards() {
+        guard cards.count > memos.count + 64 || titles.count > memos.count + 64 else { return }
+        let ids = Set(memos.map(\.id))
+        cards = cards.filter { ids.contains($0.key) }
+        titles = titles.filter { ids.contains($0.key) }
+    }
 
     /// The time a card is grouped and timed by: 만든 순 its creation, else its last edit (frozen while a memo is open).
     func sortDate(_ memo: Memo) -> Date {
@@ -520,7 +663,7 @@ final class MemoDrawer: ObservableObject {
     }
 
     /// More than 20 memos shown: the cards a little closer (12 pt apart, at least 56 tall).
-    var dense: Bool { tabMemos.count > 20 }
+    var dense: Bool { list.dense }
 
     func arranged(_ list: [Memo]) -> [Memo] {
         list.enumerated().sorted { a, b in
@@ -529,14 +672,86 @@ final class MemoDrawer: ObservableObject {
         }.map(\.element)
     }
 
-    var hits: [MemoFolders.Hit] { folders.search(query, memos: arranged(memos), language: .current) }
+    /// The results for `searchedQuery`, worked out once per query and change (the list and the footer both read them).
+    var hits: [MemoFolders.Hit] {
+        if let known = hitsCache, known.query == searchedQuery { return known.hits }
+        let made = folders.search(searchedQuery, memos: arranged(memos), language: .current, index: searchIndex)
+        hitsCache = (searchedQuery, made)
+        return made
+    }
+
+    private func searchSoon() {
+        searchTask?.cancel()
+        searchTask = nil
+        guard searchPause > .zero, !query.trimmingCharacters(in: .whitespaces).isEmpty else {
+            if searchedQuery != query { searchedQuery = query }
+            return
+        }
+        let pause = searchPause
+        searchTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: pause)
+            guard !Task.isCancelled else { return }
+            self?.searchNow()
+        }
+    }
+
+    /// The results for what's typed now (↩ and ↑ ↓ don't wait for the pause).
+    func searchNow() {
+        searchTask?.cancel()
+        searchTask = nil
+        if searchedQuery != query { searchedQuery = query }
+    }
 
     func freezeOrder() {
         order = Dictionary(memos.enumerated().map { ($0.element.id, $0.offset) }, uniquingKeysWith: { first, _ in first })
         frozen = Dictionary(memos.map { ($0.id, ($0.updatedAt, cardTitle($0))) }, uniquingKeysWith: { first, _ in first })
+        listChanged()
     }
 
-    func memo(_ id: String?) -> Memo? { id.flatMap { id in memos.first { $0.id == id } } }
+    /// A memo as it is now: the open one with the keys still waiting to go to the model (copy, the menus … take the
+    /// last key).
+    func memo(_ id: String?) -> Memo? {
+        guard let id, var memo = list.byID[id] else { return nil }
+        if let typed, typed.id == id { memo.text = typed.text }
+        return memo
+    }
+
+    // MARK: Typing in the open memo
+
+    /// The open memo's keys not yet handed to the model: its text now, and the text the model had (for joining with
+    /// another device's edit, as each key did before). Composing Korean never gets here: the text view hands over a
+    /// syllable once it's committed.
+    private var typed: (id: String, text: String, from: String)?
+    private var typedTask: Task<Void, Never>?
+    /// How long the keys pause before the model, the list, the other windows and the save hear them (the memo shows
+    /// every key itself). The save follows 0.4 s after that, as before.
+    static let typedPause: Duration = .milliseconds(250)
+
+    /// A key in the open memo: kept here until the keys pause.
+    func edit(_ id: String, text: String, from old: String) {
+        if let waiting = typed, waiting.id != id { sendTyped() }
+        typed = (id, text, typed?.from ?? old)
+        typedTask?.cancel()
+        typedTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: Self.typedPause)
+            guard !Task.isCancelled else { return }
+            self?.sendTyped()
+        }
+    }
+
+    /// The keys go to the model now (the pause is over, the memo or the drawer closes, the text lets go of the
+    /// keyboard, another change to the memo came in, quitting): one change of the memos, heard once by the list.
+    func sendTyped() {
+        typedTask?.cancel()
+        typedTask = nil
+        guard let waiting = typed else { return }
+        typed = nil
+        PerfProbe.begin("list")
+        model.updateMemo(waiting.id, text: waiting.text, from: waiting.from)
+    }
+
+    /// Keys of this memo still wait (another change that comes in sends them first, to be joined).
+    func isWaiting(_ id: String) -> Bool { typed?.id == id }
 
     // MARK: Moving around
 
@@ -571,11 +786,21 @@ final class MemoDrawer: ObservableObject {
         searching = true
         selectedID = nil
         focusSearch += 1
+        // The memos' lines read for searching off the main thread while the field opens, so the first key's search
+        // finds them ready.
+        let memos = memos
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let read = MemoFolders.SearchIndex.read(memos)
+            await self?.takeSearchLines(read)
+        }
     }
+
+    private func takeSearchLines(_ read: MemoFolders.SearchIndex.Read) { searchIndex.take(read) }
 
     func endSearch() {
         searching = false
         query = ""
+        searchNow()
         selectedID = nil
     }
 
@@ -589,6 +814,7 @@ final class MemoDrawer: ObservableObject {
 
     /// ↑ ↓: the next slip (the list's or the results').
     func moveSelection(_ step: Int) {
+        if searching { searchNow() }
         let ids = searching ? hits.map(\.memoID) : shown.map(\.id)
         guard !ids.isEmpty else { return }
         if let current = selectedID ?? expandedID, let index = ids.firstIndex(of: current) {
@@ -600,6 +826,7 @@ final class MemoDrawer: ObservableObject {
 
     /// ↩ on the picked slip: opens it (typing at once when it has no boxes).
     func openSelected() {
+        if searching { searchNow() }
         guard let id = selectedID else { return }
         if searching { reveal(id); return }
         expand(id)
@@ -648,6 +875,7 @@ final class MemoDrawer: ObservableObject {
 
     /// Leaving the open memo: a blank one quietly goes away, the rest is written out (AppModel.closeMemo).
     private func commitOpenSlip() {
+        sendTyped()
         if model.openMemoID != nil { model.closeMemo() }
     }
 
@@ -663,10 +891,6 @@ final class MemoDrawer: ObservableObject {
             folders = model.memoFolders
             selectedID = id
         }
-    }
-
-    func edit(_ id: String, text: String, from old: String) {
-        model.updateMemo(id, text: text, from: old)
     }
 
     func copy(_ id: String) {
@@ -696,6 +920,7 @@ final class MemoDrawer: ObservableObject {
 
     /// ⌘⌫ / ⋯ → 지우기: gone, with 되돌리기.
     func delete(_ id: String) {
+        sendTyped()
         guard memo(id) != nil else { return }
         if expandedID == id { expandedID = nil; editing = false }
         if bigID == id { bigID = nil }
@@ -707,6 +932,7 @@ final class MemoDrawer: ObservableObject {
 
     /// 복제 (the memo menu): a copy now, in the same folder.
     func duplicate(_ id: String) {
+        sendTyped()
         guard let copy = model.duplicateMemo(id) else { return }
         memos = model.memos
         folders = model.memoFolders
@@ -721,6 +947,7 @@ final class MemoDrawer: ObservableObject {
 
     /// 체크한 줄 지우기 (D27), with 되돌리기.
     func clearChecked(_ id: String) {
+        sendTyped()
         guard let memo = memo(id) else { return }
         let text = Checklist.removeChecked(memo.text)
         guard text != memo.text else { return }

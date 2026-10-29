@@ -26,11 +26,14 @@ enum StorageFolder {
         if FileManager.default.fileExists(atPath: destination.appendingPathComponent("todos.json").path) {
             let message = target == nil ? L("이 Mac에 전에 쓰던 목록이 있어요.") : L("이 폴더에 이미 종이냥 목록이 있어요.")
             let detail = target == nil
-                ? L("‘그 목록 쓰기’는 공유 폴더로 옮기기 전의 목록으로 돌아가고, ‘지금 목록으로 바꾸기’는 지금 보고 있는 목록을 이 Mac으로 가져와요.")
-                : L("다른 기기에서 쓰던 목록이라면 ‘그 목록 쓰기’를 고르세요. ‘지금 목록으로 바꾸기’는 그 폴더의 목록을 이 Mac의 목록으로 덮어써요.")
-            let answer = SlipAlert.run(symbol: "folder", title: L("저장 폴더"), message: message, detail: detail,
-                                       choices: [.init(title: L("취소"), isCancel: true), .init(title: L("지금 목록으로 바꾸기"), role: .quiet),
-                                                 .init(title: L("그 목록 쓰기"), role: .primary, isDefault: true)],
+                ? L("공유 폴더로 옮기기 전의 목록으로 돌아가려면 ‘전에 쓰던 목록 쓰기’를 고르세요. 덮어쓰면 전에 쓰던 목록은 사라지고 되돌릴 수 없어요.")
+                : L("다른 기기에서 쓰던 목록이면 ‘폴더 목록 쓰기’를 고르세요. 덮어쓰면 폴더에 있던 목록은 사라지고 되돌릴 수 없어요.")
+            // Nothing is backed up before an overwrite (#35): only the record is merged, either way.
+            let after = L("어느 쪽이든 완료 기록은 합쳐지고, 종이냥이 다시 시작돼요.")
+            let answer = SlipAlert.run(symbol: "folder", title: L("저장 폴더"), message: message, detail: detail + "\n" + after,
+                                       choices: [.init(title: L("취소"), isCancel: true),
+                                                 .init(title: target == nil ? L("공유 폴더 목록으로 덮어쓰기") : L("이 Mac 목록으로 덮어쓰기"), role: .quiet),
+                                                 .init(title: target == nil ? L("전에 쓰던 목록 쓰기") : L("폴더 목록 쓰기"), role: .primary, isDefault: true)],
                                        width: .medium)
             switch answer {
             case 2: copyCurrent = false
@@ -55,7 +58,7 @@ enum StorageFolder {
             // …and the focus record: the sessions the other folder lacks are added (by id), none removed.
             try mergeFocus(from: current, into: destination)
         } catch {
-            SlipAlert.inform(title: L("저장 폴더"), message: L("폴더로 옮기지 못했어요."), detail: error.localizedDescription)
+            SlipAlert.inform(title: L("저장 폴더"), message: L("폴더로 옮기지 못했어요. 지금 목록은 그대로예요."))
             return
         }
         if let target { preferences.set(target.path, forKey: preferenceKey) } else { preferences.removeObject(forKey: preferenceKey) }
@@ -106,7 +109,7 @@ enum StorageFolder {
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
         panel.prompt = L("이 폴더 쓰기")
-        panel.message = L("다른 기기와 함께 쓸 폴더를 골라요 (iCloud Drive, Dropbox, OneDrive …)")
+        panel.message = L("다른 기기와 함께 쓸 폴더를 골라요(iCloud Drive, Dropbox, OneDrive …). 고르면 종이냥이 다시 시작돼요.")
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let folder = panel.url else { return }
         switchTo(folder, defaultFolder: defaultFolder, current: current, model: model, preferences: preferences)

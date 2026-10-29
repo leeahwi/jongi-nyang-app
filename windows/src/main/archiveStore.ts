@@ -87,7 +87,7 @@ export class ArchiveStore {
         for (const entry of list) { saved.add(entry.id); this.entries?.push(entry); }
       }
     } catch {
-      this.store.storageError = `${t("완료 기록을 저장하지 못했어요. 끝낸 일은 목록에 그대로 둘게요.")}\n${this.directory}`;
+      this.store.storageError = `${t("완료 기록을 저장하지 못했어요. 끝낸 일은 목록에 그대로 둘게요.")} ${t("저장 폴더가 열리는지 확인해 주세요.")}`;
       this.store.changed();
     }
     return saved;

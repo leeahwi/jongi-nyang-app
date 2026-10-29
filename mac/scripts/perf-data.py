@@ -2,7 +2,11 @@
 """Writes the performance check's demo data set into a storage folder (scripts/perf.sh):
 about 150 open to-dos across 오늘 · 앞으로 · 언젠가, 60 events (some repeating), 2,000 lines in
 the record, 80 memos, 5 alarms, 300 focus sessions and a few repeating to-dos.
-Usage: perf-data.py <folder> [--ranges] [--memos N]   (--ranges also gives some to-dos a time range)"""
+Usage: perf-data.py <folder> [--ranges] [--memos N] [--todos N] [--spaces N] [--history N] [--history-days D] [--events N]
+(perf audit 2: --history 6000 --history-days 1095 spreads that many record lines over three years; --events 200 writes
+that many events, every fifth repeating; the defaults are unchanged)   (--ranges also gives some to-dos a time
+range; --todos 2000 adds undated to-dos on 오늘 up to that many in all; --spaces 9 writes todo-spaces.json with that many
+spaces, each to-do in one of them round the list, every tenth in none — 1.45, 할 일 스페이스)"""
 import json, os, random, sys, uuid
 from datetime import datetime, timedelta, timezone
 
@@ -44,11 +48,26 @@ for n in range(40):  # 언젠가
     i += 1; task(i, shelf="later")
 for n in range(15):  # done today
     i += 1; t = task(i); t["isCompleted"] = True; t["completedAt"] = utc(now - timedelta(minutes=random.randint(1, 200)))
+total = int(sys.argv[sys.argv.index("--todos") + 1]) if "--todos" in sys.argv else 0
+while len(items) < total:  # 1.45: a big 오늘 (the worst case for drawing and filtering it)
+    i += 1; t = task(i, todaySince=key(day))
+    if i % 7 == 0: t["isCompleted"] = True; t["completedAt"] = utc(now - timedelta(minutes=random.randint(1, 200)))
 json.dump({"items": items}, open(os.path.join(folder, "todos.json"), "w"), ensure_ascii=False, indent=2, sort_keys=True)
+
+space_count = int(sys.argv[sys.argv.index("--spaces") + 1]) if "--spaces" in sys.argv else 0
+if space_count:
+    names = ["회사", "집", "공부", "운동", "가족", "취미", "독서", "여행", "정리", "기타"]
+    palette = ["lavender", "pink", "mint", "yellow", "sky", "peach", "sand", "gray"]
+    spaces = [{"color": palette[n % 8], "id": f"s-{n:06x}", "name": names[n % len(names)], "order": n, "updatedAt": utc(now)} for n in range(space_count)]
+    places = {item["id"]: {"at": utc(now), "space": spaces[n % space_count]["id"]} for n, item in enumerate(items) if n % 10}
+    json.dump({"items": places, "spaces": spaces, "version": 1}, open(os.path.join(folder, "todo-spaces.json"), "w"),
+              ensure_ascii=False, indent=2, sort_keys=True)
 
 colors = ["blue", "sage", "coral", "purple", "yellow", "gray"]
 events = []
-for n in range(60):
+arg = lambda name, fallback: int(sys.argv[sys.argv.index(name) + 1]) if name in sys.argv else fallback
+event_count = arg("--events", 60)
+for n in range(event_count):
     first = day + timedelta(days=random.randint(-20, 30)) if n >= 6 else day
     start = random.choice(range(8 * 60, 21 * 60, 30))
     rule = ["daily", "weekly", "monthly"][n % 3] if n % 5 == 0 else "none"
@@ -58,8 +77,9 @@ for n in range(60):
 json.dump({"events": events}, open(os.path.join(folder, "events.json"), "w"), ensure_ascii=False, indent=2)
 
 by_month = {}
-for n in range(2000):
-    done = now - timedelta(days=random.randint(1, 300), minutes=random.randint(0, 900))
+history_lines, history_days = arg("--history", 2000), arg("--history-days", 300)
+for n in range(history_lines):
+    done = now - timedelta(days=random.randint(1, history_days), minutes=random.randint(0, 900))
     entry = {"id": str(uuid.uuid4()).upper(), "title": title(n), "createdAt": utc(done - timedelta(days=2)), "completedAt": utc(done)}
     by_month.setdefault(done.strftime("%Y-%m"), []).append(entry)
 for month, entries in by_month.items():
@@ -96,5 +116,5 @@ with open(os.path.join(folder, "focus.jsonl"), "w") as f:
 series = [{"id": str(uuid.uuid4()), "title": t, "rule": r, "remindAt": a, "createdAt": utc(now - timedelta(days=10))}
           for t, r, a in [("물 마시기", {"kind": "daily"}, "10:00"), ("주간 회고", {"kind": "weekly", "weekdays": [5]}, None)]]
 json.dump({"series": series}, open(os.path.join(folder, "repeats.json"), "w"), ensure_ascii=False, indent=2)
-print(f"demo data: {len(items)} to-dos ({sum(not x['isCompleted'] for x in items)} open), {len(events)} events, 2000 record lines, "
+print(f"demo data: {len(items)} to-dos ({sum(not x['isCompleted'] for x in items)} open), {len(events)} events, {history_lines} record lines, "
       f"{len(memos)} memos, {len(alarms)} alarms, 300 focus lines → {folder}")

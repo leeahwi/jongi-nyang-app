@@ -146,6 +146,65 @@ test("D12: search over every folder (초성 too), lines as written, folder names
   assert.deepEqual(hits("   "), []);
 });
 
+test("D12 (1.30): the prepared query, the folds kept and the memos' lines kept find exactly what the search did before", () => {
+  // The search as it was up to 1.29, kept here to compare with.
+  const initialsBefore = ["ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
+  const foldBefore = (character: string) => {
+    const code = character.codePointAt(0)!;
+    if (code >= 0xac00 && code <= 0xd7a3) return character;
+    const plain = character.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    return plain.length ? plain : character;
+  };
+  const initialBefore = (character: string) => {
+    const code = character.codePointAt(0)!;
+    return code < 0xac00 || code > 0xd7a3 ? undefined : initialsBefore[Math.floor((code - 0xac00) / 588)];
+  };
+  const matchBefore = (text: string, query: string): [number, number] | undefined => {
+    const wanted = [...query.trim()];
+    if (wanted.length === 0) return undefined;
+    const characters = [...text];
+    const offsets: number[] = [];
+    let offset = 0;
+    for (const character of characters) { offsets.push(offset); offset += character.length; }
+    offsets.push(offset);
+    for (let start = 0; start + wanted.length <= characters.length; start += 1) {
+      let index = 0;
+      while (index < wanted.length && (foldBefore(characters[start + index]) === foldBefore(wanted[index]) || (initialsBefore.includes(wanted[index]) && initialBefore(characters[start + index]) === wanted[index]))) index += 1;
+      if (index === wanted.length) return [offsets[start], offsets[start + wanted.length]];
+    }
+    return undefined;
+  };
+  const searchBefore = (data: MemoFolders, list: readonly Memo[], query: string) => {
+    if (!query.trim()) return [];
+    const names = new Set(visibleFolders(data).filter((folder) => matchBefore(folderName(folder, "ko"), query)).map((folder) => folder.id));
+    const out: [string, string, [number, number] | undefined, string][] = [];
+    for (const memo of list) {
+      const place = placementOf(data, memo.id);
+      const title = slipSummary(memo, "ko").title;
+      const titleRange = matchBefore(title, query);
+      if (titleRange) { out.push([memo.id, title, titleRange, place.folder]); continue; }
+      const line = memo.text.split("\n").map((entry) => entry.trim()).find((entry) => matchBefore(entry, query));
+      if (line !== undefined) out.push([memo.id, line, matchBefore(line, query), place.folder]);
+      else if (names.has(place.folder)) out.push([memo.id, title, undefined, place.folder]);
+    }
+    return out;
+  };
+  const data = sample();
+  const pool = [..."aAbBcCeEéÉèiIİıoOöÖuUüßẞﬁ ΣσςΩωΆά가각나보고서분기초안까치ㄱㄲㅂㅅㅎ하이반가워회사\u3000\u0301\u0308e\u0301😀123-_.\n\n- [ ] - [x] "];
+  let seed = 7;
+  const next = (n: number) => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed % n; };
+  for (let round = 0; round < 300; round += 1) {
+    const list: Memo[] = Array.from({ length: 8 }, (_, n) => ({ id: n < 3 ? `m${n + 1}` : `r${round}-${n}`, text: Array.from({ length: next(40) }, () => pool[next(pool.length)]).join(""), createdAt: "2026-10-20T00:00:00Z", updatedAt: "2026-10-27T04:00:00Z" }));
+    const queries = ["가", "보고", "ㅂㄱ", "a b", "AB", "é", "하이", "ㅎ", "회사", "ß", "😀", Array.from({ length: 1 + next(3) }, () => pool[next(pool.length)]).join("")];
+    for (const query of queries) {
+      const now = drawerSearch(data, list, query).map((hit) => [hit.memo.id, hit.text, hit.range, hit.folder]);
+      assert.deepEqual(now, searchBefore(data, list, query), `round ${round} ‘${query}’`);
+      // Again, the lines kept: the same.
+      assert.deepEqual(drawerSearch(data, list, query).map((hit) => [hit.memo.id, hit.text, hit.range, hit.folder]), now, `round ${round} ‘${query}’ again`);
+    }
+  }
+});
+
 test("D13: two devices put the same memo in different folders — the later one wins; a tie keeps this device's", () => {
   const here = moveMemo(sample(), "m2", "work", new Date("2026-10-27T05:00:00Z"));
   const theirs = moveMemo(sample(), "m2", "home", new Date("2026-10-27T05:01:00Z"));
@@ -218,12 +277,12 @@ test("memo drawer: slip times, footers, code lines", () => {
   assert.equal(slipTime(new Date(2025, 11, 30, 9, 0).toISOString(), today, "en"), "Dec 30, 2025");
   assert.equal(drawerFooter("folder", 5, "회사"), "회사에 다섯 장");
   assert.equal(drawerFooter("folder", 12, "회사"), "회사에 12장");
-  assert.equal(drawerFooter("folder", 0, "회사"), "회사는 비어 있어요");
+  assert.equal(drawerFooter("folder", 0, "회사"), "비어 있어요");
   assert.equal(drawerFooter("folder", 1, "Work", "en"), "1 note in Work");
   assert.equal(drawerFooter("folder", 5, "Werk", "nl"), "5 notities in Werk");
   assert.equal(drawerFooter("pinned", 3), "고정한 메모 세 장");
-  assert.equal(drawerFooter("search", 2, "", "en"), "2 notes in all folders");
-  assert.equal(drawerFooter("search", 0, "", "nl"), "Geen notities gevonden");
+  assert.equal(drawerFooter("search", 2, "", "en"), "2 notes found");
+  assert.equal(drawerFooter("search", 0, "", "nl"), "0 notities gevonden");
   for (const line of ["git log --oneline -5", "$ ls -la", "    indented()", "`brew install gh`", "npm run build"]) assert.ok(isCodeLine(line), line);
   for (const line of ["git", "주간 회의", "open the door", "cd 집으로"]) assert.ok(!isCodeLine(line), line);
 });
@@ -294,15 +353,15 @@ test("words: slip times (Asia/Seoul), sheets, footers, code lines, a deleted fol
   }
   assert.deepEqual([1, 5, 10, 11].map((count) => sheetCount(count)), ["한 장", "다섯 장", "열 장", "11장"]);
   assert.equal(drawerFooter("folder", 5, "회사"), "회사에 다섯 장");
-  assert.equal(drawerFooter("folder", 0, "회사"), "회사는 비어 있어요");
-  assert.equal(drawerFooter("folder", 0, "집"), "집은 비어 있어요");
+  assert.equal(drawerFooter("folder", 0, "회사"), "비어 있어요");
+  assert.equal(drawerFooter("folder", 0, "집"), "비어 있어요");
   assert.equal(drawerFooter("folder", 1, "Work", "en"), "1 note in Work");
-  assert.equal(drawerFooter("folder", 0, "Werk", "nl"), "Werk is leeg");
+  assert.equal(drawerFooter("folder", 0, "Werk", "nl"), "Leeg");
   assert.equal(drawerFooter("pinned", 3), "고정한 메모 세 장");
   assert.equal(drawerFooter("pinned", 1, "", "nl"), "1 vastgezette notitie");
-  assert.deepEqual(["ko", "en", "nl"].map((lang) => drawerFooter("pinned", 0, "", lang as "ko")), ["고정한 메모가 없어요", "No pinned notes", "Geen vastgezette notities"]);
-  assert.equal(drawerFooter("search", 2, "", "en"), "2 notes in all folders");
-  assert.deepEqual(["ko", "en", "nl"].map((lang) => drawerFooter("search", 0, "", lang as "ko")), ["찾은 메모가 없어요", "No notes found", "Geen notities gevonden"]);
+  assert.deepEqual(["ko", "en", "nl"].map((lang) => drawerFooter("pinned", 0, "", lang as "ko")), ["비어 있어요", "Empty", "Leeg"]);
+  assert.equal(drawerFooter("search", 2, "", "en"), "2 notes found");
+  assert.deepEqual(["ko", "en", "nl"].map((lang) => drawerFooter("search", 0, "", lang as "ko")), ["찾은 메모 0장", "0 notes found", "0 notities gevonden"]);
   for (const line of ["git log --oneline -5", "$ swift build", "    let x = 1", "./scripts/qa.sh all"]) assert.ok(isCodeLine(line), line);
   for (const line of ["git", "Buy milk tomorrow"]) assert.ok(!isCodeLine(line), line);
   const back = restoreFolder(deleteFolder(sample(), "work", now), "work", ["m1", "m3"], now);

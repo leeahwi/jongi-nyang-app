@@ -19,14 +19,17 @@ enum TodayEventsStrip {
         return parts.joined(separator: " · ") + "\n" + L("눌러서 고치기")
     }
 
-    /// An event's menu, here and in the 달력 window: 고치기… · 할 일로 추가 · 지우기….
+    /// An event's menu, here and in the 달력 window: 고치기… · 할 일로 추가 | 지우기… — with the same icons as a to-do's
+    /// menu (TaskRowMenu) and the Windows one.
     @ViewBuilder
     static func menu(_ event: CalendarEvent, calendar: EventBook, onAddTask: @escaping (String) -> Void,
                      open: @escaping (CalendarSheetRequest?) -> Void) -> some View {
-        Button("고치기…") { open(.edit(event, in: calendar)) }
-        Button("할 일로 추가") { onAddTask(event.title) }
+        Button { open(.edit(event, in: calendar)) } label: { Label("고치기…", systemImage: "pencil").labelStyle(.titleAndIcon) }
+        Button { onAddTask(event.title) } label: { Label("할 일로 추가", systemImage: "plus").labelStyle(.titleAndIcon) }
         Divider()
-        Button("지우기…") { open(.edit(event, in: calendar, confirmDelete: true)) }
+        Button(role: .destructive) { open(.edit(event, in: calendar, confirmDelete: true)) } label: {
+            Label("지우기…", systemImage: "trash").labelStyle(.titleAndIcon)
+        }
     }
 }
 

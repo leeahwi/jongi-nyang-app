@@ -1,0 +1,69 @@
+{
+  "about": "할 일 스페이스 1단계의 공유 사례 S1–S22 (spaces-phase1.md §6). 두 앱이 같은 입력에서 같은 기대값을 내요. Mac: mac/scripts/test-spaces.sh가 이 파일을 읽어요.",
+  "timeZone": "Asia/Seoul",
+  "now": "2026-10-28T01:00:00Z",
+  "file": {
+    "items": {},
+    "spaces": [
+      { "color": "pink", "id": "s-a", "name": "회사", "order": 0, "updatedAt": "2026-10-01T00:00:00Z" },
+      { "color": "mint", "id": "s-b", "name": "집", "order": 1, "updatedAt": "2026-10-01T00:00:00Z" },
+      { "color": "yellow", "id": "s-c", "name": "공부", "order": 2, "updatedAt": "2026-10-01T00:00:00Z" }
+    ],
+    "version": 1
+  },
+  "lines": [
+    { "case": "S1", "text": "견적서 보내기 #회사", "lens": null, "expect": { "added": true, "kind": "todo", "title": "견적서 보내기", "space": "s-a", "choices": ["s-a", "none"] } },
+    { "case": "S2", "text": "견적서 #회", "lens": null, "expect": { "added": true, "kind": "todo", "title": "견적서", "space": "s-a", "choices": ["s-a", "none"] } },
+    { "case": "S3", "text": "견적서 #ㅎㅅ", "lens": null, "expect": { "added": true, "kind": "todo", "title": "견적서", "space": "s-a", "choices": ["s-a", "none"] } },
+    { "case": "S4", "text": "빨래 #세탁", "lens": null, "expect": { "added": true, "kind": "todo", "title": "빨래", "space": null, "newSpace": { "name": "세탁", "color": "lavender" }, "choices": ["new:세탁", "none"] } },
+    { "case": "S5", "text": "#회사", "lens": null, "expect": { "added": false, "hint": "할 일 내용을 적어 주세요" } },
+    { "case": "S6", "text": "C# 공부", "lens": null, "expect": { "added": true, "kind": "todo", "title": "C# 공부", "space": null, "choices": [] } },
+    { "case": "S6", "text": "이슈 #12 확인", "lens": null, "expect": { "added": true, "kind": "todo", "title": "이슈 #12 확인", "space": null, "choices": [] } },
+    { "case": "S6", "text": "a#b", "lens": null, "expect": { "added": true, "kind": "todo", "title": "a#b", "space": null, "choices": [] } },
+    { "case": "S7", "text": "보고서", "lens": "s-a", "expect": { "added": true, "kind": "todo", "title": "보고서", "space": "s-a", "choices": ["s-a"] } },
+    { "case": "S8", "text": "빨래 #집", "lens": "s-a", "expect": { "added": true, "kind": "todo", "title": "빨래", "space": "s-b", "choices": ["s-b", "none"] } },
+    { "case": "S9", "text": "내일 3시 회의 #회사", "lens": null, "expect": { "added": true, "kind": "event", "title": "회의", "space": null, "choices": ["s-a", "none"] } },
+    { "case": "S10", "text": "보고서 #회사 #집", "lens": null, "expect": { "added": true, "kind": "todo", "title": "보고서 #집", "space": "s-a", "choices": ["s-a", "none"] } },
+    { "case": "S20", "addSpace": { "color": "sky", "id": "s-d", "name": "A 업무", "order": 3, "updatedAt": "2026-10-01T00:00:00Z" }, "text": "보고 #A업무", "lens": null, "expect": { "added": true, "kind": "todo", "title": "보고", "space": "s-d", "choices": ["s-d", "none"] } },
+    { "case": "S20", "addSpace": { "color": "sky", "id": "s-d", "name": "A 업무", "order": 3, "updatedAt": "2026-10-01T00:00:00Z" }, "text": "보고 #a", "lens": null, "expect": { "added": true, "kind": "todo", "title": "보고", "space": "s-d", "choices": ["s-d", "none"] } },
+    { "case": "W5", "text": "이슈 #12 확인 #회사", "lens": null, "expect": { "added": true, "kind": "todo", "title": "이슈 #12 확인", "space": "s-a", "choices": ["s-a", "none"] } },
+    { "case": "W5", "text": "##제목 정리", "lens": null, "expect": { "added": true, "kind": "todo", "title": "##제목 정리", "space": null, "choices": [] } },
+    { "case": "S19", "note": "M2: 스페이스가 0개면 #를 읽지 않아요", "noSpaces": true, "text": "빨래 #세탁", "lens": null, "expect": { "added": true, "kind": "todo", "title": "빨래 #세탁", "space": null, "choices": [] } }
+  ],
+  "lens": [
+    { "case": "S11", "lens": { "day": "2026-10-27", "spaceId": "s-a" }, "now": "2026-10-27T18:59:00Z", "expect": "s-a" },
+    { "case": "S11", "lens": { "day": "2026-10-27", "spaceId": "s-a" }, "now": "2026-10-27T19:00:00Z", "expect": null },
+    { "case": "S12", "deleteSpace": "s-a", "lens": { "day": "2026-10-28", "spaceId": "s-a" }, "now": "2026-10-28T01:00:00Z", "expect": null },
+    { "case": "S19", "noSpaces": true, "lens": { "day": "2026-10-28", "spaceId": "s-a" }, "now": "2026-10-28T01:00:00Z", "expect": null },
+    { "case": "W9", "lens": { "day": "2026-10-28", "spaceId": "none" }, "now": "2026-10-28T01:00:00Z", "expect": "none" },
+    { "case": "W8", "lens": { "day": "2026-10-28", "spaceId": "s-gone" }, "now": "2026-10-28T01:00:00Z", "expect": null }
+  ],
+  "merges": [
+    { "case": "S13", "existing": { "X": { "at": "2026-10-28T01:00:00Z", "space": "s-a" } }, "incoming": { "X": { "at": "2026-10-28T01:05:00Z", "space": "s-b" } }, "expect": { "X": "s-b" } },
+    { "case": "S13", "existing": { "X": { "at": "2026-10-28T01:05:00Z", "space": "s-b" } }, "incoming": { "X": { "at": "2026-10-28T01:00:00Z", "space": "s-a" } }, "expect": { "X": "s-b" } },
+    { "case": "S14", "existing": { "X": { "at": "2026-10-28T01:05:00Z", "space": null } }, "incoming": { "X": { "at": "2026-10-28T01:00:00Z", "space": "s-a" } }, "expect": { "X": null } },
+    { "case": "S14", "existing": { "X": { "at": "2026-10-28T01:00:00Z", "space": "s-a" } }, "incoming": { "X": { "at": "2026-10-28T01:05:00Z", "space": null } }, "expect": { "X": null } },
+    { "case": "W3", "existing": { "X": { "at": "2026-10-28T01:00:00Z", "space": "s-a" } }, "incoming": { "X": { "at": "2026-10-28T01:00:00Z", "space": "s-b" } }, "expect": { "X": "s-a" } }
+  ],
+  "renames": [
+    { "case": "S15", "existing": { "name": "업무", "updatedAt": "2026-10-28T01:00:00Z" }, "incoming": { "name": "직장", "updatedAt": "2026-10-28T01:02:00Z" }, "expect": "직장" },
+    { "case": "S15", "existing": { "name": "직장", "updatedAt": "2026-10-28T01:02:00Z" }, "incoming": { "name": "업무", "updatedAt": "2026-10-28T01:00:00Z" }, "expect": "직장" }
+  ],
+  "S16": "{\n  \"items\": {\n    \"0B1C5E2A-6F3D-4C8B-9A7E-1D2F3A4B5C6D\": {\n      \"at\": \"2026-10-28T00:01:00Z\",\n      \"pin\": true,\n      \"space\": \"s-a\"\n    },\n    \"7E8F9A0B-1C2D-4E3F-8A9B-0C1D2E3F4A5B\": {\n      \"at\": \"2026-10-28T00:02:00Z\",\n      \"space\": null\n    }\n  },\n  \"series\": {\n    \"daily-water\": {\n      \"at\": \"2026-10-27T23:00:00Z\",\n      \"space\": \"s-b\"\n    }\n  },\n  \"spaces\": [\n    {\n      \"color\": \"pink\",\n      \"icon\": \"briefcase\",\n      \"id\": \"s-a\",\n      \"name\": \"회사\",\n      \"order\": 0,\n      \"updatedAt\": \"2026-10-01T00:00:00Z\"\n    },\n    {\n      \"color\": \"mint\",\n      \"id\": \"s-b\",\n      \"name\": \"집 \\\"우리\\\"\",\n      \"order\": 1,\n      \"tags\": [],\n      \"updatedAt\": \"2026-10-01T00:00:00Z\"\n    },\n    {\n      \"color\": \"teal\",\n      \"deleted\": true,\n      \"id\": \"s-c\",\n      \"name\": \"공부\",\n      \"order\": 2,\n      \"updatedAt\": \"2026-10-20T00:00:00Z\",\n      \"weight\": 2.5\n    }\n  ],\n  \"version\": 1\n}\n",
+  "prune": {
+    "case": "S17 · S22",
+    "now": "2026-10-28T01:00:00Z",
+    "todos": ["LIVE"],
+    "items": {
+      "GONE-31": { "at": "2026-09-27T01:00:00Z", "space": "s-a" },
+      "GONE-29": { "at": "2026-09-29T01:00:00Z", "space": "s-a" },
+      "GONE-30": { "at": "2026-09-28T01:00:00Z", "space": "s-a" },
+      "LIVE": { "at": "2026-08-01T00:00:00Z", "space": "s-a" }
+    },
+    "tombstones": { "s-old": "2026-09-27T01:00:00Z", "s-new": "2026-09-29T01:00:00Z" },
+    "expectItems": ["GONE-29", "GONE-30", "LIVE"],
+    "expectSpaces": ["s-a", "s-new"]
+  },
+  "unreadable": ["{ not json", "[]", "{\"spaces\": 3}", "{\"items\": []}", ""],
+  "readable": ["{}", "{\"spaces\": []}"]
+}

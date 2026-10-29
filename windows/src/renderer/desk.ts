@@ -74,7 +74,7 @@ function buildSidebar(): void {
       const digit = shortcutForPane(pane);
       const name = paneTitle(pane);
       const row = h("button", { class: "drow", role: "tab", "data-pane": pane, title: digit ? `${name} (Ctrl+${digit})` : pane === "help" ? `${name} (F1)` : name, "aria-label": name },
-        icon(paneIcon[pane], 16), h("span", { class: "dlabel" }, name));
+        h("span", { class: "tile", "aria-hidden": "true" }, icon(paneIcon[pane], 13)), h("span", { class: "dlabel" }, name));
       row.addEventListener("click", () => choose(pane));
       rows.set(pane, row);
       sidebar.append(row);

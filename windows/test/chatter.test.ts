@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { chatterCatalogueSize, isQuietHour, nextChatterDelay, pettedChatter, pickChatter, type ChatterContext } from "../src/core/chatter";
+import { chatterCatalogueSize, isQuietHour, milestoneChatter, nextChatterDelay, pettedChatter, pickChatter, type ChatterContext } from "../src/core/chatter";
+import { dayKey, streakMilestone } from "../src/core/archive";
 
 const numbers = (values: number[]) => () => values.shift() ?? 0;
 const context = (hour: number, open: number, done: number, extra: Partial<ChatterContext> = {}): ChatterContext => ({ hour, open, done, overdue: 0, dueSoon: 0, weekday: 2, ...extra });
@@ -76,4 +77,20 @@ test("종이냥 한마디 talks about today's events (same cases as macOS)", () 
   assert.equal(asked.id, "q.focus");
   assert.equal(asked.answers[0].action, "focus25");
   assert.ok(asked.text.startsWith("다음 일정까지 50분"));
+});
+
+test("a streak of 7, 30 or 100 days: the cat cheers once that day, and says nothing when it breaks (#42, as on the Mac)", () => {
+  const streak = (count: number, endingOn: number) => new Map(Array.from({ length: count }, (_, back) => [dayKey(new Date(2026, 9, endingOn - back, 12)), [{}]]));
+  const today = new Date(2026, 9, 28, 20);
+  assert.equal(streakMilestone(streak(7, 28), today, undefined), 7);
+  assert.equal(streakMilestone(streak(30, 28), today, undefined), 30);
+  assert.equal(streakMilestone(streak(7, 28), today, "2026-10-28"), undefined, "once a day");
+  assert.equal(streakMilestone(streak(8, 28), today, undefined), undefined, "day 8: nothing");
+  assert.equal(streakMilestone(streak(7, 27), today, undefined), undefined, "before today's first check");
+  assert.equal(streakMilestone(new Map(), today, undefined), undefined, "a broken streak says nothing");
+  assert.equal(milestoneChatter(30)?.text, "30일째예요. 한 달을 꼬박 채웠어요!");
+  assert.equal(milestoneChatter(100, "en")?.text, "Day 100. That’s amazing!");
+  assert.equal(milestoneChatter(12), undefined);
+  const cheer = pickChatter(context(15, 1, 1, { milestone: 7 }), true, [], () => 0.5);
+  assert.deepEqual([cheer.id, cheer.text], ["m.0", "7일째예요. 한 주를 꼬박 채웠어요!"]);
 });

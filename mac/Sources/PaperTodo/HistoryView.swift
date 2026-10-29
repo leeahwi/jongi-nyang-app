@@ -16,20 +16,29 @@ enum HeatColor {
 
 /// A GitHub-style year of completions, monthly totals and what was finished on a chosen day.
 struct HistoryView: View {
+    /// What it shows changes with the archive's revision (#62): not with every change to the model, which it doesn't
+    /// watch — only its 검색 → 완료 기록 day and the notebook's font.
     @ObservedObject var archive: ArchiveStore
-    @ObservedObject var model: AppModel
+    let model: AppModel
     var now: () -> Date = Date.init
 
     @State private var range: HistoryRange = .recent
     @State private var selectedKey = Archive.dayKey(Date())
-    @State private var hoveredKey: String?
+    @State private var font: NotebookFont
+
+    init(archive: ArchiveStore, model: AppModel, now: @escaping () -> Date = Date.init) {
+        self.archive = archive
+        self.model = model
+        self.now = now
+        _font = State(initialValue: model.notebookFont)
+    }
 
     private let calendar = Calendar.current
     private let language = AppLanguage.current
-    private static let gap: CGFloat = 3
+    fileprivate static let gap: CGFloat = 3
     /// The heatmap card's inner width: the squares grow or shrink with the pane (7…12 pt).
     @State private var heatWidth: CGFloat = 600
-    /// The summary row's width: five tiles in a row, or 3 + 2 when narrow.
+    /// The summary row's width: five tiles in a row, or 3 + 2 when narrow (the two wider, so no cell is left empty).
     @State private var summaryWidth: CGFloat = 700
 
     private func takeHistoryDay() {
@@ -42,8 +51,8 @@ struct HistoryView: View {
     }
 
     var body: some View {
-        let entries = archive.allEntries()
-        let days = Archive.groupByDay(entries)
+        let _ = PerfProbe.count("historyBody")
+        let (entries, days) = archive.history()
         let today = now()
         let bounds = range.bounds(today: today, calendar: calendar)
         // 집중 (1.37): focus.jsonl beside the record — the minutes per day over the range.
@@ -69,21 +78,22 @@ struct HistoryView: View {
         .foregroundStyle(PaperTheme.ink)
         // 검색 → 완료 기록: that day picked (and the whole year shown when it's older).
         .onAppear(perform: takeHistoryDay)
-        .onChange(of: model.historyDay) { takeHistoryDay() }
-        .id(archive.revision)
+        .onReceive(model.$historyDay.receive(on: DispatchQueue.main)) { _ in takeHistoryDay() }
+        .onReceive(model.$notebookFont) { font = $0 }
     }
 
     // MARK: Header
 
-    /// The pane's header: how much has been done so far, a word about the streak, and the range.
+    /// The pane's header: a word about the streak (or, before the first, how to start), and the range. (1.45: no
+    /// "지금까지 564개를 끝냈어요" — the first tile says that number.)
     private func header(entries: [ArchiveEntry], days: [String: [ArchiveEntry]]) -> some View {
         let years = Set(days.keys.compactMap { Int($0.prefix(4)) }).sorted(by: >)
         let total = entries.filter { $0.completedAt != nil }.count
         let streak = Archive.currentStreak(Set(days.keys), today: now())
-        let line = [total == 0 ? L("첫 칸을 채워 볼까요?") : L("지금까지 \(total.formatted())개를 끝냈어요"),
-                    streak > 1 ? L("\(streak)일째 이어 가고 있어요. 오늘도 한 칸!")
-                    : streak == 1 ? L("오늘도 한 칸 채웠어요. 내일도 이어 가 봐요.")
-                    : L("하나만 끝내도 오늘 칸이 초록으로 채워져요.")].joined(separator: " · ")
+        let word = streak > 1 ? L("\(streak)일째 이어 가고 있어요. 오늘도 한 칸!")
+            : streak == 1 ? L("오늘도 한 칸 채웠어요. 내일도 이어 가 봐요.")
+            : L("하나만 끝내도 오늘 칸이 초록으로 채워져요.")
+        let line = total == 0 ? L("첫 칸을 채워 볼까요?") + " · " + word : word
         return DeskPaneHeader(title: L("완료 기록"), subtitle: line) {
             PaperSegmented(selection: $range, options: ([HistoryRange.recent] + years.map(HistoryRange.year)).map { ($0, $0.title, nil) },
                            label: L("기간"))
@@ -105,7 +115,8 @@ struct HistoryView: View {
         }
         let dayCount = max(1, (calendar.dateComponents([.day], from: bounds.lowerBound, to: bounds.upperBound).day ?? 0) + 1)
         let thisMonth = monthTotal(days: days, offset: 0, today: today)
-        let change = thisMonth - monthTotal(days: days, offset: -1, today: today)
+        // Last month's number only, no 적어요 / 많아요 (#42).
+        let lastMonth = monthTotal(days: days, offset: -1, today: today)
         let keys = Set(days.keys)
         let month = calendar.component(.month, from: Archive.logicalDayStart(today))
         let point = String(format: "%.1f", Double(total) / Double(dayCount))
@@ -116,7 +127,7 @@ struct HistoryView: View {
             AnyView(SummaryTile(symbol: "checkmark", label: range == .recent ? L("최근 1년 완료") : String(localized: "\(range.title) 완료", table: "History"), value: total.formatted(), unit: L("개"),
                         detail: L("하루 평균 \(average)개"))),
             AnyView(SummaryTile(symbol: "calendar", label: String(localized: "\(language.monthName(month)) 완료", table: "History"), value: "\(thisMonth)", unit: L("개"),
-                        detail: change == 0 ? L("지난달과 같아요") : change > 0 ? L("지난달보다 \(abs(change))개 많아요") : L("지난달보다 \(abs(change))개 적어요"))),
+                        detail: L("지난달 \(lastMonth)개"))),
             // "일", "day" / "days", "dag" / "dagen": the core's day count without its number.
             AnyView(SummaryTile(symbol: "flame", label: L("연속 기록"), value: "\(streak)",
                         unit: String(language.days(streak).drop(while: \.isNumber)).trimmingCharacters(in: .whitespaces),
@@ -136,11 +147,12 @@ struct HistoryView: View {
             if oneRow {
                 HStack(spacing: 10) { ForEach(tiles.indices, id: \.self) { tiles[$0] } }
             } else {
-                // Three columns, so the second row's tiles line up under the first row's.
+                // 3 + 2 on six columns (1.45): the first row's tiles two columns each, the second row's three, so both
+                // rows end at the same edge and none is left empty.
                 Grid(horizontalSpacing: 10, verticalSpacing: 10) {
-                    GridRow { ForEach(0..<3, id: \.self) { tiles[$0] } }
+                    GridRow { ForEach(0..<3, id: \.self) { tiles[$0].gridCellColumns(2) } }
                         .fixedSize(horizontal: false, vertical: true)
-                    GridRow { ForEach(3..<tiles.count, id: \.self) { tiles[$0] }; Color.clear.gridCellUnsizedAxes([.horizontal, .vertical]) }
+                    GridRow { ForEach(3..<tiles.count, id: \.self) { tiles[$0].gridCellColumns(3) } }
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -226,36 +238,19 @@ struct HistoryView: View {
 
     @ViewBuilder
     private func dayCell(date: Date, days: [String: [ArchiveEntry]], bounds: ClosedRange<Date>, todayKey: String, lastDay: Date, cell: CGFloat, focusMinutes: Int) -> some View {
-        let focusNote = focusMinutes > 0 ? " · " + L("집중 \(Focus.lengthText(focusMinutes, language: .current))") : ""
         let key = Archive.dayKey(date)
         let outside = !bounds.contains(date)
         let future = !outside && date > lastDay.addingTimeInterval(86_400)
-        let count = days[key]?.count ?? 0
-        let shape = RoundedRectangle(cornerRadius: 2.5)
         if outside {
             Color.clear.frame(width: cell, height: cell)
         } else if future {
-            shape.strokeBorder(PaperTheme.rule, lineWidth: 0.8).frame(width: cell, height: cell)
+            RoundedRectangle(cornerRadius: 2.5).strokeBorder(PaperTheme.rule, lineWidth: 0.8).frame(width: cell, height: cell)
         } else {
-            shape.fill(HeatColor.levels[Archive.heatLevel(count)])
-                .frame(width: cell, height: cell)
-                .overlay {
-                    if key == selectedKey {
-                        shape.inset(by: -2).stroke(PaperTheme.accent, lineWidth: 1.5)
-                    } else if key == todayKey {
-                        shape.inset(by: -1).stroke(PaperTheme.ink, lineWidth: 1.2)
-                    } else if key == hoveredKey {
-                        shape.inset(by: -1).stroke(PaperTheme.ink.opacity(0.55), lineWidth: 1)
-                    }
-                }
-                .contentShape(Rectangle().inset(by: -Self.gap / 2))
-                .onHover { hoveredKey = $0 ? key : (hoveredKey == key ? nil : hoveredKey) }
-                .onTapGesture { selectedKey = key }
-                .help(L("\(count)개 완료 · \(shortDate(key))") + focusNote)
-                .accessibilityElement()
-                .accessibilityLabel(L("\(longDate(key)), \(count)개 완료") + focusNote)
-                .accessibilityAddTraits(.isButton)
-                .accessibilityAction { selectedKey = key }
+            let focusNote = focusMinutes > 0 ? " · " + L("집중 \(Focus.lengthText(focusMinutes, language: .current))") : ""
+            let count = days[key]?.count ?? 0
+            HeatCell(count: count, cell: cell, selected: key == selectedKey, today: key == todayKey,
+                     help: L("\(count)개 완료 · \(shortDate(key))") + focusNote,
+                     label: L("\(longDate(key)), \(count)개 완료") + focusNote) { selectedKey = key }
         }
     }
 
@@ -388,7 +383,7 @@ struct HistoryView: View {
                                     .foregroundStyle(PaperTheme.onSage)
                                     .frame(width: 15, height: 15)
                                     .background(PaperTheme.sage.opacity(0.85), in: Circle())
-                                Text(entry.title.handwritten).font(model.notebookFont.bodyFont(.small)).lineLimit(1).help(entry.title)
+                                Text(entry.title.handwritten).font(font.bodyFont(.small)).lineLimit(1).help(entry.title)
                                 Spacer(minLength: 4)
                                 Text(entry.completedAt.map(time) ?? "")
                                     .font(.system(size: 10.5).monospacedDigit()).foregroundStyle(PaperTheme.secondary)
@@ -429,7 +424,7 @@ struct HistoryView: View {
                 .fixedSize()
             ForEach(Array(tasks.enumerated()), id: \.offset) { _, task in
                 HStack(spacing: 6) {
-                    Text(task.title.handwritten).font(model.notebookFont.font(points: 16))
+                    Text(task.title.handwritten).font(font.font(points: 16))
                         .lineLimit(1)
                     Text(Focus.lengthText(task.minutes, language: language))
                         .font(.system(size: 10.5, weight: .medium).monospacedDigit())
@@ -501,10 +496,9 @@ struct HistoryView: View {
         language.monthTitle(year: calendar.component(.year, from: date), month: calendar.component(.month, from: date))
     }
 
-    /// When a task was finished: "15:05" — English "3:05 PM".
+    /// When a task was finished: "15:05" or "3:05 PM", on the app's clock.
     private func time(_ date: Date) -> String {
-        guard language != .ko else { return date.formatted(.dateTime.hour(.twoDigits(amPM: .omitted)).minute()) }
-        return language.clock(hour: calendar.component(.hour, from: date), minute: calendar.component(.minute, from: date))
+        language.clock(hour: calendar.component(.hour, from: date), minute: calendar.component(.minute, from: date))
     }
 }
 
@@ -532,6 +526,41 @@ enum HistoryRange: Hashable {
             let end = calendar.date(from: DateComponents(year: year, month: 12, day: 31, hour: 12))!
             return start...end
         }
+    }
+}
+
+/// A day's square. The hover outline is its own (#62: a hover on the pane's state redrew the whole pane).
+private struct HeatCell: View {
+    let count: Int
+    let cell: CGFloat
+    let selected: Bool
+    let today: Bool
+    let help: String
+    let label: String
+    let select: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 2.5)
+        shape.fill(HeatColor.levels[Archive.heatLevel(count)])
+            .frame(width: cell, height: cell)
+            .overlay {
+                if selected {
+                    shape.inset(by: -2).stroke(PaperTheme.accent, lineWidth: 1.5)
+                } else if today {
+                    shape.inset(by: -1).stroke(PaperTheme.ink, lineWidth: 1.2)
+                } else if hovering {
+                    shape.inset(by: -1).stroke(PaperTheme.ink.opacity(0.55), lineWidth: 1)
+                }
+            }
+            .contentShape(Rectangle().inset(by: -HistoryView.gap / 2))
+            .onHover { hovering = $0 }
+            .onTapGesture(perform: select)
+            .help(help)
+            .accessibilityElement()
+            .accessibilityLabel(label)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { select() }
     }
 }
 

@@ -69,7 +69,7 @@ export function timeList(chip: HTMLElement, current: number | undefined, pick: (
   }
   field.addEventListener("input", () => {
     const typed = parseClockText(field.value);
-    hint.textContent = field.value.trim() ? (typed === undefined ? t("시각을 알아듣지 못했어요") : timeOf(typed)) : "";
+    hint.textContent = field.value.trim() ? (typed === undefined ? t("시각을 알아듣지 못했어요. ‘17:20’처럼 적어 보세요.") : timeOf(typed)) : "";
     hint.classList.toggle("bad", Boolean(field.value.trim()) && typed === undefined);
   });
   field.addEventListener("keydown", (event) => {

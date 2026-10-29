@@ -81,19 +81,20 @@ struct DrawerPaperShape: Shape {
     func path(in rect: CGRect) -> Path { DrawerCat.outline(in: rect, right: right) }
 }
 
-/// A memo's paper in the drawer (design B2, 1.44 ③): a square sheet of ruled notebook paper — a red margin line, rules
-/// every 22 pt under the text lines (the first under the title), a straight top edge with one row of tiny perforation
-/// holes, a 1 pt edge all round and a soft shadow (1.44). Open or picked, the margin line is 3 pt in the folder's
-/// colour (DrawerPalette.openLine); picked also gets a 2 pt outline. Used by the list, search results and 크게 보기.
+/// A memo's paper in the drawer (#14, sheet D, the user's pick 2026-10-28): a clean square sheet — no rules and no
+/// margin line — with 16 pt round its words; the paper hints are the folder-colour tape, a 1 pt edge with a soft
+/// shadow, and a row of tiny perforation holes along the straight top edge. Open or picked, the shadow goes a little
+/// deeper instead of a box round it; picked (the keyboard's place) also takes a faint 1.5 pt edge in the folder's
+/// colour, so it shows by depth and edge, not by colour alone. Used by the list, search results and 크게 보기.
 struct MemoSlipStyle: ViewModifier {
     struct State {
         var open = false
         var selected = false
-        /// The memo's folder (the line takes its colour when picked or open).
+        /// The memo's folder (the picked edge takes its colour).
         var folder: MemoFolders.Color = .lavender
         /// 크게 보기: the whole drawer's height.
         var big = false
-        /// At least this tall (68, dense 56); the ruling runs on into the room.
+        /// At least this tall (68, dense 56).
         var minHeight: CGFloat = 0
         /// 바탕 없음: a deeper shadow (the sheet floats on the desktop).
         var floating = false
@@ -107,59 +108,62 @@ struct MemoSlipStyle: ViewModifier {
     var drawer: DrawerPalette?
     let state: State
 
-    static let top: CGFloat = 13
-    static let bottom: CGFloat = 10
-    static let titleRow: CGFloat = 26
-    static let line: CGFloat = 22
-    static let leading: CGFloat = 22
-    static let margin: CGFloat = 14.5
-    static let bodySize: CGFloat = 12.5
-    /// A collapsed card's least height (a title-only memo as tall as a title and one preview line), and when dense.
+    /// Paper round the words (#14: 12 → 16; dense 10 above and below).
+    static let top: CGFloat = 16
+    static let bottom: CGFloat = 14
+    static let side: CGFloat = 16
+    /// The handwritten title's row (22 pt, option B) and an open memo's body line (14 pt on 26 pt).
+    static let titleRow: CGFloat = 28
+    static let line: CGFloat = 26
+    static let bodySize: CGFloat = 14
+    /// A card's preview: 13 pt on 20 pt lines, up to three (dense two); the kind row's chip.
+    static let previewSize: CGFloat = 13
+    static let previewLine: CGFloat = 20
+    static let kindRow: CGFloat = 24
+    /// A collapsed card's least height (a title-only memo), and when dense.
     static let cardHeight: CGFloat = 68
     static let denseHeight: CGFloat = 56
-    /// Body text drawn so each line takes exactly one rule's height: the font's own line height plus this.
+    /// Body text drawn so each line takes exactly `line`: the font's own line height plus this.
     @MainActor static let lineSpacing: CGFloat = {
         let font = NSFont.systemFont(ofSize: bodySize)
         return max(0, line - NSLayoutManager().defaultLineHeight(for: font))
     }()
+    /// The same for a card's preview lines.
+    @MainActor static let previewSpacing: CGFloat = {
+        let font = NSFont.systemFont(ofSize: previewSize)
+        return max(0, previewLine - NSLayoutManager().defaultLineHeight(for: font))
+    }()
 
     func body(content: Content) -> some View {
         let shape = SheetShape()
-        let top = state.dense ? 9 : Self.top
-        let marked = state.open || state.selected
-        let line = DrawerPalette.openLine(state.folder, drawer: drawer ?? palette, sheet: palette)
+        let deep = state.open || state.selected
         content
-            .padding(.leading, Self.leading)
-            .padding(.trailing, 12)
-            .padding(.top, top)
-            .padding(.bottom, state.dense ? 6 : Self.bottom)
-            .frame(maxWidth: .infinity, minHeight: state.minHeight, alignment: .topLeading)
+            .padding(.horizontal, Self.side)
+            .padding(.top, state.dense ? 10 : Self.top)
+            .padding(.bottom, state.dense ? 9 : Self.bottom)
+            // A card shorter than its least height (a title only) has its words in the middle, not at the top.
+            .frame(maxWidth: .infinity, minHeight: state.minHeight, alignment: .leading)
             .background {
                 ZStack(alignment: .topLeading) {
-                    // The shadow on a plain rectangle only (cheap to draw), the sheet with its holes and ruling over it.
+                    // The shadow on a plain rectangle only (cheap to draw), the sheet with its holes over it.
                     Rectangle().fill(palette.sheetBottom).padding(.top, 2).offset(y: 1)
-                        .shadow(color: state.floating ? .black.opacity(0.22) : palette.shadow, radius: state.floating ? 7 : 5, x: 0, y: 4)
+                        .shadow(color: shadow(deep), radius: deep ? 9 : (state.floating ? 7 : 5), x: 0, y: deep ? 6 : 4)
                     shape.fill(palette.sheet)
-                    Canvas { context, size in
-                        var rules = Path()
-                        // Each rule is the last point of its line's band.
-                        var y = top + Self.titleRow - 1
-                        while y < size.height - 2 {
-                            rules.addRect(CGRect(x: 0, y: y, width: size.width, height: 1))
-                            y += Self.line
-                        }
-                        context.fill(rules, with: .color(palette.sheetRule))
-                        let x = marked ? Self.margin - 1 : Self.margin
-                        context.fill(Path(CGRect(x: x, y: 0, width: marked ? 3 : 1, height: size.height)), with: .color(marked ? line : palette.sheetMargin))
-                    }
-                    .clipShape(shape)
                     shape.stroke(palette.sheetEdge, lineWidth: 1)
                 }
             }
             .overlay {
-                if state.selected && !state.open { Rectangle().strokeBorder(line, lineWidth: 2).padding(-1).allowsHitTesting(false) }
+                if state.selected && !state.open {
+                    Rectangle().strokeBorder(DrawerPalette.openLine(state.folder, drawer: drawer ?? palette, sheet: palette).opacity(0.55), lineWidth: 1.5)
+                        .allowsHitTesting(false)
+                }
             }
             .contentShape(Rectangle())
+    }
+
+    private func shadow(_ deep: Bool) -> Color {
+        if deep { return state.floating ? .black.opacity(0.34) : palette.deepShadow }
+        return state.floating ? .black.opacity(0.22) : palette.shadow
     }
 }
 

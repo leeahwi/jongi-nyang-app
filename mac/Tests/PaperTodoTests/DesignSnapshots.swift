@@ -10,6 +10,10 @@ enum DesignSnapshots {
         // `PAPERTODO_LANG=en` / `nl` (scripts/render-design.sh en): the app's text and the sample
         // data in that language; Korean when unset.
         L10n.activate(setting: ProcessInfo.processInfo.environment["PAPERTODO_LANG"] ?? "ko", preferred: [])
+        // The clock (the app follows the system's): each language's usual one, so the renders don't depend on this Mac —
+        // ko and nl 24-hour, en 12-hour. `PAPERTODO_CLOCK=h12` / `h24` draws them on the other one (to check fits).
+        AppLanguage.hourCycle = ProcessInfo.processInfo.environment["PAPERTODO_CLOCK"].flatMap(AppLanguage.HourCycle.init(rawValue:))
+            ?? (AppLanguage.current == .en ? .h12 : .h24)
         _ = NSApplication.shared
         // `PAPERTODO_PAPER=night` (scripts/render-design.sh ko night): everything in 밤 종이.
         NSApp.appearance = NSAppearance(named: night ? .darkAqua : .aqua)
@@ -283,8 +287,8 @@ enum DesignSnapshots {
             try zoom(VStack(alignment: .leading, spacing: 10) {
                 ForEach([true, false], id: \.self) { counts in
                     HStack(alignment: .bottom, spacing: 4) {
-                        IndexTab(title: L("오늘"), count: counts ? 6 : nil, color: IndexTab.color(.todos), font: font, active: true) {}
-                        IndexTab(title: L("앞으로"), count: counts ? 12 : nil, color: IndexTab.color(.ahead), font: font, active: false, previewHover: true) {}
+                        IndexTab(title: L("오늘"), count: counts ? 6 : nil, color: IndexTab.color(.todos), edge: IndexTab.edge(.todos), font: font, active: true) {}
+                        IndexTab(title: L("앞으로"), count: counts ? 12 : nil, color: IndexTab.color(.ahead), edge: IndexTab.edge(.ahead), font: font, active: false, previewHover: true) {}
                     }
                     .padding(.horizontal, 8)
                     .background(alignment: .bottom) { Rectangle().fill(IndexTab.color(.todos)).frame(height: 3) }
@@ -474,10 +478,18 @@ enum DesignSnapshots {
                        size: size, to: output.appendingPathComponent("\(name).png"))
         }
         let full = NSSize(width: DeskMetrics.size.width, height: 1500)
+        // 저장과 백업 (1.45): the sample's temporary folder drawn as the default one, never a real path.
+        FolderPath.standIn = (folder.path, NSHomeDirectory() + "/Library/Application Support/com.noa.PaperTodo")
         for pane in [DeskPane.appearance, .notifications, .repeating, .pet, .events, .storage] {
             try desk(pane, "desk-\(pane.rawValue)")
             try desk(pane, "desk-\(pane.rawValue)-full", size: full)
         }
+        // …and a shared one in iCloud Drive: its name first, then the folder's.
+        model.sharedFolder = folder
+        FolderPath.standIn = (folder.path, NSHomeDirectory() + "/Library/Mobile Documents/com~apple~CloudDocs/종이냥")
+        try desk(.storage, "desk-storage-shared")
+        model.sharedFolder = nil
+        FolderPath.standIn = (folder.path, NSHomeDirectory() + "/Library/Application Support/com.noa.PaperTodo")
         // 1.43.1: 메모 서랍 has its own pane (it was a group at the bottom of 꾸미기).
         try desk(.drawer, "desk-drawer-pane")
         try desk(.drawer, "desk-drawer-pane-full", size: full)
@@ -891,6 +903,8 @@ enum DesignSnapshots {
         try await renderConveniences(folder: folder, preferences: preferences, history: samples, output: output)
         // 1.43: 메모 서랍.
         try renderMemoDrawer(folder: folder, output: output)
+        // 1.45: 할 일 스페이스.
+        try renderSpaces(folder: folder, preferences: preferences, output: output)
         // 1.35: the menu bar item (its words in each state) and the 오늘 창 below it.
         try renderTodayWindow(model: model, alarms: sampleAlarms, events: snapshotEvents, output: output)
         print("Rendered note (3 fonts + minimum size), editor, settings and 3 reminders to \(output.path)")
@@ -957,8 +971,8 @@ enum DesignSnapshots {
         try render(PaperView(model: model), size: NSSize(width: 350, height: 400), to: output.appendingPathComponent("conv-header-compact-ahead.png"))
         model.page = .todos
         // Toasts with 되돌리기.
-        for (name, text) in [("deleted", L("지웠어요")), ("done", L("\(3)개 끝냈어요")), ("tomorrow", DateMove.movedText(DateMove.tomorrow(now: now), now: now, language: .current)),
-                             ("filed", L("\(3)개를 기록으로 옮겼어요")), ("sweep", Sweep.movedText(count: 3, someday: false, language: .current))] {
+        for (name, text) in [("deleted", L("할 일을 지웠어요")), ("done", L("\(3)개 끝냈어요")), ("tomorrow", DateMove.movedText(DateMove.tomorrow(now: now), now: now, language: .current)),
+                             ("filed", L("\(3)개를 완료 기록으로 옮겼어요")), ("sweep", Sweep.movedText(count: 3, someday: false, language: .current))] {
             var toast = PaperToast(symbol: "trash", text: text)
             toast.action = L("되돌리기")
             model.toast = toast
@@ -1022,7 +1036,7 @@ enum DesignSnapshots {
         lines.append("Dock ▸ " + [L("빠른 입력"), L("빠른 메모"), L("책상"), L("25분 집중"), L("5분 타이머")].joined(separator: " · "))
         lines.append("⋯ ▸ " + [L("검색…"), L("화면 오른쪽에 붙이기"), L("화면 왼쪽에 붙이기")].joined(separator: " · "))
         lines.append(L("시스템 알림으로도 보내기") + " ▸ " + [L("놓친 것만"), L("항상"), String(localized: "끄기", table: "Settings")].joined(separator: " · "))
-        lines.append("notification ▸ " + L("종이냥 · 알림") + " [" + L("끝냄") + " · " + L("10분 뒤") + "] · " + L("알람 · \("7:00")") + " [" + L("끄기") + " · " + L("다시 알림") + "]")
+        lines.append("notification ▸ " + L("종이냥 · 알림") + " [" + L("끝내기") + " · " + L("10분 뒤") + "] · " + L("알람 · \("7:00")") + " [" + L("끄기") + " · " + L("다시 알림") + "]")
         try (lines.joined(separator: "\n") + "\n").write(to: output.appendingPathComponent("conv-menus.txt"), atomically: true, encoding: .utf8)
     }
 

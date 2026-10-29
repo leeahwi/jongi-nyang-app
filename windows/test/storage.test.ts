@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { parseNotebook, serializeNotebook, UndoableNotebook } from "../src/core/notebook";
 import { parseMemos, serializeMemos, type Memo } from "../src/core/memo";
-import { parseStorageFile, sameFolder, serializeStorageFile, storageLabel } from "../src/core/storage";
+import { folderPlace, parseStorageFile, placeText, sameFolder, serializeStorageFile, storageLabel } from "../src/core/storage";
 import { copyData, hasList, mergeArchive, readDataFolder, writeDataFolder } from "../src/main/storageFolder";
 import { Store } from "../src/main/store";
 import { parseEvents, serializeEvents, type LocalEvent } from "../src/core/events";
@@ -34,6 +34,28 @@ test("the storage file and the folder label", () => {
   assert.equal(storageLabel("C:\\Users\\meg\\x", "C:\\Users\\me"), "C:\\Users\\meg\\x");
   assert.equal(sameFolder("C:\\Data\\", "c:/data"), true);
   assert.equal(sameFolder("/a/B", "/a/b", false), false);
+});
+
+test("folderPlace (1.30): a folder said as a path bar says it — ~, a cloud drive by name, the folder's own name last (the Mac's FolderPlace too)", () => {
+  const home = "C:\\Users\\sample";
+  const base = folderPlace(`${home}\\AppData\\Roaming\\PaperTodo`, home);
+  assert.deepEqual(base, { lead: ["~", "AppData", "Roaming"], name: "PaperTodo" });
+  assert.equal(placeText(base), "~ › AppData › Roaming › PaperTodo");
+  assert.equal(folderPlace(`${home}\\AppData\\Roaming\\PaperTodo\\archive`, home).name, "archive");
+  assert.deepEqual(folderPlace(`${home}\\OneDrive\\종이냥`, home), { lead: ["OneDrive"], name: "종이냥", cloud: "OneDrive" });
+  assert.equal(placeText(folderPlace(`${home}\\OneDrive - 회사\\종이냥`, home)), "OneDrive › 종이냥");
+  assert.equal(placeText(folderPlace(`c:/users/SAMPLE/Dropbox/종이냥`, home)), "Dropbox › 종이냥", "case and slashes don't matter");
+  assert.equal(placeText(folderPlace(`${home}\\iCloudDrive\\종이냥`, home)), "iCloud Drive › 종이냥");
+  assert.deepEqual(folderPlace(`${home}\\OneDrive`, home), { lead: [], name: "OneDrive", cloud: "OneDrive" }, "the drive itself");
+  assert.equal(placeText(folderPlace("G:\\My Drive\\종이냥", home)), "Google Drive › My Drive › 종이냥");
+  assert.equal(placeText(folderPlace("D:\\Sync\\종이냥", home)), "D: › Sync › 종이냥", "outside home");
+  assert.equal(placeText(folderPlace(home, home)), "~");
+  assert.equal(folderPlace("C:\\Users\\sampler\\x", home).lead[0], "C:", "a name that only starts like home's");
+  // The Mac's paths (the same function, as the Mac app's tests say them).
+  const mac = "/Users/sample";
+  assert.equal(placeText(folderPlace(`${mac}/Library/Mobile Documents/com~apple~CloudDocs/종이냥`, mac, false)), "iCloud Drive › 종이냥");
+  assert.equal(placeText(folderPlace(`${mac}/Library/CloudStorage/OneDrive-Personal/종이냥`, mac, false)), "OneDrive › 종이냥");
+  assert.equal(placeText(folderPlace(`${mac}/Library/Application Support/com.noa.PaperTodo`, mac, false)), "~ › Library › Application Support › com.noa.PaperTodo");
 });
 
 test("the chosen folder is kept beside the settings", () => {
@@ -256,7 +278,7 @@ test("a damaged events.json is kept aside, not trimmed", () => {
   fs.writeFileSync(path.join(directory, "events.json"), "{ not json", "utf8");
   const store = new Store(directory);
   assert.deepEqual(store.events, []);
-  assert.match(store.storageError ?? "", /일정을 읽지 못했어요/);
+  assert.match(store.storageError ?? "", /일정 파일을 읽지 못해서 일정 없이 시작했어요/);
   assert.ok(fs.readdirSync(directory).some((name) => name.startsWith("events.unreadable-")));
 });
 
@@ -295,7 +317,7 @@ test("alarms are written to alarms.json beside the tasks, shared like the rest, 
   fs.writeFileSync(path.join(damaged, "alarms.json"), "{ not json", "utf8");
   const broken = new Store(damaged);
   assert.deepEqual(broken.alarms, []);
-  assert.match(broken.storageError ?? "", /알람을 읽지 못했어요/);
+  assert.match(broken.storageError ?? "", /알람 파일을 읽지 못해서 알람 없이 시작했어요/);
   assert.ok(fs.readdirSync(damaged).some((name) => name.startsWith("alarms.unreadable-")));
 });
 

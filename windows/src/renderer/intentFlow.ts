@@ -1,4 +1,5 @@
 import { addedText, preferenceKey, switchText, type Candidate } from "../core/intent";
+import type { SpaceChoice } from "../core/todoSpaces";
 import type { IntentMade, IntentPage, WireCandidate } from "../core/types";
 import { lang, paper, t } from "./api";
 import { kindIcon } from "./inputLine";
@@ -28,16 +29,19 @@ export interface FlowHost {
   restore?: (text: string) => void;
 }
 
-/** Puts `candidate` in; shows its toast unless 빠른 입력 handed it to the note. Returns what was made. */
-export async function commitReading(host: FlowHost, candidate: Candidate, candidates: readonly Candidate[], text: string, from: "note" | "quick" | "glance"): Promise<{ made?: IntentMade; inNote?: boolean }> {
-  const result = await api.intent({ op: "commit", candidate: toWire(candidate), page: host.page(), from, candidates: candidates.map(toWire), text });
+/**
+ * Puts `candidate` in; shows its toast unless 빠른 입력 handed it to the note. Returns what was made. `space`: the
+ * line's `#회사` (or the lens's space) — a to-do goes there; anything else ignores it.
+ */
+export async function commitReading(host: FlowHost, candidate: Candidate, candidates: readonly Candidate[], text: string, from: "note" | "quick" | "glance", space?: SpaceChoice): Promise<{ made?: IntentMade; inNote?: boolean }> {
+  const result = await api.intent({ op: "commit", candidate: toWire(candidate), page: host.page(), from, candidates: candidates.map(toWire), text, ...(space ? { space } : {}) });
   if (!result.made) return {};
-  if (!result.inNote) showMade(host, result.made, candidate, candidates, text);
+  if (!result.inNote) showMade(host, result.made, candidate, candidates, text, space);
   return result;
 }
 
 /** The toast for something just made, with what its action does. */
-export function showMade(host: FlowHost, made: IntentMade, candidate: Candidate, candidates: readonly Candidate[], text: string): void {
+export function showMade(host: FlowHost, made: IntentMade, candidate: Candidate, candidates: readonly Candidate[], text: string, space?: SpaceChoice): void {
   last = { made, text };
   const others = candidates.filter((entry) => entry !== candidate && entry.kind !== candidate.kind);
   const position = candidates.indexOf(candidate);
@@ -57,9 +61,10 @@ export function showMade(host: FlowHost, made: IntentMade, candidate: Candidate,
       label: switchText(next.kind, lang()),
       run: async () => {
         await api.intent({ op: "undo", made });
-        const result = await api.intent({ op: "commit", candidate: toWire(next), page: host.page(), from: "note" });
+        // Switched to a to-do: it takes the line's space as the first reading would have.
+        const result = await api.intent({ op: "commit", candidate: toWire(next), page: host.page(), from: "note", ...(space ? { space } : {}) });
         void api.intent({ op: "learn", key: preferenceKey(text, new Date(), lang()), from: candidate.kind, to: next.kind });
-        if (result.made) showMade(host, result.made, next, candidates, text);
+        if (result.made) showMade(host, result.made, next, candidates, text, space);
       },
     };
   }

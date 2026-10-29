@@ -62,29 +62,62 @@ public enum AppLanguage: String, CaseIterable, Sendable {
 
     // MARK: Times
 
-    /// The clock: "09:30" (Korean, Dutch — 24-hour) or "9:30 AM" (English).
+    /// 24-hour or 12-hour: the app follows the system's setting (the Mac's "24-hour time", Windows' short time).
+    public enum HourCycle: String, Sendable {
+        case h24, h12
+    }
+
+    /// The clock every time in the app is written with, set at launch from the system (`HourCycle.system`) and
+    /// again when the system's locale changes. nil: each language's fixed format from before — ko and nl 24-hour,
+    /// en 12-hour, a time in a Korean sentence "오후 3:00" — which the shared test cases are written in (tests that
+    /// check another clock set it, and set it back). Same as lang.ts `setHourCycle`.
+    nonisolated(unsafe) public static var hourCycle: HourCycle?
+
+    /// This language's clock now: the app's cycle, else the language's own (en 12-hour, ko and nl 24-hour).
+    public var cycle: HourCycle { Self.hourCycle ?? (self == .en ? .h12 : .h24) }
+
+    /// The 12-hour clock's word for the half of the day: "오전" · "오후", "AM" · "PM", "a.m." · "p.m.".
+    public func period(hour: Int) -> String {
+        switch self {
+        case .ko: hour < 12 ? "오전" : "오후"
+        case .en: hour < 12 ? "AM" : "PM"
+        case .nl: hour < 12 ? "a.m." : "p.m."
+        }
+    }
+
+    /// Korean says the half first ("오후 3:00"), English and Dutch after ("3:00 PM", "3:00 p.m.").
+    public var periodFirst: Bool { self == .ko }
+
+    private func twelveDigits(hour: Int, minute: Int) -> String { "\(Self.twelve(hour)):\(String(format: "%02d", minute))" }
+
+    private func withPeriod(_ digits: String, hour: Int) -> String {
+        periodFirst ? period(hour: hour) + " " + digits : digits + " " + period(hour: hour)
+    }
+
+    /// The clock: "09:30" (24-hour), or "오전 9:30" · "9:30 AM" · "9:30 a.m." (12-hour). With no cycle set: ko and
+    /// nl "09:30", en "9:30 AM".
     public func clock(hour: Int, minute: Int) -> String {
-        switch self {
-        case .ko, .nl: return String(format: "%02d:%02d", hour, minute)
-        case .en: return "\(Self.twelve(hour)):\(String(format: "%02d", minute)) \(hour < 12 ? "AM" : "PM")"
+        switch cycle {
+        case .h24: return String(format: "%02d:%02d", hour, minute)
+        case .h12: return withPeriod(twelveDigits(hour: hour, minute: minute), hour: hour)
         }
     }
 
-    /// A time as said in a sentence: "오후 3:00", "3:00 PM", "15:00".
+    /// A time as said in a sentence: the clock ("15:00", "오후 3:00", "3:00 PM"). With no cycle set, Korean says
+    /// "오후 3:00" as before.
     public func spokenTime(hour: Int, minute: Int) -> String {
-        switch self {
-        case .ko: return "\(hour < 12 ? "오전" : "오후") \(Self.twelve(hour)):\(String(format: "%02d", minute))"
-        case .en, .nl: return clock(hour: hour, minute: minute)
-        }
+        if Self.hourCycle == nil && self == .ko { return withPeriod(twelveDigits(hour: hour, minute: minute), hour: hour) }
+        return clock(hour: hour, minute: minute)
     }
 
-    /// From–to: "10:00–11:00"; English keeps one AM/PM when both share it: "3:00–4:00 PM", "11:30 AM–12:30 PM".
+    /// From–to: "10:00–11:00"; on the 12-hour clock one half-of-day word when both share it: "3:00–4:00 PM",
+    /// "오후 3:00–4:00", "11:30 AM–12:30 PM".
     public func timeRange(from start: (hour: Int, minute: Int), to end: (hour: Int, minute: Int)) -> String {
-        guard self == .en else { return clock(hour: start.hour, minute: start.minute) + "–" + clock(hour: end.hour, minute: end.minute) }
-        if (start.hour < 12) == (end.hour < 12) {
-            return "\(Self.twelve(start.hour)):\(String(format: "%02d", start.minute))–" + clock(hour: end.hour, minute: end.minute)
+        guard cycle == .h12, (start.hour < 12) == (end.hour < 12) else {
+            return clock(hour: start.hour, minute: start.minute) + "–" + clock(hour: end.hour, minute: end.minute)
         }
-        return clock(hour: start.hour, minute: start.minute) + "–" + clock(hour: end.hour, minute: end.minute)
+        let digits = twelveDigits(hour: start.hour, minute: start.minute) + "–" + twelveDigits(hour: end.hour, minute: end.minute)
+        return withPeriod(digits, hour: start.hour)
     }
 
     /// "40분 뒤", "in 40 min", "over 40 min"
@@ -266,5 +299,14 @@ enum RegexCache {
         groupNames[pattern] = names
         lock.unlock()
         return names
+    }
+}
+
+extension AppLanguage.HourCycle {
+    /// The system's clock: how the user's locale (with the Mac's "24-hour time" switch) writes an hour — "HH" is
+    /// 24-hour, "h a" or "a h" 12-hour.
+    public static func system(locale: Locale = .autoupdatingCurrent) -> Self {
+        let format = DateFormatter.dateFormat(fromTemplate: "j", options: 0, locale: locale) ?? "HH"
+        return format.contains("H") || format.contains("k") ? .h24 : .h12
     }
 }

@@ -34,7 +34,7 @@
 			<string>Langste: %lld dagen</string>
 		</dict>
 	</dict>
-	<key>오늘 할 일 %lld개 모두 마침</key>
+	<key>오늘 할 일 %lld개를 모두 끝냈어요</key>
 	<dict>
 		<key>NSStringLocalizedFormatKey</key>
 		<string>%#@count@</string>

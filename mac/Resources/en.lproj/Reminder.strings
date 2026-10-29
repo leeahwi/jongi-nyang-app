@@ -1,2 +1,4 @@
 /* The reminder bubble: shorter words where the same Korean reads longer elsewhere. */
 "내일로" = "Tomorrow";
+/* The task editor's space field (1.45): one space. */
+"스페이스" = "Space";

@@ -179,6 +179,31 @@ private enum MemoDrawerTests {
             try equal(copy.updatedAt, now, "file time")
         }
 
+        try test("D12 search with the lines kept (1.45): the same hits as without") {
+            let index = MemoFolders.SearchIndex()
+            let more = memos + [memo("m4", "  첫 줄  \n\n   보고서 초안\r\n둘째 COFFEE café\u{2028}ㅎㅇ 하이"), memo("m5", ""), memo("m6", "\n\n하이")]
+            for query in ["ㅎㅇ", "build", "우유", "회사", "  ", "보고서", "ㅂㄱㅅ", "coffee", "cafe", "하이", "첫 줄", "없는말", "e", "ㅎ"] {
+                try equal(folders.search(query, memos: more, index: index), folders.search(query, memos: more), "‘\(query)’")
+                try equal(folders.search(query, memos: more, index: index), folders.search(query, memos: more), "‘\(query)’ again")
+            }
+            var edited = more
+            edited[3].text = "보고서 다 씀"
+            try equal(folders.search("보고서", memos: edited, index: index), folders.search("보고서", memos: edited), "an edited memo read again")
+            // Random memos of many lines (breaks of every kind, spaces at the ends) and queries.
+            let pool = Array("가나보고서ㅂㄱㅅ하이 abcABé\u{0301}\n\n\r\n\t  \u{3000}-")
+            var seed: UInt64 = 7
+            func next(_ n: Int) -> Int {
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                return Int((seed >> 33) % UInt64(n))
+            }
+            for round in 0..<300 {
+                let list = (0..<8).map { n in memo("r\(round)-\(n)", String((0..<next(40)).map { _ in pool[next(pool.count)] })) }
+                for query in ["가", "보고", "ㅂㄱ", "a b", "ab", "é", "하이", "ㅎ", String((0..<(1 + next(3))).map { _ in pool[next(pool.count)] })] {
+                    try equal(folders.search(query, memos: list, index: index), folders.search(query, memos: list), "round \(round) ‘\(query)’")
+                }
+            }
+        }
+
         try test("D12 search: 초성, every folder, the folder with each hit") {
             let hits = folders.search("ㅎㅇ", memos: memos)
             try equal(hits, [.init(memoID: "m1", folderID: "work", text: "회의 메모", range: 0..<2),
@@ -288,15 +313,15 @@ private enum MemoDrawerTests {
             try equal(MemoFolders.slipTime(at("2025-10-21T01:12:00Z"), now: base, calendar: calendar, language: .nl), "21 okt 2025", "other year nl")
             try equal([1, 5, 10, 11].map(MemoFolders.sheets), ["한 장", "다섯 장", "열 장", "11장"], "sheets")
             try equal(MemoFolders.footer(folder: "회사", count: 5), "회사에 다섯 장", "footer")
-            try equal(MemoFolders.footer(folder: "회사", count: 0), "회사에 아직 메모가 없어요", "empty")
-            try equal(MemoFolders.footer(folder: "Work", count: 0, language: .en), "Nothing in Work yet", "empty en")
+            try equal(MemoFolders.footer(folder: "회사", count: 0), "비어 있어요", "empty (#39)")
+            try equal(MemoFolders.footer(folder: "Work", count: 0, language: .en), "Empty", "empty en")
             try equal(MemoFolders.footer(folder: "Work", count: 1, language: .en), "1 note in Work", "en")
-            try equal(MemoFolders.footer(folder: "Werk", count: 0, language: .nl), "Nog niets in Werk", "nl empty")
+            try equal(MemoFolders.footer(folder: "Werk", count: 0, language: .nl), "Leeg", "nl empty")
             try equal(MemoFolders.pinnedFooter(count: 3), "고정한 메모 세 장", "pinned")
             try equal(MemoFolders.pinnedFooter(count: 1, language: .nl), "1 vastgezette notitie", "pinned nl")
             try equal(MemoFolders.searchFooter(count: 2, language: .en), "2 notes found", "search en")
             try equal(MemoFolders.searchFooter(count: 2), "찾은 메모 두 장", "search ko")
-            try equal(MemoFolders.searchFooter(count: 0), "찾는 메모가 없어요", "search none")
+            try equal(MemoFolders.searchFooter(count: 0), "찾은 메모 0장", "search none: a number, the middle says what was looked for (#39)")
         }
 
         try test("code lines are drawn fixed-width") {
@@ -534,6 +559,21 @@ private enum MemoDrawerTests {
             try equal(MemoCards.preview("장보기\n- [ ] 우유\n\n  메모 끝"), "메모 끝", "checklist lines aren't the preview")
         }
 
+        try test("D30 a card's preview (#14): three lines at most, a checklist's first items, no empty lines") {
+            typealias Row = MemoCards.PreviewRow
+            try equal(MemoCards.previewRows("주간 회의\n\n첫째 줄\n   \n둘째 줄\n셋째 줄\n넷째 줄"), [Row(text: "첫째 줄"), Row(text: "둘째 줄"), Row(text: "셋째 줄")], "three lines, blanks skipped")
+            try equal(MemoCards.previewRows("짧은 메모\n한 줄뿐"), [Row(text: "한 줄뿐")], "a short memo: only what it has")
+            try equal(MemoCards.previewRows("제목만"), [], "a title only")
+            try equal(MemoCards.previewRows("  \n\n"), [], "empty")
+            try equal(MemoCards.previewRows("장보기\n메모 먼저\n- [ ] 우유\n- [x] 빵\n  * [X] 계란\n- [ ] 사과"),
+                      [Row(checked: false, text: "우유"), Row(checked: true, text: "빵"), Row(checked: true, text: "계란")], "a checklist: its first three items")
+            try equal(MemoCards.previewRows("- [ ] 첫 항목이 제목\n- [ ] 둘째\n- [ ]   \n- [x] 셋째"), [Row(checked: false, text: "둘째"), Row(checked: true, text: "셋째")], "the first item is the title; an empty item is no row")
+            try equal(MemoCards.previewRows("목록\n- [ ] 하나\n- [ ] 둘\n- [ ] 셋", limit: 2), [Row(checked: false, text: "하나"), Row(checked: false, text: "둘")], "dense: two")
+            try equal(MemoCards.previewRows("a\r\n  b  \r\nc"), [Row(text: "b"), Row(text: "c")], "CRLF and spaces trimmed")
+            try equal(MemoCards.previewRows("https://x.com\n010-1234-5678"), [Row(text: "010-1234-5678")], "after a link title")
+            try equal(MemoCards.previewRows("제목\n" + String(repeating: "가", count: 500)).first?.text.count, 300, "a row cut at 300")
+        }
+
         try test("D26 phone numbers (Korean, 9–11 digits from 0)") {
             try equal(MemoCards.kind("꽃집 전화 010 1234 5678"), .phone("010-1234-5678"), "spaces")
             try equal(["02-123-4567", "전화 02 1234 5678", "010.1234.5678", "연락: 01012345678", "031-123-4567"].map { MemoCards.phone(in: $0) },
@@ -555,7 +595,9 @@ private enum MemoDrawerTests {
         try test("footer and bookmark words (1.44, the Windows app's)") {
             try equal(MemoFolders.footerShort(folder: "회사", count: 5), "회사 · 다섯 장", "footer")
             try equal(MemoFolders.footerShort(folder: "Work", count: 5, language: .en), "Work · 5 notes", "footer en")
-            try equal(MemoFolders.footerShort(folder: "Werk", count: 0, language: .nl), "Nog niets in Werk", "empty keeps its sentence")
+            try equal(MemoFolders.footerShort(folder: "Werk", count: 0, language: .nl), "Leeg", "empty: only that (#39)")
+            try equal(MemoFolders.pinnedFooterShort(count: 0), "비어 있어요", "pinned empty")
+            try equal([AppLanguage.ko, .en, .nl].map { MemoFolders.searchFooter(count: 0, language: $0) }, ["찾은 메모 0장", "0 notes found", "0 notities gevonden"], "search none")
             try equal(MemoFolders.pinnedFooterShort(count: 3), "고정 · 세 장", "pinned")
             try equal(MemoFolders.pinnedFooterShort(count: 3, language: .nl), "Vastgezet · 3 notities", "pinned nl")
             try equal(MemoFolders.bookmarkLabel("장보기", count: 3, key: "⌘3"), "장보기 · 세 장 · ⌘3", "bookmark")
@@ -566,6 +608,30 @@ private enum MemoDrawerTests {
             try equal(MemoFolders.movedToInbox(count: 2, inbox: "메모"), "메모 두 장은 ‘메모’ 폴더로 옮겼어요", "ko")
             try equal(MemoFolders.movedToInbox(count: 1, inbox: "Notes", language: .en), "1 note moved to ‘Notes’", "en one")
             try equal(MemoFolders.movedToInbox(count: 2, inbox: "Notities", language: .nl), "2 notities verplaatst naar ‘Notities’", "nl")
+        }
+
+        try test("memo-folders.json times read without a formatter, the same as with one (1.45)") {
+            let formatter = ISO8601DateFormatter()
+            var seed: UInt64 = 42
+            func next(_ n: Int) -> Int {
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                return Int((seed >> 33) % UInt64(n))
+            }
+            func two(_ n: Int) -> String { n < 10 ? "0\(n)" : "\(n)" }
+            var texts = ["1970-01-01T00:00:00Z", "2000-02-29T23:59:59Z", "1900-03-01T00:00:00Z", "2100-02-28T12:00:00Z", "2026-10-28T05:01:02Z"]
+            for _ in 0..<5_000 {
+                texts.append("\(1900 + next(300))-\(two(1 + next(12)))-\(two(1 + next(28)))T\(two(next(24))):\(two(next(60))):\(two(next(60)))Z")
+            }
+            for text in texts {
+                try equal(MemoFolders.utcSecond(text), formatter.date(from: text), text)
+            }
+            // Anything else goes to the formatters.
+            for text in ["2026-02-30T00:00:00Z", "2026-13-01T00:00:00Z", "2026-10-28T24:00:00Z", "2026-10-28T05:01:02.123Z", "2026-10-28T05:01:02+09:00",
+                         "1899-12-31T00:00:00Z", "2100-02-29T00:00:00Z", "abcd-ef-ghTij:kl:mnZ", ""] {
+                try equal(MemoFolders.utcSecond(text), nil, text)
+            }
+            let file = sample.replacingOccurrences(of: "2026-10-26T09:00:00Z", with: "2026-10-26T09:00:00.500Z")
+            try equal(try MemoFolders.decode(Data(file.utf8)).folder("work")?.updatedAt, at("2026-10-26T09:00:00Z"), "fractional seconds still read")
         }
 
         print("\(count) memo drawer checks passed")

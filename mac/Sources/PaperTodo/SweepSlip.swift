@@ -133,12 +133,13 @@ struct SweepView: View {
             if on { excluded.insert(item.id) } else { excluded.remove(item.id) }
         } label: {
             HStack(spacing: 10) {
+                // #32: a round pick (filled lavender with →: 넘겨요), not the square sage ✓ that means 끝냈어요.
                 ZStack {
-                    RoundedRectangle(cornerRadius: 4).fill(on ? PaperTheme.sage : PaperTheme.card)
-                    RoundedRectangle(cornerRadius: 4).strokeBorder(on ? PaperTheme.sage : PaperTheme.checkBorder, lineWidth: 1.3)
-                    if on { Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(PaperTheme.onSage) }
+                    Circle().fill(on ? PaperTheme.spaceLavender : PaperTheme.card)
+                    Circle().strokeBorder(on ? PaperTheme.spaceLavender : PaperTheme.checkBorder, lineWidth: 1.3)
+                    if on { Image(systemName: "arrow.right").font(.system(size: 8.5, weight: .bold)).foregroundStyle(PaperTheme.onSage) }
                 }
-                .frame(width: 16, height: 16)
+                .frame(width: 17, height: 17)
                 Text(item.title.handwritten)
                     .font(model.notebookFont.bodyFont(.small))
                     .foregroundStyle(on ? PaperTheme.ink : PaperTheme.ink3)

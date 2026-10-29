@@ -1,5 +1,5 @@
 import { daysText, snoozeChoices, timeParts, type Alarm } from "../core/alarm";
-import { clock, dayWord, spokenTime, weekdayName, weekdayShort } from "../core/lang";
+import { clock, dayWord, hourCycle, period, periodFirst, spokenTime, weekdayName, weekdayShort } from "../core/lang";
 import { bodyFontSize, type AppState } from "../core/types";
 import { startRinging } from "./alarmSound";
 import { h, lang, paper, t } from "./api";
@@ -81,11 +81,12 @@ function show({ alarm, muted, still, startedAt: started, next }: RingPayload): v
   current = alarm;
   startedAt = started ?? Date.now();
   const { hour, minute } = timeParts(alarm);
-  // A small 오전 before 7:00 (Korean puts it first), 7:00 with a small AM after it; Dutch 07:00.
+  // On the 12-hour clock a small 오전 before 7:00 (Korean puts it first), 7:00 with a small AM · a.m. after it; on the
+  // 24-hour clock 07:00 alone (the app's clock, lang.ts hourCycle).
   const digits = `${hour % 12 || 12}:${String(minute).padStart(2, "0")}`;
-  if (lang() === "nl") time.replaceChildren(clock(hour, minute, lang()));
-  else if (lang() === "ko") time.replaceChildren(h("small", { class: "before" }, hour < 12 ? t("오전") : t("오후")), digits);
-  else time.replaceChildren(digits, h("small", {}, hour < 12 ? "AM" : "PM"));
+  if (hourCycle(lang()) === "h24") time.replaceChildren(clock(hour, minute, lang()));
+  else if (periodFirst(lang())) time.replaceChildren(h("small", { class: "before" }, period(hour, lang())), digits);
+  else time.replaceChildren(digits, h("small", {}, period(hour, lang())));
   label.textContent = alarm.label.trim() || t("알람");
   label.title = label.textContent;
   fitLabel();

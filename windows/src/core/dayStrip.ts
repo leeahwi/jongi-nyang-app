@@ -121,6 +121,20 @@ export function stripState(items: readonly StripItem[], now: Date, limit: number
 }
 
 /** Rows under the lead: one in a narrow note (≤ 400 px wide), three in a tall one (≥ 720 px high), else two. */
+/**
+ * #31: the list row's small mark for the to-do the strip shows going on now ("지금"). #47: only that one; done ones
+ * get none. Same as DayStrip.marks (Swift).
+ */
+export function stripMarks(state: StripState): Map<string, "now" | "next"> {
+  const marks = new Map<string, "now" | "next">();
+  // #47: only 지금 — the to-dos up next sit under the list's own 다음 heading (a 다음 mark said it a third time).
+  if (state.mode === "now" && state.lead && state.lead.kind !== "event" && !state.lead.done && state.lead.taskId) marks.set(state.lead.taskId, "now");
+  return marks;
+}
+
+/** The mark's word: "지금" · "Now" · "Nu", "다음" · "Next" · "Volgende". */
+export const markWord = (mode: "now" | "next", lang: Lang = "ko"): string => (mode === "now" ? ["지금", "Now", "Nu"] : ["다음", "Next", "Volgende"])[langIndex(lang)];
+
 export const rowLimit = (width: number, height: number): number => (width <= 400 ? 1 : height >= 720 ? 3 : 2);
 
 /** The top line's link: "하루 전체 ›" · "Whole day ›" · "Hele dag ›"; narrow (≤ 400 px) "전체 ›" · "Day ›" · "Dag ›". */
@@ -130,13 +144,21 @@ export const wholeDayLink = (narrow: boolean, lang: Lang = "ko"): string =>
 // ─── Words ──────────────────────────────────────────────────────────────────
 
 /**
- * The ring's centre: the number and the small word under it. Under an hour "40" + "분 남음" · "min left" · "min over"
- * (`next`: "분 뒤" · "min away" · "min te gaan"); an hour or more "1:20" + "남음" · "left" · "over" (`next`: "뒤" · "away" · "te gaan").
+ * The ring's centre: the number and the small word under it. Under an hour "40" + "분 남음" · "min left" · "min te gaan"
+ * (#54: not "min over", which sat over "over 40 min" = in 40 min) (`next`: "분 뒤" · "min away" · "min te gaan"). An hour or more: the hours on top and the rest under them, so it reads
+ * as a length, never a clock time (1.30 — "1:01 뒤" read as 1:01 beside "다음 · 15:45"): "1시간" + "20분 남음" · "1 h" +
+ * "20 min left" · "1 u" + "en 20 min" (#60: "20 min te gaan" was cut under the hour); `next` "1시간" + "5분 뒤" · "1 h" + "5 min away" · "1 u" + "en 5 min"; on the
+ * hour "2시간" + "뒤" · "away" · "te gaan". The rows' rule (`awayText`): from two hours away, the nearest whole hour
+ * ("3시간" + "뒤" for 2 h 30 min); time left stays exact (`leftText`). Same as the Mac's DayStrip.ringText.
  */
 export function ringText(minutes: number, mode: StripMode, lang: Lang = "ko"): { value: string; caption: string } {
   const left = mode !== "next", index = langIndex(lang);
-  if (minutes < 60) return { value: String(minutes), caption: (left ? ["분 남음", "min left", "min over"] : ["분 뒤", "min away", "min te gaan"])[index] };
-  return { value: `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`, caption: (left ? ["남음", "left", "over"] : ["뒤", "away", "te gaan"])[index] };
+  if (minutes < 60) return { value: String(minutes), caption: (left ? ["분 남음", "min left", "min te gaan"] : ["분 뒤", "min away", "min te gaan"])[index] };
+  const shown = left || minutes < 120 ? minutes : Math.round(minutes / 60) * 60;
+  const h = Math.floor(shown / 60), m = shown % 60;
+  const value = [`${h}시간`, `${h} h`, `${h} u`][index];
+  if (m === 0) return { value, caption: (left ? ["남음", "left", "te gaan"] : ["뒤", "away", "te gaan"])[index] };
+  return { value, caption: (left ? [`${m}분 남음`, `${m} min left`, `en ${m} min`] : [`${m}분 뒤`, `${m} min away`, `en ${m} min`])[index] };
 }
 
 /**

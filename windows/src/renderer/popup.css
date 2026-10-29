@@ -38,7 +38,8 @@ html, body { background: transparent; }
 /* 저녁 정리: the question, then the tasks (ticked ones go along), at most five rows before it scrolls. */
 .sweep-msg { font: 500 13px var(--ui); color: var(--ink); line-height: 1.45; margin-bottom: 6px; }
 .sweep-rows { max-height: 180px; overflow-y: auto; }
-.task.picked .check span { background: var(--sage); border-color: var(--sage); }
+.check.carry-pick span { border-radius: 50%; }
+.task.picked .check.carry-pick span { background: var(--band-lavender); border-color: var(--band-lavender); }
 .task.picked .check span .icon { opacity: 1; }
 .task:not(.picked) .sweep-title { color: var(--ink-3); }
 .sweep-title { cursor: default; }

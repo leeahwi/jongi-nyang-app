@@ -1,6 +1,6 @@
 #app { display: flex; flex-direction: column; height: 100vh; }
 
-/* Top row: washi index tabs for the three pages (오늘 · 앞으로 · 메모), the tools on the right; the rest of the row and
+/* Top row: index tabs (solid, a 1 px edge) for the three pages (오늘 · 앞으로 · 메모), the tools on the right; the rest of the row and
    the header below drag the window (double-click folds it). The active tab joins the sheet through
    a 3px band of its colour under the row; the others stand a little lower. */
 :root { --tab-today: var(--tab-1); --tab-ahead: var(--tab-2); --band: var(--tab-today); }
@@ -10,21 +10,19 @@
 .index-tab {
   position: relative; height: 25px; padding: 0 12px; display: flex; align-items: center; gap: 5px; flex: none;
   border-radius: 8px 8px 0 0; background: var(--tab-color); transition: height 0.12s ease-out, box-shadow 0.12s;
+  border: 1px solid var(--tab-edge); border-bottom: none;
 }
-/* Faint vertical washi stripes over the tab colour. */
-.index-tab::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.18) 0 2px, transparent 2px 6px); pointer-events: none; }
-:root[data-paper="night"] .index-tab::after { background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.06) 0 2px, transparent 2px 6px); }
 .index-tab:hover, .index-tab.hover { height: 26px; }
 .index-tab[aria-selected="true"] { height: 28px; }
 /* A task dragged over 앞으로 (or, from 앞으로, over 오늘): the tab rises with a sage edge. */
 .index-tab.drop-target { height: 30px; box-shadow: inset 0 0 0 1.5px var(--sage), 0 -2px 6px color-mix(in srgb, var(--sage) 25%, transparent); }
-.index-tab.drop-target .tab-label { color: var(--ink); }
-.tab-today { --tab-color: var(--tab-today); }
-.tab-ahead { --tab-color: var(--tab-ahead); }
+.index-tab.drop-target .tab-label { color: var(--tab-ink); }
+.tab-today { --tab-color: var(--tab-today); --tab-edge: var(--tab-1-edge); }
+.tab-ahead { --tab-color: var(--tab-ahead); --tab-edge: var(--tab-2-edge); }
 .tab-label { position: relative; font-family: var(--title-font); font-size: 19px; line-height: 1.15; color: var(--tab-ink); white-space: nowrap; padding-top: 1px; }
 :root[data-font="clean"] .tab-label { font-size: 12.5px; }
-.index-tab[aria-selected="true"] .tab-label { color: var(--ink); }
-/* Night: the pen's thin strokes thinned out further on the dark tabs (앞으로 on lavender); a hair of stroke keeps them legible. */
+.index-tab[aria-selected="true"] .tab-label { color: var(--tab-ink); }
+/* Night: a hair of stroke keeps the pen's thin strokes legible on the tabs. */
 :root[data-paper="night"]:not([data-font="clean"]) .tab-label { -webkit-text-stroke: 0.35px currentColor; }
 .tab-count { position: relative; font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--tab-ink); min-width: 8px; text-align: center; margin-top: -4px; }
 .index-tabs.tight .index-tab { padding: 0 9px; gap: 3px; }
@@ -156,6 +154,8 @@
 .row:hover:not(.editing) .actions, .row.preview-hover .actions, .actions:focus-within { display: flex; }
 .row:hover:not(.editing) :is(.due, .time, .sent-mark, .carry), .row.preview-hover :is(.due, .time, .sent-mark, .carry) { display: none; }
 /* 어제부터 · 3일째: a quiet ink3 word before the deadline and the time. */
+/* #31: 지금 · 다음 on a row the 하루 띠 shows too: sage text on its tint (4.5:1 and more, day and night). */
+.strip-mark { height: 17px; margin-left: 8px; padding: 0 6px; border-radius: 9px; display: inline-flex; align-items: center; align-self: center; font: 600 10.5px var(--ui); color: var(--sage-text); background: var(--sage-2); white-space: nowrap; z-index: 1; flex: none; }
 .carry { height: 24px; margin-left: 8px; display: inline-flex; align-items: center; font: 500 11px var(--ui); color: var(--ink-3); white-space: nowrap; z-index: 1; flex: none; }
 .carry[hidden], .star[hidden] { display: none; }
 /* 오늘 꼭 하나: a small filled star before the title. */
@@ -268,6 +268,10 @@
 .guide-actions { width: 100%; display: flex; align-items: center; gap: 6px; margin-top: 16px; }
 .guide-actions .spacer { flex: 1; }
 .guide-actions .action { height: 32px; padding: 0 14px; font-size: 12.5px; min-width: 56px; }
+/* 다음 ↩ / 시작하기 ↩: the keycap inside the primary, as on a slip's primary (slip.css). */
+.guide-actions .action.next { display: inline-flex; align-items: center; gap: 8px; flex: none; white-space: nowrap; }
+.guide-actions .action.next .keycap { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.28); color: #f3f6ef; }
+:root[data-paper="night"] .guide-actions .action.next .keycap { background: rgba(31, 42, 30, 0.1); border-color: rgba(31, 42, 30, 0.3); color: var(--on-sage); }
 .guide-skip { font-size: 12px; color: var(--faded); }
 .guide-skip:hover { color: var(--secondary); }
 @media (prefers-reduced-motion: reduce) { .guide-card.turn .guide-art { animation: none; } }
@@ -306,6 +310,10 @@
 .strip-link { flex: none; display: inline-flex; align-items: center; gap: 3px; min-height: 18px; padding: 0; font: 500 11px/18px var(--ui); color: var(--sage-text) !important; white-space: nowrap; }
 .strip-link:hover { text-decoration: underline; text-underline-offset: 2px; }
 .strip-link.fold .icon { transform: rotate(180deg); }
+/* No all-day event: the link at the bar's right end (the bar 3 px down, so its middle meets the link's). */
+.strip-barline { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.strip-barcol { flex: 1 1 auto; min-width: 0; }
+.strip-barline .strip-bar { margin-top: 3px; }
 
 .strip-bar { display: block; position: relative; width: 100%; height: 12px; margin-top: 4px; padding: 0; }
 .sb-track { position: absolute; left: 0; right: 0; top: 3px; height: 6px; border-radius: 3px; overflow: hidden; background: var(--paper-2); }
@@ -336,6 +344,8 @@
 .strip-ring.now .rc-text b { color: var(--ink); }
 .strip-ring.soon .rc-text b { color: var(--clay-text); }
 .rc-text small { display: block; width: 40px; text-align: center; font: 500 8.5px/11px var(--ui); color: var(--ink-3); white-space: nowrap; overflow: hidden; }
+/* Two short lines (#54: nl "min te gaan" now on 지금 too): the descenders may reach under the 9 px lines, so nothing clips them. */
+.rc-text small.two { width: 32px; font: 500 8px/9px var(--ui); white-space: normal; overflow-wrap: anywhere; word-break: keep-all; overflow: visible; }
 .strip-ring.soon .rc-text small { color: var(--clay-text); }
 .lead-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .lead-kicker { font: 600 10.5px/14px var(--ui); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; color: var(--sage-text); white-space: nowrap; overflow: hidden; }
@@ -641,3 +651,46 @@
   :root:lang(en) .actions .move .move-label, :root:lang(nl) .actions .move .move-label { display: none; }
   :root:lang(en) .actions .move, :root:lang(nl) .actions .move { padding: 0 7px; margin-right: 2px; }
 }
+
+/* ─── 할 일 스페이스 (1.30) ─────────────────────────────────────────────────── */
+/* A space's band: 4px at the row's left edge, about 55 % of the row high, round on the right only; faded with a
+   finished to-do's words. The span is wider than the band so its tooltip (the space's name) is easy to reach. */
+.sband { position: absolute; left: 0; top: 22.5%; height: 55%; width: 12px; box-sizing: border-box; border-radius: 0 10px 10px 0 / 0 2px 2px 0; background: var(--band); border-right: 8px solid transparent; background-clip: padding-box; z-index: 2; }
+.sband[hidden] { display: none; }
+.row.done .sband { opacity: 0.45; }
+/* 모든 스페이스 ▾ at the end of the date line (its margins keep the line's height as it was). */
+.date-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.date-row .date-line { flex: 1; min-width: 0; }
+.space-pick { margin: -4px 0 -4px auto; flex: none; max-width: 58%; height: 22px; padding: 0 7px 0 7px; display: inline-flex; align-items: center; gap: 6px;
+  border-radius: 12px; border: 1px solid var(--rule-strong); background: color-mix(in srgb, var(--card) 70%, transparent); color: var(--ink-2); font: 500 11px var(--ui); white-space: nowrap; -webkit-app-region: no-drag; }
+.space-pick[hidden] { display: none; }
+.space-pick:hover, .space-pick[aria-expanded="true"] { background: var(--card); color: var(--ink); }
+.space-pick.on { border-color: color-mix(in srgb, var(--band, var(--ink-3)) 65%, transparent); background: color-mix(in srgb, var(--band, var(--ink-3)) 8%, var(--card)); color: var(--ink); font-weight: 600; }
+.space-pick-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.space-pick .icon { flex: none; color: var(--ink-3); }
+.space-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--band); flex: none; }
+/* 회사만 보는 중 · 다른 할 일 4개는 숨겼어요 · 모두 보기 */
+.lens-band { flex: none; margin: 4px 16px 6px 18px; min-height: 30px; padding: 4px 6px 4px 12px; display: flex; align-items: center; gap: 8px; border-radius: 9px;
+  background: color-mix(in srgb, var(--band) 9%, var(--paper)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--band) 40%, transparent); font: 500 11.5px/16px var(--ui); color: var(--ink-2); }
+.lens-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lens-all { flex: none; height: 22px; padding: 0 8px; border-radius: 6px; font: 600 11.5px var(--ui); color: var(--ink); white-space: nowrap; }
+.lens-all:hover { background: color-mix(in srgb, var(--band) 14%, transparent); }
+/* The paper menus over the note (the row menu, 모든 스페이스 ▾, the editor's 스페이스): the note's tokens. */
+.menu-layer { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
+.menu-layer > .menu { position: absolute; pointer-events: auto; }
+:root {
+  --d-menu: var(--card); --d-menu-edge: var(--rule-strong); --d-ink: var(--ink); --d-meta: var(--ink-3); --d-icon: var(--ink-2); --d-hover: color-mix(in srgb, var(--ink) 7%, transparent);
+  --d-danger: var(--clay-text); --d-sub: var(--sage-text); --d-preview: var(--ink-2); --d-select: var(--sage); --d-hand: var(--body-font);
+}
+:root[data-paper="night"] .menu { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 30px -10px rgba(0, 0, 0, 0.7); }
+.menu .dot.all { background: var(--faint); }
+.space-new { display: flex; flex-direction: column; gap: 6px; padding: 2px 3px 3px; min-width: 200px; }
+.space-new .label { margin: 3px 5px 0; }
+.space-new input { height: 30px; padding: 0 8px; border-radius: 7px; border: 1px solid var(--rule-strong); background: var(--paper); font: 13px var(--ui); color: var(--ink); user-select: text; }
+.space-new input:focus { outline: none; border-color: var(--sage); }
+/* The editor's 스페이스 field, under the to-do's title. */
+.editor .space-field { align-self: flex-start; max-width: 100%; height: 26px; padding: 0 9px 0 8px; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; border: 1px solid var(--rule); background: color-mix(in srgb, var(--card) 55%, transparent); font: 12px var(--ui); color: var(--ink); white-space: nowrap; }
+.editor .space-field:hover { background: var(--card); }
+.editor .space-field-name { color: var(--ink-3); font-weight: 600; font-size: 11px; }
+.editor .space-field-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.editor .space-field .icon { flex: none; color: var(--ink-3); }

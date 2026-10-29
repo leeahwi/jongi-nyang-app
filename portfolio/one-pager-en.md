@@ -6,7 +6,7 @@ A desktop to-do app for macOS and Windows. I built it separately on each platfor
 | --- | --- |
 | Team and role | Solo developer, pair programming with AI (Claude Code) |
 | Stack | Swift 6, SwiftUI + AppKit / Electron, TypeScript / GitHub Actions |
-| Versions | Mac 1.0 → 1.44.0, Windows 1.0 → 1.29.0 |
+| Versions | Mac 1.0 → 1.45.0, Windows 1.0 → 1.30.0 |
 | Links | Repository `github.com/leeahwi/jongi-nyang-app`, website `leeahwi.github.io/jongi-nyang-app/en/`, downloads under the repository's Releases |
 
 ## Why I built it
@@ -32,13 +32,16 @@ The alarm window before and after. It used to look like a system alert; now it's
 
 ## What I did
 
-- Wrote a case table for each feature, one input and its expected output per row, and made the Swift and TypeScript tests produce the same strings. The input line alone has 136 rows, the notes drawer has cases D1–D29, and the Windows suite has 534 tests.
+- Wrote a case table for each feature, one input and its expected output per row, and made the Swift and TypeScript tests produce the same strings. The input line alone has 136 rows, the notes drawer has cases D1–D30, and the Windows suite has 582 tests. From to-do spaces (S1–S22) on, the table is one JSON file both apps read.
 - Built measurement scripts (`mac/scripts/perf.sh`, `windows/tools/perf.mjs`) and used them to find what was burning CPU at idle. Mac went from 61% to 0.7%, Windows from 5.7% to 1.5%.
-- Added snapshot rendering of real screens in 3 languages, day and night (about 1,900 images), and a layout sweep that resizes every Windows window across sizes, scale factors and fonts. A contrast check fails if any of the note's 61 text/background pairs, or 218 pairs across the notes drawer's four papers, falls below WCAG AA.
+- Added snapshot rendering of real screens in 3 languages, day and night (about 2,100 images), and a layout sweep that resizes every Windows window across sizes, scale factors and fonts. A contrast check fails if any of the note's 111 text/background pairs, or 234 pairs across the notes drawer's four papers, falls below WCAG AA.
 - Picked and combined AI-generated design proposals into a redesign shipped in four stages (Mac 1.34–1.37, Windows 1.19–1.22). The day strip was redrawn three times.
 - Used the app every day and asked for what I found missing: time reminders on to-dos, moving a to-do to Someday and bringing it back to Today (the Later tab in Mac 1.17, with a button that brings an item back to Today; it is called Someday now), and a Memos tab (Mac 1.15), among others. Bugs I found in use were fixed the same way: tab edges cut off, a plain-looking alarm window, the app freezing after a focus session, a 30-minute task showing 29.
 - Removed a Google Calendar and Tasks integration that had taken five releases to build, and replaced it with in-app events and a `.jongi` backup file (Mac 1.31.0, Windows 1.16.0).
 - Moved the Memos tab into a notes drawer at the screen edge (Mac 1.43, Windows 1.28). Using it, I found night paper hard to read and fixed it in the next release; once notes piled up it was hard to tell where I was, so the drawer was reworked with date groups, kind labels and right-click menus (Mac 1.44, Windows 1.29). Folder data lives in a new file and `memos.json` is untouched, so an older version on another device can share the same folder without losing notes.
+- Split to-dos into spaces such as Work, Home and Study (Mac 1.45, Windows 1.30). The day stays on one sheet with a colour band at the edge of each row and a one-day filter. Tests confirmed that older versions drop unknown keys from the to-do file, so spaces live in a new file.
+- Measured again with very large data. The input line that froze for seconds at 2,000 to-dos (a height loop of 500–900 redraws) now answers in 25–58 ms, and a Mac drawer keystroke at 2,000 notes went from 694 ms to 9 ms.
+- Collected 38 issues from two UI/UX audits and a copy audit, and wrote a writing guide and a glossary so menus, buttons and errors read the same in both apps and three languages.
 - Built Jongi-nyang for Claude, an extension that lets Claude Desktop and Claude Code read and add to-dos, events and notes (Mac 1.42, Windows 1.27). It's off by default; before any change it shows the before and after and waits for a yes, and the app can undo it in one step. No background server.
 
 ## Problems I solved
@@ -59,19 +62,20 @@ Full write-ups: [Troubleshooting log](troubleshooting.en.md).
 
 | | |
 | --- | --- |
-| Shipped | Mac 1.44.0, Windows 1.29.0 (GitHub Releases) |
+| Shipped | Mac 1.45.0, Windows 1.30.0 (GitHub Releases) |
 | Performance (Mac 1.38 → 1.39) | idle CPU 61% → 0.7%, input latency 0.46 s → 0.01 s, launch 2.7 s → 1.0 s, memory 213 MB → 136 MB |
 | Performance (Windows 1.23 → 1.24) | idle CPU 5.7% → 1.5%, after an alarm 9.2% → 0.5%, memory 692 MB → 457 MB |
-| Tests | Mac: 17 test scripts, about 360 checks; Windows: 534 `node:test` tests; Claude extension: 16 |
+| Performance (Mac 1.44 → 1.45) | first key in the input line at 2,000 to-dos 5.7–8.8 s → 25–58 ms; drawer keystroke at 2,000 notes 694 ms → 9 ms |
+| Tests | Mac: 20 test scripts, about 420 checks; Windows: 582 `node:test` tests; Claude extension: 16 |
 | Languages | Korean, English, Dutch (Dutch for my friends in Belgium and the Netherlands; English and Dutch drafted by AI, not yet reviewed by a native speaker) |
-| Code | about 37k lines of Swift (zero dependencies), about 30k lines of TypeScript plus 2.6k lines of CSS |
+| Code | about 40k lines of Swift (zero dependencies), about 31k lines of TypeScript plus 2.8k lines of CSS |
 
 What changed day to day: I add things with a shortcut, see everything in one place and get a daily reminder. I forget fewer tasks and checking my schedule is much easier. I mostly add to-dos, then events. I rarely use the timer or Pomodoro, so I'm collecting feedback on them from a few people I've shared the app with.
 
-Still open: neither app is code-signed, Windows CPU while the pet is on screen (about 4–7%) didn't come down, and the translations haven't had a native speaker's review.
+Still open: neither app is code-signed, Windows CPU while the pet is on screen (about 4–7%) didn't come down, the Windows drawer is still slow at 5,000 notes or with a 1 MB note, and the translations haven't had a native speaker's review.
 
 ## If I did it again
 
 - Run the Windows version on a real Windows PC from the start. So far it has only run in Electron on macOS; the notification area, click-through and AltGr keyboards are unchecked.
-- Keep each case table in one machine-readable file (JSON, say) that both test suites read. Right now the same rows are copied into two test files.
+- Keep each case table in one machine-readable file (JSON, say) that both test suites read from the start. Spaces (1.45) were the first to do it; the older tables are still copied into two test files.
 - Write tests that don't depend on the time zone. Some cases assume Asia/Seoul, so CI runs with `TZ=Asia/Seoul`.

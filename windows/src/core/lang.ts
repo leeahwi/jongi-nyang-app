@@ -74,19 +74,61 @@ export const monthName = (month: number, lang: Lang = "ko"): string => monthName
 
 // ─── Times ───────────────────────────────────────────────────────────────────
 
-/** The clock: "09:30" (Korean, Dutch — 24-hour) or "9:30 AM" (English). */
+/** 24-hour or 12-hour: the app follows the system's setting (Windows' short time, the Mac's "24-hour time"). */
+export type HourCycle = "h24" | "h12";
+
+/**
+ * The clock every time in the app is written with, set by the main process at launch from the system (main.ts
+ * `systemHourCycle`) and handed to each window by the preload (`paper.hourCycle`). Unset: each language's fixed
+ * format from before — ko and nl 24-hour, en 12-hour, a time in a Korean sentence "오후 3:00" — which the shared
+ * test cases are written in (tests that check another clock set it, and set it back). Same as AppLanguage.hourCycle.
+ */
+let hourCycleSetting: HourCycle | undefined = fromPreload();
+
+function fromPreload(): HourCycle | undefined {
+  const value = (globalThis as { paper?: { hourCycle?: unknown } }).paper?.hourCycle;
+  return value === "h24" || value === "h12" ? value : undefined;
+}
+
+export function setHourCycle(cycle: HourCycle | undefined): void {
+  hourCycleSetting = cycle;
+}
+
+/** The app's clock as set (undefined: each language's own). */
+export const hourCycleSet = (): HourCycle | undefined => hourCycleSetting;
+
+/** A language's clock now: the app's cycle, else the language's own (en 12-hour, ko and nl 24-hour). */
+export const hourCycle = (lang: Lang = "ko"): HourCycle => hourCycleSetting ?? (lang === "en" ? "h12" : "h24");
+
+/** The 12-hour clock's word for the half of the day: "오전" · "오후", "AM" · "PM", "a.m." · "p.m.". */
+export function period(hour: number, lang: Lang = "ko"): string {
+  const am = hour < 12;
+  return lang === "ko" ? (am ? "오전" : "오후") : lang === "en" ? (am ? "AM" : "PM") : am ? "a.m." : "p.m.";
+}
+
+/** Korean says the half first ("오후 3:00"), English and Dutch after ("3:00 PM", "3:00 p.m."). */
+export const periodFirst = (lang: Lang = "ko"): boolean => lang === "ko";
+
+const twelveDigits = (hour: number, minute: number) => `${twelve(hour)}:${pad(minute)}`;
+const withPeriod = (digits: string, hour: number, lang: Lang) => (periodFirst(lang) ? `${period(hour, lang)} ${digits}` : `${digits} ${period(hour, lang)}`);
+
+/** The clock: "09:30" (24-hour), or "오전 9:30" · "9:30 AM" · "9:30 a.m." (12-hour). Unset: ko and nl "09:30", en "9:30 AM". */
 export function clock(hour: number, minute: number, lang: Lang = "ko"): string {
-  return lang === "en" ? `${twelve(hour)}:${pad(minute)} ${hour < 12 ? "AM" : "PM"}` : `${pad(hour)}:${pad(minute)}`;
+  return hourCycle(lang) === "h12" ? withPeriod(twelveDigits(hour, minute), hour, lang) : `${pad(hour)}:${pad(minute)}`;
 }
 
-/** A time as said in a sentence: "오후 3:00", "3:00 PM", "15:00". */
+/** A time as said in a sentence: the clock ("15:00", "오후 3:00", "3:00 PM"). Unset, Korean says "오후 3:00" as before. */
 export function spokenTime(hour: number, minute: number, lang: Lang = "ko"): string {
-  return lang === "ko" ? `${hour < 12 ? "오전" : "오후"} ${twelve(hour)}:${pad(minute)}` : clock(hour, minute, lang);
+  if (hourCycleSetting === undefined && lang === "ko") return withPeriod(twelveDigits(hour, minute), hour, lang);
+  return clock(hour, minute, lang);
 }
 
-/** From–to: "10:00–11:00"; English keeps one AM/PM when both share it: "3:00–4:00 PM", "11:30 AM–12:30 PM". */
+/**
+ * From–to: "10:00–11:00"; on the 12-hour clock one half-of-day word when both share it: "3:00–4:00 PM",
+ * "오후 3:00–4:00", "11:30 AM–12:30 PM".
+ */
 export function timeRange(start: { hour: number; minute: number }, end: { hour: number; minute: number }, lang: Lang = "ko"): string {
-  if (lang === "en" && (start.hour < 12) === (end.hour < 12)) return `${twelve(start.hour)}:${pad(start.minute)}–${clock(end.hour, end.minute, lang)}`;
+  if (hourCycle(lang) === "h12" && (start.hour < 12) === (end.hour < 12)) return withPeriod(`${twelveDigits(start.hour, start.minute)}–${twelveDigits(end.hour, end.minute)}`, start.hour, lang);
   return `${clock(start.hour, start.minute, lang)}–${clock(end.hour, end.minute, lang)}`;
 }
 

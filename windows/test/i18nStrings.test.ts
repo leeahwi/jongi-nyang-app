@@ -180,8 +180,9 @@ test("i18n: t() fills values and plural words, and Korean is the key itself", ()
   assert.equal(t("{count}개 남음", { count: 3 }), "3개 남음"); // tests run in Korean
   assert.equal(tIn("en", "{count}개 남음", { count: 1 }), "1 left");
   assert.equal(tIn("nl", "할 일 {n}", { n: 2 }), "Taak 2");
-  assert.equal(tIn("en", "지금까지 {n}개를 끝냈어요", { n: "1,234", count: 1234 }), "1,234 to-dos done so far");
-  assert.equal(tIn("nl", "지금까지 {n}개를 끝냈어요", { n: "1", count: 1 }), "Tot nu toe 1 taak afgerond");
+  // (1.30: the history's "지금까지 {n}개를 끝냈어요" is gone — its first tile says the number.)
+  assert.equal(tIn("en", "{n}번 집중", { n: 3 }), "3 sessions");
+  assert.equal(tIn("nl", "{n}번 집중", { n: 1 }), "1 sessie");
 });
 
 test("i18n: the scanner itself sees through comments, regexes and templates", () => {

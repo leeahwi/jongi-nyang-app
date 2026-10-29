@@ -365,12 +365,55 @@ public struct MemoFolders: Equatable, Sendable {
         return MemoFolders(folders: folders, placement: placement, updatedAt: date(object["updatedAt"]), extra: unknown(object, fileKeys), language: language)
     }
 
+    // The formatters are made once (one per date made the file take 0.7 s to read at 2,000 memos); ISO8601DateFormatter
+    // is safe to share between threads.
+    nonisolated(unsafe) private static let plainISO = ISO8601DateFormatter()
+    nonisolated(unsafe) private static let fractionalISO: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+    nonisolated(unsafe) private static let utcISO: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }()
+
     private static func date(_ value: Any?) -> Date {
         guard let text = value as? String else { return Date(timeIntervalSince1970: 0) }
-        let plain = ISO8601DateFormatter()
-        let fractional = ISO8601DateFormatter()
-        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return (plain.date(from: text) ?? fractional.date(from: text)).map(second) ?? Date(timeIntervalSince1970: 0)
+        if let quick = utcSecond(text) { return quick }
+        return (plainISO.date(from: text) ?? fractionalISO.date(from: text)).map(second) ?? Date(timeIntervalSince1970: 0)
+    }
+
+    /// The file's own shape, `2026-10-28T05:01:02Z`, read without a formatter (the formatters for anything else).
+    /// Only dates the formatter reads the same way: years from 1900, every field in range.
+    static func utcSecond(_ text: String) -> Date? {
+        let b = Array(text.utf8)
+        guard b.count == 20, b[4] == 0x2D, b[7] == 0x2D, b[10] == 0x54, b[13] == 0x3A, b[16] == 0x3A, b[19] == 0x5A else { return nil }
+        func number(_ from: Int, _ count: Int) -> Int? {
+            var out = 0
+            for i in from..<(from + count) {
+                let d = Int(b[i]) - 0x30
+                guard (0...9).contains(d) else { return nil }
+                out = out * 10 + d
+            }
+            return out
+        }
+        guard let year = number(0, 4), let month = number(5, 2), let day = number(8, 2), let hour = number(11, 2),
+              let minute = number(14, 2), let sec = number(17, 2), year >= 1900, (1...12).contains(month), hour < 24, minute < 60, sec < 60
+        else { return nil }
+        let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+        let lengths = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+        guard (1...lengths[month - 1]).contains(day) else { return nil }
+        // Days from 1970-01-01 (the civil-calendar count, H. Hinnant's days_from_civil).
+        let y = month <= 2 ? year - 1 : year
+        let era = y / 400
+        let yoe = y - era * 400
+        let doy = (153 * (month + (month > 2 ? -3 : 9)) + 2) / 5 + day - 1
+        let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+        let days = era * 146_097 + doe - 719_468
+        return Date(timeIntervalSince1970: TimeInterval(days * 86_400 + hour * 3_600 + minute * 60 + sec))
     }
 
     /// The file's text: keys in a fixed order, 2-space indent, folders in `order`, placements by
@@ -406,10 +449,7 @@ public struct MemoFolders: Equatable, Sendable {
     }
 
     public static func iso(_ date: Date) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter.string(from: second(date))
+        utcISO.string(from: second(date))
     }
 
     static func quote(_ text: String) -> String {
@@ -505,14 +545,20 @@ public struct MemoFolders: Equatable, Sendable {
         }
     }
 
-    /// The footer (1.44): "회사 · 다섯 장" · "Work · 5 notes" · "Werk · 5 notities"; an empty folder as `footer`.
+    /// The footer (1.44): "회사 · 다섯 장" · "Work · 5 notes" · "Werk · 5 notities"; an empty folder just "비어 있어요" ·
+    /// "Empty" · "Leeg" (#39: the line in the middle says how to fill it, the bookmark says which folder).
     public static func footerShort(folder name: String, count: Int, language: AppLanguage = .ko) -> String {
-        count == 0 ? footer(folder: name, count: 0, language: language) : "\(name) · \(sheetCount(count, language: language))"
+        count == 0 ? emptyFooter(language) : "\(name) · \(sheetCount(count, language: language))"
     }
 
-    /// 고정's footer (1.44): "고정 · 세 장" · "Pinned · 3 notes" · "Vastgezet · 3 notities"; none as `pinnedFooter`.
+    /// 고정's footer (1.44): "고정 · 세 장" · "Pinned · 3 notes" · "Vastgezet · 3 notities"; none "비어 있어요".
     public static func pinnedFooterShort(count: Int, language: AppLanguage = .ko) -> String {
-        count == 0 ? pinnedFooter(count: 0, language: language) : "\(["고정", "Pinned", "Vastgezet"][language.index]) · \(sheetCount(count, language: language))"
+        count == 0 ? emptyFooter(language) : "\(["고정", "Pinned", "Vastgezet"][language.index]) · \(sheetCount(count, language: language))"
+    }
+
+    /// An empty folder's or 고정's footer: "비어 있어요" · "Empty" · "Leeg".
+    public static func emptyFooter(_ language: AppLanguage = .ko) -> String {
+        ["비어 있어요", "Empty", "Leeg"][language.index]
     }
 
     /// A bookmark's label (1.44): "장보기 · 세 장 · ⌘3"; empty "공부 · 비어 있어요" · "Study · empty" · "Studie · leeg"; past the
@@ -522,40 +568,34 @@ public struct MemoFolders: Equatable, Sendable {
         return ([name, amount] + (key.map { [$0] } ?? [])).joined(separator: " · ")
     }
 
-    /// The drawer's footer: "회사에 다섯 장" · "5 notes in Work" · "5 notities in Werk"; empty folder
-    /// "회사에 아직 메모가 없어요" · "Nothing in Work yet" · "Nog niets in Werk" (the Windows app's words).
+    /// The drawer's footer in a sentence: "회사에 다섯 장" · "5 notes in Work" · "5 notities in Werk"; an empty folder
+    /// "비어 있어요" · "Empty" · "Leeg" (#39).
     public static func footer(folder name: String, count: Int, language: AppLanguage = .ko) -> String {
         switch (language, count) {
-        case (.ko, 0): return "\(name)에 아직 메모가 없어요"
+        case (_, 0): return emptyFooter(language)
         case (.ko, _): return "\(name)에 \(sheets(count))"
-        case (.en, 0): return "Nothing in \(name) yet"
         case (.en, _): return "\(AppLanguage.plural(count, "note", "notes")) in \(name)"
-        case (.nl, 0): return "Nog niets in \(name)"
         case (.nl, _): return "\(AppLanguage.plural(count, "notitie", "notities")) in \(name)"
         }
     }
 
-    /// 고정: "고정한 메모 세 장" · "3 pinned notes" · "3 vastgezette notities"; none: "고정한 메모가 없어요" · "No pinned notes" · "Geen vastgezette notities".
+    /// 고정: "고정한 메모 세 장" · "3 pinned notes" · "3 vastgezette notities"; none "비어 있어요" · "Empty" · "Leeg".
     public static func pinnedFooter(count: Int, language: AppLanguage = .ko) -> String {
         switch (language, count) {
-        case (.ko, 0): return "고정한 메모가 없어요"
+        case (_, 0): return emptyFooter(language)
         case (.ko, _): return "고정한 메모 \(sheets(count))"
-        case (.en, 0): return "No pinned notes"
         case (.en, _): return AppLanguage.plural(count, "pinned note", "pinned notes")
-        case (.nl, 0): return "Geen vastgezette notities"
         case (.nl, _): return AppLanguage.plural(count, "vastgezette notitie", "vastgezette notities")
         }
     }
 
-    /// Search (every folder): "찾은 메모 세 장" · "3 notes found" · "3 notities gevonden"; none: "찾는 메모가 없어요" · "No notes found" · "Geen notities gevonden".
+    /// Search (every folder): "찾은 메모 세 장" · "3 notes found" · "3 notities gevonden"; none the same with 0 — the
+    /// line in the middle says what was looked for (#39).
     public static func searchFooter(count: Int, language: AppLanguage = .ko) -> String {
-        switch (language, count) {
-        case (.ko, 0): return "찾는 메모가 없어요"
-        case (.ko, _): return "찾은 메모 \(sheets(count))"
-        case (.en, 0): return "No notes found"
-        case (.en, _): return "\(AppLanguage.plural(count, "note", "notes")) found"
-        case (.nl, 0): return "Geen notities gevonden"
-        case (.nl, _): return "\(AppLanguage.plural(count, "notitie", "notities")) gevonden"
+        switch language {
+        case .ko: return "찾은 메모 \(sheets(count))"
+        case .en: return "\(AppLanguage.plural(count, "note", "notes")) found"
+        case .nl: return "\(AppLanguage.plural(count, "notitie", "notities")) gevonden"
         }
     }
 

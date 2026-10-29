@@ -764,7 +764,7 @@ private struct ReminderPopupView: View {
                 .slipShadow()
         }
         .overlay(alignment: .topLeading) {
-            WashiTape(color: kind.tape)
+            WashiTape(kind: kind)
                 .frame(width: 74, height: 20)
                 .offset(x: (hasTail ? 9 : 0) + Self.bubbleWidth * 0.7 - 37, y: -9)
                 .allowsHitTesting(false)
@@ -814,7 +814,7 @@ private struct ReminderPopupView: View {
                             .disabled(open.isEmpty)
                             .help(L("할 일을 내일로 옮겨요"))
                     }
-                    Button(open.count >= 2 ? L("모두 끝냄") : L("끝냄")) {
+                    Button(open.count >= 2 ? L("모두 끝내기") : L("끝내기")) {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                             if open.count >= 2 { state.onCompleteAll(open.map(\.id)) } else { for task in open { state.onComplete(task.id) } }
                         }

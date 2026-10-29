@@ -52,6 +52,15 @@ export class MemoDrawer {
     ipcMain.on("drawer:interactive", (event, value: unknown) => { if (fromDrawer(event)) this.setInteractive(value === true); });
     ipcMain.on("drawer:resize", (event, screenX: unknown, done: unknown) => { if (fromDrawer(event) && typeof screenX === "number") this.resizeTo(screenX, done === true); });
     ipcMain.on("drawer:shape", (event, rects: unknown) => { if (fromDrawer(event)) this.setShape(rects); });
+    // The page going away (quitting) with typed text it hasn't sent yet: taken and written before the page goes on.
+    ipcMain.on("memo:flush", (event, action: unknown) => {
+      const update = action as { type?: unknown; id?: unknown; text?: unknown; from?: unknown } | undefined;
+      if (fromDrawer(event) && update?.type === "memoUpdate" && typeof update.id === "string" && typeof update.text === "string") {
+        store.updateMemo(update.id, update.text, typeof update.from === "string" ? update.from : undefined);
+        store.flush();
+      }
+      event.returnValue = true;
+    });
     ipcMain.on("handle:open", (event) => { if (fromHandle(event)) this.show(); });
     ipcMain.on("handle:drag", (event, screenY: unknown, done: unknown) => { if (fromHandle(event) && typeof screenY === "number") this.dragHandle(screenY, done === true); });
     store.on("prefs", (key: string) => {
@@ -140,7 +149,7 @@ export class MemoDrawer {
       try { ok = globalShortcut.register(wanted, () => this.toggle()); } catch { ok = false; }
       if (ok) this.registered = wanted;
     }
-    const problem = wanted && !ok ? t("다른 앱이 {key}를 쓰고 있어 켜지 못했어요. 다른 키를 골라 보세요.", { key: shortcutLabel(wanted) }) : undefined;
+    const problem = wanted && !ok ? t("다른 앱이 {key} 키를 쓰고 있어요. 다른 키를 골라 주세요.", { key: shortcutLabel(wanted) }) : undefined;
     if (problem !== this.store.drawerShortcutProblem) {
       this.store.drawerShortcutProblem = problem;
       this.store.changed();
@@ -335,7 +344,10 @@ export class MemoDrawer {
   private sendHandle(force = false): void {
     const handle = this.handle;
     if (!handle || handle.isDestroyed() || !this.handleLoaded) return;
-    const payload = { count: changedToday(this.store.memos, new Date()), side: this.store.prefs.drawerSide, look: this.look(), label: t("메모 서랍 열기") };
+    const count = changedToday(this.store.memos, new Date());
+    const detail = count > 0 ? t("오늘 고친 메모 {n}장", { n: count }) : "";
+    const tip = detail ? `${t("메모 서랍")} · ${detail}` : t("메모 서랍");
+    const payload = { count, side: this.store.prefs.drawerSide, look: this.look(), label: t("메모 서랍 열기"), tip, detail };
     const key = JSON.stringify(payload);
     if (!force && key === this.handleKey) return;
     this.handleKey = key;

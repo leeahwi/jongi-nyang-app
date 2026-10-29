@@ -1,0 +1,28 @@
+/* The paper menus (drawerMenu.ts): 메모 서랍's menus (1.29), and since 1.30 the note's row menu and 모든 스페이스 ▾.
+   Drawn with the --d-* tokens: drawer.css sets them per drawer paper, note.css maps them to the note's paper. */
+.menu { z-index: 8; min-width: 176px; max-width: calc(100% - 16px); max-height: calc(100% - 16px); overflow-y: auto; overflow-x: hidden; padding: 5px; border-radius: 10px; background: var(--d-menu); border: 0.5px solid var(--d-menu-edge); box-shadow: 0 12px 30px -10px rgba(40, 30, 10, 0.45); display: flex; flex-direction: column; color: var(--d-ink); scrollbar-width: thin; }
+.menu.submenu { z-index: 9; }
+.menu button.mi { height: 28px; padding: 0 8px; border-radius: 6px; text-align: left; font: 500 12.5px var(--ui); color: var(--d-ink); white-space: nowrap; display: flex; align-items: center; gap: 8px; min-width: 0; flex: none; }
+.menu button.mi > .t { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.menu button.mi > .k { margin-left: auto; padding-left: 12px; font-size: 11px; font-weight: 400; color: var(--d-meta); flex: none; }
+.menu button.mi > .ico { width: 16px; display: flex; flex: none; color: var(--d-icon); }
+.menu button.mi > .ico:empty:has(+ .sq, + .sq-paper) { display: none; }
+.menu button.mi > .sq, .menu button.mi > .sq-paper { margin: 0 2px; }
+.menu button.mi:hover, .menu button.mi:focus-visible, .menu button.mi.open { background: var(--d-hover); outline: none; }
+.menu button.mi.danger, .menu button.mi.danger > .ico { color: var(--d-danger); }
+.menu button.mi[aria-checked="true"] > .tick { color: var(--d-sub); }
+.menu button.mi > .tick { margin-left: auto; padding-left: 10px; display: flex; flex: none; }
+.menu .sep { height: 0.5px; margin: 4px 6px; background: var(--d-menu-edge); flex: none; }
+.menu .label { margin: 5px 8px 2px; font-size: 11px; font-weight: 600; color: var(--d-meta); flex: none; white-space: nowrap; }
+.menu .mh { display: flex; align-items: center; gap: 7px; padding: 4px 8px 4px; min-width: 0; flex: none; color: var(--d-meta); font-size: 11px; }
+.menu .mh .icon { color: var(--d-icon); flex: none; }
+.menu .mh b { font-family: var(--d-hand); font-size: 18px; line-height: 22px; font-weight: 400; color: var(--d-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding-right: var(--ink-over); }
+:root[data-font="clean"] .menu .mh b { font: 600 13px var(--ui); }
+.menu .mh .c { margin-left: auto; padding-left: 10px; white-space: nowrap; }
+.menu .sq { width: 12px; height: 12px; border-radius: 3px; background: var(--a); box-shadow: inset 0 0 0 1px var(--e); flex: none; }
+.menu .cnt { margin-left: auto; padding-left: 10px; font-size: 11px; color: var(--d-meta); font-variant-numeric: tabular-nums; flex: none; }
+.menu .cnt + .k { margin-left: 0; padding-left: 10px; }
+.menu button.mi:disabled { opacity: 0.45; pointer-events: none; }
+/* A space's colour dot (1.30). */
+.menu .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--band); flex: none; margin: 0 3.5px; }
+.menu button.mi > .ico:empty:has(+ .dot) { display: none; }

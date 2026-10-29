@@ -1,6 +1,6 @@
 import { logicalDayStart } from "./archive";
 import { eventTooltip, todayEvents, type CalendarEvent } from "./calendar";
-import { clock, langIndex, minutesAway, type Lang } from "./lang";
+import { clock, hourCycle, langIndex, minutesAway, period, periodFirst, type Lang } from "./lang";
 import type { TodoItem } from "./notebook";
 import { blockTooltip, rangeToday, type TimeRange } from "./timeRange";
 
@@ -22,8 +22,8 @@ export interface RibbonPill { key: string; title: string; color: string }
  * `done` faded with a strike; `overdue` (over, still open) outlined in clay. `range` is what a drag starts from.
  */
 export interface RibbonBlock { id: string; title: string; from: number; to: number; lane: number; done: boolean; overdue: boolean; tooltip: string; range: TimeRange }
-/** `away` ("40분 뒤") only within three hours; further off the clock says enough (as on the Mac). */
-export interface RibbonNext { title: string; time: string; away?: string }
+/** `away` ("40분 뒤") only within three hours; further off the clock says enough (as on the Mac). `minutes` until it, always. */
+export interface RibbonNext { title: string; time: string; away?: string; minutes: number }
 
 export interface Ribbon {
   /** The track's first and last hour (8 and 24 unless something is earlier or after midnight). */
@@ -63,11 +63,12 @@ export function awayText(minutes: number, lang: Lang = "ko"): string {
   return lang === "ko" ? `${span} 뒤` : lang === "en" ? `in ${span}` : `over ${span}`;
 }
 
-/** An hour label: "8", "12", "24" (ko, nl); "8 AM", "12 PM", "12 AM" (en). Hours past 24 are the next morning's. */
+/** An hour label: "8", "12", "24" (24-hour); "8 AM", "12 PM", "12 AM", "오후 1" (12-hour). Hours past 24 are the next morning's. */
 export function hourLabel(hour: number, lang: Lang = "ko"): string {
-  if (lang !== "en") return String(hour > 24 ? hour - 24 : hour);
+  if (hourCycle(lang) === "h24") return String(hour > 24 ? hour - 24 : hour);
   const value = hour % 24;
-  return `${value % 12 || 12} ${value < 12 ? "AM" : "PM"}`;
+  const digits = String(value % 12 || 12);
+  return periodFirst(lang) ? `${period(value, lang)} ${digits}` : `${digits} ${period(value, lang)}`;
 }
 
 /**
@@ -188,6 +189,7 @@ export function dayRibbon(events: readonly CalendarEvent[], tasks: readonly Todo
     title: ahead.title,
     time: clock(new Date(ahead.time).getHours(), new Date(ahead.time).getMinutes(), lang),
     ...(minutesAhead <= 180 ? { away: awayText(minutesAhead, lang) } : {}),
+    minutes: minutesAhead,
   } : undefined;
   const nothingAhead = ["오늘 남은 일정이 없어요", "Nothing else today", "Verder niets vandaag"][langIndex(lang)];
   const nowWord = ["지금", "Now", "Nu"][langIndex(lang)];

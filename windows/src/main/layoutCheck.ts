@@ -20,6 +20,10 @@ export interface LayoutCheckOptions {
   oneLine?: string[];
   /** Text fields whose placeholder must show (tall enough for a line) while they are empty. */
   placeholders?: string[];
+  /** Labels that must show in full at every size — never an ellipsis (1.30: the help's topic list, #24). They are checked even inside `ignore`. */
+  whole?: string[];
+  /** Text fields whose whole placeholder must fit while they are empty (1.30: the help's search hint, #24). */
+  wholePlaceholders?: string[];
 }
 
 export interface LayoutReport { problems: string[]; truncated: string[] }
@@ -174,6 +178,21 @@ function check(options: LayoutCheckOptions): LayoutReport {
       const style = getComputedStyle(field);
       if (!field.placeholder.trim()) problems.push(`no placeholder: ${name(field)}`);
       else if (field.clientHeight < parseFloat(style.fontSize)) problems.push(`placeholder hidden (field ${field.clientHeight}px tall): ${name(field)}`);
+    }
+  }
+  for (const selector of options.whole ?? []) {
+    for (const element of document.querySelectorAll<HTMLElement>(selector)) {
+      if (shown(element) && element.scrollWidth > element.clientWidth + 1) problems.push(`cut off (${element.scrollWidth} > ${element.clientWidth}): ${name(element)}`);
+    }
+  }
+  for (const selector of options.wholePlaceholders ?? []) {
+    for (const field of document.querySelectorAll<HTMLTextAreaElement | HTMLInputElement>(selector)) {
+      if (!field.getClientRects().length || field.value || !field.placeholder.trim()) continue;
+      const style = getComputedStyle(field);
+      inkContext.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      const room = field.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0);
+      const needed = inkContext.measureText(field.placeholder).width;
+      if (needed > room + 0.5) problems.push(`placeholder cut off (${needed.toFixed(0)} > ${room.toFixed(0)}px): ${name(field)} "${field.placeholder}"`);
     }
   }
   return { problems: [...new Set(problems)], truncated: [...new Set(truncated)] };

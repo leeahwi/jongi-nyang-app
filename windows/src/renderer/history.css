@@ -100,6 +100,9 @@
 .day .empty img { width: 64px; height: 64px; object-fit: contain; opacity: 0.9; }
 
 .foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 11px; color: var(--secondary); }
+/* When the record is taller than the pane (Dutch at 760 × 520, where the summary and the tiles' lines wrap), the foot
+   with 기록 폴더 열기 stays on the pane's bottom edge instead of scrolling out of reach (#8). Where it all fits, nothing moves. */
+.foot { position: sticky; bottom: 0; padding-top: 8px; margin-top: -8px; background: linear-gradient(transparent, var(--paper) 8px); z-index: 1; }
 .foot > span:first-child { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .foot button { color: var(--sage-text); font-weight: 600; font-size: 11px; white-space: nowrap; flex: none; }
 .foot button:hover { text-decoration: underline; }

@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { BrowserWindow, Menu, Notification, Tray, app, clipboard, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, powerMonitor, screen, shell, systemPreferences, type MenuItemConstructorOptions, type WebFrameMain } from "electron";
 import fs from "node:fs";
 import os from "node:os";
@@ -11,7 +12,7 @@ import { noteOrigin, type Point } from "../core/placement";
 import { ArchiveStore } from "./archiveStore";
 import { CalendarService } from "./calendar";
 import { defaultPrefs, type NoteNotice, fontTitles, pomodoroSettings, textSizeTitles, textSizes, type Action, type FocusCommand, type IntentMade, type IntentRequest, type IntentResult, type NotebookFont, type ParsedWhen, type Prefs, type WireCandidate, type IntentPage } from "../core/types";
-import { nativeName, resolveLang, spokenTime, type Lang, type LanguageSetting } from "../core/lang";
+import { hourCycle, nativeName, resolveLang, setHourCycle, spokenTime, type HourCycle, type Lang, type LanguageSetting } from "../core/lang";
 import { lang, setLang, t } from "../i18n";
 import type { CalendarSheetRequest, CalendarWriteRequest } from "../core/calendar";
 import { backupFileName, exportedText, makeBackup, parseBackup, summary, summaryText, type BackupFiles } from "../core/backup";
@@ -31,6 +32,7 @@ import { QuickEntry } from "./quick";
 import { QuickMemo } from "./quickMemo";
 import { MemoDrawer } from "./drawer";
 import { addFolder, deleteFolder, restoreFolder, folderName, inboxID, moveNotice, placementOf, moveMemo, pinAll, pinnedView, recolorFolder, renameFolder, reorderFolders, setFolderSort, setMemoPaper, setPinned, targetOf } from "../core/memoDrawer";
+import { addSpace, deleteSpace, findSpace, liveSpaces, moveTodo, newSpaceID, recolorSpace, renameSpace, reorderSpaces, restoreSpace, lensFor, spaceColor, spaceOf, toSpaceWords, type SpaceChoice } from "../core/todoSpaces";
 import { TimerSheet } from "./timerSheet";
 import { AlarmClock } from "./alarms";
 import { SlipConfirm, type ConfirmQuestion } from "./confirm";
@@ -116,6 +118,36 @@ function directories(): { data: string; settings: string; folder?: string; unava
  * The language for this run, chosen once at launch (changing it restarts the app): PAPERTODO_LANG
  * (snapshots), else the setting kept in settings.json — "auto" follows the system's languages.
  */
+/**
+ * The system's clock, 24-hour or 12-hour. Windows keeps it in the user's region settings (Settings → Time & language →
+ * Region → short time, `sShortTime`: "HH:mm" is 24-hour, "tt h:mm" or "h:mm tt" 12-hour), which neither
+ * app.getLocale() nor Intl sees, so it is read from the registry (with `iTime`, 1 = 24-hour, if the format is missing).
+ * Elsewhere, or when that can't be read: what Intl says for the system's locale. Snapshots: each language's own
+ * (`PAPERTODO_CLOCK=h12` / `h24` draws them on the other one).
+ */
+function systemHourCycle(): HourCycle {
+  const forced = process.env.PAPERTODO_CLOCK;
+  if (forced === "h12" || forced === "h24") return forced;
+  if (snapshotDirectory) return lang() === "en" ? "h12" : "h24";
+  if (process.platform === "win32") {
+    try {
+      const output = execFileSync("reg", ["query", "HKCU\\Control Panel\\International"], { encoding: "utf8", timeout: 1500, windowsHide: true });
+      const format = /^\s*sShortTime\s+REG_SZ\s+(.+?)\s*$/m.exec(output)?.[1];
+      if (format) return /H/.test(format) ? "h24" : "h12";
+      const flag = /^\s*iTime\s+REG_SZ\s+(\d)\s*$/m.exec(output)?.[1];
+      if (flag) return flag === "1" ? "h24" : "h12";
+    } catch {
+      // No reg.exe or no answer in time: Intl below.
+    }
+  }
+  try {
+    const cycle = new Intl.DateTimeFormat(app.getSystemLocale() || undefined, { hour: "numeric" }).resolvedOptions().hourCycle;
+    return cycle === "h11" || cycle === "h12" ? "h12" : "h24";
+  } catch {
+    return hourCycle(lang());
+  }
+}
+
 function appLanguage(settings: string): Lang {
   const forced = process.env.PAPERTODO_LANG;
   if (forced === "ko" || forced === "en" || forced === "nl") return forced;
@@ -354,6 +386,8 @@ function newDayOnNote(): void {
   if (snapshotDirectory || !note.isVisible() || note.isMinimized()) return;
   sweep?.noteOpened();
   const today = dayKey(new Date());
+  // 한 스페이스만 보기 lets go at 4 a.m. (S11): the note already draws everything; the setting follows.
+  if (store.prefs.spaceLens && store.prefs.spaceLens.day !== today) store.setPref("spaceLens", null);
   if (store.prefs.morningPick && store.prefs.morningPickDay !== today) {
     store.setPref("morningPickDay", today);
     store.setPref("starredTask", "");
@@ -378,52 +412,67 @@ function quit(): void {
   setTimeout(() => app.quit(), 120);
 }
 
+/**
+ * The note's ⋯ (#18): the same groups in the same order as the Mac's (PaperView.swift) — 만들기 | 찾기 | 보기 | 창 |
+ * 책상 | 종이냥 · 타이머 | 편집 | 목록 | 도움 | 끝내기 (the last two and 오늘 · 앞으로 · 모두 내보내기 · 가져오기 are
+ * Windows' own: the Mac has them in its menu bar).
+ */
 function moreMenu(): Menu {
   const prefs = store.prefs;
-  const template: MenuItemConstructorOptions[] = [
-    { label: t("새 할 일"), accelerator: "CmdOrCtrl+N", click: () => note.webContents.send("note:focus-new") },
-    { label: t("검색…"), accelerator: "CmdOrCtrl+F", click: openSearch },
-    { label: t("오늘"), accelerator: "CmdOrCtrl+1", click: () => note.webContents.send("note:row-command", { id: "", command: "page-today" }) },
-    { label: t("앞으로"), accelerator: "CmdOrCtrl+2", click: () => note.webContents.send("note:row-command", { id: "", command: "page-ahead" }) },
-    // 1.28: the memo tab became the 메모 서랍 (Ctrl+3 in the note opens it too).
-    { label: t("메모 서랍"), ...(store.prefs.drawerShortcut ? { accelerator: store.prefs.drawerShortcut, registerAccelerator: false } : {}), click: () => drawer.show() },
-    { label: t("포스트잇으로 접기"), accelerator: "CmdOrCtrl+M", click: () => collapse() },
-    // 화면 오른쪽 · 왼쪽에 붙이기 (checked while docked there; again: back where it was).
-    { label: t("화면 오른쪽에 붙이기"), type: "checkbox", checked: dockedSide() === "right", click: () => dockNote("right") },
-    { label: t("화면 왼쪽에 붙이기"), type: "checkbox", checked: dockedSide() === "left", click: () => dockNote("left") },
-    { label: t("글꼴"), submenu: (Object.keys(fontTitles.ko) as NotebookFont[]).map((font) => ({
-      label: fontTitles[lang()][font], type: "radio" as const, checked: prefs.font === font, click: () => store.setPref("font", font),
-    })) },
-    { label: t("글자 크기"), submenu: textSizes.map((size) => ({
-      label: textSizeTitles[lang()][size], type: "radio" as const, checked: prefs.textSize === size, click: () => store.setPref("textSize", size),
-    })) },
-    { label: t("종이냥 설정…"), accelerator: "CmdOrCtrl+,", click: () => openSettings() },
-    { label: t("완료 기록…"), accelerator: "CmdOrCtrl+H", click: () => openHistory() },
-    { label: t("달력…"), accelerator: "CmdOrCtrl+D", click: () => openCalendar() },
-    { label: t("새 일정…"), click: () => calendar.newEvent() },
-    { label: t("반복 할 일…"), click: () => openSettings("repeat") },
-    { label: t("빠른 메모…"), accelerator: "Ctrl+Alt+M", registerAccelerator: false, click: () => quickMemo.open() },
-    { label: t("알람…"), click: () => openSettings("clock") },
-    { label: t("사용 안내"), click: showGuide },
-    { label: t("도움말…"), accelerator: "F1", click: () => openHelp() },
-    { type: "separator" },
-    ...petMenu(),
-    { type: "separator" },
-    { label: t("완료한 일 숨기기"), type: "checkbox", checked: prefs.hideCompleted, click: () => store.setPref("hideCompleted", !prefs.hideCompleted) },
-    { label: t("완료한 일 정리"), enabled: store.todayItems.some((item) => item.isCompleted), click: clearCompleted },
-    { type: "separator" },
-    { label: t("실행 취소"), accelerator: "CmdOrCtrl+Z", enabled: store.history.canUndo, click: () => store.mutate((history) => history.undo()) },
-    { label: t("다시 실행"), accelerator: "CmdOrCtrl+Y", enabled: store.history.canRedo, click: () => store.mutate((history) => history.redo()) },
-    { type: "separator" },
-    { label: t("목록 복사"), accelerator: "CmdOrCtrl+Shift+C", enabled: store.items.length > 0, click: copyList },
-    { label: t("텍스트로 내보내기…"), accelerator: "CmdOrCtrl+E", enabled: store.items.length > 0, click: exportList },
-    { type: "separator" },
-    { label: t("내보내기…"), click: () => void fromStoragePane(exportBackup) },
-    { label: t("가져오기…"), click: () => void fromStoragePane(importBackup) },
-    { type: "separator" },
-    { label: t("종이냥 종료"), click: quit },
+  const groups: MenuItemConstructorOptions[][] = [
+    [
+      { label: t("새 할 일"), accelerator: "CmdOrCtrl+N", click: () => note.webContents.send("note:focus-new") },
+      { label: t("새 일정…"), click: () => calendar.newEvent() },
+      { label: t("빠른 메모…"), accelerator: "Ctrl+Alt+M", registerAccelerator: false, click: () => quickMemo.open() },
+    ],
+    [
+      { label: t("검색…"), accelerator: "CmdOrCtrl+F", click: openSearch },
+      { label: t("오늘"), accelerator: "CmdOrCtrl+1", click: () => note.webContents.send("note:row-command", { id: "", command: "page-today" }) },
+      { label: t("앞으로"), accelerator: "CmdOrCtrl+2", click: () => note.webContents.send("note:row-command", { id: "", command: "page-ahead" }) },
+      // 1.28: the memo tab became the 메모 서랍 (Ctrl+3 in the note opens it too).
+      { label: t("메모 서랍"), ...(store.prefs.drawerShortcut ? { accelerator: store.prefs.drawerShortcut, registerAccelerator: false } : {}), click: () => drawer.show() },
+    ],
+    [
+      { label: t("글꼴"), submenu: (Object.keys(fontTitles.ko) as NotebookFont[]).map((font) => ({
+        label: fontTitles[lang()][font], type: "radio" as const, checked: prefs.font === font, click: () => store.setPref("font", font),
+      })) },
+      { label: t("글자 크기"), submenu: textSizes.map((size) => ({
+        label: textSizeTitles[lang()][size], type: "radio" as const, checked: prefs.textSize === size, click: () => store.setPref("textSize", size),
+      })) },
+      { label: t("완료 숨기기"), type: "checkbox", checked: prefs.hideCompleted, click: () => store.setPref("hideCompleted", !prefs.hideCompleted) },
+    ],
+    [
+      { label: t("포스트잇으로 접기"), accelerator: "CmdOrCtrl+M", click: () => collapse() },
+      // 화면 오른쪽 · 왼쪽에 붙이기 (checked while docked there; again: back where it was).
+      { label: t("화면 오른쪽에 붙이기"), type: "checkbox", checked: dockedSide() === "right", click: () => dockNote("right") },
+      { label: t("화면 왼쪽에 붙이기"), type: "checkbox", checked: dockedSide() === "left", click: () => dockNote("left") },
+    ],
+    [
+      { label: t("달력…"), accelerator: "CmdOrCtrl+D", click: () => openCalendar() },
+      { label: t("완료 기록…"), accelerator: "CmdOrCtrl+H", click: () => openHistory() },
+      { label: t("반복 할 일…"), click: () => openSettings("repeat") },
+      { label: t("알람…"), click: () => openSettings("clock") },
+      { label: t("설정…"), accelerator: "CmdOrCtrl+,", click: () => openSettings() },
+    ],
+    petMenu(),
+    [
+      { label: t("완료한 일 정리"), enabled: store.todayItems.some((item) => item.isCompleted), click: clearCompleted },
+      { label: t("실행 취소"), accelerator: "CmdOrCtrl+Z", enabled: store.history.canUndo, click: () => store.mutate((history) => history.undo()) },
+      { label: t("다시 실행"), accelerator: "CmdOrCtrl+Y", enabled: store.history.canRedo, click: () => store.mutate((history) => history.redo()) },
+    ],
+    [
+      { label: t("목록 복사"), accelerator: "CmdOrCtrl+Shift+C", enabled: store.items.length > 0, click: copyList },
+      { label: t("텍스트로 내보내기…"), accelerator: "CmdOrCtrl+E", enabled: store.items.length > 0, click: exportList },
+      { label: t("모두 내보내기…"), click: () => void fromStoragePane(exportBackup) },
+      { label: t("가져오기…"), click: () => void fromStoragePane(importBackup) },
+    ],
+    [
+      { label: t("사용 안내"), click: showGuide },
+      { label: t("도움말…"), accelerator: "F1", click: () => openHelp() },
+    ],
+    [{ label: t("종이냥 종료"), click: quit }],
   ];
-  return Menu.buildFromTemplate(template);
+  return Menu.buildFromTemplate(groups.flatMap((group, index) => (index === 0 ? group : [{ type: "separator" as const }, ...group])));
 }
 
 /** 종이냥 on/off and the focus timer (a board of its own, whether or not the pet is out), in the tray and the note's ⋯ menu. */
@@ -475,10 +524,10 @@ async function connectClaudeDesktop(): Promise<void> {
 /** The tasks 완료한 일 정리 put in the record last (its toast's 되돌리기 brings them back). */
 let lastFiled: TodoItem[] = [];
 
-/** 완료한 일 정리: today's finished tasks to the record now, with "N개를 기록으로 옮겼어요 · 되돌리기". */
+/** 완료한 일 정리: today's finished tasks to the record now, with "N개를 완료 기록으로 옮겼어요 · 되돌리기". */
 function clearCompleted(): void {
   lastFiled = archive.fileToday();
-  if (lastFiled.length) notice({ icon: "sprout", text: t("{n}개를 기록으로 옮겼어요", { n: lastFiled.length }), undo: "unfile" });
+  if (lastFiled.length) notice({ icon: "leaf", text: t("{n}개를 완료 기록으로 옮겼어요", { n: lastFiled.length }), undo: "unfile" });
 }
 
 /** 되돌리기 after 완료한 일 정리: the tasks leave the record and come back to the list, checked. */
@@ -496,79 +545,160 @@ function moveTasks(ids: string[], target: { kind: "day"; day: string } | { kind:
   store.mutate((history) => history.moveAll(ids, target));
   const now = new Date();
   const words = text ?? (target.kind === "day" && target.day === tomorrowKey(now) ? movedTomorrowText(lang()) : movedText(target, now, lang()));
-  notice({ icon: target.kind === "someday" ? "box" : "calendar", text: words, undo: "history" });
+  notice({ icon: target.kind === "someday" ? "later" : "calendar", text: words, undo: "history" });
 }
 
+/**
+ * A row menu entry as the note's paper menu draws it (1.30): its icon, red when it deletes, the spaces' submenu in
+ * place, and (1.30.x) the row's own key at the right — the note takes it when the row is picked, the menu only shows it.
+ */
+type RowEntry = MenuItemConstructorOptions & { paperIcon?: string; danger?: boolean; spaces?: string; keyText?: string };
+
+/** Groups of menu entries with one separator between those that aren't empty (none first or last). */
+function grouped(groups: RowEntry[][]): RowEntry[] {
+  return groups.filter((group) => group.length > 0).flatMap((group, index) => (index === 0 ? group : [{ type: "separator" } as RowEntry, ...group]));
+}
+
+/** The row menu, natively (the 하루 띠's snapshots list it; the note draws the paper one, see showPaperRowMenu). */
 function rowMenu(id: string): Menu {
+  return Menu.buildFromTemplate(rowMenuTemplate(id).map(({ keyText: _key, ...entry }) => (entry.spaces ? { label: entry.label, submenu: spaceMenuNative(entry.spaces) } : entry)));
+}
+
+/** 스페이스로 옮기기 ▸ as a native submenu: the spaces (✓ the current one), 스페이스 없음. */
+function spaceMenuNative(id: string): MenuItemConstructorOptions[] {
+  const current = spaceOf(store.todoSpaces, id);
+  return [
+    ...liveSpaces(store.todoSpaces).map((space) => ({ label: space.name, type: "checkbox" as const, checked: current === space.id, click: () => moveToSpace([id], space.id) })),
+    { type: "separator" },
+    { label: t("스페이스 없음"), type: "checkbox", checked: current === undefined, click: () => moveToSpace([id], null) },
+  ];
+}
+
+/** To-dos into a space (null: 스페이스 없음), and the toast with 되돌리기 (their spaces as they were). */
+function moveToSpace(ids: string[], space: string | null): void {
+  const before = ids.map((id) => [id, spaceOf(store.todoSpaces, id) ?? null] as const);
+  store.changeSpaces((data) => ids.reduce((next, id) => moveTodo(next, id, space), data));
+  const name = findSpace(store.todoSpaces, space)?.name;
+  notice({ icon: "spaces", text: name ? t("{where} 옮겼어요", { where: toSpaceWords(name, lang()) }) : t("스페이스 없음으로 옮겼어요"), undo: "spaces", entry: JSON.stringify(before) });
+}
+
+/** The menus' entries as the note draws them: plain data, each click kept here until the next menu. */
+interface PaperEntry { kind: "item" | "sub" | "sep" | "spaces"; label?: string; pick?: number; checked?: boolean; disabled?: boolean; danger?: boolean; icon?: string; key?: string; todo?: string; entries?: PaperEntry[] }
+let paperClicks: (() => void)[] = [];
+function paperEntries(template: readonly RowEntry[]): PaperEntry[] {
+  return template.map((entry): PaperEntry => {
+    if (entry.type === "separator") return { kind: "sep" };
+    if (entry.spaces) return { kind: "spaces", label: String(entry.label), todo: entry.spaces, icon: entry.paperIcon };
+    if (Array.isArray(entry.submenu)) return { kind: "sub", label: String(entry.label), icon: entry.paperIcon, entries: paperEntries(entry.submenu as RowEntry[]) };
+    const click = entry.click;
+    paperClicks.push(() => (click as (() => void) | undefined)?.());
+    return {
+      kind: "item", label: String(entry.label), pick: paperClicks.length - 1, icon: entry.paperIcon, danger: entry.danger, ...(entry.keyText ? { key: entry.keyText } : {}),
+      ...(entry.type === "checkbox" || entry.type === "radio" ? { checked: Boolean(entry.checked) } : {}), ...(entry.enabled === false ? { disabled: true } : {}),
+    };
+  });
+}
+
+/** Right-click (or Shift+F10 · the Menu key) on a to-do in the note: the paper menu, drawn there (1.30). */
+function showPaperRowMenu(id: string, at: { x?: number; y?: number; keyboard?: boolean }): void {
+  paperClicks = [];
+  const entries = paperEntries(rowMenuTemplate(id));
+  note.webContents.send("note:row-menu", { id, entries, ...at });
+}
+
+/**
+ * The row menu, the same on the Mac (TaskRowMenu.swift), in groups: 고치기 · 알림 · 마감 · 시간 · 완료 | 이거 집중 ▸ |
+ * 내일 하기 · 날짜 바꾸기 ▸ · 언젠가로 · 오늘 꼭 하나 | 스페이스로 옮기기 ▸ · 위로 · 아래로 | 달력에 넣기 | 지우기.
+ * A row's keys (note.ts listKey) are shown beside what they do.
+ */
+function rowMenuTemplate(id: string): RowEntry[] {
   const visible = store.todayItems.filter((item) => !store.prefs.hideCompleted || !item.isCompleted);
   const index = visible.findIndex((item) => item.id === id);
   const item = store.items.find((entry) => entry.id === id);
-  if (!item) return Menu.buildFromTemplate([]);
+  if (!item) return [];
   const onToday = index >= 0;
+  const open = !item.isCompleted;
   const send = (command: string) => note.webContents.send("note:row-command", { id, command });
   const moveTo = (target: number, after: boolean) => store.mutate((history) => {
     const targetIndex = history.items.findIndex((entry) => entry.id === visible[target].id);
     history.move(id, targetIndex + (after ? 1 : 0));
   });
-  // 일정: a copy of the task as an event (changing one later doesn't change the other).
-  const calendarItems: MenuItemConstructorOptions[] = [
-    { type: "separator" },
-    { label: t("달력에 넣기…"), click: () => calendar.sendTask(id) },
-  ];
+  const someday = (): void => (onToday ? store.mutate((history) => history.setShelf(id, "later")) : moveTasks([id], { kind: "someday" }));
   // 날짜 바꾸기 ▸ 내일 · 이번 주 금요일 · 다음 주 월요일 · 언젠가 · 날짜 고르기….
-  const dateItems: MenuItemConstructorOptions[] = item.isCompleted ? [] : [{
-    label: t("날짜 바꾸기"),
+  const dateItems: RowEntry[] = open ? [{
+    label: t("날짜 바꾸기"), paperIcon: "calendar",
     submenu: moveChoices(new Date(), lang()).map((choice) => ({
       label: choice.title,
       click: () => (choice.kind === "pick" ? send("deadline") : choice.kind === "someday" ? moveTasks([id], { kind: "someday" }) : moveTasks([id], { kind: "day", day: choice.day! })),
     })),
-  }];
-  return Menu.buildFromTemplate([
-    ...(item.isCompleted ? [] : [{ label: t("이거 집중"), submenu: focusMenu(id) }, { type: "separator" }] as MenuItemConstructorOptions[]),
-    { label: t("고치기"), click: () => send("edit") },
-    { label: item.reminderAt ? t("알림 고치기…") : t("알림 설정…"), click: () => send("reminder") },
-    { label: item.dueDate ? t("마감 바꾸기…") : t("마감 정하기…"), click: () => send("deadline") },
-    // 시간 정하기: a task with a day (on 오늘, or a deadline) can have hours on it.
-    ...(item.isCompleted || !rangeDay(item, new Date()) ? [] : [{ label: t("시간 정하기…"), click: () => send("time") }]),
-    { label: item.isCompleted ? t("완료 취소") : t("완료 표시"), click: () => store.mutate((history) => history.toggle(id)) },
-    { type: "separator" },
-    ...(onToday ? [
-      ...(item.isCompleted ? [] : [{ label: t("내일 하기"), click: () => moveTasks([id], { kind: "day", day: tomorrowKey(new Date()) }) }]),
+  }] : [];
+  const starred = store.prefs.starredTask === id && store.prefs.morningPickDay === dayKey(new Date());
+  return grouped([
+    [
+      { label: t("고치기"), paperIcon: "edit", keyText: "Enter", click: () => send("edit") },
+      { label: item.reminderAt ? t("알림 고치기…") : t("알림 설정…"), paperIcon: "bell", click: () => send("reminder") },
+      { label: item.dueDate ? t("마감 바꾸기…") : t("마감 정하기…"), paperIcon: "flag", click: () => send("deadline") },
+      // 시간 정하기: a task with a day (on 오늘, or a deadline) can have hours on it.
+      ...(open && rangeDay(item, new Date()) ? [{ label: t("시간 정하기…"), paperIcon: "clock", click: () => send("time") }] : []),
+      { label: open ? t("완료 표시") : t("완료 취소"), paperIcon: "checkBox", keyText: t("Space"), click: () => store.mutate((history) => history.toggle(id)) },
+    ],
+    open ? [{ label: t("이거 집중"), paperIcon: "timer", submenu: focusMenu(id) }] : [],
+    onToday ? [
+      ...(open ? [{ label: t("내일 하기"), paperIcon: "arrowRight", keyText: "Alt+→", click: () => moveTasks([id], { kind: "day", day: tomorrowKey(new Date()) }) }] : []),
+      ...dateItems,
+      ...(item.dueDate ? [] : [{ label: t("언젠가로 옮기기"), paperIcon: "later", keyText: open ? "Alt+↓" : undefined, click: someday }]),
       // 오늘 꼭 하나 (when it is on): this task is the day's one thing, starred at the top of 다음.
-      ...(item.isCompleted || !store.prefs.morningPick ? [] : [{
-        label: t("오늘 꼭 하나"), type: "checkbox" as const, checked: store.prefs.starredTask === id && store.prefs.morningPickDay === dayKey(new Date()),
+      ...(open && store.prefs.morningPick ? [{
+        label: t("오늘 꼭 하나"), paperIcon: "star", type: "checkbox" as const, checked: starred,
         click: () => {
-          const starred = store.prefs.starredTask === id && store.prefs.morningPickDay === dayKey(new Date());
           store.setPref("morningPickDay", dayKey(new Date()));
           store.setPref("starredTask", starred ? "" : id);
         },
-      }]),
-      ...(item.dueDate ? [] : [{ label: t("언젠가로 옮기기"), click: () => store.mutate((history) => history.setShelf(id, "later")) }]),
+      }] : []),
+    ] as RowEntry[] : [
+      { label: t("오늘 하기"), paperIcon: "sun", click: () => store.mutate((history) => history.setShelf(id, item.dueDate ? "today" : undefined)) },
       ...dateItems,
-      { label: t("위로 이동"), enabled: index > 0, click: () => moveTo(index - 1, false) },
-      { label: t("아래로 이동"), enabled: index < visible.length - 1, click: () => moveTo(index + 1, true) },
-    ] as MenuItemConstructorOptions[] : [
-      { label: t("오늘 하기"), click: () => store.mutate((history) => history.setShelf(id, item.dueDate ? "today" : undefined)) },
-      ...dateItems,
-    ] as MenuItemConstructorOptions[]),
-    ...calendarItems,
-    { type: "separator" },
-    { label: t("지우기"), click: () => { store.mutate((history) => history.delete(id)); notice({ icon: "trash", text: t("지웠어요"), undo: "history" }); } },
+      ...(item.dueDate ? [{ label: t("언젠가로 옮기기"), paperIcon: "later", keyText: open ? "Alt+↓" : undefined, click: someday }] : []),
+    ] as RowEntry[],
+    [
+      // 할 일 스페이스 (1.30): 스페이스로 옮기기 ▸, once there is a space (스페이스 관리 makes the first).
+      ...(liveSpaces(store.todoSpaces).length ? [{ label: t("스페이스로 옮기기"), paperIcon: "spaces", spaces: id }] : []),
+      ...(onToday ? [
+        { label: t("위로 이동"), paperIcon: "arrowUp", keyText: "Ctrl+↑", enabled: index > 0, click: () => moveTo(index - 1, false) },
+        { label: t("아래로 이동"), paperIcon: "arrowDown", keyText: "Ctrl+↓", enabled: index < visible.length - 1, click: () => moveTo(index + 1, true) },
+      ] : []),
+    ],
+    // 일정: a copy of the task as an event (changing one later doesn't change the other).
+    open ? [{ label: t("달력에 넣기…"), paperIcon: "calendarClock", click: () => calendar.sendTask(id) }] : [],
+    [{ label: t("지우기"), paperIcon: "trash", danger: true, keyText: "Del", click: () => { store.mutate((history) => history.delete(id)); notice({ icon: "trash", text: t("할 일을 지웠어요"), undo: "history" }); } }],
   ]);
 }
 
-/** A row of the 오늘 일정 strip (or of the 달력 window's day panel, whose sheet opens there), right-clicked. */
-function eventMenu(key: string, inCalendar = false): Menu {
-  if (!calendar.find(key)) return Menu.buildFromTemplate([]);
+/** An event's menu: 고치기… · 할 일로 추가 | 지우기…, with the row menu's icons (the Mac's TodayEventsStrip.menu). */
+function eventMenuTemplate(key: string, inCalendar = false): RowEntry[] {
+  if (!calendar.find(key)) return [];
   const edit = (confirmDelete: boolean) => (inCalendar
     ? calendar.editEvent(key, confirmDelete, (request) => desk.sendAll("calendar:event-sheet", request))
     : calendar.editEvent(key, confirmDelete));
-  return Menu.buildFromTemplate([
-    { label: t("고치기…"), click: () => edit(false) },
-    { label: t("할 일로 추가"), click: () => calendar.addAsTask(key) },
-    { type: "separator" },
-    { label: t("지우기…"), click: () => edit(true) },
+  return grouped([
+    [
+      { label: t("고치기…"), paperIcon: "edit", click: () => edit(false) },
+      { label: t("할 일로 추가"), paperIcon: "plus", click: () => calendar.addAsTask(key) },
+    ],
+    [{ label: t("지우기…"), paperIcon: "trash", danger: true, click: () => edit(true) }],
   ]);
+}
+
+/** A row of the 오늘 일정 strip (or of the 달력 window's day panel, whose sheet opens there), right-clicked: natively. */
+function eventMenu(key: string, inCalendar = false): Menu {
+  return Menu.buildFromTemplate(eventMenuTemplate(key, inCalendar).map(({ paperIcon: _icon, danger: _danger, keyText: _key, ...entry }) => entry));
+}
+
+/** An event on the note right-clicked: the paper menu at the point. */
+function showPaperEventMenu(key: string, at: { x: number; y: number }): void {
+  paperClicks = [];
+  const entries = paperEntries(eventMenuTemplate(key));
+  if (entries.length) note.webContents.send("note:row-menu", { id: "", entries, ...at });
 }
 
 /** The note, shown, with the event sheet open on it. */
@@ -665,6 +795,7 @@ async function importBackup(): Promise<void> {
       "",
       t("합치기: 지금 것은 그대로 두고 없는 것만 더해요."),
       t("바꾸기: 지금 것을 모두 이 백업으로 바꿔요."),
+      t("어느 쪽이든 지금 것은 먼저 백업해 둬요."),
     ].join("\n"),
     buttons: [{ label: t("취소"), kind: "ghost" }, { label: t("바꾸기"), kind: "danger" }, { label: t("합치기"), kind: "primary" }], cancelId: 0,
   });
@@ -683,12 +814,12 @@ async function importBackup(): Promise<void> {
     files = importInto(store.dataDirectory, settingsDirectory, backup.files, mode, backupSource(), new Date()).files;
   } catch {
     store.reloadAll();
-    await warn(t("가져오지 못했어요. 지금 목록은 그대로예요."), store.dataDirectory);
+    await warn(t("가져오지 못했어요. 지금 목록은 그대로예요."));
     return;
   }
   store.reloadAll();
   const done = await ask(parent, {
-    icon: "box", title: t("가져오기"), message: t("가져왔어요."), detail: `${summaryText(summary(files), lang())}\n${t("바꾸기 전 상태는 ‘backups’ 폴더에 있어요.")}`,
+    icon: "box", title: t("가져오기"), message: t("가져왔어요."), detail: `${summaryText(summary(files), lang())}\n${t("가져오기 전 것도 ‘backups’ 폴더에 남겨 뒀어요.")}`,
     buttons: [{ label: t("백업 폴더 열기"), kind: "ghost" }, { label: t("확인"), kind: "primary" }], cancelId: 1, size: "m",
   });
   if (done === 0) void shell.openPath(backupsFolder(settingsDirectory));
@@ -709,10 +840,13 @@ async function switchStorage(folder: string | undefined): Promise<void> {
     const response = await ask(parent, {
       icon: "folder", title: t("저장 위치"), size: "m",
       message: folder ? t("이 폴더에 이미 종이냥 목록이 있어요.") : t("이 PC에 전에 쓰던 목록이 있어요."),
-      detail: folder
-        ? t("‘그 목록 쓰기’는 폴더에 있던 목록을 그대로 쓰고, ‘지금 목록으로 바꾸기’는 지금 이 목록으로 덮어써요. 종이냥이 다시 시작돼요.")
-        : t("‘그 목록 쓰기’는 공유 폴더로 옮기기 전의 목록으로 돌아가고, ‘지금 목록으로 바꾸기’는 지금 보고 있는 목록을 이 PC로 가져와요. 종이냥이 다시 시작돼요."),
-      buttons: [{ label: t("취소"), kind: "ghost" }, { label: t("지금 목록으로 바꾸기"), kind: "ghost" }, { label: t("그 목록 쓰기"), kind: "primary" }], cancelId: 0,
+      // Nothing is backed up before an overwrite (#35): only the record is merged, either way.
+      detail: [folder
+        ? t("다른 기기에서 쓰던 목록이면 ‘폴더 목록 쓰기’를 고르세요. 덮어쓰면 폴더에 있던 목록은 사라지고 되돌릴 수 없어요.")
+        : t("공유 폴더로 옮기기 전의 목록으로 돌아가려면 ‘전에 쓰던 목록 쓰기’를 고르세요. 덮어쓰면 전에 쓰던 목록은 사라지고 되돌릴 수 없어요."),
+      t("어느 쪽이든 완료 기록은 합쳐지고, 종이냥이 다시 시작돼요.")].join("\n"),
+      buttons: [{ label: t("취소"), kind: "ghost" }, { label: folder ? t("이 PC 목록으로 덮어쓰기") : t("공유 폴더 목록으로 덮어쓰기"), kind: "ghost" },
+        { label: folder ? t("폴더 목록 쓰기") : t("전에 쓰던 목록 쓰기"), kind: "primary" }], cancelId: 0,
     });
     if (response === 0) return;
     copy = response === 1;
@@ -723,7 +857,7 @@ async function switchStorage(folder: string | undefined): Promise<void> {
     else mergeArchive(store.dataDirectory, target);
     writeDataFolder(settingsDirectory, folder);
   } catch {
-    await ask(parent, { icon: "warning", title: t("저장 위치"), message: t("이 폴더에 목록을 저장하지 못했어요."), detail: target, buttons: [{ label: t("확인"), kind: "primary" }], cancelId: 0 });
+    await ask(parent, { icon: "warning", title: t("저장 위치"), message: t("폴더로 옮기지 못했어요. 지금 목록은 그대로예요."), buttons: [{ label: t("확인"), kind: "primary" }], cancelId: 0 });
     return;
   }
   app.relaunch();
@@ -768,6 +902,20 @@ function handle(action: Action, sender: Electron.WebContents, frame?: WebFrameMa
   switch (action.type) {
     // ─── 메모 서랍 ───
     case "drawer": { if (action.command === "open") drawer.show({ memo: action.memo, write: action.write }); else if (action.command === "close") drawer.close(); else drawer.toggle(); return; }
+    case "spaceAdd": {
+      const color = action.color ?? undefined;
+      store.changeSpaces((data) => addSpace(data, action.name, action.id, color));
+      if (action.todo && findSpace(store.todoSpaces, action.id)) moveToSpace([action.todo], action.id);
+      return;
+    }
+    case "spaceRename": return store.changeSpaces((data) => renameSpace(data, action.id, action.name));
+    case "spaceColor": return store.changeSpaces((data) => recolorSpace(data, action.id, spaceColor(action.color) === action.color ? action.color : "lavender"));
+    case "spaceDelete": return store.changeSpaces((data) => deleteSpace(data, action.id).data);
+    case "spaceRestore": return store.changeSpaces((data) => restoreSpace(data, action.id, action.todos));
+    case "spaceOrder": return store.changeSpaces((data) => reorderSpaces(data, action.ids));
+    case "todoSpace": return moveToSpace(action.ids, action.space);
+    case "spaceLens": return store.setPref("spaceLens", action.space ? lensFor(action.space) : null);
+    case "openSpaces": return void openDesk("spaces");
     case "folderAdd": return store.changeFolders((data) => addFolder(data, action.name, action.color, action.id));
     case "folderRename": return store.changeFolders((data) => renameFolder(data, action.id, action.name));
     case "folderColor": return store.changeFolders((data) => recolorFolder(data, action.id, action.color));
@@ -834,6 +982,7 @@ function handle(action: Action, sender: Electron.WebContents, frame?: WebFrameMa
     }
     case "saveSeries": store.saveSeries(action); return;
     case "deleteSeries": return store.deleteSeries(action.id);
+    case "restoreSeries": return store.restoreSeries(action.series, action.todos);
     case "setDeadline": return store.mutate((history) => {
       if (action.dueDate) history.setDeadline(action.id, action.dueDate, Boolean(action.keepOnToday));
       else history.setDue(action.id, undefined);
@@ -897,14 +1046,14 @@ function handle(action: Action, sender: Electron.WebContents, frame?: WebFrameMa
       if (window) moreMenu().popup({ window, x: Math.round(action.x), y: Math.round(action.y) });
       return;
     }
-    case "showRowMenu": {
-      rowMenu(action.id).popup({ window: note });
-      return;
-    }
+    case "showRowMenu": return showPaperRowMenu(action.id, { x: action.x, y: action.y, keyboard: action.keyboard });
+    case "rowMenuPick": { const click = paperClicks[action.pick]; paperClicks = []; click?.(); return; }
     case "calendarNewEvent": return calendar.newEvent(action.at);
     case "calendarEditEvent": return calendar.editEvent(action.key);
     case "showEventMenu": {
       const inCalendar = desk.isCalendarFrame(frame);
+      // On the note: the paper menu, with the row menu's icons (the 달력 window keeps the native one).
+      if (!inCalendar && action.x !== undefined && action.y !== undefined) return showPaperEventMenu(action.key, { x: action.x, y: action.y });
       eventMenu(action.key, inCalendar).popup({ window: inCalendar ? desk.browserWindow! : note });
       return;
     }
@@ -919,7 +1068,10 @@ function handle(action: Action, sender: Electron.WebContents, frame?: WebFrameMa
     }
     case "alarmDelete": return store.removeAlarm(action.id);
     case "showStorageProblem":
-      void ask(note, { icon: "warning", title: t("저장 확인 필요"), message: store.storageError ?? "", buttons: [{ label: t("확인"), kind: "primary" }], cancelId: 0, size: "m" });
+      void ask(note, {
+        icon: "warning", title: t("저장 폴더 확인"), message: store.storageError ?? "", size: "m",
+        buttons: [{ label: t("저장 폴더 열기"), kind: "ghost" }, { label: t("닫기"), kind: "primary" }], cancelId: 1,
+      }).then((answer) => { if (answer === 0) void shell.openPath(store.dataDirectory); });
       return;
     case "window":
       if (action.command === "quit") return quit();
@@ -1052,8 +1204,26 @@ function intentCommit(candidate: WireCandidate, page: IntentPage): IntentResult 
   }
 }
 
+/**
+ * `#회사` or the lens (S1–S8): a to-do just made goes into its space; `#세탁` with no such space makes it first (the
+ * next colour, S4) — taken back with the to-do. Anything else made keeps no space (S9).
+ */
+function withSpace(result: IntentResult, space: SpaceChoice | undefined): IntentResult {
+  if (!space || space.kind === "none" || result.made?.kind !== "todo" || !result.made.id) return result;
+  const todo = result.made.id;
+  if (space.kind === "space") {
+    store.changeSpaces((data) => moveTodo(data, todo, space.id));
+    return result;
+  }
+  const id = newSpaceID(store.todoSpaces);
+  store.changeSpaces((data) => moveTodo(addSpace(data, space.name, id), todo, id));
+  return findSpace(store.todoSpaces, id) ? { ...result, made: { ...result.made, space: id } } : result;
+}
+
 /** Takes back what a reading made: no trace, no line in the record. */
 function intentUndo(made: IntentMade): void {
+  // A space the line made (`#세탁`) goes with its to-do.
+  if (made.space) store.changeSpaces((data) => deleteSpace(data, made.space!).data);
   if (made.kind === "todo" && made.id) store.mutate((history) => history.retract(made.id!));
   else if (made.kind === "event" && made.id) calendar.removeFromLine(made.id);
   else if (made.kind === "timer") {
@@ -1074,11 +1244,11 @@ function intentRequest(request: IntentRequest): IntentResult {
     store.setPref("intentPrefer", memory.prefer);
     return {};
   }
-  const result = intentCommit(request.candidate, request.from === "quick" ? "today" : request.page);
+  const result = withSpace(intentCommit(request.candidate, request.from === "quick" ? "today" : request.page), request.space);
   // 빠른 입력 while the note is up: the card closes at once and the note shows the toast.
   if (result.made && request.from === "quick" && note.isVisible() && !note.isMinimized() && request.candidates && request.text !== undefined) {
     const index = request.candidates.findIndex((entry) => JSON.stringify(entry) === JSON.stringify(request.candidate));
-    note.webContents.send("note:toast", { made: result.made, candidates: request.candidates, index: Math.max(0, index), text: request.text });
+    note.webContents.send("note:toast", { made: result.made, candidates: request.candidates, index: Math.max(0, index), text: request.text, ...(request.space ? { space: request.space } : {}) });
     return { ...result, inNote: true };
   }
   return result;
@@ -1198,7 +1368,7 @@ function glanceTimer(now = Date.now()): GlanceTimer | undefined {
 }
 
 /**
- * The tray's tooltip, like the Mac's menu bar text: "종이냥 · 12:30" while a timer runs, "종이냥 · 치과
+ * The tray's tooltip, like the Mac's menu bar text: "종이냥 · 21분 남음" while a timer runs (#46), "종이냥 · 치과
  * 40분" when an event or a reminder starts within the hour, else just "종이냥".
  */
 function trayTooltip(now = new Date()): string {
@@ -1454,10 +1624,10 @@ function trayMenu(): MenuItemConstructorOptions[] {
     { label: t("1시간 쉬기"), enabled: store.prefs.reminderEnabled, click: () => periodic.snooze(60) },
     { label: t("완료 기록…"), click: () => openHistory() },
     { label: t("달력"), click: () => openCalendar() },
-    { label: t("종이냥 설정…"), click: () => openSettings() },
+    { label: t("설정…"), click: () => openSettings() },
     { label: t("도움말…"), click: () => openHelp() },
     { type: "separator" },
-    { label: t("내보내기…"), click: () => void fromStoragePane(exportBackup) },
+    { label: t("모두 내보내기…"), click: () => void fromStoragePane(exportBackup) },
     { label: t("가져오기…"), click: () => void fromStoragePane(importBackup) },
     { type: "separator" },
     ...petMenu(),
@@ -1478,6 +1648,7 @@ function registerIPC(): void {
   ipcMain.on("state:want", (event) => { if (event.senderFrame) stateFrames.add(event.senderFrame); });
   // The preload asks once, before the page draws (every window speaks the app's language).
   ipcMain.on("lang:get", (event) => { event.returnValue = lang(); });
+  ipcMain.on("clock:get", (event) => { event.returnValue = hourCycle(lang()); });
   ipcMain.handle("act", (event, action: Action) => handle(action, event.sender, event.senderFrame));
   // 밤 종이: asked by every page (and frame) as it loads, before it draws.
   ipcMain.on("paper:get", (event) => { event.returnValue = paperNight(); });
@@ -1629,6 +1800,10 @@ async function runSnapshots(directory: string): Promise<void> {
   // `npm run snapshot -- drawer`: only 메모 서랍's shots (1.28).
   if (process.env.PAPERTODO_SNAPSHOT_ONLY === "drawer") {
     return finishSnapshots(await drawerShots(directory, save, wait));
+  }
+  // `npm run snapshot -- spaces`: only 할 일 스페이스's shots (1.30), day and night.
+  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "spaces") {
+    return finishSnapshots(await spacesShots(directory, save, wait, settled));
   }
   // `npm run snapshot -- ai`: only AI 연결's shots (1.27), day and night.
   if (process.env.PAPERTODO_SNAPSHOT_ONLY === "ai") {
@@ -2278,7 +2453,7 @@ async function convenienceShots(directory: string, save: Save, wait: Wait, settl
     store.setPref("starredTask", "");
     store.setPref("morningPick", false);
     // The toasts: a delete, a move to tomorrow, 모두 끝냄.
-    for (const [name, notice] of [["deleted", { icon: "trash", text: t("지웠어요"), undo: "history" }], ["tomorrow", { icon: "calendar", text: movedTomorrowText(lang()), undo: "history" }], ["all-done", { icon: "check", text: t("{n}개 끝냈어요", { n: 3 }), undo: "history" }]] as const) {
+    for (const [name, notice] of [["deleted", { icon: "trash", text: t("할 일을 지웠어요"), undo: "history" }], ["tomorrow", { icon: "calendar", text: movedTomorrowText(lang()), undo: "history" }], ["all-done", { icon: "check", text: t("{n}개 끝냈어요", { n: 3 }), undo: "history" }]] as const) {
       note.webContents.send("note:notice", notice);
       await shot(`${prefix}conv-toast-${name}`);
     }
@@ -3278,11 +3453,11 @@ function confirmQuestions(): [string, ConfirmQuestion][] {
   return [
     ["confirm-language", languageQuestion(lang() === "en" ? "nl" : "en")],
     ["confirm-import", { icon: "box", title: t("가져오기"), message: t("이 백업을 가져올까요?"), size: "m", cancelId: 0,
-      detail: [`${t("종이냥")}-2026-10-08.jongi`, t("{from}에서 {when} 내보냄", { from: "Mac 1.34.0", when: exportedText(new Date().toISOString(), lang()) ?? "" }), summaryText({ todos: 12, memos: 3, repeats: 2, events: 9, archive: 140, alarms: 3, focus: 18 }, lang()), "", t("합치기: 지금 것은 그대로 두고 없는 것만 더해요."), t("바꾸기: 지금 것을 모두 이 백업으로 바꿔요.")].join("\n"),
+      detail: [`${t("종이냥")}-2026-10-08.jongi`, t("{from}에서 {when} 내보냄", { from: "Mac 1.34.0", when: exportedText(new Date().toISOString(), lang()) ?? "" }), summaryText({ todos: 12, memos: 3, repeats: 2, events: 9, archive: 140, alarms: 3, focus: 18 }, lang()), "", t("합치기: 지금 것은 그대로 두고 없는 것만 더해요."), t("바꾸기: 지금 것을 모두 이 백업으로 바꿔요."), t("어느 쪽이든 지금 것은 먼저 백업해 둬요.")].join("\n"),
       buttons: [{ label: t("취소"), kind: "ghost" }, { label: t("바꾸기"), kind: "danger" }, { label: t("합치기"), kind: "primary" }] }],
     ["confirm-storage", { icon: "folder", title: t("저장 위치"), size: "m", cancelId: 0, message: t("이 폴더에 이미 종이냥 목록이 있어요."),
-      detail: t("‘그 목록 쓰기’는 폴더에 있던 목록을 그대로 쓰고, ‘지금 목록으로 바꾸기’는 지금 이 목록으로 덮어써요. 종이냥이 다시 시작돼요."),
-      buttons: [{ label: t("취소"), kind: "ghost" }, { label: t("지금 목록으로 바꾸기"), kind: "ghost" }, { label: t("그 목록 쓰기"), kind: "primary" }] }],
+      detail: [t("다른 기기에서 쓰던 목록이면 ‘폴더 목록 쓰기’를 고르세요. 덮어쓰면 폴더에 있던 목록은 사라지고 되돌릴 수 없어요."), t("어느 쪽이든 완료 기록은 합쳐지고, 종이냥이 다시 시작돼요.")].join("\n"),
+      buttons: [{ label: t("취소"), kind: "ghost" }, { label: t("이 PC 목록으로 덮어쓰기"), kind: "ghost" }, { label: t("폴더 목록 쓰기"), kind: "primary" }] }],
     // 1.28: where the memo tab's memos went (M1).
     ...(moveQuestion() ? [["confirm-move-notice", moveQuestion()!] as [string, ConfirmQuestion]] : []),
   ];
@@ -3493,7 +3668,10 @@ function drawerSample(): { ids: Record<string, string> } {
     memo("shopping", t("장보기\n우유, 달걀, 사과"), at(0, 8, 30)),
     memo("books", t("읽을 책\n- [ ] 작은 습관의 힘\n- [x] 데미안"), at(3, 21, 0)),
     memo("thought", t("떠오른 생각\n주말에 화분 분갈이"), at(2, 13, 0)),
-    ...Array.from({ length: 24 }, (_, index) => memo(`log${index + 1}`, t("하루 기록 {n}\n오늘 한 일 짧게", { n: index + 1 }), at(index * 2, 21, 30))),
+    // The dense folder (#14: two lines at most on a card): a long entry and a checklist first.
+    memo("log1", t("하루 기록 1\n이번 주에 한 일을 한곳에 모아 두었어요. 급한 것부터 위에 적고, 끝난 건 지워 가며 정리하기. 다음 주 월요일에 한 번 더 보기."), at(0, 21, 30)),
+    memo("log2", t("하루 기록 2\n- [x] 자료 모으기\n- [ ] 표 정리하기\n- [ ] 메일 보내기"), at(2, 21, 30)),
+    ...Array.from({ length: 22 }, (_, index) => memo(`log${index + 3}`, t("하루 기록 {n}\n오늘 한 일 짧게", { n: index + 3 }), at((index + 2) * 2, 21, 30))),
   ];
   const ids = Object.fromEntries(entries.map((entry) => [entry.key, entry.memo.id]));
   store.memos = [...entries.map((entry) => entry.memo), ...store.memos.filter((existing) => !existing.id.startsWith("DRAWER-"))].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
@@ -3549,6 +3727,113 @@ const fakeDesktop = `(() => {
  * short and tall screens. Each shot is checked (layoutCheck plus the drawer's own: the cat whole, the title not
  * under the icons, every bookmark inside the window). Returns how many problems it found.
  */
+/**
+ * 할 일 스페이스 (1.30), day and night (spaces/, spaces/night/): 오늘 with no space (as 1.29 drew it), the mixed sheet with
+ * its bands, 회사만 보는 중, the line's ● 회사 and + 새 스페이스 chips, 모든 스페이스 ▾, the row menu's 스페이스로 옮기기 ▸,
+ * the editor's 스페이스, and the desk's 스페이스 pane. Each one is checked for cut words and menus outside the note.
+ */
+async function spacesShots(directory: string, save: Save, wait: Wait, settled: (window: BrowserWindow) => Promise<unknown>): Promise<number> {
+  let problems = 0;
+  const run = (script: string) => note.webContents.executeJavaScript(script).catch((error: Error) => `script failed: ${error.message}`);
+  const check = `(() => {
+    const out = [];
+    const r = (el) => el.getBoundingClientRect();
+    const cut = (el) => el && getComputedStyle(el).display !== "none" && el.scrollWidth > el.clientWidth + 1;
+    const pick = document.querySelector(".space-pick:not([hidden]) .space-pick-label");
+    if (cut(pick)) out.push("space button cut: " + pick.textContent);
+    const button = document.querySelector(".space-pick:not([hidden])"), title = document.querySelector(".title");
+    if (button && title && r(button).left < r(title).right - 0.5 && Math.abs(r(button).top - r(title).top) < 20) out.push("space button over the title");
+    if (button && r(button).right > window.innerWidth - 60) out.push("space button under the cat");
+    const lens = document.querySelector(".lens-band .lens-text");
+    if (cut(lens)) out.push("band text cut: " + lens.textContent);
+    for (const chip of document.querySelectorAll(".inp .chip")) if (chip.scrollWidth > chip.clientWidth + 1) out.push("chip cut: " + chip.textContent);
+    const chips = document.querySelector(".inp .reads");
+    if (chips && chips.scrollWidth > chips.clientWidth + 1) out.push("chips overflow the line");
+    for (const menu of document.querySelectorAll(".menu")) { const m = r(menu); if (m.right > window.innerWidth + 0.5 || m.bottom > window.innerHeight + 0.5 || m.left < -0.5 || m.top < -0.5) out.push("menu outside the note"); if (menu.scrollHeight > menu.clientHeight + 1) out.push("menu scrolls"); }
+    for (const label of document.querySelectorAll(".menu .mi > .t")) if (label.scrollWidth > label.clientWidth + 1) out.push("menu row cut: " + label.textContent);
+    for (const band of document.querySelectorAll(".row .sband:not([hidden])")) { const b = r(band); if (b.width < 11 || b.height < 10 || getComputedStyle(band).backgroundColor === "rgba(0, 0, 0, 0)") out.push("band not drawn"); }
+    const field = document.querySelector(".editor .space-field");
+    if (field && field.scrollWidth > field.clientWidth + 1) out.push("editor space field cut");
+    return out;
+  })()`;
+  const shot = async (name: string, prefix: string) => {
+    await wait(350);
+    await settled(note);
+    const found = await run(check) as string[] | string;
+    const list = Array.isArray(found) ? found : [found];
+    console.log(`spaces ${prefix}${name}: ${list.length ? list.join("; ") : "ok"}`);
+    problems += list.length;
+    await save(`spaces/${prefix}${name}`, note.webContents.capturePage());
+  };
+  const send = (command: string, id = "") => note.webContents.send("note:row-command", { id, command });
+  const today = () => store.todayItems;
+  fs.mkdirSync(path.join(directory, "spaces", "night"), { recursive: true });
+  note.setSize(400, 640);
+  store.setPref("spaceLens", null);
+  send("page-today");
+  // 0 spaces first: the sheet as 1.29 drew it (compared with a 1.29 build's).
+  for (const paper of ["day", "night"] as const) {
+    store.setPref("paper", paper);
+    await shot("today-none", paper === "night" ? "night/" : "");
+  }
+  // Three spaces (회사 · 집 · 공부) and to-dos in them, a few without.
+  const ids = { work: "s-a1b2c3", home: "s-d4e5f6", study: "s-0a9b8c" };
+  store.changeSpaces((data) => addSpace(addSpace(addSpace(data, t("회사"), ids.work, "pink"), t("집"), ids.home, "mint"), t("공부"), ids.study, "sky"));
+  store.mutate((history) => { history.add(t("세탁기 돌리기")); history.add(t("주간 보고서 초안")); });
+  const items = today();
+  const place: [number, string][] = [[0, ids.work], [1, ids.work], [2, ids.study], [3, ids.home], [items.length - 1, ids.work], [items.length - 2, ids.home]];
+  store.changeSpaces((data) => place.reduce((next, [index, space]) => (items[index] ? moveTodo(next, items[index].id, space) : next), data));
+  const rowID = items[1].id;
+  const workName = t("회사");
+  for (const paper of ["day", "night"] as const) {
+    const prefix = paper === "night" ? "night/" : "";
+    store.setPref("paper", paper);
+    store.setPref("spaceLens", null);
+    await shot("today-mixed", prefix);
+    const bands = await run(`document.querySelectorAll(".row .sband:not([hidden])").length`);
+    console.log(`spaces ${prefix}bands drawn: ${bands}`);
+    if (!bands) problems += 1;
+    // 회사만 보는 중 · 다른 할 일 N개는 숨겼어요 · 모두 보기
+    store.setPref("spaceLens", lensFor(ids.work));
+    await shot("today-lens", prefix);
+    store.setPref("spaceLens", null);
+    // The line: ● 회사, then + 새 스페이스 ‘세탁’.
+    await run(`(() => { const field = document.querySelector(".inp .typed"); field.focus(); field.value = ${JSON.stringify(`${t("견적서 보내기 금요일까지")} #${[...workName].slice(0, Math.max(1, Math.floor([...workName].length / 2))).join("")}`)}; field.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+    await shot("line-chip", prefix);
+    await run(`(() => { const field = document.querySelector(".inp .typed"); field.value = ${JSON.stringify(`${t("빨래")} #${t("세탁")}`)}; field.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+    await shot("line-new", prefix);
+    await run(`(() => { const field = document.querySelector(".inp .typed"); field.value = ""; field.dispatchEvent(new Event("input", { bubbles: true })); field.blur(); })()`);
+    // 모든 스페이스 ▾
+    await run(`document.querySelector(".space-pick").click()`);
+    await shot("picker", prefix);
+    await run(`document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
+    // Right-click → 스페이스로 옮기기 ▸
+    const point = await run(`(() => { const row = document.querySelector('.row[data-id=${JSON.stringify(rowID)}]'); const box = row.getBoundingClientRect(); return { x: Math.round(box.left + 90), y: Math.round(box.top + box.height / 2) }; })()`) as { x: number; y: number };
+    showPaperRowMenu(rowID, point);
+    await wait(250);
+    await run(`(() => { const label = ${JSON.stringify(t("스페이스로 옮기기"))}; const button = [...document.querySelectorAll(".menu .mi")].find((entry) => entry.textContent.includes(label)); button?.click(); })()`);
+    await shot("row-menu", prefix);
+    await run(`document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
+    // The editor's 스페이스.
+    send("reminder", rowID);
+    await wait(500);
+    await shot("editor", prefix);
+    send("close-editor");
+    await wait(200);
+  }
+  // The desk's 스페이스 pane, day and night.
+  for (const paper of ["day", "night"] as const) {
+    store.setPref("paper", paper);
+    await showDeskPane("spaces", wait);
+    const report = await inPane("settings", `(() => { const out = []; for (const el of document.querySelectorAll(".space-row .space-name, .space-count, .group .foot, .row .grow")) if (el.scrollWidth > el.clientWidth + 1) out.push("cut: " + (el.value ?? el.textContent)); return out.join("; "); })()`);
+    console.log(`spaces desk ${paper}: ${report || "ok"}`);
+    if (report) problems += 1;
+    await save(`spaces/${paper === "night" ? "night/" : ""}desk`, captureDesk(wait));
+  }
+  store.setPref("paper", "day");
+  return problems;
+}
+
 async function drawerShots(directory: string, save: Save, wait: Wait): Promise<number> {
   let problems = 0;
   const sample = drawerSample();
@@ -3896,16 +4181,16 @@ const aheadDragScript = `(() => {
 /** What the size sweep (and the 1.24 shots) check in the note. */
 const noteLayoutChecks: LayoutCheckOptions = {
   ignore: ".peek, .strike, .guide, .scrim",
-  inside: [".tabs-row", ".tools button", ".index-tab", ".title-row", ".footer", ".footer > *", ".editor", ".event-sheet", ".event-sheet .tape", ".editor .actions .action", ".dock", ".inp", ".strip-top", ".strip-lead", ".tt-scroll", ".sheet-pop", ".slip-foot .sbtn",
+  inside: [".tabs-row", ".tools button", ".index-tab", ".title-row", ".footer", ".footer > *", ".editor", ".event-sheet", ".event-sheet .tape", ".editor .actions .action", ".dock", ".inp", ".strip-top", ".strip-barline", ".strip-lead", ".tt-scroll", ".sheet-pop", ".slip-foot .sbtn",
     ".focus-card", ".fc-top", ".fc-close", ".fc-ring", ".fc-btn", ".fc-foot", ".fc-cat", ".pick-bar", ".pick-cancel", ".focus-pick",
     ".search-slip", ".search-line", ".search-foot", ".row.preview-hover .actions", ".fc-play"],
   oneLine: [".fc-kicker", ".fc-next", ".fc-btn", ".fc-rest", ".fc-row-title", ".pick-text", ".pick-cancel", ".focus-pick", ".group-name", ".group-count", ".footer > *", ".tab-label", ".editor .actions .action", ".seg button", ".quick button:not(.two-line)", ".choice-title", ".choice-sub", ".move", ".due", ".time",
     ".carry", ".search-head", ".search-meta", ".search-foot .keys > span", ".slip-title",
     ".date-line", ".prog", ".group-head span", ".group-mark span", ".chip", ".sbtn", ".kbd", ".slip-title", ".sheet-toggle", ".range-length",
-    ".strip-link", ".ad-pill", ".ad-more", ".tt-title", ".strip-hours span", ".lead-kicker", ".lead-sub", ".strip-nothing", ".rc-text b", ".rc-text small", ".sr-time", ".sr-away",
+    ".strip-link", ".ad-pill", ".ad-more", ".tt-title", ".strip-hours span", ".lead-kicker", ".lead-sub", ".strip-nothing", ".rc-text b", ".rc-text small:not(.two)", ".sr-time", ".sr-away",
     ".tt-hour span", ".tb-time", ".tb-title", ".tt-more", ".ttn-when", ".ttn-chip", ".tml-time"],
   rows: [".tabs-row", ".tools", ".index-tabs", ".title-row", ".footer", ".lines > .row", ".editor .actions", ".quick", ".custom", ".alert-row", ".month-row", ".time-line", ".search-row", ".search-head", ".actions",
-    ".inp-row", ".strip-top", ".strip-lead", ".lead-row", ".strip-row", ".ttn-foot", ".tt-more-list button", ".slip-head", ".slip-foot", ".sheet-row", ".sheet-line", ".prog", ".fc-top", ".fc-btns", ".fc-foot", ".fc-row", ".pick-bar", ".group-head", ".group-mark"],
+    ".inp-row", ".strip-top", ".strip-barline", ".strip-lead", ".lead-row", ".strip-row", ".ttn-foot", ".tt-more-list button", ".slip-head", ".slip-foot", ".sheet-row", ".sheet-line", ".prog", ".fc-top", ".fc-btns", ".fc-foot", ".fc-row", ".pick-bar", ".group-head", ".group-mark"],
   // The focus card's column never needs to scroll (only its list does).
   noScroll: [".fc-body"],
   placeholders: [".inp .typed"],
@@ -4125,6 +4410,9 @@ async function sizeSweep(directory: string, save: Save, wait: Wait, settled: (wi
       inside: [".pane-head", ".search", ".content", ".topics"],
       rows: [".pane-head", ".neighbours", ".found", ".card", ".kicker"],
       oneLine: [".pane-head h1", ".topic", ".chip", ".keys kbd", ".neighbour .title", ".group-title"],
+      // #24: every topic's name and the search hint whole, at every size and in every language.
+      whole: [".topic .label"],
+      wholePlaceholders: [".search input"],
     },
   };
   const sidebarChecks: LayoutCheckOptions = { ignore: ".pane-frame", inside: [".dside", ".drow"], oneLine: [".drow", ".dhead"], rows: [".drow"] };
@@ -4143,6 +4431,9 @@ async function sizeSweep(directory: string, save: Save, wait: Wait, settled: (wi
     { name: "pet", pane: "pet" },
     { name: "events", pane: "events" },
     { name: "storage", pane: "storage" },
+    // 1.30: a shared folder in OneDrive — the drive's name, then the folder's (as the Mac's desk-storage-shared).
+    { name: "storage-shared", pane: "storage", open: async () => { Object.assign(store.storage, { custom: true, label: t("공유 폴더"), path: "C:\\Users\\sample\\OneDrive\\종이냥", archivePath: "C:\\Users\\sample\\OneDrive\\종이냥\\archive" }); broadcast(); await wait(200); }, // i18n-ok: a folder name
+      close: async () => { Object.assign(store.storage, { custom: false, label: t("이 PC (기본)"), path: "C:\\Users\\sample\\AppData\\Roaming\\PaperTodo", archivePath: "C:\\Users\\sample\\AppData\\Roaming\\PaperTodo\\archive" }); broadcast(); } },
     // AI 연결 (1.27): on, with today's and yesterday's work in the list (log only: nothing on the note).
     { name: "ai", pane: "ai", open: async () => { ai.setEnabled(true); ai.seedForSnapshots(aiSample(false).entries); await wait(200); } },
     { name: "help", pane: "help", open: async () => { openHelp("window"); await wait(300); } },
@@ -4341,7 +4632,7 @@ function updateNoteHotkey(): void {
     globalShortcut.unregister(noteAccelerator);
     noteHotkeyHeld = false;
   }
-  const problem = wanted && !noteHotkeyHeld ? t("다른 앱이 Ctrl+Alt+J를 쓰고 있어 켜지 못했어요. 그 앱의 단축키를 바꾸고 다시 켜 보세요.") : undefined;
+  const problem = wanted && !noteHotkeyHeld ? t("다른 앱이 Ctrl+Alt+J를 쓰고 있어요. 그 앱의 단축키를 바꾼 뒤 다시 켜 주세요.") : undefined;
   if (problem !== store.noteShortcutProblem) {
     store.noteShortcutProblem = problem;
     store.changed();
@@ -4361,22 +4652,27 @@ function toggleNote(): void {
 
 app.on("second-instance", (_event, argv) => secondLaunch(argv));
 app.on("before-quit", () => { quitting = true; store?.flush(); });
-app.on("will-quit", () => { quick?.dispose(); quickMemo?.dispose(); drawer?.dispose(); if (noteHotkeyHeld) globalShortcut.unregister(noteAccelerator); globalShortcut.unregisterAll(); store?.unwatch(); ai?.stop(); });
+app.on("will-quit", () => { store?.flush(); quick?.dispose(); quickMemo?.dispose(); drawer?.dispose(); if (noteHotkeyHeld) globalShortcut.unregister(noteAccelerator); globalShortcut.unregisterAll(); store?.unwatch(); ai?.stop(); });
 app.on("window-all-closed", () => undefined);
 
 app.whenReady().then(() => {
   const place = directories();
   settingsDirectory = place.settings;
   setLang(appLanguage(place.settings));
+  // Every time in the app on the system's clock (preload hands it to each window: "clock:get").
+  setHourCycle(systemHourCycle());
   // Google 캘린더 · Tasks are gone: their sign-in and copies on this device go too.
   removeLeftovers(place.settings);
   store = new Store(place.data, demo, place.settings);
   const windows = process.platform === "win32";
   store.storage = {
     label: storageLabel(place.folder, os.homedir(), windows, "PC", lang()) + (place.unavailable ? ` ${t("(열 수 없음)")}` : ""), custom: Boolean(place.folder),
-    path: place.data, archivePath: path.join(place.data, "archive"),
+    path: place.data, archivePath: path.join(place.data, "archive"), home: os.homedir(),
   };
-  if (place.unavailable) store.storageError = `${t("저장 폴더를 열 수 없어 이 PC의 기본 위치에 저장하고 있어요. 폴더가 다시 보이면 종이냥을 다시 시작하세요.")}\n${place.unavailable}`;
+  // Snapshots: the demo's temporary folder said as the default one on a sample PC, so no real path is drawn (only what
+  // the storage pane shows; the data stays in the temporary folder).
+  if (snapshotDirectory) Object.assign(store.storage, { path: "C:\\Users\\sample\\AppData\\Roaming\\PaperTodo", archivePath: "C:\\Users\\sample\\AppData\\Roaming\\PaperTodo\\archive", home: "C:\\Users\\sample" });
+  if (place.unavailable) store.storageError = t("‘{name}’ 폴더를 열 수 없어서 이 PC의 기본 위치에 저장하고 있어요. 폴더가 다시 보이면 종이냥을 다시 시작해 주세요.", { name: path.basename(place.unavailable) });
   ai = new AiConnection(store, place.settings, {
     toast: notice,
     noteVisible: () => Boolean(note && !note.isDestroyed() && note.isVisible() && !note.isMinimized()),
@@ -4417,8 +4713,9 @@ app.whenReady().then(() => {
   floating = new FloatingNote(store, rendererDirectory, showNote, quit);
   const live = !snapshotDirectory && !offscreenEnabled;
   // A timer started, paused or ended: every window hears it (the 오늘 창's card), and the tray.
-  focusLog = new FocusLog(place.data, (file) => {
-    store.storageError = `${t("집중 기록을 저장하지 못했어요.")}\n${file}`;
+  focusLog = new FocusLog(place.data, () => {
+    // Appended once, never tried again: this session isn't in the record.
+    store.storageError = [t("집중 기록을 저장하지 못했어요."), t("이번 집중은 기록에 남지 않았어요."), t("저장 폴더가 열리는지 확인해 주세요.")].join(" ");
     store.changed();
   });
   focusTimer = new FocusTimerWidget(store, rendererDirectory, {
@@ -4453,6 +4750,7 @@ app.whenReady().then(() => {
     quickMemo: () => quickMemo.open(),
     drawer: () => drawer.show(),
     alarms: () => openSettings("clock"),
+    finished: () => archive?.all() ?? [],
   });
   // 시계 알람: every device rings its own; snapshots never ring.
   alarmClock = new AlarmClock(store, rendererDirectory, { petAnchor: () => pet?.anchor(), changed: updateTray, rang: alarmNotice }, live);

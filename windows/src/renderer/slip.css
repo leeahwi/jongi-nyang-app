@@ -21,15 +21,21 @@ body.slip-window { background: transparent; overflow: hidden; }
 @keyframes slip-in { from { opacity: 0; transform: translateY(8px) rotate(-0.6deg); } }
 .slip.leaving { opacity: 0; transition: opacity 0.12s ease-out; }
 
-/* The washi tape: 74 × 20, tilted, half above the edge, white stripes over the colour, zig-zag ends. */
+/* The washi tape: 74 × 20, tilted, half above the edge, zig-zag ends — its kind's colour solid with a 1 px edge (1.30,
+   like the tabs, no stripes). The tape itself is the edge colour; ::before, 1 px in with the same outline, is the fill. */
 .tape {
   position: absolute; top: -9px; left: 50%; width: 74px; height: 20px; z-index: 3; pointer-events: none;
-  transform: translateX(-50%) rotate(-2.5deg); opacity: 0.9;
-  background: repeating-linear-gradient(90deg, var(--tape-stripe, rgba(255, 255, 255, 0.28)) 0 3px, transparent 3px 8px), var(--tc, var(--tape-todo));
+  transform: translateX(-50%) rotate(-2.5deg);
+  background: var(--te, var(--tape-todo-edge));
   clip-path: polygon(0 8%, 4% 0, 8% 10%, 12% 0, 88% 0, 92% 10%, 96% 0, 100% 8%, 100% 92%, 96% 100%, 92% 90%, 88% 100%, 12% 100%, 8% 90%, 4% 100%, 0 92%);
 }
-.tape.todo { --tc: var(--tape-todo); } .tape.memo { --tc: var(--tape-memo); } .tape.event { --tc: var(--tape-event); }
-.tape.timer { --tc: var(--tape-timer); } .tape.alarm { --tc: var(--tape-alarm); } .tape.confirm { --tc: var(--tape-confirm); }
+.tape::before {
+  content: ""; position: absolute; inset: 1px; background: var(--tc, var(--tape-todo));
+  clip-path: polygon(0 8%, 4% 0, 8% 10%, 12% 0, 88% 0, 92% 10%, 96% 0, 100% 8%, 100% 92%, 96% 100%, 92% 90%, 88% 100%, 12% 100%, 8% 90%, 4% 100%, 0 92%);
+}
+.tape.todo { --tc: var(--tape-todo); --te: var(--tape-todo-edge); } .tape.memo { --tc: var(--tape-memo); --te: var(--tape-memo-edge); }
+.tape.event { --tc: var(--tape-event); --te: var(--tape-event-edge); } .tape.timer { --tc: var(--tape-timer); --te: var(--tape-timer-edge); }
+.tape.alarm { --tc: var(--tape-alarm); --te: var(--tape-alarm-edge); } .tape.confirm { --tc: var(--tape-confirm); --te: var(--tape-confirm-edge); }
 
 /* Header */
 .slip-head { display: flex; align-items: center; gap: 10px; padding: 16px 16px 0; min-width: 0; }
@@ -96,7 +102,6 @@ button.chip:hover { background: color-mix(in srgb, var(--sage) 9%, var(--paper-2
 :root[data-paper="night"] .sbtn.primary { box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.6); }
 :root[data-paper="night"] .sbtn.primary:hover { background: color-mix(in srgb, var(--sage) 88%, white); }
 :root[data-paper="night"] .sbtn.primary .keycap { background: rgba(31, 42, 30, 0.1); border-color: rgba(31, 42, 30, 0.3); color: var(--on-sage); }
-:root[data-paper="night"] { --tape-stripe: rgba(255, 255, 255, 0.1); }
 .sbtn.primary.waiting { opacity: 0.5; box-shadow: none; }
 /* A destructive primary (지우기, 모두 지우기, 바꾸기): clay instead of sage. */
 .sbtn.primary.clay { background: var(--clay); box-shadow: 0 2px 6px -2px rgba(150, 80, 50, 0.5); }

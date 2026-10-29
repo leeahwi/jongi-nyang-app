@@ -1,5 +1,6 @@
 import type { TodoItem } from "./notebook";
 import type { Lang } from "./lang";
+import { milestoneDays } from "./chatter";
 
 /** A finished task as kept in the record: one JSON line per task, one file per month. */
 export interface ArchiveEntry {
@@ -140,6 +141,18 @@ export function currentStreak(days: ReadonlyMap<string, unknown[]>, today: Date)
     cursor.setDate(cursor.getDate() - 1);
   }
   return streak;
+}
+
+/**
+ * The day a streak reaches 7, 30 or 100 days (#42): that count, for the cat's one cheer — undefined before today's first
+ * completion, for any other count, or once it was said today (`saidOn`, the day key it was said on). A streak that breaks
+ * says nothing.
+ */
+export function streakMilestone(days: ReadonlyMap<string, unknown[]>, today: Date, saidOn: string | undefined): number | undefined {
+  const key = dayKey(logicalDayStart(today));
+  if (!days.has(key) || saidOn === key) return undefined;
+  const streak = currentStreak(days, today);
+  return milestoneDays.includes(streak) ? streak : undefined;
 }
 
 export function longestStreak(days: ReadonlyMap<string, unknown[]>): number {

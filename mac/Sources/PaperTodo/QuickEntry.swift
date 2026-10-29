@@ -70,6 +70,8 @@ struct QuickEntryView: View {
     var previewToast: PaperToast?
     @State private var text: String
     @State private var picked = 0
+    /// 할 일 스페이스 (1.45): the line's space choice (⇧Tab with a `#`, or a click on the chip).
+    @State private var spacePick = 0
     @State private var toast: PaperToast?
     @State private var focus = 0
     @State private var focused = false
@@ -85,19 +87,31 @@ struct QuickEntryView: View {
 
     private var candidates: [Intent.Candidate] { model.intentCandidates(text) }
 
+    /// 빠른 입력 reads `#` but doesn't follow the note's lens (W15: it doesn't show the filtered list).
+    private var spaceReading: SpaceToken.Reading { model.spaceReading(text, lens: false) }
+
     var body: some View {
         let candidates = self.candidates
+        let reading = spaceReading
+        let index = min(picked, max(0, candidates.count - 1))
+        let spaceChoice = SpaceLine.choice(reading, pick: spacePick, candidates: candidates, index: index)
         PaperSlip(kind: .todo, width: SlipWidth.medium.rawValue) {
             VStack(alignment: .leading, spacing: 0) {
                 SlipHeader(kind: .todo, symbol: "checkmark", title: L("빠른 입력"), context: L("어디서든 ⌃⌥N"), onClose: onClose)
                 VStack(alignment: .leading, spacing: 8) {
                     if !candidates.isEmpty {
-                        IntentChips(candidates: candidates, picked: min(picked, candidates.count - 1)) { picked = $0 }
+                        IntentChips(candidates: candidates, picked: index, onPick: { picked = $0 },
+                                    space: spaceChoice.map { SpaceChoiceChip.make($0, model: model, cycles: SpaceLine.hintsCycling(reading)) },
+                                    onSpace: { spacePick = SpaceLine.next(spacePick, reading) })
                     }
                     IntentField(text: $text, placeholder: L("무엇이든 적어요"), font: model.notebookFont.handNSFont(28),
                                 focusRequest: focus,
                                 onFocus: { focused = $0 },
                                 onTab: { step in
+                                    if step < 0, SpaceLine.cycles(spaceReading) {
+                                        spacePick = SpaceLine.next(spacePick, spaceReading)
+                                        return true
+                                    }
                                     guard candidates.count > 1 else { return false }
                                     picked = (picked + step + candidates.count) % candidates.count
                                     return true
@@ -113,6 +127,10 @@ struct QuickEntryView: View {
                         }
                     if let problem = Intent.problem(text, language: .current) {
                         Text(problem.text(.current))
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundStyle(PaperTheme.clayText)
+                    } else if SpaceLine.needsTitle(reading) {
+                        Text(SpaceWords.needsTitle(.current))
                             .font(.system(size: 11.5, weight: .medium))
                             .foregroundStyle(PaperTheme.clayText)
                     }
@@ -142,7 +160,7 @@ struct QuickEntryView: View {
                 }
             }
         }
-        .onChange(of: text) { picked = 0 }
+        .onChange(of: text) { picked = 0; spacePick = 0 }
         .onAppear { focus += 1 }
     }
 
@@ -152,20 +170,23 @@ struct QuickEntryView: View {
         guard !trimmed.isEmpty else { return onClose() }
         var list = model.intentCandidates(trimmed)
         var index = min(picked, max(0, list.count - 1))
+        let reading = model.spaceReading(trimmed, lens: false)
+        var space = SpaceLine.pickedChoice(reading, pick: spacePick)
         if literal {
             list = [.todo(QuickParse(title: trimmed))]
             index = 0
+            space = reading.token == nil ? reading.choices.first : nil
         } else if asEvent {
             if let event = list.firstIndex(where: { $0.kind == .event }) {
                 index = event
             } else {
                 // ⌘Return still makes an event (at the next half hour), as before.
-                list = Intent.read("/일정 " + trimmed, now: Date(), language: .current) // ko-only: Korean words the parser reads
+                list = Intent.read("/일정 " + reading.text, now: Date(), language: .current) // ko-only: Korean words the parser reads
                 index = 0
             }
         }
         guard !list.isEmpty else { return }
-        guard let commit = model.commitIntent(text: trimmed, candidates: list, index: index, page: .todos) else {
+        guard let commit = model.commitIntent(text: trimmed, candidates: list, index: index, page: .todos, space: space) else {
             text = ""
             return onClose()
         }

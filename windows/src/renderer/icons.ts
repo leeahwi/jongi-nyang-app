@@ -100,7 +100,21 @@ export const iconPaths: Record<string, string> = {
   colorWheel: '<circle cx="12" cy="12" r="8.25"/><path d="M12 3.75v16.5M3.75 12h16.5"/>',
   panel: '<rect x="3" y="4.5" width="18" height="15" rx="2.25"/><path d="M15 4.5v15"/>',
   clearChecked: '<path d="M4 7.5l2.2 2.2L10 5.8M4 16.5l2.2 2.2 3.8-3.9M13.5 7.5h6.5M13.5 16.5h6.5"/>',
+  /** 할 일 스페이스 (1.30): a sheet whose lines carry a band at the left edge. */
+  spaces: '<rect x="4" y="9" width="16" height="12" rx="2.5"/><path d="M6.5 6h11M9 3h6"/>',
+  // #26: one meaning, one shape (docs/icons.md) — the cat is 종이냥 (the pet), the archive box 저장과 백업, a calendar
+  // with a clock 일정, the bubble with quotes the cat's 한마디.
+  cat: '<path d="M12 5c.67 0 1.35.09 2 .26 1.78-2 5.03-2.84 6.42-2.26 1.4.58-.42 7-.42 7 .57 1.07 1 2.24 1 3.44C21 17.9 16.97 21 12 21s-9-3-9-7.56c0-1.25.5-2.4 1-3.44 0 0-1.89-6.42-.5-7 1.39-.58 4.72.23 6.5 2.23A9.04 9.04 0 0 1 12 5Z"/><path d="M8 14v.5M16 14v.5"/><path d="M11.25 16.25h1.5L12 17z"/>',
+  archive: '<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/>',
+  calendarClock: '<path d="M20 11V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h5"/><path d="M4 10h16M9 3v4M15 3v4"/><circle cx="17" cy="17" r="4"/><path d="M17 15.3V17l1.1 1.1"/>',
+  quote: '<path d="M21 11.5a8.4 8.4 0 0 1-12.3 7.4L3 20.5l1.6-5A8.4 8.4 0 1 1 21 11.5z"/><path d="M8.6 13a1.6 1.6 0 0 0 1.6-1.6V9.5H8.6M13.4 13a1.6 1.6 0 0 0 1.6-1.6V9.5h-1.6"/>',
   drawer: '<rect x="4" y="9" width="16" height="11" rx="2"/><path d="M10 13.5h4"/><path d="M7 9V5.5A1.5 1.5 0 0 1 8.5 4h7A1.5 1.5 0 0 1 17 5.5V9"/>',
+  /** 메모 서랍의 바탕 (#26): a sheet over a dashed one, as the Mac's square.on.square.dashed. */
+  backdrop: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 5V4.5A.5.5 0 0 0 15.5 4h-1M11 4H9M5.5 4h-1a.5.5 0 0 0-.5.5v1M4 9v2M4 14.5v1a.5.5 0 0 0 .5.5H5"/>',
+  // 꾸미기 ‘종이 색’ on 자동: half day, half night (the Mac's circle.lefthalf.filled).
+  contrast: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 0 0 17z" fill="currentColor" stroke="none"/>',
+  // 메모 서랍 칸 ‘폭’: two arrows apart (the Mac's arrow.left.and.right).
+  width: '<path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4"/>',
 };
 
 const madeIcons = new Map<string, SVGSVGElement>();

@@ -57,7 +57,7 @@ private enum DayStripTests {
             try equal(s.minutes, 40, "minutes left"); try expect(abs(s.progress - 1.0 / 3) < 0.0001, "progress \(s.progress)")
             try equal(titles(s.rows), ["보고서 마무리", "치과"], "rows")
             try equal(languages.map { DayStrip.ringText(minutes: s.minutes, mode: s.mode, language: $0).value }, ["40", "40", "40"], "ring value")
-            try equal(languages.map { DayStrip.ringText(minutes: s.minutes, mode: s.mode, language: $0).caption }, ["분 남음", "min left", "min over"], "ring caption")
+            try equal(languages.map { DayStrip.ringText(minutes: s.minutes, mode: s.mode, language: $0).caption }, ["분 남음", "min left", "min te gaan"], "ring caption")
             try equal(languages.map { DayStrip.kicker(mode: s.mode, item: s.lead!, language: $0, calendar: seoul) },
                       ["지금 · 13:00–14:00", "Now · 1:00–2:00 PM", "Nu · 13:00–14:00"], "kicker")
             try equal(languages.map { DayStrip.kicker(mode: s.mode, item: s.lead!, language: $0, short: true, calendar: seoul) },
@@ -68,6 +68,21 @@ private enum DayStripTests {
                       ["지금 팀 회의, 40분 남음. 다음 14:00 보고서 마무리, 15:30 치과",
                        "Now 팀 회의, 40 min left. Next 2:00 PM 보고서 마무리, 3:30 PM 치과",
                        "Nu 팀 회의, nog 40 min. Volgende 14:00 보고서 마무리, 15:30 치과"], "sentence")
+        }
+        try test("R8 the list's marks (#31): the to-dos the strip shows") {
+            let marked = { (now: Date, list: [TodoItem]) -> [String: DayStrip.Mode] in
+                let marks = DayStrip.marks(state(now, tasks: list))
+                return Dictionary(uniqueKeysWithValues: list.compactMap { item in marks[item.id.uuidString].map { (item.title, $0) } })
+            }
+            // #47: only 지금 — the to-dos up next sit under the list's own 다음 heading.
+            try equal(marked(at(14, 20), tasks), ["보고서 마무리": .now], "a to-do on now; the reminder under it gets none")
+            try equal(marked(at(13, 20), tasks), [:], "an event on now: no to-do marked")
+            try equal(marked(at(12, 40), tasks), [:], "nothing on: the lead up next gets none")
+            var done = tasks
+            done[0].isCompleted = true
+            try equal(marked(at(14, 20), done), [:], "done: no mark")
+            try equal(languages.map { DayStrip.markWord(.now, language: $0) }, ["지금", "Now", "Nu"], "now word")
+            try equal(languages.map { DayStrip.markWord(.next, language: $0) }, ["다음", "Next", "Volgende"], "next word")
         }
         try test("R2 three rows: a reminder counts as an item") {
             let s = state(at(13, 20), rows: 3)
@@ -93,8 +108,20 @@ private enum DayStripTests {
             var s = state(at(10, 30))
             try equal(s.mode, .next, "mode"); try equal(s.minutes, 150, "minutes"); try equal(s.progress, 0, "no arc over an hour away")
             try equal(DayStrip.isSoon(s.minutes), false, "ink2")
-            try equal(languages.map { DayStrip.ringText(minutes: 150, mode: .next, language: $0).value }, ["2:30", "2:30", "2:30"], "value")
+            // 1.45: never a clock-like "2:30" — the rows' rule, the nearest whole hour from two hours away ("3시간 뒤").
+            try equal(languages.map { DayStrip.ringText(minutes: 150, mode: .next, language: $0).value }, ["3시간", "3 h", "3 u"], "value")
             try equal(languages.map { DayStrip.ringText(minutes: 150, mode: .next, language: $0).caption }, ["뒤", "away", "te gaan"], "caption")
+            try equal(DayStrip.awayText(150, language: .ko), "3시간 뒤", "the same as a row's when")
+            try equal(languages.map { DayStrip.ringText(minutes: 61, mode: .next, language: $0).value }, ["1시간", "1 h", "1 u"], "61 value")
+            try equal(languages.map { DayStrip.ringText(minutes: 61, mode: .next, language: $0).caption }, ["1분 뒤", "1 min away", "en 1 min"], "61 caption")
+            try equal(DayStrip.awayText(61, language: .ko), "1시간 1분 뒤", "61 as a row")
+            try equal(languages.map { DayStrip.ringText(minutes: 120, mode: .next, language: $0).caption }, ["뒤", "away", "te gaan"], "120 caption")
+            for minutes in [60, 61, 99, 150, 600, 1439] {
+                for language in languages {
+                    let text = DayStrip.ringText(minutes: minutes, mode: .next, language: language)
+                    try expect(!text.value.contains(":") && !text.caption.contains(":"), "no h:mm at \(minutes) (\(language))")
+                }
+            }
             s = state(at(20, 30))
             try equal(s.mode, .nothing, "nothing left"); try equal(s.lead == nil && s.rows.isEmpty, true, "empty")
             try equal(languages.map { DayStrip.sentence(s, language: $0, calendar: seoul) }, ["오늘 남은 일정이 없어요", "Nothing else today", "Verder niets vandaag"], "sentence")
@@ -139,9 +166,11 @@ private enum DayStripTests {
         try test("R10 an hour or more") {
             let s = state(at(12, 40), events: [event("긴 회의", (12, 0), (14, 0))], tasks: [])
             try equal(s.minutes, 80, "80")
-            try equal(languages.map { DayStrip.ringText(minutes: 80, mode: .now, language: $0).value }, ["1:20", "1:20", "1:20"], "value")
-            try equal(languages.map { DayStrip.ringText(minutes: 80, mode: .now, language: $0).caption }, ["남음", "left", "over"], "caption")
-            try equal(languages.map { DayStrip.ringText(minutes: 60, mode: .now, language: $0).value }, ["1:00", "1:00", "1:00"], "60")
+            try equal(languages.map { DayStrip.ringText(minutes: 80, mode: .now, language: $0).value }, ["1시간", "1 h", "1 u"], "value")
+            try equal(languages.map { DayStrip.ringText(minutes: 80, mode: .now, language: $0).caption }, ["20분 남음", "20 min left", "en 20 min"], "caption")
+            try equal(languages.map { DayStrip.ringText(minutes: 60, mode: .now, language: $0).value }, ["1시간", "1 h", "1 u"], "60")
+            try equal(languages.map { DayStrip.ringText(minutes: 60, mode: .now, language: $0).caption }, ["남음", "left", "te gaan"], "60 caption")
+            try equal(DayStrip.ringText(minutes: 150, mode: .now, language: .ko).caption, "30분 남음", "time left stays exact")
             try equal(languages.map { DayStrip.ringText(minutes: 59, mode: .now, language: $0).value }, ["59", "59", "59"], "59")
             try equal(languages.map { DayStrip.leftText(80, language: $0) }, ["1시간 20분 남음", "1 h 20 min left", "nog 1 u 20 min"], "said")
             try equal(languages.map { DayStrip.leftText(60, language: $0) }, ["1시간 남음", "1 h left", "nog 1 u"], "said 60")

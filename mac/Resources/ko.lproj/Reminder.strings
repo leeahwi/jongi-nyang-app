@@ -1,2 +1,4 @@
 /* Korean: the key is the text. Here so the table isn’t looked up in another language. */
 "내일로" = "내일로";
+/* The task editor's space field (1.45): one space. */
+"스페이스" = "스페이스";

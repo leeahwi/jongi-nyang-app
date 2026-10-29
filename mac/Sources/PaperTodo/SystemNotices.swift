@@ -4,7 +4,7 @@ import UserNotifications
 
 /// 시스템 알림으로도 보내기 (1.38): besides the cat's own bubble, a macOS notification — always, or only for
 /// what may be missed (놓친 것만: the screen is locked, the cat and the note are both out of sight, or another
-/// app is full screen). Task reminders get `끝냄` · `10분 뒤`, alarms `끄기` · `다시 알림`; a click opens the
+/// app is full screen). Task reminders get `끝내기` · `10분 뒤`, alarms `끄기` · `다시 알림`; a click opens the
 /// note (an alarm: its ring slip). Permission is asked the first time one is needed.
 @MainActor
 final class SystemNoticeController: NSObject, UNUserNotificationCenterDelegate {
@@ -37,7 +37,7 @@ final class SystemNoticeController: NSObject, UNUserNotificationCenterDelegate {
         distributed.addObserver(self, selector: #selector(unlocked), name: .init("com.apple.screenIsUnlocked"), object: nil)
         guard let center else { return }
         center.delegate = self
-        let done = UNNotificationAction(identifier: "done", title: L("끝냄"))
+        let done = UNNotificationAction(identifier: "done", title: L("끝내기"))
         let later = UNNotificationAction(identifier: "later", title: L("10분 뒤"))
         let stop = UNNotificationAction(identifier: "stop", title: L("끄기"))
         let again = UNNotificationAction(identifier: "again", title: L("다시 알림"))

@@ -37,7 +37,9 @@ const line = new InputLine({
   variant: "note",
   placeholder: () => ({ long: t("무엇이든 적어요"), short: t("무엇이든 적어요") }),
   prefer: () => state?.prefs.intentPrefer ?? {},
-  commit: async (candidate, candidates, text) => Boolean((await commitReading(flow, candidate, candidates, text, "glance")).made),
+  // 할 일 스페이스: `#회사` puts the to-do there (the 오늘 창 shows no bands yet: stage 2).
+  spaces: () => (state ? { data: state.todoSpaces } : undefined),
+  commit: async (candidate, candidates, text, space) => Boolean((await commitReading(flow, candidate, candidates, text, "glance", space)).made),
   onEscape: (event) => { event.preventDefault(); if (line.value) line.clear(); else close(); },
 });
 const links = h("div", { class: "g-links" });
@@ -77,7 +79,11 @@ function timerNow(): GlanceTimer | undefined {
 
 function cardElement(entry: GlanceCard): HTMLElement {
   const element = h("div", { class: `c3 ${entry.kind}${entry.hot ? " hot" : ""}${entry.empty ? " empty" : ""}` },
-    h("small", {}, entry.label), h("b", {}, entry.big), h("span", { class: "c3-small", title: entry.small }, entry.small));
+    h("small", {}, entry.label),
+    // The timer's length with a small "남음" after it (#46).
+    h("b", {}, entry.unit && entry.unitFirst ? h("span", { class: "c3-unit" }, `${entry.unit} `) : null, h("span", { class: "c3-big" }, entry.big),
+      entry.unit && !entry.unitFirst ? h("span", { class: "c3-unit" }, ` ${entry.unit}`) : null),
+    h("span", { class: "c3-small", title: entry.small }, entry.small));
   if (entry.kind === "timer" && !entry.empty) {
     // Pause (or go on) and stop, over the card's corner.
     const paused = Boolean(state?.timer && state.timer.endsAt === undefined);
@@ -99,7 +105,8 @@ function cardElement(entry: GlanceCard): HTMLElement {
     element.classList.add("link");
     element.tabIndex = 0;
     element.setAttribute("role", "button");
-    element.setAttribute("aria-label", `${entry.label}: ${entry.big === "—" ? "" : `${entry.big} `}${entry.small}`);
+    const value = entry.unit ? (entry.unitFirst ? `${entry.unit} ${entry.big}` : `${entry.big} ${entry.unit}`) : entry.big;
+    element.setAttribute("aria-label", `${entry.label}: ${entry.big === "—" ? "" : `${value} `}${entry.small}`);
     element.addEventListener("click", (event) => { if (!(event.target as HTMLElement).closest(".c3-tool")) action(); });
     element.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); action(); } });
   }
@@ -151,6 +158,7 @@ function render(): void {
   const start = logicalDayStart(now);
   const events = expand(state.events ?? [], start, new Date(start.getTime() + 8 * 86_400_000), lang());
   cards.replaceChildren(...glanceCards(events, timerNow(), state.alarms ?? [], new Set(state.prefs.alarmHandled ?? []), now, lang()).map(cardElement));
+  fitTimerWord();
 
   // Today's tasks: just-checked ones keep their place for a moment.
   const today = state.items.filter((item) => pageOf(item, now) === "today");
@@ -177,19 +185,28 @@ function render(): void {
   links.replaceChildren(
     link(t("노트 열기"), "note", () => { void api.act({ type: "openNote" }); close(); }),
     link(t("책상"), "desk", () => { void api.act({ type: "openCalendar" }); close(); }),
-    link(state.prefs.petVisible ? t("종이냥 숨기기") : t("종이냥 보이기"), "paw", () => api.act({ type: "setPref", key: "petVisible", value: !state!.prefs.petVisible })),
+    link(state.prefs.petVisible ? t("종이냥 숨기기") : t("종이냥 보이기"), "cat", () => api.act({ type: "setPref", key: "petVisible", value: !state!.prefs.petVisible })),
   );
   report();
+}
+
+/** The timer's small word ("남음", "nog") steps aside when the card is too narrow for it: the time never gets "…". */
+function fitTimerWord(): void {
+  const value = cards.querySelector<HTMLElement>(".c3.timer b");
+  const word = value?.querySelector<HTMLElement>(".c3-unit");
+  if (!value || !word) return;
+  word.hidden = false;
+  if (value.scrollWidth > value.clientWidth + 1) word.hidden = true;
 }
 
 /** The cards count down while the window is up. */
 setInterval(() => {
   if (document.visibilityState !== "visible" || !state) return;
   const timer = timerNow();
-  const shownTimer = cards.querySelector(".c3.timer b");
+  const shownTimer = cards.querySelector(".c3.timer .c3-big");
   if (timer && shownTimer) {
     const next = glanceCards([], timer, [], new Set(), new Date(), lang())[1].big;
-    if (shownTimer.textContent !== next) shownTimer.textContent = next;
+    if (shownTimer.textContent !== next) { shownTimer.textContent = next; fitTimerWord(); }
   }
 }, 1000);
 setInterval(() => { if (document.visibilityState === "visible") render(); }, 30_000);

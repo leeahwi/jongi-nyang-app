@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { isBackupName, mergeFiles, parseBackup, makeBackup, readable, replaceFiles, summary, summaryText } from "../src/core/backup";
 import {
-  appendFocus, focusByTask, focusLine, focusRecord, focusSummary, focusTotal, focusTotals, mergeFocus, parseFocus, type FocusRecord,
+  appendFocus, focusByTask, focusLine, focusNextLine, focusRecord, focusSummary, focusTotal, focusTotals, mergeFocus, parseFocus, type FocusRecord,
 } from "../src/core/focus";
 import { glanceCards, glanceText, type GlanceTimer } from "../src/core/glance";
 import { isoDate } from "../src/core/notebook";
@@ -158,13 +158,20 @@ test("FB5 storage: a move to another folder adds the sessions it lacks, by id", 
 test("focus in the tray's words and the timer card", () => {
   const now = new Date(2026, 9, 8, 14, 50);
   const focusing: GlanceTimer = { remainingMs: 12 * 60_000 + 30_000, paused: false, caption: "집중", countdown: true, focus: "보고서 마무리" };
-  assert.equal(glanceText([], [], focusing, now, "ko"), "● 12:30");
-  assert.equal(glanceText([], [], { ...focusing, focus: undefined }, now, "ko"), "12:30");
+  assert.equal(glanceText([], [], focusing, now, "ko"), "● 13분 남음");
+  assert.equal(glanceText([], [], { ...focusing, focus: undefined }, now, "ko"), "13분 남음");
   assert.equal(glanceText([], [], { ...focusing, paused: true }, now, "ko"), undefined);
   const card = (timer: GlanceTimer, lang: Lang) => glanceCards([], timer, [], new Set(), now, lang)[1];
   assert.equal(card(focusing, "ko").small, "보고서 마무리");
-  assert.equal(card(focusing, "ko").big, "12:30");
+  assert.equal(card(focusing, "ko").big, "13분");
   assert.equal(card({ ...focusing, paused: true }, "ko").small, "멈춤 · 보고서 마무리");
   assert.equal(card({ ...focusing, paused: true }, "en").small, "Paused · 보고서 마무리");
   assert.equal(card({ ...focusing, paused: true }, "nl").small, "Gepauzeerd · 보고서 마무리");
+});
+
+test("the focus card's next line: how long first, the clock time last (#46)", () => {
+  assert.deepEqual((["ko", "en", "nl"] as const).map((lang, index) => focusNextLine(["치과", "Dentist", "Tandarts"][index], ["15:30", "3:30 PM", "15:30"][index], 40, lang)),
+    ["40분 뒤 치과 · 15:30", "Dentist in 40 min · 3:30 PM", "Tandarts over 40 min · 15:30"]);
+  assert.deepEqual((["ko", "en", "nl"] as const).map((lang) => focusNextLine("x", "16:10", 80, lang)),
+    ["1시간 20분 뒤 x · 16:10", "x in 1 h 20 min · 16:10", "x over 1 u 20 min · 16:10"]);
 });

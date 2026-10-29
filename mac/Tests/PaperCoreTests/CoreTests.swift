@@ -248,6 +248,24 @@ private enum CoreTests {
             try expect([0, 1, 2, 3, 4, 5, 6, 40].map(Archive.heatLevel) == [0, 1, 2, 2, 3, 3, 4, 4], "Heat levels")
         }
 
+        try test("a streak of 7, 30 or 100 days: the cat cheers once that day, and says nothing when it breaks (#42)") {
+            func streak(_ count: Int, endingOn last: Date) -> Set<String> {
+                var keys = Set<String>()
+                for back in 0..<count { keys.insert(Archive.dayKey(seoul.date(byAdding: .day, value: -back, to: last)!, calendar: seoul)) }
+                return keys
+            }
+            try expect(Archive.streakMilestone(streak(7, endingOn: local(10, 28)), today: local(10, 28, 20), saidOn: nil, calendar: seoul) == 7, "Day 7")
+            try expect(Archive.streakMilestone(streak(30, endingOn: local(10, 28)), today: local(10, 28, 20), saidOn: nil, calendar: seoul) == 30, "Day 30")
+            try expect(Archive.streakMilestone(streak(7, endingOn: local(10, 28)), today: local(10, 28, 20), saidOn: "2026-10-28", calendar: seoul) == nil, "Once a day")
+            try expect(Archive.streakMilestone(streak(8, endingOn: local(10, 28)), today: local(10, 28, 20), saidOn: nil, calendar: seoul) == nil, "Day 8: nothing")
+            try expect(Archive.streakMilestone(streak(7, endingOn: local(10, 27)), today: local(10, 28, 20), saidOn: nil, calendar: seoul) == nil, "Before today's first check: nothing")
+            try expect(Archive.streakMilestone([], today: local(10, 28, 20), saidOn: nil, calendar: seoul) == nil, "A broken streak says nothing")
+            try expect(PetChatter.milestone(30)?.text == "30일째예요. 한 달을 꼬박 채웠어요!" && PetChatter.milestone(100, language: .en)?.text == "Day 100. That’s amazing!"
+                       && PetChatter.milestone(12) == nil, "Cheers")
+            let cheer = PetChatter.pick(PetChatter.Context(hour: 15, open: 1, done: 1, milestone: 7), questions: true, recent: [], random: { 0.5 })
+            try expect(cheer.id == "m.0" && cheer.text == "7일째예요. 한 주를 꼬박 채웠어요!", "The cheer comes first: \(cheer.id)")
+        }
+
         func dayStart(_ month: Int, _ day: Int) -> Date { local(month, day, 4) }
 
         try test("repeat rules: daily, weekdays, chosen days, monthly clamped to short months") {
@@ -851,6 +869,23 @@ private enum CoreTests {
             try expect(AppLanguage.allCases.map { $0.spokenTime(hour: 9, minute: 30) } == ["오전 9:30", "9:30 AM", "09:30"], "spoken time")
             try expect(AppLanguage.en.timeRange(from: (15, 0), to: (16, 0)) == "3:00–4:00 PM" && AppLanguage.en.timeRange(from: (11, 30), to: (12, 30)) == "11:30 AM–12:30 PM"
                        && AppLanguage.nl.timeRange(from: (11, 30), to: (12, 30)) == "11:30–12:30", "time range")
+            // The system's clock (the app sets it at launch): every time on one clock, a sentence's too.
+            defer { AppLanguage.hourCycle = nil }
+            AppLanguage.hourCycle = .h24
+            try expect(AppLanguage.allCases.map { $0.clock(hour: 15, minute: 0) } == ["15:00", "15:00", "15:00"], "24-hour clock")
+            try expect(AppLanguage.allCases.map { $0.spokenTime(hour: 9, minute: 30) } == ["09:30", "09:30", "09:30"], "24-hour spoken time")
+            try expect(AppLanguage.allCases.map { $0.timeRange(from: (11, 30), to: (12, 30)) } == ["11:30–12:30", "11:30–12:30", "11:30–12:30"], "24-hour range")
+            try expect(AppLanguage.allCases.map { DayRibbon.hourLabel(13, language: $0) } == ["13", "13", "13"], "24-hour hour label")
+            AppLanguage.hourCycle = .h12
+            try expect(AppLanguage.allCases.map { $0.clock(hour: 15, minute: 0) } == ["오후 3:00", "3:00 PM", "3:00 p.m."], "12-hour clock")
+            try expect(AppLanguage.allCases.map { $0.spokenTime(hour: 9, minute: 30) } == ["오전 9:30", "9:30 AM", "9:30 a.m."], "12-hour spoken time")
+            try expect(AppLanguage.allCases.map { $0.clock(hour: 0, minute: 5) } == ["오전 12:05", "12:05 AM", "12:05 a.m."], "12-hour midnight")
+            try expect(AppLanguage.allCases.map { $0.timeRange(from: (15, 0), to: (16, 0)) } == ["오후 3:00–4:00", "3:00–4:00 PM", "3:00–4:00 p.m."], "12-hour range, one half")
+            try expect(AppLanguage.allCases.map { $0.timeRange(from: (11, 30), to: (12, 30)) } == ["오전 11:30–오후 12:30", "11:30 AM–12:30 PM", "11:30 a.m.–12:30 p.m."], "12-hour range, both halves")
+            try expect(AppLanguage.allCases.map { DayRibbon.hourLabel(13, language: $0) } == ["오후 1", "1 PM", "1 p.m."], "12-hour hour label")
+            AppLanguage.hourCycle = nil
+            try expect(AppLanguage.HourCycle.system(locale: Locale(identifier: "en_US")) == .h12 && AppLanguage.HourCycle.system(locale: Locale(identifier: "nl_NL")) == .h24
+                       && AppLanguage.HourCycle.system(locale: Locale(identifier: "en_US@hours=h23")) == .h24, "the system's clock from the locale")
             try expect(AppLanguage.allCases.map { $0.minutesAway(5) } == ["5분 뒤", "in 5 min", "over 5 min"], "minutes away")
             try expect(AppLanguage.allCases.map { "\($0.days(1)) \($0.days(3)) \($0.todos(1)) \($0.todos(2))" }
                        == ["1일 3일 할 일 1개 할 일 2개", "1 day 3 days 1 to-do 2 to-dos", "1 dag 3 dagen 1 taak 2 taken"], "counts")
@@ -1147,6 +1182,28 @@ private enum CoreTests {
                 let got = BubbleText.wrap(text, language: language)
                 try expect(got == wrapped, "wrap(\(text.debugDescription), \(language)) gave \(got.debugDescription)")
             }
+        }
+
+        try test("FolderPlace: a folder said as Finder's path bar says it (1.45, the Windows app's folderPlace too)") {
+            let home = "/Users/sample"
+            let base = FolderPlace.of(home + "/Library/Application Support/com.noa.PaperTodo", home: home)
+            try expect(base == FolderPlace(lead: ["~", "Library", "Application Support"], name: "com.noa.PaperTodo"), "default \(base)")
+            try expect(base.text == "~ › Library › Application Support › com.noa.PaperTodo", base.text)
+            try expect(FolderPlace.of(home + "/Library/Application Support/com.noa.PaperTodo/archive", home: home).name == "archive", "archive")
+            let icloud = FolderPlace.of(home + "/Library/Mobile Documents/com~apple~CloudDocs/종이냥", home: home)
+            try expect(icloud == FolderPlace(lead: ["iCloud Drive"], name: "종이냥", cloud: "iCloud Drive"), "iCloud \(icloud)")
+            try expect(icloud.text == "iCloud Drive › 종이냥", icloud.text)
+            let deep = FolderPlace.of(home + "/Library/Mobile Documents/com~apple~CloudDocs/집/종이냥/archive", home: home)
+            try expect(deep.lead == ["iCloud Drive", "집", "종이냥"] && deep.name == "archive", "deep \(deep)")
+            try expect(FolderPlace.of(home + "/Library/CloudStorage/OneDrive-Personal/종이냥", home: home).text == "OneDrive › 종이냥", "OneDrive")
+            try expect(FolderPlace.of(home + "/Library/CloudStorage/Dropbox/종이냥", home: home).text == "Dropbox › 종이냥", "Dropbox")
+            try expect(FolderPlace.of(home + "/Library/CloudStorage/GoogleDrive-sample@example.com/My Drive/종이냥", home: home).text == "Google Drive › My Drive › 종이냥", "Google Drive")
+            try expect(FolderPlace.of(home + "/Dropbox/종이냥", home: home).cloud == "Dropbox", "old Dropbox")
+            try expect(FolderPlace.of(home + "/Library/Mobile Documents/com~apple~CloudDocs", home: home) == FolderPlace(lead: [], name: "iCloud Drive", cloud: "iCloud Drive"), "the drive itself")
+            try expect(FolderPlace.of(home + "/Documents/종이냥", home: home).text == "~ › Documents › 종이냥", "documents")
+            try expect(FolderPlace.of(home, home: home).text == "~", "home")
+            try expect(FolderPlace.of("/Volumes/공유/종이냥", home: home).text == "Volumes › 공유 › 종이냥", "outside home")
+            try expect(FolderPlace.of("/Users/sampler/종이냥", home: home).lead.first == "Users", "a name that only starts like home's")
         }
 
         print("\n\(count) checks passed.")

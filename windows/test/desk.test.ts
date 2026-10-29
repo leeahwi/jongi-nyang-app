@@ -5,9 +5,10 @@ import {
   settingsTabs, shortcutForPane, stepPane, themeSource,
 } from "../src/core/desk";
 
-test("desk: the sidebar's order — 보기 · 설정 · 도움, twelve panes (AI 연결 since 1.27, 메모 서랍 since 1.28)", () => {
+test("desk: the sidebar's order — 보기 · 설정 · 도움, thirteen panes (AI 연결 since 1.27, 메모 서랍 since 1.28, 스페이스 after it since 1.30)", () => {
   assert.deepEqual(deskSections.map((entry) => entry.section), ["view", "settings", "help"]);
-  assert.deepEqual(deskPanes, ["calendar", "history", "clock", "appearance", "notifications", "repeat", "pet", "events", "storage", "drawer", "ai", "help"]);
+  assert.deepEqual(deskPanes, ["calendar", "history", "clock", "appearance", "notifications", "repeat", "pet", "events", "storage", "drawer", "spaces", "ai", "help"]);
+  assert.equal(shortcutForPane("spaces"), undefined); // no digit, as AI 연결
 });
 
 test("desk: Ctrl+1…9 go down the sidebar; 도움말 has none (F1)", () => {
@@ -31,7 +32,8 @@ test("desk: ↑ ↓ step through the panes and stop at the ends", () => {
   assert.equal(stepPane("help", 1), "help");
   assert.equal(stepPane("help", -1), "ai");
   assert.equal(stepPane("storage", 1), "drawer");
-  assert.equal(stepPane("drawer", 1), "ai");
+  assert.equal(stepPane("drawer", 1), "spaces");
+  assert.equal(stepPane("spaces", 1), "ai");
 });
 
 test("desk: the settings panes share one page; the old tab names still open the right pane", () => {

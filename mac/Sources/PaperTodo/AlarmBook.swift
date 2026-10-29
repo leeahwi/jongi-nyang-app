@@ -86,6 +86,14 @@ final class AlarmBook: ObservableObject {
         save()
     }
 
+    /// 되돌리기 after 지우기: the alarm as it was (unless it is back already).
+    func restore(_ alarm: Alarm) {
+        reloadIfChanged()
+        guard !alarms.contains(where: { $0.id == alarm.id }) else { return }
+        alarms.append(alarm)
+        save()
+    }
+
     /// A ring this Mac has shown (or skipped): it doesn't ring again here.
     func markHandled(_ key: String, now: Date = Date()) {
         var kept = Alarm.recentHandled(handled, now: now)
@@ -115,7 +123,7 @@ final class AlarmBook: ObservableObject {
             problem = nil
         } catch {
             // Never saved over: the file stays for the person (or another device) to fix.
-            problem = L("알람 파일을 읽지 못했어요.") + "\n\(url.path)"
+            problem = L("알람 파일을 읽지 못했어요.") + " " + L("원래 파일은 덮어쓰지 않고 그대로 둬요.") + " " + L("저장 폴더가 열리는지 확인해 주세요.")
         }
     }
 
@@ -137,7 +145,8 @@ final class AlarmBook: ObservableObject {
             try data.write(to: url, options: .atomic)
             known = data
         } catch {
-            problem = L("알람을 저장하지 못했어요.") + "\n\(url.path)"
+            // Not tried again until the file reads again (save() waits for problem == nil).
+            problem = AppModel.saveProblem(L("알람을 저장하지 못했어요."), retries: false)
         }
     }
 

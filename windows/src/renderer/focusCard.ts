@@ -19,7 +19,7 @@ const ringLength = 2 * Math.PI * ringRadius;
 export interface FocusCardHost {
   /** Today's tasks (the 오늘 sheet's), for the folded list. */
   todayItems(): TodoItem[];
-  /** "15:30 치과 (40분 뒤)": the day ribbon's next thing, or undefined. */
+  /** "40분 뒤 치과 · 15:30": the day ribbon's next thing (`focusNextLine`), or undefined. */
   next(): string | undefined;
   /** The note's other cards and editors close when the card comes. */
   closeOthers(): void;
@@ -181,7 +181,7 @@ export class FocusCard {
     if (this.task.textContent !== view.title) this.task.textContent = view.title;
     this.task.title = view.title;
     const next = this.host.next();
-    this.nextLine.textContent = next ? `${t("다음")} · ${next}` : "";
+    this.nextLine.textContent = next ?? "";
     this.nextLine.hidden = !next;
 
     // The buttons for the stage (rebuilt only when it changes, so the focus stays on a button).

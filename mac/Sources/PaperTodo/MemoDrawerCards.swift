@@ -3,8 +3,8 @@ import PaperCore
 import SwiftUI
 
 // 메모 서랍's cards (1.44, design ③ 날짜 묶음 + 카드): every card the same places — the title (the short time or the
-// paw at its right), one preview line, and a kind row when a link, a phone number or a checklist is found (a chip at
-// the left, the time at the right). A piece of tape on every card. Opened in place: its text, then the bar —
+// paw at its right), up to three preview lines (#14: a checklist's first three items; dense two), and a kind row when
+// a link, a phone number or a checklist is found (a chip at the left, the time at the right). A piece of tape on every card. Opened in place: its text, then the bar —
 // [크게 보기 · 복사 · ⚙] · `5:38 고침` · [폴더로 옮기기 · 지우기].
 
 /// One memo in the list: collapsed (a card) or open in place.
@@ -27,7 +27,7 @@ struct MemoCard: View {
     private var sheet: DrawerPalette { drawer.folders.paper(of: memo.id).map { DrawerPalette.of(DrawerPalette.Kind(rawValue: $0.rawValue)!) } ?? palette }
 
     var body: some View {
-        let sheet = sheet
+        let sheet = sheet, dense = drawer.dense
         VStack(alignment: .leading, spacing: 0) {
             if expanded {
                 OpenMemo(drawer: drawer, memo: memo, palette: sheet, font: font)
@@ -37,8 +37,8 @@ struct MemoCard: View {
         }
         .modifier(MemoSlipStyle(palette: sheet, drawer: palette,
                                 state: .init(open: expanded, selected: selected, folder: folderColor,
-                                             minHeight: expanded ? 0 : (drawer.dense ? MemoSlipStyle.denseHeight : MemoSlipStyle.cardHeight),
-                                             floating: drawer.shownBackdrop == .none, dense: drawer.dense && !expanded)))
+                                             minHeight: expanded ? 0 : (dense ? MemoSlipStyle.denseHeight : MemoSlipStyle.cardHeight),
+                                             floating: drawer.shownBackdrop == .none, dense: dense && !expanded)))
         .overlay(alignment: .top) { CardTape(id: memo.id, color: palette.tab(folderColor).tape) }
         .overlay {
             // A right-click: the memo's menu (while typing, the text's own menu with `이 메모` added).
@@ -55,7 +55,7 @@ struct MemoCard: View {
         }
         .onHover { hovering = $0 }
         .onTapGesture { if !expanded { drawer.expand(memo.id) } }
-        .draggableIf(!expanded, "memo:" + memo.id) { DragCard(title: MemoCards.title(memo.text, language: .current), palette: sheet, font: font) }
+        .draggableIf(!expanded, "memo:" + memo.id) { DragCard(title: drawer.cardTitle(memo), palette: sheet, font: font) }
         .accessibilityElement(children: expanded ? .contain : .combine)
         .accessibilityAddTraits(expanded ? [] : .isButton)
         .accessibilityAction { drawer.expand(memo.id) }
@@ -63,19 +63,16 @@ struct MemoCard: View {
 
     @ViewBuilder private func closed(_ sheet: DrawerPalette) -> some View {
         let card = drawer.card(memo)
-        let title = card.title, preview = card.preview, kind = card.kind
+        let title = card.title, kind = card.kind
+        let limit = drawer.dense ? 2 : 3
         let time = MemoCards.shortTime(drawer.sortDate(memo), in: group, now: drawer.now(), language: .current)
         let paw = pinned && group == .pinned
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(title.handwritten)
-                    .font(font.handFont(MemoDrawerView.hand(20)))
-                    .foregroundStyle(sheet.ink)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                CardTitle(words: Text(verbatim: title.handwritten), font: font, color: sheet.ink)
                 Spacer(minLength: 4)
                 if paw {
-                    Image(systemName: "pawprint.fill")
+                    Image(systemName: "pin.fill")
                         .font(.system(size: 10))
                         .foregroundStyle(sheet.paw)
                         .accessibilityLabel(L("고정"))
@@ -83,19 +80,89 @@ struct MemoCard: View {
                 if kind == nil { TimeText(text: time, palette: sheet) }
             }
             .frame(height: MemoSlipStyle.titleRow)
-            if let preview {
-                Text(verbatim: Checklist.isCode(preview) ? preview : preview.keepingParticles)
-                    .font(Checklist.isCode(preview) ? .system(size: 11.5, design: .monospaced) : .system(size: MemoSlipStyle.bodySize))
-                    .foregroundStyle(sheet.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .frame(height: MemoSlipStyle.line)
+            if !card.rows.isEmpty {
+                PreviewRows(rows: card.rows, limit: limit, palette: sheet)
             }
             if let kind {
                 KindRow(drawer: drawer, kind: kind, time: time, palette: sheet)
-                    .frame(height: MemoSlipStyle.line)
+                    .frame(height: MemoSlipStyle.kindRow)
             }
         }
+    }
+}
+
+/// A handwritten title (#14, option B): 22 pt, the strokes a hair heavier — the same words drawn again 0.25 pt to the
+/// right, which darkens them as much as the open memo's 0.7 pt text stroke (DrawerTextView) and about as the Windows
+/// app's 0.35 px one; the clean face is already medium and stays as it is.
+struct CardTitle: View {
+    let words: Text
+    let font: NotebookFont
+    let color: Color
+    var size: CGFloat = 22
+
+    var body: some View {
+        let words = words.font(font.handFont(MemoDrawerView.hand(size)))
+        words
+            .foregroundStyle(color)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .overlay(alignment: .leading) {
+                if font != .clean {
+                    words.foregroundStyle(color).lineLimit(1).truncationMode(.tail).offset(x: 0.25).accessibilityHidden(true)
+                }
+            }
+    }
+}
+
+/// A card's lines under its title (#14): a memo's words wrapped into at most `limit` lines with … at the end of the
+/// last, or a checklist's first items one per line with small boxes. Only the lines there are (no empty ones).
+struct PreviewRows: View {
+    let rows: [MemoCards.PreviewRow]
+    let limit: Int
+    let palette: DrawerPalette
+
+    var body: some View {
+        if rows.first?.checked != nil {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(rows.prefix(limit).enumerated()), id: \.offset) { _, row in
+                    let done = row.checked == true
+                    HStack(spacing: 6) {
+                        CheckBox(checked: done, palette: palette, size: 11)
+                        Text(verbatim: row.text.keepingParticles)
+                            .font(.system(size: MemoSlipStyle.previewSize))
+                            .foregroundStyle(done ? palette.faint : palette.preview)
+                            .strikethrough(done, color: palette.faint)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                    .frame(height: MemoSlipStyle.previewLine)
+                }
+            }
+            .accessibilityElement(children: .combine)
+        } else {
+            Text(words)
+                .font(.system(size: MemoSlipStyle.previewSize))
+                .foregroundStyle(palette.preview)
+                .lineSpacing(MemoSlipStyle.previewSpacing)
+                .lineLimit(limit)
+                .truncationMode(.tail)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, MemoSlipStyle.previewSpacing / 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// The rows joined by line breaks; a code line in the fixed-width face.
+    private var words: AttributedString {
+        var all = AttributedString()
+        for (index, row) in rows.prefix(limit).enumerated() {
+            if index > 0 { all.append(AttributedString("\n")) }
+            let code = Checklist.isCode(row.text)
+            var part = AttributedString(code ? row.text : row.text.keepingParticles)
+            if code { part.font = .system(size: MemoSlipStyle.previewSize - 1, design: .monospaced) }
+            all.append(part)
+        }
+        return all
     }
 }
 
@@ -232,7 +299,7 @@ private struct HoverPill: View {
         let pinned = drawer.folders.isPinned(memo.id)
         HStack(spacing: 0) {
             BarButton(symbol: "doc.on.doc", palette: palette, help: L("복사 (⇧⌘C)")) { drawer.copy(memo.id) }
-            BarButton(symbol: pinned ? "pawprint.fill" : "pawprint", palette: palette, help: pinned ? L("고정 풀기") : L("고정하기"), tint: pinned ? palette.check : nil) {
+            BarButton(symbol: pinned ? "pin.fill" : "pin", palette: palette, help: pinned ? L("고정 풀기") : L("고정하기"), tint: pinned ? palette.check : nil) {
                 drawer.togglePin(memo.id)
             }
             BarMenuButton(drawer: drawer, symbol: "ellipsis", palette: palette, help: L("더 보기")) { DrawerMenus.memo(drawer, memo.id) }
@@ -390,29 +457,26 @@ struct CheckedText: View {
                         .buttonStyle(.plain)
                         .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
                         .accessibilityLabel(item.text)
-                        .accessibilityValue(item.checked ? L("끝냄") : L("안 끝냄"))
+                        .accessibilityValue(item.checked ? L("완료됨") : L("미완료"))
                         Text(verbatim: item.text.keepingParticles)
                             .font(.system(size: MemoSlipStyle.bodySize))
                             .foregroundStyle(item.checked ? palette.faint : palette.ink)
                             .strikethrough(item.checked, color: palette.faint)
-                            .modifier(OnTheRules())
+                            .modifier(OnTheLines())
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .contentShape(Rectangle())
                             .onTapGesture { edit(at: index) }
                     }
                 } else if index == titleIndex {
-                    Text(line.trimmingCharacters(in: .whitespaces).handwritten)
-                        .font(font.handFont(MemoDrawerView.hand(20)))
-                        .foregroundStyle(palette.ink)
-                        .lineLimit(1)
+                    CardTitle(words: Text(verbatim: line.trimmingCharacters(in: .whitespaces).handwritten), font: font, color: palette.ink)
                         .frame(maxWidth: .infinity, minHeight: MemoSlipStyle.titleRow, maxHeight: MemoSlipStyle.titleRow, alignment: .leading)
                         .contentShape(Rectangle())
                         .onTapGesture { edit(at: index) }
                 } else if !line.trimmingCharacters(in: .whitespaces).isEmpty {
                     Text(verbatim: Checklist.isCode(line) ? line : line.keepingParticles)
-                        .font(Checklist.isCode(line) ? .system(size: 11.5, design: .monospaced) : .system(size: MemoSlipStyle.bodySize))
+                        .font(Checklist.isCode(line) ? .system(size: MemoSlipStyle.bodySize - 1, design: .monospaced) : .system(size: MemoSlipStyle.bodySize))
                         .foregroundStyle(palette.ink)
-                        .modifier(OnTheRules())
+                        .modifier(OnTheLines())
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .contentShape(Rectangle())
                         .onTapGesture { edit(at: index) }
@@ -427,8 +491,9 @@ struct CheckedText: View {
     }
 }
 
-/// Text whose lines sit one per rule of the memo sheet (22 pt each, centred in its band).
-struct OnTheRules: ViewModifier {
+/// An open memo's text: each line exactly `MemoSlipStyle.line` (26 pt) tall, its words centred in it — the same lines
+/// as while it's typed, so opening the editor doesn't move them.
+struct OnTheLines: ViewModifier {
     var lines: Int?
 
     func body(content: Content) -> some View {
@@ -444,6 +509,8 @@ struct OnTheRules: ViewModifier {
 struct CheckBox: View {
     let checked: Bool
     let palette: DrawerPalette
+    /// 13 in an open memo; 11 on a card's preview (#14).
+    var size: CGFloat = 13
 
     var body: some View {
         RoundedRectangle(cornerRadius: 3, style: .continuous)
@@ -452,9 +519,9 @@ struct CheckBox: View {
                 if !checked { RoundedRectangle(cornerRadius: 3, style: .continuous).strokeBorder(palette.box, lineWidth: 1.2) }
             }
             .overlay {
-                if checked { Image(systemName: "checkmark").font(.system(size: 7.5, weight: .bold)).foregroundStyle(palette.checkOn) }
+                if checked { Image(systemName: "checkmark").font(.system(size: size * 0.58, weight: .bold)).foregroundStyle(palette.checkOn) }
             }
-            .frame(width: 13, height: 13)
+            .frame(width: size, height: size)
             .contentShape(Rectangle().inset(by: -4))
     }
 }
@@ -480,12 +547,18 @@ struct SlipEditor: View {
 
     var body: some View {
         let id = memo.id
-        DrawerTextView(text: $text, palette: palette, bodyFont: .systemFont(ofSize: MemoSlipStyle.bodySize), titleFont: font.handNSFont(MemoDrawerView.hand(20)),
-                       lineHeight: MemoSlipStyle.line, titleLineHeight: MemoSlipStyle.titleRow,
+        DrawerTextView(text: $text, palette: palette, bodyFont: .systemFont(ofSize: MemoSlipStyle.bodySize), titleFont: font.handNSFont(MemoDrawerView.hand(22)),
+                       titleStroke: font != .clean, lineHeight: MemoSlipStyle.line, titleLineHeight: MemoSlipStyle.titleRow,
                        onEscape: { drawer.collapse() }, focus: SlipMotion.enabled ? 1 : 0, caretLine: drawer.editLine, minHeight: minHeight,
-                       onEdit: { old, new in drawer.edit(id, text: new, from: old) }, accessibilityLabel: L("메모 내용"),
+                       onEdit: { old, new in drawer.edit(id, text: new, from: old) }, onBlur: { drawer.sendTyped() }, accessibilityLabel: L("메모 내용"),
                        extraMenu: { [weak drawer] in drawer.map { DrawerMenus.textSection($0, id) } ?? [] }, menuDrawer: drawer)
-            .onChange(of: memo.text) { _, newer in if newer != text { text = newer } }
+            .focusEffectDisabled()
+            .onChange(of: memo.text) { _, newer in
+                guard newer != text else { return }
+                // Another change while keys wait here: they go first and are joined with it; the joined text comes
+                // back through here.
+                if drawer.isWaiting(id) { drawer.sendTyped() } else { text = newer }
+            }
     }
 }
 
@@ -527,10 +600,7 @@ struct SearchSlip: View {
         Button { drawer.reveal(hit.memoID) } label: {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(onTitle ? highlighted(sheet) : AttributedString(title.handwritten))
-                        .font(font.handFont(MemoDrawerView.hand(19)))
-                        .foregroundStyle(sheet.ink)
-                        .lineLimit(1)
+                    CardTitle(words: Text(onTitle ? highlighted(sheet) : AttributedString(title.handwritten)), font: font, color: sheet.ink)
                     Spacer(minLength: 4)
                     if let memo { TimeText(text: MemoCards.dayTime(memo.updatedAt, now: drawer.now(), language: .current), palette: sheet) }
                     if let folder {
@@ -548,15 +618,18 @@ struct SearchSlip: View {
                 .frame(height: MemoSlipStyle.titleRow)
                 if !onTitle {
                     Text(highlighted(sheet))
-                        .font(.system(size: MemoSlipStyle.bodySize))
-                        .foregroundStyle(sheet.secondary)
-                        .modifier(OnTheRules(lines: 2))
+                        .font(.system(size: MemoSlipStyle.previewSize))
+                        .foregroundStyle(sheet.preview)
+                        .lineSpacing(MemoSlipStyle.previewSpacing)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.vertical, MemoSlipStyle.previewSpacing / 2)
                 } else if let next = memo.flatMap({ MemoCards.preview($0.text) }) {
                     Text(verbatim: next.keepingParticles)
-                        .font(.system(size: MemoSlipStyle.bodySize))
-                        .foregroundStyle(sheet.secondary)
+                        .font(.system(size: MemoSlipStyle.previewSize))
+                        .foregroundStyle(sheet.preview)
                         .lineLimit(1)
-                        .frame(height: MemoSlipStyle.line)
+                        .frame(height: MemoSlipStyle.previewLine)
                 }
             }
             .modifier(MemoSlipStyle(palette: sheet, drawer: palette, state: .init(selected: selected, folder: folder?.colorKey ?? .lavender,
@@ -565,7 +638,7 @@ struct SearchSlip: View {
         .buttonStyle(.plain)
     }
 
-    private var title: String { drawer.memo(hit.memoID).map { MemoCards.title($0.text, language: .current) } ?? "" }
+    private var title: String { drawer.memo(hit.memoID).map { drawer.cardTitle($0) } ?? "" }
     /// The match is in the title line: marked there, the next line under it.
     private var onTitle: Bool {
         guard hit.range != nil, let memo = drawer.memo(hit.memoID) else { return false }
@@ -602,7 +675,7 @@ struct DrawerGroupHeader: View {
         HStack(spacing: 6) {
             HStack(spacing: 5) {
                 if pinned {
-                    Image(systemName: "pawprint.fill").font(.system(size: 9.5)).foregroundStyle(palette.paw)
+                    Image(systemName: "pin.fill").font(.system(size: 9.5)).foregroundStyle(palette.paw)
                 }
                 Text(title).font(.system(size: 11, weight: .medium)).foregroundStyle(palette.groupHeader)
                 Text("\(count)").font(.system(size: 11).monospacedDigit()).foregroundStyle(palette.faint)

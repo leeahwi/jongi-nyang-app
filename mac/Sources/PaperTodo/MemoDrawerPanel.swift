@@ -53,11 +53,14 @@ final class MemoDrawerController {
             .sink { [weak self] in self?.backdrop?.needsLayout = true }
             .store(in: &subscriptions)
         drawer.$shortcut.removeDuplicates().dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.registerShortcut() } }.store(in: &subscriptions)
-        // The handle's number: memos changed today (worked out only when the memos change).
-        model.$memos.sink { [weak self] memos in
-            let count = MemoFolders.changedToday(memos, now: Date())
-            if self?.handleState.count != count { self?.handleState.count = count }
-        }.store(in: &subscriptions)
+        // The handle's number (its tooltip): memos changed today, worked out once the memos stop changing for half a
+        // second (a typed memo changes them on every key).
+        model.$memos
+            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
+            .sink { [weak self] memos in
+                let count = MemoFolders.changedToday(memos, now: Date())
+                if self?.handleState.count != count { self?.handleState.count = count }
+            }.store(in: &subscriptions)
         NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
@@ -396,27 +399,37 @@ final class DrawerHandleState: ObservableObject {
     @Published var right = true
 }
 
-/// The paw bookmark at the screen's edge: 24 × 46, 6 more out under the pointer; the number of memos changed today
-/// under the paw (none when 0). Click opens the drawer; drag moves it up or down. Nothing moves on its own.
+/// The paw bookmark at the screen's edge: 24 × 46, 6 more out under the pointer. 1.45: a solid pale cream with a soft
+/// 1 pt edge and a dark paw, the same on every drawer paper, day and night (it sits on the screen's edge over other
+/// apps, not on the drawer's paper); the number of memos changed today is in its tooltip and accessibility value, not
+/// on its face. Click opens the drawer; drag moves it up or down. Nothing moves on its own.
 struct DrawerHandleView: View {
     @ObservedObject var state: DrawerHandleState
     @ObservedObject var drawer: MemoDrawer
-    /// Snapshots: this paper rather than the drawer's.
-    var paper: DrawerPalette?
+    /// Snapshots: drawn as if the pointer were on it.
+    var previewHover = false
     var onOpen: () -> Void = {}
     var onDrag: (CGFloat) -> Void = { _ in }
     var onDragEnd: () -> Void = {}
-    @Environment(\.colorScheme) private var scheme
-    @State private var hovering = false
+    @State private var pointerOn = false
+    private var hovering: Bool { pointerOn || previewHover }
     @State private var dragged = false
     @State private var startY: CGFloat?
 
     static let size = NSSize(width: 36, height: 54)
     static let tab = CGSize(width: 24, height: 46)
     static let peek: CGFloat = 6
+    /// Its colours (`scripts/check-contrast.py` checks the paw on the fill: 3:1 or more).
+    static let fill = Color(drawerHex: "#f6e7b0")
+    static let edge = Color(drawerHex: "#e2cf86")
+    static let paw = Color(drawerHex: "#5e4a12")
+
+    /// The tooltip: `메모 서랍 · 오늘 고친 메모 5장` (just the name when none changed today).
+    static func help(count: Int) -> String {
+        count > 0 ? L("메모 서랍") + " · " + L("오늘 고친 메모 \(count)장") : L("메모 서랍")
+    }
 
     var body: some View {
-        let palette = paper ?? drawer.theme.palette(scheme)
         let right = state.right
         let shape = right ? UnevenRoundedRectangle(topLeadingRadius: 10, bottomLeadingRadius: 10, style: .continuous)
             : UnevenRoundedRectangle(bottomTrailingRadius: 10, topTrailingRadius: 10, style: .continuous)
@@ -424,20 +437,12 @@ struct DrawerHandleView: View {
         HStack(spacing: 0) {
             if right { Spacer(minLength: 0) }
             ZStack {
-                StripeFill(shape: shape, a: palette.pinTab.0, b: palette.pinTab.1)
-                shape.strokeBorder(Color.black.opacity(palette.kind == .night ? 0.35 : 0.1), lineWidth: 0.5)
-                VStack(spacing: 2) {
-                    Image(systemName: "pawprint.fill")
-                        .font(.system(size: 11))
-                    if state.count > 0 {
-                        Text("\(min(state.count, 99))")
-                            .font(.system(size: 9.5, weight: .semibold).monospacedDigit())
-                            .lineLimit(1)
-                            .fixedSize()
-                    }
-                }
-                .foregroundStyle(palette.pinTabInk)
-                .offset(x: right ? -1 : 1)
+                shape.fill(Self.fill)
+                shape.strokeBorder(Self.edge, lineWidth: 1)
+                Image(systemName: "pawprint.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Self.paw)
+                    .offset(x: right ? -1 : 1)
             }
             .frame(width: width, height: Self.tab.height)
             .shadow(color: .black.opacity(0.18), radius: 3, x: right ? -1 : 1, y: 1)
@@ -446,7 +451,7 @@ struct DrawerHandleView: View {
         .frame(width: Self.size.width, height: Self.size.height)
         .contentShape(Rectangle().inset(by: 2))
         .onHover { inside in
-            withAnimation(.easeOut(duration: 0.12)) { hovering = inside }
+            withAnimation(.easeOut(duration: 0.12)) { pointerOn = inside }
         }
         .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .global)
             .onChanged { _ in
@@ -460,7 +465,7 @@ struct DrawerHandleView: View {
                 dragged = false
                 startY = nil
             })
-        .help(L("메모 서랍"))
+        .help(Self.help(count: state.count))
         .accessibilityElement()
         .accessibilityLabel(L("메모 서랍 열기"))
         .accessibilityValue(state.count > 0 ? L("오늘 고친 메모 \(state.count)장") : "")

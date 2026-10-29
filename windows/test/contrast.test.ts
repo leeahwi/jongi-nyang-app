@@ -34,24 +34,24 @@ const pairs: Pair[] = [
     { fg: "clay", bg, need: "ui" as Need, where: "now line, the focus card's ring" },
     { fg: "stamp", bg, need: "text" as Need, where: "AI 연결's stamp on a row" },
   ]),
-  { fg: "sage-text", bg: "sage-2", need: "text", where: "selected chip, now pill, pick bar" },
+  { fg: "sage-text", bg: "sage-2", need: "text", where: "selected chip, now pill, pick bar, the list's 지금 · 다음 mark (#31)" },
   { fg: "ink", bg: "sage-2", need: "text", where: "text on a selected row" },
   { fg: "clay-text", bg: "clay-2", need: "text", where: "soon pill, ringing pill" },
   { fg: "on-sage", bg: "sage", need: "text", where: "primary button, today's date" },
+  { fg: "on-sage", bg: "band-lavender", need: "ui", where: "저녁 정리: the → in a picked round pick (#32; the pick itself is the lavender band on paper and card)" },
   { fg: "paper", bg: "ink", need: "text", where: "toast, tooltips" },
   { fg: "toast-action", bg: "ink", need: "text", where: "toast action" },
   { fg: "toast-strong", bg: "ink", need: "text", where: "toast's strong words, icon" },
   { fg: "event-blue", bg: "event-blue-2", need: "ui", where: "event badge's icon" },
   { fg: "memo-ink", bg: "memo-2", need: "ui", where: "memo badge's icon" },
-  ...["tab-1", "tab-2", "tab-3"].flatMap((bg) => [
-    { fg: "ink", bg, need: "text" as Need, where: "the open tab's name" },
-    { fg: "tab-ink", bg, need: "text" as Need, where: "the other tabs' names" },
-  ]),
+  // 1.30: the tabs are solid and, at night, lighter than the paper, so a tab's name and count are --tab-ink (a dark
+  // ink at night too), picked or not. The old tab colours live on as --tint-1 / --tint-2 under ink.
+  ...["tab-1", "tab-2"].map((bg) => ({ fg: "tab-ink", bg, need: "text" as Need, where: "a tab's name and count, picked or not" })),
+  ...["tint-1", "tint-2", "tab-3"].map((bg) => ({ fg: "ink", bg, need: "text" as Need, where: "settings panes' icon tiles, the help's group badges" })),
 ];
 
 function resolve(tokens: Record<string, string>, name: string): string {
   if (tokens[name]) return tokens[name];
-  if (name === "tab-ink") return tokens.ink; // var(--ink), day and night
   throw new Error(`no token --${name}`);
 }
 
@@ -85,6 +85,27 @@ test("contrast: the stage-4 day tokens are the shared table's (Mac 1.37.0 = Wind
   assert.deepEqual([night["ink-3"], night.faint, night["clay-text"], night["sage-text"], night["check-border"]], ["#9f9989", "#8a8577", "#e29a7c", "#a3c49c", "#837e69"]);
 });
 
+test("contrast (1.30): the solid tabs' colours, edges and ink are option B (the same as the Mac's PaperTheme)", () => {
+  assert.deepEqual([day["tab-1"], day["tab-1-edge"], day["tab-2"], day["tab-2-edge"], day["tab-ink"]], ["#f6dc7c", "#dcc062", "#d6ccf6", "#bdb0ea", "#2f2e2a"]);
+  assert.deepEqual([night["tab-1"], night["tab-1-edge"], night["tab-2"], night["tab-2-edge"], night["tab-ink"]], ["#c4a245", "#d6b65a", "#9d92dc", "#b2a8ea", "#1f1d18"]);
+  assert.ok(contrast(night["tab-ink"], night["tab-1"]) >= 6.85 && contrast(night["tab-ink"], night["tab-2"]) >= 6);
+  // No stripes over the tabs any more.
+  const note = fs.readFileSync(path.join(process.cwd(), "src/renderer/note.css"), "utf8");
+  assert.ok(!/\.index-tab::after/.test(note), "no stripes over the index tabs");
+});
+
+test("contrast (1.30): the slips' tape is solid with a 1 px edge, no stripes (the Mac's PaperTheme tape tokens)", () => {
+  const kinds = ["todo", "memo", "event", "timer", "alarm", "confirm"];
+  assert.deepEqual(kinds.map((kind) => [day[`tape-${kind}`], day[`tape-${kind}-edge`]]),
+    [["#e9cf7a", "#c8b269"], ["#cfc6ea", "#b2aac9"], ["#bcd0ea", "#a2b3c9"], ["#c9dcc4", "#adbda9"], ["#ecc4bc", "#cba9a2"], ["#d9d3c4", "#bbb5a9"]]);
+  assert.deepEqual(kinds.map((kind) => [night[`tape-${kind}`], night[`tape-${kind}-edge`]]),
+    [["#8a7a3f", "#a19565"], ["#5d5578", "#7d7793"], ["#4d5f7a", "#717f95"], ["#4f6650", "#728573"], ["#7a4f4a", "#95726e"], ["#55524a", "#77756e"]]);
+  // At night the tape is lighter than the paper, and its edge lighter still (so it shows).
+  for (const kind of kinds) assert.ok(contrast(night[`tape-${kind}-edge`], night.paper) > contrast(night[`tape-${kind}`], night.paper), kind);
+  const slip = fs.readFileSync(path.join(process.cwd(), "src/renderer/slip.css"), "utf8");
+  assert.ok(!/repeating-linear-gradient|--tape-stripe/.test(slip), "no stripes on the tape");
+});
+
 test("contrast: event colours at night are the day's at 85 % brightness, still apart from the paper", () => {
   for (const hex of ["#5b8bd0", "#6b8f71", "#d9765f", "#8e7cc3", "#d4a72c", "#8a8a8a"]) {
     const dimmed = toHex(mix(parseHex(hex), [0, 0, 0], 0.85));
@@ -110,5 +131,22 @@ test("contrast (1.25): the open day's event blocks — ink titles and ink-2 time
       }
     }
   }
+  assert.deepEqual(failures, []);
+});
+
+test("contrast (1.30): 할 일 스페이스's eight bands are marks at 3:1 or more on paper, paper-2 and card, day and night (table printed)", () => {
+  const colors = ["lavender", "pink", "mint", "yellow", "sky", "peach", "sand", "gray"];
+  const failures: string[] = [];
+  const lines: string[] = [];
+  for (const [label, tokens] of [["day", day], ["night", night]] as const) {
+    for (const color of colors) {
+      const band = tokens[`band-${color}`];
+      assert.ok(band, `no --band-${color} (${label})`);
+      const ratios = ["paper", "paper-2", "card"].map((bg) => contrast(band, tokens[bg]));
+      lines.push(`  ${label} --band-${color} ${band}: ${ratios.map((ratio) => ratio.toFixed(2)).join(" / ")} (paper / paper-2 / card, needs 3)`);
+      ratios.forEach((ratio, index) => { if (ratio < 3) failures.push(`${label} ${color} on ${["paper", "paper-2", "card"][index]} ${ratio.toFixed(2)}`); });
+    }
+  }
+  console.log(lines.join("\n"));
   assert.deepEqual(failures, []);
 });

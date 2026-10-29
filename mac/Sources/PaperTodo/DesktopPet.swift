@@ -18,6 +18,8 @@ final class DesktopPetController {
     /// The 타이머 submenu, provided by the timer.
     var timerMenu: () -> NSMenu = { NSMenu() }
     private var panel: NSPanel?
+    /// `--offscreen` (the performance check): the strip far off every screen, out of the user's way (#64).
+    var offscreen = false
     private var monitors: [Any] = []
     private var clipTask: Task<Void, Never>?
     private var idleTask: Task<Void, Never>?
@@ -78,14 +80,16 @@ final class DesktopPetController {
             let panel = panel ?? makePanel()
             layout()
             panel.orderFrontRegardless()
-            installMouseMonitors()
             settle()
-            scheduleIdle()
+            if onScreen {
+                installMouseMonitors()
+                scheduleIdle()
+            }
         } else {
             panel?.orderOut(nil)
             removeMouseMonitors()
-            idleTask?.cancel()
-            clipTask?.cancel()
+            idleTask?.cancel(); idleTask = nil
+            clipTask?.cancel(); clipTask = nil
             dragOrigin = nil
         }
     }
@@ -116,9 +120,36 @@ final class DesktopPetController {
             guard let self, let panel = self.panel else { return }
             NSMenu.popUpContextMenu(self.menu(), with: event, for: panel.contentView!)
         }
+        // The strip's size is set here (layout), never worked out from the cat: no size passes on each frame of a clip.
+        hosting.sizingOptions = []
         panel.contentView = hosting
         self.panel = panel
+        // #64: covered (a full-screen app, the screen locked or asleep), the cat rests — no clips, no mouse watching.
+        NotificationCenter.default.publisher(for: NSWindow.didChangeOcclusionStateNotification, object: panel)
+            .sink { [weak self] _ in self?.occlusionChanged() }
+            .store(in: &subscriptions)
         return panel
+    }
+
+    /// Someone can see the cat: its window is on screen and not covered (`--offscreen` counts as seen, so the
+    /// performance check measures a cat at work).
+    private var onScreen: Bool {
+        guard let panel, panel.isVisible else { return false }
+        return offscreen || panel.occlusionState.contains(.visible)
+    }
+
+    private func occlusionChanged() {
+        guard isVisible else { return }
+        if onScreen {
+            installMouseMonitors()
+            if idleTask == nil && clipTask == nil { scheduleIdle() }
+        } else {
+            removeMouseMonitors()
+            idleTask?.cancel(); idleTask = nil
+            clipTask?.cancel(); clipTask = nil
+            dragOrigin = nil
+            settle()
+        }
     }
 
     private var homeFraction: Double {
@@ -130,7 +161,7 @@ final class DesktopPetController {
         guard let panel else { return }
         let screen = savedScreen() ?? NSScreen.main ?? NSScreen.screens.first
         guard let area = screen?.visibleFrame else { return }
-        panel.setFrame(NSRect(x: area.minX, y: area.minY, width: area.width, height: Self.stripHeight), display: true)
+        panel.setFrame(NSRect(x: area.minX + (offscreen ? 40_000 : 0), y: area.minY, width: area.width, height: Self.stripHeight), display: true)
         anchorX = clampX(area.width * homeFraction)
         state.homeX = anchorX
     }
@@ -160,6 +191,7 @@ final class DesktopPetController {
     }
 
     private func updateInteractivity() {
+        PerfProbe.count("petMouse")
         guard let panel, dragOrigin == nil else { return }
         let point = NSEvent.mouseLocation
         let over = (anchorFrame.map { $0.insetBy(dx: -8, dy: 0).contains(point) } ?? false)
@@ -181,6 +213,7 @@ final class DesktopPetController {
         clipTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(activity.duration))
             guard !Task.isCancelled, let self else { return }
+            self.clipTask = nil
             if case .walk(_, let to) = action { self.state.homeX = to }
             self.settle()
             self.scheduleIdle()
@@ -193,9 +226,11 @@ final class DesktopPetController {
 
     private func scheduleIdle() {
         idleTask?.cancel()
+        guard onScreen else { idleTask = nil; return }
         idleTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(Double.random(in: 5...14)))
             guard !Task.isCancelled, let self else { return }
+            self.idleTask = nil
             self.idle()
         }
     }
@@ -270,8 +305,8 @@ final class DesktopPetController {
     private func drag(by dx: CGFloat) {
         if dragOrigin == nil {
             dragOrigin = state.homeX
-            clipTask?.cancel()
-            idleTask?.cancel()
+            clipTask?.cancel(); clipTask = nil
+            idleTask?.cancel(); idleTask = nil
             asleep = false
             settle()
         }
@@ -333,6 +368,8 @@ final class DesktopPetController {
         let line = PetChatter.pick(model.chatterContext(), questions: model.chatterQuestions, recent: recent, language: .current, random: { Double.random(in: 0..<1) })
         recent = Array(([line.id] + recent.filter { $0 != line.id }).prefix(12))
         preferences.set(recent, forKey: "chatter.recent")
+        // A streak's cheer is said once, that day (#42).
+        if line.id.hasPrefix("m.") { model.preferences.set(Archive.dayKey(Archive.logicalDayStart(Date())), forKey: AppModel.milestoneSaidKey) }
         nextChatter = Date().addingTimeInterval(PetChatter.nextDelay(model.chatterFrequency, random: { Double.random(in: 0..<1) }))
         if line.isQuestion {
             ask(line)

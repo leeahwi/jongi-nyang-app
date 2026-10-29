@@ -45,9 +45,17 @@ extension DesignSnapshots {
             memo("weekend", t("주말 계획\n토요일 오전 공원 산책, 저녁엔 친구들이랑 저녁 약속", "Weekend plans\nSaturday morning walk in the park, dinner with friends in the evening",
                               "Weekendplannen\nZaterdagochtend wandelen in het park, ’s avonds uit eten met vrienden"), at(daysAgo: 2, 21, 15)),
         ]
-        // A busy folder (more than 20): the dense list.
+        // A busy folder (more than 20): the dense list — two lines at most on a card (#14), a long one and a checklist first.
         for n in 0..<24 {
-            memos.append(memo("many\(n)", t("할 일 묶음 \(n + 1)\n작은 메모 한 줄", "Batch \(n + 1)\nA short line", "Stapel \(n + 1)\nEen korte regel"), at(daysAgo: n, 12, 0)))
+            let text = switch n {
+            case 0: t("할 일 묶음 1\n이번 주 안에 끝낼 것들을 한곳에 모아 두었어요. 급한 것부터 위에 적고, 끝난 건 지워 가며 정리하기. 다음 주 월요일에 한 번 더 보기.",
+                      "Batch 1\nEverything to finish this week in one place. The urgent ones go on top, and the done ones get crossed off as I go. One more look next Monday.",
+                      "Stapel 1\nAlles wat deze week af moet, op één plek. Het dringende bovenaan, en wat klaar is streep ik door. Maandag nog een keer kijken.")
+            case 1: t("할 일 묶음 2\n- [x] 자료 모으기\n- [ ] 표 정리하기\n- [ ] 메일 보내기", "Batch 2\n- [x] Gather the notes\n- [ ] Tidy the table\n- [ ] Send the email",
+                      "Stapel 2\n- [x] Notities verzamelen\n- [ ] Tabel opruimen\n- [ ] Mail versturen")
+            default: t("할 일 묶음 \(n + 1)\n작은 메모 한 줄", "Batch \(n + 1)\nA short line", "Stapel \(n + 1)\nEen korte regel")
+            }
+            memos.append(memo("many\(n)", text, at(daysAgo: n, 12, 0)))
         }
         try MemoFile.save(memos, to: data.appendingPathComponent("memos.json"))
         var folders = MemoFolders.fresh(language: .current)
@@ -218,20 +226,16 @@ extension DesignSnapshots {
         try shot("toast-\(paper)", size(height: 600))
         reset()
 
-        // The handle at the edge: at rest, with today's number, under the pointer (drawn out), on the left; each paper.
-        let handleState = DrawerHandleState()
+        // The handle at the edge (1.45: one pale cream on every paper, day and night; today's number only in its
+        // tooltip): at rest and under the pointer (drawn out), on the right and on the left.
         var handles: [AnyView] = []
-        for theme in [MemoDrawer.Theme.day, .night, .kraft, .grid] {
-            drawer.theme = theme
-            for (count, right) in [(0, true), (3, true), (12, false)] {
-                let state = DrawerHandleState()
-                state.count = count
-                state.right = right
-                handles.append(AnyView(DrawerHandleView(state: state, drawer: drawer, paper: theme.palette(.light)).environment(\.colorScheme, theme == .night ? .dark : .light)
-                    .frame(width: DrawerHandleView.size.width, height: DrawerHandleView.size.height)))
-            }
+        for (right, hover) in [(true, false), (true, true), (false, false), (false, true)] {
+            let state = DrawerHandleState()
+            state.count = 3
+            state.right = right
+            handles.append(AnyView(DrawerHandleView(state: state, drawer: drawer, previewHover: hover)
+                .frame(width: DrawerHandleView.size.width, height: DrawerHandleView.size.height)))
         }
-        _ = handleState
         drawer.theme = night ? .night : .day
         try render(HStack(spacing: 18) { ForEach(handles.indices, id: \.self) { handles[$0] } }
                     .padding(16).background(screen), size: nil, to: output.appendingPathComponent("drawer-handle.png"))
@@ -243,8 +247,11 @@ extension DesignSnapshots {
         drawer.theme = .auto
         try render(settings(MemoDrawerSettingsGroup(drawer: drawer)), size: nil, to: output.appendingPathComponent("drawer-settings.png"))
         try render(settings(MemoDrawerSettingsGroup(drawer: drawer, previewRecording: true,
-                                                   previewProblem: L("\(DrawerShortcut(keyCode: 46, modifiers: 4096 | 2048, key: "M").text) 키는 종이냥이 이미 쓰고 있어요 (빠른 메모 · 노트 · 빠른 입력)."))),
+                                                   previewProblem: L("\(DrawerShortcut(keyCode: 46, modifiers: 4096 | 2048, key: "M").text) 키는 종이냥이 이미 써요(빠른 메모 · 노트 · 빠른 입력). 다른 키를 눌러 주세요."))),
                    size: nil, to: output.appendingPathComponent("drawer-settings-recording.png"))
+        // A key of one's own: the small ‘기본값’ link comes up beside it (#27).
+        drawer.shortcut = DrawerShortcut(keyCode: 2, modifiers: 4096 | 2048, key: "D")
+        try render(settings(MemoDrawerSettingsGroup(drawer: drawer)), size: nil, to: output.appendingPathComponent("drawer-settings-custom.png"))
         drawer.shortcut = nil
         try render(settings(MemoDrawerSettingsGroup(drawer: drawer)), size: nil, to: output.appendingPathComponent("drawer-settings-off.png"))
         drawer.shortcut = .standard

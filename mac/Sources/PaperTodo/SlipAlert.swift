@@ -41,6 +41,30 @@ enum SlipAlert {
         return picked
     }
 
+    /// A name asked on a slip (새 스페이스…, 1.45): the trimmed text, or nil for 취소 / Esc / nothing typed.
+    static func askName(title: String, message: String, placeholder: String, initial: String = "") -> String? {
+        let panel = ModalSlipPanel(nonactivating: false)
+        panel.title = title
+        panel.level = .modalPanel
+        var result: String?
+        panel.show(NameSlipView(title: title, message: message, placeholder: placeholder, text: initial) { name in
+            result = name
+            NSApp.stopModal()
+        })
+        let anchor = NSApp.keyWindow ?? NSApp.mainWindow
+        if let anchor, anchor.isVisible {
+            panel.placeSlip(topCenter: NSPoint(x: anchor.frame.midX, y: anchor.frame.maxY - 90))
+        } else if let area = (NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main)?.visibleFrame {
+            panel.placeSlip(topCenter: NSPoint(x: area.midX, y: area.maxY - area.height / 4))
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.runModal(for: panel)
+        panel.orderOut(nil)
+        let clean = result.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        return clean?.isEmpty == false ? clean : nil
+    }
+
     /// Something went wrong: the reason and 확인.
     static func inform(symbol: String = "exclamationmark.circle", title: String, message: String, detail: String? = nil) {
         run(symbol: symbol, title: title, message: message, detail: detail,
@@ -123,4 +147,58 @@ struct SlipAlertView: View {
             .buttonStyle(SlipButtonStyle(role: choice.role, key: choice.isDefault ? "↩" : nil))
         if choice.isDefault { base.keyboardShortcut(.defaultAction) } else { base }
     }
+}
+
+/// The name slip: a line to type in, 취소 and 만들기 (Return).
+struct NameSlipView: View {
+    let title: String
+    let message: String
+    let placeholder: String
+    @State var text: String
+    var onDone: (String?) -> Void = { _ in }
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        PaperSlip(kind: .confirm, width: SlipWidth.small.rawValue) {
+            VStack(alignment: .leading, spacing: 0) {
+                SlipHeader(kind: .confirm, symbol: "square.stack", title: title)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(message)
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundStyle(PaperTheme.ink2)
+                    TextField(placeholder, text: $text)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 15))
+                        .foregroundStyle(PaperTheme.ink)
+                        .focused($focused)
+                        .onSubmit { if !trimmed.isEmpty { onDone(text) } }
+                        .padding(.horizontal, 10)
+                        .frame(height: 32)
+                        .background(PaperTheme.card, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay { RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(focused ? PaperTheme.sage : PaperTheme.rule, lineWidth: 1.5) }
+                        .accessibilityLabel(message)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 4)
+                SlipFooter {
+                    Button("") { onDone(nil) }
+                        .keyboardShortcut(.cancelAction)
+                        .opacity(0)
+                        .frame(width: 0, height: 0)
+                        .accessibilityHidden(true)
+                } trailing: {
+                    HStack(spacing: 6) {
+                        Button(L("취소")) { onDone(nil) }.buttonStyle(SlipButtonStyle(role: .ghost))
+                        Button(L("만들기")) { onDone(text) }
+                            .buttonStyle(SlipButtonStyle(role: .primary, key: "↩"))
+                            .disabled(trimmed.isEmpty)
+                    }
+                }
+            }
+        }
+        .onAppear { focused = true }
+    }
+
+    private var trimmed: String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
 }

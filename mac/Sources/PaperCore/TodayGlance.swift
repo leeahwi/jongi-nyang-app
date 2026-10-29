@@ -27,10 +27,10 @@ public enum TodayGlance {
         return found.min { ($0.at, $0.isEvent ? 0 : 1) < ($1.at, $1.isEvent ? 0 : 1) }
     }
 
-    /// The menu bar's words next to the cat: a running timer's remaining time ("12:30"), else what
+    /// The menu bar's words next to the cat: a running timer's time left as a length ("21분", #46), else what
     /// starts within the hour ("치과 40분"), else nothing ("").
     public static func menuBarText(timerRemaining: TimeInterval?, soon: Soon?, language: AppLanguage) -> String {
-        if let timerRemaining { return FocusTimer.clock(max(0, timerRemaining)) }
+        if let timerRemaining { return timerLength(timerRemaining, language: language) }
         guard let soon else { return "" }
         return soonText(title: soon.title, minutes: soon.minutes, language: language)
     }
@@ -50,13 +50,12 @@ public enum TodayGlance {
         return trimmed.count > limit ? String(trimmed.prefix(limit)).trimmingCharacters(in: .whitespaces) + "…" : trimmed
     }
 
-    /// The full state for VoiceOver and the tooltip: "종이냥 · 타이머 12:30 남음 · 오늘 할 일 3개 남음" ("남은 할 일 없음").
-    /// en "Jongi-nyang · Timer: 12:30 left · 3 to-dos left"; nl "Jongi-nyang · Timer: nog 12:30 · nog 3 taken".
+    /// The full state for VoiceOver and the tooltip: "종이냥 · 타이머 21분 남음 · 오늘 할 일 3개 남음" ("남은 할 일 없음").
+    /// en "Jongi-nyang · Timer: 21 min left · 3 to-dos left"; nl "Jongi-nyang · Timer: nog 21 min · nog 3 taken".
     public static func accessibilityText(appName: String, timerRemaining: TimeInterval?, soon: Soon?, openTasks: Int, language: AppLanguage) -> String {
         var parts = [appName]
         if let timerRemaining {
-            let clock = FocusTimer.clock(max(0, timerRemaining))
-            parts.append(["타이머 \(clock) 남음", "Timer: \(clock) left", "Timer: nog \(clock)"][language.index])
+            parts.append(["타이머 ", "Timer: ", "Timer: "][language.index] + timerLeftText(timerRemaining, language: language))
         }
         if let soon {
             parts.append("\(soon.title) \(DayRibbon.away(soon.minutes, language: language))")
@@ -67,6 +66,22 @@ public enum TodayGlance {
         case .nl: parts.append(openTasks == 0 ? "Niets meer voor vandaag" : "nog " + AppLanguage.plural(openTasks, "taak", "taken") + " vandaag")
         }
         return parts.joined(separator: " · ")
+    }
+
+    // MARK: Timer
+
+    /// #46: a timer's time left as a length (`FocusTimer.lengthText`): "21분" · "21 min", "1시간 5분", "45초".
+    public static func timerLength(_ seconds: TimeInterval, language: AppLanguage) -> String {
+        FocusTimer.lengthText(seconds, language: language)
+    }
+
+    /// The small word beside the length on the timer card: "남음" · "left" after it, "nog" before it.
+    public static func timerLeftWord(_ language: AppLanguage) -> String { FocusTimer.leftWord(language) }
+    public static func timerLeftWordFirst(_ language: AppLanguage) -> Bool { FocusTimer.leftWordFirst(language) }
+
+    /// Said in full: "21분 남음" · "21 min left" · "nog 21 min".
+    public static func timerLeftText(_ seconds: TimeInterval, language: AppLanguage) -> String {
+        FocusTimer.leftText(seconds, language: language)
     }
 
     // MARK: Cards

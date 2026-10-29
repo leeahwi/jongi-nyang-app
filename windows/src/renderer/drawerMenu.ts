@@ -9,7 +9,7 @@ import { h, icon } from "./api";
  */
 
 export type MenuEntry =
-  | { kind: "item"; label: string; icon?: string | null; key?: string; run: () => void; danger?: boolean; checked?: boolean; extra?: Node[] }
+  | { kind: "item"; label: string; icon?: string | null; key?: string; run: () => void; danger?: boolean; checked?: boolean; extra?: Node[]; /** A count before the shortcut (1.30). */ count?: string; disabled?: boolean }
   | { kind: "sub"; label: string; icon?: string | null; entries: () => MenuEntry[]; extra?: Node[] }
   | { kind: "sep" }
   | { kind: "label"; text: string }
@@ -50,7 +50,7 @@ function closeFrom(level: number): void {
   stack[level - 1]?.querySelector<HTMLElement>(".mi.open")?.classList.remove("open");
 }
 
-const rows = (menu: HTMLElement) => [...menu.querySelectorAll<HTMLElement>(":scope > button.mi, :scope > .swrow > button")];
+const rows = (menu: HTMLElement) => [...menu.querySelectorAll<HTMLElement>(":scope > button.mi:not(:disabled), :scope > .swrow > button")];
 
 function build(entries: MenuEntry[], level: number, label: string): HTMLElement {
   const menu = h("div", { class: `menu${level ? " submenu" : ""}`, role: "menu", "aria-label": label, tabindex: "-1" });
@@ -75,8 +75,10 @@ function build(entries: MenuEntry[], level: number, label: string): HTMLElement 
       case "item": {
         const button = h("button", { class: `mi${entry.danger ? " danger" : ""}`, role: entry.checked !== undefined ? "menuitemcheckbox" : "menuitem", ...(entry.checked !== undefined ? { "aria-checked": String(entry.checked) } : {}) },
           h("span", { class: "ico" }, entry.icon ? icon(entry.icon, 15) : null), ...(entry.extra ?? []), h("span", { class: "t" }, entry.label),
+          entry.count !== undefined ? h("span", { class: "cnt" }, entry.count) : null,
           entry.key ? h("span", { class: "k" }, entry.key) : null,
           entry.checked ? h("span", { class: "tick" }, icon("check", 13, 2)) : null);
+        if (entry.disabled) button.disabled = true;
         button.addEventListener("click", () => { closeMenus(); entry.run(); });
         button.addEventListener("mouseenter", () => { window.clearTimeout(hoverTimer); hoverTimer = window.setTimeout(() => closeFrom(level + 1), 160); });
         menu.append(button);

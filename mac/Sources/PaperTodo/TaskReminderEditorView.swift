@@ -86,7 +86,8 @@ struct TaskReminderEditorView: View {
                         Color.clear.preference(key: EditorHeaderHeight.self, value: geometry.size.height)
                     }
                 }
-            PaperSegmented(selection: $mode, options: modeOptions, label: L("알림 종류"))
+            // Four words of very different lengths in Dutch: as wide as their words, so the gaps read even (1.45).
+            PaperSegmented(selection: $mode, options: modeOptions, label: L("알림 종류"), fit: true)
             .padding(.horizontal, 18)
             .padding(.bottom, 12)
 
@@ -196,6 +197,36 @@ struct TaskReminderEditorView: View {
                     .foregroundStyle(PaperTheme.faded)
                     .padding(.top, 1)
             }
+            // 할 일 스페이스 (1.45): which space it's in, changed at once (only once there's a space).
+            if !model.todoSpaces.isEmpty { spaceField.padding(.top, 2) }
+        }
+    }
+
+    private var spaceField: some View {
+        let space = model.spaceOf(item.id)
+        return HStack(spacing: 8) {
+            // One space here: "Space" (the desk's pane is "Spaces").
+            Text(String(localized: "스페이스", table: "Reminder"))
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(PaperTheme.ink2)
+            HStack(spacing: 5) {
+                if let space {
+                    RoundedRectangle(cornerRadius: 2).fill(PaperTheme.space(space.colorKey)).frame(width: 8, height: 8)
+                } else {
+                    RoundedRectangle(cornerRadius: 2).strokeBorder(PaperTheme.ink3, lineWidth: 1).frame(width: 8, height: 8)
+                }
+                Text(space?.name ?? SpaceWords.noSpace(.current)).lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down").font(.system(size: 8, weight: .semibold)).foregroundStyle(PaperTheme.ink3)
+            }
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(PaperTheme.ink)
+            .padding(.horizontal, 8)
+            .frame(height: 24)
+            .background(PaperTheme.paper2, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .fixedSize()
+            .overlay { SpaceMenuArea(label: space?.name ?? SpaceWords.noSpace(.current), items: { SpaceMenus.move(model, item.id, offerNew: false) }, font: model.notebookFont) }
+            .accessibilityLabel(L("스페이스") + " " + (space?.name ?? SpaceWords.noSpace(.current)))
+            Spacer(minLength: 0)
         }
     }
 
@@ -235,7 +266,7 @@ struct TaskReminderEditorView: View {
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundStyle(isValid ? PaperTheme.ink : PaperTheme.clayText)
 
-                Text(isValid ? L("앱이 켜져 있을 때 종이냥이 알려드려요.") : L("지난 시간은 고를 수 없어요."))
+                Text(isValid ? L("앱이 켜져 있을 때 종이냥이 알려 줘요.") : L("지난 시간은 고를 수 없어요."))
                     .font(.system(size: 11))
                     .foregroundStyle(isValid ? PaperTheme.secondary : PaperTheme.clayText)
                     .fixedSize(horizontal: false, vertical: true)
@@ -378,7 +409,7 @@ struct TaskReminderEditorView: View {
             let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
             return AppLanguage.current.clock(hour: parts.hour!, minute: parts.minute!)
         }
-        if let after, after == start { return L("시작할 때 알려 드려요.") }
+        if let after, after == start { return L("시작할 때 알려 줘요.") }
         if let after { return L("알림은 그대로예요 · \(clock(after))") }
         return L("이미 지난 시간이라 알림은 없어요.")
     }

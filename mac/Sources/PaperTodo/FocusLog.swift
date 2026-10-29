@@ -43,7 +43,8 @@ final class FocusLog: ObservableObject {
                 try Data(Focus.append(record, to: "").utf8).write(to: url, options: .atomic)
             }
         } catch {
-            model?.storageError = L("집중 기록을 저장하지 못했어요.") + "\n\(url.path)"
+            // Appended once, never tried again: this session isn't in the record.
+            model?.storageError = [L("집중 기록을 저장하지 못했어요."), L("이번 집중은 기록에 남지 않았어요."), L("저장 폴더가 열리는지 확인해 주세요.")].joined(separator: " ")
         }
         cache = nil
         revision += 1

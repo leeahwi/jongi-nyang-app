@@ -48,6 +48,7 @@ export class ReminderPopup {
     const owner = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) =>
       [...ReminderPopup.instances].find((popup) => popup.window && !popup.window.isDestroyed() && popup.window.webContents === event.sender);
     ipcMain.handle("popup:place", (event, size: { width: number; height: number }) => owner(event)?.place(size));
+    ipcMain.handle("popup:pointer", (event) => owner(event)?.pointer());
     ipcMain.on("popup:interactive", (event, interactive: boolean) => {
       owner(event)?.window?.setIgnoreMouseEvents(!interactive, { forward: true });
     });
@@ -159,6 +160,20 @@ export class ReminderPopup {
     window.showInactive();
     window.setAlwaysOnTop(true, "floating");
     return { travel: width + 4 };
+  }
+
+  /**
+   * Where the pointer is over this window (page pixels), or nothing. A click-through window hears only the
+   * pointer's moves, so a pointer that has rested on the slip since before it came is found this way.
+   */
+  private pointer(): { x: number; y: number } | undefined {
+    const window = this.window;
+    if (!window || window.isDestroyed() || !window.isVisible()) return undefined;
+    const cursor = screen.getCursorScreenPoint();
+    const bounds = window.getContentBounds();
+    const x = cursor.x - bounds.x;
+    const y = cursor.y - bounds.y;
+    return x >= 0 && y >= 0 && x < bounds.width && y < bounds.height ? { x, y } : undefined;
   }
 
   private ensureWindow(): BrowserWindow {

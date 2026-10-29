@@ -41,9 +41,9 @@ enum BackupController {
         do {
             backup = try Backup.parse(String(contentsOf: url, encoding: .utf8))
         } catch let problem as Backup.Problem {
-            return fail(L("가져오지 못했어요."), problem.message(.current))
+            return fail(L("가져오지 못했어요. 지금 목록은 그대로예요."), problem.message(.current))
         } catch {
-            return fail(L("가져오지 못했어요."), Backup.Problem.notBackup.message(.current))
+            return fail(L("가져오지 못했어요. 지금 목록은 그대로예요."), Backup.Problem.notBackup.message(.current))
         }
 
         let ask = SlipAlert.run(symbol: "square.and.arrow.down", title: L("가져오기"), message: L("이 백업을 가져올까요?"),
@@ -65,12 +65,12 @@ enum BackupController {
         do {
             result = try apply(backup, replace: replace, folder: model.storageFolderURL) { model.stopSaving() }
         } catch {
-            return fail(L("가져오지 못했어요."), (error as? Backup.Problem)?.message(.current) ?? error.localizedDescription)
+            return fail(L("가져오지 못했어요. 지금 목록은 그대로예요."), (error as? Backup.Problem)?.message(.current))
         }
 
         let done = SlipAlert.run(symbol: "checkmark", title: L("가져오기"), message: L("가져왔어요."),
-                                 detail: "\(Backup.summary(result).text(.current))\n" + L("가져오기 전 상태는 ‘backups’ 폴더에 있어요. 종이냥이 다시 시작돼요."),
-                                 choices: [.init(title: L("백업 폴더 열기")), .init(title: L("확인"), role: .primary, isDefault: true, isCancel: true)],
+                                 detail: "\(Backup.summary(result).text(.current))\n" + L("종이냥이 다시 시작돼요. 가져오기 전 것도 ‘backups’ 폴더에 남겨 뒀어요."),
+                                 choices: [.init(title: L("백업 폴더 열기")), .init(title: L("다시 시작"), role: .primary, isDefault: true, isCancel: true)],
                                  cat: .happy)
         if done == 0 { NSWorkspace.shared.open(backupsFolder) }
         restart()
@@ -176,7 +176,7 @@ enum BackupController {
     /// The question's lines: the file, where and when it was made, what's in it, and the two ways in.
     static func importDetail(fileName: String, backup: Backup.Contents) -> String {
         "\(fileName)\n\(origin(backup))\n\(Backup.summary(backup.files).text(.current))\n\n"
-            + L("합치기: 지금 것은 그대로 두고 없는 것만 더해요.\n바꾸기: 지금 것을 모두 이 백업으로 바꿔요.")
+            + L("합치기: 지금 것은 그대로 두고 없는 것만 더해요.\n바꾸기: 지금 것을 모두 이 백업으로 바꿔요.\n어느 쪽이든 지금 것은 먼저 백업해 둬요.")
     }
 
     /// 바꾸기 replaces everything: clay, on the left, away from the default 합치기.
@@ -193,7 +193,7 @@ enum BackupController {
         return backup.from.isEmpty ? L("\(when) 내보냄") : L("\(backup.from)에서 \(when) 내보냄")
     }
 
-    private static func fail(_ title: String, _ detail: String) {
+    private static func fail(_ title: String, _ detail: String?) {
         SlipAlert.inform(title: L("백업 · 옮기기"), message: title, detail: detail)
     }
 

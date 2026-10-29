@@ -51,7 +51,7 @@ extension AppModel {
         let order = items.map(\.id)
         delete(id)
         let after = history.notebook
-        offerUndo(symbol: "trash", text: L("지웠어요"), after: after) { [weak self] in
+        offerUndo(symbol: "trash", text: L("할 일을 지웠어요"), after: after) { [weak self] in
             self?.restoreTasks([item], order: order)
         }
     }
@@ -121,7 +121,7 @@ extension AppModel {
             }
         }
         let after = history.notebook
-        offerUndo(symbol: someday ? "tray" : "arrow.right", text: Sweep.movedText(count: chosen.count, someday: someday, language: .current),
+        offerUndo(symbol: someday ? "tray.and.arrow.down" : "arrow.right", text: Sweep.movedText(count: chosen.count, someday: someday, language: .current),
                   after: after) { [weak self] in
             self?.mutate { history in
                 history.batch { notebook in for item in before { notebook.restorePlace(id: item.id, dueDate: item.dueDate, shelf: item.shelf) } }
@@ -182,7 +182,7 @@ extension AppModel {
 }
 
 extension AppModel {
-    /// 로그인할 때 같이 열기 (Settings → 알림 → 시작, the guide's last card, the cat's question).
+    /// 로그인할 때 같이 열기 (Settings → 꾸미기 → 시작, the guide's last card, the cat's question).
     var loginItemOn: Bool { SMAppService.mainApp.status == .enabled }
     var guideSeen: Bool { preferences.bool(forKey: "guide.seen") }
 

@@ -98,6 +98,83 @@ private enum ConvenienceTests {
             try expect(history.notebook.items.count == 1 && history.notebook.items[0].todaySince == "2026-10-08", "undo keeps the stamp")
         }
 
+        // #63: only the tasks stamped on the list now go into the undo/redo snapshots (as Windows' trackToday).
+        try test("todaySince: undo and redo keep 어제부터 right") {
+            func label(_ history: UndoableNotebook, _ title: String) -> String? {
+                history.notebook.items.first { $0.title == title }.flatMap { Carry.label($0, now: now, calendar: seoul) }
+            }
+            func since(_ history: UndoableNotebook, _ title: String) -> String? {
+                history.notebook.items.first { $0.title == title }?.todaySince
+            }
+            // A check clears the list's day; undo brings back the task with its own day, redo the finished one without.
+            let old = task("old", since: "2026-10-06")
+            var history = UndoableNotebook(notebook: Notebook(items: [old, task("b", since: "2026-10-07")]))
+            // Steps on another task first, so the check has snapshots behind it.
+            let b = history.notebook.items[1].id
+            for _ in 0..<4 { history.toggle(id: b, now: now); history.stampToday(now: now, calendar: seoul) }
+            history.toggle(id: old.id, now: now); history.stampToday(now: now, calendar: seoul)
+            try expect(since(history, "old") == nil && label(history, "old") == nil, "checked: \(since(history, "old") ?? "nil")")
+            history.undo(); history.stampToday(now: now, calendar: seoul)
+            try expect(since(history, "old") == "2026-10-06" && label(history, "old") == "3일째", "undo: \(label(history, "old") ?? "nil")")
+            history.redo(); history.stampToday(now: now, calendar: seoul)
+            try expect(since(history, "old") == nil, "redo: \(since(history, "old") ?? "nil")")
+            // Unchecking puts the task back on today as new: today's day (the same before #63).
+            for _ in 0..<5 { history.undo(); history.stampToday(now: now, calendar: seoul) }
+            try expect(since(history, "old") == "2026-10-06" && since(history, "b") == "2026-10-07", "all undone: \(since(history, "b") ?? "nil")")
+
+            // An add is stamped today; undo takes it away, redo brings it back with that day.
+            history.add("new", shelf: nil, now: now); history.stampToday(now: now, calendar: seoul)
+            try expect(since(history, "new") == "2026-10-08", "added")
+            history.undo(); history.stampToday(now: now, calendar: seoul)
+            try expect(!history.notebook.items.contains { $0.title == "new" }, "undo add")
+            history.redo(); history.stampToday(now: now, calendar: seoul)
+            try expect(since(history, "new") == "2026-10-08" && label(history, "new") == nil, "redo add")
+
+            // A task without a day (an older file, another writer) gets it in the snapshots that have it open on today,
+            // never in one where it's finished or off today.
+            let bare = task("bare"), done = task("done", done: true), later = task("later", shelf: .later)
+            var steps = UndoableNotebook(notebook: Notebook(items: [bare, done, later]))
+            steps.edit(id: bare.id, title: "bare 2")
+            steps.toggle(id: done.id, now: now)
+            steps.setShelf(id: later.id, shelf: nil)
+            steps.stampToday(now: now, calendar: seoul)
+            try expect(since(steps, "bare 2") == "2026-10-08" && since(steps, "done") == "2026-10-08" && since(steps, "later") == "2026-10-08", "list")
+            steps.undo(); steps.stampToday(now: now, calendar: seoul)
+            try expect(since(steps, "later") == nil && since(steps, "done") == "2026-10-08", "undo shelf: \(since(steps, "later") ?? "nil")")
+            steps.undo()
+            try expect(since(steps, "done") == nil, "the finished one has none in its snapshot")
+            steps.undo()
+            try expect(since(steps, "bare") == "2026-10-08", "the open one has the day in its snapshot")
+
+            // Many at once (a day's turn): the one-pass path, the same result.
+            let many = (0..<12).map { task("m\($0)") }
+            var batch = UndoableNotebook(notebook: Notebook(items: many))
+            batch.toggle(id: many[0].id, now: now)
+            batch.toggle(id: many[0].id, now: now)
+            batch.stampToday(now: now, calendar: seoul)
+            batch.undo(); batch.undo()
+            try expect(batch.notebook.items.allSatisfy { $0.todaySince == "2026-10-08" }, "many: \(batch.notebook.items.map { $0.todaySince ?? "-" })")
+
+            // Another writer's task without a day goes into every snapshot: they get its day too.
+            var shared = UndoableNotebook(notebook: Notebook(items: [task("mine", since: "2026-10-07")]))
+            shared.stampToday(now: now, calendar: seoul)
+            shared.add("step", shelf: nil, now: now); shared.stampToday(now: now, calendar: seoul)
+            let theirs = task("theirs")
+            shared.adopt(Notebook(items: shared.notebook.items + [theirs]))
+            shared.stampToday(now: now, calendar: seoul)
+            shared.undo(); shared.stampToday(now: now, calendar: seoul)
+            try expect(since(shared, "theirs") == "2026-10-08" && since(shared, "mine") == "2026-10-07", "adopted: \(since(shared, "theirs") ?? "nil")")
+
+            // The clock set back a day: a day later than today is taken back in the snapshots too.
+            var back = UndoableNotebook(notebook: Notebook(items: [task("x")]))
+            back.stampToday(now: now, calendar: seoul)
+            back.add("y", shelf: nil, now: now); back.stampToday(now: now, calendar: seoul)
+            let yesterday = at(7, 14, 50)
+            back.stampToday(now: yesterday, calendar: seoul)
+            back.undo(); back.stampToday(now: yesterday, calendar: seoul)
+            try expect(since(back, "x") == "2026-10-07", "set back: \(since(back, "x") ?? "nil")")
+        }
+
         try test("날짜 바꾸기: choices (M1–M6)") {
             func describe(_ choices: [DateMove.Choice]) -> String {
                 choices.map { choice -> String in
@@ -165,9 +242,9 @@ private enum ConvenienceTests {
             try expect(!Snooze.options(now: now, moves: false, calendar: seoul).contains(.tomorrow), "periodic")
             let titles: [String] = AppLanguage.allCases.map { language in options.map { $0.title(language) }.joined(separator: " · ") }
             try expect(titles == [
-                "5분 뒤 · 10분 뒤 · 30분 뒤 · 1시간 뒤 · 오늘 저녁 7시 · 내일 아침 9시 · 내일로 미루기",
-                "In 5 min · In 10 min · In 30 min · In 1 hour · Tonight at 7 PM · Tomorrow at 9 AM · Move to tomorrow",
-                "Over 5 min · Over 10 min · Over 30 min · Over 1 uur · Vanavond om 19:00 · Morgen om 09:00 · Naar morgen",
+                "5분 뒤 · 10분 뒤 · 30분 뒤 · 1시간 뒤 · 오늘 저녁 7시 · 내일 아침 9시 · 내일 하기",
+                "In 5 min · In 10 min · In 30 min · In 1 hour · Tonight at 7 PM · Tomorrow at 9 AM · Do tomorrow",
+                "Over 5 min · Over 10 min · Over 30 min · Over 1 uur · Vanavond om 19:00 · Morgen om 09:00 · Morgen doen",
             ], "\(titles)")
             try expect(AppLanguage.allCases.map { Snooze.eventAgainTitle($0) } == ["5분 전에 다시", "5 min before", "5 min ervoor"], "event")
             try expect(show(Snooze.eventAgain(start: at(8, 15, 30), now: now)) == "2026-10-08 15:25" && Snooze.eventAgain(start: at(8, 14, 54), now: now) == nil, "event again")
@@ -197,8 +274,8 @@ private enum ConvenienceTests {
             words.append(Sweep.question(.evening, count: 1, language: .en))
             words += AppLanguage.allCases.map { Sweep.movedText(count: 3, someday: false, language: $0) }
             words += AppLanguage.allCases.map { Sweep.movedText(count: 2, someday: true, language: $0) }
-            let wanted: [String] = ["오늘 3개 남았어요. 내일로 넘길까요?", "3 to-dos left today. Move them to tomorrow?", "Nog 3 taken voor vandaag. Naar morgen schuiven?",
-                                    "1 to-do left today. Move it to tomorrow?", "3개를 내일로 옮겼어요", "Moved 3 to tomorrow", "3 verplaatst naar morgen",
+            let wanted: [String] = ["오늘도 수고했어요. 남은 3개는 내일로 넘길까요?", "Good work today. Move 3 to-dos to tomorrow?", "Goed gedaan vandaag. 3 taken naar morgen?",
+                                    "Good work today. Move 1 to-do to tomorrow?", "3개를 내일로 옮겼어요", "Moved 3 to tomorrow", "3 verplaatst naar morgen",
                                     "2개를 언젠가로 옮겼어요", "Moved 2 to Someday", "2 verplaatst naar Ooit"]
             try expect(words == wanted, "\(words)")
         }
@@ -294,6 +371,66 @@ private enum ConvenienceTests {
             try expect(pickedDone.next == [b.id], "done pick ignored")
             try expect(!LoginAsk.shouldAsk(manualStarts: 2, loginItemOn: false, asked: false) && LoginAsk.shouldAsk(manualStarts: 3, loginItemOn: false, asked: false)
                        && !LoginAsk.shouldAsk(manualStarts: 5, loginItemOn: true, asked: false) && !LoginAsk.shouldAsk(manualStarts: 5, loginItemOn: false, asked: true), "login")
+        }
+
+        try test("검색: the folded keys and the prepared query match as before (1.45)") {
+            // The matching as it was up to 1.44 (a string per folded letter), kept here to compare with.
+            func before(_ query: String, in text: String) -> Range<Int>? {
+                let wanted = Search.cleanQuery(query)
+                guard !wanted.isEmpty else { return nil }
+                let line = Array(text.precomposedStringWithCanonicalMapping.unicodeScalars)
+                guard line.count >= wanted.count else { return nil }
+                let folded = line.map(Search.fold), foldedQuery = wanted.map(Search.fold)
+                outer: for start in 0...(line.count - wanted.count) {
+                    for offset in wanted.indices {
+                        let t = line[start + offset], q = wanted[offset]
+                        if foldedQuery[offset] == folded[start + offset] { continue }
+                        if let initial = Search.choseong(of: t), Search.consonants.firstIndex(of: q.value) == initial { continue }
+                        continue outer
+                    }
+                    return start..<(start + wanted.count)
+                }
+                return nil
+            }
+            // Two scalars' keys are equal exactly when their folds are (below U+1100 every scalar; above it a sample).
+            var keyOf: [String: UInt32] = [:], foldOf: [UInt32: String] = [:]
+            let above: [UInt32] = [0x1100, 0x1161, 0x2000, 0x2003, 0x2126, 0x212B, 0x2D00, 0x3000, 0x3131, 0x314E, 0xAC00, 0xBCF4, 0xD7A3, 0xFF21, 0x1F600]
+            for value in Array(0..<0x1100) + above {
+                guard let scalar = Unicode.Scalar(value) else { continue }
+                let folded = Search.fold(scalar), key = Search.foldKey(scalar)
+                if let known = keyOf[folded] { try expect(known == key, "U+\(String(value, radix: 16)): key \(key), its fold's \(known)") }
+                if let known = foldOf[key] { try expect(known == folded, "U+\(String(value, radix: 16)): fold \(folded) under key \(key) of \(known)") }
+                keyOf[folded] = key
+                foldOf[key] = folded
+            }
+            // Random lines and queries of Latin with accents, Greek, Hangul, consonants, odd spaces, combining marks.
+            let pool = Array("aAbBcCeEéÉèiIİıoOöÖuUüßẞﬁ ΣσςΩωΆά가각나보고서분기초안까치ㄱㄲㅂㅅㅎ하이반가워  \u{3000}\u{0301}\u{0308}e\u{0301}Ⴀⴀ123-_.")
+            var seed: UInt64 = 0x9E3779B97F4A7C15
+            func next(_ n: Int) -> Int {
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                return Int((seed >> 33) % UInt64(n))
+            }
+            var compared = 0
+            for _ in 0..<20_000 {
+                let line = String((0..<(1 + next(14))).map { _ in pool[next(pool.count)] })
+                let chars = Array(line)
+                var query: String
+                switch next(3) {
+                case 0: query = String((0..<(1 + next(3))).map { _ in pool[next(pool.count)] })
+                case 1:
+                    let from = next(chars.count), count = 1 + next(max(1, chars.count - from))
+                    query = String(chars[from..<min(chars.count, from + count)]).uppercased()
+                default:
+                    let from = next(chars.count)
+                    query = String(chars[from..<min(chars.count, from + 3)].map { c -> Character in
+                        guard let v = c.unicodeScalars.first?.value, (0xAC00...0xD7A3).contains(v) else { return c }
+                        return Character(Unicode.Scalar(Search.consonants[Int((v - 0xAC00) / 588)])!)
+                    })
+                }
+                try expect(Search.match(query, in: line) == before(query, in: line), "\(query) in \(line): \(String(describing: Search.match(query, in: line))) vs \(String(describing: before(query, in: line)))")
+                compared += 1
+            }
+            try expect(compared == 20_000, "compared")
         }
 
         print("\(count) convenience checks passed.")

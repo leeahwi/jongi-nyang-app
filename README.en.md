@@ -8,7 +8,7 @@
 
 macOS · Windows · Free · No account
 
-[**Download for Mac**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.44.0) &nbsp;·&nbsp; [**Download for Windows**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.29.0) &nbsp;·&nbsp; [Project site](https://leeahwi.github.io/jongi-nyang-app/en/) &nbsp;·&nbsp; [한국어](README.md)
+[**Download for Mac**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.45.0) &nbsp;·&nbsp; [**Download for Windows**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.30.0) &nbsp;·&nbsp; [Project site](https://leeahwi.github.io/jongi-nyang-app/en/) &nbsp;·&nbsp; [한국어](README.md)
 
 [![Mac](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=mac-*&label=Mac&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![Windows](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=windows-*&label=Windows&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![CI](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml/badge.svg)](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml)
 
@@ -60,6 +60,15 @@ From any app, pull it out from the edge of the screen with <kbd>⇧⌘D</kbd> (W
   <img src="docs/readme/cards/drawer-en-light.png" width="800" alt="The notes drawer grouped by date, and a note's right-click menu">
 </picture>
 
+### To-do spaces
+
+Sort to-dos into spaces such as Work, Home and Study. Today still shows them all on one sheet, with only a colour band at the left of each row. Pick one from `All spaces ▾` or press <kbd>⌥⌘1</kbd>–<kbd>9</kbd> (Windows <kbd>Ctrl+Shift+1</kbd>–<kbd>9</kbd>) to see just that space for the day, and add `#work` on the input line to put a to-do there. Without any spaces, the notepad stays as it was.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/readme/cards/spaces-en-dark.png">
+  <img src="docs/readme/cards/spaces-en-light.png" width="800" alt="Two Today sheets: on the left, to-do rows with a space's colour band at their edge; on the right, the same sheet showing Work only, with four other to-dos hidden">
+</picture>
+
 ### A paper cat
 
 It celebrates finished tasks, delivers reminders, and now and then asks a question you answer with a button. Day and night paper; Korean, English and Dutch.
@@ -84,8 +93,8 @@ Everything is saved as JSON files on your computer. Pick a synced folder such as
 
 ## Installation
 
-- **macOS** 14 or later, Apple Silicon — open the [v1.44.0 DMG](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.44.0) and drag the app into Applications. Intel Macs need a source build.
-- **Windows** 10/11, x64 — run the installer (`.exe`) from [v1.29.0](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.29.0) or extract the ZIP.
+- **macOS** 14 or later, Apple Silicon — open the [v1.45.0 DMG](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.45.0) and drag the app into Applications. Intel Macs need a source build.
+- **Windows** 10/11, x64 — run the installer (`.exe`) from [v1.30.0](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.30.0) or extract the ZIP.
 - Other versions are on the [releases page](https://github.com/leeahwi/jongi-nyang-app/releases).
 
 The macOS release has no Developer ID signature or notarization; the Windows release is not code-signed. If the first launch is blocked, use **System Settings → Privacy & Security → Open Anyway** on macOS, or **More info → Run anyway** in Windows SmartScreen.
@@ -97,7 +106,7 @@ Data is stored as JSON and other files in a folder you choose. No account or ded
 - **Choose a location:** Change the folder in the app's **Desk → Storage & Backup** settings.
 - **Share across devices:** Choose a folder synchronized by iCloud Drive, OneDrive, Dropbox, or another provider to use the same data on macOS and Windows. The provider handles file transfer.
 - **Back up or move:** Export tasks, notes and note folders, events, alarms, completion history, and focus history to a `.jongi` file, then import it on another device.
-- **Files:** Tasks are in `todos.json`, notes in `memos.json`, and the notes drawer's folders, pins, sort order and per-note paper in `memo-folders.json`. The AI connection setting (`ai-link.json`) and the log of what Claude did (`ai-log.jsonl`) stay in each device's settings folder, even with a shared folder.
+- **Files:** Tasks are in `todos.json`, notes in `memos.json`, the notes drawer's folders, pins, sort order and per-note paper in `memo-folders.json`, and to-do spaces in `todo-spaces.json`. The AI connection setting (`ai-link.json`) and the log of what Claude did (`ai-log.jsonl`) stay in each device's settings folder, even with a shared folder.
 
 The [architecture document](docs/architecture.md) explains concurrent edits in shared folders. Reminders and alarms fire on each device where the app is running.
 

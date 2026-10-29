@@ -176,15 +176,15 @@ private enum FocusTests {
             try each(all.map { Focus.timeUpLine(minutes: 90, language: $0) }, ["1시간 30분 다 됐어요", "1 h 30 min done", "1 u 30 min voorbij"], "time up, long")
             let dentist = ["치과", "Dentist", "Tandarts"]
             try each(all.map { Focus.nextLine(title: dentist[$0 == .ko ? 0 : $0 == .en ? 1 : 2], at: at(2026, 10, 8, 15, 30), minutes: 40, language: $0, calendar: seoul) },
-                            ["다음 · 15:30 치과 (40분 뒤)", "Next · 3:30 PM Dentist (in 40 min)", "Volgende · 15:30 Tandarts (over 40 min)"], "next")
+                            ["40분 뒤 치과 · 15:30", "Dentist in 40 min · 3:30 PM", "Tandarts over 40 min · 15:30"], "next: how long first, the clock last (#46)")
             try each(all.map { Focus.nextLine(title: "x", at: at(2026, 10, 8, 16, 10), minutes: 80, language: $0, calendar: seoul) },
-                            ["다음 · 16:10 x (1시간 20분 뒤)", "Next · 4:10 PM x (in 1 h 20 min)", "Volgende · 16:10 x (over 1 u 20 min)"], "next, later")
+                            ["1시간 20분 뒤 x · 16:10", "x in 1 h 20 min · 4:10 PM", "x over 1 u 20 min · 16:10"], "next, later")
             try each(all.map { Focus.restLine(3, open: false, language: $0) },
                             ["그 밖의 오늘 할 일 3개 · 펼치기", "3 other to-dos today · Show", "Nog 3 taken vandaag · Tonen"], "rest")
             try each(all.map { Focus.restLine(1, open: true, language: $0) },
                             ["그 밖의 오늘 할 일 1개 · 접기", "1 other to-do today · Hide", "Nog 1 taak vandaag · Verbergen"], "rest, open")
             try expect(all.allSatisfy { Focus.restLine(0, open: false, language: $0) == nil }, "none")
-            try expectEqual(Focus.menuBarText(remaining: 750), "● 12:30", "menu bar")
+            try expectEqual(AppLanguage.allCases.map { Focus.menuBarText(remaining: 750, language: $0) }, ["● 13분", "● 13 min", "● 13 min"], "menu bar (#46)")
         }
 
         let start = at(2026, 10, 8, 14)

@@ -11,9 +11,9 @@ export type SnoozeId = "5" | "10" | "30" | "60" | "evening" | "morning" | "tomor
 export interface SnoozeChoice { id: SnoozeId; title: string; /** When it comes again (none for 내일로 미루기). */ at?: Date }
 
 const titles: Record<Lang, Record<SnoozeId, string>> = {
-  ko: { "5": "5분 뒤", "10": "10분 뒤", "30": "30분 뒤", "60": "1시간 뒤", evening: "오늘 저녁 7시", morning: "내일 아침 9시", tomorrow: "내일로 미루기" },
-  en: { "5": "In 5 min", "10": "In 10 min", "30": "In 30 min", "60": "In 1 hour", evening: "Tonight at 7 PM", morning: "Tomorrow at 9 AM", tomorrow: "Move to tomorrow" },
-  nl: { "5": "Over 5 min", "10": "Over 10 min", "30": "Over 30 min", "60": "Over 1 uur", evening: "Vanavond om 19:00", morning: "Morgen om 09:00", tomorrow: "Naar morgen" },
+  ko: { "5": "5분 뒤", "10": "10분 뒤", "30": "30분 뒤", "60": "1시간 뒤", evening: "오늘 저녁 7시", morning: "내일 아침 9시", tomorrow: "내일 하기" },
+  en: { "5": "In 5 min", "10": "In 10 min", "30": "In 30 min", "60": "In 1 hour", evening: "Tonight at 7 PM", morning: "Tomorrow at 9 AM", tomorrow: "Do tomorrow" },
+  nl: { "5": "Over 5 min", "10": "Over 10 min", "30": "Over 30 min", "60": "Over 1 uur", evening: "Vanavond om 19:00", morning: "Morgen om 09:00", tomorrow: "Morgen doen" },
 };
 export const snoozeTitle = (id: SnoozeId, lang: Lang = "ko"): string => titles[lang][id];
 

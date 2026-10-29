@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { hourLabel } from "../src/core/ribbon";
 import { test } from "node:test";
 import { heatLevelTitlesIn, archiveChoicesIn } from "../src/core/archive";
 import { backupFileName, backupMessages, exportedText, parseBackup, summaryText } from "../src/core/backup";
@@ -12,7 +13,7 @@ import { deadlineChoiceTitles, dueStyleTitles, label, sentence } from "../src/co
 import { eventColorTitle, eventRepeatTitle, occurrences, type EventColor, type EventRepeat, type LocalEvent } from "../src/core/events";
 import { defaultPomodoro, nextPhase, phaseName, startCountdown, startPomodoro, timerCaption } from "../src/core/focusTimer";
 import {
-  clock, days, langs, longDate, minutesAway, monthName, monthShort, monthTitle as langMonthTitle, nativeName, resolveLang, shortDate, spokenTime, timeRange,
+  clock, days, langs, longDate, minutesAway, monthName, monthShort, monthTitle as langMonthTitle, nativeName, resolveLang, setHourCycle, shortDate, spokenTime, timeRange,
   todos, weekdayName, weekdayShort, weekStartsMonday, type Lang,
 } from "../src/core/lang";
 import { lookbackMessage } from "../src/core/lookback";
@@ -50,6 +51,23 @@ test("languages: the setting, the week start and dates written by hand", () => {
   assert.equal(timeRange({ hour: 15, minute: 0 }, { hour: 16, minute: 0 }, "en"), "3:00–4:00 PM");
   assert.equal(timeRange({ hour: 11, minute: 30 }, { hour: 12, minute: 30 }, "en"), "11:30 AM–12:30 PM");
   assert.equal(timeRange({ hour: 11, minute: 30 }, { hour: 12, minute: 30 }, "nl"), "11:30–12:30");
+  // The system's clock (the main process sets it at launch): every time on one clock, a sentence's too.
+  try {
+    setHourCycle("h24");
+    assert.deepEqual(langs.map((lang) => clock(15, 0, lang)), ["15:00", "15:00", "15:00"]);
+    assert.deepEqual(langs.map((lang) => spokenTime(9, 30, lang)), ["09:30", "09:30", "09:30"]);
+    assert.deepEqual(langs.map((lang) => timeRange({ hour: 11, minute: 30 }, { hour: 12, minute: 30 }, lang)), ["11:30–12:30", "11:30–12:30", "11:30–12:30"]);
+    assert.deepEqual(langs.map((lang) => hourLabel(13, lang)), ["13", "13", "13"]);
+    setHourCycle("h12");
+    assert.deepEqual(langs.map((lang) => clock(15, 0, lang)), ["오후 3:00", "3:00 PM", "3:00 p.m."]);
+    assert.deepEqual(langs.map((lang) => spokenTime(9, 30, lang)), ["오전 9:30", "9:30 AM", "9:30 a.m."]);
+    assert.deepEqual(langs.map((lang) => clock(0, 5, lang)), ["오전 12:05", "12:05 AM", "12:05 a.m."]);
+    assert.deepEqual(langs.map((lang) => timeRange({ hour: 15, minute: 0 }, { hour: 16, minute: 0 }, lang)), ["오후 3:00–4:00", "3:00–4:00 PM", "3:00–4:00 p.m."]);
+    assert.deepEqual(langs.map((lang) => timeRange({ hour: 11, minute: 30 }, { hour: 12, minute: 30 }, lang)), ["오전 11:30–오후 12:30", "11:30 AM–12:30 PM", "11:30 a.m.–12:30 p.m."]);
+    assert.deepEqual(langs.map((lang) => hourLabel(13, lang)), ["오후 1", "1 PM", "1 p.m."]);
+  } finally {
+    setHourCycle(undefined);
+  }
   assert.deepEqual(langs.map((lang) => minutesAway(5, lang)), ["5분 뒤", "in 5 min", "over 5 min"]);
   assert.deepEqual(langs.map((lang) => `${days(1, lang)} ${days(3, lang)} ${todos(1, lang)} ${todos(2, lang)}`),
     ["1일 3일 할 일 1개 할 일 2개", "1 day 3 days 1 to-do 2 to-dos", "1 dag 3 dagen 1 taak 2 taken"]);

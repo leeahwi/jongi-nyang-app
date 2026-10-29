@@ -30,6 +30,8 @@ interface Session {
   deadline?: number;
   dismissTimer?: number;
   hovering: boolean;
+  /** The pointer is over the bubble or the cat, remembered even while the bubble is still opening. */
+  pointerInside: boolean;
   menuOpen: boolean;
   finishing: boolean;
 }
@@ -60,7 +62,7 @@ async function show(payload: PopupPayload): Promise<void> {
   const walks = payload.style !== "compact" && !reduceMotion();
   const current: Session = {
     payload, tasks: payload.tasks, completed: new Set(), phase: { kind: "still" }, travel: 0,
-    bubble: h("div"), timers: [], size: { width: 0, height: 0 }, hovering: false, menuOpen: false, finishing: false,
+    bubble: h("div"), timers: [], size: { width: 0, height: 0 }, hovering: false, pointerInside: false, menuOpen: false, finishing: false,
   };
   session = current;
   document.documentElement.dataset.font = payload.font;
@@ -94,7 +96,7 @@ async function show(payload: PopupPayload): Promise<void> {
   current.travel = travel;
 
   if (!walks) {
-    requestAnimationFrame(() => current.bubble.classList.add("open"));
+    requestAnimationFrame(() => { current.bubble.classList.add("open"); void hoverIfInside(current); });
     return beginReading(current);
   }
   current.phase = { kind: "walkingIn", start: performance.now() };
@@ -102,6 +104,7 @@ async function show(payload: PopupPayload): Promise<void> {
   later(current, walkInMs, () => {
     current.phase = { kind: "arrived", start: performance.now() };
     current.bubble.classList.add("open");
+    void hoverIfInside(current);
     later(current, 300, () => beginReading(current));
     // Once the greeting is over the cat holds still and nothing redraws.
     later(current, greetingMs, () => { if (current.phase.kind === "arrived") current.phase = { kind: "still" }; });
@@ -125,8 +128,7 @@ function buildBubble(current: Session): HTMLDivElement {
   const body = h("div", { class: "slip-body" });
   const foot = h("div", { class: "slip-foot" });
   bubble.append(tape(events ? "event" : "alarm"), head.element, body, foot);
-  bubble.addEventListener("mouseenter", () => setHover(current, true));
-  bubble.addEventListener("mouseleave", () => setHover(current, false));
+  watchPointer(current, bubble);
   if (events) {
     buildEvents(current, head.context, body, foot);
     return bubble;
@@ -146,7 +148,7 @@ function buildBubble(current: Session): HTMLDivElement {
   // boxes and the primary opens the note.
   // 모두 끝냄: the rows all checked at once, sent together (one undo step and the note's "3개 끝냈어요").
   const finishAll = payload.scheduled
-    ? slipButton(visible.length > 1 ? t("모두 끝냄") : t("끝냄"), "primary", () => completeAll(current, visible))
+    ? slipButton(visible.length > 1 ? t("모두 끝내기") : t("끝내기"), "primary", () => completeAll(current, visible))
     : slipButton(t("노트 열기"), "primary", () => api.send("popup:open"));
   if (payload.scheduled) finishAll.disabled = !payload.canComplete;
   if (payload.preview && payload.scheduled) finishAll.title = t("미리보기: 목록은 바뀌지 않아요");
@@ -183,7 +185,7 @@ function completeAll(current: Session, tasks: PopupTask[]): void {
 }
 
 /**
- * 저녁 정리: "오늘 3개 남았어요. 내일로 넘길까요?", the tasks (each ticked; untick one to leave it), and
+ * 저녁 정리: "오늘도 수고했어요. 남은 3개는 내일로 넘길까요?", the tasks (each ticked; untick one to leave it), and
  * 내일로 · 언젠가로 · 그대로 두기 (the morning version: 오늘 할게요 keeps them). It stays until answered.
  */
 function buildSweep(current: Session, bubble: HTMLDivElement): HTMLDivElement {
@@ -199,7 +201,8 @@ function buildSweep(current: Session, bubble: HTMLDivElement): HTMLDivElement {
   const refresh = () => { for (const button of buttons) button.disabled = chosen.size === 0; };
   for (const task of current.tasks) {
     const title = task.title || t("제목 없는 할 일");
-    const box = h("button", { class: "check", role: "checkbox", "aria-checked": "true", "aria-label": title }, h("span", {}, icon("check", 12, 2.6)));
+    // #32: a round pick (filled lavender with →: 넘겨요), not the square sage ✓ that means 끝냈어요.
+    const box = h("button", { class: "check carry-pick", role: "checkbox", "aria-checked": "true", "aria-label": title }, h("span", {}, icon("arrowRight", 11, 2.8)));
     const row = h("div", { class: "task picked", "data-id": task.id }, box, h("span", { class: "open-task sweep-title", title }, title), h("span", { class: "when" }));
     const flip = () => {
       if (chosen.has(task.id)) chosen.delete(task.id); else chosen.add(task.id);
@@ -221,8 +224,7 @@ function buildSweep(current: Session, bubble: HTMLDivElement): HTMLDivElement {
   else foot.append(tomorrow, someday, h("span", { class: "spacer" }), slipButton(t("오늘 할게요"), "primary", () => answer("keep")));
   bubble.append(tape("todo"), head.element, body, foot);
   bubble.classList.add("sweep-bubble");
-  bubble.addEventListener("mouseenter", () => setHover(current, true));
-  bubble.addEventListener("mouseleave", () => setHover(current, false));
+  watchPointer(current, bubble);
   return bubble;
 }
 
@@ -331,8 +333,7 @@ function buildCat(current: Session): NonNullable<Session["cat"]> {
   shadow.style.height = `${size * 0.07}px`;
   shadow.style.bottom = `${size * 0.035}px`;
   image.addEventListener("click", () => api.send("popup:open"));
-  image.addEventListener("mouseenter", () => setHover(current, true));
-  image.addEventListener("mouseleave", () => setHover(current, false));
+  watchPointer(current, image);
   stage.append(track);
   const cat = { track, lift, image, shadow, size };
   applyPose(current, cat, performance.now());
@@ -368,7 +369,41 @@ function beginReading(current: Session): void {
   resumeIfIdle(current);
 }
 
+/**
+ * The window lets clicks through to whatever is behind it until the pointer is over the bubble or the cat
+ * (popup:interactive), and through it the page hears only the pointer's moves. So the pointer is remembered
+ * while the bubble is still opening (the cat walking in), any move decides whether it is over the bubble or
+ * the cat, and when the bubble opens a pointer that has not moved at all is looked up on the screen.
+ */
+function watchPointer(current: Session, element: HTMLElement): void {
+  element.addEventListener("mouseenter", () => setHover(current, true));
+  element.addEventListener("mouseleave", () => setHover(current, false));
+}
+
+function overSlip(current: Session, target: EventTarget | null): boolean {
+  return target instanceof Node && (current.bubble.contains(target) || Boolean(current.cat?.image.contains(target)));
+}
+
+// Any move over the window (as the pet and the timer do it): over the bubble or the cat, or not.
+document.addEventListener("mousemove", (event) => {
+  const current = session;
+  if (!current) return;
+  const over = overSlip(current, event.target);
+  if (over !== current.pointerInside || over !== current.hovering) setHover(current, over);
+});
+
+async function hoverIfInside(current: Session): Promise<void> {
+  if (current.hovering) return;
+  if (!current.pointerInside && !current.bubble.matches(":hover") && !current.cat?.image.matches(":hover")) {
+    const at = await api.popupPointer();
+    if (session !== current || !at || current.hovering) return;
+    if (!overSlip(current, document.elementFromPoint(at.x, at.y))) return;
+  }
+  setHover(current, true);
+}
+
 function setHover(current: Session, hovering: boolean): void {
+  current.pointerInside = hovering;
   if (!current.bubble.classList.contains("open")) return;
   current.hovering = hovering;
   api.send("popup:interactive", hovering);

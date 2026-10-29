@@ -69,13 +69,13 @@ struct MenuBarState {
     /// A running (or paused) timer's part gone by, for the ring around the face.
     var progress: Double? = nil
 
-    /// `focusing`: 집중 on a to-do — the time gets a small mark ("● 12:30"). A paused timer has no words.
+    /// `focusing`: 집중 on a to-do — the time gets a small mark ("● 21분"). A paused timer has no words.
     static func current(model: AppModel, timer: FocusTimer?, focusing: Bool = false, now: Date = Date()) -> MenuBarState {
         let soon = TodayWindowView.soon(model: model, now: now)
         let remaining = timer.flatMap { $0.isPaused ? nil : $0.remaining(at: now) }
         let language = AppLanguage.current
         var text = model.menuBarText == .hide ? "" : TodayGlance.menuBarText(timerRemaining: remaining, soon: soon, language: language)
-        if focusing, let remaining, model.menuBarText != .hide { text = Focus.menuBarText(remaining: remaining) }
+        if focusing, let remaining, model.menuBarText != .hide { text = Focus.menuBarText(remaining: remaining, language: language) }
         // VoiceOver and the tooltip still name a paused timer's time.
         let accessibility = TodayGlance.accessibilityText(appName: PaperTheme.mascotName, timerRemaining: timer.map { $0.remaining(at: now) }, soon: soon,
                                                           openTasks: model.remainingCount, language: language)
@@ -358,7 +358,10 @@ struct TodayWindowView: View {
             // While focusing: the to-do's title under the time (focus-cases.md glance rule).
             let focusTitle = timer.isFocusing ? timer.session?.title : nil
             GlanceCard(caption: L("타이머"),
-                       value: running.map { FocusTimer.clock($0.remaining(at: now)) } ?? "—",
+                       // #46: a length ("21분" + small "남음"), not "20:50" beside the clock times either side.
+                       value: running.map { TodayGlance.timerLength($0.remaining(at: now), language: language) } ?? "—",
+                       unit: running.map { _ in TodayGlance.timerLeftWord(language) },
+                       unitFirst: TodayGlance.timerLeftWordFirst(language),
                        line: running.map { timer in
                            guard let focusTitle else {
                                // A plain timer: when it ends (the caption already says 타이머).
@@ -371,7 +374,7 @@ struct TodayWindowView: View {
                        } ?? TodayGlance.timerHint(language),
                        hot: false,
                        running: running.map { !$0.isPaused } ?? false,
-                       accessibility: running.map { L("타이머") + ": " + FocusTimer.clock($0.remaining(at: now)) + ", " + $0.caption(language) }
+                       accessibility: running.map { L("타이머") + ": " + TodayGlance.timerLeftText($0.remaining(at: now), language: language) + ", " + $0.caption(language) }
                            ?? L("타이머") + ": " + L("없음"))
                 .overlay(alignment: .topTrailing) {
                     if running != nil && (timerHover || previewTimerHover) { timerButtons(paused: running?.isPaused ?? false) }
@@ -468,7 +471,7 @@ struct TodayWindowView: View {
             Spacer(minLength: 6)
             footerLink(L("책상"), symbol: "sidebar.left", action: onCalendar)
             Spacer(minLength: 6)
-            footerLink(model.petVisible ? L("종이냥 숨기기") : L("종이냥 보이기"), symbol: "pawprint") { model.petVisible.toggle() }
+            footerLink(model.petVisible ? L("종이냥 숨기기") : L("종이냥 보이기"), symbol: "cat") { model.petVisible.toggle() }
         }
         .padding(.horizontal, 2)
     }
@@ -493,6 +496,9 @@ struct TodayWindowView: View {
 private struct GlanceCard: View {
     let caption: String
     let value: String
+    /// A small word beside the value: the timer's "남음" · "left" after it, or Dutch "nog" before it (#46).
+    var unit: String? = nil
+    var unitFirst = false
     let line: String
     /// Within the hour: clay (clay means 곧 · 늦음).
     let hot: Bool
@@ -511,11 +517,12 @@ private struct GlanceCard: View {
                 .foregroundStyle(accent ?? PaperTheme.ink3)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
-            Text(value)
-                .font(.system(size: 17, weight: .semibold).monospacedDigit())
-                .foregroundStyle(accent ?? PaperTheme.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
+            // The small word steps aside when the card is too narrow for it (the value never gets "…").
+            ViewThatFits(in: .horizontal) {
+                valueLine(unit: unit)
+                valueLine(unit: nil)
+            }
+            .foregroundStyle(accent ?? PaperTheme.ink)
             Text(line)
                 .font(.system(size: 10.5).monospacedDigit())
                 .foregroundStyle(PaperTheme.ink2)
@@ -533,6 +540,18 @@ private struct GlanceCard: View {
         .contentShape(RoundedRectangle(cornerRadius: 10))
         .accessibilityElement(children: .contain)
         .accessibilityLabel(accessibility)
+    }
+
+    private func valueLine(unit: String?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 3) {
+            if let unit, unitFirst { Text(unit).font(.system(size: 10.5, weight: .medium)) }
+            Text(value)
+                .font(.system(size: 17, weight: .semibold).monospacedDigit())
+                .lineLimit(1)
+                .minimumScaleFactor(unit == nil ? 0.75 : 1)
+            if let unit, !unitFirst { Text(unit).font(.system(size: 10.5, weight: .medium)) }
+        }
+        .fixedSize(horizontal: unit != nil, vertical: false)
     }
 }
 

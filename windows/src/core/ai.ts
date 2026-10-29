@@ -272,11 +272,11 @@ export function aiMarks(entries: readonly AiLogEntry[], now: Date, current: (tar
 
 // ─── Words (the same table as the Mac's AIText) ───────────────────────────────
 
-/** "할 일" · "task(s)" · "taak/taken"; memos are "note(s)" in English, as in the app. */
+/** "할 일" · "to-do(s)" · "taak/taken"; memos are "note(s)" in English, as in the app. */
 export function aiUnit(target: AiTarget, count: number, lang: Lang): string {
   const one = count === 1;
   const words: Record<AiTarget, [string, string, string, string, string]> = {
-    todos: ["할 일", "task", "tasks", "taak", "taken"],
+    todos: ["할 일", "to-do", "to-dos", "taak", "taken"],
     events: ["일정", "event", "events", "afspraak", "afspraken"],
     memos: ["메모", "note", "notes", "notitie", "notities"],
   };
@@ -308,7 +308,7 @@ export function aiChangeKind(change: AiChange): AiChangeKind {
 }
 
 /**
- * The toast for Claude's entry: "Claude가 할 일 2개를 넣었어요" · "Claude added 2 tasks"; one item's time, date
+ * The toast for Claude's entry: "Claude가 할 일 2개를 넣었어요" · "Claude added 2 to-dos"; one item's time, date
  * or check: "Claude가 ‘보고서 쓰기’ 시간을 바꿨어요"; several: "Claude가 할 일 3개를 바꿨어요".
  */
 export function aiToastText(entry: AiLogEntry, lang: Lang): string {
@@ -327,23 +327,24 @@ export function aiToastText(entry: AiLogEntry, lang: Lang): string {
   }
 }
 
-/** At launch, for what Claude did while the app was closed: "자리 비운 사이 Claude가 3가지를 했어요". */
+/** At launch, for what Claude did while the app was closed: "자리를 비운 사이 Claude가 3개를 넣거나 고쳤어요". */
 export function aiAwayText(count: number, lang: Lang): string {
   return {
-    ko: `자리 비운 사이 Claude가 ${count}가지를 했어요`,
+    ko: `자리를 비운 사이 Claude가 ${count}개를 넣거나 고쳤어요`,
     en: `While you were away, Claude made ${count} ${count === 1 ? "change" : "changes"}`,
-    nl: `Terwijl je weg was, heeft Claude ${count} ${count === 1 ? "ding" : "dingen"} gedaan`,
+    nl: `Terwijl je weg was, heeft Claude ${count} ${count === 1 ? "ding" : "dingen"} toegevoegd of gewijzigd`,
   }[lang];
 }
 
 /** After 되돌리기: all back, some (partial), or nothing (M14). */
 export function aiUndoText(undone: number, left: number, lang: Lang): string {
-  if (undone === 0) return { ko: "그새 바뀌어서 되돌리지 못했어요", en: "It changed since, so it can’t be undone", nl: "Het is intussen gewijzigd, dus ongedaan maken lukt niet" }[lang];
+  // Not a failure: what was changed since is kept as it is (#36).
+  if (undone === 0) return { ko: "그사이 직접 고친 항목이라 그대로 뒀어요", en: "You changed it since, so it stays as you left it", nl: "Je hebt het intussen aangepast, dus het blijft zo" }[lang];
   if (left === 0) return { ko: "되돌렸어요", en: "Undone", nl: "Ongedaan gemaakt" }[lang];
   return {
-    ko: `${undone}개는 되돌리고, 그새 바뀐 ${left}개는 그대로 뒀어요`,
-    en: `Undid ${undone}; ${left} changed since, so ${left === 1 ? "it stays" : "they stay"}`,
-    nl: `${undone} ongedaan gemaakt; ${left} intussen gewijzigd, ${left === 1 ? "die blijft" : "die blijven"} staan`,
+    ko: `${undone}개를 되돌렸어요. 그사이 고친 ${left}개는 그대로 뒀어요`,
+    en: `Undid ${undone}. The ${left} you changed since ${left === 1 ? "stays as it is" : "stay as they are"}`,
+    nl: `${undone} ongedaan gemaakt. ${left === 1 ? "Die ene die je intussen aanpaste, blijft zo" : `De ${left} die je intussen aanpaste, blijven zo`}`,
   }[lang];
 }
 

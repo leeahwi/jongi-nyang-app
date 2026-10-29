@@ -11,6 +11,9 @@ struct DrawerTextView: NSViewRepresentable {
     var bodyFont: NSFont = .systemFont(ofSize: 12.5)
     /// The first non-empty line in this face (the memo's title); nil: all body.
     var titleFont: NSFont?
+    /// The title's strokes a hair heavier (#14, option B: a 0.7 pt stroke in its own ink, as dark as a card's title;
+    /// not for the clean face).
+    var titleStroke = false
     /// Every line this tall (the memo sheet's rules), the title line `titleLineHeight`; nil: the font's own.
     var lineHeight: CGFloat?
     var titleLineHeight: CGFloat?
@@ -24,6 +27,8 @@ struct DrawerTextView: NSViewRepresentable {
     var minHeight: CGFloat = 18
     /// Called with the text before each change (another device's edit may have come in meanwhile).
     var onEdit: ((String, String) -> Void)?
+    /// The text lets go of the keyboard.
+    var onBlur: (() -> Void)?
     var accessibilityLabel = ""
     /// A memo being typed: its right-click is the system's text menu with this section added (`이 메모`, 1.44).
     var extraMenu: (@MainActor () -> [DrawerMenuItem])?
@@ -41,6 +46,8 @@ struct DrawerTextView: NSViewRepresentable {
         view.isAutomaticTextReplacementEnabled = false
         view.isAutomaticSpellingCorrectionEnabled = false
         view.textContainerInset = .zero
+        // #14: no ring or box round the text while it's typed — the caret alone says so.
+        view.focusRingType = .none
         view.textContainer?.lineFragmentPadding = 0
         view.textContainer?.widthTracksTextView = true
         view.isVerticallyResizable = false
@@ -48,7 +55,7 @@ struct DrawerTextView: NSViewRepresentable {
         view.delegate = context.coordinator
         view.setAccessibilityLabel(accessibilityLabel)
         view.string = text
-        context.coordinator.restyle(view)
+        context.coordinator.restyle(view, full: true)
         view.onSubmit = { context.coordinator.parent.onSubmit() }
         view.onEscape = { context.coordinator.parent.onEscape() }
         view.submitsOnReturn = submitsOnReturn
@@ -69,11 +76,11 @@ struct DrawerTextView: NSViewRepresentable {
             // From elsewhere (another device, a box ticked): taken, the caret kept where it was.
             let caret = TextMerge.caret(view.selectedRange().location, from: view.string, to: text)
             view.string = text
-            coordinator.restyle(view)
+            coordinator.restyle(view, full: true)
             view.setSelectedRange(NSRange(location: min(caret, (text as NSString).length), length: 0))
             view.invalidateIntrinsicContentSize()
-        } else if old.palette != palette || old.titleFont != titleFont || old.bodyFont != bodyFont {
-            coordinator.restyle(view)
+        } else if old.palette != palette || old.titleFont != titleFont || old.bodyFont != bodyFont || old.titleStroke != titleStroke {
+            coordinator.restyle(view, full: true)
         }
         if focus != coordinator.focused {
             coordinator.focused = focus
@@ -98,16 +105,36 @@ struct DrawerTextView: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: DrawerTextView
         var focused = 0
+        /// What the keys changed since the last restyle: from `start` to `tail` characters before the end (both stay
+        /// right as later keys move the text around them). nil: nothing yet.
+        private var dirty: (start: Int, tail: Int)?
+        /// How many restyles took only the edited lines (the check counts them).
+        private(set) var lineRestyles = 0
         init(_ parent: DrawerTextView) { self.parent = parent }
+
+        func textView(_ textView: NSTextView, shouldChangeTextIn range: NSRange, replacementString text: String?) -> Bool {
+            let tail = (textView.textStorage?.length ?? 0) - NSMaxRange(range)
+            dirty = dirty.map { (min($0.start, range.location), min($0.tail, tail)) } ?? (range.location, tail)
+            return true
+        }
 
         func textDidChange(_ notification: Notification) {
             guard let view = notification.object as? NSTextView else { return }
+            // Korean (any input method) while a syllable is being composed: nothing leaves the text view — no
+            // restyle, no edit, no save — until it's committed; only its height may change.
+            guard !view.hasMarkedText() else {
+                view.invalidateIntrinsicContentSize()
+                return
+            }
             let before = parent.text
             restyle(view)
-            parent.text = view.string
-            parent.onEdit?(before, view.string)
+            let now = view.string
+            parent.text = now
+            parent.onEdit?(before, now)
             view.invalidateIntrinsicContentSize()
         }
+
+        func textDidEndEditing(_ notification: Notification) { parent.onBlur?() }
 
         func takeFocus(_ view: NSTextView, line: Int?) {
             DispatchQueue.main.async {
@@ -128,8 +155,9 @@ struct DrawerTextView: NSViewRepresentable {
             }
         }
 
-        /// The memo's look while it's typed: ink, the title line in handwriting, code lines fixed-width.
-        func restyle(_ view: NSTextView) {
+        /// The memo's look while it's typed: ink, the title line in handwriting, code lines fixed-width. A key after the
+        /// title line restyles only its own lines (a 1 MB memo isn't styled again whole on every key).
+        func restyle(_ view: NSTextView, full: Bool = false) {
             guard let storage = view.textStorage else { return }
             let palette = parent.palette
             let ink = NSColor(palette.ink)
@@ -146,22 +174,51 @@ struct DrawerTextView: NSViewRepresentable {
                 return [.font: font, .foregroundColor: ink, .paragraphStyle: paragraph, .baselineOffset: offset]
             }
             let body = ruled(parent.bodyFont, parent.lineHeight)
+            func titleAttributes(_ font: NSFont) -> [NSAttributedString.Key: Any] {
+                var attributes = ruled(font, parent.titleLineHeight ?? parent.lineHeight)
+                guard parent.titleStroke else { return attributes }
+                // Stroke and fill: the width is a percentage of the size, so 0.7 pt at any size (AppKit's 0.35 barely shows).
+                attributes[.strokeWidth] = -(0.7 / font.pointSize * 100)
+                attributes[.strokeColor] = ink
+                return attributes
+            }
             view.typingAttributes = body
             view.insertionPointColor = NSColor(palette.check)
             view.selectedTextAttributes = [.backgroundColor: NSColor(palette.check).withAlphaComponent(0.22)]
             guard !view.hasMarkedText() else { return }
+            let text = storage.string as NSString
+            let mono = NSFont.monospacedSystemFont(ofSize: parent.bodyFont.pointSize - 1, weight: .regular)
+            let edited = dirty.map { ($0.start, max($0.start, text.length - $0.tail)) }
+            dirty = nil
+            if !full, let (start, end) = edited, start <= text.length, start >= titleEnd(text) {
+                // The lines the keys touched, and the one after (a line break typed or taken away moves it).
+                var lines = text.lineRange(for: NSRange(location: start, length: min(end, text.length) - start))
+                if NSMaxRange(lines) < text.length { lines = NSUnionRange(lines, text.lineRange(for: NSRange(location: NSMaxRange(lines), length: 0))) }
+                storage.beginEditing()
+                storage.setAttributes(body, range: lines)
+                var location = lines.location
+                while location < NSMaxRange(lines) {
+                    let range = text.lineRange(for: NSRange(location: location, length: 0))
+                    if Checklist.isCode(text.substring(with: range).trimmingCharacters(in: .newlines)) {
+                        storage.addAttributes(ruled(mono, parent.lineHeight), range: range)
+                    }
+                    if range.length == 0 { break }
+                    location = NSMaxRange(range)
+                }
+                storage.endEditing()
+                lineRestyles += 1
+                return
+            }
             storage.beginEditing()
             let full = NSRange(location: 0, length: storage.length)
             storage.setAttributes(body, range: full)
-            let text = storage.string as NSString
             var location = 0
             var titled = parent.titleFont == nil
-            let mono = NSFont.monospacedSystemFont(ofSize: parent.bodyFont.pointSize - 1, weight: .regular)
             while location <= text.length {
                 let range = text.lineRange(for: NSRange(location: location, length: 0))
                 let line = text.substring(with: range).trimmingCharacters(in: .newlines)
                 if !titled, !line.trimmingCharacters(in: .whitespaces).isEmpty, let title = parent.titleFont {
-                    storage.addAttributes(ruled(title, parent.titleLineHeight ?? parent.lineHeight), range: range)
+                    storage.addAttributes(titleAttributes(title), range: range)
                     titled = true
                 } else if Checklist.isCode(line) {
                     storage.addAttributes(ruled(mono, parent.lineHeight), range: range)
@@ -172,8 +229,23 @@ struct DrawerTextView: NSViewRepresentable {
             }
             storage.endEditing()
             if let title = parent.titleFont, storage.length == 0 {
-                view.typingAttributes = ruled(title, parent.titleLineHeight ?? parent.lineHeight)
+                view.typingAttributes = titleAttributes(title)
             }
+        }
+
+        /// Where the title line (the first with words) ends, its break included; 0 without a title face, the text's
+        /// end when no line has words yet. An edit from there on can't change which line is the title.
+        private func titleEnd(_ text: NSString) -> Int {
+            guard parent.titleFont != nil else { return 0 }
+            var location = 0
+            while location < text.length {
+                let range = text.lineRange(for: NSRange(location: location, length: 0))
+                // The same test as the whole restyle's.
+                if !text.substring(with: range).trimmingCharacters(in: .newlines).trimmingCharacters(in: .whitespaces).isEmpty { return NSMaxRange(range) }
+                if range.length == 0 { break }
+                location = NSMaxRange(range)
+            }
+            return text.length + 1
         }
     }
 

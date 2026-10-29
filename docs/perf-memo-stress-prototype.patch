@@ -1,0 +1,119 @@
+diff --git a/mac/Sources/PaperTodo/MemoDrawerCards.swift b/mac/Sources/PaperTodo/MemoDrawerCards.swift
+index 85e63e1..533dba0 100644
+--- a/mac/Sources/PaperTodo/MemoDrawerCards.swift
++++ b/mac/Sources/PaperTodo/MemoDrawerCards.swift
+@@ -55,7 +55,7 @@ struct MemoCard: View {
+         }
+         .onHover { hovering = $0 }
+         .onTapGesture { if !expanded { drawer.expand(memo.id) } }
+-        .draggableIf(!expanded, "memo:" + memo.id) { DragCard(title: MemoCards.title(memo.text, language: .current), palette: sheet, font: font) }
++        .draggableIf(!expanded, "memo:" + memo.id) { DragCard(title: drawer.cardTitle(memo), palette: sheet, font: font) }
+         .accessibilityElement(children: expanded ? .contain : .combine)
+         .accessibilityAddTraits(expanded ? [] : .isButton)
+         .accessibilityAction { drawer.expand(memo.id) }
+diff --git a/mac/Sources/PaperTodo/MemoDrawerModel.swift b/mac/Sources/PaperTodo/MemoDrawerModel.swift
+index 75ebf93..f43aba6 100644
+--- a/mac/Sources/PaperTodo/MemoDrawerModel.swift
++++ b/mac/Sources/PaperTodo/MemoDrawerModel.swift
+@@ -498,7 +498,7 @@ final class MemoDrawer: ObservableObject {
+     func card(_ memo: Memo) -> Card {
+         if let known = cards[memo.id], known.text == memo.text { return known.card }
+         let made = Card(title: MemoCards.title(memo.text, language: .current), preview: MemoCards.preview(memo.text), kind: MemoCards.kind(memo.text))
+-        if cards.count > 2000 { cards.removeAll() }
++        if cards.count > 20000 { cards.removeAll() }
+         cards[memo.id] = (memo.text, made)
+         return made
+     }
+@@ -508,7 +508,7 @@ final class MemoDrawer: ObservableObject {
+         if let known = cards[memo.id], known.text == memo.text { return known.card.title }
+         if let known = titles[memo.id], known.text == memo.text { return known.title }
+         let title = MemoCards.title(memo.text, language: .current)
+-        if titles.count > 2000 { titles.removeAll() }
++        if titles.count > 20000 { titles.removeAll() }
+         titles[memo.id] = (memo.text, title)
+         return title
+     }
+@@ -520,7 +520,26 @@ final class MemoDrawer: ObservableObject {
+     }
+ 
+     /// More than 20 memos shown: the cards a little closer (12 pt apart, at least 56 tall).
+-    var dense: Bool { tabMemos.count > 20 }
++    var dense: Bool {
++        let key = [memos.count, folders.placement.count, folders.folders.count, tab.hashValue]
++        if let cached = denseCache, cached.key == key { return cached.value }
++        let value = tabMemos.count > 20
++        denseCache = (key, value)
++        return value
++    }
++    private var denseCache: (key: [Int], value: Bool)?
++    func folderCount(_ id: String) -> Int {
++        let key = [memos.count, folders.placement.count]
++        if folderCountsKey != key {
++            var counts: [String: Int] = [:]
++            for memo in memos { counts[folders.folderID(of: memo.id), default: 0] += 1 }
++            folderCounts = counts
++            folderCountsKey = key
++        }
++        return folderCounts[id] ?? 0
++    }
++    private var folderCounts: [String: Int] = [:]
++    private var folderCountsKey: [Int] = []
+ 
+     func arranged(_ list: [Memo]) -> [Memo] {
+         list.enumerated().sorted { a, b in
+diff --git a/mac/Sources/PaperTodo/MemoDrawerView.swift b/mac/Sources/PaperTodo/MemoDrawerView.swift
+index 814bb1f..3c661a9 100644
+--- a/mac/Sources/PaperTodo/MemoDrawerView.swift
++++ b/mac/Sources/PaperTodo/MemoDrawerView.swift
+@@ -522,7 +522,7 @@ private struct FolderTab: View {
+         let shape = right ? UnevenRoundedRectangle(topLeadingRadius: 9, bottomLeadingRadius: 9, style: .continuous)
+             : UnevenRoundedRectangle(bottomTrailingRadius: 9, topTrailingRadius: 9, style: .continuous)
+         let back = picked ? palette.pickedTab?.back : nil
+-        let count = drawer.folders.count(drawer.memos, in: folder.id)
++        let count = drawer.folderCount(folder.id)
+         let hint = MemoFolders.bookmarkLabel(name, count: count, key: number <= 9 ? "⌘\(number)" : nil, language: .current)
+         Button { drawer.show(.folder(folder.id)) } label: {
+             ZStack {
+diff --git a/mac/Sources/PaperCore/MemoFolders.swift b/mac/Sources/PaperCore/MemoFolders.swift
+index b88225e..8d80292 100644
+--- a/mac/Sources/PaperCore/MemoFolders.swift
++++ b/mac/Sources/PaperCore/MemoFolders.swift
+@@ -365,12 +365,22 @@ public struct MemoFolders: Equatable, Sendable {
+         return MemoFolders(folders: folders, placement: placement, updatedAt: date(object["updatedAt"]), extra: unknown(object, fileKeys), language: language)
+     }
+ 
++    nonisolated(unsafe) private static let plainISO = ISO8601DateFormatter()
++    nonisolated(unsafe) private static let fractionalISO: ISO8601DateFormatter = {
++        let formatter = ISO8601DateFormatter()
++        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
++        return formatter
++    }()
++    nonisolated(unsafe) private static let utcISO: ISO8601DateFormatter = {
++        let formatter = ISO8601DateFormatter()
++        formatter.formatOptions = [.withInternetDateTime]
++        formatter.timeZone = TimeZone(identifier: "UTC")
++        return formatter
++    }()
++
+     private static func date(_ value: Any?) -> Date {
+         guard let text = value as? String else { return Date(timeIntervalSince1970: 0) }
+-        let plain = ISO8601DateFormatter()
+-        let fractional = ISO8601DateFormatter()
+-        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+-        return (plain.date(from: text) ?? fractional.date(from: text)).map(second) ?? Date(timeIntervalSince1970: 0)
++        return (plainISO.date(from: text) ?? fractionalISO.date(from: text)).map(second) ?? Date(timeIntervalSince1970: 0)
+     }
+ 
+     /// The file's text: keys in a fixed order, 2-space indent, folders in `order`, placements by
+@@ -406,10 +416,7 @@ public struct MemoFolders: Equatable, Sendable {
+     }
+ 
+     public static func iso(_ date: Date) -> String {
+-        let formatter = ISO8601DateFormatter()
+-        formatter.formatOptions = [.withInternetDateTime]
+-        formatter.timeZone = TimeZone(identifier: "UTC")
+-        return formatter.string(from: second(date))
++        utcISO.string(from: second(date))
+     }
+ 
+     static func quote(_ text: String) -> String {

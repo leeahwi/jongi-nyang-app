@@ -72,7 +72,7 @@ test("M15: what Claude did while the app was closed: one notice at launch with t
   const shown: NoteNotice[] = [];
   const next = new AiConnection(again, folder, { toast: (notice) => { shown.push(notice); return true; }, noteVisible: () => true, say: () => undefined, changed: () => undefined }, files, "windows 1.27.0");
   next.start();
-  assert.deepEqual(shown.map((notice) => [notice.text, notice.show]), [["자리 비운 사이 Claude가 3가지를 했어요", "ai"]]);
+  assert.deepEqual(shown.map((notice) => [notice.text, notice.show]), [["자리를 비운 사이 Claude가 3개를 넣거나 고쳤어요", "ai"]]);
   assert.equal(again.items.length, 3);
   next.start();
   assert.equal(shown.length, 1, "seen: not said twice");
@@ -119,13 +119,13 @@ test("M14: changed here since: left as it is, and said so; a partial undo says h
   store.mutate((history) => history.edit(items[0].id, "보고서 다듬기"));
   assert.equal(ai.undoLatest(), false, "Ctrl+Z after an edit here is the edit's");
   ai.undo(entry.id);
-  assert.equal(toasts[toasts.length - 1].text, "1개는 되돌리고, 그새 바뀐 1개는 그대로 뒀어요");
+  assert.equal(toasts[toasts.length - 1].text, "1개를 되돌렸어요. 그사이 고친 1개는 그대로 뒀어요");
   assert.deepEqual(store.items.map((item) => item.title), ["보고서 다듬기"]);
   const { entry: second, items: [only] } = claudeAdds(folder, ["장보기"]);
   logChanged(ai);
   store.mutate((history) => history.toggle(only.id));
   ai.undo(second.id);
-  assert.equal(toasts[toasts.length - 1].text, "그새 바뀌어서 되돌리지 못했어요");
+  assert.equal(toasts[toasts.length - 1].text, "그사이 직접 고친 항목이라 그대로 뒀어요");
   assert.equal(store.items.some((item) => item.id === only.id), true);
   assert.equal(ai.view().marks.includes(only.id), false, "an edit takes the stamp away");
   ai.stop();
@@ -149,7 +149,7 @@ test("an event Claude moved goes back; the note hidden meanwhile gets the away n
   assert.equal(shown.length, 0, "hidden: kept for later");
   visible = true;
   ai.noteShown();
-  assert.deepEqual(shown.map((notice) => notice.text), ["자리 비운 사이 Claude가 1가지를 했어요"]);
+  assert.deepEqual(shown.map((notice) => notice.text), ["자리를 비운 사이 Claude가 1개를 넣거나 고쳤어요"]);
   assert.equal(store.events[0].start, 660);
   ai.undo(entry.id);
   assert.equal(store.events[0].start, 600);

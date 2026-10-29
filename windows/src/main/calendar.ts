@@ -169,7 +169,7 @@ export class CalendarService {
       return { ok: true };
     }
     if (request.kind === "skip") {
-      if (!request.day) return { ok: false, error: t("지울 날을 모르겠어요.") };
+      if (!request.day) return { ok: false, error: t("어느 날을 지울지 알 수 없어요. 달력에서 그날을 고른 뒤 다시 지워 주세요.") };
       this.store.putEvent(skipDay(existing!, request.day, now));
       return { ok: true };
     }

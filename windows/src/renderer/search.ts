@@ -17,7 +17,7 @@ export interface SearchHost {
   closed(): void;
 }
 
-const groupIcon: Record<SearchGroup["kind"], string> = { today: "sun", ahead: "calendar", memos: "note", history: "sprout", events: "calendarDot" };
+const groupIcon: Record<SearchGroup["kind"], string> = { today: "sun", ahead: "calendar", memos: "note", history: "leaf", events: "calendarClock" };
 
 export interface SearchSlip { close(): void; element: HTMLElement; set(query: string): Promise<void> }
 

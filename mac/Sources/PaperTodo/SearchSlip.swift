@@ -238,7 +238,7 @@ private struct SearchRow: View {
         case .today, .ahead: hit.done ? "checkmark.square" : "square"
         case .memos: "note.text"
         case .history: "leaf"
-        case .events: "calendar"
+        case .events: "calendar.badge.clock"
         }
     }
 

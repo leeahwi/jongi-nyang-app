@@ -154,9 +154,13 @@ struct PaperSegmented<Value: Hashable>: View {
     @Binding var selection: Value
     let options: [(value: Value, title: String, symbol: String?)]
     let label: String
+    /// Segments as wide as their words, the room left shared out evenly (NSSegmentedControl's `.fit`, 1.45) — for
+    /// labels of very different lengths ("Eenmalig · Herhalen · Deadline · Tijd"), so the gaps between them read even.
+    /// Otherwise every segment is as wide as the others.
+    var fit = false
 
     var body: some View {
-        HStack(spacing: 2) {
+        SegmentRow(spacing: 2, fit: fit) {
             ForEach(options, id: \.value) { option in
                 let selected = option.value == selection
                 Button { selection = option.value } label: {
@@ -185,5 +189,37 @@ struct PaperSegmented<Value: Hashable>: View {
         .overlay { RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(PaperTheme.rule, lineWidth: 1) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(label)
+    }
+}
+
+/// PaperSegmented's row: equal segments, or (`fit`) each as wide as its label (at the semibold a picked one gets, plus
+/// 10 pt a side) with what's left shared out evenly; when even that doesn't fit, every segment in proportion.
+private struct SegmentRow: Layout {
+    var spacing: CGFloat
+    var fit: Bool
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let natural = sizes.reduce(0) { $0 + $1.width + (fit ? 20 : 0) } + spacing * CGFloat(max(0, subviews.count - 1))
+        return CGSize(width: proposal.width ?? natural, height: sizes.map(\.height).max() ?? 0)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard !subviews.isEmpty else { return }
+        let count = CGFloat(subviews.count)
+        let room = max(0, bounds.width - spacing * (count - 1))
+        let widths: [CGFloat]
+        if fit {
+            let ideal = subviews.map { $0.sizeThatFits(.unspecified).width + 20 }
+            let natural = ideal.reduce(0, +)
+            widths = natural <= room ? ideal.map { $0 + (room - natural) / count } : ideal.map { $0 * room / max(1, natural) }
+        } else {
+            widths = Array(repeating: room / count, count: subviews.count)
+        }
+        var x = bounds.minX
+        for (index, subview) in subviews.enumerated() {
+            subview.place(at: CGPoint(x: x, y: bounds.minY), proposal: ProposedViewSize(width: widths[index], height: bounds.height))
+            x += widths[index] + spacing
+        }
     }
 }

@@ -4,6 +4,13 @@
 // DevTools protocol (renderers) and the Node inspector (main process). Nothing global is pressed.
 //   node tools/perf.mjs [--quick] [--long] [--out=file.json] [--dir=folder] [--trace]
 // --quick: shorter idle windows (20 s) and use loop (1 min); --long: the full 10-minute use loop.
+// --todos=2000 --spaces=9 (1.30): today's sheet that full and that many spaces; the `spaces` step times the lens.
+// --app=<folder>: another build (a 1.29 checkout) on the same data, to alternate with.
+// Perf audit 2: --history=6000 --history-days=1095 --events=200 (the record and events that big); the steps `ipc`
+// (state messages and bytes, idle and per check), `depth` (a check at undo depth 0 and 200: round trip and the main
+// process's CPU), `panes` (the desk's month, week and 완료 기록 opened, then the busy time per check with the desk open)
+// and `windows` (memory per renderer with every window made once). Run it with PAPERTODO_OFFSCREEN=1 so no window
+// comes on screen.
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -30,6 +37,9 @@ const only = option("only")?.split(",");
 const want = (name) => !only || only.includes(name);
 const idleSeconds = quick ? 20 : 60;
 const useMinutes = flag("long") ? 10 : quick ? 1 : 3;
+const dataOptions = { ...(option("todos") ? { todos: Number(option("todos")) } : {}), ...(option("spaces") ? { spaces: Number(option("spaces")) } : {}),
+  ...(option("history") ? { history: Number(option("history")) } : {}), ...(option("history-days") ? { historyDays: Number(option("history-days")) } : {}),
+  ...(option("events") ? { events: Number(option("events")) } : {}) };
 const base = option("dir") ?? fs.mkdtempSync(path.join(os.tmpdir(), "paper-perf-"));
 fs.mkdirSync(base, { recursive: true });
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -74,14 +84,14 @@ const children = new Set();
 process.on("exit", () => { for (const child of children) try { child.kill("SIGKILL"); } catch { /* gone */ } });
 let portBase = 9400 + Math.floor(Math.random() * 400);
 
-async function launch(name, dataOptions = {}) {
+async function launch(name, extraData = {}) {
   const folder = path.join(base, name);
   fs.rmSync(folder, { recursive: true, force: true });
   const data = path.join(folder, "data");
   const tmp = path.join(folder, "tmp");
   fs.mkdirSync(data, { recursive: true });
   fs.mkdirSync(tmp, { recursive: true });
-  writePerfData(data, new Date(), dataOptions);
+  writePerfData(data, new Date(), { ...dataOptions, ...extraData });
   const debugPort = portBase++;
   const inspectPort = portBase++;
   const started = Date.now();
@@ -102,6 +112,14 @@ async function launch(name, dataOptions = {}) {
   const main = await connect(mainTarget.webSocketDebuggerUrl);
   while (!(await evaluate(main, `Boolean(process.mainModule)`))) await sleep(10);
   await evaluate(main, `globalThis.__e = process.mainModule.require("electron"); globalThis.__fs = process.mainModule.require("fs"); true`);
+  // PAPERTODO_OFFSCREEN=1 (perf audit 2): the windows that have no off-screen place of their own (the desk) are moved
+  // off every screen before they show, so a measured run never puts a window in front of the person at the Mac.
+  if (process.env.PAPERTODO_OFFSCREEN === "1") await evaluate(main, `(() => {
+    const proto = __e.BrowserWindow.prototype;
+    const away = (window) => { const [x, y] = window.getPosition(); if (x > -20000) window.setPosition(-40000 + 100, -40000 + 100); };
+    for (const name of ["show", "showInactive"]) { const original = proto[name]; proto[name] = function (...args) { away(this); return original.apply(this, args); }; }
+    return true;
+  })()`);
   // The note's page.
   let noteTarget;
   for (let tries = 0; tries < 600 && !noteTarget; tries += 1) { noteTarget = (await json(debugPort, "list"))?.find((target) => target.url.endsWith("note.html")); if (!noteTarget) await sleep(20); }
@@ -199,7 +217,9 @@ async function typing(run) {
   const typed = await evaluate(note, `window.__typed`);
   const chips = await evaluate(note, `document.querySelectorAll(".reads .chip").length`);
   await evaluate(note, `(() => { const field = document.querySelector("textarea.typed"); field.value = ""; field.dispatchEvent(new Event("input")); field.blur(); return true; })()`);
-  // The same in a memo (every keystroke is saved through the main process).
+  // The same in a memo (every keystroke is saved through the main process) — while the note had a memo tab (≤ 1.27).
+  const memoTab = await evaluate(note, `!!document.querySelector(".index-tab.tab-memos")`);
+  if (!memoTab) return { keystrokes: typed.length, perKey: typed.map((entry) => Math.round(entry.shown)).join(" "), shownMedian: round(median(typed.map((entry) => entry.shown))), shownP95: round(p95(typed.map((entry) => entry.shown))), handlerMedian: round(median(typed.map((entry) => entry.handled)), 2), chips };
   await click(note, ".index-tab.tab-memos");
   await sleep(300);
   await click(note, ".memo-row");
@@ -226,9 +246,10 @@ async function typing(run) {
 /** Clicking a tab → the frame with the new page. */
 async function tabSwitch(run) {
   const { note } = run;
-  const times = { ahead: [], memos: [], today: [] };
+  const tabs = (await evaluate(note, `[...document.querySelectorAll(".index-tab")].map((tab) => [...tab.classList].find((name) => name.startsWith("tab-")).slice(4))`));
+  const times = Object.fromEntries(tabs.map((tab) => [tab, []]));
   for (let round_ = 0; round_ < 5; round_ += 1) {
-    for (const tab of ["ahead", "memos", "today"]) {
+    for (const tab of [...tabs.slice(1), tabs[0]]) {
       await evaluate(note, `(() => { window.__tab = undefined; document.addEventListener("click", (event) => { const start = event.timeStamp; requestAnimationFrame(() => setTimeout(() => { window.__tab = performance.now() - start; }, 0)); }, { once: true, capture: true }); return true; })()`);
       await click(note, `.index-tab.tab-${tab}`);
       if (!(await until(note, "window.__tab !== undefined"))) continue;
@@ -237,6 +258,37 @@ async function tabSwitch(run) {
     }
   }
   return Object.fromEntries(Object.entries(times).map(([tab, list]) => [tab, round(median(list))]));
+}
+
+/**
+ * 1.30: 오늘 drawn again (a state from the main process → the frame after: here a pref that changes nothing drawn), and
+ * 한 스페이스만 보기 switched on and off (the act → the frame with the band, then without). Without spaces (a 1.29
+ * build) only the redraw.
+ */
+async function spacesStep(run) {
+  const { note } = run;
+  const frame = (expression, condition) => evaluate(note, `new Promise((resolve) => { const start = performance.now(); ${expression}; const look = () => (${condition}) ? requestAnimationFrame(() => setTimeout(() => resolve(performance.now() - start), 0)) : performance.now() - start > 4000 ? resolve(NaN) : setTimeout(look, 1); look(); })`);
+  const redraw = [], script = [];
+  // The note's own listener runs first (it was there before this one): the time to this one is the IPC and the draw's script.
+  await evaluate(note, `(window.paper.on("state", () => { window.__drawn += 1; window.__drawnAt = performance.now(); }), true)`);
+  for (let index = 0; index < 12; index += 1) {
+    await evaluate(note, `(window.__drawn = 0, window.__actAt = performance.now(), true)`);
+    redraw.push(await frame(`window.__actAt = performance.now(); window.paper.act({ type: "setPref", key: "timerRecent", value: [${40 + index}] })`, "window.__drawn > 0"));
+    script.push(await evaluate(note, `window.__drawnAt - window.__actAt`));
+    await sleep(300);
+  }
+  const rows = await evaluate(note, `document.querySelectorAll(".lines .row").length`);
+  const spaces = await evaluate(note, `document.querySelector(".space-pick") ? !document.querySelector(".space-pick").hidden : false`);
+  const on = [], off = [];
+  if (spaces) {
+    for (let index = 0; index < 6; index += 1) {
+      on.push(await frame(`window.paper.act({ type: "spaceLens", space: "s-100000" })`, `!!document.querySelector(".lens-band")?.isConnected`));
+      await sleep(300);
+      off.push(await frame(`window.paper.act({ type: "spaceLens" })`, `!document.querySelector(".lens-band")?.isConnected`));
+      await sleep(300);
+    }
+  }
+  return { rows, redrawMedian: round(median(redraw)), redrawP95: round(p95(redraw)), scriptMedian: round(median(script)), ...(spaces ? { lensOnMedian: round(median(on)), lensOffMedian: round(median(off)) } : {}) };
 }
 
 /** Checking a task → its row starts the check animation (after the round trip through the main process). */
@@ -392,6 +444,191 @@ async function use(run, minutes) {
 
 async function setPref(run, key, value) { await act(run.note, { type: "setPref", key, value }); await sleep(500); }
 
+
+// ─── Perf audit 2 ─────────────────────────────────────────────────────────────
+
+/** Counts every message the main process sends to a page or frame (by channel, with its JSON size). */
+async function countMessages(run) {
+  await evaluate(run.main, `(() => {
+    if (globalThis.__sent) return true;
+    globalThis.__sent = {};
+    const frame = __e.webContents.getAllWebContents()[0].mainFrame;
+    const proto = Object.getPrototypeOf(frame);
+    const original = proto.send;
+    proto.send = function (channel, ...args) {
+      let bytes = 0; try { bytes = JSON.stringify(args).length; } catch { /* not JSON */ }
+      const entry = (__sent[channel] ??= { count: 0, bytes: 0 });
+      entry.count += 1; entry.bytes += bytes;
+      return original.call(this, channel, ...args);
+    };
+    const contents = Object.getPrototypeOf(__e.webContents.getAllWebContents()[0]);
+    const originalContents = contents.send;
+    contents.send = function (channel, ...args) {
+      let bytes = 0; try { bytes = JSON.stringify(args).length; } catch { /* not JSON */ }
+      const entry = (__sent["wc:" + channel] ??= { count: 0, bytes: 0 });
+      entry.count += 1; entry.bytes += bytes;
+      return originalContents.call(this, channel, ...args);
+    };
+    return true;
+  })()`);
+}
+const takeMessages = async (run) => { const sent = await evaluate(run.main, `(() => { const out = __sent; globalThis.__sent = {}; return out; })()`); return Object.fromEntries(Object.entries(sent).map(([key, value]) => [key, { count: value.count, kB: round(value.bytes / 1024, 1) }])); };
+
+/** One check from the note through the main process: act → the note's next state; the main process's CPU for it. */
+const toggleRow = (run, which) => evaluate(run.note, `(async () => {
+  if (window.__seen === undefined) { window.__seen = 0; window.paper.on("state", () => { window.__seen += 1; }); }
+  const row = ${which === "done" ? `[...document.querySelectorAll(".lines .row.done")].pop()` : `[...document.querySelectorAll(".lines .row:not(.done)")][3]`};
+  const seen = window.__seen, start = performance.now();
+  window.paper.act({ type: "toggle", id: row.dataset.id });
+  while (window.__seen === seen && performance.now() - start < 5000) await new Promise((resolve) => setTimeout(resolve, 0));
+  return performance.now() - start;
+})()`);
+async function checkRoundTrip(run, times) {
+  const out = [], cpu = [];
+  for (let index = 0; index < times; index += 1) {
+    const before = await evaluate(run.main, `(() => { const u = process.cpuUsage(); return (u.user + u.system) / 1000; })()`);
+    out.push(await toggleRow(run, "open"));
+    await sleep(150);
+    const after = await evaluate(run.main, `(() => { const u = process.cpuUsage(); return (u.user + u.system) / 1000; })()`);
+    cpu.push(after - before);
+    await toggleRow(run, "done");
+    await sleep(150);
+  }
+  return { roundTripMedian: round(median(out)), roundTripP95: round(p95(out)), mainCpuMedian: round(median(cpu)) };
+}
+
+async function ipcStep(run) {
+  await countMessages(run);
+  await takeMessages(run);
+  await sleep(idleSeconds * 1000);
+  const idle = await takeMessages(run);
+  await toggleRow(run, "open"); await sleep(600);
+  const oneCheck = await takeMessages(run);
+  await toggleRow(run, "done"); await sleep(600);
+  await takeMessages(run);
+  return { idleSeconds, idle, oneCheck };
+}
+
+async function depthStep(run) {
+  const fresh = await checkRoundTrip(run, 8);
+  // 200 steps of undo behind: 100 checks and unchecks of one row.
+  await evaluate(run.note, `(async () => { const id = [...document.querySelectorAll(".lines .row:not(.done)")][8].dataset.id; for (let i = 0; i < 200; i += 1) { await window.paper.act({ type: "toggle", id }); } return true; })()`);
+  // (an even number of toggles: the row is back as it was)
+  await sleep(1500);
+  const deep = await checkRoundTrip(run, 8);
+  return { depth0: fresh, depth200: deep };
+}
+
+/** Busy time per process (ms) while `work` runs, from a DevTools trace. */
+async function busyDuring(run, work, label) {
+  const version = await json(run.debugPort, "version");
+  const browser = await connect(version.webSocketDebuggerUrl);
+  const events = [];
+  browser.on("Tracing.dataCollected", (params) => events.push(...params.value));
+  const done = new Promise((resolve) => browser.on("Tracing.tracingComplete", resolve));
+  await browser.send("Tracing.start", { traceConfig: { includedCategories: ["toplevel", "devtools.timeline", "v8.execute", "blink"], recordMode: "recordAsMuchAsPossible" }, transferMode: "ReportEvents" });
+  await sleep(300);
+  await work();
+  await sleep(1200);
+  await browser.send("Tracing.end");
+  await done;
+  browser.close();
+  const urls = await evaluate(run.main, `__e.webContents.getAllWebContents().map((w) => ({ pid: w.getOSProcessId(), url: w.getURL().split("/").pop().split("?")[0] }))`);
+  const kinds = await evaluate(run.main, `__e.app.getAppMetrics().map((m) => ({ pid: m.pid, type: m.type }))`);
+  const nameOf = (pid) => urls.filter((entry) => entry.pid === pid).map((entry) => entry.url).join("+") || kinds.find((entry) => entry.pid === pid)?.type || String(pid);
+  const busy = {}, longest = {};
+  for (const event of events) {
+    if (event.ph !== "X" || !event.dur || !["ThreadControllerImpl::RunTask", "RunTask"].includes(event.name)) continue;
+    const where = nameOf(event.pid);
+    busy[where] = (busy[where] ?? 0) + event.dur / 1000;
+    longest[where] = Math.max(longest[where] ?? 0, event.dur / 1000);
+  }
+  const top = Object.entries(busy).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([where, ms]) => [where, { busyMs: round(ms), longestTaskMs: round(longest[where]) }]);
+  return { [label]: Object.fromEntries(top) };
+}
+
+const deskWindow = `__e.BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().includes("desk.html"))`;
+/** A desk frame's first contentful paint (absolute ms), or undefined. */
+const framePaint = (page) => evaluate(run.main, `(() => { const w = ${deskWindow}; if (!w) return undefined;
+  return Promise.all(w.webContents.mainFrame.framesInSubtree.filter((f) => f.url.includes(${JSON.stringify(page)})).map((frame) => frame.executeJavaScript('(() => { const p = performance.getEntriesByName("first-contentful-paint")[0]; return p ? performance.timeOrigin + p.startTime : null; })()').catch(() => null)))
+    .then((list) => list.find((value) => value) ?? undefined); })()`);
+
+async function panesStep(run) {
+  const result = {};
+  const started = Date.now();
+  await act(run.note, { type: "openCalendar" });
+  let month;
+  for (let tries = 0; tries < 120 && month === undefined; tries += 1) { await sleep(100); month = await framePaint("calendarWindow.html"); }
+  for (let tries = 0; tries < 50 && !(await evaluate(run.main, `!!${deskWindow}`)); tries += 1) await sleep(100);
+  result.monthFirstPaintMs = month === undefined ? NaN : round(month - started, 0);
+  await sleep(1500);
+  // The week view: the calendar's own button (→ the frame after).
+  result.weekMs = await evaluate(run.main, `(() => { const w = ${deskWindow}; const frame = w?.webContents.mainFrame.framesInSubtree.find((f) => f.url.includes("calendarWindow.html")); if (!frame) return null;
+    return frame.executeJavaScript('new Promise((resolve) => { const button = [...document.querySelectorAll("button")].find((b) => /주|week/i.test(b.textContent) && !/월|month/i.test(b.textContent)); if (!button) return resolve(null); const start = performance.now(); button.click(); requestAnimationFrame(() => setTimeout(() => resolve(performance.now() - start), 0)); })'); })()`);
+  result.weekMs = result.weekMs === null ? NaN : round(result.weekMs);
+  await sleep(800);
+  const historyStart = Date.now();
+  await act(run.note, { type: "deskPane", pane: "history" });
+  let history;
+  for (let tries = 0; tries < 120 && history === undefined; tries += 1) { await sleep(50); history = await framePaint("history.html"); }
+  result.historyFirstPaintMs = history === undefined ? NaN : round(history - historyStart, 0);
+  result.historyNodes = await evaluate(run.main, `(() => { const w = ${deskWindow}; const frame = w?.webContents.mainFrame.framesInSubtree.find((f) => f.url.includes("history.html")); return frame ? frame.executeJavaScript("document.querySelectorAll('*').length") : null; })()`);
+  await sleep(1500);
+  // A check in the note while the desk shows 완료 기록 (the calendar frame kept behind it).
+  Object.assign(result, await busyDuring(run, () => toggleRow(run, "open"), "checkWithDeskOpen"));
+  await toggleRow(run, "done"); await sleep(600);
+  result.idleDeskOpen = await cpuOver(run, Math.min(idleSeconds, 30));
+  await evaluate(run.main, `(() => { ${deskWindow}?.destroy(); return true; })()`);
+  await sleep(800);
+  Object.assign(result, await busyDuring(run, () => toggleRow(run, "open"), "checkNoteOnly"));
+  await toggleRow(run, "done"); await sleep(600);
+  return result;
+}
+
+/** Memory by renderer after the windows a session makes (desk, drawer, quick entry, quick memo, timer sheet). */
+async function windowsStep(run) {
+  await act(run.note, { type: "openCalendar" }); await sleep(2500);
+  await act(run.note, { type: "drawer", command: "open" }); await sleep(2500);
+  await act(run.note, { type: "drawer", command: "close" }); await sleep(800);
+  await evaluate(run.main, `(() => { ${deskWindow}?.hide(); return true; })()`);
+  await sleep(2000);
+  const metrics = await evaluate(run.main, metricsExpression);
+  const byPage = {};
+  for (const entry of metrics) {
+    const kind = entry.type === "Tab" ? (entry.pages.join("+") || "?") : entry.type;
+    byPage[kind] = round((byPage[kind] ?? 0) + entry.memory / 1024, 0);
+  }
+  return { processes: metrics.length, windows: await evaluate(run.main, `__e.BrowserWindow.getAllWindows().length`), mbByProcess: byPage };
+}
+
+/** The note's JavaScript by function (self time, ms) while `work` runs: a CPU profile from the page. */
+async function profileNote(run, work, seconds = 0) {
+  const { note } = run;
+  await note.send("Profiler.enable");
+  await note.send("Profiler.setSamplingInterval", { interval: 200 });
+  await note.send("Profiler.start");
+  await work();
+  if (seconds) await sleep(seconds * 1000);
+  const { profile } = await note.send("Profiler.stop");
+  const self = new Map();
+  const byId = new Map(profile.nodes.map((node) => [node.id, node]));
+  const counts = new Map();
+  for (const sample of profile.samples) counts.set(sample, (counts.get(sample) ?? 0) + 1);
+  const span = (profile.endTime - profile.startTime) / 1000 / Math.max(1, profile.samples.length);
+  for (const [id, count] of counts) {
+    const frame = byId.get(id).callFrame;
+    const where = `${frame.functionName || "(anonymous)"} ${frame.url.split("/").pop()}:${frame.lineNumber + 1}`;
+    self.set(where, (self.get(where) ?? 0) + count * span);
+  }
+  return Object.fromEntries([...self].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([key, value]) => [key, round(value)]));
+}
+
+async function profileStep(run) {
+  const check = await profileNote(run, async () => { for (let index = 0; index < 4; index += 1) { await toggleRow(run, "open"); await sleep(300); await toggleRow(run, "done"); await sleep(300); } });
+  const idle = await profileNote(run, async () => undefined, idleSeconds);
+  return { checkTimes8: check, idle };
+}
+
 // ─── The run ──────────────────────────────────────────────────────────────────
 
 const results = { load: os.loadavg().map((value) => round(value, 1)), when: new Date().toISOString(), platform: `${process.platform} ${os.release()} · ${os.cpus()[0]?.model}`, idleSeconds, useMinutes };
@@ -437,9 +674,15 @@ try {
   if (flag("trace")) await step("idle", { key: "traceIdle", text: "trace idle" }, () => trace(run, 10));
   await step("typing", { key: "typing", text: "typing (ms)" }, () => typing(run));
   await step("tabs", { key: "tabSwitch", text: "tab switch (ms)" }, () => tabSwitch(run));
+  await step("spaces", { key: "spaces", text: "오늘 redraw · lens (ms)" }, () => spacesStep(run));
   await step("check", { key: "check", text: "check → animation (ms)" }, () => checkTask(run));
   await step("search", { key: "search", text: "search 3 chars (ms)" }, () => searchTime(run));
   await step("desk", { key: "desk", text: "desk → month (ms)" }, () => desk(run));
+  await step("ipc", { key: "ipc", text: "IPC (messages · kB)" }, () => ipcStep(run));
+  await step("depth", { key: "depth", text: "check at undo depth" }, () => depthStep(run));
+  await step("panes", { key: "panes", text: "desk panes" }, () => panesStep(run));
+  await step("windows", { key: "windows", text: "memory by window" }, () => windowsStep(run));
+  await step("profile", { key: "profile", text: "note JS profile (self ms)" }, () => profileStep(run));
 
   await showNote(false);
   await sleep(1500);

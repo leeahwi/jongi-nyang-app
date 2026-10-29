@@ -572,15 +572,15 @@ private enum PresentationTests {
 
         try await test("the desk: one window, its panes in sidebar order, ⌘1…⌘9 and the old entry points") {
             try expectEqual(DeskPane.allCases.map(\.rawValue),
-                            ["calendar", "history", "clock", "appearance", "notifications", "repeating", "pet", "events", "storage", "drawer", "ai", "help"], "Sidebar order")
+                            ["calendar", "history", "clock", "appearance", "notifications", "repeating", "pet", "events", "storage", "drawer", "spaces", "ai", "help"], "Sidebar order")
             try expectEqual(DeskPane.Section.view.panes, [.calendar, .history, .clock], "보기")
-            try expectEqual(DeskPane.Section.settings.panes, [.appearance, .notifications, .repeating, .pet, .events, .storage, .drawer, .ai], "설정")
+            try expectEqual(DeskPane.Section.settings.panes, [.appearance, .notifications, .repeating, .pet, .events, .storage, .drawer, .spaces, .ai], "설정")
             try expectEqual(DeskPane.Section.help.panes, [.help], "도움")
             try expectEqual(DeskPane.allCases.compactMap(\.shortcut), Array(1...9), "⌘1…⌘9 for the first nine")
             // 1.43.1: 메모 서랍 joined after 저장과 백업, so ⌘1…⌘9 still open the same panes as before (and as on Windows).
             try expectEqual((1...9).map { number in DeskPane.allCases.first { $0.shortcut == number }! },
                             [.calendar, .history, .clock, .appearance, .notifications, .repeating, .pet, .events, .storage], "⌘1…⌘9 unchanged")
-            try expect(DeskPane.drawer.shortcut == nil && DeskPane.ai.shortcut == nil, "메모 서랍 and AI 연결 have no number")
+            try expect(DeskPane.drawer.shortcut == nil && DeskPane.spaces.shortcut == nil && DeskPane.ai.shortcut == nil, "메모 서랍, 스페이스 and AI 연결 have no number")
             try expect(DeskPane.help.shortcut == nil, "도움말 is ⌘? instead")
             let fixture = try Fixture(items: [])
             defer { fixture.cleanup() }
@@ -929,11 +929,13 @@ private enum PresentationTests {
             let model = fixture.model()
             let now = Date()
             var timer = FocusTimer.countdown(minutes: 25, now: now.addingTimeInterval(-(12 * 60 + 30)))
-            try expectEqual(MenuBarState.current(model: model, timer: timer, focusing: true, now: now).text, "● 12:30", "focusing")
-            try expectEqual(MenuBarState.current(model: model, timer: timer, now: now).text, "12:30", "plain")
+            // #46: a length (12:30 left → "13분"), not a clock's form.
+            let words = [FocusTimer.lengthText(12 * 60 + 30, language: .current), FocusTimer.leftText(12 * 60 + 30, language: .current)]
+            try expectEqual(MenuBarState.current(model: model, timer: timer, focusing: true, now: now).text, "● " + words[0], "focusing")
+            try expectEqual(MenuBarState.current(model: model, timer: timer, now: now).text, words[0], "plain")
             timer.pause(at: now)
             try expectEqual(MenuBarState.current(model: model, timer: timer, focusing: true, now: now).text, "", "paused")
-            try expect(MenuBarState.current(model: model, timer: timer, now: now).accessibility.contains("12:30"), "VoiceOver still hears a paused time")
+            try expect(MenuBarState.current(model: model, timer: timer, now: now).accessibility.contains(words[1]), "VoiceOver still hears a paused time")
         }
 
         try await test("handwriting: a title's last letter keeps its ink inside the frame (Ahead, coffee, koffie)") {
@@ -986,12 +988,12 @@ private enum PresentationTests {
             let focused = [width(25, left: 1500, focusTitle: "보고서"), width(25, left: 1111, focusTitle: "보고서"), width(25, left: 9, focusTitle: "보고서")]
             try expect(Set(focused).count == 1, "focus tag widths differ: \(focused)")
             try expect(TabularClock.template("1:02:05") == "8:88:88" && TabularClock.template("09:59") == "88:88", "templates")
-            // The menu bar draws "● 12:30" in the system's tabular digits: the same width for every time of a form.
+            // The menu bar draws "● 21분" (#46) in the system's tabular digits: the same width for every time of a form.
             let font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
             @MainActor func bar(_ seconds: TimeInterval) -> CGFloat { (" " + Focus.menuBarText(remaining: seconds) as NSString).size(withAttributes: [.font: font]).width }
-            let menu = [600, 599, 71, 8, 3599].map { bar(TimeInterval($0)) }
+            let menu = [600, 599, 1500, 3000].map { bar(TimeInterval($0)) }
             try expect(Set(menu).count == 1, "menu bar widths differ: \(menu)")
-            try expect(Set([3600, 7199, 4271].map { bar(TimeInterval($0)) }).count == 1, "menu bar hour form")
+            try expect(Set([4200, 5400, 8400].map { bar(TimeInterval($0)) }).count == 1, "menu bar hour form")
         }
 
         // 1.42.1: a slip's window is the slip's size from the start (not the provisional 520 × 420 with the slip
@@ -1036,6 +1038,38 @@ private enum PresentationTests {
             // A slip shown again in the same window starts from its own size too.
             panel.show(view())
             try expect(same(panel.frame.size, grown), "shown again: window \(panel.frame.size), slip \(grown)")
+        }
+
+        try await test("메모 서랍 (1.45): a key restyles only its own lines, and the memo looks as if it were restyled whole") {
+            _ = NSApplication.shared
+            let parent = DrawerTextView(text: .constant(""), palette: DrawerPalette.of(.day), bodyFont: .systemFont(ofSize: MemoSlipStyle.bodySize),
+                                        titleFont: .systemFont(ofSize: 20, weight: .semibold), lineHeight: MemoSlipStyle.line, titleLineHeight: MemoSlipStyle.titleRow)
+            @MainActor func made(_ text: String) -> (DrawerTextView.KeyTextView, DrawerTextView.Coordinator) {
+                let view = DrawerTextView.KeyTextView()
+                view.isRichText = false
+                let coordinator = DrawerTextView.Coordinator(parent)
+                view.delegate = coordinator
+                view.string = text
+                coordinator.restyle(view, full: true)
+                return (view, coordinator)
+            }
+            let (view, coordinator) = made("\n  \n장보기 목록\n- [ ] 우유\n    indented code\ngit log --oneline -5\n보통 줄")
+            let pieces = ["가", "a", " ", "\n", "    ", "git status x", "$ ls", "`x`", "\n\n", "제목 ", "- [ ] ", "\t"]
+            var seed: UInt64 = 11
+            func next(_ n: Int) -> Int {
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                return Int((seed >> 33) % UInt64(max(1, n)))
+            }
+            for step in 0..<600 {
+                let length = (view.string as NSString).length
+                let at = next(length + 1)
+                let cut = next(4) == 0 ? min(next(6), length - at) : 0
+                let typed = next(5) == 0 ? "" : pieces[next(pieces.count)]
+                view.insertText(typed, replacementRange: NSRange(location: at, length: cut))
+                let (whole, _) = made(view.string)
+                try expect(view.textStorage!.isEqual(to: whole.textStorage!), "step \(step): ‘\(typed)’ at \(at) (cut \(cut)) in \(view.string.debugDescription)")
+            }
+            try expect(coordinator.lineRestyles > 300, "most keys restyled only their lines (\(coordinator.lineRestyles) of 600)")
         }
 
         print("\n\(count) checks passed.")

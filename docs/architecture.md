@@ -10,22 +10,22 @@
 flowchart TB
     subgraph SPEC["두 앱이 나누는 것"]
         direction LR
-        CASES["공유 시험 사례<br/>입력 줄 1–324, 하루 띠 R/K/G/N/T<br/>집중 F/FB, 앞으로, 편의 기능, 메모 서랍 D1–D29, AI 연결"]
-        FORMAT["파일 형식<br/>todos.json, memo-folders.json, events.json, focus.jsonl …"]
+        CASES["공유 시험 사례<br/>입력 줄 1–324, 하루 띠 R/K/G/N/T<br/>집중 F/FB, 앞으로, 편의 기능, 메모 서랍 D1–D30, AI 연결<br/>스페이스 S1–S22 (spaces-cases.json 하나를 두 앱이 읽음)"]
+        FORMAT["파일 형식<br/>todos.json, todo-spaces.json, memo-folders.json, events.json, focus.jsonl …"]
         TOKENS["디자인 토큰<br/>종이, 먹, 세이지, 점토 (낮/밤)"]
         CHATTER["종이냥 한마디<br/>chatter_lines.py → 두 앱의 표"]
     end
 
     subgraph MAC["mac/ (Swift Package)"]
         direction TB
-        MCORE["PaperCore<br/>화면과 무관한 로직<br/>(39개 파일, 약 9,700줄)"]
-        MAPP["PaperTodo<br/>SwiftUI + AppKit<br/>노트, 메모 서랍, 펫, 쪽지, 책상, 메뉴 막대"]
+        MCORE["PaperCore<br/>화면과 무관한 로직<br/>(41개 파일, 약 10,800줄)"]
+        MAPP["PaperTodo<br/>SwiftUI + AppKit<br/>노트, 스페이스, 메모 서랍, 펫, 쪽지, 책상, 메뉴 막대"]
         MAPP --> MCORE
     end
 
     subgraph WIN["windows/ (Electron)"]
         direction TB
-        WCORE["src/core<br/>화면과 무관한 로직<br/>(47개 파일, 약 9,600줄)"]
+        WCORE["src/core<br/>화면과 무관한 로직<br/>(48개 파일, 약 10,400줄)"]
         WMAIN["src/main<br/>창, 저장, 알림, 타이머, 알림 영역, 메모 서랍"]
         MCP["mcp/<br/>종이냥 for Claude 확장<br/>(Mac 앱에도 그대로 넣음)"]
         WREND["src/renderer<br/>창마다 HTML, CSS, TS"]
@@ -61,7 +61,9 @@ flowchart TB
 | 반복, 마감, 보관 | `Repeat.swift`, `Deadline.swift`, `Archive.swift` | `repeat.ts`, `deadline.ts`, `archive.ts` |
 | 메모 합치기 | `TextMerge.swift` | `textMerge.ts` |
 | 메모 서랍: 폴더, 고정, 정렬, 메모의 종이 | `MemoFolders.swift`, `MemoFolderSearch.swift` | `memoDrawer.ts` |
-| 메모 서랍: 날짜 묶음, 종류 표시, 짧은 시간 | `MemoCards.swift` | `memoCards.ts` |
+| 메모 서랍: 날짜 묶음, 종류 표시, 짧은 시간, 세 줄 미리보기 | `MemoCards.swift` | `memoCards.ts` |
+| 찾기: 초성, 접은 글자, 메모의 줄 미리 읽기 | `Convenience.swift`(`Search.Query`), `MemoFolderSearch.swift`(`SearchIndex`) | `search.ts`, `memoDrawer.ts`(`drawerSearch`) |
+| 할 일 스페이스: 파일, 합치기, `#` 읽기, 한 스페이스만 보기 | `TodoSpaces.swift` | `todoSpaces.ts` |
 | AI 연결: 연결 설정, 기록, 되돌리기 | `AIConnect.swift` | `ai.ts` (확장은 `windows/mcp/`) |
 | 백업 | `Backup.swift` | `backup.ts` |
 | 종이냥 한마디 | `PetChatter.swift` (생성됨) | `chatter.ts` (생성됨) |
@@ -119,6 +121,7 @@ flowchart LR
     subgraph FOLDER["저장 폴더 (기본 위치 또는 공유 폴더)"]
         direction TB
         T["todos.json<br/>할 일 (선택 항목: timeStart, timeEnd, todaySince)"]
+        TS["todo-spaces.json<br/>할 일 스페이스와 할 일마다의 자리"]
         ME["memos.json<br/>메모"]
         MF["memo-folders.json<br/>메모 서랍의 폴더, 고정, 정렬, 메모의 종이"]
         R["repeats.json<br/>반복 할 일"]
@@ -128,7 +131,7 @@ flowchart LR
         AR["archive/YYYY-MM.jsonl<br/>완료 기록, 달마다"]
     end
     subgraph DEVICE["기기마다 따로"]
-        S["설정<br/>Mac: UserDefaults, Windows: settings.json"]
+        S["설정<br/>Mac: UserDefaults, Windows: settings.json<br/>(한 스페이스만 보기도 여기)"]
         AI["ai-link.json, ai-log.jsonl<br/>AI 연결 설정, Claude가 한 일의 기록"]
         H["울린 알람, 띄운 알림 기록"]
         B["backups/<br/>가져오기 전 자동 보관 (최근 10개)"]
@@ -149,6 +152,8 @@ flowchart LR
 새 필드는 선택 항목으로만 더한다. 그래서 공유 폴더에서 한 기기만 새 버전이어도 다른 기기의 옛 버전이 같은 파일을 연다. 1.39/1.24의 `timeStart`, `timeEnd`가 그렇게 들어갔고, 알람의 '다시 울림 없음'은 `snooze: 0`으로 저장해 옛 버전에서는 10분으로 읽힌다.
 
 옛 버전이 저장하면서 모르는 항목을 지울 수 있는 곳은 새 파일로 뗐다. 메모 서랍(Mac 1.43, Windows 1.28)의 폴더와 고정은 `memos.json`에 칸을 더하지 않고 `memo-folders.json`에 둔다. 옛 버전이 `memos.json`을 저장해도 폴더 정보는 남고, 옛 버전이 만든 메모는 '메모' 폴더에 보인다. 1.44/1.29부터는 이 파일에서 모르는 항목을 읽은 그대로 다시 써서, 더 새 버전이 더한 칸도 지우지 않는다. 이유는 [결정 기록 ADR 7](decisions.md#adr-7-메모-폴더는-memosjson-밖의-새-파일에-둔다)에 있다.
+
+할 일 스페이스(Mac 1.45, Windows 1.30)도 같은 이유로 `todos.json` 옆의 `todo-spaces.json`에 둔다. 두 앱 모두 1.44/1.29까지는 `todos.json`의 모르는 칸을 지우고 저장하기 때문이다. 이유는 [결정 기록 ADR 9](decisions.md#adr-9-할-일-스페이스는-todo-spacesjson에-따로-둔다)에 있다.
 
 ## 공유 폴더로 함께 쓰기
 
@@ -175,8 +180,29 @@ sequenceDiagram
 - 알림과 알람: 목록은 함께 쓰고, 울리는 건 기기마다 따로 기억한다. 다른 기기가 10분 넘게 전에 띄운 할 일 알림은 늦게 켠 기기에서 다시 띄우지 않는다.
 - 완료 기록: 달마다 파일 하나에 한 줄씩 덧붙이는 형식이라, 폴더를 옮기거나 합쳐도 같은 항목은 한 번만 남는다.
 - 메모 서랍의 폴더: 폴더는 id로 합치고, 메모의 자리(폴더, 고정, 종이)는 나중에 고친 쪽이 이긴다. 지운 폴더는 30일 동안 지운 표시를 남겨 다른 기기가 되살리지 않게 한다.
+- 할 일 스페이스: 메모 폴더와 같은 규칙이다. 스페이스는 id로, 할 일의 자리는 할 일마다 나중에 고친 쪽이 이기고, 같은 초면 파일에 있던 쪽을 둔다. ‘스페이스 없음’으로 옮긴 것도 `null`로 남겨 합칠 때 이긴다.
 
 Windows가 공유 폴더를 확인할 때마다 파일을 통째로 읽던 것은 1.24에서 고쳤다. 쉬는 동안 분당 10번 읽던 것이 0번이 됐다.
+
+## 할 일 스페이스
+
+Mac 1.45, Windows 1.30에서 할 일을 회사, 집, 공부 같은 스페이스로 나눈다. 기본 화면은 한 장 그대로이고, 스페이스는 줄 끝의 색 띠와 잠깐 거르기로만 쓴다.
+
+```mermaid
+flowchart LR
+    LINE["입력 줄<br/>보고서 금요일까지 #회사"] -->|"# 읽기 (앞부분, 초성)"| CORE["코어<br/>TodoSpaces.swift / todoSpaces.ts"]
+    CORE -->|할 일| TODOS["todos.json<br/>(모양 그대로)"]
+    CORE -->|자리| FILE["todo-spaces.json<br/>spaces[] + items{할 일 id: 자리}"]
+    LENS["한 스페이스만 보기<br/>(기기 설정, 새벽 4시에 풀림)"] --> VIEW["오늘 탭<br/>색 띠, 거르기, 머리말 버튼"]
+    FILE --> VIEW
+    TODOS --> VIEW
+```
+
+- 코어가 파일 읽기와 쓰기, 합치기, 입력 줄의 `#` 읽기, 한 스페이스만 보기의 하루(새벽 4시)를 맡는다. 화면은 할 일마다 자리를 찾아 띠를 그리고 거르기만 한다.
+- `#`는 할 일에만 붙는다. 일정, 타이머, 알람, 메모에는 `#회사`만 글에서 빼고, `C#`, `#12`, `a#b`는 글 그대로 둔다. 스페이스가 하나도 없으면 `#`를 읽지 않는다.
+- 거르기는 보기만 바꾼다. 탭의 숫자, 알림, 알람, 고양이는 숨긴 할 일도 그대로 센다.
+- Windows는 할 일마다의 자리를 창에 한 줄 글로 보내 바뀔 때만 다시 읽고, 거르기로 숨긴 줄은 버리지 않고 두었다가 다시 쓴다. 처음 짠 대로는 1,900줄에서 다시 그리기가 1.29보다 30% 넘게 느렸는데, 이렇게 5–20%까지 줄였다.
+- 두 앱은 `docs/plans/spaces-cases.json`의 S1–S22를 같이 읽어 같은 결과를 낸다. 사례 표를 두 시험 파일에 옮겨 적지 않은 첫 기능이다.
 
 ## 종이냥 for Claude
 
@@ -217,7 +243,7 @@ jongi-nyang-app/
 │  └─ art/                 고양이 그림 프롬프트와 검사 기록
 ├─ windows/              Windows 앱 (Electron + TypeScript)
 │  ├─ src/core, main, renderer, i18n
-│  ├─ test/                node:test 시험 (534개)
+│  ├─ test/                node:test 시험
 │  ├─ mcp/                 종이냥 for Claude 확장 (Mac 앱에도 넣음)
 │  ├─ tools/               빌드, 스냅숏과 크기 훑기, 성능 측정, 끌기 측정, 아이콘
 │  └─ assets/              글꼴, 고양이 그림, 알림 영역과 작업 표시줄 아이콘

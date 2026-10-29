@@ -274,7 +274,7 @@ export class FocusTimerWidget {
         if (this.timer) this.writeRound(now, false);
         this.round = { id: newID(), start: now };
         this.setTimer(startPomodoro(settings, now));
-        this.say(t("{minutes}분 집중해요. 화이팅!", { minutes: settings.focusMinutes }), 3);
+        this.say(t("{minutes}분 집중해요. 응원할게요!", { minutes: settings.focusMinutes }), 3);
         break;
       }
       case "togglePause":

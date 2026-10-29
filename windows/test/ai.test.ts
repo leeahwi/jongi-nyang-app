@@ -38,7 +38,7 @@ test("ai-log.jsonl: lines read back, a torn line and unknown kinds left out", ()
 test("toasts, as on the Mac (AIText.toast)", () => {
   const a = item({ id: "A" });
   assert.equal(aiToastText(entry({ changes: [added(a), added(item({ id: "B" }))] }), "ko"), "Claude가 할 일 2개를 넣었어요");
-  assert.equal(aiToastText(entry({ changes: [added(a), added(item({ id: "B" }))] }), "en"), "Claude added 2 tasks");
+  assert.equal(aiToastText(entry({ changes: [added(a), added(item({ id: "B" }))] }), "en"), "Claude added 2 to-dos");
   assert.equal(aiToastText(entry({ changes: [added(a)] }), "nl"), "Claude heeft 1 taak toegevoegd");
   assert.equal(aiToastText(entry({ target: "memos", changes: [{ file: "memos.json", id: "M", before: null, after: { id: "M", text: "x" } }] }), "en"), "Claude added 1 note");
   assert.equal(aiToastText(entry({ target: "events", changes: [{ file: "events.json", id: "V", before: null, after: { id: "V", title: "회의" } }, { file: "events.json", id: "W", before: null, after: { id: "W", title: "점심" } }] }), "nl"), "Claude heeft 2 afspraken toegevoegd");
@@ -56,13 +56,13 @@ test("toasts, as on the Mac (AIText.toast)", () => {
   assert.equal(aiToastText(entry({ kind: "change", changes: [changed(item({ id: "A" }), item({ id: "A", title: "x" })), changed(item({ id: "B" }), item({ id: "B", title: "y" }))] }), "ko"), "Claude가 할 일 2개를 바꿨어요");
   assert.equal(aiChangeKind(changed(item({ id: "A" }), item({ id: "A", reminderAt: "2026-10-27T07:00:00Z" }))), "time");
   assert.equal(aiShortTitle("첫 줄\n둘째 줄"), "첫 줄");
-  assert.equal(aiAwayText(3, "ko"), "자리 비운 사이 Claude가 3가지를 했어요");
+  assert.equal(aiAwayText(3, "ko"), "자리를 비운 사이 Claude가 3개를 넣거나 고쳤어요");
   assert.equal(aiAwayText(1, "en"), "While you were away, Claude made 1 change");
-  assert.equal(aiAwayText(3, "nl"), "Terwijl je weg was, heeft Claude 3 dingen gedaan");
+  assert.equal(aiAwayText(3, "nl"), "Terwijl je weg was, heeft Claude 3 dingen toegevoegd of gewijzigd");
   assert.equal(aiUndoText(2, 0, "ko"), "되돌렸어요");
-  assert.equal(aiUndoText(0, 1, "en"), "It changed since, so it can’t be undone");
-  assert.equal(aiUndoText(1, 1, "ko"), "1개는 되돌리고, 그새 바뀐 1개는 그대로 뒀어요");
-  assert.equal(aiUndoText(1, 2, "nl"), "1 ongedaan gemaakt; 2 intussen gewijzigd, die blijven staan");
+  assert.equal(aiUndoText(0, 1, "en"), "You changed it since, so it stays as you left it");
+  assert.equal(aiUndoText(1, 1, "ko"), "1개를 되돌렸어요. 그사이 고친 1개는 그대로 뒀어요");
+  assert.equal(aiUndoText(1, 2, "nl"), "1 ongedaan gemaakt. De 2 die je intussen aanpaste, blijven zo");
 });
 
 test("M13–M14: undo puts back what is still as Claude left it, and leaves what changed since", () => {
@@ -127,7 +127,7 @@ test("the cat now and then, in its own words", () => {
   const two = entry({ changes: [added(item({ id: "A" })), added(item({ id: "B" }))] });
   const now = local(27, 10);
   assert.equal(aiCatLine(two, undefined, now, () => 0.1, "ko"), "Claude가 할 일 두 개 놓고 갔어요.");
-  assert.equal(aiCatLine(two, undefined, now, () => 0.1, "en"), "Claude left two tasks for you.");
+  assert.equal(aiCatLine(two, undefined, now, () => 0.1, "en"), "Claude left two to-dos for you.");
   assert.equal(aiCatLine(entry({ changes: [added(item({ id: "A" }))] }), undefined, now, () => 0.1, "nl"), "Claude heeft één taak voor je klaargezet.");
   assert.equal(aiCatLine(two, undefined, now, () => 0.9, "ko"), undefined);
   assert.equal(aiCatLine(two, now.getTime() - 3_600_000, now, () => 0.1, "ko"), undefined);

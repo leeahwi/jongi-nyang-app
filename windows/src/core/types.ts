@@ -15,6 +15,7 @@ import type { IntentKind, IntentPrefer } from "./intent";
 import type { AheadTarget } from "./ahead";
 import type { DeskPane, PaperSetting } from "./desk";
 import type { DrawerBackdrop, DrawerSide, DrawerTheme, FolderSort, MemoFolders, MemoPaper } from "./memoDrawer";
+import type { SpaceChoice, SpaceLens, TodoSpaces } from "./todoSpaces";
 
 export type NotebookFont = "pen" | "brush" | "clean";
 export type TextSize = "small" | "regular" | "large" | "extraLarge";
@@ -69,6 +70,8 @@ export interface Prefs {
   chatterQuestions: boolean;
   /** The last lines said, so they don't come round again too soon. */
   chatterRecent: string[];
+  /** The day the cat last cheered a streak (7 · 30 · 100 days), as a day key: once that day (#42). */
+  chatterMilestoneDay: string;
   /** 일정: today's events above today's tasks (when there are events). */
   calendarStrip: boolean;
   /** Minutes before an event its alert comes up; 0 turns them off. */
@@ -116,6 +119,8 @@ export interface Prefs {
   /** 메모 서랍 (1.28), this device's: the shortcut (an Electron accelerator; "" = off), the side, the width (260–480),
    *  the edge handle and its place (0 top … 1 bottom of the work area), the look, the last folder shown, 위에 고정. */
   drawerShortcut: string;
+  /** The key the drawer had when its switch was turned off (#27): turning it on brings that key back. */
+  drawerShortcutLast: string;
   drawerSide: DrawerSide;
   drawerWidth: number;
   drawerHandle: boolean;
@@ -130,6 +135,8 @@ export interface Prefs {
   drawerBackdrop: DrawerBackdrop;
   drawerPinnedSort: FolderSort;
   drawerRecentMoves: string[];
+  /** 할 일 스페이스 (1.30), this device's: the space 오늘 shows alone and the logical day it was picked (none: all). */
+  spaceLens: SpaceLens | null;
 }
 
 export type SystemNotify = "missed" | "always" | "off";
@@ -181,6 +188,7 @@ export const defaultPrefs: Prefs = {
   chatterFrequency: "normal",
   chatterQuestions: true,
   chatterRecent: [],
+  chatterMilestoneDay: "",
   calendarStrip: true,
   calendarAlertMinutes: 10,
   calendarAlertsShown: [],
@@ -206,6 +214,7 @@ export const defaultPrefs: Prefs = {
   aiSeenAt: "",
   aiCatSaid: 0,
   drawerShortcut: "Control+Shift+D",
+  drawerShortcutLast: "Control+Shift+D",
   drawerSide: "right",
   drawerWidth: 300,
   drawerHandle: true,
@@ -217,6 +226,7 @@ export const defaultPrefs: Prefs = {
   drawerBackdrop: "solid",
   drawerPinnedSort: "edited",
   drawerRecentMoves: [],
+  spaceLens: null,
 }
 
 export function pomodoroSettings(prefs: Prefs): PomodoroSettings {
@@ -296,9 +306,14 @@ export interface AppState {
   drawerBackdropNote?: string;
   /** 메모 서랍: the folders and each memo's place (memo-folders.json). */
   memoFolders: MemoFolders;
+  /** 할 일 스페이스: the spaces (todo-spaces.json; `items` left empty here — see spaceOf). */
+  todoSpaces: TodoSpaces;
+  /** Each to-do's live space: `<todo id>\t<space id>` lines (packSpaceOf; read with spaceIndexOf). */
+  spaceOf: string;
   /** Where the list lives: "이 PC (기본)" or the shared folder (home shortened to ~). */
   /** Where everything is kept: the folder (todos, memos, repeats) and its archive folder for the record. */
-  storage: { label: string; custom: boolean; path: string; archivePath: string };
+  /** `home`: the home folder, said as ~ in the storage pane (1.30). */
+  storage: { label: string; custom: boolean; path: string; archivePath: string; home: string };
   /** 일정: today's strip (worked out again every minute) and the tasks put in the calendar. */
   calendar: CalendarView;
   /** Every event kept in events.json (the 달력 window spreads them over the days it shows). */
@@ -381,9 +396,9 @@ export interface ParsedWhen {
 /**
  * A toast on the note for something done elsewhere (a menu, a bubble, the cat, Claude): its words and how its
  * 되돌리기 undoes it — "history" (Ctrl+Z), "memo" (지운 메모 되돌리기), "unfile" (완료한 일 정리 taken back),
- * "ai" (Claude's entry `entry`); or `show`: a 보기 that opens 설정 › AI 연결 (자리 비운 사이).
+ * "ai" (Claude's entry `entry`), "spaces" (to-dos back in their spaces: `entry` is [id, space | null][] as JSON); or `show`: a 보기 that opens 설정 › AI 연결 (자리 비운 사이).
  */
-export interface NoteNotice { icon: string; text: string; undo?: "history" | "memo" | "unfile" | "ai"; entry?: string; /** 보기 → 설정 › AI 연결, or 열기 → the drawer on memo `entry`. */ show?: "ai" | "drawer"; /** A sentence (AI 연결's): up to two lines, a little longer up. */ long?: boolean }
+export interface NoteNotice { icon: string; text: string; undo?: "history" | "memo" | "unfile" | "ai" | "spaces"; entry?: string; /** 보기 → 설정 › AI 연결, or 열기 → the drawer on memo `entry`. */ show?: "ai" | "drawer"; /** A sentence (AI 연결's): up to two lines, a little longer up. */ long?: boolean }
 
 export interface PopupTask {
   id: string;
@@ -405,14 +420,14 @@ export type WireCandidate =
   | { kind: "memo"; text: string }
   | { kind: "repeat"; title: string; rule: RepeatRule; time?: string };
 /** What putting a reading in made: its kind and the id of what was made (none for a timer). */
-export interface IntentMade { kind: IntentKind; id?: string }
+export interface IntentMade { kind: IntentKind; id?: string; /** A space made with it (`#세탁`): taken back with it. */ space?: string }
 export type IntentRequest =
-  | { op: "commit"; candidate: WireCandidate; page: IntentPage; from: "note" | "quick" | "glance"; candidates?: WireCandidate[]; text?: string }
+  | { op: "commit"; candidate: WireCandidate; page: IntentPage; from: "note" | "quick" | "glance"; candidates?: WireCandidate[]; text?: string; /** A to-do's space (`#회사`, the lens). */ space?: SpaceChoice }
   | { op: "undo"; made: IntentMade }
   | { op: "learn"; key?: string; from: IntentKind; to: IntentKind };
 export interface IntentResult { made?: IntentMade; error?: string; /** 빠른 입력: the note is up and shows the toast itself. */ inNote?: boolean }
 /** The note shows the toast for a line put in from 빠른 입력. */
-export interface IntentToast { made: IntentMade; candidates: WireCandidate[]; index: number; text: string }
+export interface IntentToast { made: IntentMade; candidates: WireCandidate[]; index: number; text: string; space?: SpaceChoice }
 
 export interface PopupPayload {
   tasks: PopupTask[];
@@ -455,6 +470,8 @@ export type Action =
   | { type: "setRange"; id: string; start?: number; end?: number }
   | { type: "saveSeries"; taskID?: string; seriesID?: string; title?: string; rule: RepeatRule; remindAt?: string }
   | { type: "deleteSeries"; id: string }
+  /** 되돌리기 after 반복 그만하기: the rule back, and its open copies in it again. */
+  | { type: "restoreSeries"; series: Series; todos: string[] }
   | { type: "setDeadline"; id: string; dueDate?: string; keepOnToday?: boolean }
   | { type: "moveToLater"; id: string }
   /** 날짜 바꾸기 · → 내일 · Alt+→ / ← / ↓ · 저녁 정리: tasks due on a day, or to 언젠가, as one undo step. */
@@ -472,7 +489,7 @@ export type Action =
   | { type: "setPref"; key: keyof Prefs; value: Prefs[keyof Prefs] }
   | { type: "collapse"; anchor?: { x: number; y: number } }
   /** Settings' panes on the desk ("calendar" is the old name of 일정, "events"). */
-  | { type: "openSettings"; tab?: "calendar" | "clock" | "events" | "storage" | "drawer" | "ai" }
+  | { type: "openSettings"; tab?: "calendar" | "clock" | "events" | "storage" | "drawer" | "spaces" | "ai" }
   /** 설정 › AI 연결: the switch, 되돌리기 on an entry (or its toast), Claude 데스크톱에 연결, Claude Code 명령 복사. */
   | { type: "aiEnable"; on: boolean }
   | { type: "aiUndo"; id: string }
@@ -492,7 +509,10 @@ export type Action =
   | { type: "copyList" }
   | { type: "exportList" }
   | { type: "showMenu"; menu: "more"; x: number; y: number }
-  | { type: "showRowMenu"; id: string }
+  /** A to-do's menu: the note draws it on paper (at the point, or under the row when `keyboard`: Shift+F10 · the Menu key). */
+  | { type: "showRowMenu"; id: string; x?: number; y?: number; keyboard?: boolean }
+  /** A row of that menu picked (its number in the menu the main process sent last). */
+  | { type: "rowMenuPick"; pick: number }
   | { type: "timerCommand"; command: TimerCommand }
   /** 집중 (the focus card's buttons, the pick state's 집중). */
   | { type: "focus"; command: FocusCommand }
@@ -501,7 +521,7 @@ export type Action =
   | { type: "calendarNewEvent"; at?: { day: string; minutes: number } }
   /** A strip row: its event in the sheet (고치기). */
   | { type: "calendarEditEvent"; key: string }
-  | { type: "showEventMenu"; key: string }
+  | { type: "showEventMenu"; key: string; x?: number; y?: number }
   | { type: "openCalendar"; day?: string }
   /** The 오늘 창's 노트 열기 (and 외 N개). */
   | { type: "openNote" }
@@ -551,5 +571,17 @@ export type Action =
   | { type: "openLink"; url: string }
   /** The drawer's text menu: 오려 두기 · 복사하기 · 붙여넣기 · 모두 선택 in the page that asked. */
   | { type: "editCommand"; command: "cut" | "copy" | "paste" | "selectAll" }
+  /** 할 일 스페이스 (1.30): a new space (and a to-do moved into it), a new name, colour or order, deleted (its to-dos to
+   *  스페이스 없음) and its 되돌리기, to-dos moved (null: 스페이스 없음), and the lens (none: 모든 스페이스). */
+  | { type: "spaceAdd"; id: string; name: string; color?: string; todo?: string }
+  | { type: "spaceRename"; id: string; name: string }
+  | { type: "spaceColor"; id: string; color: string }
+  | { type: "spaceDelete"; id: string }
+  | { type: "spaceRestore"; id: string; todos: string[] }
+  | { type: "spaceOrder"; ids: string[] }
+  | { type: "todoSpace"; ids: string[]; space: string | null }
+  | { type: "spaceLens"; space?: string }
+  /** The desk's 스페이스 pane (스페이스 관리…). */
+  | { type: "openSpaces" }
   /** Text to the clipboard (a memo's 복사). */
   | { type: "copyText"; text: string };

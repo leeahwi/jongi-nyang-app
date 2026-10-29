@@ -11,8 +11,8 @@
 
 - **Windows 10/11 (x64)** — this folder (`windows/`). Electron 44 + TypeScript, no outside UI libraries.
 - The **macOS version** lives in the [`mac/` folder](../mac). Same design, features and file format, so one shared folder gives you the same list on a Mac.
-- No internet, account or server: everything stays on this PC (or in a synced folder you choose). [Events](#events--calendar) live inside Jongi-nyang too, and a single [backup file](#backup--move) moves everything to another computer.
-- **Korean, English and Dutch.** Desk → Appearance → **Language**: Automatic (the system’s language) · 한국어 · English · Nederlands. Changing it restarts the app.
+- No internet, account or server: everything stays on this PC (or in a shared folder you choose). [Events](#events--calendar) live inside Jongi-nyang too, and a single [backup file](#backup--move) moves everything to another computer.
+- **Korean, English and Dutch.** Desk → Appearance → **App language**: Automatic (the system’s language) · 한국어 · English · Nederlands. Changing it restarts the app.
 - **Night paper**: when Windows is in dark mode, the paper turns the color of paper in a room with the light off (Desk → Appearance → Paper: Automatic · Day · Night).
 
 ---
@@ -32,6 +32,7 @@
 - [Backup & move](#backup--move)
 - [종이냥 for Claude · AI connection](#종이냥-for-claude--ai-connection)
 - [Notes drawer](#notes-drawer)
+- [To-do spaces](#to-do-spaces)
 - [Screens](#screens)
 - [Install and run](#install-and-run)
 - [Shortcuts](#shortcuts)
@@ -85,7 +86,7 @@
 - The first launch shows a five-card welcome tour, and `F1` opens Help (on the desk) with every topic and a search box.
 
 ### 🌐 Languages
-- Desk → Appearance → **Language**: **Automatic** follows the system’s preferred languages (the first of Korean, English, Dutch; otherwise English), or pick 한국어 · English · Nederlands. The app restarts after a confirm.
+- Desk → Appearance → **App language**: **Automatic** follows the system’s preferred languages (the first of Korean, English, Dutch; otherwise English), or pick 한국어 · English · Nederlands. The app restarts after a confirm.
 - Everything follows: menus, the tray, dialogs, Help, the welcome tour, dates and times (English 12-hour clock, Dutch weeks start on Monday), quick add and the cat’s lines.
 - In English and Dutch the handwriting faces are **Caveat** (Pen) and **Kalam** (Marker), with the Korean faces behind them for Hangul.
 
@@ -134,8 +135,8 @@ Stage 4 of the new design (1.22): just one to-do and the time left.
 - **Since yesterday · 3 days**: an undated to-do that stayed on Today past a day gets a small tag at the end. The day it first came to Today is saved in the to-do as `"todaySince": "yyyy-MM-dd"`, the same as on the Mac.
 - **Evening tidy-up** (on by default, 8 PM, 6–10 PM): the cat asks ‘3 to-dos left today. Move them to tomorrow?’ — untick what stays, then To tomorrow · To Someday · Leave as is. Missed it? The first time you open the notepad the next day it asks as the **Morning tidy-up**. It waits while you focus.
 - **Today’s one thing** (off by default): the first time you open the notepad each day the empty line asks ‘If you do just one thing today?’ — the first to-do you write goes to the top of Next with a star.
-- **Snooze choices**: the reminder slip’s ⌄ has In 5 · 10 · 30 min · 1 hour · Tonight at 7 PM · Tomorrow at 9 AM · Move to tomorrow, and the slip has a **To tomorrow** button. Event alerts get **5 min before**.
-- **Windows notifications too** (Desk → Reminders, default ‘Only missed’): when the cat and the notepad are both hidden or the screen is locked, reminders also go to Windows notifications, with **Done · In 10 min** right there (alarms: **Stop · Snooze**).
+- **Snooze choices**: the reminder slip’s ⌄ has In 5 · 10 · 30 min · 1 hour · Tonight at 7 PM · Tomorrow at 9 AM · Do tomorrow, and the slip has a **To tomorrow** button. Event alerts get **5 min before**.
+- **Windows notifications too** (Desk → Reminders, default ‘Only missed’): when the cat and the notepad are both hidden or the screen is locked, reminders also go to Windows notifications, with **Mark done · In 10 min** right there (alarms: **Stop · Snooze**).
 - **Search** `Ctrl+F` (⋯ → Search…, or the top of the desk): Today · Ahead · Notes · History · Events at once. Case and accents don’t matter (cafe finds Café); Korean matches first consonants too.
 - **Input line**: ‘every day drink water’ · ‘weekdays 8am workout’ · ‘every Monday 9am team meeting’ → a repeating to-do (a repeating event for event words); ‘take out laundry in 30 min’ → a reminder in 30 minutes.
 - **Your day**: click an empty spot to write a to-do or event for that time, or double-click for a new event slip at that time (to the quarter hour).
@@ -150,7 +151,7 @@ Stage 4 of the new design (1.22): just one to-do and the time left.
 
 1.24 lets a to-do have a **time**, and makes Jongi-nyang much lighter. Same rules and shared cases as Mac 1.39.
 
-- **Set a time**: right-click a line → **Set a time…**, or **Time** on its reminder card: start → end (the 15-minute list, or type ‘5:20pm’), lengths **30 min · 1 hour · 2 hours**, **Remove**. A start alone shows as 30 minutes. The day is the due date, or today while it sits on Today.
+- **Set a time**: right-click a line → **Set a time…**, or **Time** on its reminder slip: start → end (the 15-minute list, or type ‘5:20pm’), lengths **30 min · 1 hour · 2 hours**, **Remove**. A start alone shows as 30 minutes. The day is the due date, or today while it sits on Today.
 - **From the line**: `report 2-4pm` · `report from 2 to 4` · `2pm–3:30pm report` (Korean `3시부터 5시까지 보고서`, Dutch `verslag van 2 tot 4 uur`) → chip ‘To-do · today 2:00–4:00 PM’; `Tab` gives the event with the same hours. A range already over goes to tomorrow.
 - **Reminder**: a to-do without one gets a reminder at the start (shown on the card, change or remove it). Moving the time moves a reminder that was at the start.
 - **Day ribbon · Your day**: green stretches on the bar, green-outlined blocks in the opened day — done ones faded and struck through, ones past their time and still open in red, side by side when they overlap. Drag a block and it follows the mouse, then settles on a quarter hour; drag its top or bottom edge to change its start or end (`Esc` cancels).
@@ -230,19 +231,34 @@ Since 1.27, Claude (Claude Desktop · Claude Code) can look at your to-dos, even
 
 ## Notes drawer
 
-In 1.28 the notepad’s Notes tab became the **Notes drawer**: pull your notes out from the edge of the screen, jot things down and edit them right there. Every note from the Notes tab is in the drawer’s ‘Notes’ folder (no file is changed), and the first launch says so once. 1.29 has the same behaviour, files and test cases (D1–D29) as Mac 1.44.
+In 1.28 the notepad’s Notes tab became the **Notes drawer**: pull your notes out from the edge of the screen, jot things down and edit them right there. Every note from the Notes tab is in the drawer’s ‘Notes’ folder (no file is changed), and the first launch says so once. 1.30 has the same behaviour, files and test cases (D1–D30) as Mac 1.45.
 
-- **Open · close**: `Ctrl+Shift+D` from any app (change or turn it off in Desk → Notes drawer), the paw bookmark at the screen’s edge (the handle — today’s count in small type; drag it up or down), ⋯ → Notes drawer, right-clicking the cat, the drawer button above the notepad, `Ctrl+3` or the notification area menu. It slides out over 180 ms, the full height above the taskbar of the screen your mouse is on, and clicking another app doesn’t close it. The same shortcut, `Esc` or × do.
+- **Open · close**: `Ctrl+Shift+D` from any app (change or turn it off in Desk → Notes drawer), the handle at the screen’s edge (pale cream with a paw — hover for ‘Notes drawer · 5 notes edited today’; drag it up or down), ⋯ → Notes drawer, right-clicking the cat, the drawer button above the notepad, `Ctrl+3` or the notification area menu. It slides out over 180 ms, the full height above the taskbar of the screen your mouse is on, and clicking another app doesn’t close it. The same shortcut, `Esc` or × do.
 - **The drawer**: one sheet of paper with paper cat ears on its top edge (a step darker than the notes). The header shows the folder’s name (handwritten) ▾ — click it or press `Ctrl+L` for the folder list —, search, keep-on-top and close. Write on the taped slip and press `Enter` for a new note at the top of the folder. At the bottom: ⚙ · ‘Work · 5 notes’ · the shortcut.
-- **Note cards (1.29)**: grouped by date like Apple Notes — Pinned · Today · Yesterday · This week · Last week · October · September 2025 (weeks start on Monday). Each card has a strip of tape in its folder’s colour, a handwritten title, one line of preview and a short time (`6:02 PM` · `Tuesday` · `Oct 13`). What a note is gets a small chip, found in its words: a link (`youtube.com/watch`, click to open — a title that is only the address reads ‘youtube.com link’), a phone number (`010-1234-5678`, click to copy), a checklist (2/4 and a bar). Hover for Copy · Pin · ⋯; an open note has [Larger view · Copy · ⚙] ‘Edited 5:38 PM’ [Move to folder · Delete] under it. A folder with more than 20 notes gets a little denser.
-- **Menus**: everything has a right-click menu too (icons, the shortcuts that exist, delete last) — an empty spot (= the ⚙ at the bottom: New note · New note from clipboard · paper · backdrop · left/right · settings · help · quit), a note (Open and edit · Larger view · Copy · Duplicate · Pin · Move to folder ▸ Recent · This note’s paper · Remove ticked lines · Delete), text you’re editing (Cut · Copy · Paste · Select all + This note), a bookmark (New note here · Rename · Color · Sort · Duplicate · Delete folder) and Pinned (Sort · Unpin all). `Shift+F10` and the Menu key open them as well.
-- **Folders**: the bookmarks at the side. The chosen one shows its name, the others their first letter; hover for ‘Shopping · 3 notes · Ctrl+3’. `+` for a new folder (a name, eight colours), drag to reorder or drop a note on a bookmark to move it; the paw bookmark is ‘Pinned’. Sort by last edited · date created · title (per folder). `Ctrl+1`–`9` · `Ctrl+0`; `Ctrl+F` searches every folder.
+- **Note cards (1.29)**: grouped by date like Apple Notes — Pinned · Today · Yesterday · This week · Last week · October · September 2025 (weeks start on Monday). Each card has a strip of tape in its folder’s colour, a handwritten title, up to three lines of preview (a checklist’s first three items, 1.30) and a short time (`6:02 PM` · `Tuesday` · `Oct 13`). What a note is gets a small chip, found in its words: a link (`youtube.com/watch`, click to open — a title that is only the address reads ‘youtube.com link’), a phone number (`010-1234-5678`, click to copy), a checklist (2/4 and a bar). Hover for Copy · Pin · ⋯; an open note has [Larger view · Copy · ⚙] ‘Edited 5:38 PM’ [Move to folder · Delete] under it. A folder with more than 20 notes gets a little denser.
+- **Menus**: everything has a right-click menu too (icons, the shortcuts that exist, delete last) — an empty spot (= the ⚙ at the bottom: New note · New note from clipboard · paper · backdrop · left/right · settings · help · Quit Jongi-nyang), a note (Open and edit · Larger view · Copy · Duplicate · Pin · Move to folder ▸ Recent · This note’s paper · Remove ticked lines · Delete), text you’re editing (Cut · Copy · Paste · Select all + This note), a bookmark (New note here · Rename · Color · Sort · Duplicate · Delete folder) and Pinned (Sort · Unpin all). `Shift+F10` and the Menu key open them as well.
+- **Folders**: the bookmarks at the side. The chosen one shows its name, the others their first letter; hover for ‘Shopping · 3 notes · Ctrl+3’. `+` for a new folder (a name, eight colours), drag to reorder or drop a note on a bookmark to move it; the pin bookmark is ‘Pinned’. Bookmarks and the handle are solid colours, no stripes (1.30). Sort by last edited · date created · title (per folder). `Ctrl+1`–`9` · `Ctrl+0`; `Ctrl+F` searches every folder.
 - **Paper and backdrop**: Day paper · Night paper · Kraft · Grid notebook, plus Auto, which follows the notepad’s day or night (1.29: each paper a step darker behind the notes, a 1 px edge on every note, darker grey text). One note can have its own paper (This note’s paper). Backdrop: Solid · Frosted · Strong (the screen behind shows through, blurred, on Windows 11) · None (only the notes, floating). Right or left, 260–480 wide (drag its inner edge).
+- **New look (1.30)**: whatever the font setting, card titles are 22 px handwriting, previews 13 px body ink one step lighter (darker than the old grey on all four papers), and an open note 14 px with 26 px lines. Cards, open notes and the larger view drop the ruled lines and the red margin; a strip of folder-coloured tape, a faint edge and shadow and a small torn edge at the top are left. No green box while editing, just the caret; a card picked with the keyboard gets a faint edge in its folder’s colour. Pinned shows a pin instead of a paw.
 - **Data**: the notes stay in `memos.json`; folders and places go in a new file beside it, `memo-folders.json`, so an older version saving the notes never wipes them. Changes on two devices merge entry by entry (the later one wins); backups and shared folders take it along. Quick note and `/note` go to the folder you last looked at.
 
 ![Notes drawer — Day paper · Night paper · Kraft · Grid notebook](../docs/screenshots/windows/en/drawer-themes.png)
 
 ![Backdrop — Solid · Frosted · Strong · None](../docs/screenshots/windows/en/drawer-backdrops.png)
+
+## To-do spaces
+
+Since 1.30 you can split to-dos into **spaces** like Work · Home · Study. The Today tab is still one page — split up, not split apart. Same behaviour, same file and same test cases as Mac 1.45 (S1–S22, `docs/plans/spaces-cases.json`).
+
+- **Colour bands**: only to-dos with a space get a small band in its colour at the left end of the line; hover over it for the name. Without any space the notepad looks exactly like 1.29.
+- **One space at a time**: `All spaces ▾` in the Today header, or `Ctrl+Shift+1`–`9` in the notepad (`Ctrl+Shift+0` shows all). ‘Showing Work only · 4 other to-dos hidden · Show all’ stays on top, and what you write goes into that space. At 4 a.m. the next day it goes back to all. The tab’s number and reminders still count the hidden to-dos.
+- **`#` in the input line**: `Send the quote by Friday #work`; the start of the name (`#wo`) works too. A name that doesn’t exist yet becomes a new space when you put the line in. With a `#` in the line, `Shift+Tab` picks another space. Events · timers · alarms · notes get no space. Quick entry (`Ctrl+Alt+N`) works the same.
+- **Moving and managing**: right-click a to-do (or `Shift+F10` · the Menu key) → `Move to space ▸`, or the Space field on the reminder · repeat · deadline slip. Desk → Spaces makes, renames, colours (eight), reorders (drag) and deletes them (with Undo). On Windows the to-do’s right-click menu is now a paper menu like the Notes drawer’s.
+- **Data**: `todos.json` keeps its shape; the spaces and where each to-do is live beside it in the new `todo-spaces.json` (an older version saving the list never wipes them). When two devices change the same thing the later change wins; backups and shared folders take it along.
+
+| One sheet, mixed | Work only |
+| --- | --- |
+| ![Today: a space's colour band at the edge of each to-do](../docs/screenshots/windows/en/spaces-today.png) | ![Showing Work only, the other to-dos hidden](../docs/screenshots/windows/en/spaces-lens.png) |
 
 ## Screens
 
@@ -287,6 +303,7 @@ npm start            # build, then run
 | `Space` · `Ctrl+Enter` · `Ctrl+=` · `Esc` | Focus card: pause · done · 5 more min · stop |
 | `Enter` · `S` / `Space` | Stop · snooze a ringing alarm |
 | `Ctrl+1` · `Ctrl+2` · `Ctrl+3` | Today · Ahead · open the Notes drawer |
+| `Ctrl+Shift+1`–`9` · `Ctrl+Shift+0` | Show one space (in their order) · all spaces (in the notepad) |
 | `↑` `↓` · `Space` · `Enter` · `Delete` | Select a line · check off · edit · delete |
 | `Ctrl+↑` `Ctrl+↓` | Reorder |
 | `Ctrl+Z` / `Ctrl+Y` | Undo / Redo |
@@ -306,6 +323,7 @@ npm start            # build, then run
 %APPDATA%\PaperTodo\todos.json              to-dos (since 1.23 with `todaySince`, the day one came to Today; since 1.24 with a time, `timeStart` · `timeEnd` — as on the Mac)
 %APPDATA%\PaperTodo\memos.json              notes
 %APPDATA%\PaperTodo\memo-folders.json       the Notes drawer’s folders and each note’s place (1.28, same as the Mac)
+%APPDATA%\PaperTodo\todo-spaces.json        to-do spaces and where each to-do is (1.30, same as the Mac)
 %APPDATA%\PaperTodo\repeats.json            repeating to-dos
 %APPDATA%\PaperTodo\events.json             events
 %APPDATA%\PaperTodo\alarms.json             alarms
@@ -372,9 +390,10 @@ The **Cat talk** tables (`src/core/chatter.ts`) are generated by `generate.py` f
 - The event card (Add to calendar · New event · Edit) is a small card inside the notepad (like the reminder card) instead of a popover on the Mac. Quick add’s event key is `Ctrl+Enter` (Mac `⌘Return`).
 - Export · Import are in the ⋯ menu · tray menu · Desk → Storage & backup instead of the Mac’s File menu (⇧⌘E · ⇧⌘I).
 - The desk opens from the note’s desk icon · the ⋯ menu · tray menu · `Ctrl+D` (Mac `⌘D`) instead of the View menu, and the event cards appear inside its calendar. Each pane holds its old window’s page as it was. Night paper follows Windows’ app mode (light · dark).
+- Showing one space is `Ctrl+Shift+1`–`9` · `Ctrl+Shift+0` (Mac `⌥⌘1`–`9` · `⌥⌘0`). `Ctrl+Alt+digit` was left alone because it clashes with layouts that type with AltGr. `All spaces ▾` sits at the end of the date line, clear of the cat.
 - The language restarts the app itself; the Mac sets the app’s own language for macOS and relaunches.
 
-> **Still to check on a real Windows PC**: this app was run with Electron on macOS to check every screen and behaviour (keyboard · drag and drop · quick add · shared-folder sync · note merging · reminders · cat talk) and to build the installer. Installing on real Windows, the notification area, click-through, `Ctrl+Alt+N` focus and AltGr keyboards haven’t been checked yet.
+> **Still to check on a real Windows PC**: this app was run with Electron on macOS to check every screen and behaviour (keyboard · drag and drop · quick add · shared-folder sync · note merging · reminders · cat talk) and to build the installer. Installing on real Windows, the notification area, click-through (the reminder slip’s check box), `Ctrl+Alt+N` focus, AltGr keyboards, the notes drawer’s Frosted and Strong backdrops, `Ctrl+Shift+0` against the input-language shortcut, the 12- or 24-hour clock read from the region setting, and `Shift+F10` · the Menu key haven’t been checked yet.
 
 ## Fonts and images
 

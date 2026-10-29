@@ -11,7 +11,7 @@ import re
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
-from chatter_lines import ALWAYS, DUE_SOON, EN, EVENTS, FALLBACK, FREQUENCY, GENERAL, NL, OVERDUE, PETTED, PROGRESS, QUESTIONS, TIME, WEEKDAY  # noqa: E402
+from chatter_lines import ALWAYS, DUE_SOON, EN, EVENTS, FALLBACK, FREQUENCY, GENERAL, MILESTONE, NL, OVERDUE, PETTED, PROGRESS, QUESTIONS, TIME, WEEKDAY  # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 MAC = os.path.join(ROOT, "Sources", "PaperCore", "PetChatter.swift")
@@ -25,7 +25,7 @@ KO = {
     "TIME": {name: lines for name, _, _, lines in TIME}, "WEEKDAY": {name: lines for name, _, lines in WEEKDAY},
     "GENERAL": GENERAL, "EVENTS": EVENTS,
     "QUESTIONS": {qid: (text, [(label, reply) for label, reply, _, _ in answers]) for qid, text, _, answers in QUESTIONS},
-    "PETTED": PETTED, "FALLBACK": FALLBACK, "FREQUENCY": FREQUENCY,
+    "PETTED": PETTED, "MILESTONE": MILESTONE, "FALLBACK": FALLBACK, "FREQUENCY": FREQUENCY,
 }
 LANGS = {"ko": KO, "en": EN, "nl": NL}
 
@@ -66,6 +66,7 @@ def check():
             assert placeholders(text) == placeholders(other_text), f"{lang} {qid}: placeholders"
             assert len(answers) == len(other_answers), f"{lang} {qid}: {len(other_answers)} answers, Korean has {len(answers)}"
         assert len(LANGS[lang]["PETTED"]) == len(PETTED), f"{lang}: petted lines"
+        assert len(LANGS[lang]["MILESTONE"]) == len(MILESTONE) == 3, f"{lang}: milestone lines (7, 30, 100)"
         assert LANGS[lang]["FALLBACK"].keys() == FALLBACK.keys() and LANGS[lang]["FREQUENCY"].keys() == FREQUENCY.keys()
 
 
@@ -107,6 +108,7 @@ def swift():
         questions.append(f"        Question(id: {q(qid)}, text: [{texts}], answers: [\n" + ",\n".join(per_lang) + "],\n"
                          f"                 applies: {{ c in {applies} }}),")
     petted = ",\n".join(f"        [{', '.join(q(t) for t in LANGS[lang]['PETTED'])}]" for lang in LANGS)
+    milestone = ",\n".join(f"        [{', '.join(q(t) for t in LANGS[lang]['MILESTONE'])}]" for lang in LANGS)
     frequency = lambda key: ", ".join(q(LANGS[lang]["FREQUENCY"][key]) for lang in LANGS)
     fallback = lambda key: ", ".join(q(LANGS[lang]["FALLBACK"][key]) for lang in LANGS)
     return f'''import Foundation
@@ -155,12 +157,16 @@ public enum PetChatter {{
         public var nowEvent: String?
         public var endedEvent: String?
         public var eventsLeft: Int
+        /// A streak that reached 7, 30 or 100 days today and hasn't been cheered yet (Archive.streakMilestone).
+        public var milestone: Int?
 
         public init(hour: Int, open: Int, done: Int, overdue: Int = 0, dueSoon: Int = 0, firstOpen: String? = nil, weekday: Int = 2,
-                    nextEvent: String? = nil, nextIn: Int = 0, nowEvent: String? = nil, endedEvent: String? = nil, eventsLeft: Int = 0) {{
+                    nextEvent: String? = nil, nextIn: Int = 0, nowEvent: String? = nil, endedEvent: String? = nil, eventsLeft: Int = 0,
+                    milestone: Int? = nil) {{
             self.hour = hour; self.open = open; self.done = done; self.overdue = overdue; self.dueSoon = dueSoon
             self.firstOpen = firstOpen; self.weekday = weekday
             self.nextEvent = nextEvent; self.nextIn = nextIn; self.nowEvent = nowEvent; self.endedEvent = endedEvent; self.eventsLeft = eventsLeft
+            self.milestone = milestone
         }}
     }}
 
@@ -188,6 +194,7 @@ public enum PetChatter {{
     /// One line (or question) for this moment, avoiding the ones said recently.
     public static func pick(_ context: Context, questions: Bool, recent: [String], language: AppLanguage = .ko, random: () -> Double) -> Line {{
         let l = language
+        if let days = context.milestone, let line = milestone(days, language: l) {{ return line }}
         var groups: [(weight: Double, lines: [Line])] = []
         groups.append((4, progress(context, l)))
         if context.overdue > 0 {{ groups.append((3, lines(overdueLines, context, l))) }} else if context.dueSoon > 0 {{ groups.append((2, lines(dueSoonLines, context, l))) }}
@@ -213,6 +220,15 @@ public enum PetChatter {{
         let pool = fresh.isEmpty ? chosen : fresh
         return pool[min(pool.count - 1, Int(random() * Double(pool.count)))]
     }}
+
+    /// The day a streak reaches 7, 30 or 100 days: one short cheer ("m.0" · "m.1" · "m.2"); nil for any other count.
+    public static func milestone(_ days: Int, language: AppLanguage = .ko) -> Line? {{
+        guard let index = milestoneDays.firstIndex(of: days) else {{ return nil }}
+        return Line(id: "m.\\(index)", text: milestoneLines[language.index][index], answers: [])
+    }}
+
+    /// The streaks the cat cheers, once each, on the day they're reached.
+    public static let milestoneDays = [7, 30, 100]
 
     /// A short answer when the cat is patted.
     public static func petted(language: AppLanguage = .ko, random: () -> Double) -> Line {{
@@ -259,6 +275,9 @@ public enum PetChatter {{
 
     private static let pettedLines: [[String]] = [
 {petted}]
+
+    private static let milestoneLines: [[String]] = [
+{milestone}]
 
     private struct Question: Sendable {{
         let id: String
@@ -323,6 +342,7 @@ def ts():
         fn = "() => true" if applies == "true" else f"(c) => {applies}"
         questions.append(f"  {{ id: {q(qid)}, text: [{texts}], answers: [\n" + ",\n".join(per_lang) + f"], applies: {fn} }},")
     petted = ",\n".join(f"  [{', '.join(q(t) for t in LANGS[lang]['PETTED'])}]" for lang in LANGS)
+    milestone = ",\n".join(f"  [{', '.join(q(t) for t in LANGS[lang]['MILESTONE'])}]" for lang in LANGS)
     frequency = ",\n".join(
         f"  {lang}: {{ {', '.join(f'{key}: {q(LANGS[lang]["FREQUENCY"][key])}' for key in FREQUENCY)} }}" for lang in LANGS)
     fallback = lambda key: ", ".join(q(LANGS[lang]["FALLBACK"][key]) for lang in LANGS)
@@ -364,6 +384,8 @@ export interface ChatterContext {{
   nowEvent?: string;
   endedEvent?: string;
   eventsLeft?: number;
+  /** A streak that reached 7, 30 or 100 days today and hasn't been cheered yet (streakMilestone in archive.ts). */
+  milestone?: number;
 }}
 
 export type ChatterFrequency = "rare" | "normal" | "often";
@@ -383,6 +405,8 @@ export function nextChatterDelay(frequency: ChatterFrequency, random: () => numb
 
 /** One line (or question) for this moment, avoiding the ones said recently. */
 export function pickChatter(context: ChatterContext, questions: boolean, recent: readonly string[], random: () => number, lang: Lang = "ko"): ChatterLine {{
+  const cheer = context.milestone === undefined ? undefined : milestoneChatter(context.milestone, lang);
+  if (cheer) return cheer;
   const groups: {{ weight: number; lines: ChatterLine[] }}[] = [];
   groups.push({{ weight: 4, lines: progress(context, lang) }});
   if (context.overdue > 0) groups.push({{ weight: 3, lines: lines(overdueLines, context, lang) }});
@@ -412,6 +436,16 @@ export function pickChatter(context: ChatterContext, questions: boolean, recent:
   const fresh = chosen.filter((line) => !recent.includes(line.id));
   const pool = fresh.length > 0 ? fresh : chosen;
   return pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))];
+}}
+
+/** The streaks the cat cheers, once each, on the day they're reached. */
+export const milestoneDays: readonly number[] = [7, 30, 100];
+
+/** The day a streak reaches 7, 30 or 100 days: one short cheer ("m.0" · "m.1" · "m.2"); undefined for any other count. */
+export function milestoneChatter(days: number, lang: Lang = "ko"): ChatterLine | undefined {{
+  const index = milestoneDays.indexOf(days);
+  if (index < 0) return undefined;
+  return {{ id: `m.${{index}}`, text: milestoneLines[langIndex(lang)][index], answers: [] }};
 }}
 
 /** A short answer when the cat is patted. */
@@ -450,6 +484,9 @@ function weekdayLines(weekday: number): Table | undefined {{
 
 const pettedLines: readonly (readonly string[])[] = [
 {petted}];
+
+const milestoneLines: readonly (readonly string[])[] = [
+{milestone}];
 
 const answer = (label: string, reply: string, pose: ChatterPose, action?: ChatterAction): ChatterAnswer => (action ? {{ label, reply, pose, action }} : {{ label, reply, pose }});
 

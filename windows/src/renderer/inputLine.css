@@ -21,3 +21,7 @@
 @media (forced-colors: active) {
   .inp.focused { outline: 2px solid Highlight; }
 }
+/* 할 일 스페이스 (1.30): ● 회사 after the to-do's chip; + 새 스페이스 ‘회사’ dashed. */
+.chip.space-chip { gap: 5px; }
+.chip.space-chip .space-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--band); flex: none; }
+.chip.space-chip.new { outline: 1px dashed var(--ink-3); outline-offset: -1px; }

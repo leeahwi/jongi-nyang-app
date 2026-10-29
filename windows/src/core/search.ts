@@ -23,11 +23,22 @@ const syllableStart = 0xac00;
 const syllableEnd = 0xd7a3;
 
 /** One character folded for comparing: lower case, accents dropped (Hangul syllables stay whole). */
-function fold(character: string): string {
+function foldOnce(character: string): string {
   const code = character.codePointAt(0)!;
   if (code >= syllableStart && code <= syllableEnd) return character;
   const plain = character.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
   return plain.length ? plain : character;
+}
+/** Each character's fold worked out once (a search folds every letter of every memo). */
+const folds = new Map<string, string>();
+export function fold(character: string): string {
+  let folded = folds.get(character);
+  if (folded === undefined) {
+    folded = foldOnce(character);
+    if (folds.size > 50_000) folds.clear();
+    folds.set(character, folded);
+  }
+  return folded;
 }
 
 /** A syllable's first consonant ("보" → "ㅂ"), or undefined for anything else. */
@@ -37,11 +48,18 @@ function initialOf(character: string): string | undefined {
   return initials[Math.floor((code - syllableStart) / 588)];
 }
 
-const sameCharacter = (text: string, query: string) => fold(text) === fold(query) || (initials.includes(query) && initialOf(text) === query);
+/** A query made ready once for many lines: its characters, their folds, which are lone consonants. */
+export interface PreparedQuery { wanted: string[]; folded: string[]; initial: boolean[]; /** No lone consonant: a match is the folds' joined text found in the line's. */ plain: boolean; joined: string }
+export function prepareQuery(query: string): PreparedQuery {
+  const wanted = [...query.trim()];
+  const folded = wanted.map(fold);
+  const initial = wanted.map((character) => initials.includes(character));
+  return { wanted, folded, initial, plain: !initial.includes(true), joined: folded.join("") };
+}
 
 /** Where `query` first stands in `text` ([start, end) in UTF-16 units), or undefined; a blank query matches nothing. */
-export function matchRange(text: string, query: string): [number, number] | undefined {
-  const wanted = [...query.trim()];
+export function matchRange(text: string, query: string | PreparedQuery): [number, number] | undefined {
+  const { wanted, folded, initial } = typeof query === "string" ? prepareQuery(query) : query;
   if (wanted.length === 0) return undefined;
   const characters = [...text];
   // Offsets of each character (astral characters take two units).
@@ -51,7 +69,7 @@ export function matchRange(text: string, query: string): [number, number] | unde
   offsets.push(offset);
   for (let start = 0; start + wanted.length <= characters.length; start += 1) {
     let index = 0;
-    while (index < wanted.length && sameCharacter(characters[start + index], wanted[index])) index += 1;
+    while (index < wanted.length && (fold(characters[start + index]) === folded[index] || (initial[index] && initialOf(characters[start + index]) === wanted[index]))) index += 1;
     if (index === wanted.length) return [offsets[start], offsets[start + wanted.length]];
   }
   return undefined;

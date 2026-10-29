@@ -85,21 +85,21 @@ private enum AIConnectTests {
         try test("toasts: the plan's table, ko/en/nl") {
             let entry = AIConnect.parse(added)[0]
             try equal(AIText.toast(entry, .ko), "Claude가 할 일 2개를 넣었어요", "ko add")
-            try equal(AIText.toast(entry, .en), "Claude added 2 tasks", "en add")
+            try equal(AIText.toast(entry, .en), "Claude added 2 to-dos", "en add")
             try equal(AIText.toast(entry, .nl), "Claude heeft 2 taken toegevoegd", "nl add")
             let moved = AIConnect.parse(line("c", now, kind: "change", changes: [(taskA, todo(taskA, "보고서 쓰기", start: "15:00", end: "16:00"),
                                                                                   todo(taskA, "보고서 쓰기", start: "16:00", end: "17:00"))]))[0]
             try equal(AIText.toast(moved, .ko), "Claude가 ‘보고서 쓰기’ 시간을 바꿨어요", "ko time")
             try equal(AIText.toast(moved, .en), "Claude changed the time of ‘보고서 쓰기’", "en time")
             try equal(AIText.toast(moved, .nl), "Claude heeft de tijd van ‘보고서 쓰기’ gewijzigd", "nl time")
-            try equal(AIText.away(3, .ko), "자리 비운 사이 Claude가 3가지를 했어요", "ko away")
+            try equal(AIText.away(3, .ko), "자리를 비운 사이 Claude가 3개를 넣거나 고쳤어요", "ko away")
             try equal(AIText.away(3, .en), "While you were away, Claude made 3 changes", "en away")
-            try equal(AIText.away(3, .nl), "Terwijl je weg was, heeft Claude 3 dingen gedaan", "nl away")
+            try equal(AIText.away(3, .nl), "Terwijl je weg was, heeft Claude 3 dingen toegevoegd of gewijzigd", "nl away")
             try equal(AIText.away(1, .en), "While you were away, Claude made 1 change", "en away one")
             let none = AIConnect.UndoOutcome(undone: 0, left: 1)
-            try equal(AIText.undoResult(none, .ko), "그새 바뀌어서 되돌리지 못했어요", "ko no undo")
-            try equal(AIText.undoResult(none, .en), "It changed since, so it can’t be undone", "en no undo")
-            try equal(AIText.undoResult(none, .nl), "Het is intussen gewijzigd, dus herstellen lukt niet", "nl no undo")
+            try equal(AIText.undoResult(none, .ko), "그사이 직접 고친 항목이라 그대로 뒀어요", "ko no undo")
+            try equal(AIText.undoResult(none, .en), "You changed it since, so it stays as you left it", "en no undo")
+            try equal(AIText.undoResult(none, .nl), "Je hebt het intussen aangepast, dus het blijft zo", "nl no undo")
             try equal([AIText.undoAction(.ko), AIText.undoAction(.en), AIText.undoAction(.nl)], ["되돌리기", "Undo", "Herstel"], "undo (this app's Dutch word)")
             try equal([AIText.showAction(.ko), AIText.showAction(.en), AIText.showAction(.nl)], ["보기", "Show", "Bekijken"], "show")
         }
@@ -120,14 +120,14 @@ private enum AIConnectTests {
             try equal(AIText.toast(done, .nl), "Claude heeft ‘보고서 쓰기’ afgevinkt", "nl done")
             let renamed = change(todo(taskA, "보고서"), todo(taskA, "보고서 쓰기"))
             try equal(AIText.toast(renamed, .ko), "Claude가 ‘보고서 쓰기’ 할 일을 바꿨어요", "other")
-            try equal(AIText.toast(renamed, .en), "Claude changed the task ‘보고서 쓰기’", "en other")
+            try equal(AIText.toast(renamed, .en), "Claude changed the to-do ‘보고서 쓰기’", "en other")
             let place = change("{\"id\":\"e\",\"title\":\"치과\",\"date\":\"2026-10-27\",\"start\":600,\"end\":660,\"location\":\"A\"}",
                                "{\"id\":\"e\",\"title\":\"치과\",\"date\":\"2026-10-27\",\"start\":600,\"end\":660,\"location\":\"B\"}", target: "events")
             try equal(AIText.toast(place, .ko), "Claude가 ‘치과’ 일정을 바꿨어요", "event other")
             try equal(AIText.toast(place, .nl), "Claude heeft de afspraak ‘치과’ gewijzigd", "nl event other")
             let many = AIConnect.Entry(id: "x", at: now, kind: .change, target: .todos, count: 3)
             try equal([AIText.toast(many, .ko), AIText.toast(many, .en), AIText.toast(many, .nl)],
-                      ["Claude가 할 일 3개를 바꿨어요", "Claude changed 3 tasks", "Claude heeft 3 taken gewijzigd"], "many")
+                      ["Claude가 할 일 3개를 바꿨어요", "Claude changed 3 to-dos", "Claude heeft 3 taken gewijzigd"], "many")
             try equal(AIText.shortTitle("이번 주 금요일까지 분기 보고서 초안 마무리하고 팀장님께 보내기"), "이번 주 금요일까지 분기 보고서 초안 마무…", "long title cut")
         }
 
@@ -170,9 +170,9 @@ private enum AIConnectTests {
                          AIConnect.undoStep(entry.changes[1], target: .todos, current: JSONValue.parse(todo(taskB, "장보기", done: true)))]
             try equal(steps, [.remove, .changedSince], "steps")
             let outcome = AIConnect.UndoOutcome(undone: 1, left: 1)
-            try equal(AIText.undoResult(outcome, .ko), "1개는 되돌리고, 그새 바뀐 1개는 그대로 뒀어요", "ko partial")
-            try equal(AIText.undoResult(outcome, .en), "Undid 1; 1 changed since, so it stays", "en partial")
-            try equal(AIText.undoResult(outcome, .nl), "1 hersteld; 1 intussen gewijzigd, die blijft staan", "nl partial")
+            try equal(AIText.undoResult(outcome, .ko), "1개를 되돌렸어요. 그사이 고친 1개는 그대로 뒀어요", "ko partial")
+            try equal(AIText.undoResult(outcome, .en), "Undid 1. The 1 you changed since stays as it is", "en partial")
+            try equal(AIText.undoResult(outcome, .nl), "1 hersteld. Die ene die je intussen aanpaste, blijft zo", "nl partial")
             try equal(AIText.undoResult(.init(undone: 2, left: 0), .ko), "되돌렸어요", "all")
         }
 
@@ -233,7 +233,7 @@ private enum AIConnectTests {
         try test("the cat: now and then, not twice in two hours") {
             let entry = AIConnect.parse(added)[0]
             try equal(AIText.catLine(entry, lastSaid: nil, now: now, random: { 0.2 }, .ko), "Claude가 할 일 두 개 놓고 갔어요.", "ko two")
-            try equal(AIText.catLine(entry, lastSaid: nil, now: now, random: { 0.2 }, .en), "Claude left two tasks for you.", "en")
+            try equal(AIText.catLine(entry, lastSaid: nil, now: now, random: { 0.2 }, .en), "Claude left two to-dos for you.", "en")
             try equal(AIText.catLine(entry, lastSaid: nil, now: now, random: { 0.2 }, .nl), "Claude heeft twee taken voor je klaargezet.", "nl")
             try expect(AIText.catLine(entry, lastSaid: nil, now: now, random: { 0.7 }, .ko) == nil, "only half the time")
             try expect(AIText.catLine(entry, lastSaid: now.addingTimeInterval(-3600), now: now, random: { 0 }, .ko) == nil, "not again within two hours")

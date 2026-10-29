@@ -200,12 +200,14 @@ public enum Focus {
         return ["\(length) 다 됐어요", "\(length) done", "\(length) voorbij"][language.index]
     }
 
-    /// "다음 · 15:30 치과 (40분 뒤)" · "Next · 3:30 PM Dentist (in 40 min)" · "Volgende · 15:30 Tandarts (over 40 min)".
+    /// The line under the title: how long until it first, the clock time last, so the time left in the ring above isn't
+    /// read beside a clock (#46): "40분 뒤 치과 · 15:30" · "Dentist in 40 min · 3:30 PM" · "Tandarts over 40 min · 15:30".
+    /// Same as focus.ts `focusNextLine`.
     public static func nextLine(title: String, at: Date, minutes: Int, language: AppLanguage = .ko, calendar: Calendar = .paper) -> String {
         let p = calendar.dateComponents([.hour, .minute], from: at)
         let clock = language.clock(hour: p.hour!, minute: p.minute!)
-        let word = ["다음", "Next", "Volgende"][language.index]
-        return "\(word) · \(clock) \(title) (\(DayRibbon.away(minutes, language: language)))"
+        let away = DayRibbon.away(minutes, language: language)
+        return (language == .ko ? "\(away) \(title)" : "\(title) \(away)") + " · " + clock
     }
 
     /// The line under the buttons: "그 밖의 오늘 할 일 3개 · 펼치기" ("· 접기" when open) — en "3 other to-dos today ·
@@ -220,8 +222,10 @@ public enum Focus {
         }
     }
 
-    /// The menu bar / tray words while focusing: "● 12:30" (a plain timer stays "12:30").
-    public static func menuBarText(remaining: TimeInterval) -> String { "● " + FocusTimer.clock(max(0, remaining)) }
+    /// The menu bar / tray words while focusing: "● 21분" (a plain timer stays "21분"; #46, a length, not a clock).
+    public static func menuBarText(remaining: TimeInterval, language: AppLanguage = .ko) -> String {
+        "● " + FocusTimer.lengthText(remaining, language: language)
+    }
 
     // MARK: Helpers
 

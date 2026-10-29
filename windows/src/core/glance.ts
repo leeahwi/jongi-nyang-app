@@ -1,6 +1,5 @@
 import { daysText, nextAlarm, timeParts, type Alarm } from "./alarm";
 import type { CalendarEvent } from "./calendar";
-import { clock as timerClock } from "./focusTimer";
 import { clock, dayWord, langIndex, weekdayShort, type Lang } from "./lang";
 import type { TodoItem } from "./notebook";
 import { awayText, upNext } from "./ribbon";
@@ -29,6 +28,35 @@ export function shortTitle(title: string, limit = 12): string {
 /** "40분", "40 min", "40 min" */
 const minutesWord = (minutes: number, lang: Lang) => (lang === "ko" ? `${minutes}분` : `${minutes} min`);
 
+/**
+ * #46: a timer's time left as a length, never in a clock's form ("20:50" beside "다음 일정 20:40" read as 8:50 PM).
+ * Whole minutes rounded up ("21분" · "21 min" for 20:50), from an hour with its minutes ("1시간 5분" · "1 h 5 min" ·
+ * "1 u 5 min", "1시간" on the hour), the last minute in seconds ("45초" · "45 sec"). The day strip's rule (#19).
+ * Same as the Mac's `TodayGlance.timerLength`.
+ */
+export function timerLength(ms: number, lang: Lang = "ko"): string {
+  const index = langIndex(lang);
+  const total = Math.ceil(Math.max(0, ms) / 1000);
+  if (total < 60) return [`${total}초`, `${total} sec`, `${total} sec`][index];
+  const minutes = Math.ceil(total / 60);
+  const h = Math.floor(minutes / 60), m = minutes % 60;
+  const rest = [`${m}분`, `${m} min`, `${m} min`][index];
+  if (h === 0) return rest;
+  const hours = [`${h}시간`, `${h} h`, `${h} u`][index];
+  return m === 0 ? hours : `${hours} ${rest}`;
+}
+
+/** The small word beside the length on the timer card: "남음" · "left" after it, Dutch "nog" before it
+ * ("nog 21 min" — "21 min te gaan" didn't fit a third of the 오늘 창). */
+export const timerLeftWord = (lang: Lang = "ko"): string => ["남음", "left", "nog"][langIndex(lang)];
+export const timerLeftWordFirst = (lang: Lang = "ko"): boolean => lang === "nl";
+
+/** Said in full: "21분 남음" · "21 min left" · "nog 21 min". */
+export function timerLeftText(ms: number, lang: Lang = "ko"): string {
+  const length = timerLength(ms, lang);
+  return timerLeftWordFirst(lang) ? `${timerLeftWord(lang)} ${length}` : `${length} ${timerLeftWord(lang)}`;
+}
+
 /** The soonest timed event or open task reminder starting within the hour (after now). */
 export function soonest(events: readonly CalendarEvent[], items: readonly TodoItem[], now: Date): { title: string; at: Date } | undefined {
   const at = now.getTime();
@@ -40,13 +68,13 @@ export function soonest(events: readonly CalendarEvent[], items: readonly TodoIt
 }
 
 /**
- * The words beside the icon: a running timer's remaining time ("12:30"; "● 12:30" while focusing on a
- * task); else the next event or
+ * The words beside the icon (the tray's tooltip): a running timer's time left as a length (#46: "21분 남음";
+ * "● 21분 남음" while focusing on a task — the Mac's menu bar, narrower, says "21분"); else the next event or
  * reminder within the hour ("치과 40분", "Dentist 40 min", "Tandarts 40 min", the title cut to 12
  * characters); else nothing.
  */
 export function glanceText(events: readonly CalendarEvent[], items: readonly TodoItem[], timer: GlanceTimer | undefined, now: Date, lang: Lang = "ko"): string | undefined {
-  if (timer && !timer.paused) return `${timer.focus !== undefined ? "● " : ""}${timerClock(timer.remainingMs)}`;
+  if (timer && !timer.paused) return `${timer.focus !== undefined ? "● " : ""}${timerLeftText(timer.remainingMs, lang)}`;
   const next = soonest(events, items, now);
   if (!next) return undefined;
   return `${shortTitle(next.title)} ${minutesWord(Math.max(1, Math.ceil((next.at.getTime() - now.getTime()) / 60_000)), lang)}`;
@@ -57,8 +85,11 @@ export interface GlanceCard {
   kind: GlanceCardKind;
   /** "다음 일정", "타이머", "다음 알람" */
   label: string;
-  /** The time ("15:30", "12:30") or "—". */
+  /** The time ("15:30"), the timer's time left ("21분", #46) or "—". */
   big: string;
+  /** A small word beside `big`: the timer's "남음" · "left" after it, or Dutch "nog" before it (`unitFirst`). */
+  unit?: string;
+  unitFirst?: boolean;
   /** "40분 뒤 · 치과", "내일 · 평일", "집중 1/4" — or what to type when there is nothing (“타이머 25”). */
   small: string;
   /** Within the hour, or a timer running: clay. */
@@ -128,7 +159,8 @@ export function glanceCards(events: readonly CalendarEvent[], timer: GlanceTimer
     if (value.countdown) return value.paused ? pausedWord[index] : untilText(new Date(at + Math.ceil(value.remainingMs / 60_000) * 60_000), lang);
     return value.paused ? `${value.caption} · ${pausedWord[index]}` : value.caption;
   };
-  const timerCard = timer ? card("timer", { big: timerClock(timer.remainingMs), small: timerSmall(timer), hot: !timer.paused, empty: false }) : empty("timer");
+  // #46: a length ("21분" + small "남음"), not "20:50" between the event's and the alarm's clock times.
+  const timerCard = timer ? card("timer", { big: timerLength(timer.remainingMs, lang), unit: timerLeftWord(lang), ...(timerLeftWordFirst(lang) ? { unitFirst: true } : {}), small: timerSmall(timer), hot: !timer.paused, empty: false }) : empty("timer");
 
   const ring = nextAlarm(alarms, now, handled);
   const alarmCard = ring ? card("alarm", {

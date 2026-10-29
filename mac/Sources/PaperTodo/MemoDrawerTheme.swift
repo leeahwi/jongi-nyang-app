@@ -16,11 +16,14 @@ struct DrawerPalette: Equatable {
     let rule: Color
     let background: Background
     let texture: Double
-    /// Text: ink (titles, memo text), the small green 메모 서랍 line, secondary (previews), faint (times, footer).
+    /// Text: ink (titles, memo text), the small green 메모 서랍 line, secondary (search hints, chips), faint (times,
+    /// footer); preview: a card's lines under its title (#14, option B) — the ink at one step lighter over the sheet
+    /// (낮 78 %, 밤 86 %, 크라프트 84 %, 모눈 80 %: each above the old grey's contrast), written as the colour it makes.
     let ink: Color
     let title: Color
     let label: Color
     let secondary: Color
+    let preview: Color
     let faint: Color
     /// Icons in the header and on slips.
     let icon: Color
@@ -44,9 +47,12 @@ struct DrawerPalette: Equatable {
     let selection: Color
     let toast: Color
     let toastText: Color
-    /// 고정 (the paw bookmark): its two stripes and its paw.
-    let pinTab: (Color, Color)
+    /// 고정 (the paw bookmark, 1.45 solid): its colour (day and night: the note's 오늘 tab), its 1 pt edge, its paw;
+    /// and the washi tape on a pinned memo in the 고정 view (unchanged, the old second stripe).
+    let pinTab: Color
+    let pinTabEdge: Color
     let pinTabInk: Color
+    let pinTape: Color
     /// kraft and grid: the picked bookmark is a paper of its own colour (the others keep their colours).
     let pickedTab: (back: Color, ink: Color, edge: Color)?
     /// 1.44: the open memo's margin line when the folder's colour can't be used; 지우기 on the bar; a sheet's shadow.
@@ -59,12 +65,18 @@ struct DrawerPalette: Equatable {
 
     static func == (a: DrawerPalette, b: DrawerPalette) -> Bool { a.kind == b.kind }
 
-    /// The sheet's ruling (B2): rules, the red margin line, the line under it; the cat ears' pink inside.
-    var sheetRule: Color { Color(drawerHex: ["day": "#ece4d2", "night": "#4a463f", "kraft": "#e8dcc3", "grid": "#d8e2ee"][kind.rawValue]!) }
-    var sheetMargin: Color { Color(drawerHex: ["day": "#efc4c0", "night": "#9a6266", "kraft": "#d79a8a", "grid": "#f0b8b4"][kind.rawValue]!) }
+    /// The sheet's foot (a 1 pt lip under it). Sheet D (#14): no rules and no margin line any more.
     var sheetBottom: Color { Color(drawerHex: ["day": "#e0d7c4", "night": "#1d1c19", "kraft": "#c9b08a", "grid": "#d8e0e8"][kind.rawValue]!) }
     /// A sheet's 1 pt edge (1.44).
     var sheetEdge: Color { slipEdge }
+    /// An open or picked sheet (#14): its shadow a little deeper instead of a box round it.
+    var deepShadow: Color {
+        switch kind {
+        case .day, .kraft: Color(red: 60 / 255, green: 50 / 255, blue: 30 / 255).opacity(0.24)
+        case .night: Color.black.opacity(0.62)
+        case .grid: Color(red: 30 / 255, green: 50 / 255, blue: 80 / 255).opacity(0.24)
+        }
+    }
     /// The bar's pills and the kind chips: ink at 6 %, a hairline at 10 %.
     var pill: Color { ink.opacity(kind == .night ? 0.07 : 0.06) }
     var pillEdge: Color { ink.opacity(kind == .night ? 0.12 : 0.10) }
@@ -80,7 +92,8 @@ struct DrawerPalette: Equatable {
 
     // MARK: Folder colours by paper
 
-    /// A bookmark's colours: two stripes (one for solid papers), its ink, the open slip's edge, the tape.
+    /// A bookmark's colours: its fill `a` (1.45: solid on every paper; `b` was the second stripe and is only measured
+    /// now), its ink, its 1 pt edge (also the open slip's), the tape.
     struct TabColors {
         let a: Color
         let b: Color
@@ -94,7 +107,7 @@ struct DrawerPalette: Equatable {
         return TabColors(a: Color(drawerHex: row.0), b: Color(drawerHex: row.1), ink: Color(drawerHex: row.2), edge: Color(drawerHex: row.3), tape: Color(drawerHex: row.4))
     }
 
-    /// (stripe a, stripe b, ink on it, open slip's edge, tape) per paper and colour key.
+    /// (fill, old second stripe, ink on it, edge, tape) per paper and colour key.
     static let folderColors: [Kind: [MemoFolders.Color: (String, String, String, String, String)]] = [
         .day: [
             .lavender: ("#dcd8f3", "#d3cef0", "#3f3a73", "#c9c0ef", "#d3cef0"),
@@ -195,11 +208,11 @@ struct DrawerPalette: Equatable {
     static let day = DrawerPalette(
         kind: .day, paper: pair("#e6dbc3"), edge: pair("#c9bb9b"), rule: Color(red: 170 / 255, green: 150 / 255, blue: 110 / 255).opacity(0.35),
         background: .ruled, texture: 0.18,
-        ink: pair("#2a2925"), title: pair("#2a2925"), label: pair("#42603c"), secondary: pair("#5c584f"), faint: pair("#646057"),
+        ink: pair("#2a2925"), title: pair("#2a2925"), label: pair("#42603c"), secondary: pair("#5c584f"), preview: pair("#595853"), faint: pair("#646057"),
         icon: pair("#55504a"), slip: pair("#fffdf7"), slipEdge: pair("#d0c2a3"), slipRadius: 10, sheet: pair("#fffdf7"), placeholder: pair("#646057"),
         dogEar: pair("#efe7d4"), check: pair("#5f7a5a"), checkOn: pair("#fffdf8"), box: pair("#8a8374"), track: pair("#ece6d8"), paw: pair("#c4797e"),
         selection: pair("#b9b2a2"), toast: pair("#2a2925"), toastText: pair("#fbf9f3"),
-        pinTab: (Color(drawerHex: "#f3e3a0"), Color(drawerHex: "#efdc90")), pinTabInk: pair("#6b5520"), pickedTab: nil,
+        pinTab: Color(drawerHex: "#f6dc7c"), pinTabEdge: Color(drawerHex: "#dcc062"), pinTabInk: pair("#6b5520"), pinTape: Color(drawerHex: "#efdc90"), pickedTab: nil,
         openLine: pair("#8d82cf"), danger: pair("#a4472f"), shadow: Color(red: 60 / 255, green: 50 / 255, blue: 30 / 255).opacity(0.12), groupHeader: pair("#5c584f"), scheme: .light)
 
     /// 1.43.1: lighter text and sheets a step above the drawer (the user found 1.43's night paper hard to read); 1.44 a
@@ -207,32 +220,32 @@ struct DrawerPalette: Equatable {
     static let night = DrawerPalette(
         kind: .night, paper: pair("#1c1a17"), edge: pair("#4a463f"), rule: Color.white.opacity(0.04),
         background: .ruled, texture: 0,
-        ink: pair("#f6f1e6"), title: pair("#f6f1e6"), label: pair("#b3cbad"), secondary: pair("#dad3c3"), faint: pair("#c4bdad"),
+        ink: pair("#f6f1e6"), title: pair("#f6f1e6"), label: pair("#b3cbad"), secondary: pair("#dad3c3"), preview: pair("#dcd7cd"), faint: pair("#c4bdad"),
         icon: pair("#cdc6b7"), slip: pair("#3d3a34"), slipEdge: pair("#5a554b"), slipRadius: 10, sheet: pair("#3d3a34"), placeholder: pair("#c4bdad"),
         dogEar: pair("#4f4b43"), check: pair("#b3cbad"), checkOn: pair("#1f2a1e"), box: pair("#a39d90"), track: pair("#55514a"), paw: pair("#d39a9e"),
         selection: pair("#847e72"), toast: pair("#ece6d6"), toastText: pair("#2a2924"),
-        pinTab: (Color(drawerHex: "#716641"), Color(drawerHex: "#6a603c")), pinTabInk: pair("#fff1bf"), pickedTab: nil,
+        pinTab: Color(drawerHex: "#c4a245"), pinTabEdge: Color(drawerHex: "#d6b65a"), pinTabInk: pair("#1f1d18"), pinTape: Color(drawerHex: "#6a603c"), pickedTab: nil,
         openLine: pair("#9d95d6"), danger: pair("#eaa58a"), shadow: Color.black.opacity(0.45), groupHeader: pair("#dad3c3"), scheme: .dark)
 
     static let kraft = DrawerPalette(
         kind: .kraft, paper: pair("#cdb187"), edge: pair("#a98d63"), rule: .clear,
         background: .plain, texture: 0.3,
-        ink: pair("#33281d"), title: pair("#33281d"), label: pair("#4a3a22"), secondary: pair("#574a39"), faint: pair("#54452f"),
+        ink: pair("#33281d"), title: pair("#33281d"), label: pair("#4a3a22"), secondary: pair("#574a39"), preview: pair("#53493e"), faint: pair("#54452f"),
         icon: pair("#5a4732"), slip: pair("#fbf6ea"), slipEdge: pair("#a98d63"), slipRadius: 4, sheet: pair("#fbf6ea"), placeholder: pair("#54452f"),
         dogEar: pair("#e8dcc3"), check: pair("#4f7040"), checkOn: pair("#fbf6ea"), box: pair("#8c7a58"), track: pair("#e8dcc3"), paw: pair("#a55f4c"),
         selection: pair("#8f7650"), toast: pair("#33281d"), toastText: pair("#fbf6ea"),
-        pinTab: (Color(drawerHex: "#f1d37a"), Color(drawerHex: "#f1d37a")), pinTabInk: pair("#5a4410"),
+        pinTab: Color(drawerHex: "#f1d37a"), pinTabEdge: Color(drawerHex: "#dcc46a"), pinTabInk: pair("#5a4410"), pinTape: Color(drawerHex: "#f1d37a"),
         pickedTab: (Color(drawerHex: "#f4ecdc"), Color(drawerHex: "#5a3f22"), Color(drawerHex: "#a98d63")),
         openLine: pair("#8a6a40"), danger: pair("#8f3a22"), shadow: Color(red: 60 / 255, green: 50 / 255, blue: 30 / 255).opacity(0.12), groupHeader: pair("#4a3a22"), scheme: .light)
 
     static let grid = DrawerPalette(
         kind: .grid, paper: pair("#dde6f0"), edge: pair("#b3c2d4"), rule: Color(drawerHex: "#c9d5e3"),
         background: .grid, texture: 0,
-        ink: pair("#1f2a35"), title: pair("#1f2a35"), label: pair("#2f5793"), secondary: pair("#4b5865"), faint: pair("#57636f"),
+        ink: pair("#1f2a35"), title: pair("#1f2a35"), label: pair("#2f5793"), secondary: pair("#4b5865"), preview: pair("#4c555d"), faint: pair("#57636f"),
         icon: pair("#4f5c69"), slip: pair("#ffffff"), slipEdge: pair("#bccadb"), slipRadius: 10, sheet: pair("#ffffff"), placeholder: pair("#57636f"),
         dogEar: pair("#e4ebf2"), check: pair("#3f6aa8"), checkOn: pair("#ffffff"), box: pair("#7d8a98"), track: pair("#e2e9f0"), paw: pair("#c4797e"),
         selection: pair("#9fb6dc"), toast: pair("#1f2a35"), toastText: pair("#f8fafb"),
-        pinTab: (Color(drawerHex: "#f6e7b0"), Color(drawerHex: "#f6e7b0")), pinTabInk: pair("#5e4a12"),
+        pinTab: Color(drawerHex: "#f6e7b0"), pinTabEdge: Color(drawerHex: "#dcc46a"), pinTabInk: pair("#5e4a12"), pinTape: Color(drawerHex: "#f6e7b0"),
         pickedTab: (Color(drawerHex: "#e4ebf8"), Color(drawerHex: "#24416e"), Color(drawerHex: "#9fb6dc")),
         openLine: pair("#6f8fc4"), danger: pair("#a4472f"), shadow: Color(red: 30 / 255, green: 50 / 255, blue: 80 / 255).opacity(0.13), groupHeader: pair("#4b5865"), scheme: .light)
 

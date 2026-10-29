@@ -9,8 +9,10 @@ public enum Backup {
     public static let version = 1
     /// The files a backup carries, besides archive/*.jsonl. focus.jsonl is read tolerantly (a torn
     /// line is skipped, never a reason to refuse the backup) and merged line by line, by id.
-    /// memo-folders.json (1.43, 메모 서랍) is merged by MemoFolders.merge (folders by id, placements by memo, newer wins).
-    public static let dataFiles = ["todos.json", "memos.json", "repeats.json", "events.json", "alarms.json", Focus.fileName, MemoFolders.fileName]
+    /// memo-folders.json (1.43, 메모 서랍) is merged by MemoFolders.merge (folders by id, placements by memo, newer wins);
+    /// todo-spaces.json (1.45, 할 일 스페이스) by TodoSpaces.merge (S18: the same rules as two devices, this Mac's on a tie).
+    public static let dataFiles = ["todos.json", "memos.json", "repeats.json", "events.json", "alarms.json", Focus.fileName, MemoFolders.fileName,
+                                   TodoSpaces.fileName]
 
     public struct Contents: Equatable, Sendable {
         public var exportedAt: String
@@ -103,6 +105,7 @@ public enum Backup {
             case "events.json": ok = (try? strict.decode(LocalEvent.File.self, from: data)) != nil
             case "alarms.json": ok = (try? Alarm.File.decode(data)) != nil
             case MemoFolders.fileName: ok = (try? MemoFolders.decode(data)) != nil
+            case TodoSpaces.fileName: ok = (try? TodoSpaces.decode(data)) != nil
             default:
                 guard isArchive(name) else { continue }
                 ok = lines(text).allSatisfy { (try? tolerant.decode(ArchiveEntry.self, from: Data($0.utf8))) != nil }
@@ -182,6 +185,10 @@ public enum Backup {
                 guard let theirs = try? MemoFolders.decode(Data(text.utf8)) else { continue }
                 guard let here = try? MemoFolders.decode(Data(mine.utf8)) else { result[name] = text; continue }
                 result[name] = MemoFolders.merge(here: here, theirs: theirs).encoded()
+            case TodoSpaces.fileName:
+                guard let theirs = try? TodoSpaces.decode(Data(text.utf8)) else { continue }
+                guard let here = try? TodoSpaces.decode(Data(mine.utf8)) else { result[name] = text; continue }
+                result[name] = TodoSpaces.merge(existing: here, incoming: theirs).encoded()
             default: result[name] = mergeLines(mine, text)
             }
         }

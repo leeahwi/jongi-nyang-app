@@ -67,7 +67,11 @@ final class EventBook: ObservableObject {
     func setDayOpen(_ open: Bool, now: Date) { openDay = open ? Archive.dayKey(now) : nil }
 
     /// Put on the calendar from this to-do.
-    func isSent(_ taskID: UUID) -> Bool { events.contains { $0.taskId == taskID.uuidString } }
+    func isSent(_ taskID: UUID) -> Bool {
+        // Every row asks: the id's text once, not once per event (#61).
+        let id = taskID.uuidString
+        return events.contains { $0.taskId == id }
+    }
 
     // MARK: Changing
 
@@ -133,7 +137,7 @@ final class EventBook: ObservableObject {
             problem = nil
         } catch {
             // Never saved over: the file stays for the person (or another device) to fix.
-            problem = L("일정 파일을 읽지 못했어요.") + "\n\(url.path)"
+            problem = L("일정 파일을 읽지 못했어요.") + " " + L("원래 파일은 덮어쓰지 않고 그대로 둬요.") + " " + L("저장 폴더가 열리는지 확인해 주세요.")
         }
     }
 
@@ -156,7 +160,8 @@ final class EventBook: ObservableObject {
             try data.write(to: url, options: .atomic)
             known = data
         } catch {
-            problem = L("일정을 저장하지 못했어요.") + "\n\(url.path)"
+            // Not tried again until the file reads again (save() waits for problem == nil).
+            problem = AppModel.saveProblem(L("일정을 저장하지 못했어요."), retries: false)
         }
     }
 

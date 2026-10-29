@@ -10,6 +10,7 @@ struct AlarmSettingsGroup: View {
     @State private var draft = Alarm()
     @State private var sound = AlarmSound()
     @State private var pickingTime = false
+    @State private var toast: PaperToast?
 
     init(book: AlarmBook, notebookFont: NotebookFont, editing: String? = nil) {
         self.book = book
@@ -19,7 +20,7 @@ struct AlarmSettingsGroup: View {
     }
 
     var body: some View {
-        SettingsGroup(title: L("알람"), footer: book.problem ?? L("종이냥이 켜져 있으면 이 Mac에서 울려요. Mac이 잠들어 있다가 알람 시각에서 15분 안에 깨어나면 그때 울리고, 그보다 늦으면 건너뛰어요. 공유 폴더를 쓰면 다른 기기도 같은 알람을 각자 울려요.")) {
+        SettingsGroup(title: L("알람"), footer: book.problem ?? L("종이냥이 켜져 있으면 울려요. 잠들어 있던 Mac이 15분 안에 깨어나면 그때 울리고, 늦으면 건너뛰어요.")) {
             if book.alarms.isEmpty {
                 HStack(spacing: 12) {
                     Image(nsImage: PetArt.image(.sleep) ?? PaperTheme.mascot).resizable().scaledToFit().frame(width: 40, height: 40)
@@ -42,15 +43,22 @@ struct AlarmSettingsGroup: View {
                 }
                 SettingsSeparator()
             }
-            Button {
+            DeskListAddRow(title: L("알람 추가")) {
                 let id = book.add()
                 begin(id)
-            } label: {
-                SettingsLabel(L("알람 추가"), systemImage: "plus").settingsRow()
             }
-            .buttonStyle(.plain)
         }
+        .deskPaneToast($toast)
         .onDisappear { sound.stop() }
+    }
+
+    /// 지우기 (the row's menu or the editor's): gone, with 지웠어요 · 되돌리기 under the card (#22).
+    private func delete(_ id: String) {
+        guard let alarm = book.alarm(id) else { return }
+        sound.stop()
+        book.delete(id)
+        if editing == id { editing = nil }
+        toast = .deleted(L("알람을 지웠어요"), into: $toast) { [book] in book.restore(alarm) }
     }
 
     // MARK: A row
@@ -98,6 +106,7 @@ struct AlarmSettingsGroup: View {
         .settingsRow()
         .onTapGesture { begin(alarm.id) }
         .help("눌러서 고치기")
+        .deskRowMenu(edit: { begin(alarm.id) }, delete: { delete(alarm.id) })
         .accessibilityElement(children: .combine)
         .accessibilityAction(named: "고치기") { begin(alarm.id) }
     }
@@ -177,9 +186,7 @@ struct AlarmSettingsGroup: View {
             }
             HStack(spacing: 6) {
                 Button(role: .destructive) {
-                    sound.stop()
-                    book.delete(draft.id)
-                    editing = nil
+                    delete(draft.id)
                 } label: {
                     Label("지우기", systemImage: "trash").labelStyle(.titleAndIcon)
                 }

@@ -204,7 +204,12 @@ struct SettingsPaneView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    DeskPaneHeader(title: pane.title, subtitle: pane.subtitle, cat: pane == .appearance ? .groom : nil)
+                    if pane == .drawer {
+                        // 서랍 열기 in the header, not in a row that is about something else (#27).
+                        DeskPaneHeader(title: pane.title, subtitle: pane.subtitle) { OpenDrawerButton(model: model) }
+                    } else {
+                        DeskPaneHeader(title: pane.title, subtitle: pane.subtitle, cat: pane == .appearance ? .groom : nil)
+                    }
                     content
                 }
                 .frame(maxWidth: DeskMetrics.column, alignment: .leading)
@@ -240,6 +245,7 @@ struct SettingsPaneView: View {
             CompletedSettingsGroup(model: model)
             BackupSettingsGroup(model: model)
         case .drawer: MemoDrawerSettingsGroup(drawer: model.drawer)
+        case .spaces: SpacesSettingsPanel(model: model)
         case .ai:
             if let ai = model.ai { AISettingsPanel(ai: ai) }
         case .calendar, .history, .help: EmptyView()
@@ -253,7 +259,15 @@ struct SettingsPaneView: View {
             LanguageSettingsGroup(model: model)
             PaperColorGroup(model: model)
 
-            livePreview
+            // The sample sheet, named like every other group (#21).
+            VStack(alignment: .leading, spacing: 7) {
+                Text(L("미리보기"))
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(PaperTheme.ink2)
+                    .padding(.leading, 4)
+                    .accessibilityAddTraits(.isHeader)
+                livePreview
+            }
 
             SettingsGroup(title: L("글꼴")) {
                 ForEach(Array(NotebookFont.allCases.enumerated()), id: \.element) { index, font in
@@ -300,8 +314,10 @@ struct SettingsPaneView: View {
                 .settingsRow()
             }
 
-            SettingsGroup(title: L("메뉴 막대"), footer: L("자동이면 타이머가 도는 동안 남은 시간이, 1시간 안에 일정이나 알림이 있으면 ‘치과 40분’처럼 종이냥 얼굴 옆에 나와요. 누르면 오늘 창이 열려요.")
-                          + " " + L("타이머가 도는 동안에는 얼굴 둘레에 얇은 고리가 차올라요. Dock 아이콘을 우클릭하면 빠른 입력 · 빠른 메모 · 책상 · 25분 집중 · 5분 타이머가 있어요.")) {
+            // #30: 시작 (로그인 시 실행) with the other "outside the note" groups, as on Windows (시작 · 빠른 입력).
+            LoginItemGroup()
+
+            SettingsGroup(title: L("메뉴 막대"), more: "window", footer: L("자동이면 타이머의 남은 시간이나 1시간 안의 일정이 ‘치과 40분’처럼 얼굴 옆에 나와요. 누르면 오늘 창이 열려요.")) {
                 HStack(spacing: 12) {
                     SettingsLabel(L("메뉴 막대에 글자"), systemImage: "menubar.rectangle")
                     Spacer(minLength: 8)
@@ -318,17 +334,17 @@ struct SettingsPaneView: View {
                 .settingsRow()
             }
 
-            SettingsGroup(title: L("빠른 입력"), footer: [
+            SettingsGroup(title: L("빠른 입력"), more: "quick", footer: [
                 model.quickEntryRegistered
-                    ? L("다른 앱을 쓰다가도 ⌃⌥N을 누르면 작은 입력 칸이 떠요. ‘내일 3시 엄마께 전화’, ‘금요일까지 보고서’처럼 적으면 알림·마감을 알아서 정해요. ‘내일 3시 회의’는 일정이 돼요.")
-                    : L("다른 앱이 ⌃⌥N을 쓰고 있어서 켜지 못했어요."),
+                    ? L("다른 앱을 쓰다가도 ⌃⌥N을 누르면 작은 입력 칸이 떠요. 적은 말에 맞춰 알림 · 마감 · 일정을 정해요.")
+                    : L("다른 앱이 ⌃⌥N을 쓰고 있어요. 그 앱의 단축키를 바꾼 뒤 다시 켜 주세요."),
                 model.quickMemoRegistered
-                    ? L("⌃⌥M은 빠른 메모예요. 적고 ⌘Return이면 메모 서랍에서 마지막으로 본 폴더 맨 위에 들어가요.")
-                    : L("다른 앱이 ⌃⌥M을 쓰고 있어서 켜지 못했어요."),
+                    ? L("빠른 메모는 메모 서랍에서 마지막으로 본 폴더 맨 위에 들어가요.")
+                    : L("다른 앱이 ⌃⌥M을 쓰고 있어요. 그 앱의 단축키를 바꾼 뒤 다시 켜 주세요."),
                 model.noteHotKeyRegistered
-                    ? L("⌃⌥J는 노트를 불러오거나 넣어 둬요.")
-                    : L("다른 앱이 ⌃⌥J를 쓰고 있어서 켜지 못했어요."),
-                model.quickMemoClipboard ? L("빈 메모를 열면 방금 복사한 글이 골라진 채로 들어가요. 그냥 적으면 바뀌어요.") : "",
+                    ? ""
+                    : L("다른 앱이 ⌃⌥J를 쓰고 있어요. 그 앱의 단축키를 바꾼 뒤 다시 켜 주세요."),
+                model.quickMemoClipboard ? L("빈 메모를 열면 방금 복사한 글이 골라진 채로 들어가요.") : "",
             ].filter { !$0.isEmpty }.joined(separator: " ")) {
                 HStack {
                     SettingsLabel(L("어디서든 빠른 입력 (⌃⌥N)"), systemImage: "keyboard")
@@ -411,7 +427,8 @@ struct SettingsPaneView: View {
 
     private var notificationPanel: some View {
         Group {
-            SettingsGroup(title: L("알림 모양")) {
+            // 할 일별 알림 was a card of words only, like a row one could press (#21): now this group's footnote.
+            SettingsGroup(title: L("알림 모양"), footer: L("할 일마다 알림은 할 일 줄의 알림 버튼에서 정해요. 같은 때 울릴 알림은 한 번에 모아 보여 줘요.")) {
                 HStack(spacing: 10) {
                     ForEach(ReminderPresentationStyle.allCases) { style in
                         Button { model.reminderStyle = style } label: {
@@ -431,7 +448,7 @@ struct SettingsPaneView: View {
                     SettingsTile(systemImage: "bell.badge")
                     VStack(alignment: .leading, spacing: 2) {
                         Text("남은 할 일 알려주기").font(.system(size: 13, weight: .medium))
-                        Text("할 일이 남아 있을 때만 종이냥이 한 번에 모아서 알려줘요.")
+                        Text("할 일이 남아 있을 때만 종이냥이 한 번에 모아서 알려 줘요.")
                             .font(.system(size: 11))
                             .foregroundStyle(PaperTheme.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -492,29 +509,19 @@ struct SettingsPaneView: View {
                 switchRow(L("오늘 꼭 하나"), detail: L("새 날 처음 노트를 열면 오늘 꼭 할 하나를 물어보고, 그 일에 별을 달아 맨 위에 둬요."), symbol: "star", isOn: $model.dailyPickEnabled)
             }
 
-            SettingsGroup(title: L("시스템 알림"), footer: L("놓친 것만: 화면이 잠겨 있거나, 고양이와 노트가 모두 숨어 있거나, 다른 앱이 화면 전체를 쓰고 있을 때만 macOS 알림으로도 보내요. 알림에서 바로 끝냄 · 10분 뒤를 고를 수 있어요.")) {
-                VStack(alignment: .leading, spacing: 8) {
+            SettingsGroup(title: L("시스템 알림"), more: "alerts", footer: L("놓친 것만: 화면이 잠겼거나, 고양이와 노트가 숨어 있거나, 다른 앱이 전체 화면일 때만 macOS 알림으로도 보내요.")) {
+                // The name and, on the right, its choices — the row every other setting has (#21).
+                HStack(spacing: 12) {
                     SettingsLabel(L("시스템 알림으로도 보내기"), systemImage: "bell.badge")
+                    Spacer(minLength: 8)
                     PaperSegmented(selection: $model.systemNotices,
                                    options: [(.missed, L("놓친 것만"), nil), (.always, L("항상"), nil), (.off, String(localized: "끄기", table: "Settings"), nil)],
                                    label: L("시스템 알림으로도 보내기"))
-                }
-                .padding(.vertical, 8)
-                .settingsRow()
-            }
-
-            SettingsGroup(title: L("할 일별 알림")) {
-                HStack(alignment: .center, spacing: 10) {
-                    SettingsTile(systemImage: "clock")
-                    Text("할 일 줄의 알림 버튼에서 시각을 정해요. 같은 때 울릴 알림은 말풍선 하나에 모아 보여줘요.")
-                        .font(.system(size: 12))
-                        .foregroundStyle(PaperTheme.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(width: AppLanguage.current == .ko ? 220 : AppLanguage.current == .en ? 260 : 300)
                 }
                 .settingsRow()
             }
 
-            LoginItemGroup()
         }
     }
 
@@ -581,9 +588,9 @@ struct SettingsPaneView: View {
 
     private var statusText: String {
         if !controller.enabled {
-            return L("꺼져 있어요. 켜면 노트를 쓰는 동안에는 잠시 기다렸다 알려줘요.")
+            return L("꺼져 있어요. 켜면 노트를 쓰는 동안에는 잠시 기다렸다 알려 줘요.")
         } else if !controller.hasTasks {
-            return L("남은 할 일이 생기면 알려드려요.")
+            return L("남은 할 일이 생기면 알려 줘요.")
         } else if let next = controller.nextDue {
             let language = AppLanguage.current
             let time = language == .ko
@@ -606,12 +613,28 @@ private struct AnyLabelStyle: LabelStyle {
 struct SettingsGroup<Content: View>: View {
     let title: String
     var footer: String?
+    /// A 도움말 topic: the footnote ends in ‘자세히’, which opens it (#21) — the footnote stays one or two lines.
+    var more: String?
     let content: Content
+    @Environment(\.openHelpTopic) private var openHelpTopic
 
-    init(title: String, footer: String? = nil, @ViewBuilder content: () -> Content) {
+    init(title: String, more: String? = nil, footer: String? = nil, @ViewBuilder content: () -> Content) {
         self.title = title
         self.footer = footer
+        self.more = more
         self.content = content()
+    }
+
+    /// The footnote, and ‘자세히’ after it as a link in the sage text colour.
+    private func footnote(_ text: String) -> AttributedString {
+        var line = AttributedString(text.keepingParticles)
+        guard let more, let url = URL(string: "jongi-help:\(more)") else { return line }
+        var link = AttributedString(L("자세히"))
+        link.link = url
+        link.foregroundColor = PaperTheme.sageText
+        link.font = .system(size: 11, weight: .semibold)
+        line += AttributedString(" ") + link
+        return line
     }
 
     var body: some View {
@@ -625,11 +648,17 @@ struct SettingsGroup<Content: View>: View {
                 .background(PaperTheme.card, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .overlay { RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(PaperTheme.rule, lineWidth: 1) }
             if let footer {
-                Text(footer.keepingParticles)
+                Text(footnote(footer))
                     .font(.system(size: 11))
                     .foregroundStyle(PaperTheme.ink2)
+                    .tint(PaperTheme.sageText)
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 4)
+                    .environment(\.openURL, OpenURLAction { url in
+                        guard url.scheme == "jongi-help" else { return .systemAction }
+                        openHelpTopic(url.absoluteString.replacingOccurrences(of: "jongi-help:", with: ""))
+                        return .handled
+                    })
             }
         }
     }
@@ -696,18 +725,20 @@ private struct ReminderStyleTile: View {
     }
 }
 
-/// Settings → 반복: every recurring task with its next day, edit/delete, and a form to add one.
+/// Settings → 반복: every recurring task with its next day, edit/delete, and `+ 새 반복 할 일` as the card's last row (#22).
 private struct RepeatSettingsPanel: View {
     @ObservedObject var model: AppModel
     @State private var editing: String?
     @State private var title = ""
     @State private var draft = RepeatDraft()
+    @State private var hovered: String?
+    @State private var toast: PaperToast?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             SettingsGroup(title: L("반복 할 일"), footer: L("반복하는 날마다 목록에 하나씩 나타나요. 전날 것을 못 끝냈으면 새로 쌓지 않고 오늘로 옮겨요.")) {
                 if model.series.isEmpty {
-                    Text("아직 반복 할 일이 없어요. 할 일의 종 버튼 → 반복에서 만들거나 아래 ‘새 반복 할 일’로 더하세요.")
+                    Text("아직 반복 할 일이 없어요. 할 일의 종 버튼 → 반복에서 만들거나 아래 ‘새 반복 할 일’로 더해 보세요.")
                         .font(.system(size: 12))
                         .foregroundStyle(PaperTheme.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -718,18 +749,20 @@ private struct RepeatSettingsPanel: View {
                     if index > 0 { SettingsSeparator() }
                     if editing == entry.id { form(for: entry) } else { row(entry) }
                 }
-            }
-            SettingsGroup(title: L("추가")) {
+                SettingsSeparator()
                 if editing == "new" {
                     form(for: nil)
                 } else {
-                    Button { begin(nil) } label: {
-                        SettingsLabel(L("새 반복 할 일"), systemImage: "plus").settingsRow()
-                    }
-                    .buttonStyle(.plain)
+                    DeskListAddRow(title: L("새 반복 할 일")) { begin(nil) }
                 }
             }
+            .deskPaneToast($toast)
         }
+    }
+
+    private func delete(_ entry: Series) {
+        let restore = model.deleteSeries(entry.id)
+        toast = .deleted(L("반복 할 일을 지웠어요"), into: $toast, restore: restore)
     }
 
     private func row(_ entry: Series) -> some View {
@@ -745,13 +778,13 @@ private struct RepeatSettingsPanel: View {
                 .buttonStyle(QuietButtonStyle())
                 .help("고치기")
                 .accessibilityLabel("\(entry.title) 고치기")
-            Button { model.deleteSeries(entry.id) } label: { Image(systemName: "trash").font(.system(size: 12)) }
-                .buttonStyle(QuietButtonStyle())
-                .help("반복 그만하기 (목록의 할 일은 남아요)")
-                .accessibilityLabel("\(entry.title) 반복 그만하기")
+            DeskRowTrash(shown: hovered == entry.id, label: L("\(entry.title) 반복 그만하기"), help: L("반복 그만하기 (목록의 할 일은 남아요)")) { delete(entry) }
         }
         .padding(.vertical, 8)
         .settingsRow()
+        .contentShape(Rectangle())
+        .onHover { hovered = $0 ? entry.id : (hovered == entry.id ? nil : hovered) }
+        .deskRowMenu(edit: { begin(entry) }, delete: { delete(entry) })
     }
 
     private func form(for entry: Series?) -> some View {
@@ -805,7 +838,9 @@ struct CompletedSettingsGroup: View {
     var body: some View {
         SettingsGroup(title: L("완료한 일"), footer: model.archiveAfterDays == .never
             ? L("완료한 일이 목록에 계속 남아요. ⋯ → 완료한 일 정리로 직접 지울 수 있어요.")
-            : L("완료한 일은 그날(새벽 4시 기준)이 지나면 목록에서 빠져 월별 기록 파일로 옮겨져요. 기록은 책상 → 완료 기록에서 볼 수 있어요.")) {
+            : model.archiveAfterDays == .nextDay ? L("끝낸 일은 다음 날 새벽 4시에 완료 기록으로 옮겨요.")
+            : model.archiveAfterDays == .threeDays ? L("끝낸 일은 3일 뒤 새벽 4시에 완료 기록으로 옮겨요.")
+            : L("끝낸 일은 7일 뒤 새벽 4시에 완료 기록으로 옮겨요.")) {
             HStack {
                 SettingsLabel(L("완료한 일 기록으로 옮기기"), systemImage: "calendar")
                 Spacer()
@@ -816,7 +851,8 @@ struct CompletedSettingsGroup: View {
             SettingsSeparator()
             Button(action: model.showHistory) {
                 HStack {
-                    SettingsLabel(L("완료 기록 보기"), systemImage: "sparkles")
+                    // The desk's own 완료 기록 icon (1.45).
+                    SettingsLabel(L("완료 기록 보기"), systemImage: "leaf")
                     Spacer()
                     Text("⌘ Y  ›").font(.system(size: 12)).foregroundStyle(PaperTheme.faded)
                 }
@@ -830,7 +866,7 @@ struct CompletedSettingsGroup: View {
                     Spacer(minLength: 8)
                     Button("열기") { model.openFolder(model.archiveFolderURL) }
                         .buttonStyle(PaperActionButtonStyle())
-                        .help("Finder에서 완료 기록 폴더 열기 (월별 파일, 예: 2026-10.jsonl)")
+                        .help("Finder에서 완료 기록 폴더 열기")
                 }
                 FolderPath(url: model.archiveFolderURL)
                     .padding(.leading, FolderPath.indent)
@@ -846,7 +882,7 @@ struct StorageSettingsGroup: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
-        SettingsGroup(title: L("저장 위치"), footer: L("할 일 · 메모 · 반복 할 일 · 일정 · 알람 · 집중 기록(focus.jsonl)과 완료 기록(archive 폴더)이 이 폴더에 저장돼요. iCloud Drive · OneDrive · Dropbox 같은 폴더를 고르면 다른 기기의 종이냥과 같은 목록을 써요. 다른 기기에서도 같은 폴더를 고르세요. 바꾸면 종이냥이 다시 시작돼요.")) {
+        SettingsGroup(title: L("저장 위치"), more: "data", footer: L("할 일 · 메모 · 일정 · 기록이 모두 이 폴더에 있어요. iCloud Drive 같은 공유 폴더를 고르면 다른 기기와 같은 목록을 써요.")) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 10) {
                     SettingsLabel(L("저장 폴더"), systemImage: "folder")
@@ -885,7 +921,7 @@ struct CalendarSettingsPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            SettingsGroup(title: L("오늘 일정"), footer: L("하루 띠는 제목 아래에 지금 하는 일과 다음 일, 오늘 하루를 한눈에 보여 줘요. 누르면 그 자리에서 하루 일정표가 펼쳐져요.") + " " + L("일정은 할 일과 같은 저장 폴더에 함께 있어요. 공유 폴더를 쓰면 다른 기기와 함께 써요.")) {
+            SettingsGroup(title: L("오늘 일정"), more: "calendar", footer: L("하루 띠는 제목 아래에 지금 하는 일과 다음 일을 보여 줘요. 누르면 하루 일정표가 펼쳐져요.")) {
                 HStack {
                     SettingsLabel(L("하루 띠 보이기"), systemImage: "calendar")
                     Spacer()
@@ -907,23 +943,45 @@ struct CalendarSettingsPanel: View {
     }
 }
 
-/// A folder's place on disk, shortened in the middle when long; the full path on hover, and it
-/// can be selected and copied.
+/// A folder's place on disk, said as Finder's path bar says it (1.45, FolderPlace): the places it's in faint and
+/// shortened from the front when long, then its own name in full and a little bolder — `~ › Library › Application
+/// Support › com.noa.PaperTodo`, `iCloud Drive › 종이냥`. The full path on hover and in Copy Path.
 struct FolderPath: View {
     let url: URL
     /// Lines the path up with a SettingsLabel's title (its tile and the gap after it).
     static let indent: CGFloat = 38
+    /// Snapshots only: the sample's temporary folder said as a stand-in one (`from` → `to`), so no real path is drawn.
+    @MainActor static var standIn: (from: String, to: String)?
 
     var body: some View {
-        Text(AppModel.displayPath(url))
-            .font(.system(size: 11, design: .monospaced))
-            .foregroundStyle(PaperTheme.secondary)
-            .lineLimit(1)
-            .truncationMode(.middle)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .textSelection(.enabled)
-            .help(url.path)
-            .accessibilityLabel("폴더 위치 \(url.path)")
+        let shown = Self.standIn.map { url.path.replacingOccurrences(of: $0.from, with: $0.to) } ?? url.path
+        let place = FolderPlace.of(shown, home: NSHomeDirectory())
+        HStack(spacing: 0) {
+            if !place.leadText.isEmpty {
+                Text(place.leadText)
+                    .foregroundStyle(PaperTheme.ink3)
+                    .lineLimit(1)
+                    .truncationMode(.head)
+            }
+            Text(place.name)
+                .fontWeight(.semibold)
+                .foregroundStyle(PaperTheme.ink2)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .layoutPriority(1)
+        }
+        .font(.system(size: 11.5))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .help(shown)
+        .contextMenu {
+            Button(L("경로 복사")) {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(url.path, forType: .string)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L("폴더 위치 \(place.text)"))
     }
 }
 
@@ -944,15 +1002,15 @@ struct PetSettingsPanel: View {
 
     @ViewBuilder
     private var petGroup: some View {
-            SettingsGroup(title: L("종이냥 펫"), footer: L("화면 아래(Dock 위)에 앉아 눈을 깜빡이고, 갸웃하고, 가끔 걸어 다녀요. 한동안 Mac을 쓰지 않으면 졸고, 할 일을 끝내면 축하해 줘요. 끌어서 자리를 옮기고, 우클릭하면 메뉴가 나와요. 펫이 있으면 알림은 펫 위에 말풍선으로 떠요.")) {
-                toggleRow(L("펫 보이기"), systemImage: "pawprint", isOn: $model.petVisible)
+            SettingsGroup(title: L("종이냥 펫"), footer: L("Dock 위에 앉아 눈을 깜빡이고, 가끔 걸어 다녀요. 끌어서 옮기고, 우클릭하면 메뉴가 나와요.")) {
+                toggleRow(L("펫 보이기"), systemImage: "cat", isOn: $model.petVisible)
                 SettingsSeparator()
                 toggleRow(L("돌아다니기"), systemImage: "figure.walk", isOn: $model.petWanders)
                     .disabled(!model.petVisible)
                     .opacity(model.petVisible ? 1 : 0.45)
             }
 
-            SettingsGroup(title: L("종이냥 한마디"), footer: L("오늘 남은 일, 시간대, 마감에 맞춰 응원하거나 가볍게 말을 걸어요. 물어볼 때는 말풍선의 버튼으로 답해요(‘쉴래요’를 누르면 5분 타이머가 켜져요). 집중 타이머가 도는 동안, 알림이 떠 있을 때, 밤 11시~아침 7시, Mac을 쓰지 않는 동안에는 조용히 있어요. 고양이를 누르면 가끔 대답해요.")) {
+            SettingsGroup(title: L("종이냥 한마디"), more: "pet", footer: L("가끔 응원하거나 말을 걸어요. 집중할 때와 밤 11시–아침 7시에는 조용해요.")) {
                 toggleRow(L("가끔 말 걸기"), systemImage: "bubble.left", isOn: $model.chatterEnabled)
                 SettingsSeparator()
                 HStack(spacing: 12) {
@@ -973,7 +1031,7 @@ struct PetSettingsPanel: View {
                     .opacity(model.chatterEnabled ? 1 : 0.45)
                 SettingsSeparator()
                 HStack {
-                    SettingsLabel(L("지금 한마디 듣기"), systemImage: "sparkles")
+                    SettingsLabel(L("지금 한마디 듣기"), systemImage: "quote.bubble")
                     Spacer()
                     Button("들어 보기", action: model.previewChatter)
                         .buttonStyle(PaperActionButtonStyle())
@@ -985,7 +1043,7 @@ struct PetSettingsPanel: View {
 
     @ViewBuilder
     private var timerGroups: some View {
-            SettingsGroup(title: L("뽀모도로"), footer: L("집중과 휴식을 번갈아 해요. 빨간 원(집중)·초록 원(휴식)이 줄어드는 팻말이 화면에 따로 떠요. 끌어서 옮기고, 누르면 일시정지해요. 펫이 있으면 끝날 때 함께 축하해 줘요.") + " " + L("시간은 −·+ 로 1분씩(⌥나 ⇧를 누르고 있으면 5분씩) 바꾸거나 숫자를 직접 적어요.")) {
+            SettingsGroup(title: L("뽀모도로"), more: "timer", footer: L("집중과 휴식을 번갈아 해요. 시간은 −·+로 1분씩(⌥나 ⇧를 누르면 5분씩) 바꾸거나 직접 적어요.")) {
                 stepperRow(L("집중"), systemImage: "target", value: $model.pomodoroSettings.focusMinutes, range: 1...180, unit: L("분"))
                 SettingsSeparator()
                 stepperRow(L("휴식"), systemImage: "cup.and.saucer", value: $model.pomodoroSettings.restMinutes, range: 1...60, unit: L("분"))
@@ -1074,7 +1132,17 @@ private struct SettingsTintKey: EnvironmentKey {
     static let defaultValue = PaperTheme.sage2
 }
 
+private struct OpenHelpTopicKey: EnvironmentKey {
+    static let defaultValue: @MainActor (String) -> Void = { _ in }
+}
+
 extension EnvironmentValues {
+    /// ‘자세히’ under a settings group: opens 도움말 on that topic (the desk sets it).
+    var openHelpTopic: @MainActor (String) -> Void {
+        get { self[OpenHelpTopicKey.self] }
+        set { self[OpenHelpTopicKey.self] = newValue }
+    }
+
     /// The open pane's colour, for the icon tiles in its rows.
     var settingsTint: Color {
         get { self[SettingsTintKey.self] }
@@ -1185,7 +1253,7 @@ private struct PaperStepper: View {
     }
 }
 
-/// Settings → 알림 → 시작: open 종이냥 when logging in to the Mac.
+/// Settings → 꾸미기 → 시작: open 종이냥 when logging in to the Mac.
 private struct LoginItemGroup: View {
     @State private var on = SMAppService.mainApp.status == .enabled
     @State private var note: String?
@@ -1193,9 +1261,9 @@ private struct LoginItemGroup: View {
     var body: some View {
         SettingsGroup(title: String(localized: "시작", table: "Settings"), footer: note ?? L("Mac에 로그인하면 종이냥이 바로 켜져서 알림을 놓치지 않아요.")) {
             HStack {
-                SettingsLabel(L("로그인 시 종이냥 실행"), systemImage: "power")
+                SettingsLabel(L("로그인할 때 같이 열기"), systemImage: "power")
                 Spacer()
-                Toggle("로그인 시 종이냥 실행", isOn: $on)
+                Toggle("로그인할 때 같이 열기", isOn: $on)
                     .toggleStyle(PaperToggleStyle()).labelsHidden()
             }
             .settingsRow()
@@ -1223,12 +1291,15 @@ struct LanguageSettingsGroup: View {
     @State private var setting = L10n.setting
 
     var body: some View {
+        // The name and, on the right, the choices — as on Windows and every other row (#21).
         SettingsGroup(title: L("언어")) {
-            HStack(spacing: 10) {
-                SettingsTile(systemImage: "globe")
+            HStack(spacing: 12) {
+                SettingsLabel(L("앱 언어"), systemImage: "globe")
+                Spacer(minLength: 8)
                 PaperSegmented(selection: Binding(get: { setting }, set: { choose($0) }),
                                options: [("auto", L("자동"), nil)] + AppLanguage.allCases.map { ($0.rawValue, $0.nativeName, nil) },
                                label: L("언어"))
+                    .frame(width: AppLanguage.current == .ko ? 330 : AppLanguage.current == .en ? 340 : 370)
             }
             .settingsRow()
         }
@@ -1251,12 +1322,14 @@ struct PaperColorGroup: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
-        SettingsGroup(title: L("종이 색"), footer: L("자동이면 Mac이 어두운 모드일 때 밤 종이가 돼요. 불 끈 방의 종이처럼 어둡고 조용한 색이에요.")) {
+        SettingsGroup(title: L("종이"), footer: L("자동이면 Mac이 어두운 모드일 때 밤 종이가 돼요. 불 끈 방의 종이처럼 어둡고 조용한 색이에요.")) {
             HStack(spacing: 12) {
-                SettingsLabel(L("종이 색"), systemImage: "moon")
+                // The icon follows the choice: half and half for 자동, a sun for 낮, a moon for 밤 (#21).
+                SettingsLabel(L("종이 색"), systemImage: model.paperColor == .day ? "sun.max" : model.paperColor == .night ? "moon" : "circle.lefthalf.filled")
                 Spacer(minLength: 8)
                 PaperSegmented(selection: $model.paperColor, options: PaperColor.allCases.map { ($0, $0.title, nil) }, label: L("종이 색"))
-                    .frame(width: AppLanguage.current == .ko ? 180 : 250)
+                    // Dutch "Automatisch" needs room on both sides of it (1.45: it touched its segment's edges at 250).
+                    .frame(width: AppLanguage.current == .ko ? 180 : AppLanguage.current == .en ? 250 : 290)
             }
             .settingsRow()
         }
@@ -1268,7 +1341,7 @@ struct BackupSettingsGroup: View {
     let model: AppModel
 
     var body: some View {
-        SettingsGroup(title: L("백업 · 옮기기"), footer: L("다른 컴퓨터로 옮길 때: 여기서 내보낸 .jongi 파일을 그 컴퓨터의 종이냥에서 가져오면 할 일 · 메모 · 반복 · 일정 · 알람 · 집중 기록 · 완료 기록이 그대로 옮겨져요. Mac과 Windows 사이도 돼요.")) {
+        SettingsGroup(title: L("백업 · 옮기기"), more: "backup", footer: L("내보낸 백업 파일(.jongi)을 다른 컴퓨터의 종이냥에서 가져오면 모두 그대로 옮겨져요. Mac ↔ Windows도 돼요.")) {
             HStack(spacing: 10) {
                 SettingsLabel(L("백업 파일"), systemImage: "square.and.arrow.up")
                 Spacer(minLength: 8)

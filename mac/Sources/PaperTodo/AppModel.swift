@@ -9,7 +9,7 @@ final class AppModel: ObservableObject {
     /// Bumped on every change to the list: the derived lists below are worked out once per change and day
     /// (1.39 — every row asked for them again on every redraw).
     private var revision = 0
-    private var derived: (revision: Int, day: String, today: [TodoItem], ahead: Int)?
+    private var derived: (revision: Int, day: String, today: [TodoItem], ahead: Int, done: Int)?
     @Published var storageError: String?
     @Published var focusRequest = 0
     @Published var editingTaskReminderID: UUID?
@@ -190,6 +190,25 @@ final class AppModel: ObservableObject {
     @Published var memoFolders = MemoFolders.fresh(language: .current)
     /// memo-folders.json as this Mac last read or wrote it.
     var knownFoldersData: Data?
+    /// 할 일 스페이스 (1.45): which space each to-do is in, in todo-spaces.json next to todos.json (TodoSpacesModel.swift).
+    @Published var todoSpaces = TodoSpaces() { didSet { if todoSpaces != oldValue { spaceIndex = Self.spaceIndex(todoSpaces); spacesRevision &+= 1 } } }
+    /// todo-spaces.json as this Mac last read or wrote it.
+    var knownSpacesData: Data?
+    /// Catch-ups in a row that found the file unreadable (moved aside on the third, W21).
+    var spacesBadReads = 0
+    /// Each to-do's live space (rows look theirs up on every draw).
+    private(set) var spaceIndex: [UUID: TodoSpaces.Space] = [:]
+    /// Bumped when the spaces change (the input line's reading is kept until then).
+    private(set) var spacesRevision = 0
+    /// 한 스페이스만 보기: this Mac's, until the 4 a.m. day turns (`spaces.lens`).
+    @Published var spaceLens: SpaceLens? {
+        didSet {
+            guard spaceLens != oldValue else { return }
+            preferences.set(spaceLens.flatMap { try? JSONEncoder().encode($0) }, forKey: "spaces.lens")
+        }
+    }
+    /// memo-folders.json is written off the main thread, one write after another (MemoDrawerModel.swift).
+    let folderWriter = MemoFoldersWriter()
     /// The drawer: its settings (this Mac's), what it shows, its window (set by the app).
     private(set) lazy var drawer = MemoDrawer(model: self)
     /// Set by the app: opens or closes the drawer (the note's paw button, the cat, ⋯, 윈도우 메뉴, ⌘3).
@@ -299,11 +318,14 @@ final class AppModel: ObservableObject {
         let current = memos[index].text
         let text = from.map { $0 != current ? TextMerge.merge(base: $0, ours: typed, theirs: current) : typed } ?? typed
         guard text != current else { return }
-        memos[index].text = text
-        memos[index].updatedAt = Date()
+        // One change of the list, not four (each was heard by every window and the drawer on every key).
+        var list = memos
+        list[index].text = text
+        list[index].updatedAt = Date()
+        if index != 0 { list.insert(list.remove(at: index), at: 0) }
         memoEdits.insert(id)
         if id == openMemoID { openMemoTyped = true }
-        if index != 0 { memos.insert(memos.remove(at: index), at: 0) }
+        memos = list
         saveMemosSoon()
     }
 
@@ -361,7 +383,7 @@ final class AppModel: ObservableObject {
             memoEdits = []
             memoDeletions = []
         } catch {
-            storageError = L("메모를 저장하지 못했어요.") + "\n\(memosURL.path)"
+            storageError = Self.saveProblem(L("메모를 저장하지 못했어요."))
         }
     }
 
@@ -406,6 +428,8 @@ final class AppModel: ObservableObject {
     @Published var reminderStyle: ReminderPresentationStyle {
         didSet { preferences.set(reminderStyle.rawValue, forKey: "reminderStyle") }
     }
+    /// The days with a completion (the record and the list), for the cat's streak cheer (#42); set by the app.
+    var completedDays: () -> Set<String> = { [] }
     var onCollapse: (() -> Void)?
     var onReminderSettings: (() -> Void)?
     var onTaskReminderEditing: (() -> Void)?
@@ -434,11 +458,14 @@ final class AppModel: ObservableObject {
     /// Everything here on disk now (before a backup is made or imported).
     func saveEverything() {
         commitEditing()
+        drawer.sendTyped()
         if hasUnsavedChanges { retrySave() }
         saveMemosNow()
+        finishMemoFolderWrites()
     }
 
     func stopSaving() {
+        finishMemoFolderWrites()
         savingStopped = true
         memoSaveTask?.cancel()
         calendar.stopSaving()
@@ -498,6 +525,8 @@ final class AppModel: ObservableObject {
             keepUnreadable(memosFile, what: .memos)
         }
         loadMemoFolders()
+        loadTodoSpaces()
+        spaceLens = preferences.data(forKey: "spaces.lens").flatMap { try? JSONDecoder().decode(SpaceLens.self, from: $0) }
         do {
             history = UndoableNotebook(notebook: try file.load())
         } catch NotebookFileError.missing {
@@ -507,10 +536,10 @@ final class AppModel: ObservableObject {
                 .appendingPathExtension("unreadable-\(Int(Date().timeIntervalSince1970)).json")
             do {
                 try FileManager.default.copyItem(at: storageURL, to: backup)
-                storageError = L("전에 쓰던 목록을 읽지 못했어요. 원본은 \(backup.lastPathComponent)에 남겨 뒀어요. 새 목록은 그대로 잘 저장돼요.")
+                storageError = L("목록 파일을 읽지 못해서 빈 목록으로 시작했어요.") + " " + Self.keptAside(backup)
             } catch {
                 canSave = false
-                storageError = L("전에 쓰던 목록을 읽지 못했어요. 원본을 지키려고 덮어쓰지 않아요. 지금 목록은 ‘텍스트로 내보내기’로 남겨 두세요.") + "\n\(storageURL.path)"
+                storageError = L("목록 파일을 읽지 못했어요. 원래 파일을 지키려고 그 위에 저장하지 않아요. 여기 적은 건 ‘텍스트로 내보내기’로 따로 남겨 두세요.")
             }
         }
         // 어제부터: older files have no stamps yet — today, from now on.
@@ -532,16 +561,34 @@ final class AppModel: ObservableObject {
     var todayItems: [TodoItem] { derivedLists().today }
 
     /// Today's sheet and 앞으로's count, for this version of the list on this (4 a.m.) day.
-    private func derivedLists() -> (today: [TodoItem], ahead: Int) {
+    private func derivedLists() -> (today: [TodoItem], ahead: Int, done: Int) {
         let now = Date()
         let day = Archive.dayKey(now)
-        if let derived, derived.revision == revision, derived.day == day { return (derived.today, derived.ahead) }
+        if let derived, derived.revision == revision, derived.day == day { return (derived.today, derived.ahead, derived.done) }
         let today = items.filter { Shelf.page(of: $0, now: now) == .today }
         let ahead = items.filter { Ahead.isAhead($0, now: now) }.count
-        derived = (revision, day, today, ahead)
-        return (today, ahead)
+        let done = today.reduce(0) { $0 + ($1.isCompleted ? 1 : 0) }
+        derived = (revision, day, today, ahead, done)
+        return (today, ahead, done)
     }
-    var visibleItems: [TodoItem] { todayItems.filter(isShown) }
+    /// Today's rows as shown: finished ones hidden when asked, and only the space picked in the header (1.45).
+    /// Worked out once per change (#61: the note asked for it on every row, twice, and each time it filtered the sheet).
+    var visibleItems: [TodoItem] {
+        let today = todayItems
+        let key = VisibleKey(revision: revision, day: derived?.day ?? "", hideCompleted: hideCompleted, finishing: finishingIDs,
+                             lens: spaceShown, spaces: spacesRevision)
+        if let visible, visible.key == key { return visible.items }
+        let shown = today.filter(isShown)
+        let lens = key.lens
+        let items = lens == .all ? shown : shown.filter { lens.includes(spaceIndex[$0.id]?.id) }
+        visible = (key, items)
+        return items
+    }
+    /// What `visibleItems` depends on besides the list.
+    private struct VisibleKey: Equatable {
+        var revision: Int, day: String, hideCompleted: Bool, finishing: Set<UUID>, lens: SpaceLens.Shown, spaces: Int
+    }
+    private var visible: (key: VisibleKey, items: [TodoItem])?
     /// Today's rows as the sheet shows them: 다음 first, then the rest.
     var todayDisplayOrder: [TodoItem] {
         let visible = visibleItems
@@ -566,9 +613,13 @@ final class AppModel: ObservableObject {
             firstOpen: open.first?.title,
             weekday: Calendar.paper.component(.weekday, from: now) - 1,
             nextEvent: events?.next, nextIn: events?.nextIn ?? 0, nowEvent: events?.now,
-            endedEvent: events?.ended, eventsLeft: events?.left ?? 0)
+            endedEvent: events?.ended, eventsLeft: events?.left ?? 0,
+            milestone: Archive.streakMilestone(completedDays(), today: now, saidOn: preferences.string(forKey: Self.milestoneSaidKey)))
     }
-    /// "완료한 일 숨기기" applies to every page; a just-finished task lingers for its animation.
+
+    /// The day the cat last cheered a streak (7 · 30 · 100 days): once that day.
+    static let milestoneSaidKey = "chatter.milestoneDay"
+    /// "완료 숨기기" applies to every page; a just-finished task lingers for its animation.
     private func isShown(_ item: TodoItem) -> Bool { !hideCompleted || !item.isCompleted || finishingIDs.contains(item.id) }
     // MARK: 앞으로
 
@@ -620,7 +671,7 @@ final class AppModel: ObservableObject {
             moveToToday(id)
         }
         let after = history.notebook
-        var toast = PaperToast(symbol: destination == .someday ? "tray" : destination == .today ? "sun.max" : "calendar",
+        var toast = PaperToast(symbol: destination == .someday ? "tray.and.arrow.down" : destination == .today ? "sun.max" : "calendar",
                                text: { if case .day(let key) = destination { DateMove.movedText(key, now: now, language: .current) } else { Ahead.movedText(destination, now: now, language: .current) } }())
         toast.action = L("되돌리기")
         toast.moved = id
@@ -637,8 +688,12 @@ final class AppModel: ObservableObject {
     /// The 오늘 창's tasks: today's open ones (and one just checked, for its animation).
     var glanceTodayItems: [TodoItem] { todayItems.filter { !$0.isCompleted || finishingIDs.contains($0.id) } }
     /// Counts for today's sheet — what the footer, menu bar and reminders talk about.
-    var completedCount: Int { todayItems.filter(\.isCompleted).count }
-    var remainingCount: Int { todayItems.filter { !$0.isCompleted }.count }
+    /// Once per change too (#61: the header, the footer, the menu bar and the reminders each counted the sheet).
+    var completedCount: Int { derivedLists().done }
+    var remainingCount: Int {
+        let lists = derivedLists()
+        return lists.today.count - lists.done
+    }
     /// Every finished task, wherever it lives.
     var totalCompletedCount: Int { history.notebook.completedCount }
 
@@ -755,11 +810,22 @@ final class AppModel: ObservableObject {
     }
 
     /// Stops the repetition; copies already on the list stay as ordinary tasks.
-    func deleteSeries(_ id: String) {
-        series.removeAll { $0.id == id }
+    /// 반복 그만하기: the rule goes, its open copies stay on the list as plain to-dos. Returns 되돌리기 (#22): the rule
+    /// back in its place, the copies in it again.
+    @discardableResult
+    func deleteSeries(_ id: String) -> () -> Void {
+        guard let index = series.firstIndex(where: { $0.id == id }) else { return {} }
+        let entry = series[index]
+        series.remove(at: index)
         saveRepeats()
         let open = items.filter { $0.seriesID == id && !$0.isCompleted }.map(\.id)
         mutate { history in for item in open { history.setSeries(id: item, seriesID: nil) } }
+        return { [weak self] in
+            guard let self, !self.series.contains(where: { $0.id == id }) else { return }
+            self.series.insert(entry, at: min(index, self.series.count))
+            self.saveRepeats()
+            self.mutate { history in for item in open { history.setSeries(id: item, seriesID: id) } }
+        }
     }
 
     /// Puts today's copies on the list; runs at launch, every 30 minutes, after waking and at 4 a.m.
@@ -793,11 +859,11 @@ final class AppModel: ObservableObject {
     private func keepUnreadable(_ url: URL, what: Unreadable) {
         let backup = url.deletingPathExtension().appendingPathExtension("unreadable-\(Int(Date().timeIntervalSince1970)).json")
         if (try? FileManager.default.copyItem(at: url, to: backup)) != nil {
-            storageError = what == .memos
-                ? L("전에 쓰던 메모를 읽지 못했어요. 원본은 \(backup.lastPathComponent)에 남겨 뒀어요.")
-                : L("전에 쓰던 반복 할 일을 읽지 못했어요. 원본은 \(backup.lastPathComponent)에 남겨 뒀어요.")
+            storageError = (what == .memos
+                ? L("메모 파일을 읽지 못해서 메모 없이 시작했어요.")
+                : L("반복 할 일 파일을 읽지 못해서 반복 없이 시작했어요.")) + " " + Self.keptAside(backup)
         } else {
-            storageError = (what == .memos ? L("전에 쓰던 메모를 읽지 못했어요.") : L("전에 쓰던 반복 할 일을 읽지 못했어요.")) + "\n\(url.path)"
+            storageError = (what == .memos ? L("메모 파일을 읽지 못했어요.") : L("반복 할 일 파일을 읽지 못했어요.")) + " " + L("저장 폴더가 열리는지 확인해 주세요.")
         }
     }
 
@@ -810,7 +876,7 @@ final class AppModel: ObservableObject {
             try FileManager.default.createDirectory(at: repeatsURL.deletingLastPathComponent(), withIntermediateDirectories: true)
             try encoder.encode(RepeatsFile(series: series)).write(to: repeatsURL, options: .atomic)
         } catch {
-            storageError = L("반복 할 일을 저장하지 못했어요.") + "\n\(repeatsURL.path)"
+            storageError = Self.saveProblem(L("반복 할 일을 저장하지 못했어요."))
         }
     }
     // MARK: Shared folder
@@ -843,6 +909,7 @@ final class AppModel: ObservableObject {
         }
         catchUpMemos()
         catchUpMemoFolders()
+        catchUpTodoSpaces()
         calendar.reloadIfChanged()
         alarms.reloadIfChanged()
         let decoder = JSONDecoder()
@@ -1106,8 +1173,8 @@ final class AppModel: ObservableObject {
         let filed: [TodoItem]
         if let fileCompleted { filed = fileCompleted(done) } else { archiveCompleted(Set(done.map(\.id))); filed = done }
         guard !filed.isEmpty else { return }
-        // 1.38: `3개를 기록으로 옮겼어요 · 되돌리기` — the entries leave the record and the tasks come back.
-        var toast = PaperToast(symbol: "leaf", text: L("\(filed.count)개를 기록으로 옮겼어요"))
+        // 1.38: `3개를 완료 기록으로 옮겼어요 · 되돌리기` — the entries leave the record and the tasks come back.
+        var toast = PaperToast(symbol: "leaf", text: L("\(filed.count)개를 완료 기록으로 옮겼어요"))
         toast.action = L("되돌리기")
         toast.perform = { [weak self] in
             guard let self else { return }
@@ -1173,8 +1240,8 @@ final class AppModel: ObservableObject {
     }
 
     func showStorageError(_ message: String) {
-        let answer = SlipAlert.run(symbol: "externaldrive.badge.exclamationmark", title: L("저장 상태 확인"), message: message,
-                                   choices: [.init(title: L("저장 폴더 열기")), .init(title: L("확인"), role: .primary, isDefault: true, isCancel: true)],
+        let answer = SlipAlert.run(symbol: "externaldrive.badge.exclamationmark", title: L("저장 폴더 확인"), message: message,
+                                   choices: [.init(title: L("저장 폴더 열기")), .init(title: L("닫기"), role: .primary, isDefault: true, isCancel: true)],
                                    cat: nil, width: .medium)
         if answer == 0 {
             NSWorkspace.shared.open(file.url.deletingLastPathComponent())
@@ -1191,8 +1258,20 @@ final class AppModel: ObservableObject {
             hasUnsavedChanges = false
             storageError = nil
         } catch {
-            storageError = L("목록을 저장하지 못했어요. 앱을 닫기 전에 텍스트로 내보내 주세요.") + "\n\(file.url.path)"
+            storageError = Self.saveProblem(L("할 일을 저장하지 못했어요."))
         }
+    }
+
+    /// A failed save, the way every file says it (#34): what didn't happen, what's still safe, the next try, what to do.
+    /// Only for the files saved whole on every change — the next change really is the next try.
+    static func saveProblem(_ what: String, retries: Bool = true) -> String {
+        [what, L("앱을 끄기 전까지 적은 글은 화면에 그대로 있어요."), retries ? L("다음에 바뀔 때 다시 저장해 볼게요.") : nil,
+         L("저장 폴더가 열리는지 확인해 주세요.")].compactMap { $0 }.joined(separator: " ")
+    }
+
+    /// An unreadable file copied aside: its name only — the storage folder button shows where (#25).
+    static func keptAside(_ copy: URL) -> String {
+        L("원래 파일은 저장 폴더에 ‘\(copy.lastPathComponent)’ 이름으로 남겨 뒀어요.")
     }
 
     private var plainText: String {

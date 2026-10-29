@@ -94,7 +94,7 @@ struct MemoDrawerView: View {
 
     private var tapeColor: Color {
         switch drawer.tab {
-        case .pinned: palette.pinTab.1
+        case .pinned: palette.pinTape
         case .folder: palette.tab(drawer.currentFolder?.colorKey ?? .lavender).tape
         }
     }
@@ -154,10 +154,11 @@ struct MemoDrawerView: View {
     // MARK: The list
 
     private var list: some View {
-        let sections = drawer.sections
-        let byID = Dictionary(drawer.memos.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        // Worked out once per change (the footer and every card read the same).
+        let shown = drawer.list
+        let sections = shown.sections, byID = shown.byID
         let hasPinned = sections.contains { $0.group == .pinned }
-        let gap: CGFloat = drawer.dense ? 12 : 16
+        let gap: CGFloat = shown.dense ? 12 : 16
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
@@ -197,7 +198,7 @@ struct MemoDrawerView: View {
                 .scaledToFit()
                 .frame(width: 58, height: 58)
                 .accessibilityHidden(true)
-            Text(drawer.tab == .pinned ? L("발 모양 버튼으로 고정한 메모가 여기 모여요.") : L("위 쪽지에 적거나, 다른 폴더의 메모를 이\u{00A0}책갈피로 끌어 오세요.").keepingParticles)
+            Text(drawer.tab == .pinned ? L("메모를 펼쳐 핀을 누르면 여기에 모여요.") : L("위 쪽지에 적거나, 다른 폴더의 메모를 이\u{00A0}책갈피로 끌어 와 보세요.").keepingParticles)
                 .font(.system(size: 12))
                 .foregroundStyle(palette.secondary)
                 .multilineTextAlignment(.center)
@@ -218,8 +219,11 @@ struct MemoDrawerView: View {
                     SearchSlip(drawer: drawer, hit: hit, palette: palette, font: font)
                         .id(hit.memoID)
                 }
-                if hits.isEmpty && !drawer.query.trimmingCharacters(in: .whitespaces).isEmpty {
-                    Text(L("모든 폴더에서 찾아봤지만 없어요."))
+                if hits.isEmpty && !drawer.searchedQuery.trimmingCharacters(in: .whitespaces).isEmpty {
+                    // One shape for every search that finds nothing (#39): the words looked for, then 없어요.
+                    Text(Search.emptyText(drawer.searchedQuery, language: .current).keepingParticles)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 18)
                         .font(.system(size: 12))
                         .foregroundStyle(palette.secondary)
                         .padding(.top, 24)
@@ -501,7 +505,7 @@ private struct WidthGrip: View {
 
 // MARK: - Bookmarks
 
-/// A folder's bookmark: its colour (striped on day and night paper) with a 1 pt edge in the folder's edge colour; an
+/// A folder's bookmark: its colour (solid on every paper since 1.45) with a 1 pt edge in the folder's edge colour; an
 /// un-picked one shows the name's first letter, the picked one is wider, joined to the paper, the name written down it.
 /// Hover: `장보기 · 세 장 · ⌘3`. Right-click: the folder's menu. Drop a memo on it to move it there; drag bookmarks to
 /// reorder them.
@@ -522,15 +526,11 @@ private struct FolderTab: View {
         let shape = right ? UnevenRoundedRectangle(topLeadingRadius: 9, bottomLeadingRadius: 9, style: .continuous)
             : UnevenRoundedRectangle(bottomTrailingRadius: 9, topTrailingRadius: 9, style: .continuous)
         let back = picked ? palette.pickedTab?.back : nil
-        let count = drawer.folders.count(drawer.memos, in: folder.id)
+        let count = drawer.folderCount(folder.id)
         let hint = MemoFolders.bookmarkLabel(name, count: count, key: number <= 9 ? "⌘\(number)" : nil, language: .current)
         Button { drawer.show(.folder(folder.id)) } label: {
             ZStack {
-                if let back {
-                    shape.fill(back)
-                } else {
-                    StripeFill(shape: shape, a: colors.a, b: colors.b)
-                }
+                shape.fill(back ?? colors.a)
                 if picked {
                     VerticalName(name: name, font: font, color: palette.pickedTab?.ink ?? colors.ink)
                         .padding(.vertical, 8)
@@ -594,13 +594,13 @@ private struct PinTab: View {
             : UnevenRoundedRectangle(bottomTrailingRadius: 9, topTrailingRadius: 9, style: .continuous)
         Button { drawer.show(.pinned) } label: {
             ZStack {
-                StripeFill(shape: shape, a: palette.pinTab.0, b: palette.pinTab.1)
-                Image(systemName: "pawprint.fill")
+                shape.fill(palette.pinTab)
+                Image(systemName: "pin.fill")
                     .font(.system(size: picked ? 12 : 10))
                     .foregroundStyle(palette.pinTabInk)
             }
             .frame(width: picked ? 30 : 22, height: picked ? 46 : 40)
-            .overlay { shape.strokeBorder(Color(drawerHex: palette.kind == .night ? "#a3955d" : "#dcc46a"), lineWidth: picked ? 0.5 : 1) }
+            .overlay { shape.strokeBorder(palette.pinTabEdge, lineWidth: picked ? 0.5 : 1) }
             .overlay { if targeted { shape.strokeBorder(palette.check, lineWidth: 1.5) } }
             .contentShape(shape)
         }
@@ -619,62 +619,42 @@ private struct PinTab: View {
     }
 }
 
-/// Diagonal stripes, 5 pt each, like the note's tabs: drawn once per size (no tile seams), clipped to the shape.
-struct StripeFill<S: Shape>: View {
-    let shape: S
-    let a: Color
-    let b: Color
-
-    var body: some View {
-        shape.fill(a)
-            .overlay {
-                if a != b {
-                    Canvas { context, size in
-                        var bands = Path()
-                        let step: CGFloat = 10
-                        var x = -size.height
-                        while x < size.width + size.height {
-                            bands.move(to: CGPoint(x: x, y: size.height))
-                            bands.addLine(to: CGPoint(x: x + step / 2, y: size.height))
-                            bands.addLine(to: CGPoint(x: x + step / 2 + size.height, y: 0))
-                            bands.addLine(to: CGPoint(x: x + size.height, y: 0))
-                            bands.closeSubpath()
-                            x += step
-                        }
-                        context.fill(bands, with: .color(b))
-                    }
-                    .clipShape(shape)
-                    .allowsHitTesting(false)
-                }
-            }
-    }
-}
-
-/// The picked bookmark's name, down the tab: Korean letters stacked, Latin words turned.
+/// The picked bookmark's name, down the tab: Korean letters stacked, Latin words turned. #55 D-2: the whole name
+/// (the others show their colour and first letter); only a name longer than the tab can be (150 pt) is cut with "…",
+/// as on Windows — a Latin one by its width, not after six letters ("Boodschappen" whole, not "Boods…").
 private struct VerticalName: View {
     let name: String
     let font: NotebookFont
     let color: Color
 
+    /// Stacked letters: six fit in 150 pt.
     static let limit = 6
+    /// A turned name's longest run, so the tab stays within 150 pt.
+    static let longest: CGFloat = 126
 
     static func stacked(_ name: String) -> Bool {
         name.unicodeScalars.contains { (0xAC00...0xD7A3).contains($0.value) || (0x3131...0x318E).contains($0.value) }
     }
 
-    static func shown(_ name: String) -> String {
-        name.count > limit ? String(name.prefix(limit - 1)) + "…" : name
+    @MainActor static func shown(_ name: String, font: NotebookFont) -> String {
+        if stacked(name) { return name.count > limit ? String(name.prefix(limit - 1)) + "…" : name }
+        let face = font.handNSFont(17)
+        func width(_ text: String) -> CGFloat { (text as NSString).size(withAttributes: [.font: face]).width }
+        guard width(name) > longest else { return name }
+        var cut = name
+        while cut.count > 1, width(cut + "…") > longest { cut.removeLast() }
+        return cut.trimmingCharacters(in: .whitespaces) + "…"
     }
 
     @MainActor static func height(_ name: String, font: NotebookFont) -> CGFloat {
-        let text = shown(name)
+        let text = shown(name, font: font)
         if stacked(name) { return max(62, CGFloat(text.count) * 19 + 20) }
         let width = (text as NSString).size(withAttributes: [.font: font.handNSFont(17)]).width
         return max(62, min(150, ceil(width) + 24))
     }
 
     var body: some View {
-        let text = Self.shown(name)
+        let text = Self.shown(name, font: font)
         if Self.stacked(name) {
             VStack(spacing: 0) {
                 ForEach(Array(text.enumerated()), id: \.offset) { _, letter in
@@ -747,7 +727,10 @@ private struct SearchField: View {
                 .font(.system(size: 14))
                 .foregroundStyle(palette.ink)
                 .focused($focused)
-                .onSubmit { drawer.selectedID.map { drawer.reveal($0) } ?? drawer.hits.first.map { drawer.reveal($0.memoID) } }
+                .onSubmit {
+                    drawer.searchNow()
+                    _ = drawer.selectedID.map { drawer.reveal($0) } ?? drawer.hits.first.map { drawer.reveal($0.memoID) }
+                }
         }
         .padding(.horizontal, 9)
         .frame(height: 30)
@@ -785,7 +768,7 @@ private struct FolderSheetView: View {
                     let colors = palette.tab(color)
                     let picked = sheet.color == color
                     Button { drawer.folderSheet?.color = color } label: {
-                        StripeFill(shape: Circle(), a: colors.a, b: colors.b)
+                        Circle().fill(colors.a)
                             .overlay { Circle().strokeBorder(colors.edge, lineWidth: 0.8) }
                             .frame(width: 20, height: 20)
                             .padding(3)

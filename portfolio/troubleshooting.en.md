@@ -2,7 +2,7 @@
 
 [한국어](troubleshooting.md)
 
-Six problems I ran into while building Jongi-nyang, each written as situation, how I traced it, options, what I chose and why, result, and what changed afterwards. The numbers match [`mac/CHANGELOG.md`](../mac/CHANGELOG.md) and [`windows/CHANGELOG.md`](../windows/CHANGELOG.md) (both in Korean).
+Nine problems I ran into while building Jongi-nyang, each written as situation, how I traced it, options, what I chose and why, result, and what changed afterwards. The numbers match [`mac/CHANGELOG.md`](../mac/CHANGELOG.md) and [`windows/CHANGELOG.md`](../windows/CHANGELOG.md) (both in Korean).
 
 ## 1. 61% CPU while doing nothing (Mac 1.38.1 → 1.39.0)
 
@@ -72,3 +72,36 @@ Six problems I ran into while building Jongi-nyang, each written as situation, h
 | Choice and why | The third. The drawer paper went darker (#262420) and the sheets a step lighter (#3b3832), 1.33:1 apart, with an edge. Grey text went to #bfb8a8 (5.92:1), preview lines to 7.53:1. The eight bookmark colours got lighter, with the lowest text contrast still above 5.02:1. Both apps use the same colours. The same release moved the hard-to-find drawer settings into their own pane on the Desk. |
 | Result | The sheets lift off the paper, and times and hints read clearly. Sheet against paper is decorative and has no bar, so the contrast check now prints it as a number. |
 | Afterwards | Once notes piled up, the next problem was that notes didn't stand apart from each other. In 1.44 (Windows 1.29) all four papers got a darker drawer, an edge on every sheet and grey text above 6:1 (day 4.98 → 6.16, grid 4.91 → 6.14). The contrast check now covers 218 pairs across the drawer's four papers. |
+
+## 7. The Windows reminder's check box wouldn't take a click (Windows 1.29.0 → 1.30.0)
+
+| Step | What happened |
+| --- | --- |
+| Situation | I heard that ticking the check box on a to-do's reminder slip sometimes did nothing, and that moving the pointer off the slip and back seemed to help. Every test passed. |
+| Tracing | The reminder slip is a see-through window over the bottom of the screen, so it normally lets clicks through to the window behind and takes them only while the pointer is over the slip or the cat. A click-through window hears only the pointer's moves. If the pointer arrived during the two seconds the slip was opening (the cat walking in), that move was dropped, and a pointer that then stayed still sent nothing more. A pointer already resting there before the slip came sent nothing at all. With no Windows PC at hand, I built a probe (`windows/tools/popup-click.cjs`) that bundles the real slip window, preload and page, keeps the window off every display, sends only CDP mouse moves and records whether the click lands: paper, cat and compact styles × due, remaining and evening tidy-up, with the pointer arriving during the walk-in, after it, or resting there from the start. |
+| Options | Let the slip always take clicks (and block the window behind). Remember a pointer that arrived early and check again when the slip opens. Ask where the pointer is when the slip opens. |
+| Choice and why | The second and third together. A see-through window that always takes clicks would block the app next to the slip. The slip now remembers an early arrival and checks it when it opens, takes clicks after the smallest move over it, and for a pointer that never moved asks the main process where the pointer is and looks at what's under it. |
+| Result | Before the fix, the click went through to the window behind in 5 of the 9 cases where the pointer moves. After the first change all 9 ticked the box, and the second change covered the 2 resting-pointer cases: 11 of 11. |
+| Afterwards | The probe takes `--renderer` to run an older slip page, so before and after are compared under the same conditions. It still hasn't been checked on a real Windows PC, so the issue stays open with the `verify` label. |
+
+## 8. The input line froze for seconds with many to-dos (Mac 1.44.0 → 1.45.0)
+
+| Step | What happened |
+| --- | --- |
+| Situation | Measuring to-do spaces with 2,000 to-dos (1,900 rows on Today), I found that the first key in an empty input line and `Esc` to clear it froze the notepad for seconds. 1.44 did it too. With a normal number of to-dos it never showed, so tests and snapshots passed. |
+| Tracing | `perf.sh --spaces` runs a test copy and times each key to its response; I also counted the redraws. To keep the ruled paper going below the rows, the note measured the list's height and kept it in its state. With many rows that height is the lazy list's estimate, which moved by about a point on every layout. Each change re-ran the whole Today list and laid the note out again, which moved the estimate again. Going from an empty line to a written one (or back) brings the chips in or out and changes the list's room, and each time this loop ran 500–900 rounds. Opening the note and drawing Today had the same loop in them. |
+| Options | Round the height. Hold off redrawing for a while after it changes. Stop following the height once the rows fill the sheet. |
+| Choice and why | The third. Rounding can still flip at a boundary, and waiting delays real changes too. Once the rows fill the sheet, the ruled paper below them is always one row, so from there the height can stay one value and the picture is the same. |
+| Result | Measured by turns against the old build under the same conditions: first key 5.7–8.8 s → 25–58 ms, `Esc` 10–14 s (once 32 s) → 22–41 ms. Opening the note 1,161 · 1,163 ms → 450 · 526 ms, drawing Today 590 · 700 ms → 88 · 96 ms. With about 70 rows the first key went from 62–388 ms to 26–49 ms. Time per key (about 20 ms) and the picture didn't change. |
+| Afterwards | `perf.sh --spaces` keeps the first-key and `Esc` steps. Numbers now come from very large data as well as the usual sample; the notes drawer was measured the same way at 2,000 and 5,000 notes and with a 1 MB note ([`docs/perf-memo-stress.md`](../docs/perf-memo-stress.md)). |
+
+## 9. In Dutch, the small desk hid the History pane's button (Windows 1.29.0 → 1.30.0)
+
+| Step | What happened |
+| --- | --- |
+| Situation | While changing the tab design I ran the snapshot size sweep (`npm run snapshot -- sweep`). In Dutch, with a 760 × 520 desk and the Noto font, the History pane's footnote and its ‘Map openen’ (open the history folder) button fell outside what you could see. The sweep failed with 2 findings in `desk-760x520-noto-history`. It did the same before the tab change. |
+| Tracing | Dutch runs about 30% longer than Korean, so at that size the summary and the tiles' lines wrapped and the record grew taller than the pane. The footnote row sat at the end of the record and scrolled out of the pane with it. |
+| Options | Shorten the Dutch text. Make the desk's minimum size larger. Pin the footnote row to the pane's bottom edge. |
+| Choice and why | The third. Shorter text would no longer match the other panes, and a larger minimum wouldn't fit small screens. Pinning the row (`position: sticky`) moves it only when the record is taller than the pane; where everything fits, nothing changes. It's three lines of CSS. |
+| Result | Sweep findings 2 → 0. However long the record, the footnote and ‘Map openen’ stay at the bottom of the pane. |
+| Afterwards | The sweep was later widened to fail when help topic names or the search hint are cut off as well. Drawing the longest language in the smallest window catches clipping that one language alone doesn't show. |

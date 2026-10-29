@@ -21,7 +21,7 @@ struct PaperView: View {
 
     /// The note's height: the 하루 띠's rows and its open day follow it.
     @State private var height: CGFloat = 560
-    /// The list's rows (for the ruled paper under them).
+    /// The list's rows (for the ruled paper under them); `.greatestFiniteMagnitude` once they fill the sheet.
     @State private var listHeight: CGFloat = 0
     /// The header's tools (pin, 책상, ⋯) as drawn, so the tab row's variants are measured against a stand-in of the
     /// same width rather than four copies of the tools (1.39: the ⋯ menu measured four times on every redraw).
@@ -50,6 +50,8 @@ struct PaperView: View {
                 AheadPageView(model: model, previewDrag: previewAheadDrag, previewLine: previewLine)
             } else {
                 DayStripView(model: model, calendar: model.calendar, noteHeight: height, compact: height < 470, now: previewNow)
+                // 할 일 스페이스 (1.45): what the list hides while one space shows (nothing otherwise).
+                SpaceLensBand(model: model)
                 todayList
                     .overlay(alignment: .bottom) { ToastHost(model: model) }
                 Group {
@@ -93,13 +95,28 @@ struct PaperView: View {
 
     // MARK: Today's list: 다음, then the rest
 
+    /// #31: the to-dos the 하루 띠 shows in its 지금 · 다음 block (DayStripView's own state), for the rows' small mark.
+    /// None while the strip is off or the day is open.
+    private func stripMarks(width: CGFloat) -> [String: DayStrip.Mode] {
+        let calendar = model.calendar
+        let now = previewNow ?? Date()
+        guard calendar.showsStrip, !calendar.isDayOpen(now: now) else { return [:] }
+        let items = DayStrip.items(events: calendar.todayEvents(now: now), tasks: model.todayItems, now: now)
+        return DayStrip.marks(DayStrip.state(items, now: now, rows: DayStrip.rowLimit(width: Double(width), height: Double(height))))
+    }
+
     private var todayList: some View {
         let visible = model.visibleItems
         let split = TodayGroups.split(visible, series: model.series, now: Date(), first: model.todayPickID)
         let byID = Dictionary(uniqueKeysWithValues: visible.map { ($0.id, $0) })
         let next = split.next.compactMap { byID[$0] }
         let rest = split.rest.compactMap { byID[$0] }
+        // Worked out once here and handed to the rows (#61): each row asking the model filtered the whole sheet, twice.
+        let restIDs = rest.map(\.id)
+        let firstID = visible.first?.id, lastID = visible.last?.id
+        let shared = TaskRowShared(model)
         return GeometryReader { geometry in
+            let marks = stripMarks(width: geometry.size.width)
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
                     VStack(spacing: 0) {
@@ -110,14 +127,16 @@ struct PaperView: View {
                             GroupHeader(title: L("다음"), count: next.count).padding(.top, 4)
                         }
                         ForEach(next) { item in
-                            TaskRow(item: item, model: model, rowDrop: $rowDrop, ruled: true, draggable: false, nextTime: split.times[item.id])
+                            TaskRow(item: item, model: model, rowDrop: $rowDrop, ruled: true, draggable: false, nextTime: split.times[item.id],
+                                    stripMark: marks[item.id.uuidString], edges: RowEdges(item.id, first: firstID, last: lastID), shared: shared)
                         }
                         if split.showsHeaders {
                             // Not "오늘 할 일" again under the page title of that name.
                             GroupHeader(title: L("그 밖에"), count: rest.count).padding(.top, 8)
                         }
                         ForEach(rest) { item in
-                            TaskRow(item: item, model: model, rowDrop: $rowDrop, ruled: true, groupRows: rest.map(\.id))
+                            TaskRow(item: item, model: model, rowDrop: $rowDrop, ruled: true, stripMark: marks[item.id.uuidString], groupRows: restIDs,
+                                    edges: RowEdges(item.id, first: firstID, last: lastID), shared: shared)
                         }
                         if model.todayItems.isEmpty {
                             EmptySheetNote(pose: .happy, text: L("오늘 할 일을 한 줄 적어 볼까요?"))
@@ -127,7 +146,13 @@ struct PaperView: View {
                                 .transition(.opacity.combined(with: .move(edge: .top)))
                         }
                       }
-                      .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listHeight = $0 }
+                      // Rows as tall as the sheet or taller are kept as one value: the rules below are one row then,
+                      // whatever the rows add up to. The lazy stack's height is a guess that moves by a point or so on
+                      // each layout; fed back in, every guess redrew the whole sheet and laid it out again — with 2,000
+                      // rows the line going from empty to written (or back with Esc) went round 500–900 times, 4–14 s.
+                      .onGeometryChange(for: CGFloat.self) { [sheet = geometry.size.height] in
+                          $0.size.height < sheet ? $0.size.height : .greatestFiniteMagnitude
+                      } action: { listHeight = $0 }
                         // The paper's lines carry on below the last row.
                         PaperRules().frame(height: max(PaperTheme.rowHeight, geometry.size.height - listHeight))
                     }
@@ -183,13 +208,19 @@ struct PaperView: View {
                 .accessibilityLabel("책상 열기")
                 }
 
+                // ⋯ (#18): the same groups in the same order as Windows' moreMenu() — 만들기 | 찾기 | 보기 | 창 | 책상 |
+                // 종이냥 · 타이머 | 편집 | 목록 | 도움 — with the menu bar's keys beside them.
                 Menu {
                     Button("새 할 일", action: model.focusNewTask)
                         .keyboardShortcut("n")
+                    Button("새 일정…") { model.newEvent() }
+                    Button("빠른 메모…", action: model.showQuickMemo)
+                        .keyboardShortcut("m", modifiers: [.control, .option])
+                    Divider()
                     Button("검색…") { model.onSearch?() }
-                    Button("포스트잇으로 접기", action: model.minimizeToIcon)
-                    Toggle("화면 오른쪽에 붙이기", isOn: Binding(get: { model.dockedSide?() == .right }, set: { _ in model.onDockNote?(.right) }))
-                    Toggle("화면 왼쪽에 붙이기", isOn: Binding(get: { model.dockedSide?() == .left }, set: { _ in model.onDockNote?(.left) }))
+                        .keyboardShortcut("f")
+                    Button("메모 서랍", action: model.toggleMemoDrawer)
+                    Divider()
                     Picker("글꼴", selection: $model.notebookFont) {
                         ForEach(NotebookFont.allCases) { font in
                             Text("\(font.title)  \(font.preview)").tag(font)
@@ -198,18 +229,24 @@ struct PaperView: View {
                     Picker("글자 크기", selection: $model.textSize) {
                         ForEach(NotebookTextSize.allCases) { Text($0.title).tag($0) }
                     }
-                    Button("설정…", action: model.showReminderSettings)
-                    Button("완료 기록…", action: model.showHistory)
-                    Button("새 일정…") { model.newEvent() }
+                    Toggle("완료 숨기기", isOn: $model.hideCompleted)
+                    Divider()
+                    Button("포스트잇으로 접기", action: model.minimizeToIcon)
+                        .keyboardShortcut("m")
+                    Toggle("화면 오른쪽에 붙이기", isOn: Binding(get: { model.dockedSide?() == .right }, set: { _ in model.onDockNote?(.right) }))
+                    Toggle("화면 왼쪽에 붙이기", isOn: Binding(get: { model.dockedSide?() == .left }, set: { _ in model.onDockNote?(.left) }))
+                    Divider()
                     Button("달력…", action: model.showCalendar)
+                        .keyboardShortcut("d")
+                    Button("완료 기록…", action: model.showHistory)
+                        .keyboardShortcut("y")
                     Button("반복 할 일…", action: model.showRepeatSettings)
-                    Button("빠른 메모…", action: model.showQuickMemo)
-                    Button("메모 서랍 열기", action: model.toggleMemoDrawer)
                     Button("알람…", action: model.showAlarmSettings)
-                    Button("사용 안내", action: model.showGuide)
-                    Button("도움말…", action: model.showHelp)
+                    Button("설정…", action: model.showReminderSettings)
+                        .keyboardShortcut(",")
                     Divider()
                     Toggle("종이냥 펫", isOn: $model.petVisible)
+                        .keyboardShortcut("p", modifiers: [.command, .shift])
                     Menu("타이머") {
                         ForEach(TimerLength.presets + model.timerRecent, id: \.self) { minutes in
                             Button("\(minutes)분 타이머") { model.petCommand(.countdown(minutes: minutes)) }
@@ -222,16 +259,21 @@ struct PaperView: View {
                         Button("중지") { model.petCommand(.stop) }
                     }
                     Divider()
-                    Toggle("완료한 일 숨기기", isOn: $model.hideCompleted)
                     Button("완료한 일 정리", action: model.clearCompleted)
                         .disabled(model.completedCount == 0)
-                    Divider()
                     Button("실행 취소", action: model.undo).disabled(!model.canUndo)
+                        .keyboardShortcut("z")
                     Button("다시 실행", action: model.redo).disabled(!model.canRedo)
+                        .keyboardShortcut("z", modifiers: [.command, .shift])
                     Divider()
                     Button("목록 복사", action: model.copyTasks).disabled(model.items.isEmpty)
+                        .keyboardShortcut("c", modifiers: [.command, .shift])
                     Button("텍스트로 내보내기…", action: model.exportTasks).disabled(model.items.isEmpty)
+                        .keyboardShortcut("e")
                     Divider()
+                    Button("사용 안내", action: model.showGuide)
+                    Button("도움말…", action: model.showHelp)
+                        .keyboardShortcut("?")
                     Button("키보드 단축키", action: model.showShortcuts)
                 } label: {
                     Image(systemName: "ellipsis").font(.system(size: 14, weight: .medium))
@@ -247,7 +289,7 @@ struct PaperView: View {
 
     private var allDoneNote: some View {
         HStack(spacing: 8) {
-            Image(systemName: "sparkles").font(.system(size: 11))
+            Image(systemName: "leaf").font(.system(size: 11))
             Text(L("오늘 한 장 끝! 수고했어요").handwritten)
                 .font(model.notebookFont.bodyFont(model.textSize))
                 .lineLimit(1)
@@ -266,26 +308,28 @@ struct PaperView: View {
                 Button {
                     model.showStorageError(error)
                 } label: {
-                    Label("저장 확인 필요", systemImage: "exclamationmark.circle")
+                    Label("저장 폴더 확인", systemImage: "exclamationmark.circle")
                         .foregroundStyle(PaperTheme.clayText)
                 }
                 .buttonStyle(.plain)
-            } else if model.todayItems.isEmpty {
-                Text("오늘 한 장, 가볍게 시작해요").lineLimit(1)
-                historyButton
             } else {
+                // 1.45 (#20): the same footer with or without to-dos — the empty sheet's word is the cat's, above.
                 historyButton
             }
             Spacer(minLength: 8)
+            // Nothing done yet: nothing to hide — gone, but its place kept, so nothing moves when the first is done.
+            let nothingDone = model.completedCount == 0
             Button {
                 model.hideCompleted.toggle()
             } label: {
                 Text(model.hideCompleted ? L("완료 보기") : L("완료 숨기기")).lineLimit(1)
             }
             .buttonStyle(.plain)
-            .disabled(model.completedCount == 0)
+            .disabled(nothingDone)
             .help("완료한 할 일 표시 전환")
             .foregroundStyle(PaperTheme.faded)
+            .opacity(nothingDone ? 0 : 1)
+            .accessibilityHidden(nothingDone)
         }
         .font(.system(size: 11))
         .foregroundStyle(PaperTheme.secondary)
@@ -365,6 +409,88 @@ enum TaskRowStyle {
     var titleGap: CGFloat { self == .sheet ? 17 : 6 }
 }
 
+/// Whether a row is the first or the last of today's visible rows: 위로 · 아래로 이동 can't go further.
+struct RowEdges: Equatable {
+    var first: Bool
+    var last: Bool
+
+    init(_ id: UUID, first: UUID?, last: UUID?) {
+        self.first = first == id
+        self.last = last == id
+    }
+}
+
+/// What the rows of a list share of the model, read once as the list is drawn (#61).
+@MainActor
+struct TaskRowShared {
+    let selected: UUID?
+    let pick: UUID?
+    let editRequest: UUID?
+    let editingReminder: UUID?
+    let font: NotebookFont
+    let textSize: NotebookTextSize
+    let dueStyle: DueStyle
+    let focusPicking: Bool
+
+    init(_ model: AppModel) {
+        selected = model.selectedTaskID
+        pick = model.todayPickID
+        editRequest = model.editRequestID
+        editingReminder = model.editingTaskReminderID
+        font = model.notebookFont
+        textSize = model.textSize
+        dueStyle = model.dueStyle
+        focusPicking = model.focusPicking
+    }
+}
+
+/// What one row shows of the model: the row is drawn again when this (or the task) changes, not on every change.
+struct TaskRowLook: Equatable {
+    var selected: Bool
+    var picked: Bool
+    var editRequested: Bool
+    var editingReminder: Bool
+    var aiMarked: Bool
+    var space: TodoSpaces.Space?
+    var series: Series?
+    var font: NotebookFont
+    var textSize: NotebookTextSize
+    var dueStyle: DueStyle
+    var focusPicking: Bool
+    var edges: RowEdges
+
+    @MainActor
+    init(_ item: TodoItem, model: AppModel, shared: TaskRowShared, edges: RowEdges) {
+        selected = shared.selected == item.id
+        picked = shared.pick == item.id
+        editRequested = shared.editRequest == item.id
+        editingReminder = shared.editingReminder == item.id
+        aiMarked = model.isAIMarked(item.id.uuidString)
+        space = model.spaceOf(item.id)
+        series = item.seriesID.flatMap { id in model.series.first { $0.id == id } }
+        font = shared.font
+        textSize = shared.textSize
+        dueStyle = shared.dueStyle
+        focusPicking = shared.focusPicking
+        self.edges = edges
+    }
+}
+
+/// A row's right-click menu, worked out when SwiftUI asks for the menu — not every time the row is drawn (#61). It
+/// watches the model itself, so a menu opened again shows the model as it is then (spaces, recent lengths, the day).
+private struct TaskRowContextMenu: View {
+    @ObservedObject var model: AppModel
+    let item: TodoItem
+    let onShelf: Bool
+    let actions: TaskRowMenu.Actions
+    let edges: RowEdges
+
+    var body: some View {
+        RowMenuContent(items: TaskRowMenu.items(model, item: item, onShelf: onShelf, actions: actions),
+                       disabled: TaskRowMenu.disabled(isFirst: edges.first, isLast: edges.last))
+    }
+}
+
 /// What a 앞으로 row shows at its end instead of the D-3 / ~금 caption.
 enum AheadMeta: Equatable {
     /// In a day: a small flag (the day says when).
@@ -377,7 +503,11 @@ struct TaskRow: View {
     let item: TodoItem
     /// On 앞으로: 오늘 하기 / 마감 날짜 instead of 나중에 / 알림, and moves by dropping on a day.
     var onShelf = false
-    @ObservedObject var model: AppModel
+    /// Not watched (#61): what the row shows of the model is `look`, from the list that draws it, so a change redraws
+    /// only the rows it touches. Every row watched the whole model: a check redrew every row built so far (all of
+    /// them once ↑ had scrolled to the last), 2.8–13.9 s with 2,000 to-dos.
+    let model: AppModel
+    let look: TaskRowLook
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovering = false
     @State private var editing = false
@@ -391,6 +521,8 @@ struct TaskRow: View {
     var draggable = true
     /// In 다음: when it's due today (a reminder, or a repeat's time).
     var nextTime: Date?
+    /// #31: shown in the 하루 띠's 지금 · 다음 block too — a small 지금 or 다음 before the row's time.
+    var stripMark: DayStrip.Mode?
     /// The rows a drag moves among (the row's group); all visible rows when nil.
     var groupRows: [UUID]?
     var style: TaskRowStyle = .sheet
@@ -409,10 +541,34 @@ struct TaskRow: View {
     /// Started with Return on a selected row: finishing hands the keyboard back to the list.
     @State private var editFromKeyboard = false
 
-    private var isFirst: Bool { model.visibleItems.first?.id == item.id }
-    private var isLast: Bool { model.visibleItems.last?.id == item.id }
+    /// `edges`: first or last of today's visible rows (the menu's 위로 · 아래로), from the list; asked of the model when
+    /// nil. `shared`: what the list's rows share of the model, read once for them all; read here when nil.
+    init(item: TodoItem, onShelf: Bool = false, model: AppModel, rowDrop: Binding<TaskRowDrop?>, previewHover: Bool = false,
+         ruled: Bool = false, draggable: Bool = true, nextTime: Date? = nil, stripMark: DayStrip.Mode? = nil, groupRows: [UUID]? = nil,
+         edges: RowEdges? = nil, shared: TaskRowShared? = nil, style: TaskRowStyle = .sheet, aheadMeta: AheadMeta? = nil,
+         onDragPoint: ((CGPoint) -> Void)? = nil, onDragEnd: ((Bool) -> Void)? = nil) {
+        self.item = item
+        self.onShelf = onShelf
+        self.model = model
+        _rowDrop = rowDrop
+        self.previewHover = previewHover
+        self.ruled = ruled
+        self.draggable = draggable
+        self.nextTime = nextTime
+        self.stripMark = stripMark
+        self.groupRows = groupRows
+        self.style = style
+        self.aheadMeta = aheadMeta
+        self.onDragPoint = onDragPoint
+        self.onDragEnd = onDragEnd
+        look = TaskRowLook(item, model: model, shared: shared ?? TaskRowShared(model),
+                           edges: edges ?? RowEdges(item.id, first: model.visibleItems.first?.id, last: model.visibleItems.last?.id))
+    }
+
+    private var isFirst: Bool { look.edges.first }
+    private var isLast: Bool { look.edges.last }
     private var hasReminder: Bool { item.reminderAt != nil }
-    private var series: Series? { item.seriesID.flatMap { id in model.series.first { $0.id == id } } }
+    private var series: Series? { look.series }
     private var dropAfter: Bool? { rowDrop?.target == item.id ? rowDrop?.after : nil }
 
     var body: some View {
@@ -448,7 +604,7 @@ struct TaskRow: View {
             .accessibilityValue(item.isCompleted ? L("완료됨") : L("미완료"))
 
             taskContent
-                .font(model.notebookFont.bodyFont(style == .sheet ? model.textSize : model.textSize.smaller ?? .small))
+                .font(look.font.bodyFont(style == .sheet ? look.textSize : look.textSize.smaller ?? .small))
                 .tint(PaperTheme.sage)
                 .padding(.leading, style.titleGap)
                 .padding(.trailing, 8)
@@ -467,6 +623,12 @@ struct TaskRow: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rowWidth = $0 }
         .contentShape(Rectangle())
         .background(rowBackground)
+        .overlay(alignment: .leading) {
+            // 할 일 스페이스 (1.45): the space's colour band on 오늘's rows only (phase 1).
+            if style == .sheet && !onShelf, let space = look.space {
+                SpaceBand(space: space, height: style.height, faded: item.isCompleted)
+            }
+        }
         .overlay(alignment: .bottom) {
             if ruled {
                 Rectangle().fill(PaperTheme.rule).frame(height: 0.6)
@@ -481,8 +643,8 @@ struct TaskRow: View {
             NSApp.keyWindow?.makeFirstResponder(nil)
             model.selectedTaskID = item.id
         }
-        .onChange(of: model.editRequestID) { _, id in
-            guard id == item.id else { return }
+        .onChange(of: look.editRequested) { _, requested in
+            guard requested else { return }
             model.editRequestID = nil
             beginEdit()
             editFromKeyboard = true
@@ -501,43 +663,11 @@ struct TaskRow: View {
         .onChange(of: showingReminderEditor) { _, shown in
             if !shown && model.editingTaskReminderID == item.id { model.editingTaskReminderID = nil }
         }
-        .onChange(of: model.editingTaskReminderID) { _, id in
-            if showingReminderEditor && id != item.id { showingReminderEditor = false }
+        .onChange(of: look.editingReminder) { _, editing in
+            if showingReminderEditor && !editing { showingReminderEditor = false }
         }
         .contextMenu {
-            Button("고치기", action: beginEdit)
-            Button("알림 설정…", action: openReminderEditor)
-            // 1.39: a time on its day — not for a task on 언젠가, which has no day.
-            if !item.isCompleted && TimeBlock.day(of: item, now: Date()) != nil {
-                Button("시간 정하기…") { openEditor(time: true) }
-            }
-            Button(item.isCompleted ? L("완료 취소") : L("완료 표시")) { model.toggle(item.id) }
-            if !item.isCompleted {
-                Button("달력에 넣기…", action: openCalendarSheet)
-                focusMenu
-            }
-            Divider()
-            if !item.isCompleted {
-                if !onShelf { Button("내일 하기") { model.moveToTomorrow(item.id) } }
-                dateMenu
-                if model.dailyPickEnabled && !onShelf {
-                    Button(model.todayPickID == item.id ? L("오늘 꼭 하나 해제") : L("오늘 꼭 하나로")) {
-                        model.setDailyPick(model.todayPickID == item.id ? nil : item.id)
-                    }
-                }
-            }
-            if onShelf {
-                Button("오늘 하기") { model.move(item.id, to: .today) }
-                if item.dueDate != nil { Button("언젠가로 옮기기") { model.move(item.id, to: .someday) } }
-            } else {
-                if item.dueDate == nil { Button("언젠가로 옮기기") { model.moveToLater(item.id) } }
-                Button("위로 이동") { moveUp() }
-                    .disabled(isFirst)
-                Button("아래로 이동") { moveDown() }
-                    .disabled(isLast)
-            }
-            Divider()
-            Button("지우기") { model.deleteWithToast(item.id) }
+            TaskRowContextMenu(model: model, item: item, onShelf: onShelf, actions: menuActions, edges: look.edges)
         }
         .overlay(alignment: dropAfter == true ? .bottom : .top) {
             if dropAfter != nil {
@@ -565,7 +695,13 @@ struct TaskRow: View {
         }
     }
 
-    private var isSelected: Bool { model.selectedTaskID == item.id && !editing }
+    private var isSelected: Bool { look.selected && !editing }
+
+    /// What the right-click menu (TaskRowMenu) does with this row.
+    private var menuActions: TaskRowMenu.Actions {
+        TaskRowMenu.Actions(edit: beginEdit, reminder: openReminderEditor, deadline: { openEditor(deadline: true) },
+                            time: { openEditor(time: true) }, calendar: openCalendarSheet, moveUp: moveUp, moveDown: moveDown)
+    }
 
     private func openCalendarSheet() {
         commitEdit()
@@ -685,11 +821,12 @@ struct TaskRow: View {
 
     private var showsActions: Bool { (hovering || previewHover) && !editing }
     /// 할 일 골라 집중…: open rows offer 집중 (on hover, or always on the selected row).
-    private var offersFocus: Bool { model.focusPicking && !item.isCompleted && !editing }
+    private var offersFocus: Bool { look.focusPicking && !item.isCompleted && !editing }
 
     /// At rest: the deadline and the alert or repeat, as quiet text.
     private var meta: some View {
         HStack(spacing: 10) {
+            if !item.isCompleted, let stripMark { StripMarkTag(mode: stripMark) }
             if !item.isCompleted && !onShelf { carriedTag }
             if !item.isCompleted { SentToCalendarMark(calendar: model.calendar, taskID: item.id) }
             if let aheadMeta, let due = item.dueDate, !item.isCompleted {
@@ -731,44 +868,40 @@ struct TaskRow: View {
         .accessibilityLabel(L("\(item.title) 시간: \(text)"))
     }
 
-    /// On hover, in the same place. Today: 알림 · 나중에 · 삭제. 마감/나중에 tabs: ↑ 오늘로 ·
-    /// 마감 날짜 · 삭제. Finished tasks: 삭제. Also in the right-click menu, for keyboard and VoiceOver.
+    /// On hover, in the same place — three at most (#55 D-3, the user's pick; the title keeps its room). Today: → 내일 ·
+    /// 알림 · ⋯. 앞으로: ↑ 오늘로 · 마감 · ⋯. Finished: ⋯. The rest (언젠가로 ⌥↓, 이거 집중 F, 지우기 ⌫ …) are in ⋯,
+    /// which is the right-click menu (#17), for the mouse, keyboard and VoiceOver alike. Same as Windows.
     private var actionBar: some View {
         HStack(spacing: 2) {
             if !item.isCompleted {
                 if onShelf {
                     moveButton(L("오늘로"), symbol: "arrow.up", help: L("오늘 할 일로 옮겨요")) { model.moveToToday(item.id) }
                         .accessibilityLabel("\(item.title) 오늘 하기")
-                    rowIconButton("calendar", help: item.dueDate == nil ? L("마감 정하기") : L("마감 날짜 바꾸기")) { openEditor(deadline: true) }
+                    rowIconButton("flag", help: item.dueDate == nil ? L("마감 정하기") : L("마감 날짜 바꾸기")) { openEditor(deadline: true) }
                         .accessibilityLabel("\(item.title) 마감 날짜")
                 } else {
-                    // 1.38: → 내일 (⌥→), then ↓ 언젠가, 집중 (F), 알림.
+                    // 1.38: → 내일 (⌥→), then 알림.
                     moveButton(L("내일"), symbol: "arrow.right", help: L("내일 할 일로 옮겨요 (⌥→)")) { model.moveToTomorrow(item.id) }
                         .accessibilityLabel(L("\(item.title) 내일 하기"))
-                    if item.dueDate == nil {
-                        moveButton(L("언젠가"), symbol: "arrow.down", help: L("앞으로 탭의 언젠가로 옮겨요 (⌥↓)")) { model.moveToLater(item.id) }
-                            .accessibilityLabel("\(item.title) 언젠가로 옮기기")
-                    }
-                    rowIconButton("timer", help: L("이거 집중 (F)")) { model.focus(on: item.id) }
-                        .accessibilityLabel(L("\(item.title) 집중"))
                     rowIconButton("bell", help: L("알림 · 반복 · 마감 설정"), action: openReminderEditor)
                         .accessibilityLabel("\(item.title) 알림 설정")
                 }
             }
-            rowIconButton("trash", help: L("지우기 (⌘Z로 되돌리기)")) { model.deleteWithToast(item.id) }
-                .accessibilityLabel("\(item.title) 지우기")
+            rowIconButton("ellipsis", help: L("더 보기"), action: openRowMenu)
+                .accessibilityLabel(L("더 보기"))
         }
     }
 
-    /// 날짜 바꾸기 ▸: 내일 · 이번 주 금요일 · 다음 주 월요일 · 언젠가 · 날짜 고르기….
-    private var dateMenu: some View {
-        Menu("날짜 바꾸기") {
-            ForEach(Array(DateMove.choices(now: Date()).enumerated()), id: \.offset) { _, choice in
-                Button(choice.title(.current)) {
-                    if choice == .pick { openEditor(deadline: true) } else { model.changeDate(item.id, to: choice) }
-                }
-            }
-        }
+    /// ⋯: the right-click menu (TaskRowMenu), under the pointer that pressed it. A menu popped for the moment, so its
+    /// keys (⌫, ⌥↓ …) are the menu's only while it is open, never the hovered row's.
+    private func openRowMenu() {
+        commitEdit()
+        let items = TaskRowMenu.items(model, item: item, onShelf: onShelf, actions: menuActions)
+        let menu = DrawerMenuBuilder.menu(items, palette: nil, font: model.notebookFont)
+        let disabled = TaskRowMenu.disabled(isFirst: isFirst, isLast: isLast)
+        for row in menu.items where disabled.contains(row.title) { row.isEnabled = false }
+        guard let event = NSApp.currentEvent, let view = event.window?.contentView else { return }
+        menu.popUp(positioning: nil, at: view.convert(event.locationInWindow, from: nil), in: view)
     }
 
     /// 어제부터 · 3일째: how long it has sat on today's sheet (ink3, before the time or deadline).
@@ -781,23 +914,6 @@ struct TaskRow: View {
                 .lineLimit(1)
                 .fixedSize()
                 .help(L("오늘 할 일에 \(label) 있어요"))
-        }
-    }
-
-    /// 이거 집중 ▸: the Pomodoro's focus length (25분), 50분, the recent typed lengths, 직접 정하기…, 뽀모도로로.
-    private var focusMenu: some View {
-        let first = model.pomodoroSettings.focusMinutes
-        var seen = Set<Int>()
-        // 1.39: a task with a time today offers what's left of it first.
-        let left = TimeBlock.focusMinutes(item, now: Date()).map { [$0] } ?? []
-        let lengths = (left + [first, 50] + model.timerRecent).filter { seen.insert($0).inserted }
-        return Menu("이거 집중") {
-            ForEach(lengths, id: \.self) { minutes in
-                Button(L("\(minutes)분")) { model.focus(on: item.id, minutes: minutes) }
-            }
-            Divider()
-            Button("직접 정하기…") { model.petCommand(.focusChooseLength(task: item.id)) }
-            Button("뽀모도로로") { model.petCommand(.focusPomodoro(task: item.id)) }
         }
     }
 
@@ -877,7 +993,7 @@ struct TaskRow: View {
             Button { openEditor(deadline: true) } label: {
                 HStack(spacing: 3) {
                     Image(systemName: "flag").font(.system(size: 9.5, weight: .semibold))
-                    Text(Deadline.label(key, style: model.dueStyle, now: timeline.date, language: .current))
+                    Text(Deadline.label(key, style: look.dueStyle, now: timeline.date, language: .current))
                 }
                 .font(.system(size: 11, weight: urgency == .later ? .medium : .bold))
                 .monospacedDigit()
@@ -937,7 +1053,7 @@ struct TaskRow: View {
                 .accessibilityLabel("할 일 고치기")
         } else {
             HStack(spacing: 5) {
-            if model.todayPickID == item.id && !onShelf {
+            if look.picked && !onShelf {
                 // 오늘 꼭 하나: a small star before the title, until the day ends.
                 Image(systemName: "star.fill")
                     .font(.system(size: 10, weight: .semibold))
@@ -948,7 +1064,7 @@ struct TaskRow: View {
             Group {
                 // AI 연결 (1.42): Claude added or changed it today — the stamp, or its small seal when the title
                 // would otherwise be squeezed.
-                if model.isAIMarked(item.id.uuidString) {
+                if look.aiMarked {
                     ViewThatFits(in: .horizontal) {
                         HStack(spacing: 6) { titleText; AIStamp() }
                         HStack(spacing: 6) { titleText.frame(minWidth: 110, idealWidth: 110, alignment: .leading); AIStamp() }
@@ -1048,5 +1164,24 @@ private struct SentToCalendarMark: View {
                 .help("달력에 넣은 할 일")
                 .accessibilityLabel("달력에 넣은 할 일")
         }
+    }
+}
+
+/// #31: "지금" on the row the 하루 띠 shows going on now (sage text on its tint, 4.5:1 and more on both papers; #47: not "다음").
+struct StripMarkTag: View {
+    let mode: DayStrip.Mode
+
+    var body: some View {
+        let word = DayStrip.markWord(mode, language: .current)
+        Text(word)
+            .font(.system(size: 10.5, weight: .semibold))
+            .foregroundStyle(PaperTheme.sageText)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 6)
+            .frame(height: 17)
+            .background(PaperTheme.sage2, in: Capsule())
+            .help(mode == .now ? L("하루 띠의 ‘지금’에도 있어요") : L("하루 띠의 ‘다음’에도 있어요"))
+            .accessibilityLabel(word)
     }
 }

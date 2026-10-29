@@ -11,7 +11,7 @@ const listen = new Set([
   "state", "note:focus-new", "note:commit-editing", "note:row-command", "note:event-sheet", "calendar:event-sheet",
   "popup:show", "popup:retain", "popup:reset", "floating:summary", "history:changed", "pet:state", "timer:state", "timer:chime", "quick:open",
   "quickMemo:open", "quickMemo:blur", "timerSheet:open", "ring:show", "ring:hush", "note:toast", "confirm:show", "glance:open",
-  "desk:pane", "paper", "focus:chime", "note:notice", "drawer:open", "drawer:shut", "drawer:look", "drawer:backdrop", "handle:state",
+  "desk:pane", "paper", "focus:chime", "note:notice", "note:row-menu", "drawer:open", "drawer:shut", "drawer:look", "drawer:backdrop", "handle:state",
 ]);
 const send = new Set([
   "popup:interactive", "popup:complete", "popup:complete-all", "popup:snooze", "popup:snooze-until", "popup:tomorrow", "popup:event-again", "popup:sweep", "popup:open", "popup:open-event", "popup:closed",
@@ -26,6 +26,8 @@ const send = new Set([
 
 /** The app's language, asked once as the page loads (the main process chose it at launch). */
 const lang = ipcRenderer.sendSync("lang:get") as Lang;
+/** The app's clock (24-hour or 12-hour, the system's), asked once as the page loads; lang.ts reads it. */
+const hourCycle = ipcRenderer.sendSync("clock:get") as string;
 
 /**
  * 밤 종이: `<html data-paper="night">` switches every token (base.css). Set before the page draws and
@@ -47,14 +49,19 @@ let wantsState = false;
 const api = {
   platform: process.platform,
   lang,
+  hourCycle,
   /** Night paper now, and a call whenever it changes (pages that draw colours themselves). */
   isNight: (): boolean => night,
   onPaper: (callback: (night: boolean) => void): void => { paperListeners.push(callback); },
   getState: (): Promise<AppState> => ipcRenderer.invoke("state:get"),
   act: (action: Action): Promise<void> => ipcRenderer.invoke("act", action),
+  /** 메모 서랍, the page going away: the open memo's last typed text, handed over and saved before it returns. */
+  flushMemo: (action: Extract<Action, { type: "memoUpdate" }>): void => { ipcRenderer.sendSync("memo:flush", action); },
   /** 완료 기록: the record of finished tasks and the focus sessions (focus.jsonl). */
   getHistory: (): Promise<{ entries: ArchiveEntry[]; focus: FocusRecord[]; now: number }> => ipcRenderer.invoke("history:get"),
   placePopup: (size: { width: number; height: number }): Promise<{ travel: number }> => ipcRenderer.invoke("popup:place", size),
+  /** The pointer's place over the reminder's window, when it is over it (a resting pointer sends no moves). */
+  popupPointer: (): Promise<{ x: number; y: number } | undefined> => ipcRenderer.invoke("popup:pointer"),
   /** 입력 줄: put a reading in, take it back, or learn from a switch (see intent.ts). */
   intent: (request: IntentRequest): Promise<IntentResult> => ipcRenderer.invoke("intent", request),
   /** 검색: what matches, grouped (오늘 · 앞으로 · 메모 · 완료 기록 · 일정). */

@@ -15,7 +15,7 @@ PROGRESS = {
         "오늘 한 장 다 끝냈어요! 최고예요.",
         "할 일 끝! 남은 시간은 마음껏 쉬어요.",
         "다 했어요. 제가 꾹꾹이 해 줄게요.",
-        "오늘의 나, 백 점!",
+        "오늘의 나, 참 잘했어요!",
         "다 끝냈으니 간식 타임 어때요?",
         "체크 표시가 꽉 찼어요. 보기만 해도 좋아요.",
         "내일의 나도 오늘처럼만 해 줘요.",
@@ -69,8 +69,8 @@ TIME = [
     ]),
     ("lunch", 11, 14, [
         "점심은 맛있게 먹었어요?",
-        "밥 먹고 하는 거예요. 꼭이요!",
-        "배고프면 일이 안 돼요. 밥부터!",
+        "밥 먹고 해요. 할 일은 기다려 줘요.",
+        "배고프면 밥부터 챙겨요.",
         "점심 먹고 잠깐 걷는 건 어때요?",
         "오후도 힘내려면 든든하게요.",
     ]),
@@ -78,9 +78,9 @@ TIME = [
         "오후엔 살짝 졸리죠. 기지개 한 번!",
         "물 한 잔 마셔요. 저는 우유요.",
         "어깨 한 번 돌려 볼까요?",
-        "3시엔 간식이죠. 저는 츄르요.",
-        "졸릴 땐 찬물 세수 한 번!",
-        "오후 햇볕은 낮잠 각이에요… 아, 일해야죠.",
+        "3시엔 간식이죠. 저는 생선 과자요.",
+        "졸리면 잠깐 일어나 볼까요?",
+        "오후 햇볕엔 낮잠이 솔솔 와요… 아, 일해야죠.",
         "조금만 더 하면 저녁이에요.",
     ]),
     ("evening", 18, 23, [
@@ -125,7 +125,7 @@ GENERAL = [
     "눈 깜빡깜빡. 건조하지 않게요.",
     "하품은 전염돼요. 하아암—",
     "생각이 많을 땐 종이에 적어 보세요.",
-    "모르는 건 모른다고 해도 괜찮아요.",
+    "막히면 잠깐 쉬었다 와도 괜찮아요.",
     "지금 하는 거, 분명 의미 있어요.",
     "저는 늘 여기 바닥에 있어요. 든든하죠?",
 ]
@@ -183,7 +183,7 @@ QUESTIONS = [
     ("q.proud", "다 끝냈네요! 기분 어때요?", ("c.open == 0 && c.done > 0", "c.open === 0 && c.done > 0"), [
         ("뿌듯해요", "저도 뿌듯해요!", "cheer", None),
         ("피곤해요", "푹 쉬어요. 내일 또 봐요.", "yawn", None)]),
-    ("q.night", "오늘은 일찍 잘 거죠?", ("c.hour >= 21", "c.hour >= 21"), [
+    ("q.night", "오늘은 일찍 쉴 수 있을까요?", ("c.hour >= 21", "c.hour >= 21"), [
         ("네", "좋은 꿈 꿔요.", "yawn", None),
         ("조금만 더요", "그럼 딱 하나만 더 해요.", "blink", None)]),
     # Added in 1.23.1 / 1.8.1
@@ -191,11 +191,11 @@ QUESTIONS = [
         ("푹 잤어요", "좋아요! 오늘 컨디션 최고겠네요.", "happy", None),
         ("잘 못 잤어요", "오늘은 무리하지 말고 일찍 자요.", "tilt", None)]),
     ("q.snack", "간식 먹을래요?", ("14 <= c.hour && c.hour < 18", "c.hour >= 14 && c.hour < 18"), [
-        ("좋아요", "저도 하나만요… 츄르면 더 좋고요.", "happy", None),
+        ("좋아요", "저도 하나만요… 생선 과자면 더 좋고요.", "happy", None),
         ("참을래요", "의지력 대단해요!", "cheer", None)]),
     ("q.eyes", "눈 좀 쉬어 줄까요? 먼 곳 한 번 봐요.", ALWAYS, [
         ("볼게요", "하나, 둘… 잘했어요!", "blink", None),
-        ("나중에", "꼭이요. 눈은 소중하니까요.", "tilt", None)]),
+        ("나중에", "그래요. 생각나면 먼 곳 한 번 봐요.", "tilt", None)]),
     ("q.walk", "잠깐 일어나서 걸을래요?", ALWAYS, [
         ("걸을래요", "다녀와요! 자리 지키고 있을게요.", "hop", None),
         ("앉아 있을래요", "그럼 다리라도 쭉 펴요.", "stretch", None)]),
@@ -204,7 +204,7 @@ QUESTIONS = [
         ("아니요", "조용한 것도 좋죠. 사각사각.", "blink", None)]),
     ("q.pet", "저 쓰다듬어 줄래요?", ALWAYS, [
         ("쓰담쓰담", "골골골… 행복해요.", "happy", None),
-        ("이따가요", "기다릴게요. 꼭이요!", "tilt", None)]),
+        ("이따가요", "기다릴게요. 골골.", "tilt", None)]),
     ("q.weekend", "주말에 뭐 할 거예요?", ("c.weekday == 5", "c.weekday === 5"), [
         ("놀 거예요", "좋아요! 신나게 놀아요.", "cheer", None),
         ("쉴 거예요", "푹 쉬는 것도 멋진 계획이에요.", "yawn", None)]),
@@ -217,7 +217,7 @@ QUESTIONS = [
     # 일정 (1.29.0 / 1.14.0)
     ("q.ready", "곧 ‘{event}’ 시간이에요. 준비됐어요?", ("c.nextEvent != nil && c.nextIn <= 15", "c.nextEvent !== undefined && (c.nextIn ?? 0) <= 15"), [
         ("준비됐어요", "잘 다녀와요! 자리 지키고 있을게요.", "hop", None),
-        ("아직요", "서둘러요! 제가 응원할게요.", "cheer", None)]),
+        ("아직요", "하나씩 챙겨요. 응원할게요.", "cheer", None)]),
     ("q.focus", "다음 일정까지 {in}분 있어요.\n25분 집중해 볼까요?", ("c.nextEvent != nil && c.nextIn >= 40 && c.open > 0", "c.nextEvent !== undefined && (c.nextIn ?? 0) >= 40 && c.open > 0"), [
         ("해 볼게요", "좋아요! 25분 타이머를 켤게요.", "cheer", "focus25"),
         ("괜찮아요", "그럼 천천히 해요.", "blink", None)]),
@@ -228,6 +228,14 @@ QUESTIONS = [
 
 PETTED = ["냥!", "골골골…", "헤헤, 간지러워요.", "쓰다듬어 줘서 고마워요.", "더 해 주세요!",
           "꾹꾹—", "거기 좋아요, 거기!", "냐앙~", "기분 좋아서 꼬리가 올라갔어요.", "한 번 더요!"]
+
+# A streak reaching 7, 30 or 100 days (#42): said once, on that day, instead of a line from the groups. Nothing is said
+# when a streak breaks. In this order: 7, 30, 100.
+MILESTONE = [
+    "7일째예요. 한 주를 꼬박 채웠어요!",
+    "30일째예요. 한 달을 꼬박 채웠어요!",
+    "100일째예요. 정말 대단해요!",
+]
 
 # What {first}, {event}, {now} and {ended} say when there's nothing to name, and the 한마디 frequency names.
 FALLBACK = {"first": "첫 할 일", "event": "다음 일정", "any": "일정"}
@@ -254,7 +262,7 @@ EN = {
             "You finished today’s page! You’re the best.",
             "All done! Rest as much as you like.",
             "All done. Have some celebratory kneading.",
-            "Today’s you: a perfect score!",
+            "Today’s you did great!",
             "All done, so… snack time?",
             "A page full of checkmarks. What a view.",
             "Dear tomorrow-you: do it just like today.",
@@ -305,8 +313,8 @@ EN = {
         ],
         "lunch": [
             "Did you have a nice lunch?",
-            "Eat first, then work. Promise!",
-            "Can’t work on an empty tummy. Food first!",
+            "Eat first. Your to-dos will wait.",
+            "Hungry? Food comes first.",
             "How about a little walk after lunch?",
             "Eat well to keep going this afternoon.",
         ],
@@ -314,9 +322,9 @@ EN = {
             "Afternoons get sleepy. Big stretch!",
             "Drink some water. I’ll have milk.",
             "Shall we roll our shoulders?",
-            "Three o’clock is snack time. Churu for me.",
-            "Sleepy? Splash some cold water on your face!",
-            "Afternoon sun is perfect for a nap… oh right, work.",
+            "Three o’clock is snack time. Fish treats for me.",
+            "Sleepy? Maybe stand up for a bit?",
+            "Afternoon sun makes me so sleepy… oh right, work.",
             "A little more and it’s evening.",
         ],
         "evening": [
@@ -358,7 +366,7 @@ EN = {
         "Blink blink. Don’t let your eyes dry out.",
         "Yawns are contagious. Yaaawn—",
         "Too much on your mind? Write it down.",
-        "It’s okay to say you don’t know.",
+        "Stuck? It’s fine to take a break.",
         "What you’re doing right now matters.",
         "I’m always down here. Reassuring, right?",
     ],
@@ -410,18 +418,18 @@ EN = {
         "q.proud": ("All done! How do you feel?", [
             ("Proud", "I’m proud too!"),
             ("Tired", "Rest well. See you tomorrow.")]),
-        "q.night": ("Early night tonight, right?", [
+        "q.night": ("Think you can rest early tonight?", [
             ("Yes", "Sweet dreams."),
             ("A bit longer", "Then just one more thing.")]),
         "q.sleep": ("Did you sleep well last night?", [
             ("Like a log", "Great! You’ll be in top shape today."),
             ("Not really", "Take it easy today and go to bed early.")]),
         "q.snack": ("Snack time?", [
-            ("Yes please", "One for me too… Churu would be even better."),
+            ("Yes please", "One for me too… fish treats would be even better."),
             ("I’ll pass", "What willpower!")]),
         "q.eyes": ("Rest your eyes? Look at something far away.", [
             ("Okay", "One, two… well done!"),
-            ("Later", "Promise? Eyes are precious.")]),
+            ("Later", "Okay. Look into the distance when you think of it.")]),
         "q.walk": ("Want to get up and walk a bit?", [
             ("Let’s walk", "Off you go! I’ll guard your seat."),
             ("I’ll stay", "Then at least stretch your legs.")]),
@@ -430,7 +438,7 @@ EN = {
             ("No", "Quiet is nice too. Scritch scratch.")]),
         "q.pet": ("Want to pet me?", [
             ("Pat pat", "Purrrr… so happy."),
-            ("Later", "I’ll wait. Promise!")]),
+            ("Later", "I’ll wait. Purr.")]),
         "q.weekend": ("Plans for the weekend?", [
             ("Fun stuff", "Yay! Have a blast."),
             ("Resting", "A good rest is a great plan.")]),
@@ -442,7 +450,7 @@ EN = {
             ("Not sure yet", "Pick something warm.")]),
         "q.ready": ("‘{event}’ is soon. Ready?", [
             ("Ready", "Have a good one! I’ll guard your seat."),
-            ("Not yet", "Hurry! I’m cheering for you.")]),
+            ("Not yet", "One thing at a time. I’m cheering for you.")]),
         "q.focus": ("{in} min until your next event.\nFocus for 25 minutes?", [
             ("Let’s go", "Great! I’ll start a 25-minute timer."),
             ("No thanks", "Then take it easy.")]),
@@ -452,6 +460,7 @@ EN = {
     },
     "PETTED": ["Meow!", "Purrrr…", "Hehe, that tickles.", "Thanks for the pets.", "More, please!",
                "Knead knead—", "Right there, right there!", "Mrrow~", "My tail went up, I’m so happy.", "Once more!"],
+    "MILESTONE": ["Day 7. A whole week!", "Day 30. A whole month!", "Day 100. That’s amazing!"],
     "FALLBACK": {"first": "first to-do", "event": "next event", "any": "event"},
     "FREQUENCY": {"rare": "Rarely", "normal": "Sometimes", "often": "Often"},
 }
@@ -471,7 +480,7 @@ NL = {
             "Het blad van vandaag is af! Topper.",
             "Alles klaar! Rust lekker uit.",
             "Alles gedaan. Kom, een feestelijk kneedbeurtje.",
-            "Jij van vandaag: een tien!",
+            "Goed gedaan vandaag!",
             "Alles af, dus… snoeptijd?",
             "Een blad vol vinkjes. Wat een gezicht.",
             "Lieve jij-van-morgen: doe het net zo.",
@@ -522,8 +531,8 @@ NL = {
         ],
         "lunch": [
             "Lekker geluncht?",
-            "Eerst eten, dan werken. Echt!",
-            "Met een lege maag gaat het niet. Eerst eten!",
+            "Eerst eten. Je taken wachten wel.",
+            "Honger? Eten gaat voor.",
             "Even een wandelingetje na de lunch?",
             "Eet goed, dan hou je de middag vol.",
         ],
@@ -531,9 +540,9 @@ NL = {
             "’s Middags word je slaperig. Even rekken!",
             "Drink een glas water. Ik neem melk.",
             "Zullen we even de schouders rollen?",
-            "Om drie uur is het snoeptijd. Churu voor mij.",
-            "Slaperig? Even koud water in je gezicht!",
-            "Middagzon is perfect voor een dutje… o ja, werken.",
+            "Om drie uur is het snoeptijd. Visjes voor mij.",
+            "Slaperig? Even opstaan?",
+            "Van middagzon word ik zo slaperig… o ja, werken.",
             "Nog even en het is avond.",
         ],
         "evening": [
@@ -575,7 +584,7 @@ NL = {
         "Knipper knipper. Niet laten uitdrogen.",
         "Gapen is besmettelijk. Haaaa—",
         "Veel aan je hoofd? Schrijf het op.",
-        "Je mag best zeggen dat je iets niet weet.",
+        "Vast? Even pauze is prima.",
         "Wat je nu doet, doet ertoe.",
         "Ik zit hier altijd onderaan. Fijn idee, toch?",
     ],
@@ -627,18 +636,18 @@ NL = {
         "q.proud": ("Alles af! Hoe voelt dat?", [
             ("Trots", "Ik ben ook trots!"),
             ("Moe", "Rust lekker uit. Tot morgen.")]),
-        "q.night": ("Vanavond op tijd naar bed, toch?", [
+        "q.night": ("Lukt het om vanavond vroeg te rusten?", [
             ("Ja", "Slaap lekker."),
             ("Nog even", "Dan nog één dingetje.")]),
         "q.sleep": ("Heb je goed geslapen vannacht?", [
             ("Heerlijk", "Fijn! Dan ben je vandaag in topvorm."),
             ("Niet zo", "Doe vandaag rustig aan en ga vroeg slapen.")]),
         "q.snack": ("Zin in een snack?", [
-            ("Graag", "Ik ook eentje… Churu is nog beter."),
+            ("Graag", "Ik ook eentje… visjes zijn nog beter."),
             ("Ik sla over", "Wat een wilskracht!")]),
         "q.eyes": ("Je ogen even rust geven? Kijk eens ver weg.", [
             ("Doe ik", "Eén, twee… goed zo!"),
-            ("Straks", "Beloofd? Ogen zijn kostbaar.")]),
+            ("Straks", "Oké. Kijk even in de verte als je eraan denkt.")]),
         "q.walk": ("Even opstaan en een stukje lopen?", [
             ("Ga ik doen", "Ga maar! Ik hou je plekje warm."),
             ("Ik blijf zitten", "Strek dan in elk geval je benen.")]),
@@ -647,7 +656,7 @@ NL = {
             ("Nee", "Stilte is ook fijn. Krts krts.")]),
         "q.pet": ("Wil je me aaien?", [
             ("Aai aai", "Spinnnn… zo blij."),
-            ("Straks", "Ik wacht. Beloofd!")]),
+            ("Straks", "Ik wacht. Spin spin.")]),
         "q.weekend": ("Plannen voor het weekend?", [
             ("Leuke dingen", "Joepie! Veel plezier."),
             ("Uitrusten", "Goed uitrusten is ook een topplan.")]),
@@ -659,7 +668,7 @@ NL = {
             ("Weet ik nog niet", "Kies iets warms.")]),
         "q.ready": ("Zo meteen ‘{event}’. Klaar?", [
             ("Klaar", "Succes! Ik hou je plekje warm."),
-            ("Nog niet", "Opschieten! Ik moedig je aan.")]),
+            ("Nog niet", "Eén ding tegelijk. Ik duim voor je.")]),
         "q.focus": ("Nog {in} min tot je volgende afspraak.\n25 minuten focussen?", [
             ("Doen we", "Top! Ik start een timer van 25 minuten."),
             ("Hoeft niet", "Doe dan rustig aan.")]),
@@ -669,6 +678,7 @@ NL = {
     },
     "PETTED": ["Miauw!", "Spinnnn…", "Hihi, dat kriebelt.", "Dank je voor het aaien.", "Meer, graag!",
                "Kneed kneed—", "Daar, ja daar!", "Mrauw~", "Mijn staart gaat omhoog van blijdschap.", "Nog een keer!"],
+    "MILESTONE": ["Dag 7. Een hele week!", "Dag 30. Een hele maand!", "Dag 100. Echt geweldig!"],
     "FALLBACK": {"first": "eerste taak", "event": "volgende afspraak", "any": "afspraak"},
     "FREQUENCY": {"rare": "Zelden", "normal": "Soms", "often": "Vaak"},
 }

@@ -20,6 +20,8 @@ AI에게 맡긴 것:
 - 매일 앱을 쓰면서 이상한 곳을 찾아 고치게 했다. 잘린 손글씨 한 픽셀, 탭 끝 잘림, 밋밋한 알람 창, 어색한 말, 걷는 고양이의 머리와 몸 비율, 더블클릭한 자리에 포스트잇이 접혀야 한다는 것 같은 것들이다. 집중 뒤 ×를 누르면 앱이 멈추는 것과 30분짜리 할 일이 29분으로 시작하는 것도 쓰다가 찾았고, 원인은 AI와 함께 추적해 1.40.1에서 고쳤다.
 - 메모 서랍(Mac 1.43–1.44, Windows 1.28–1.29)은 쓰면서 고칠 곳을 짚었다. 밤 종이에서 글자가 눈에 안 들어온다, 서랍 설정을 찾기 어렵다, 모눈 종이에서 메모와 바탕이 잘 안 나뉜다, 메모끼리 구별이 약하다, 기본 메모 높이가 너무 빡빡하다, 메모에 우클릭 메뉴가 있었으면 좋겠다. AI가 다른 메모 앱과 HIG를 조사해 시안을 여러 장 냈고, 나는 사람들에게 익숙한 안(날짜 묶음과 카드)을 골랐다.
 - 메뉴 막대 오늘 창의 위쪽이 잘리는 것을 쓰다가 찾았다(Mac 1.42.1). 원인은 AI와 함께 추적했다.
+- 할 일 스페이스(Mac 1.45, Windows 1.30)는 내가 할 일만 나누고 싶다고 정했다. 메모 폴더를 같이 쓰자는 첫 기획안은 접었고, 오늘 한 장은 그대로 두는 ‘나누되 쪼개지 않기’, 한 스페이스만 보기는 다음 날 아침에 풀기, 일정은 1단계에서 빼기를 골랐다.
+- 시안 가운데 고른 것: 단색 탭(B), 메모 서랍 글자(B)와 메모지(D), 할 일 줄의 마우스 버튼 셋, 책상 목록은 아이콘만. AI가 한 UI/UX 점검과 문구 점검에서 무엇을 이번 판에 고칠지 정했다.
 - Claude 연결(Mac 1.42, Windows 1.27)에서는 기본은 꺼 두고, 고치기 전에는 반드시 보여 주고 확인을 받고, 앱에서 한 번에 되돌릴 수 있어야 한다는 선을 정했다.
 - 버전마다 무엇을 넣을지, 두 앱을 같은 버전 단위로 맞출지 정하고 결과를 검토했다.
 - 고양이 그림은 생성된 것 가운데 골랐고, 같은 크기와 바닥선에 맞췄다.
@@ -44,6 +46,8 @@ What I did:
 - Used the app every day and reported what was wrong: a pixel of clipped handwriting, tab edges cut off, a plain-looking alarm window, an awkward word, the walking cat's head-to-body proportions, the exact spot a sticky note should fold to. I also found in use that × froze the app after a focus session and that a 30-minute to-do started a 29-minute focus; we traced both and fixed them in Mac 1.40.1.
 - Pointed out what to fix in the notes drawer while using it (Mac 1.43–1.44, Windows 1.28–1.29): text on night paper was hard to read, the drawer settings were hard to find, notes didn't stand apart from the grid paper or from each other, the default note height felt cramped, and notes needed a right-click menu. The AI researched other note apps and the HIG and produced several mock-ups; I picked the one people already know (date groups and cards).
 - Found in use that the top of the menu-bar Today window was cut off (Mac 1.42.1); we traced the cause together.
+- Decided that to-do spaces (Mac 1.45, Windows 1.30) split to-dos only. I dropped the first plan of sharing the note folders, and picked "split without breaking up" (the day stays on one sheet), a one-space view that clears the next morning, and no events in the first stage.
+- Picked among mock-ups: solid tabs (B), the drawer's text (B) and sheets (D), three hover buttons on a to-do row, icons only in the desk's list. From the AI's UI/UX and copy audits I decided what to fix in this release.
 - For the Claude connection (Mac 1.42, Windows 1.27) I set the lines: off by default, every change shown and confirmed first, and one-step undo in the app.
 - Decided what went into each release and whether both apps shipped in step, and reviewed the results.
 - Picked the cat images from what was generated and normalized them to one size and baseline.

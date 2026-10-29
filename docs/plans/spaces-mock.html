@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;padding:24px 26px 30px;background:#fff;font-family:'Noto Sans KR',sans-serif;width:1340px;color:#2f2e2a}
+h1{font-size:19px;margin:0 0 4px}
+.lead{font-size:12.5px;color:#6f6a60;margin:0 0 18px;line-height:1.6}
+.stage{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px 22px}
+.cap{font-size:13px;font-weight:700;margin-bottom:2px}
+.cap small{display:block;font-weight:400;color:#6f6a60;font-size:11.5px;line-height:1.5;margin:2px 0 8px;min-height:52px}
+/* note */
+.note{position:relative;background:#faf6ec;border:1px solid #e3dccb;border-radius:14px;overflow:hidden;height:600px;box-shadow:0 2px 10px rgba(60,50,30,.08)}
+.tabs{display:flex;gap:6px;padding:10px 0 0 34px;border-bottom:3px solid #efe1a6;height:34px;align-items:flex-end}
+.tab{font-family:'Nanum Pen Script';font-size:19px;padding:3px 14px 0;border-radius:9px 9px 0 0;background:#efe1a6;color:#2a2925;height:28px}
+.tab.b{background:#e3dcf3;color:#6b6680}
+.tab small{font-family:'Noto Sans KR';font-size:10px;color:#6f6a60}
+.hd{padding:10px 18px 4px}
+.date{font-size:11px;color:#55704f;font-weight:700}
+.title{display:flex;align-items:baseline;gap:8px}
+.title b{font-family:'Nanum Pen Script';font-size:30px;font-weight:400}
+.title span{font-size:11px;color:#6f6a60}
+.lens{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;border:1px solid #d9d1bf;border-radius:999px;padding:2px 9px 2px 7px;color:#4a463f;background:#fffdf7;margin-left:auto}
+.lens i{width:9px;height:9px;border-radius:3px;display:inline-block}
+.lens.on{border-color:#c98f97;background:#fbeef0;color:#7a3f48;font-weight:700}
+.sec{font-size:10.5px;color:#6f6a60;padding:8px 18px 2px 52px;display:flex;justify-content:space-between}
+.sec.g{font-size:11.5px;color:#4a463f;font-weight:700;padding-top:10px;align-items:center;gap:6px;justify-content:flex-start}
+.sec.g i{width:10px;height:10px;border-radius:3px}
+.sec.g em{font-style:normal;font-weight:400;color:#6f6a60;margin-left:auto}
+.row{position:relative;display:flex;align-items:center;gap:10px;padding:0 16px 0 18px;height:40px;border-bottom:1px solid #ece4d2}
+.row .flag{position:absolute;left:0;top:9px;width:5px;height:22px;border-radius:0 3px 3px 0}
+.box{width:17px;height:17px;border:1.6px solid #9c968a;border-radius:4px;flex:none}
+.box.done{background:#5c7a5a;border-color:#5c7a5a}
+.t{font-family:'Nanum Pen Script';font-size:21px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t.done{text-decoration:line-through;color:#9c968a}
+.chipf{font-size:10px;color:#5d584e;border-radius:6px;padding:1px 6px;white-space:nowrap}
+.m{font-size:10.5px;color:#55704f;white-space:nowrap}
+.dim{opacity:.33}
+.hint{margin:8px 14px;padding:7px 10px;font-size:11px;background:#fbeef0;border:1px solid #ecc9ce;color:#7a3f48;border-radius:9px;display:flex;justify-content:space-between}
+.hint u{text-decoration:none;font-weight:700}
+.input{position:absolute;left:12px;right:12px;bottom:12px;background:#fffdf7;border:1px solid #ddd5c3;border-radius:12px;padding:9px 12px}
+.input .tx{font-family:'Nanum Pen Script';font-size:20px;color:#2a2925}
+.input .tx s{text-decoration:none;color:#9a5a63;background:#fbeef0;border-radius:4px;padding:0 3px}
+.input .ph{font-family:'Nanum Pen Script';font-size:19px;color:#8d877b}
+.chips{display:flex;gap:5px;margin-top:5px}
+.chips span{white-space:nowrap;font-size:10.5px;border-radius:999px;padding:2px 8px;background:#efe9db;color:#4a463f}
+.chips span.f{background:#f6dfe3;color:#7a3f48;font-weight:700}
+.pop{position:absolute;right:12px;top:200px;width:182px;background:#fffdf7;border:1px solid #ddd5c3;border-radius:11px;box-shadow:0 8px 24px rgba(40,30,10,.18);padding:6px;font-size:12px;z-index:3}
+.pop div{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:7px}
+.pop div i{width:10px;height:10px;border-radius:3px}
+.pop div em{margin-left:auto;font-style:normal;color:#8d877b;font-size:10.5px}
+.pop .sel{background:#efe9db;font-weight:700}
+.pop hr{border:0;border-top:1px solid #ece4d2;margin:4px 2px}
+/* drawer */
+.dr{position:relative;height:600px;border-radius:14px 14px 0 0;background:#e6dbc3;border:1px solid #d0c2a3;overflow:hidden}
+.dr .hdr{padding:14px 16px 6px 46px}
+.dr .lbl{font-size:10.5px;color:#42603c;font-weight:700}
+.dr .nm{font-family:'Nanum Pen Script';font-size:30px}
+.bm{position:absolute;left:0;width:28px;border-radius:0 8px 8px 0;font-family:'Nanum Pen Script';font-size:15px;text-align:center;padding:8px 0;border:1px solid rgba(0,0,0,.08);border-left:0}
+.card{margin:0 12px 12px 42px;background:#fffdf7;border:1px solid #d0c2a3;padding:8px 12px;box-shadow:0 2px 6px rgba(60,50,30,.1)}
+.card .ct{font-family:'Nanum Pen Script';font-size:20px;display:flex;justify-content:space-between}
+.card .ct small{font-family:'Noto Sans KR';font-size:10px;color:#646057}
+.card .pv{font-size:11px;color:#5c584f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gh{margin:6px 12px 6px 42px;font-size:11px;color:#42603c;font-weight:700;display:flex;gap:6px;align-items:center}
+.gh em{font-style:normal;font-weight:400;color:#646057;margin-left:auto}
+.todo{margin:0 12px 10px 42px;background:#fffdf7;border:1px solid #d0c2a3;padding:2px 10px;box-shadow:0 2px 6px rgba(60,50,30,.1)}
+.todo .row{padding:0;height:34px}
+.todo .t{font-size:19px}
+.todo .row:last-child{border-bottom:0}
+.add{font-size:11px;color:#646057;padding:6px 0 4px}
+.legend{font-size:12px;color:#4a463f;line-height:1.75;margin-top:16px}
+.legend b{color:#2f2e2a}
+</style></head><body>
+<h1>할 일 스페이스 — 시안</h1>
+<p class="lead">할 일을 회사 · 집 · 공부 같은 스페이스로 나눠요(메모 서랍의 폴더와는 따로예요). 오늘 한 장에는 지금처럼 모든 할 일이 보이고, 스페이스는 줄 왼쪽 끝의 작은 색 띠로만 알려 줘요.</p>
+<div class="stage" id="st"></div>
+<p class="legend"><b>①</b> 기본은 지금과 같은 한 장. 스페이스가 있는 할 일만 왼쪽 끝에 색 띠. <b>②</b> ‘모든 스페이스 ▾’로 잠깐 한 스페이스만 보고, 숨긴 수를 띠로 알려 주며, 다음 날 아침이면 풀려요. 이때 적는 할 일은 그 스페이스로. <b>③</b> 입력 줄 <code>#회사</code>. <b>④</b> ‘스페이스별로 묶기’(설정, 기본 꺼짐). <b>⑤</b> 줄 우클릭 → 스페이스로 옮기기, 머리말 메뉴에서 스페이스 만들기 · 이름 · 색 · 순서.</p>
+<script>
+const F={회사:"#d98a96",집:"#7fb08a",공부:"#7f9fd1",none:""};
+const rows=[["오늘 꼭 해야 할 일 정리하기","회사","15:55"],["물 마시기","집","23:30"],["주간 보고서 초안","회사","금"],["미뤄 둔 책 10쪽 읽기","공부",""],["세탁기 돌리기","집",""],["창문 열고, 커피 한 잔","",""]];
+const tabs=`<div class="tabs"><div class="tab">오늘 <small>6</small></div><div class="tab b">앞으로</div></div>`;
+const row=(r,o={})=>`<div class="row ${o.dim?'dim':''}">${r[1]?`<span class="flag" style="background:${F[r[1]]}"></span>`:''}<span class="box ${o.done?'done':''}"></span><span class="t ${o.done?'done':''}">${r[0]}</span>${o.chip&&r[1]?`<span class="chipf" style="background:${F[r[1]]}33">${r[1]}</span>`:''}${r[2]?`<span class="m">${r[2]}</span>`:''}</div>`;
+const head=(lens,on)=>`<div class="hd"><div class="date">10월 28일 수요일</div><div class="title"><b>오늘 할 일</b><span>1 / 6</span><span class="lens ${on?'on':''}">${on?`<i style="background:${F.회사}"></i>회사만`:'<i style="background:conic-gradient(#d98a96 0 33%,#7fb08a 0 66%,#7f9fd1 0)"></i>모든 스페이스'} ▾</span></div></div>`;
+const inp=(t)=>`<div class="input">${t}</div>`;
+const ph=`<div class="ph">무엇이든 적어요 — 할 일, 일정, 타이머 40…</div>`;
+const note=(inner)=>`<div class="note">${tabs}${inner}</div>`;
+// 1
+const n1=note(head(false,false)+`<div class="sec"><span>다음</span><span>2</span></div>`+row(rows[0])+row(rows[1])+`<div class="sec"><span>그 밖에</span><span>4</span></div>`+row(rows[5],{done:true})+row(rows[2])+row(rows[3])+row(rows[4])+inp(ph));
+// 2 lens
+const pop=`<div class="pop"><div><i style="background:conic-gradient(#d98a96 0 33%,#7fb08a 0 66%,#7f9fd1 0)"></i>모든 스페이스<em>6</em></div><hr><div class="sel"><i style="background:${F.회사}"></i>회사<em>2 · ⌘⌥1</em></div><div><i style="background:${F.집}"></i>집<em>2 · ⌘⌥2</em></div><div><i style="background:${F.공부}"></i>공부<em>1 · ⌘⌥3</em></div><div><i style="background:#ddd"></i>스페이스 없음<em>1</em></div></div>`;
+const n2=note(head(true,true)+`<div class="hint"><span>회사만 보는 중 · 다른 할 일 4개는 숨겼어요</span><u>모두 보기</u></div><div class="sec"><span>다음</span><span>1</span></div>`+row(rows[0])+`<div class="sec"><span>그 밖에</span><span>1</span></div>`+row(rows[2])+inp(`<div class="ph">회사에 적어요 — 할 일, 일정…</div>`)+pop);
+// 3 input
+const n3=note(head(false,false)+`<div class="sec"><span>다음</span><span>2</span></div>`+row(rows[0])+row(rows[1])+`<div class="sec"><span>그 밖에</span><span>4</span></div>`+row(rows[5],{done:true})+row(rows[2])+row(rows[3])+row(rows[4])+inp(`<div class="tx">견적서 보내기 금요일까지 <s>#회사</s></div><div class="chips"><span>할 일</span><span>금요일 마감</span><span class="f">● 회사</span><span style="background:none;color:#8d877b">Tab 바꾸기</span></div>`));
+// 4 grouped
+const g=(n,c)=>`<div class="sec g"><i style="background:${F[n]||'#ddd'}"></i>${n=='none'?'스페이스 없음':n}<em>${c}</em></div>`;
+const n4=note(head(false,false)+g("회사",2)+row(rows[0])+row(rows[2])+g("집",2)+row(rows[1])+row(rows[4])+g("공부",1)+row(rows[3])+g("none",1)+row(rows[5],{done:true})+inp(ph));
+// 5 menu
+const ctx=`<div class="pop" style="top:236px;left:70px;right:auto;width:190px"><div>펼쳐서 고치기</div><div>내일로</div><hr><div class="sel">스페이스로 옮기기<em>▸</em></div><hr><div>지우기</div></div><div class="pop" style="top:300px;right:10px;width:168px"><div class="sel"><i style="background:${F.회사}"></i>회사<em>✓</em></div><div><i style="background:${F.집}"></i>집</div><div><i style="background:${F.공부}"></i>공부</div><div><i style="background:#ddd"></i>스페이스 없음</div><hr><div>+ 새 스페이스…</div></div>`;
+const dr=note(head(false,false)+`<div class="sec"><span>다음</span><span>2</span></div>`+row(rows[0])+row(rows[1])+`<div class="sec"><span>그 밖에</span><span>4</span></div>`+row(rows[5],{done:true})+row(rows[2])+row(rows[3])+row(rows[4])+inp(ph)+ctx);
+const caps=[["① 오늘 한 장 (기본)","지금과 같은 한 장. 스페이스가 있는 할 일 왼쪽 끝에만 그 색 띠가 붙어요. 한 장은 그대로."],
+["② 한 스페이스만 보기","머리말 ‘모든 스페이스 ▾’ 또는 ⌘⌥1–9. 숨긴 수를 띠로 알려 주고, 다음 날 아침엔 다시 모두 보여요."],
+["③ 입력 줄 #회사","#스페이스 이름으로 바로 넣어요. 칩에 보이고 Tab으로 바꿔요. ‘회사만 보는 중’이면 # 없이도 회사로."],
+["④ 스페이스별로 묶기 (선택)","설정에서 켜면 한 장 안에서 스페이스 머리말로 나눠요. 여전히 한 장, 스크롤 하나. 기본은 꺼짐."],
+["⑤ 우클릭 → 스페이스로 옮기기","줄을 우클릭해 옮기고, 없는 이름은 ‘새 스페이스…’로 만들어요. 앞으로 탭 · 오늘 창도 같은 색 띠."]];
+const frames=[n1,n2,n3,n4,dr];
+document.getElementById("st").innerHTML=frames.map((f,i)=>`<div><div class="cap">${caps[i][0]}<small>${caps[i][1]}</small></div>${f}</div>`).join("");
+</script>
+</body></html>

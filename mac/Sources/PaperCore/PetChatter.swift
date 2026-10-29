@@ -44,12 +44,16 @@ public enum PetChatter {
         public var nowEvent: String?
         public var endedEvent: String?
         public var eventsLeft: Int
+        /// A streak that reached 7, 30 or 100 days today and hasn't been cheered yet (Archive.streakMilestone).
+        public var milestone: Int?
 
         public init(hour: Int, open: Int, done: Int, overdue: Int = 0, dueSoon: Int = 0, firstOpen: String? = nil, weekday: Int = 2,
-                    nextEvent: String? = nil, nextIn: Int = 0, nowEvent: String? = nil, endedEvent: String? = nil, eventsLeft: Int = 0) {
+                    nextEvent: String? = nil, nextIn: Int = 0, nowEvent: String? = nil, endedEvent: String? = nil, eventsLeft: Int = 0,
+                    milestone: Int? = nil) {
             self.hour = hour; self.open = open; self.done = done; self.overdue = overdue; self.dueSoon = dueSoon
             self.firstOpen = firstOpen; self.weekday = weekday
             self.nextEvent = nextEvent; self.nextIn = nextIn; self.nowEvent = nowEvent; self.endedEvent = endedEvent; self.eventsLeft = eventsLeft
+            self.milestone = milestone
         }
     }
 
@@ -77,6 +81,7 @@ public enum PetChatter {
     /// One line (or question) for this moment, avoiding the ones said recently.
     public static func pick(_ context: Context, questions: Bool, recent: [String], language: AppLanguage = .ko, random: () -> Double) -> Line {
         let l = language
+        if let days = context.milestone, let line = milestone(days, language: l) { return line }
         var groups: [(weight: Double, lines: [Line])] = []
         groups.append((4, progress(context, l)))
         if context.overdue > 0 { groups.append((3, lines(overdueLines, context, l))) } else if context.dueSoon > 0 { groups.append((2, lines(dueSoonLines, context, l))) }
@@ -102,6 +107,15 @@ public enum PetChatter {
         let pool = fresh.isEmpty ? chosen : fresh
         return pool[min(pool.count - 1, Int(random() * Double(pool.count)))]
     }
+
+    /// The day a streak reaches 7, 30 or 100 days: one short cheer ("m.0" · "m.1" · "m.2"); nil for any other count.
+    public static func milestone(_ days: Int, language: AppLanguage = .ko) -> Line? {
+        guard let index = milestoneDays.firstIndex(of: days) else { return nil }
+        return Line(id: "m.\(index)", text: milestoneLines[language.index][index], answers: [])
+    }
+
+    /// The streaks the cat cheers, once each, on the day they're reached.
+    public static let milestoneDays = [7, 30, 100]
 
     /// A short answer when the cat is patted.
     public static func petted(language: AppLanguage = .ko, random: () -> Double) -> Line {
@@ -180,7 +194,7 @@ public enum PetChatter {
             "오늘 한 장 다 끝냈어요! 최고예요.",
             "할 일 끝! 남은 시간은 마음껏 쉬어요.",
             "다 했어요. 제가 꾹꾹이 해 줄게요.",
-            "오늘의 나, 백 점!",
+            "오늘의 나, 참 잘했어요!",
             "다 끝냈으니 간식 타임 어때요?",
             "체크 표시가 꽉 찼어요. 보기만 해도 좋아요.",
             "내일의 나도 오늘처럼만 해 줘요.",
@@ -189,7 +203,7 @@ public enum PetChatter {
             "You finished today’s page! You’re the best.",
             "All done! Rest as much as you like.",
             "All done. Have some celebratory kneading.",
-            "Today’s you: a perfect score!",
+            "Today’s you did great!",
             "All done, so… snack time?",
             "A page full of checkmarks. What a view.",
             "Dear tomorrow-you: do it just like today.",
@@ -198,7 +212,7 @@ public enum PetChatter {
             "Het blad van vandaag is af! Topper.",
             "Alles klaar! Rust lekker uit.",
             "Alles gedaan. Kom, een feestelijk kneedbeurtje.",
-            "Jij van vandaag: een tien!",
+            "Goed gedaan vandaag!",
             "Alles af, dus… snoeptijd?",
             "Een blad vol vinkjes. Wat een gezicht.",
             "Lieve jij-van-morgen: doe het net zo.",
@@ -380,20 +394,20 @@ public enum PetChatter {
     private static let timeLunch = Table(id: "t.lunch", texts: [
         [
             "점심은 맛있게 먹었어요?",
-            "밥 먹고 하는 거예요. 꼭이요!",
-            "배고프면 일이 안 돼요. 밥부터!",
+            "밥 먹고 해요. 할 일은 기다려 줘요.",
+            "배고프면 밥부터 챙겨요.",
             "점심 먹고 잠깐 걷는 건 어때요?",
             "오후도 힘내려면 든든하게요."],
         [
             "Did you have a nice lunch?",
-            "Eat first, then work. Promise!",
-            "Can’t work on an empty tummy. Food first!",
+            "Eat first. Your to-dos will wait.",
+            "Hungry? Food comes first.",
             "How about a little walk after lunch?",
             "Eat well to keep going this afternoon."],
         [
             "Lekker geluncht?",
-            "Eerst eten, dan werken. Echt!",
-            "Met een lege maag gaat het niet. Eerst eten!",
+            "Eerst eten. Je taken wachten wel.",
+            "Honger? Eten gaat voor.",
             "Even een wandelingetje na de lunch?",
             "Eet goed, dan hou je de middag vol."]])
     private static let timeAfter = Table(id: "t.after", texts: [
@@ -401,25 +415,25 @@ public enum PetChatter {
             "오후엔 살짝 졸리죠. 기지개 한 번!",
             "물 한 잔 마셔요. 저는 우유요.",
             "어깨 한 번 돌려 볼까요?",
-            "3시엔 간식이죠. 저는 츄르요.",
-            "졸릴 땐 찬물 세수 한 번!",
-            "오후 햇볕은 낮잠 각이에요… 아, 일해야죠.",
+            "3시엔 간식이죠. 저는 생선 과자요.",
+            "졸리면 잠깐 일어나 볼까요?",
+            "오후 햇볕엔 낮잠이 솔솔 와요… 아, 일해야죠.",
             "조금만 더 하면 저녁이에요."],
         [
             "Afternoons get sleepy. Big stretch!",
             "Drink some water. I’ll have milk.",
             "Shall we roll our shoulders?",
-            "Three o’clock is snack time. Churu for me.",
-            "Sleepy? Splash some cold water on your face!",
-            "Afternoon sun is perfect for a nap… oh right, work.",
+            "Three o’clock is snack time. Fish treats for me.",
+            "Sleepy? Maybe stand up for a bit?",
+            "Afternoon sun makes me so sleepy… oh right, work.",
             "A little more and it’s evening."],
         [
             "’s Middags word je slaperig. Even rekken!",
             "Drink een glas water. Ik neem melk.",
             "Zullen we even de schouders rollen?",
-            "Om drie uur is het snoeptijd. Churu voor mij.",
-            "Slaperig? Even koud water in je gezicht!",
-            "Middagzon is perfect voor een dutje… o ja, werken.",
+            "Om drie uur is het snoeptijd. Visjes voor mij.",
+            "Slaperig? Even opstaan?",
+            "Van middagzon word ik zo slaperig… o ja, werken.",
             "Nog even en het is avond."]])
     private static let timeEvening = Table(id: "t.evening", texts: [
         [
@@ -513,7 +527,7 @@ public enum PetChatter {
             "눈 깜빡깜빡. 건조하지 않게요.",
             "하품은 전염돼요. 하아암—",
             "생각이 많을 땐 종이에 적어 보세요.",
-            "모르는 건 모른다고 해도 괜찮아요.",
+            "막히면 잠깐 쉬었다 와도 괜찮아요.",
             "지금 하는 거, 분명 의미 있어요.",
             "저는 늘 여기 바닥에 있어요. 든든하죠?"],
         [
@@ -539,7 +553,7 @@ public enum PetChatter {
             "Blink blink. Don’t let your eyes dry out.",
             "Yawns are contagious. Yaaawn—",
             "Too much on your mind? Write it down.",
-            "It’s okay to say you don’t know.",
+            "Stuck? It’s fine to take a break.",
             "What you’re doing right now matters.",
             "I’m always down here. Reassuring, right?"],
         [
@@ -565,7 +579,7 @@ public enum PetChatter {
             "Knipper knipper. Niet laten uitdrogen.",
             "Gapen is besmettelijk. Haaaa—",
             "Veel aan je hoofd? Schrijf het op.",
-            "Je mag best zeggen dat je iets niet weet.",
+            "Vast? Even pauze is prima.",
             "Wat je nu doet, doet ertoe.",
             "Ik zit hier altijd onderaan. Fijn idee, toch?"]])
 
@@ -573,6 +587,11 @@ public enum PetChatter {
         ["냥!", "골골골…", "헤헤, 간지러워요.", "쓰다듬어 줘서 고마워요.", "더 해 주세요!", "꾹꾹—", "거기 좋아요, 거기!", "냐앙~", "기분 좋아서 꼬리가 올라갔어요.", "한 번 더요!"],
         ["Meow!", "Purrrr…", "Hehe, that tickles.", "Thanks for the pets.", "More, please!", "Knead knead—", "Right there, right there!", "Mrrow~", "My tail went up, I’m so happy.", "Once more!"],
         ["Miauw!", "Spinnnn…", "Hihi, dat kriebelt.", "Dank je voor het aaien.", "Meer, graag!", "Kneed kneed—", "Daar, ja daar!", "Mrauw~", "Mijn staart gaat omhoog van blijdschap.", "Nog een keer!"]]
+
+    private static let milestoneLines: [[String]] = [
+        ["7일째예요. 한 주를 꼬박 채웠어요!", "30일째예요. 한 달을 꼬박 채웠어요!", "100일째예요. 정말 대단해요!"],
+        ["Day 7. A whole week!", "Day 30. A whole month!", "Day 100. That’s amazing!"],
+        ["Dag 7. Een hele week!", "Dag 30. Een hele maand!", "Dag 100. Echt geweldig!"]]
 
     private struct Question: Sendable {
         let id: String
@@ -670,7 +689,7 @@ public enum PetChatter {
                 answer("Trots", "Ik ben ook trots!", .cheer),
                 answer("Moe", "Rust lekker uit. Tot morgen.", .yawn)]],
                  applies: { c in c.open == 0 && c.done > 0 }),
-        Question(id: "q.night", text: ["오늘은 일찍 잘 거죠?", "Early night tonight, right?", "Vanavond op tijd naar bed, toch?"], answers: [
+        Question(id: "q.night", text: ["오늘은 일찍 쉴 수 있을까요?", "Think you can rest early tonight?", "Lukt het om vanavond vroeg te rusten?"], answers: [
             [
                 answer("네", "좋은 꿈 꿔요.", .yawn),
                 answer("조금만 더요", "그럼 딱 하나만 더 해요.", .blink)],
@@ -694,25 +713,25 @@ public enum PetChatter {
                  applies: { c in c.hour < 12 }),
         Question(id: "q.snack", text: ["간식 먹을래요?", "Snack time?", "Zin in een snack?"], answers: [
             [
-                answer("좋아요", "저도 하나만요… 츄르면 더 좋고요.", .happy),
+                answer("좋아요", "저도 하나만요… 생선 과자면 더 좋고요.", .happy),
                 answer("참을래요", "의지력 대단해요!", .cheer)],
             [
-                answer("Yes please", "One for me too… Churu would be even better.", .happy),
+                answer("Yes please", "One for me too… fish treats would be even better.", .happy),
                 answer("I’ll pass", "What willpower!", .cheer)],
             [
-                answer("Graag", "Ik ook eentje… Churu is nog beter.", .happy),
+                answer("Graag", "Ik ook eentje… visjes zijn nog beter.", .happy),
                 answer("Ik sla over", "Wat een wilskracht!", .cheer)]],
                  applies: { c in 14 <= c.hour && c.hour < 18 }),
         Question(id: "q.eyes", text: ["눈 좀 쉬어 줄까요? 먼 곳 한 번 봐요.", "Rest your eyes? Look at something far away.", "Je ogen even rust geven? Kijk eens ver weg."], answers: [
             [
                 answer("볼게요", "하나, 둘… 잘했어요!", .blink),
-                answer("나중에", "꼭이요. 눈은 소중하니까요.", .tilt)],
+                answer("나중에", "그래요. 생각나면 먼 곳 한 번 봐요.", .tilt)],
             [
                 answer("Okay", "One, two… well done!", .blink),
-                answer("Later", "Promise? Eyes are precious.", .tilt)],
+                answer("Later", "Okay. Look into the distance when you think of it.", .tilt)],
             [
                 answer("Doe ik", "Eén, twee… goed zo!", .blink),
-                answer("Straks", "Beloofd? Ogen zijn kostbaar.", .tilt)]],
+                answer("Straks", "Oké. Kijk even in de verte als je eraan denkt.", .tilt)]],
                  applies: { c in true }),
         Question(id: "q.walk", text: ["잠깐 일어나서 걸을래요?", "Want to get up and walk a bit?", "Even opstaan en een stukje lopen?"], answers: [
             [
@@ -739,13 +758,13 @@ public enum PetChatter {
         Question(id: "q.pet", text: ["저 쓰다듬어 줄래요?", "Want to pet me?", "Wil je me aaien?"], answers: [
             [
                 answer("쓰담쓰담", "골골골… 행복해요.", .happy),
-                answer("이따가요", "기다릴게요. 꼭이요!", .tilt)],
+                answer("이따가요", "기다릴게요. 골골.", .tilt)],
             [
                 answer("Pat pat", "Purrrr… so happy.", .happy),
-                answer("Later", "I’ll wait. Promise!", .tilt)],
+                answer("Later", "I’ll wait. Purr.", .tilt)],
             [
                 answer("Aai aai", "Spinnnn… zo blij.", .happy),
-                answer("Straks", "Ik wacht. Beloofd!", .tilt)]],
+                answer("Straks", "Ik wacht. Spin spin.", .tilt)]],
                  applies: { c in true }),
         Question(id: "q.weekend", text: ["주말에 뭐 할 거예요?", "Plans for the weekend?", "Plannen voor het weekend?"], answers: [
             [
@@ -783,13 +802,13 @@ public enum PetChatter {
         Question(id: "q.ready", text: ["곧 ‘{event}’ 시간이에요. 준비됐어요?", "‘{event}’ is soon. Ready?", "Zo meteen ‘{event}’. Klaar?"], answers: [
             [
                 answer("준비됐어요", "잘 다녀와요! 자리 지키고 있을게요.", .hop),
-                answer("아직요", "서둘러요! 제가 응원할게요.", .cheer)],
+                answer("아직요", "하나씩 챙겨요. 응원할게요.", .cheer)],
             [
                 answer("Ready", "Have a good one! I’ll guard your seat.", .hop),
-                answer("Not yet", "Hurry! I’m cheering for you.", .cheer)],
+                answer("Not yet", "One thing at a time. I’m cheering for you.", .cheer)],
             [
                 answer("Klaar", "Succes! Ik hou je plekje warm.", .hop),
-                answer("Nog niet", "Opschieten! Ik moedig je aan.", .cheer)]],
+                answer("Nog niet", "Eén ding tegelijk. Ik duim voor je.", .cheer)]],
                  applies: { c in c.nextEvent != nil && c.nextIn <= 15 }),
         Question(id: "q.focus", text: ["다음 일정까지 {in}분 있어요.\n25분 집중해 볼까요?", "{in} min until your next event.\nFocus for 25 minutes?", "Nog {in} min tot je volgende afspraak.\n25 minuten focussen?"], answers: [
             [

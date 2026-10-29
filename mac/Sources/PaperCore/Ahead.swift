@@ -233,10 +233,10 @@ public enum Ahead {
         }
     }
 
-    /// The empty sheet: "앞으로 할 일이 없어요. 아래에 “금요일까지 보고서”처럼 적어 보세요."
+    /// The empty sheet: "앞으로 할 일이 없어요. 아래에 ‘금요일까지 보고서’처럼 적어 보세요."
     public static func emptyText(_ language: AppLanguage) -> String {
         [
-            "앞으로 할 일이 없어요. 아래에 “금요일까지 보고서”처럼 적어 보세요.",
+            "앞으로 할 일이 없어요. 아래에 ‘금요일까지 보고서’처럼 적어 보세요.",
             "Nothing ahead. Try typing ‘report by Friday’ below.",
             "Niets vooruit. Typ hieronder bijv. ‘verslag voor vrijdag’.",
         ][language.index]

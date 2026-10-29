@@ -119,8 +119,8 @@ public enum Snooze: Equatable, Hashable, Sendable {
         }
     }
 
-    /// "5분 뒤", "1시간 뒤", "오늘 저녁 7시", "내일 아침 9시", "내일로 미루기"; en "In 5 min", "In 1 hour", "Tonight at 7 PM",
-    /// "Tomorrow at 9 AM", "Move to tomorrow"; nl "Over 5 min", "Over 1 uur", "Vanavond om 19:00", "Morgen om 09:00", "Naar morgen".
+    /// "5분 뒤", "1시간 뒤", "오늘 저녁 7시", "내일 아침 9시", "내일 하기"; en "In 5 min", "In 1 hour", "Tonight at 7 PM",
+    /// "Tomorrow at 9 AM", "Do tomorrow"; nl "Over 5 min", "Over 1 uur", "Vanavond om 19:00", "Morgen om 09:00", "Morgen doen".
     public func title(_ language: AppLanguage = .ko) -> String {
         switch self {
         case .minutes(let minutes):
@@ -131,7 +131,7 @@ public enum Snooze: Equatable, Hashable, Sendable {
             return ["\(minutes)분 뒤", "In \(minutes) min", "Over \(minutes) min"][language.index]
         case .evening: return ["오늘 저녁 7시", "Tonight at 7 PM", "Vanavond om 19:00"][language.index]
         case .tomorrowMorning: return ["내일 아침 9시", "Tomorrow at 9 AM", "Morgen om 09:00"][language.index]
-        case .tomorrow: return ["내일로 미루기", "Move to tomorrow", "Naar morgen"][language.index]
+        case .tomorrow: return ["내일 하기", "Do tomorrow", "Morgen doen"][language.index]
         }
     }
 
@@ -193,15 +193,15 @@ public enum Sweep {
     public static let times: [Int] = Array(stride(from: 18 * 60, through: 22 * 60, by: 30))
     public static let defaultTime = 20 * 60
 
-    /// Evening: "오늘 3개 남았어요. 내일로 넘길까요?" · "3 to-dos left today. Move them to tomorrow?" ·
-    /// "Nog 3 taken voor vandaag. Naar morgen schuiven?". Morning: "어제 남은 일이 3개 있어요. 오늘 할까요?" ·
+    /// Evening (the day's end, so a word for it first — #38): "오늘도 수고했어요. 남은 3개는 내일로 넘길까요?" ·
+    /// "Good work today. Move 3 to-dos to tomorrow?" · "Goed gedaan vandaag. 3 taken naar morgen?" (short: the slip is narrow in Dutch). Morning: "어제 남은 일이 3개 있어요. 오늘 할까요?" ·
     /// "3 to-dos left from yesterday. Do them today?" · "Nog 3 taken van gisteren. Vandaag doen?".
     public static func question(_ moment: Moment, count: Int, language: AppLanguage = .ko) -> String {
         let one = count == 1
         switch (moment, language) {
-        case (.evening, .ko): return "오늘 \(count)개 남았어요. 내일로 넘길까요?"
-        case (.evening, .en): return "\(language.todos(count)) left today. Move \(one ? "it" : "them") to tomorrow?"
-        case (.evening, .nl): return "Nog \(language.todos(count)) voor vandaag. Naar morgen schuiven?"
+        case (.evening, .ko): return "오늘도 수고했어요. 남은 \(count)개는 내일로 넘길까요?"
+        case (.evening, .en): return "Good work today. Move \(language.todos(count)) to tomorrow?"
+        case (.evening, .nl): return "Goed gedaan vandaag. \(language.todos(count)) naar morgen?"
         case (.morning, .ko): return "어제 남은 일이 \(count)개 있어요. 오늘 할까요?"
         case (.morning, .en): return "\(language.todos(count)) left from yesterday. Do \(one ? "it" : "them") today?"
         case (.morning, .nl): return "Nog \(language.todos(count)) van gisteren. Vandaag doen?"
@@ -272,21 +272,37 @@ public enum Search {
     /// (anything below U+1100) match without case or accents; a lone Korean consonant (ㄱ…ㅎ) matches
     /// a syllable starting with it, so "ㅂㄱㅅ" finds 보고서 and "보고ㅅ" too; spaces of any kind are
     /// one space; the query is trimmed and its inner spaces collapsed.
-    public static func match(_ query: String, in text: String) -> Range<Int>? {
-        let wanted = cleanQuery(query)
-        guard !wanted.isEmpty else { return nil }
+    public static func match(_ query: String, in text: String) -> Range<Int>? { match(Query(query), in: text) }
+
+    /// A query made ready once for many lines (a search reads every line of every memo): its cleaned scalars, their
+    /// folded keys and which of them are lone consonants.
+    public struct Query: Sendable {
+        let wanted: [Unicode.Scalar]
+        let keys: [UInt32]
+        /// The syllable-table index of each scalar that is a lone consonant (ㄱ…ㅎ), else -1.
+        let initials: [Int]
+        public init(_ query: String) {
+            wanted = Search.cleanQuery(query)
+            keys = wanted.map(Search.foldKey)
+            initials = wanted.map { q in Search.consonants.firstIndex(of: q.value) ?? -1 }
+        }
+        public var isEmpty: Bool { wanted.isEmpty }
+    }
+
+    public static func match(_ query: Query, in text: String) -> Range<Int>? {
+        let wanted = query.wanted, count = wanted.count
+        guard count > 0 else { return nil }
         let line = scalars(text)
-        guard line.count >= wanted.count else { return nil }
-        let folded = line.map(fold)
-        let foldedQuery = wanted.map(fold)
-        outer: for start in 0...(line.count - wanted.count) {
-            for offset in wanted.indices {
-                let t = line[start + offset], q = wanted[offset]
-                if foldedQuery[offset] == folded[start + offset] { continue }
-                if let initial = choseong(of: t), consonants.firstIndex(of: q.value) == initial { continue }
+        guard line.count >= count else { return nil }
+        let folded = line.map(foldKey)
+        outer: for start in 0...(line.count - count) {
+            for offset in 0..<count {
+                if query.keys[offset] == folded[start + offset] { continue }
+                let initial = query.initials[offset]
+                if initial >= 0, let syllable = choseong(of: line[start + offset]), syllable == initial { continue }
                 continue outer
             }
-            return start..<(start + wanted.count)
+            return start..<(start + count)
         }
         return nil
     }
@@ -296,7 +312,15 @@ public enum Search {
         return Array(words.joined(separator: " ").unicodeScalars)
     }
 
-    static func scalars(_ text: String) -> [Unicode.Scalar] { Array(text.precomposedStringWithCanonicalMapping.unicodeScalars) }
+    /// The NFC text's scalars. Text of only scalars below U+0300 (no combining marks), Hangul syllables and the
+    /// compatibility jamo is NFC already, and skips Foundation's normalizing.
+    static func scalars(_ text: String) -> [Unicode.Scalar] {
+        let plain = text.unicodeScalars.allSatisfy { scalar in
+            let value = scalar.value
+            return value < 0x300 || (0xAC00...0xD7A3).contains(value) || (0x3131...0x318E).contains(value)
+        }
+        return Array((plain ? text : text.precomposedStringWithCanonicalMapping).unicodeScalars)
+    }
 
     /// The compatibility jamo consonants that start syllables, in the order of the syllable table.
     static let consonants: [UInt32] = [0x3131, 0x3132, 0x3134, 0x3137, 0x3138, 0x3139, 0x3141, 0x3142, 0x3143, 0x3145,
@@ -315,6 +339,30 @@ public enum Search {
         return String(String.UnicodeScalarView(base)).lowercased()
     }
 
+    /// `fold` as a number, so a search compares numbers instead of making a string per letter: two scalars fold to
+    /// equal strings exactly when their keys are equal. Below U+1100 from a table made once from `fold` itself (a
+    /// fold of one scalar its value, of none or of several a number past the last scalar); above it the scalar's own
+    /// value, or a space's.
+    static func foldKey(_ scalar: Unicode.Scalar) -> UInt32 {
+        let value = scalar.value
+        if value < 0x1100 { return foldKeys[Int(value)] }
+        return scalar.properties.isWhitespace ? 0x20 : value
+    }
+
+    static let foldKeys: [UInt32] = {
+        var longer: [String: UInt32] = [:]
+        return (0..<0x1100).map { value -> UInt32 in
+            guard let scalar = Unicode.Scalar(value) else { return 0x110000 + UInt32(value) }
+            let folded = Array(fold(scalar).precomposedStringWithCanonicalMapping.unicodeScalars)
+            if folded.count == 1 { return folded[0].value }
+            let text = String(String.UnicodeScalarView(folded))
+            if let known = longer[text] { return known }
+            let key = 0x120000 + UInt32(longer.count)
+            longer[text] = key
+            return key
+        }
+    }()
+
     // MARK: Finding
 
     /// Every group with something, in order: 오늘 (the sheet's order, open first), 앞으로 (dated by
@@ -325,7 +373,8 @@ public enum Search {
     public static func find(_ query: String, items: [TodoItem], memos: [Memo], history: [ArchiveEntry], events: [EventEntry],
                             now: Date, calendar: Calendar = .paper, language: AppLanguage = .ko, limit: Int = Search.limit,
                             memoFolders: [String: String] = [:]) -> [(group: Group, hits: [Hit])] {
-        guard !cleanQuery(query).isEmpty else { return [] }
+        let query = Query(query)
+        guard !query.isEmpty else { return [] }
         let todayKey = Archive.dayKey(now, calendar: calendar)
         let thisYear = calendar.component(.year, from: Archive.logicalDayStart(now, calendar: calendar))
         func dayText(_ date: Date) -> String {

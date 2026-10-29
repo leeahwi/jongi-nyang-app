@@ -40,7 +40,20 @@ export function writePerfData(folder, now = new Date(), options = {}) {
   for (let index = 0; index < 70; index += 1) task(`${pick(words)} 앞 ${index + 1}`, { dueDate: key(day(1 + (index % 40))), ...(index % 7 === 0 ? { reminderAt: iso(at(1 + (index % 40), 10)) } : {}) });
   for (let index = 0; index < 30; index += 1) task(`${pick(words)} 언젠가 ${index + 1}`, { shelf: "later" });
   if (options.extraItems) items.push(...options.extraItems);
+  // `--todos=2000`: today's sheet filled up to that many to-dos in all (1.30's spaces measure; a tenth of them done).
+  for (let index = items.length; index < (options.todos ?? 0); index += 1) {
+    task(`${pick(words)} 오늘 ${index + 1}`, index % 10 === 0 ? { isCompleted: true, completedAt: iso(at(0, 9, index % 60)) } : {});
+  }
   fs.writeFileSync(path.join(folder, "todos.json"), JSON.stringify({ items }, null, 2) + "\n");
+
+  // ─── todo-spaces.json (1.30, `--spaces=9`): that many spaces, every to-do but each fifth in one ───
+  if (options.spaces) {
+    const colors = ["lavender", "pink", "mint", "yellow", "sky", "peach", "sand", "gray"];
+    const spaces = Array.from({ length: options.spaces }, (_, index) => ({ color: colors[index % 8], id: `s-${(0x100000 + index).toString(16)}`, name: ["회사", "집", "공부", "운동", "가족", "모임", "취미", "여행", "돈"][index % 9] + (index >= 9 ? index : ""), order: index, updatedAt: created }));
+    const placed = {};
+    items.forEach((item, index) => { if (index % 5 !== 4) placed[item.id] = { at: created, space: spaces[index % spaces.length].id }; });
+    fs.writeFileSync(path.join(folder, "todo-spaces.json"), JSON.stringify({ items: placed, spaces, version: 1 }, null, 2) + "\n");
+  }
 
   // ─── repeats.json ───
   const series = [
@@ -72,7 +85,7 @@ export function writePerfData(folder, now = new Date(), options = {}) {
   event("치과", day(0), 15 * 60 + 30, 16 * 60 + 30);
   event("고객 미팅", day(0), 17 * 60, 18 * 60);
   event("휴가 계획", day(0), 0, 0, { allDay: true });
-  while (events.length < 60) {
+  while (events.length < (options.events ?? 60)) {
     const offset = Math.floor(random() * 60) - 25;
     if (random() < 0.15) event(pick(eventTitles), day(offset), 0, 0, { allDay: true, days: 1 + Math.floor(random() * 3) });
     else { const start = (8 + Math.floor(random() * 11)) * 60 + pick([0, 15, 30, 45]); event(pick(eventTitles), day(offset), start, start + pick([30, 60, 90])); }
@@ -93,9 +106,12 @@ export function writePerfData(folder, now = new Date(), options = {}) {
   fs.writeFileSync(path.join(folder, "alarms.json"), JSON.stringify({ alarms }, null, 2) + "\n");
 
   // ─── archive/YYYY-MM.jsonl: 2,000 finished tasks over the last ~8 months ───
+  // (perf audit 2: options.history lines over options.historyDays days, e.g. 6,000 over 1,095 for three years.)
   const months = new Map();
-  for (let index = 0; index < 2000; index += 1) {
-    const finished = at(-3 - Math.floor(index / 8.5), 9 + (index % 10), (index * 13) % 60);
+  const historyLines = options.history ?? 2000;
+  const perDay = historyLines / (options.historyDays ?? 2000 / 8.5);
+  for (let index = 0; index < historyLines; index += 1) {
+    const finished = at(-3 - Math.floor(index / perDay), 9 + (index % 10), (index * 13) % 60);
     const month = `${finished.getFullYear()}-${pad(finished.getMonth() + 1)}`;
     const line = JSON.stringify({ id: id(), title: `${pick(words)} ${index}`, createdAt: iso(new Date(finished.getTime() - 86_400_000)), completedAt: iso(finished) });
     months.set(month, [...(months.get(month) ?? []), line]);
@@ -119,7 +135,8 @@ export function writePerfData(folder, now = new Date(), options = {}) {
   return { open: items.filter((item) => !item.isCompleted).length, events: events.length, memos: memos.length };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) {
+// (Bundled into a test, import.meta.url is the test's own file: the name check keeps it from running then.)
+if (process.argv[1] && path.basename(new URL(import.meta.url).pathname) === "perf-data.mjs" && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) {
   const folder = process.argv[2];
   if (!folder) { console.error("usage: node tools/perf-data.mjs <folder>"); process.exit(2); }
   console.log(writePerfData(folder));

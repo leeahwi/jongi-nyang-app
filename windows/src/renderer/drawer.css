@@ -18,13 +18,14 @@
 /* ─── 낮 종이 ─── */
 :root[data-look="day"], .it[data-sheet="day"], .big[data-sheet="day"] {
   --d-paper: #e6dbc3; --d-edge: #c9bb9b; --d-line: rgba(170, 150, 110, 0.35); --d-ink: #2a2925; --d-title: #2a2925;
-  --d-sub: #42603c; --d-icon: #55504a; --d-card: #fffdf7; --d-card-edge: #d0c2a3; --d-shadow: rgba(60, 50, 30, 0.12); --d-meta: #646057; --d-preview: #5c584f; --d-grp: #5c584f;
+  --d-sub: #42603c; --d-icon: #55504a; --d-card: #fffdf7; --d-card-edge: #d0c2a3; --d-shadow: rgba(60, 50, 30, 0.12); --d-meta: #646057; --d-preview: #5c584f; --d-peek: #595853; --d-grp: #5c584f;
   --d-check: #5f7a5a; --d-on-check: #fffdf8; --d-box: #8a8374; --d-done: #646057; --d-select: #6f63b8; --d-open: #8d82cf;
   --d-bar: #5f7a5a; --d-bar-track: #e6dfcf; --d-foot-rule: #c9bb9b; --d-foot: #646057; --d-foot-paw: #c98a8f;
   --d-hover: rgba(70, 60, 40, 0.07); --d-mark: rgba(233, 207, 122, 0.55); --d-menu: #fffdf8; --d-menu-edge: #d0c2a3;
   --d-qk: #fffdf7; --d-qk-edge: #d0c2a3; --d-radius: 10px;
   --d-chip: #f3efe6; --d-pill: #f5f2ea; --d-pill-edge: rgba(70, 60, 40, 0.14); --d-pin: #7f6418; --d-danger: #a4472f;
-  --d-slip-rule: #ece4d2; --d-slip-margin: #efc4c0; --d-slip-bottom: #e0d7c4; --d-ear: #e6dbc3; --d-ear-in: rgba(242, 201, 198, 0.8);
+  --d-pintab: #f6dc7c; --d-pintab-edge: #dcc062; --d-pintab-ink: #66531a; /* 고정's bookmark (1.30): the note's 오늘 tab */
+  --d-shadow-deep: rgba(60, 50, 30, 0.24); --d-slip-bottom: #e0d7c4; --d-ear: #e6dbc3; --d-ear-in: rgba(242, 201, 198, 0.8);
   --c-lavender-a: #dcd8f3; --c-lavender-b: #d3cef0; --c-lavender-ink: #3f3a73; --c-lavender-tape: #d3cef0; --c-lavender-edge: #9d92d8; --c-lavender-line: #8e84c8;
   --c-pink-a: #f2d3d6; --c-pink-b: #eccacd; --c-pink-ink: #6f3239; --c-pink-tape: #ecc6ca; --c-pink-edge: #d79aa2; --c-pink-line: #b87b82;
   --c-mint-a: #cfe6d6; --c-mint-b: #c4dfcc; --c-mint-ink: #2d5638; --c-mint-tape: #c4dfcc; --c-mint-edge: #86b896; --c-mint-line: #689776;
@@ -38,13 +39,14 @@
 /* ─── 밤 종이 (the folder colours as in 1.28.1) ─── */
 :root[data-look="night"], .it[data-sheet="night"], .big[data-sheet="night"] {
   --d-paper: #1c1a17; --d-edge: #4a463f; --d-line: rgba(255, 255, 255, 0.04); --d-ink: #f6f1e6; --d-title: #f7f2e7;
-  --d-sub: #b3cbad; --d-icon: #cdc6b7; --d-card: #3d3a34; --d-card-edge: #5a554b; --d-shadow: rgba(0, 0, 0, 0.45); --d-meta: #c4bdad; --d-preview: #dad3c3; --d-grp: #c4bdad;
+  --d-sub: #b3cbad; --d-icon: #cdc6b7; --d-card: #3d3a34; --d-card-edge: #5a554b; --d-shadow: rgba(0, 0, 0, 0.45); --d-meta: #c4bdad; --d-preview: #dad3c3; --d-peek: #dcd7cd; --d-grp: #c4bdad;
   --d-check: #b3cbad; --d-on-check: #1f2a1e; --d-box: #a39d90; --d-done: #c4bdad; --d-select: #b0a8e0; --d-open: #9d95d6;
   --d-bar: #b3cbad; --d-bar-track: #524e46; --d-foot-rule: #4a463f; --d-foot: #c4bdad; --d-foot-paw: #d39a9e;
   --d-hover: rgba(255, 255, 255, 0.06); --d-mark: rgba(190, 168, 90, 0.5); --d-menu: #45423b; --d-menu-edge: #5a554b;
   --d-qk: #3d3a34; --d-qk-edge: #5a554b; --d-radius: 10px;
   --d-chip: #4a4740; --d-pill: #46433c; --d-pill-edge: rgba(255, 255, 255, 0.12); --d-pin: #d9c47a; --d-danger: #eaa58a;
-  --d-slip-rule: #4a463f; --d-slip-margin: #9a6266; --d-slip-bottom: #1d1c19; --d-ear: #1c1a17; --d-ear-in: #7d555a;
+  --d-pintab: #c4a245; --d-pintab-edge: #d6b65a; --d-pintab-ink: #1f1d18; /* 고정's bookmark (1.30): the note's 오늘 tab, dark ink */
+  --d-shadow-deep: rgba(0, 0, 0, 0.62); --d-slip-bottom: #1d1c19; --d-ear: #1c1a17; --d-ear-in: #7d555a;
   --c-lavender-a: #5e5888; --c-lavender-b: #575181; --c-lavender-ink: #f1edff; --c-lavender-tape: #7d75ad; --c-lavender-edge: #8f87c4; --c-lavender-line: #8f87c4;
   --c-pink-a: #74545a; --c-pink-b: #6c4e54; --c-pink-ink: #ffe4e8; --c-pink-tape: #8a666c; --c-pink-edge: #a8797f; --c-pink-line: #ad7f85;
   --c-mint-a: #4b6a55; --c-mint-b: #46634f; --c-mint-ink: #e2f5e7; --c-mint-tape: #5f8269; --c-mint-edge: #719a7e; --c-mint-line: #719a7e;
@@ -58,13 +60,14 @@
 /* ─── 크라프트지 ─── */
 :root[data-look="kraft"], .it[data-sheet="kraft"], .big[data-sheet="kraft"] {
   --d-paper: #cdb187; --d-edge: #a98d63; --d-line: transparent; --d-ink: #33281d; --d-title: #33281d;
-  --d-sub: #4a3a22; --d-icon: #5a4732; --d-card: #fbf6ea; --d-card-edge: #a98d63; --d-shadow: rgba(60, 50, 30, 0.12); --d-meta: #54452f; --d-preview: #574a39; --d-grp: #4a3a22;
+  --d-sub: #4a3a22; --d-icon: #5a4732; --d-card: #fbf6ea; --d-card-edge: #a98d63; --d-shadow: rgba(60, 50, 30, 0.12); --d-meta: #54452f; --d-preview: #574a39; --d-peek: #53493e; --d-grp: #4a3a22;
   --d-check: #5f7f4e; --d-on-check: #fbf6ea; --d-box: #8f7a5a; --d-done: #54452f; --d-select: #6b4f2b; --d-open: #8a6a40;
   --d-bar: #5a7a4b; --d-bar-track: #ece2cd; --d-foot-rule: #a98d63; --d-foot: #4a3a22; --d-foot-paw: #8f4f3e;
   --d-hover: rgba(90, 64, 30, 0.08); --d-mark: rgba(241, 211, 122, 0.7); --d-menu: #fbf6ea; --d-menu-edge: #c9b08a;
   --d-qk: #fbf6ea; --d-qk-edge: #a98d63; --d-radius: 4px;
   --d-chip: #f1e9d8; --d-pill: #f3ecde; --d-pill-edge: rgba(90, 60, 20, 0.16); --d-pin: #5f4712; --d-danger: #8f3a22;
-  --d-slip-rule: #e8dcc3; --d-slip-margin: #d79a8a; --d-slip-bottom: #c9b08a; --d-ear: #cdb187; --d-ear-in: rgba(227, 160, 142, 0.7);
+  --d-pintab: #f1d37a; --d-pintab-edge: #ab9049; --d-pintab-ink: #5c4512; /* 고정's bookmark (1.30): this paper's yellow */
+  --d-shadow-deep: rgba(60, 50, 30, 0.24); --d-slip-bottom: #c9b08a; --d-ear: #cdb187; --d-ear-in: rgba(227, 160, 142, 0.7);
   --c-lavender-a: #f4ecdc; --c-lavender-b: #f4ecdc; --c-lavender-ink: #5c4228; --c-lavender-tape: #9cc2a6; --c-lavender-edge: #a3927d; --c-lavender-line: #98856f;
   --c-pink-a: #e9a38f; --c-pink-b: #e9a38f; --c-pink-ink: #4f2418; --c-pink-tape: #e9a38f; --c-pink-edge: #c27a66; --c-pink-line: #bd7763;
   --c-mint-a: #9cc2a6; --c-mint-b: #9cc2a6; --c-mint-ink: #203d2a; --c-mint-tape: #9cc2a6; --c-mint-edge: #6f9a7b; --c-mint-line: #679173;
@@ -78,13 +81,14 @@
 /* ─── 모눈 노트 ─── */
 :root[data-look="grid"], .it[data-sheet="grid"], .big[data-sheet="grid"] {
   --d-paper: #dde6f0; --d-edge: #b3c2d4; --d-line: #c9d5e3; --d-ink: #1f2a35; --d-title: #1f2a35;
-  --d-sub: #2f5793; --d-icon: #4f5c69; --d-card: #ffffff; --d-card-edge: #bccadb; --d-shadow: rgba(30, 50, 80, 0.13); --d-meta: #57636f; --d-preview: #4b5865; --d-grp: #4b5865;
+  --d-sub: #2f5793; --d-icon: #4f5c69; --d-card: #ffffff; --d-card-edge: #bccadb; --d-shadow: rgba(30, 50, 80, 0.13); --d-meta: #57636f; --d-preview: #4b5865; --d-peek: #4c555d; --d-grp: #4b5865;
   --d-check: #3f6aa8; --d-on-check: #ffffff; --d-box: #7c8a99; --d-done: #57636f; --d-select: #3f6aa8; --d-open: #6f8fc4;
   --d-bar: #3f6aa8; --d-bar-track: #e3e9f0; --d-foot-rule: #b3c2d4; --d-foot: #57636f; --d-foot-paw: #c98a8f;
   --d-hover: rgba(40, 70, 110, 0.07); --d-mark: rgba(246, 231, 176, 0.9); --d-menu: #ffffff; --d-menu-edge: #bccadb;
   --d-qk: #ffffff; --d-qk-edge: #bccadb; --d-radius: 10px;
   --d-chip: #eff2f6; --d-pill: #f1f4f7; --d-pill-edge: rgba(40, 70, 110, 0.14); --d-pin: #806516; --d-danger: #a4472f;
-  --d-slip-rule: #d8e2ee; --d-slip-margin: #f0b8b4; --d-slip-bottom: #d8e0e8; --d-ear: #dde6f0; --d-ear-in: #f6d6d2;
+  --d-pintab: #f6e7b0; --d-pintab-edge: #cebe87; --d-pintab-ink: #614f17; /* 고정's bookmark (1.30): this paper's yellow */
+  --d-shadow-deep: rgba(30, 50, 80, 0.24); --d-slip-bottom: #d8e0e8; --d-ear: #dde6f0; --d-ear-in: #f6d6d2;
   --c-lavender-a: #e4ebf8; --c-lavender-b: #e4ebf8; --c-lavender-ink: #2f4a7a; --c-lavender-tape: #f6d6d2; --c-lavender-edge: #b3c0d6; --c-lavender-line: #7c8eaf;
   --c-pink-a: #f6d6d2; --c-pink-b: #f6d6d2; --c-pink-ink: #6e2f28; --c-pink-tape: #f6d6d2; --c-pink-edge: #e0aaa3; --c-pink-line: #b98079;
   --c-mint-a: #d3eadf; --c-mint-b: #d3eadf; --c-mint-ink: #24533c; --c-mint-tape: #d3eadf; --c-mint-edge: #a4c1b3; --c-mint-line: #719583;
@@ -191,42 +195,61 @@ body.drawer-window { background: transparent; overflow: hidden; color: var(--d-i
 .grp .lbl > span { overflow: hidden; text-overflow: ellipsis; }
 .grp .n { font-weight: 400; color: var(--d-meta); }
 .grp::after { content: ""; flex: 1; min-width: 12px; height: 1px; background: var(--d-edge); opacity: 0.7; }
-.grp .icon { color: var(--d-pin); fill: currentColor; stroke-width: 0.6; flex: none; }
+.grp .icon { color: var(--d-pin); fill: currentColor; flex: none; }
 .it:not(:first-child) { margin-top: 0; }
 .list > .grp:not(:first-child) { margin-top: 6px; }
 
-/* ─── A MEMO CARD — one block, swapped as a whole (drawer.ts slipShell). A sheet of ruled paper: square corners,
-   a red margin line, rules every 22px (the first under the title), a 1 px edge and a soft shadow, a strip of
-   tape across its top. The open or picked memo's margin line is 3 px in its folder's colour; the picked one
-   is ringed in it too. ─── */
+/* ─── A MEMO CARD — one block, swapped as a whole (drawer.ts slipShell). Sheet D (#14, the user's pick): a clean
+   square sheet, no rules and no margin line, 16px round its words; the paper hints are the folder-colour tape,
+   a 1 px edge with a soft shadow, and the small perforation along its top edge. Open or picked, the shadow goes a
+   little deeper instead of a box round it; the picked one (the keyboard's place) also takes a faint 1.5 px edge
+   in its folder's colour — depth and edge, never colour alone. A card shorter than its least height (a title
+   only) has its words in the middle. ─── */
 .it {
-  --margin-line: var(--d-slip-margin); --margin-width: 1px; --pad-top: 13px; --min: 68px;
-  position: relative; flex: none; border-radius: 0; padding: var(--pad-top) 12px 10px 22px; min-height: var(--min);
+  --pad-top: 16px; --pad-bottom: 14px; --min: 68px;
+  position: relative; flex: none; border-radius: 0; padding: var(--pad-top) 16px var(--pad-bottom); min-height: var(--min);
   background-color: var(--d-card); color: var(--d-ink);
-  background-image: repeating-linear-gradient(transparent 0 21px, var(--d-slip-rule) 21px 22px);
-  background-position: 0 calc(var(--pad-top) + 1px); background-size: 100% calc(100% - var(--pad-top) - 1px); background-repeat: no-repeat;
   box-shadow: 0 1px 0 var(--d-slip-bottom), 0 4px 10px var(--d-shadow), 0 0 0 1px var(--d-card-edge);
 }
-.list.dense .it { --pad-top: 9px; --min: 56px; padding-bottom: 6px; }
+/* A title-only card (drawer.ts marks it): its words in the middle of its least height. Only those are flex boxes. */
+.it.short { display: flex; flex-direction: column; justify-content: center; }
+/* Cards out of view are not laid out until they come near (their last size is kept): three preview lines on
+   2,000 cards cost the list's redraw a fifth more than one line did. The clip margin keeps the tape above the edge. */
+.list > .it:not(.open) { content-visibility: auto; contain-intrinsic-size: auto 96px; overflow-clip-margin: 8px; }
+.list.dense .it { --pad-top: 10px; --pad-bottom: 9px; --min: 56px; }
 /* The perforation along the top edge: small half holes of the drawer's paper. */
 .it::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; pointer-events: none; background: radial-gradient(circle at 3.5px 0, var(--drawer-paper) 1.3px, transparent 1.6px) 0 0 / 7px 3px repeat-x; }
-/* The margin line, over the rules. */
-.it::after { content: ""; position: absolute; top: 0; bottom: 0; left: 15px; width: var(--margin-width); margin-left: calc((1px - var(--margin-width)) / 2); background: var(--margin-line); pointer-events: none; }
-.it.open, .it.selected { --margin-line: var(--ln); --margin-width: 3px; }
-.it.selected { box-shadow: 0 1px 0 var(--d-slip-bottom), 0 4px 10px var(--d-shadow), 0 0 0 2px var(--ln); }
+.it.open { box-shadow: 0 1px 0 var(--d-slip-bottom), 0 6px 18px var(--d-shadow-deep), 0 0 0 1px var(--d-card-edge); }
+.it.selected:not(.open) { box-shadow: 0 1px 0 var(--d-slip-bottom), 0 6px 18px var(--d-shadow-deep), 0 0 0 1.5px color-mix(in srgb, var(--ln) 55%, var(--d-card-edge)); }
+/* The keyboard's place is the picked card's depth and edge (above): no ring round it, and none round the text being typed. */
+.it:focus-visible, .it .editor:focus-visible, .hw-field:focus-visible { outline: none; }
 .it.dragging { opacity: 0.45; }
 .it > .tp { position: absolute; top: -5px; width: 30px; height: 10px; margin-left: -15px; opacity: 0.88; pointer-events: none; z-index: 1; }
-.it .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-width: 0; min-height: 22px; }
-.it .row .hw { font-family: var(--d-hand); font-size: 20px; line-height: 22px; color: var(--d-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding-right: var(--ink-over); }
-:root[data-font="clean"] .it .row .hw { font-size: 14px; font-weight: 600; }
+.it .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-width: 0; min-height: 28px; }
+/* The title (#14, option B): 22px, its strokes a hair heavier (0.35px, as night paper's tab names); the clean face is already bold. */
+.it .row .hw { font-family: var(--d-hand); font-size: 22px; line-height: 28px; color: var(--d-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding-right: var(--ink-over); }
+:root:not([data-font="clean"]) .it .row .hw, :root:not([data-font="clean"]) .hw-field { -webkit-text-stroke: 0.35px currentColor; }
+:root[data-font="clean"] .it .row .hw { font-size: 15px; font-weight: 600; }
 .it .row .right { display: flex; align-items: center; gap: 5px; flex: none; }
-.m { font-size: 10.5px; color: var(--d-meta); white-space: nowrap; flex: none; font-variant-numeric: tabular-nums; }
+.m { font-size: 11px; color: var(--d-meta); white-space: nowrap; flex: none; font-variant-numeric: tabular-nums; }
 .it .paw { color: var(--d-pin); display: flex; }
-.it .paw .icon, .acts .ib.on .icon, .hov .ib.on .icon { fill: currentColor; stroke-width: 0.6; }
-.p { margin: 0; font-size: 11.5px; line-height: 22px; color: var(--d-preview); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.code { font-family: var(--d-mono); font-size: 11px; letter-spacing: 0; }
+/* 고정 is a pin (#26, docs/icons.md: the paw is the drawer's own); a pinned memo's pin is filled. */
+.it .paw .icon, .acts .ib.on .icon, .hov .ib.on .icon { fill: currentColor; }
+/* The preview (#14): up to three lines of the memo's words (dense two), wrapped, … at the end of the last; the ink one
+   step lighter. A checklist shows its first items instead, one a line, with small boxes. */
+.p { margin: 0; font-size: 13px; line-height: 20px; color: var(--d-peek); white-space: pre-line; overflow-wrap: anywhere; overflow: hidden;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
+.list.dense .p, .p.hit { -webkit-line-clamp: 2; }
+.pk { display: flex; flex-direction: column; }
+.pr { display: flex; align-items: center; gap: 6px; min-width: 0; height: 20px; font-size: 13px; color: var(--d-peek); }
+.pr > span:last-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr.done > span:last-child { color: var(--d-done); text-decoration: line-through; }
+.pr .bx { width: 11px; height: 11px; margin-top: 0; border-radius: 2.5px; }
+.pr .bx.on::after { content: ""; width: 5px; height: 2.5px; border: solid var(--d-on-check); border-width: 0 0 1.5px 1.5px; transform: translateY(-0.5px) rotate(-45deg); }
+.list.dense .pr:nth-child(n + 3) { display: none; }
+.code { font-family: var(--d-mono); font-size: 12px; letter-spacing: 0; }
 /* The kind row: a chip on the left (a link's address, a phone number, a checklist's count and bar), the time on the right. */
-.kind { display: flex; align-items: center; gap: 6px; min-height: 22px; min-width: 0; }
+.kind { display: flex; align-items: center; gap: 6px; min-height: 24px; min-width: 0; }
 .kind .m { margin-left: auto; }
 .kchip { display: inline-flex; align-items: center; gap: 4px; padding: 0 7px; border-radius: 999px; background: var(--d-chip); color: var(--d-preview); font: 10.5px/18px var(--ui); min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; flex: 0 1 auto; }
 .kchip > span { overflow: hidden; text-overflow: ellipsis; }
@@ -239,67 +262,50 @@ button.kchip:hover { color: var(--d-ink); box-shadow: inset 0 0 0 0.5px var(--d-
 .hov .ib { width: 24px; height: 22px; border-radius: 999px; }
 .hov .ib.on { color: var(--d-pin); }
 .it:not(.open):hover > .hov, .it.preview-hover > .hov { display: flex; }
+/* #50: the pill takes the title row's right end while it's up — the date (and the pin, which the pill's 고정 shows
+   filled) steps aside instead of showing half under it. visibility, so the title never reflows. */
+.it:not(.open):hover > .row > .right, .it.preview-hover > .row > .right { visibility: hidden; }
+body.dragging-memo .it > .row > .right { visibility: visible; }
 body.dragging-memo .it > .hov { display: none !important; }
 
 /* An open memo: every line, checklist boxes that work, and its bar under it. */
 .body { margin-top: 0; }
-.ln { font-size: 12px; line-height: 22px; margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; color: var(--d-ink); cursor: text; min-height: 22px; }
+/* An open memo (#14): 14px on 26px lines, as while it's typed. */
+.ln { font-size: 14px; line-height: 26px; margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; color: var(--d-ink); cursor: text; min-height: 26px; }
+.ln.code { font-size: 13px; }
 .ck { display: flex; gap: 7px; align-items: flex-start; }
-.bx { width: 12px; height: 12px; border-radius: 3px; margin-top: 5px; flex: none; border: 1.2px solid var(--d-box); display: grid; place-items: center; color: var(--d-on-check); cursor: default; }
+.bx { width: 12px; height: 12px; border-radius: 3px; margin-top: 7px; flex: none; border: 1.2px solid var(--d-box); display: grid; place-items: center; color: var(--d-on-check); cursor: default; }
 .bx .icon { opacity: 0; }
 .bx.on { background: var(--d-check); border-color: var(--d-check); }
 .bx.on .icon { opacity: 1; }
 button.bx:hover { border-color: var(--d-ink); }
 .ck.done .ckt { color: var(--d-done); text-decoration: line-through; }
 .ckt { min-width: 0; }
-.editor { display: block; width: 100%; resize: none; border: 0; outline: none; background-color: transparent; color: var(--d-ink); font: 12.5px/22px var(--ui); padding: 0; margin: 0; min-height: 44px; overflow: hidden; user-select: text; }
+.editor { display: block; width: 100%; resize: none; border: 0; outline: none; background-color: transparent; color: var(--d-ink); font: 14px/26px var(--ui); padding: 0; margin: 0; min-height: 52px; overflow: hidden; user-select: text; }
 /* The open memo's bar: [크게 보기 · 복사 · ⚙] · `오후 5:38 고침` · [폴더로 옮기기 · 지우기]. */
 .acts { display: flex; align-items: center; gap: 6px; margin-top: 8px; min-width: 0; }
 .pill { display: flex; align-items: center; gap: 1px; padding: 2px 4px; border-radius: 999px; background: var(--d-pill); box-shadow: inset 0 0 0 0.5px var(--d-pill-edge); flex: none; }
 .pill .ib { width: 25px; height: 22px; border-radius: 999px; }
 .pill .ib.danger { color: var(--d-danger); }
-.acts .when { flex: 1; min-width: 0; text-align: center; font-size: 10.5px; color: var(--d-meta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acts .when { flex: 1; min-width: 0; text-align: center; font-size: 11px; color: var(--d-meta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Too narrow for the time between the pills (260 wide, a long date): it goes under them. */
 .acts.stack { flex-wrap: wrap; justify-content: space-between; row-gap: 2px; }
 .acts.stack .when { order: 3; flex-basis: 100%; }
 
 /* 크게 보기: the open memo over the whole list. */
-.big { left: 10px; right: 10px; top: var(--big-top, 120px); bottom: 50px; z-index: 4; display: flex; flex-direction: column; padding: 12px 12px 10px 22px; color: var(--d-ink);
-  background-color: var(--d-card); box-shadow: 0 1px 0 var(--d-slip-bottom), 0 10px 30px -10px var(--d-shadow), 0 0 0 1px var(--d-card-edge); }
-.big::after { content: ""; position: absolute; top: 0; bottom: 0; left: 14px; width: 3px; background: var(--ln); pointer-events: none; }
+.big { left: 10px; right: 10px; top: var(--big-top, 120px); bottom: 50px; z-index: 4; display: flex; flex-direction: column; padding: 16px 16px 14px; color: var(--d-ink);
+  background-color: var(--d-card); box-shadow: 0 1px 0 var(--d-slip-bottom), 0 10px 30px -10px var(--d-shadow-deep), 0 0 0 1px var(--d-card-edge); }
 .big .row { display: flex; align-items: center; gap: 8px; }
-.big .editor { flex: 1; overflow-y: auto; font-size: 13px; background-image: repeating-linear-gradient(transparent 0 21px, var(--d-slip-rule) 21px 22px); background-attachment: local; }
-.it .p, .it .body, .it .editor { line-height: 22px; }
+.big .editor { flex: 1; overflow-y: auto; }
+.big .editor:focus-visible { outline: none; }
 
-/* ─── Menus (the ⚙ menu, a memo's ⋯ / right-click, the folder list, a bookmark's, the text menu) and their
-   submenus — HTML, inside the paper. Icons on every row, shortcuts where they exist, destructive last. ─── */
-.menu { z-index: 8; min-width: 176px; max-width: calc(100% - 16px); max-height: calc(100% - 16px); overflow-y: auto; overflow-x: hidden; padding: 5px; border-radius: 10px; background: var(--d-menu); border: 0.5px solid var(--d-menu-edge); box-shadow: 0 12px 30px -10px rgba(40, 30, 10, 0.45); display: flex; flex-direction: column; color: var(--d-ink); scrollbar-width: thin; }
-.menu.submenu { z-index: 9; }
-.menu button.mi { height: 28px; padding: 0 8px; border-radius: 6px; text-align: left; font: 500 12.5px var(--ui); color: var(--d-ink); white-space: nowrap; display: flex; align-items: center; gap: 8px; min-width: 0; flex: none; }
-.menu button.mi > .t { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.menu button.mi > .k { margin-left: auto; padding-left: 12px; font-size: 11px; font-weight: 400; color: var(--d-meta); flex: none; }
-.menu button.mi > .ico { width: 16px; display: flex; flex: none; color: var(--d-icon); }
-.menu button.mi > .ico:empty:has(+ .sq, + .sq-paper) { display: none; }
-.menu button.mi > .sq, .menu button.mi > .sq-paper { margin: 0 2px; }
-.menu button.mi:hover, .menu button.mi:focus-visible, .menu button.mi.open { background: var(--d-hover); outline: none; }
-.menu button.mi.danger, .menu button.mi.danger > .ico { color: var(--d-danger); }
-.menu button.mi[aria-checked="true"] > .tick { color: var(--d-sub); }
-.menu button.mi > .tick { margin-left: auto; padding-left: 10px; display: flex; flex: none; }
-.menu .sep { height: 0.5px; margin: 4px 6px; background: var(--d-menu-edge); flex: none; }
-.menu .label { margin: 5px 8px 2px; font-size: 11px; font-weight: 600; color: var(--d-meta); flex: none; white-space: nowrap; }
-.menu .mh { display: flex; align-items: center; gap: 7px; padding: 4px 8px 4px; min-width: 0; flex: none; color: var(--d-meta); font-size: 11px; }
-.menu .mh .icon { color: var(--d-icon); flex: none; }
-.menu .mh b { font-family: var(--d-hand); font-size: 18px; line-height: 22px; font-weight: 400; color: var(--d-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding-right: var(--ink-over); }
-:root[data-font="clean"] .menu .mh b { font: 600 13px var(--ui); }
-.menu .mh .c { margin-left: auto; padding-left: 10px; white-space: nowrap; }
-.menu .sq { width: 12px; height: 12px; border-radius: 3px; background: var(--a); box-shadow: inset 0 0 0 1px var(--e); flex: none; }
-.menu .cnt { margin-left: auto; padding-left: 10px; font-size: 11px; color: var(--d-meta); font-variant-numeric: tabular-nums; flex: none; }
-.menu .cnt + .k { margin-left: 0; padding-left: 10px; }
+/* ─── Menus: menu.css (shared with the note's row menu and 모든 스페이스 ▾, 1.30), drawn with the --d-* tokens above. ─── */
 /* A row of swatches (종이 · 바탕 · 이 메모의 종이): a small sample over its name. */
 .swrow { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 4px; padding: 3px 4px 6px; flex: none; }
 .swrow button { display: flex; flex-direction: column; align-items: center; gap: 3px; font: 10px/12px var(--ui); color: var(--d-preview); min-width: 0; padding: 2px 0; border-radius: 7px; }
 .swrow button:hover, .swrow button:focus-visible { background: var(--d-hover); outline: none; }
-.swrow button > span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* A long name (en ‘Same as drawer’) takes a second line instead of being cut. */
+.swrow button > span:last-child { max-width: 100%; text-align: center; text-wrap: balance; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .swrow i { display: block; width: 100%; max-width: 44px; height: 26px; border-radius: 6px; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.22); }
 .swrow button[aria-checked="true"] { color: var(--d-ink); font-weight: 600; }
 .swrow button[aria-checked="true"] i { box-shadow: 0 0 0 2px var(--d-select); }
@@ -343,7 +349,7 @@ button.bx:hover { border-color: var(--d-ink); }
 .empty p { margin: 6px 0 0; font-size: 11.5px; line-height: 1.5; text-wrap: balance; }
 
 /* Search results: the folder's name small, the matched words marked. */
-.it .where { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--d-meta); min-height: 22px; white-space: nowrap; overflow: hidden; max-width: 100%; }
+.it .where { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--d-meta); min-height: 22px; white-space: nowrap; overflow: hidden; max-width: 100%; }
 .it .where .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--a); box-shadow: inset 0 0 0 1px var(--e); flex: none; }
 .it .where .m { margin-left: auto; }
 mark { background: var(--d-mark); color: inherit; border-radius: 2px; padding: 0 1px; }
@@ -369,14 +375,15 @@ mark { background: var(--d-mark); color: inherit; border-radius: 2px; padding: 0
 .ears .ear-edge { fill: none; stroke: var(--d-edge); stroke-width: 1; }
 .ears .ear-in { fill: var(--d-ear-in); }
 
-/* ─── The bookmarks: a 1 px edge in the folder's colour; an un-picked one shows its name's first character ─── */
+/* ─── The bookmarks: one solid colour (1.30, no stripes) with a 1 px edge in the folder's colour; an un-picked one
+   shows its name's first character ─── */
 .tabs { position: absolute; top: calc(var(--d-top) + 118px); bottom: 20px; width: calc(var(--d-tabs) + 1px); display: flex; flex-direction: column; gap: 6px; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; z-index: 2; padding: 0 0 8px; }
 .tabs::-webkit-scrollbar { display: none; }
 .side-right .tabs { left: 0; align-items: flex-end; }
 .side-left .tabs { right: 0; align-items: flex-start; }
 .bk {
   flex: none; width: 24px; height: 42px; display: flex; align-items: center; justify-content: center;
-  background: repeating-linear-gradient(135deg, var(--a) 0 5px, var(--b) 5px 10px); color: var(--k);
+  background: var(--a); color: var(--k);
   border: 1px solid var(--e); padding: 0; font-family: var(--d-hand); font-size: 15px; line-height: 1; overflow: hidden;
 }
 :root[data-font="clean"] .bk { font: 600 11px var(--ui); }
@@ -387,7 +394,9 @@ mark { background: var(--d-mark); color: inherit; border-radius: 2px; padding: 0
 .side-right .bk.on { margin-right: 0; }
 :root[data-font="clean"] .bk.on { font-size: 13px; font-weight: 600; }
 :root:lang(en) .bk.on, :root:lang(nl) .bk.on { font-size: 17px; }
-.bk.paw .icon { flex: none; fill: currentColor; stroke-width: 0.6; }
+/* 고정: its own colour (day and night: the note's 오늘 tab). */
+.bk.paw { --a: var(--d-pintab); --k: var(--d-pintab-ink); --e: var(--d-pintab-edge); }
+.bk.paw .icon { flex: none; fill: currentColor; }
 .bk.paw.on { writing-mode: horizontal-tb; padding: 0; height: 64px; }
 .bk.add { background: transparent; border: 1px dashed color-mix(in srgb, var(--d-icon) 60%, transparent); color: var(--d-icon); height: 26px; }
 .side-right .bk.add { border-right: none; }
@@ -414,7 +423,8 @@ mark { background: var(--d-mark); color: inherit; border-radius: 2px; padding: 0
 :root[data-backdrop="none"] .hd { margin: 6px 10px 6px; padding: 6px 6px 4px 12px; border-radius: 14px; background: var(--d-card); box-shadow: 0 0 0 1px var(--d-card-edge), 0 2px 8px rgba(0, 0, 0, 0.18); }
 :root[data-backdrop="none"] .qk { box-shadow: 0 0 0 1px var(--d-qk-edge), 0 4px 14px rgba(0, 0, 0, 0.22); }
 :root[data-backdrop="none"] .it { box-shadow: 0 1px 0 var(--d-slip-bottom), 0 4px 14px rgba(0, 0, 0, 0.22), 0 0 0 1px var(--d-card-edge); }
-:root[data-backdrop="none"] .it.selected { box-shadow: 0 1px 0 var(--d-slip-bottom), 0 4px 14px rgba(0, 0, 0, 0.22), 0 0 0 2px var(--ln); }
+:root[data-backdrop="none"] .it.open { box-shadow: 0 1px 0 var(--d-slip-bottom), 0 6px 18px rgba(0, 0, 0, 0.34), 0 0 0 1px var(--d-card-edge); }
+:root[data-backdrop="none"] .it.selected:not(.open) { box-shadow: 0 1px 0 var(--d-slip-bottom), 0 6px 18px rgba(0, 0, 0, 0.34), 0 0 0 1.5px color-mix(in srgb, var(--ln) 55%, var(--d-card-edge)); }
 :root[data-backdrop="none"] .grp { align-self: flex-start; padding: 2px 9px; border-radius: 999px; background: var(--d-card); box-shadow: 0 0 0 1px var(--d-card-edge), 0 2px 6px rgba(0, 0, 0, 0.16); color: var(--d-preview); }
 :root[data-backdrop="none"] .grp::after { display: none; }
 :root[data-backdrop="none"] .ft { border-top: none; background: transparent; }
@@ -424,19 +434,21 @@ mark { background: var(--d-mark); color: inherit; border-radius: 2px; padding: 0
 :root[data-backdrop="none"] .empty { padding: 12px; border-radius: 12px; background: var(--d-card); box-shadow: 0 0 0 1px var(--d-card-edge), 0 4px 14px rgba(0, 0, 0, 0.22); }
 :root[data-backdrop="none"] .tabs { top: calc(var(--d-top) + 128px); }
 
-/* ─── The handle (a window of its own) ─── */
+/* ─── The handle (a window of its own): 1.30, one solid pale cream with a soft 1 px edge and a dark paw — the same on
+   every paper, day and night, since it sits on the screen's edge over other apps, not on the drawer's paper. Today's
+   number is in its tooltip and its description, not on its face. ─── */
 body.handle-window { background: transparent; overflow: hidden; }
 .handle {
+  --handle-fill: #f6e7b0; --handle-edge: #e2cf86; --handle-paw: #5e4a12;
   position: absolute; top: 2px; width: 30px; height: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
-  background: repeating-linear-gradient(135deg, var(--a) 0 5px, var(--b) 5px 10px); color: var(--k); border: 1px solid var(--e);
+  background: var(--handle-fill); color: var(--handle-paw); border: 1px solid var(--handle-edge);
   box-shadow: 0 2px 6px rgba(60, 48, 24, 0.22); transition: transform 0.12s ease-out; cursor: default; padding: 0;
 }
 .handle.side-right { right: 0; border-radius: 10px 0 0 10px; border-right: none; transform: translateX(6px); padding-right: 6px; }
 .handle.side-left { left: 0; border-radius: 0 10px 10px 0; border-left: none; transform: translateX(-6px); padding-left: 6px; }
 .handle:hover, .handle.peek { transform: translateX(0); }
-.handle .n { font: 700 9.5px/11px var(--ui); font-variant-numeric: tabular-nums; }
 .handle .icon { fill: currentColor; stroke-width: 0.6; }
-.handle:focus-visible { outline: 2px solid var(--k); outline-offset: -3px; }
+.handle:focus-visible { outline: 2px solid var(--handle-paw); outline-offset: -3px; }
 
 @media (prefers-reduced-motion: reduce) {
   .stage, .handle { transition: none; }
@@ -444,16 +456,17 @@ body.handle-window { background: transparent; overflow: hidden; }
 @media (forced-colors: active) {
   .dr, .it, .bk, .qk, .menu, .handle, .grp, .pill, .kchip { border: 1px solid CanvasText; }
   .it.selected { outline: 2px solid Highlight; }
+  .it:focus-visible { outline: 2px solid Highlight; }
 }
 
 /* Handwriting overhangs its first letter (Caveat's y, J): a little room on the left that the layout doesn't see. */
 .it .row .hw, .fname .hw, .menu .mh b { padding-left: 2px; margin-left: -2px; }
 
 /* The open memo's first line, edited in handwriting where its title stands. */
-.hw-field { flex: 1; min-width: 0; height: 22px; border: 0; outline: none; background: transparent; color: var(--d-ink); padding: 0 var(--ink-over) 0 0; margin: 0;
-  font-family: var(--d-hand); font-size: 20px; line-height: 22px; user-select: text; }
+.hw-field { flex: 1; min-width: 0; height: 28px; border: 0; outline: none; background: transparent; color: var(--d-ink); padding: 0 var(--ink-over) 0 0; margin: 0;
+  font-family: var(--d-hand); font-size: 22px; line-height: 28px; user-select: text; }
 .hw-field::placeholder { color: var(--d-meta); }
-:root[data-font="clean"] .hw-field { font: 600 14px var(--ui); }
-.big .hw-field { font-size: 22px; height: 30px; }
-:root[data-font="clean"] .big .hw-field { font-size: 15px; }
+:root[data-font="clean"] .hw-field { font: 600 15px/28px var(--ui); }
+.big .hw-field { font-size: 24px; height: 30px; }
+:root[data-font="clean"] .big .hw-field { font-size: 16px; }
 .editor::placeholder { color: var(--d-meta); }

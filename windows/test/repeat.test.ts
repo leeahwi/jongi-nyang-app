@@ -130,7 +130,7 @@ test("store: an unreadable memos.json is kept aside, not overwritten", () => {
   try {
     fs.writeFileSync(path.join(directory, "memos.json"), "{ broken");
     const store = new Store(directory);
-    assert.ok(store.storageError?.includes("메모를"));
+    assert.ok(store.storageError?.includes("메모 파일을"));
     assert.ok(fs.readdirSync(directory).some((name) => name.startsWith("memos.unreadable-")));
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });

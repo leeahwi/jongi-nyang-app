@@ -17,13 +17,13 @@
 /* A row's line icon on a small square tinted by the pane (as on the Mac): 꾸미기 honey, 알림 lavender,
    종이냥 rose, 시계 clay, 일정 sky, 저장과 백업 paper, 반복 sage. */
 :root { --tint: var(--sage-2); }
-:root[data-pane="appearance"] { --tint: var(--tab-1); }
-:root[data-pane="notifications"] { --tint: var(--tab-2); }
+:root[data-pane="appearance"] { --tint: var(--tint-1); }
+:root[data-pane="notifications"] { --tint: var(--tint-2); }
 :root[data-pane="pet"] { --tint: var(--tab-3); }
 :root[data-pane="clock"] { --tint: var(--clay-2); }
 :root[data-pane="events"] { --tint: var(--event-blue-2); }
 :root[data-pane="storage"] { --tint: var(--paper-2); }
-:root[data-pane="ai"] { --tint: var(--tab-2); }
+:root[data-pane="ai"] { --tint: var(--tint-2); }
 .glyph { width: 28px; height: 28px; flex: none; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: var(--tint); }
 .row .glyph .icon { color: var(--ink); }
 .choice { width: 100%; text-align: left; }
@@ -92,7 +92,14 @@ select { height: 28px; border-radius: 7px; border: 1px solid var(--rule); backgr
 .row.storage .where { display: flex; justify-content: space-between; gap: 8px; }
 .row.storage .kind { color: var(--secondary); font-weight: 500; }
 /* A folder's place on disk: one line, shortened in the middle when it is long (settings.ts folderPath); select it to copy the whole path. */
-.folder-path { margin-top: 3px; font: 11px/1.4 Consolas, "Cascadia Mono", ui-monospace, monospace; color: var(--secondary); white-space: nowrap; overflow: hidden; user-select: text; cursor: text; }
+/* 저장과 백업's folders (1.30): the places it is in faint, cut from the front when long (direction: rtl on the box, the text
+   kept left to right in a bdi), then the folder's own name whole and a little bolder — like a path bar, not code. */
+.folder-place { margin-top: 3px; display: flex; min-width: 0; font: 500 11.5px/1.4 var(--ui); color: var(--ink-3); white-space: nowrap; user-select: text; }
+.folder-place .fp-lead { min-width: 0; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+.folder-place .fp-lead bdi { direction: ltr; unicode-bidi: isolate; }
+/* (A box's last space collapses: the gap before the name is its margin.) */
+.folder-place .fp-lead + .fp-name { margin-left: 0.3em; }
+.folder-place .fp-name { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--ink-2); }
 .row.storage-actions { gap: 6px; padding-top: 8px; padding-bottom: 8px; }
 .row .action.small { height: 30px; padding: 0 12px; font-size: 12px; font-weight: 600; gap: 5px; }
 .row .action.small .icon { color: inherit; }
@@ -163,4 +170,49 @@ input.step-value:focus { background: var(--card); outline: 2px solid color-mix(i
 .keyfield:hover { border-color: var(--check-border); }
 .keyfield.recording { border-color: var(--sage); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sage) 22%, transparent); color: var(--sage-text); }
 .row.drawer-key { gap: 8px; }
+.row.drawer-key .switch { margin-left: 4px; }
+/* A small text button in the sage text colour: ‘기본값’ beside a changed key, ‘자세히’ at the end of a footnote (#21, #27). */
+.textlink { padding: 0 2px; border: 0; background: none; font: 600 11.5px var(--ui); color: var(--sage-text); cursor: pointer; white-space: nowrap; }
+.textlink:hover { text-decoration: underline; }
+.foot .textlink { font-size: 11px; padding: 0; }
+/* 메모 서랍 › 폭: a sage slider and its number. */
+.width-slider { width: 150px; accent-color: var(--sage); }
+.width-value { min-width: 30px; text-align: right; font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+/* The pane header's own button (메모 서랍's 서랍 열기). */
+.pane-head .ph-action { flex: none; height: 32px; padding: 0 12px; font-size: 12px; font-weight: 600; gap: 5px; }
+.pane-head .ph-action .icon { color: inherit; }
 .row.drawer-theme .segmented button { padding: 0 8px; }
+
+/* 스페이스 (1.30): a row per space — the grip, its colour, its name typed over in place, its open to-dos, 지우기. */
+.row.space-row { gap: 8px; }
+.space-grip { width: 16px; height: 28px; margin-left: -6px; flex: none; display: flex; align-items: center; justify-content: center; color: var(--faint); cursor: grab; transform: rotate(90deg); }
+.space-row.new .space-grip { cursor: default; }
+.space-row.dragging { background: color-mix(in srgb, var(--sage) 8%, var(--card)); cursor: grabbing; }
+.space-swatch { width: 18px; height: 18px; flex: none; border-radius: 50%; background: var(--band); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--card) 40%, transparent); }
+.space-swatch:not(.still):hover, .space-swatch[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--card), 0 0 0 3.5px var(--band); }
+.space-name { flex: 1; min-width: 0; height: 30px; padding: 0 8px; margin-left: 2px; border-radius: 7px; border: 1px solid transparent; background: transparent; font: 13px var(--ui); color: var(--ink); user-select: text; }
+.space-name:hover { border-color: var(--rule); }
+.space-name:focus { outline: none; border-color: var(--sage); background: var(--paper); }
+.space-name::placeholder { color: var(--ink-3); }
+.space-count { flex: none; font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.space-delete { width: 28px; height: 28px; flex: none; border-radius: 7px; display: flex; align-items: center; justify-content: center; color: var(--ink-2); }
+.space-delete:hover { background: color-mix(in srgb, var(--clay) 10%, transparent); color: var(--clay-text); }
+.row.space-colors { min-height: 40px; gap: 10px; padding-left: 46px; }
+.space-colors button { width: 20px; height: 20px; border-radius: 50%; background: var(--band); flex: none; }
+.space-colors button:hover, .space-colors button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--card), 0 0 0 3.5px var(--band); }
+.space-colors button[aria-checked="true"] { box-shadow: 0 0 0 2px var(--card), 0 0 0 3.5px var(--ink); }
+.choice.space-add { gap: 6px; }
+.settings-toast { position: fixed; left: 0; right: 0; bottom: 18px; display: flex; justify-content: center; pointer-events: none; z-index: 20; padding: 0 16px; }
+
+/* #22: the list panes' rows. + 새 … is the card's last row; a row's trash shows under the pointer (or the keyboard); a row's
+   right-click is the paper menu (menu.css, with the note's tokens). */
+.row.list-add { gap: 10px; color: var(--sage-text); font-weight: 500; }
+.row.list-add > .icon { width: 28px; flex: none; }
+.hover-trash .quiet.danger, .space-row .space-delete { opacity: 0; transition: opacity 0.12s ease-out; }
+.hover-trash:hover .quiet.danger, .hover-trash .quiet.danger:focus-visible, .space-row:hover .space-delete, .space-row .space-delete:focus-visible { opacity: 1; }
+:root {
+  --d-menu: var(--card); --d-menu-edge: var(--rule-strong); --d-ink: var(--ink); --d-meta: var(--ink-3); --d-icon: var(--ink-2); --d-hover: color-mix(in srgb, var(--ink) 7%, transparent);
+  --d-danger: var(--clay-text); --d-sub: var(--sage-text); --d-preview: var(--ink-2); --d-select: var(--sage); --d-hand: var(--body-font);
+}
+body > .menu { position: fixed; }
+:root[data-paper="night"] .menu { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 30px -10px rgba(0, 0, 0, 0.7); }

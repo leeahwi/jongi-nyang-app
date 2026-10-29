@@ -124,6 +124,19 @@ public enum DayStrip {
                      rows: Array(later.dropFirst().prefix(limit)))
     }
 
+    /// #31: the list row's small mark for the to-do the strip shows going on now ("지금"). #47: only that one — the to-dos up
+    /// next sit under the list's own "다음" heading, so a "다음" mark said the same word a third time and cut en · nl titles.
+    /// Done ones get none. Same as dayStrip.ts `stripMarks`.
+    public static func marks(_ state: State) -> [String: Mode] {
+        guard state.mode == .now, let lead = state.lead, lead.kind != .event, !lead.done, let id = lead.taskID else { return [:] }
+        return [id: .now]
+    }
+
+    /// The mark's word: "지금" · "Now" · "Nu", "다음" · "Next" · "Volgende".
+    public static func markWord(_ mode: Mode, language: AppLanguage) -> String {
+        mode == .now ? DayRibbon.nowWord(language) : ["다음", "Next", "Volgende"][language.index]
+    }
+
     /// Rows under the lead: one in a narrow note (≤ 400 pt wide), three in a tall one (≥ 720 pt high), else two.
     public static func rowLimit(width: Double, height: Double) -> Int {
         width <= 400 ? 1 : height >= 720 ? 3 : 2
@@ -142,16 +155,25 @@ public enum DayStrip {
     // MARK: Words
 
     /// The ring's centre: the number and the small word under it. Under an hour "40" + "분 남음" · "min left" ·
-    /// "min over" (`.next`: "분 뒤" · "min away" · "min te gaan"); an hour or more "1:20" + "남음" · "left" · "over"
-    /// (`.next`: "뒤" · "away" · "te gaan").
+    /// "min te gaan" (#54: not "min over", which sat over "over 40 min" = in 40 min) (`.next`: "분 뒤" · "min away" ·
+    /// "min te gaan"; the kicker above says Nu or Volgende). An hour or more: the hours on top and the rest under
+    /// them, so it reads as a length, never a clock time (1.45 — "1:01 뒤" read as 1:01 beside "다음 · 15:45"):
+    /// "1시간" + "20분 남음" · "1 h" + "20 min left" · "1 u" + "en 20 min" (Dutch reads "1 uur en 20 minuten"; "20 min te gaan" was cut under the hour, #60); `.next` "1시간" + "5분 뒤" · "1 h" + "5 min away"
+    /// · "1 u" + "en 5 min"; on the hour "2시간" + "뒤" · "away" · "te gaan". The rows' rule (`awayText`): from two
+    /// hours away, the nearest whole hour ("3시간" + "뒤" for 2 h 30 min); time left stays exact (`leftText`).
     public static func ringText(minutes: Int, mode: Mode, language: AppLanguage) -> (value: String, caption: String) {
         let left = mode != .next
+        let index = language.index
         if minutes < 60 {
-            let caption = left ? ["분 남음", "min left", "min over"][language.index] : ["분 뒤", "min away", "min te gaan"][language.index]
+            let caption = left ? ["분 남음", "min left", "min te gaan"][index] : ["분 뒤", "min away", "min te gaan"][index]
             return ("\(minutes)", caption)
         }
-        let caption = left ? ["남음", "left", "over"][language.index] : ["뒤", "away", "te gaan"][language.index]
-        return ("\(minutes / 60):" + String(format: "%02d", minutes % 60), caption)
+        let shown = left || minutes < 120 ? minutes : Int((Double(minutes) / 60).rounded(.toNearestOrAwayFromZero)) * 60
+        let h = shown / 60, m = shown % 60
+        let value = ["\(h)시간", "\(h) h", "\(h) u"][index]
+        if m == 0 { return (value, left ? ["남음", "left", "te gaan"][index] : ["뒤", "away", "te gaan"][index]) }
+        let caption = left ? ["\(m)분 남음", "\(m) min left", "en \(m) min"][index] : ["\(m)분 뒤", "\(m) min away", "en \(m) min"][index]
+        return (value, caption)
     }
 
     /// A row's "when": "40분 뒤" · "in 40 min" · "over 40 min"; under two hours with its minutes ("1시간 5분 뒤",

@@ -69,9 +69,10 @@ export function readNotifyLink(argv: readonly string[]): NotifyAction | undefine
 const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 
 const words: Record<Lang, { done: string; later: string; stop: string; again: string }> = {
-  ko: { done: "끝냄", later: "10분 뒤", stop: "끄기", again: "다시 알림" },
-  en: { done: "Done", later: "In 10 min", stop: "Stop", again: "Snooze" },
-  nl: { done: "Klaar", later: "Over 10 min", stop: "Stoppen", again: "Sluimeren" },
+  // A button says what it does (#38): 끝내기, not the state word 끝냄.
+  ko: { done: "끝내기", later: "10분 뒤", stop: "끄기", again: "다시 알림" },
+  en: { done: "Mark done", later: "In 10 min", stop: "Stop", again: "Snooze" },
+  nl: { done: "Afvinken", later: "Over 10 min", stop: "Stoppen", again: "Sluimeren" },
 };
 
 /**

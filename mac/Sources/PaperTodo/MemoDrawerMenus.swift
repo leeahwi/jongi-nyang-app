@@ -26,8 +26,10 @@ struct DrawerMenuItem {
     var symbol: String?
     /// A folder's colour square instead of a symbol.
     var square: MemoFolders.Color?
-    /// The square drawn as 고정's paw.
-    var paw = false
+    /// 고정's pin (#26: docs/icons.md, the paw is the drawer's own).
+    var pin = false
+    /// 할 일 스페이스 (1.45): a space's colour dot instead of a symbol.
+    var dot: SpaceDot?
     /// Shown right-aligned (a folder's count).
     var detail: String?
     /// Shown as the row's shortcut (and pressed while the menu is open): the key and its modifiers.
@@ -98,11 +100,11 @@ enum DrawerMenus {
             var item = DrawerMenuItem.action(folder.displayName(.current), symbol: nil, key: index < 9 ? cmd("\(index + 1)") : nil,
                                              checked: drawer.tab == .folder(folder.id) && !drawer.searching) { drawer.show(.folder(folder.id)) }
             item.square = folder.colorKey
-            item.detail = "\(drawer.folders.count(drawer.memos, in: folder.id))"
+            item.detail = "\(drawer.folderCount(folder.id))"
             items.append(item)
         }
         var pinned = DrawerMenuItem.action(L("고정"), symbol: nil, key: cmd("0"), checked: drawer.tab == .pinned && !drawer.searching) { drawer.show(.pinned) }
-        pinned.paw = true
+        pinned.pin = true
         pinned.detail = "\(drawer.folders.pinnedMemos(drawer.memos).count)"
         items.append(pinned)
         items.append(.separator)
@@ -136,7 +138,7 @@ enum DrawerMenus {
             .action(L("메모 서랍 설정…"), symbol: "gearshape", key: cmd(",")) { drawer.openSettings() },
             .action(L("도움말"), symbol: "questionmark.circle") { drawer.openHelp() },
             .separator,
-            .action(L("종이냥 끝내기"), symbol: "power", key: cmd("q")) { NSApp.terminate(nil) },
+            .action(L("종이냥 종료"), symbol: "power", key: cmd("q")) { NSApp.terminate(nil) },
         ]
     }
 
@@ -155,7 +157,7 @@ enum DrawerMenus {
             .action(L("복사"), symbol: "doc.on.doc", key: cmd("c", .shift)) { drawer.copy(id) },
             .action(L("복제"), symbol: "plus.square.on.square") { drawer.duplicate(id) },
             .separator,
-            .action(String(localized: "고정", table: "Drawer"), symbol: "pawprint", checked: pinned) { drawer.togglePin(id) },
+            .action(String(localized: "고정", table: "Drawer"), symbol: "pin", checked: pinned) { drawer.togglePin(id) },
             .submenu(L("폴더로 옮기기"), symbol: "tray.and.arrow.down", move(drawer, id)),
             .separator,
             .section(L("이 메모의 종이")),
@@ -171,7 +173,7 @@ enum DrawerMenus {
     /// 이 메모의 종이: 서랍 따라 · 낮 · 밤 · 크라프트 · 모눈.
     static func paperSwatches(_ drawer: MemoDrawer, _ id: String) -> [DrawerSwatch] {
         let current = drawer.folders.paper(of: id)
-        var out = [DrawerSwatch(id: "follow", label: L("서랍 따라"), look: .split, picked: current == nil) { drawer.setPaper(id, nil) }]
+        var out = [DrawerSwatch(id: "follow", label: L("서랍과 같게"), look: .split, picked: current == nil) { drawer.setPaper(id, nil) }]
         for paper in MemoFolders.Paper.allCases {
             let kind = DrawerPalette.Kind(rawValue: paper.rawValue)!
             out.append(DrawerSwatch(id: paper.rawValue, label: paper.short, look: .sheet(kind), picked: current == paper) { drawer.setPaper(id, paper) })
@@ -205,7 +207,7 @@ enum DrawerMenus {
     static func memoGear(_ drawer: MemoDrawer, _ id: String) -> [DrawerMenuItem] {
         guard let memo = drawer.memo(id) else { return [] }
         var items: [DrawerMenuItem] = [
-            .action(String(localized: "고정", table: "Drawer"), symbol: "pawprint", checked: drawer.folders.isPinned(id)) { drawer.togglePin(id) },
+            .action(String(localized: "고정", table: "Drawer"), symbol: "pin", checked: drawer.folders.isPinned(id)) { drawer.togglePin(id) },
             .separator,
             .section(L("이 메모의 종이")),
             .swatches(paperSwatches(drawer, id)),
@@ -222,7 +224,7 @@ enum DrawerMenus {
         guard let folder = drawer.folders.folder(id) else { return [] }
         var header = DrawerMenuItem(kind: .header, title: folder.displayName(.current))
         header.square = folder.colorKey
-        header.detail = MemoFolders.sheetCount(drawer.folders.count(drawer.memos, in: id), language: .current)
+        header.detail = MemoFolders.sheetCount(drawer.folderCount(id), language: .current)
         let colors = MemoFolders.Color.allCases.map { color in
             var item = DrawerMenuItem.action(color.title, symbol: nil, checked: folder.colorKey == color) { drawer.model.recolorMemoFolder(id, to: color) }
             item.square = color
@@ -247,11 +249,11 @@ enum DrawerMenus {
     /// 고정's bookmark: 정렬 · 고정 모두 풀기.
     static func pinned(_ drawer: MemoDrawer) -> [DrawerMenuItem] {
         var header = DrawerMenuItem(kind: .header, title: L("고정"))
-        header.paw = true
+        header.pin = true
         header.detail = MemoFolders.sheetCount(drawer.folders.pinnedMemos(drawer.memos).count, language: .current)
         var items: [DrawerMenuItem] = [header, .separator, .submenu(L("정렬"), symbol: "arrow.up.arrow.down", sort(drawer, .pinned))]
         if !drawer.folders.pinnedMemos(drawer.memos).isEmpty {
-            items += [.separator, .action(L("고정 모두 풀기"), symbol: "pawprint", destructive: false) { drawer.unpinAll() }]
+            items += [.separator, .action(L("고정 모두 풀기"), symbol: "pin.slash", destructive: false) { drawer.unpinAll() }]
         }
         return items
     }
@@ -380,7 +382,8 @@ enum DrawerMenuBuilder {
     }
 
     static func image(_ item: DrawerMenuItem) -> NSImage? {
-        if item.paw { return NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: nil) }
+        if item.pin { return NSImage(systemSymbolName: "pin.fill", accessibilityDescription: nil) }
+        if let dot = item.dot { return PaperTheme.spaceDot(dot) }
         if let square = item.square { return colorSquare(square) }
         guard let symbol = item.symbol else { return nil }
         let image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
@@ -562,10 +565,10 @@ struct DrawerSwatchSample: View {
             }
         case .sheet(let kind):
             let palette = DrawerPalette.of(kind)
+            // A plain sheet (#14, sheet D: no margin line); 모눈 keeps its grid so it reads apart from 낮.
             ZStack(alignment: .leading) {
                 palette.sheet
-                if kind == .grid { GridLines(step: 6).stroke(palette.sheetRule, lineWidth: 0.6) }
-                Rectangle().fill(palette.sheetMargin).frame(width: 1).padding(.leading, 7)
+                if kind == .grid { GridLines(step: 6).stroke(palette.rule, lineWidth: 0.6) }
             }
             .overlay { Rectangle().strokeBorder(palette.sheetEdge, lineWidth: 1) }
         case .backdrop(let backdrop, let kind):
@@ -628,8 +631,8 @@ struct DrawerMenuHeader: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            if item.paw {
-                Image(systemName: "pawprint.fill").font(.system(size: 12)).foregroundStyle(.secondary)
+            if item.pin {
+                Image(systemName: "pin.fill").font(.system(size: 12)).foregroundStyle(.secondary)
             } else if let square = item.square {
                 Image(nsImage: DrawerMenuBuilder.colorSquare(square))
             } else if let symbol = item.symbol {
@@ -684,8 +687,10 @@ struct DrawerMenuPreview: View {
             HStack(spacing: 7) {
                 Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold)).opacity(item.checked ? 1 : 0).frame(width: 12)
                 Group {
-                    if item.paw {
-                        Image(systemName: "pawprint.fill")
+                    if item.pin {
+                        Image(systemName: "pin.fill")
+                    } else if let dot = item.dot {
+                        Image(nsImage: PaperTheme.spaceDot(dot))
                     } else if let square = item.square {
                         Image(nsImage: DrawerMenuBuilder.colorSquare(square))
                     } else if let symbol = item.symbol {
@@ -696,7 +701,7 @@ struct DrawerMenuPreview: View {
                 }
                 .font(.system(size: 12.5))
                 .frame(width: 16)
-                .opacity(item.symbol == nil && item.square == nil && !item.paw ? 0 : 1)
+                .opacity(item.symbol == nil && item.square == nil && item.dot == nil && !item.pin ? 0 : 1)
                 Text(item.title).font(.system(size: 13)).foregroundStyle(item.destructive ? Color(nsColor: .systemRed) : .primary).lineLimit(1)
                 Spacer(minLength: 16)
                 if let detail = item.detail { Text(detail).font(.system(size: 13)).foregroundStyle(.secondary) }

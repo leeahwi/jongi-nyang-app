@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Jongi-nyang — a to-do app like a sheet of paper</title>
-<meta name="description" content="A note for today's to-dos, with a paper cat at the bottom of your screen. A free to-do app for macOS and Windows.">
+<meta name="description" content="A notepad for today's to-dos, with a paper cat at the bottom of your screen. A free to-do app for macOS and Windows.">
 <meta name="theme-color" content="#fbf9f3" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#2a2924" media="(prefers-color-scheme: dark)">
 <link rel="icon" type="image/png" href="../assets/favicon.png">
@@ -13,7 +13,7 @@
 <link rel="alternate" hreflang="en" href="https://leeahwi.github.io/jongi-nyang-app/en/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Jongi-nyang — a to-do app like a sheet of paper">
-<meta property="og:description" content="A note for today's to-dos. For macOS and Windows.">
+<meta property="og:description" content="A notepad for today's to-dos. For macOS and Windows.">
 <meta property="og:image" content="https://leeahwi.github.io/jongi-nyang-app/assets/og-en.png">
 <meta property="og:url" content="https://leeahwi.github.io/jongi-nyang-app/en/">
 <meta name="twitter:card" content="summary_large_image">
@@ -36,6 +36,7 @@
     <nav class="nav" aria-label="Main">
       <a href="#tour">Tour</a>
       <a href="#features">Features</a>
+      <a href="#spaces">Spaces</a>
       <a href="#drawer">Notes drawer</a>
       <a href="#built">How it's built</a>
       <a href="#faq">FAQ</a>
@@ -56,13 +57,13 @@
 <main id="main">
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap">
-      <a class="badge" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.44.0"><span class="dot" aria-hidden="true"></span>New · notes in a drawer at the screen edge<span class="go" aria-hidden="true">→</span></a>
+      <a class="badge" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.45.0"><span class="dot" aria-hidden="true"></span>New · sort to-dos into spaces<span class="go" aria-hidden="true">→</span></a>
       <h1 id="hero-title">Today's to-dos,<br>on <span class="hand">one sheet of paper.</span></h1>
-      <p class="lede">A note for writing down to-dos and ticking them off. The top shows what's on now and how long is left, and a paper cat brings your reminders. There's no account; everything is saved as files on your computer.</p>
+      <p class="lede">A notepad for writing down to-dos and ticking them off. The top shows what's on now and how long is left, and a paper cat brings your reminders. There's no account; everything is saved as files on your computer.</p>
       <div class="cta">
-        <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.44.0">
+        <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.45.0">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
-          Download for Mac <small>1.44.0</small>
+          Download for Mac <small>1.45.0</small>
         </a>
         <div class="line" role="img" aria-label="Input line example: ‘meeting tomorrow 3pm’ is read as ‘Event · tomorrow 3:00 PM’" data-line='[["meeting tomorrow 3pm","Event · tomorrow 3:00 PM"],["report by Friday","To-do · due Friday"],["timer 40","40-minute timer"],["alarm 7am weekdays","Alarm · weekdays 7:00 AM","clay"]]'>
           <span class="pen" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg></span>
@@ -70,7 +71,7 @@
           <span class="chip" aria-hidden="true">Event · tomorrow 3:00 PM</span>
         </div>
       </div>
-      <p class="alt">Also for Windows 10/11: <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.29.0">Download for Windows 1.29.0</a> · <span lang="ko">종이냥</span> (<i>jongi-nyang</i>) means “paper cat”.</p>
+      <p class="alt">Also for Windows 10/11: <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.30.0">Download for Windows 1.30.0</a> · <span lang="ko">종이냥</span> (<i>jongi-nyang</i>) means ‘paper cat’.</p>
     </div>
   </section>
 
@@ -95,17 +96,17 @@
         <div class="slides">
           <article class="slide" id="s-note" role="tabpanel" aria-labelledby="t-note">
             <div>
-              <p class="kicker">01 · The note</p>
-              <h3>A note that puts now first</h3>
-              <p>One sheet of paper with Today and Ahead tabs. The day strip at the top writes what's on now in large handwriting, with the time left in a ring beside it. What's next and today's list follow below.</p>
+              <p class="kicker">01 · The notepad</p>
+              <h3>A notepad that puts now first</h3>
+              <p>One sheet of paper with Today and Ahead tabs. The day ribbon at the top writes what's on now in large handwriting, with the time left in a ring beside it. What's next and today's list follow below.</p>
             </div>
-            <figure class="shot" style="margin:0"><img src="../assets/note-en.webp" width="640" height="976" alt="The Jongi-nyang note on a Mac: the day strip shows ‘Team meeting’ now with 30 minutes left, then what's next and today's list"></figure>
+            <figure class="shot" style="margin:0"><img src="../assets/note-en.webp" width="640" height="976" alt="The Jongi-nyang notepad on a Mac: the day ribbon shows ‘Team meeting’ now with 30 minutes left, then what's next and today's list"></figure>
           </article>
           <article class="slide" id="s-day" role="tabpanel" aria-labelledby="t-day" hidden>
             <div>
               <p class="kicker">02 · Timetable</p>
               <h3>Your day, unfolded</h3>
-              <p>Click the day strip and the day unfolds into a timetable right there. Drag a block and it follows the mouse, then settles on a quarter hour. Drag its top or bottom edge to change its length.</p>
+              <p>Click the day ribbon and the day unfolds into a timetable right there. Drag a block and it follows the mouse, then settles on a quarter hour. Drag its top or bottom edge to change its length.</p>
             </div>
             <figure class="shot" style="margin:0"><img src="../assets/day-en.webp" width="640" height="613" alt="The unfolded day timetable: events as color blocks and to-dos outlined in green" loading="lazy"></figure>
           </article>
@@ -113,7 +114,7 @@
             <div>
               <p class="kicker">03 · Focus</p>
               <h3>Focus on one thing</h3>
-              <p>Type “report 25 min focus” and the note turns into a single card. When time is up, pick Done, 5 more min or Not now. It can run Pomodoro rounds too.</p>
+              <p>Type ‘report 25 min focus’ and the notepad turns into a single card. When time is up, pick Done, 5 more min or Not now. It can run Pomodoro rounds too.</p>
             </div>
             <figure class="shot" style="margin:0"><img src="../assets/focus-en.webp" width="640" height="854" alt="The focus card: a ring of time left around one to-do" loading="lazy"></figure>
           </article>
@@ -137,7 +138,7 @@
             <div>
               <p class="kicker">06 · Desk</p>
               <h3>Calendar and settings on the Desk</h3>
-              <p>Calendar, history, settings and help live in the Desk window. Keep the note small on screen, and open the Desk when you need to look further ahead.</p>
+              <p>Calendar, history, settings and help live in the Desk window. Keep the notepad small on screen, and open the Desk when you need to look further ahead.</p>
             </div>
             <figure class="shot" style="margin:0"><img src="../assets/desk-en.webp" width="1200" height="835" alt="The Desk window's calendar: a month view with the selected day's events on the right" loading="lazy"></figure>
           </article>
@@ -145,7 +146,7 @@
       </div>
       <div class="deckbar">
         <div role="tablist" aria-label="Screens">
-          <button class="pill" type="button" role="tab" id="t-note" aria-controls="s-note" aria-selected="true">Note</button>
+          <button class="pill" type="button" role="tab" id="t-note" aria-controls="s-note" aria-selected="true">Notepad</button>
           <button class="pill" type="button" role="tab" id="t-day" aria-controls="s-day" aria-selected="false" tabindex="-1">Timetable</button>
           <button class="pill" type="button" role="tab" id="t-focus" aria-controls="s-focus" aria-selected="false" tabindex="-1">Focus</button>
           <button class="pill" type="button" role="tab" id="t-alarm" aria-controls="s-alarm" aria-selected="false" tabindex="-1">Alarms</button>
@@ -181,7 +182,7 @@
         <article class="step reveal">
           <span class="num">02</span>
           <h3>See now first</h3>
-          <p>The day strip above the list shows what's on now and how long is left. Click it when you want the whole day.</p>
+          <p>The day ribbon above the list shows what's on now and how long is left. Click it when you want the whole day.</p>
           <div class="mini" aria-hidden="true">
             <div class="now">
               <div class="ring"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="17" fill="none" stroke="var(--rule)" stroke-width="4"/><circle cx="20" cy="20" r="17" fill="none" stroke="var(--sage)" stroke-width="4" stroke-linecap="round" stroke-dasharray="72 107"/></svg><b>30<small>min left</small></b></div>
@@ -206,8 +207,8 @@
     <div class="wrap">
       <div class="head reveal">
         <p class="eyebrow">Features</p>
-        <h2 id="features-title">Type anything on one line.<br>The note works it out.</h2>
-        <p>To-dos, events, timers and alarms all go into one input line. If it reads you wrong, press <kbd>Tab</kbd>. If you already added it, click “Switch” in the message that appears.</p>
+        <h2 id="features-title">Type anything on one line.<br>The notepad works it out.</h2>
+        <p>To-dos, events, timers and alarms all go into one input line. If it reads you wrong, press <kbd>Tab</kbd>. If you already added it, click ‘Switch’ in the message that appears.</p>
       </div>
       <div class="panel reveal" data-tabs>
         <div class="panel-top">
@@ -222,24 +223,24 @@
         <div class="tabpanel" id="p-event" role="tabpanel" aria-labelledby="k-event">
           <div class="panes">
             <div class="pane"><div class="pane-head"><span>You type</span><span>Input line</span></div><div class="pane-body"><div class="input"><span class="pen" aria-hidden="true">✎</span>meeting tomorrow 3pm</div><p class="hint">A day and a time, together.</p></div></div>
-            <div class="pane"><div class="pane-head"><span>It reads</span><span class="live">Chip</span></div><div class="pane-body result"><span class="chip">Event · tomorrow 3:00 PM</span><p>It goes onto tomorrow's day strip and timetable as a colored block.</p></div></div>
+            <div class="pane"><div class="pane-head"><span>It reads</span><span class="live">Chip</span></div><div class="pane-body result"><span class="chip">Event · tomorrow 3:00 PM</span><p>It goes onto tomorrow's day ribbon and timetable as a colored block.</p></div></div>
           </div>
         </div>
         <div class="tabpanel" id="p-todo" role="tabpanel" aria-labelledby="k-todo" hidden>
           <div class="panes">
-            <div class="pane"><div class="pane-head"><span>You type</span><span>Input line</span></div><div class="pane-body"><div class="input"><span class="pen" aria-hidden="true">✎</span>report by Friday</div><p class="hint">A due date with “by”.</p></div></div>
+            <div class="pane"><div class="pane-head"><span>You type</span><span>Input line</span></div><div class="pane-body"><div class="input"><span class="pen" aria-hidden="true">✎</span>report by Friday</div><p class="hint">A due date with ‘by’.</p></div></div>
             <div class="pane"><div class="pane-head"><span>It reads</span><span class="live">Chip</span></div><div class="pane-body result"><span class="chip">To-do · due Friday</span><p>It shows up as due on Friday in the Ahead tab.</p></div></div>
           </div>
         </div>
         <div class="tabpanel" id="p-timer" role="tabpanel" aria-labelledby="k-timer" hidden>
           <div class="panes">
-            <div class="pane"><div class="pane-head"><span>You type</span><span>Input line</span></div><div class="pane-body"><div class="input"><span class="pen" aria-hidden="true">✎</span>timer 40</div><p class="hint">Minutes after “timer”.</p></div></div>
-            <div class="pane"><div class="pane-head"><span>It reads</span><span class="live">Chip</span></div><div class="pane-body result"><span class="chip">40-minute timer</span><p>Add a to-do, as in “report 25 min focus”, and it becomes a focus card.</p></div></div>
+            <div class="pane"><div class="pane-head"><span>You type</span><span>Input line</span></div><div class="pane-body"><div class="input"><span class="pen" aria-hidden="true">✎</span>timer 40</div><p class="hint">Minutes after ‘timer’.</p></div></div>
+            <div class="pane"><div class="pane-head"><span>It reads</span><span class="live">Chip</span></div><div class="pane-body result"><span class="chip">40-minute timer</span><p>Add a to-do, as in ‘report 25 min focus’, and it becomes a focus card.</p></div></div>
           </div>
         </div>
         <div class="tabpanel" id="p-alarm" role="tabpanel" aria-labelledby="k-alarm" hidden>
           <div class="panes">
-            <div class="pane"><div class="pane-head"><span>You type</span><span>Input line</span></div><div class="pane-body"><div class="input"><span class="pen" aria-hidden="true">✎</span>alarm 7am weekdays</div><p class="hint">Days to ring on, like “weekdays”.</p></div></div>
+            <div class="pane"><div class="pane-head"><span>You type</span><span>Input line</span></div><div class="pane-body"><div class="input"><span class="pen" aria-hidden="true">✎</span>alarm 7am weekdays</div><p class="hint">Days to ring on, like ‘weekdays’.</p></div></div>
             <div class="pane"><div class="pane-head"><span>It reads</span><span class="live">Chip</span></div><div class="pane-body result"><span class="chip clay">Alarm · weekdays 7:00 AM</span><p>It rings every weekday morning. When it rings, you can snooze for 5, 10 or 15 minutes.</p></div></div>
           </div>
         </div>
@@ -252,7 +253,7 @@
         </article>
         <article class="tile reveal" style="--t: var(--tape-event)">
           <div class="art"><img src="../assets/pet-ko.webp" width="600" height="500" alt="The cat asking a question in a speech bubble with answer buttons (Korean interface)" loading="lazy"></div>
-          <div class="copy"><h3>A cat for company</h3><p>It breathes and wanders above the Dock, and walks over with a to-do when its reminder is due. Finish one and it celebrates. Now and then it asks “A 5-minute break?”; answer with a button and a 5-minute timer starts.</p></div>
+          <div class="copy"><h3>A cat for company</h3><p>It breathes and wanders above the Dock, and walks over with a to-do when its reminder is due. Finish one and it celebrates. Now and then it asks ‘A 5-minute break?’; answer with a button and a 5-minute timer starts.</p></div>
         </article>
         <article class="tile reveal" style="--t: var(--tape-timer)">
           <div class="art" aria-hidden="true">
@@ -265,10 +266,29 @@
           <div class="copy"><h3>Mac and Windows, one list</h3><p>Choose the same cloud folder as the storage location on both computers and they share one list. Edits made at nearly the same time both survive, and a memo edited on both is merged line by line and character by character.</p></div>
         </article>
         <article class="tile reveal" style="--t: var(--tape-memo)">
-          <div class="art top"><img src="../assets/note-night.webp" width="640" height="976" alt="The same note on night paper (Korean interface)" loading="lazy"></div>
-          <div class="copy"><h3>Night paper</h3><p>Put the system in dark mode and every window switches to night paper: the color of paper in a room with the lights off. Day or night, all text passes WCAG AA contrast.</p></div>
+          <div class="art top"><img src="../assets/note-night.webp" width="640" height="976" alt="The same notepad on night paper (Korean interface)" loading="lazy"></div>
+          <div class="copy"><h3>Night paper</h3><p>Put the system in dark mode and every window switches to night paper: the color of paper in a room with the lights off. Day or night, text stays easy to read (WCAG AA).</p></div>
         </article>
       </div>
+    </div>
+  </section>
+
+  <section id="spaces" aria-labelledby="spaces-title">
+    <div class="wrap">
+      <div class="head reveal">
+        <p class="eyebrow">To-do spaces</p>
+        <h2 id="spaces-title">Sorted, still one sheet</h2>
+        <p>From 1.45 (Windows 1.30) you can sort to-dos into spaces such as Work, Home and Study. Today still shows them all on one sheet, with only the space’s colour band at the left of each row.</p>
+      </div>
+      <div class="stage reveal">
+        <div class="film-frame"><img src="../assets/spaces-en.webp" width="1200" height="700" alt="Two Today sheets. On the left, to-do rows carry a space’s colour band at their edge; on the right, the same sheet shows Work only, with four other to-dos hidden" loading="lazy" style="display:block;width:100%;height:auto"></div>
+      </div>
+      <ul class="points">
+        <li class="reveal"><strong>Show one space</strong><span>Pick it from ‘All spaces ▾’ in the header, or press <kbd>⌥⌘1</kbd>–<kbd>9</kbd> (<kbd>Ctrl+Shift+1</kbd>–<kbd>9</kbd> on Windows). Everything shows again at 4 a.m. the next day.</span></li>
+        <li class="reveal"><strong># as you type</strong><span>Write ‘send the quote by Friday #work’ and it goes into Work. The start of the name, like ‘#wo’, is enough.</span></li>
+        <li class="reveal"><strong>Move and manage</strong><span>Right-click a to-do to move it to another space. Set names, colours and order under Desk → Spaces.</span></li>
+        <li class="reveal"><strong>Nothing changes until you make one</strong><span>With no spaces, the notepad looks just as before. Reminders and the cat still count the to-dos you’ve hidden.</span></li>
+      </ul>
     </div>
   </section>
 
@@ -298,13 +318,13 @@
     <div class="wrap">
       <div class="head reveal">
         <p class="eyebrow">Design</p>
-        <h2 id="design-title">The day strip, drawn three times</h2>
+        <h2 id="design-title">The day ribbon, drawn three times</h2>
         <p>I spent more time on how to show today above the list than on anything else. Rounds 1 and 2 showed the whole day. Using it, I found that what I needed was what's on now and how long is left.</p>
       </div>
       <div class="rounds reveal">
-        <div class="round"><span class="n">01</span><div><h3>Round 1</h3><p>The whole day as one bar, with now and next in one sentence.</p></div><div class="shot"><img src="../assets/round1.webp" width="720" height="189" alt="Day strip, round 1: a bar inside a card and a now-and-next sentence (Korean interface)" loading="lazy"></div></div>
-        <div class="round"><span class="n">02</span><div><h3>Round 2</h3><p>Six-hour ticks, with timed to-dos placed under the bar.</p></div><div class="shot"><img src="../assets/round2.webp" width="720" height="189" alt="Day strip, round 2: six-hour ticks (Korean interface)" loading="lazy"></div></div>
-        <div class="round"><span class="n">03</span><div><h3>Round 3</h3><p>No card, and what's on now written large. The whole day only opens when you click.</p></div><div class="shot"><img src="../assets/round3.webp" width="720" height="296" alt="Day strip, round 3: a thin bar, a 30-minutes-left ring, the current event in large handwriting and the next two rows (Korean interface)" loading="lazy"></div></div>
+        <div class="round"><span class="n">01</span><div><h3>Round 1</h3><p>The whole day as one bar, with now and next in one sentence.</p></div><div class="shot"><img src="../assets/round1.webp" width="720" height="189" alt="Day ribbon, round 1: a bar inside a card and a now-and-next sentence (Korean interface)" loading="lazy"></div></div>
+        <div class="round"><span class="n">02</span><div><h3>Round 2</h3><p>Six-hour ticks, with timed to-dos placed under the bar.</p></div><div class="shot"><img src="../assets/round2.webp" width="720" height="189" alt="Day ribbon, round 2: six-hour ticks (Korean interface)" loading="lazy"></div></div>
+        <div class="round"><span class="n">03</span><div><h3>Round 3</h3><p>No card, and what's on now written large. The whole day only opens when you click.</p></div><div class="shot"><img src="../assets/round3.webp" width="720" height="296" alt="Day ribbon, round 3: a thin bar, a 30-minutes-left ring, the current event in large handwriting and the next two rows (Korean interface)" loading="lazy"></div></div>
       </div>
       <div class="more"><a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/design-process.md">Read the design process (Korean) <span class="ext" aria-hidden="true">↗</span></a></div>
     </div>
@@ -320,13 +340,13 @@
       <div class="stats reveal">
         <div class="stat"><b>136 rows</b><span>of input-line cases both apps pass character for character</span></div>
         <div class="stat"><b>471 + 300</b><span>Windows tests, plus about 300 Mac checks</span></div>
-        <div class="stat"><b>61% → 0.7%</b><span>Mac idle CPU with the note open</span></div>
+        <div class="stat"><b>61% → 0.7%</b><span>Mac idle CPU with the notepad open</span></div>
         <div class="stat"><b>WCAG AA</b><span>for all text, day and night. Anything below it fails the check</span></div>
       </div>
       <ul class="points">
-        <li class="reveal"><strong>Case tables come first</strong><span>How “meeting tomorrow 3pm” is read, down to the words on the chip, is one row. The Swift and TypeScript tests must both produce that exact string.</span></li>
+        <li class="reveal"><strong>Case tables come first</strong><span>How ‘meeting tomorrow 3pm’ is read, down to the words on the chip, is one row. The Swift and TypeScript tests must both produce that exact string.</span></li>
         <li class="reveal"><strong>Screens are checked by rendering them</strong><span>On the Mac, about 1,500 real screens are captured across 3 languages, day and night. On Windows, every window is redrawn at different sizes, scale factors and fonts to catch clipped text.</span></li>
-        <li class="reveal"><strong>Where the 61% CPU came from</strong><span>The blinking “now” line in the day strip was redrawing the whole note every frame. Drawing that line on its own brought idle CPU down to 0.7%. In the same release, typing latency on the Mac fell from 0.46 s to 0.01 s and launch from 2.7 s to 1.0 s. On Windows, memory after 10 minutes went from 692 MB to 457 MB.</span></li>
+        <li class="reveal"><strong>Where the 61% CPU came from</strong><span>The blinking ‘now’ line in the day ribbon was redrawing the whole notepad every frame. Drawing that line on its own brought idle CPU down to 0.7%. In the same release, typing latency on the Mac fell from 0.46 s to 0.01 s and launch from 2.7 s to 1.0 s. On Windows, memory after 10 minutes went from 692 MB to 457 MB.</span></li>
         <li class="reveal"><strong>Not done yet</strong><span>The Windows version has only run in Electron on macOS, never on a real Windows PC. Neither app is code-signed.</span></li>
       </ul>
       <div class="more">
@@ -364,21 +384,21 @@
       <div class="downloads">
         <div class="dl reveal">
           <h3>Mac</h3>
-          <p class="meta">1.44.0 · macOS 14 or later · Apple Silicon · DMG</p>
+          <p class="meta">1.45.0 · macOS 14 or later · Apple Silicon · DMG</p>
           <ol>
             <li>Open the DMG and drag <strong>Jongi-nyang</strong> into Applications.</li>
             <li>In Applications, <strong>right-click → Open</strong>. If it's blocked: System Settings → Privacy &amp; Security → <strong>Open Anyway</strong>.</li>
           </ol>
-          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.44.0">Download for Mac</a>
+          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.45.0">Download for Mac</a>
         </div>
         <div class="dl reveal">
           <h3>Windows</h3>
-          <p class="meta">1.29.0 · Windows 10/11 x64 · installer or portable zip</p>
+          <p class="meta">1.30.0 · Windows 10/11 x64 · installer or portable zip</p>
           <ol>
-            <li>Run <code>JongiNyang-1.29.0-x64.exe</code>.</li>
+            <li>Run <code>JongiNyang-1.30.0-x64.exe</code>.</li>
             <li>If SmartScreen appears: <strong>More info → Run anyway</strong>.</li>
           </ol>
-          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.29.0">Download for Windows</a>
+          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.30.0">Download for Windows</a>
         </div>
       </div>
     </div>
@@ -397,6 +417,7 @@
         <ul>
           <li><a href="#tour">Tour</a></li>
           <li><a href="#features">Features</a></li>
+          <li><a href="#spaces">Spaces</a></li>
           <li><a href="#drawer">Notes drawer</a></li>
           <li><a href="#download">Download</a></li>
           <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/CHANGELOG.en.md">Changelog</a></li>
@@ -421,7 +442,7 @@
     </div>
     <div class="legal">
       <span>© 2026 leeAhwi · Source code under the <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/LICENSE">Apache License 2.0</a></span>
-      <span>Mac 1.44.0 · Windows 1.29.0</span>
+      <span>Mac 1.45.0 · Windows 1.30.0</span>
     </div>
   </div>
 </footer>

@@ -56,8 +56,8 @@ private enum LocalizationTests {
         }
 
         try test("placeholders, reordered") {
-            try expectEqual(L("\(3)개 중 \(1)개 완료, \(2)개 남음"),
-                            pick("3개 중 1개 완료, 2개 남음", "1 of 3 done, 2 left", "1 van 3 klaar, nog 2"), "progress")
+            try expectEqual(L("\(3)개 중 \(1)개 끝냈어요, \(2)개 남았어요"),
+                            pick("3개 중 1개 끝냈어요, 2개 남았어요", "1 of 3 done, 2 left", "1 van 3 klaar, nog 2"), "progress")
             try expectEqual(L("\("macOS 1.32.0")에서 \("Oct 8, 3:30 PM") 내보냄"),
                             pick("macOS 1.32.0에서 Oct 8, 3:30 PM 내보냄", "Exported from macOS 1.32.0 on Oct 8, 3:30 PM",
                                  "Geëxporteerd uit macOS 1.32.0 op Oct 8, 3:30 PM"), "backup origin")
@@ -68,7 +68,7 @@ private enum LocalizationTests {
             try expectEqual(L("오늘 고친 메모 \(3)장"), pick("오늘 고친 메모 3장", "3 notes changed today", "3 notities vandaag gewijzigd"), "notes")
             try expectEqual(L("\(1)시간마다"), pick("1시간마다", "Every hour", "Elk uur"), "every hour")
             try expectEqual(L("\(2)시간마다"), pick("2시간마다", "Every 2 hours", "Elke 2 uur"), "every 2 hours")
-            try expectEqual(L("오늘 할 일 \(1)개 모두 마침"), pick("오늘 할 일 1개 모두 마침", "Today’s to-do is done", "De taak van vandaag is klaar"), "one done")
+            try expectEqual(L("오늘 할 일 \(1)개를 모두 끝냈어요"), pick("오늘 할 일 1개를 모두 끝냈어요", "Today’s to-do is done", "De taak van vandaag is klaar"), "one done")
         }
 
         try test("the same Korean, a second meaning in its own table") {
@@ -91,16 +91,16 @@ private enum LocalizationTests {
             try expectEqual(L("완료"), pick("완료", "Mark done", "Afvinken"), "mark done stays")
             try expectEqual(L("예: 40 또는 1:30"), pick("예: 40 또는 1:30", "e.g. 40 or 1:30", "bijv. 40 of 1:30"), "placeholder")
             try expectEqual(L("쓰던 글은 남아요"), pick("쓰던 글은 남아요", "your text stays", "je tekst blijft"), "quick note context")
-            try expectEqual(L("무엇이든 적어요 — 할 일, 일정, 타이머 40…"),
-                            pick("무엇이든 적어요 — 할 일, 일정, 타이머 40…", "Type anything — a to-do, an event, timer 40…", "Typ iets — een taak, afspraak, timer 40…"), "input line")
-            try expectEqual(L("하루 띠 보이기"), pick("하루 띠 보이기", "Show day ribbon", "Dagbalk tonen"), "day ribbon setting")
+            try expectEqual(L("무엇이든 적어요: 할 일, 일정, ‘타이머 40’"),
+                            pick("무엇이든 적어요: 할 일, 일정, ‘타이머 40’", "Type anything: a to-do, an event, ‘timer 40’", "Typ wat je wilt: een taak, afspraak, ‘timer 40’"), "input line")
+            try expectEqual(L("하루 띠 보이기"), pick("하루 띠 보이기", "Show day ribbon", "Daglint tonen"), "day ribbon setting")
             try expectEqual(L("알람이 없어요. 아침 기상이나 약 먹을 시간을 맞춰 보세요."),
                             pick("알람이 없어요. 아침 기상이나 약 먹을 시간을 맞춰 보세요.", "No alarms yet. Set one for waking up or taking medicine.",
                                  "Nog geen wekkers. Zet er een om op te staan of je medicijnen te nemen."), "no alarms")
         }
 
         try test("the desk and night paper (glossary)") {
-            try expectEqual(DeskPane.calendar.windowTitle, pick("책상 — 달력", "Desk — Calendar", "Bureau — Kalender"), "window title")
+            try expectEqual(DeskPane.calendar.windowTitle, pick("달력", "Calendar", "Kalender"), "window title (#73: just the pane's name, not ‘책상 — 달력’)")
             try expectEqual(DeskPane.notifications.title, pick("알림", "Reminders", "Herinneringen"), "reminders pane (its own table)")
             try expectEqual(L("알림"), pick("알림", "Reminder", "Herinnering"), "one reminder stays")
             try expectEqual(DeskPane.pet.title, pick("종이냥", "Cat", "Kat"), "cat pane")
@@ -108,7 +108,7 @@ private enum LocalizationTests {
             try expectEqual(DeskPane.storage.title, pick("저장과 백업", "Storage & backup", "Opslag & back-up"), "storage pane")
             try expectEqual(DeskPane.Section.allCases.map(\.title), language == .ko ? ["보기", "설정", "도움"] : language == .en ? ["View", "Settings", "Help"] : ["Bekijken", "Instellingen", "Help"], "sidebar headings")
             try expectEqual(PaperColor.allCases.map(\.title), language == .ko ? ["자동", "낮", "밤"] : language == .en ? ["Automatic", "Day", "Night"] : ["Automatisch", "Dag", "Nacht"], "paper colour")
-            try expectEqual(L("종이 색"), pick("종이 색", "Paper", "Papier"), "paper setting")
+            try expectEqual(L("종이 색"), pick("종이 색", "Paper color", "Papierkleur"), "paper setting")
             try expectEqual(L("밤 종이"), pick("밤 종이", "Night paper", "Nachtpapier"), "night paper")
         }
 

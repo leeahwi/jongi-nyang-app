@@ -44,17 +44,34 @@ enum PaperTheme {
     static let marginRule = token("#e7d8ce", night: "#4a3630")
     /// An open checkbox's border.
     static let checkBorder = token("#908a7b", night: "#837e69")
-    /// The note's tabs: 오늘 (tab1), 앞으로 (tab2, lavender), 메모 (tab3).
-    static let tabToday = token("#f5e7b2", night: "#6a5e35")
-    static let tabAhead = token("#e3ddf2", night: "#4f4868")
+    /// The note's tabs (1.45, solid with a 1 pt edge): 오늘 honey, 앞으로 lavender — lighter at night than the
+    /// paper, so their names are in a dark ink there too (`tabInk`).
+    static let tabToday = token("#f6dc7c", night: "#c4a245")
+    static let tabAhead = token("#d6ccf6", night: "#9d92dc")
+    static let tabTodayEdge = token("#dcc062", night: "#d6b65a")
+    static let tabAheadEdge = token("#bdb0ea", night: "#b2a8ea")
+    /// A tab's name and count, picked or not: ink by day, a dark ink on the light night tabs.
+    static let tabInk = token("#2f2e2a", night: "#1f1d18")
+    /// The tabs' old softer colours, kept for what wears them under ink (light ink at night): the 꾸미기 · 알림 ·
+    /// AI 연결 panes' icon tiles and the help's groups.
+    static let tintToday = token("#f5e7b2", night: "#6a5e35")
+    static let tintAhead = token("#e3ddf2", night: "#4f4868")
+    /// 종이냥's pane tile and help group (rose).
     static let tabMemo = token("#f3dbd7", night: "#63443f")
-    /// Washi tape on the slips, by kind.
+    /// Washi tape on the slips, by kind (1.45: solid with a 1 pt edge like the tabs, no stripes). Its edge is the
+    /// colour a step darker by day and a step lighter at night, where the tape is lighter than the paper.
     static let tapeHoney = token("#e9cf7a", night: "#8a7a3f")
     static let tapeLavender = token("#cfc6ea", night: "#5d5578")
     static let tapeSky = token("#bcd0ea", night: "#4d5f7a")
     static let tapeMint = token("#c9dcc4", night: "#4f6650")
     static let tapeRose = token("#ecc4bc", night: "#7a4f4a")
     static let tapeNeutral = token("#d9d3c4", night: "#55524a")
+    static let tapeHoneyEdge = token("#c8b269", night: "#a19565")
+    static let tapeLavenderEdge = token("#b2aac9", night: "#7d7793")
+    static let tapeSkyEdge = token("#a2b3c9", night: "#717f95")
+    static let tapeMintEdge = token("#adbda9", night: "#728573")
+    static let tapeRoseEdge = token("#cba9a2", night: "#95726e")
+    static let tapeNeutralEdge = token("#bbb5a9", night: "#77756e")
     /// Event blue on a light tint (the event sheet's and alert's badge).
     static let eventBlue = token("#5585cc", night: "#8fb1e3")
     static let eventTint = token("#e2eaf6", night: "#313b4a")

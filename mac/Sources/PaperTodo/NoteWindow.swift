@@ -78,6 +78,14 @@ final class NoteWindow: NSWindow {
         isMovableByWindowBackground = false
     }
 
+    /// `--offscreen` (the performance check): the note stays where it was put, far off every screen. A titled window
+    /// is pulled back onto a screen as it comes up — the check's note came up at the screen's left edge.
+    var keepsOffscreen = false
+
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        keepsOffscreen ? frameRect : super.constrainFrameRect(frameRect, to: screen)
+    }
+
     func canStartHeaderDrag(at point: NSPoint) -> Bool {
         guard let contentView else { return false }
         let contentPoint = contentView.convert(point, from: nil)

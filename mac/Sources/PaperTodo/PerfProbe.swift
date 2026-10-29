@@ -16,6 +16,9 @@ enum PerfProbe {
     private static var monitor: Any?
     private static var observer: CFRunLoopObserver?
     private static var shotSignal: DispatchSourceSignal?
+    private static var countSignal: DispatchSourceSignal?
+    /// What woke the app since the last `kill -USR2` (#64): model changes, the cat's frames and mouse events …
+    private static var counts: [String: Int] = [:]
     private static var shots = 0
     private static var folder = ""
 
@@ -33,6 +36,12 @@ enum PerfProbe {
         source.setEventHandler { MainActor.assumeIsolated { capture() } }
         source.resume()
         shotSignal = source
+        // `kill -USR2 <pid>`: `counts <name>=<n> …` since the last one (#64, what an idle app does).
+        signal(SIGUSR2, SIG_IGN)
+        let counter = DispatchSource.makeSignalSource(signal: SIGUSR2, queue: .main)
+        counter.setEventHandler { MainActor.assumeIsolated { writeCounts() } }
+        counter.resume()
+        countSignal = counter
         write("start \(String(format: "%.1f", sinceProcessStart()))")
         monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseUp]) { event in
             let label: String
@@ -65,10 +74,26 @@ enum PerfProbe {
         write("mark \(label) \(String(format: "%.1f", sinceProcessStart()))")
     }
 
+    /// One more of something that wakes the app (written with `kill -USR2`).
+    static func count(_ name: String) {
+        guard isOn else { return }
+        counts[name, default: 0] += 1
+    }
+
+    private static func writeCounts() {
+        write("counts " + counts.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: " "))
+        counts.removeAll()
+    }
+
     /// A file written, and how long it took.
     static func io(_ name: String, since start: TimeInterval) {
         guard isOn else { return }
         write("io \(name) \(String(format: "%.2f", (ProcessInfo.processInfo.systemUptime - start) * 1000))")
+    }
+
+    static func io(_ name: String, ms: Double) {
+        guard isOn else { return }
+        write("io \(name) \(String(format: "%.2f", ms))")
     }
 
     static var now: TimeInterval { ProcessInfo.processInfo.systemUptime }

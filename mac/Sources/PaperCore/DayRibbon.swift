@@ -188,9 +188,11 @@ public enum DayRibbon {
     /// A label under the track: "8", "12", "24" (28 is "4"); English "8 AM", "12 PM", "12 AM".
     public static func hourLabel(_ hour: Int, language: AppLanguage) -> String {
         let h = hour % 24
-        switch language {
-        case .en: return "\(AppLanguage.twelve(h)) \(h < 12 ? "AM" : "PM")"
-        case .ko, .nl: return hour == 24 ? "24" : "\(h)"
+        switch language.cycle {
+        case .h12:
+            let digits = "\(AppLanguage.twelve(h))"
+            return language.periodFirst ? language.period(hour: h) + " " + digits : digits + " " + language.period(hour: h)
+        case .h24: return hour == 24 ? "24" : "\(h)"
         }
     }
 

@@ -79,13 +79,14 @@ function summary(start: Date, end: Date): HTMLElement {
     return sum;
   };
   const thisMonth = month(0);
-  const change = thisMonth - month(-1);
+  // Last month's number only, no 적어요 / 많아요 (#42).
+  const lastMonth = month(-1);
   const streak = currentStreak(days, now);
   return h("div", { class: "tiles" },
     tile("check", range === "recent" ? t("최근 1년 완료") : t("{year}년 완료", { year: range }), number(total), t("개", { n: total }),
       t("하루 평균 {n}개", { n: decimal(total / Math.max(1, Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1)) })),
     tile("calendar", t("{month} 완료", { month: monthName(today.getMonth() + 1, lang()) }), String(thisMonth), t("개", { n: thisMonth }),
-      change === 0 ? t("지난달과 같아요") : change > 0 ? t("지난달보다 {n}개 많아요", { n: Math.abs(change) }) : t("지난달보다 {n}개 적어요", { n: Math.abs(change) })),
+      t("지난달 {n}개", { n: lastMonth })),
     tile("flame", t("연속 기록"), String(streak), t("일", { n: streak }), t("최장 {n}일", { n: longestStreak(days) })),
     tile("star", t("가장 많이 한 날"), String(best.value), t("개", { n: best.value }), best.value ? longDate(keyDate(best.key)) : t("아직 없어요")),
     focusTile(start, end),
@@ -220,16 +221,18 @@ function dayPanel(): HTMLElement {
   return h("div", { class: "card day" }, h("div", { class: "day-head" }, h("span", { class: "date" }, longDate(date)), h("span", { class: "count" }, t("{n}개", { n: list.length }))), focusLine, body);
 }
 
-/** The pane's header: its name, how much has been done so far with a word about the streak, and the range to look at. */
+/**
+ * The pane's header: its name, a word about the streak (or, before the first, how to start), and the range to look at.
+ * (1.30: no "지금까지 564개를 끝냈어요" — the first tile says that number; the Mac's the same.)
+ */
 function paneHead(ranges: HTMLElement): HTMLElement {
   const total = entries.filter((entry) => entry.completedAt).length;
   const streak = currentStreak(days, now);
-  const so = total === 0 ? t("첫 칸을 채워 볼까요?") : t("지금까지 {n}개를 끝냈어요", { n: number(total), count: total });
   const word = streak > 1 ? t("{n}일째 이어 가고 있어요. 오늘도 한 칸!", { n: streak })
     : streak === 1 ? t("오늘도 한 칸 채웠어요. 내일도 이어 가 봐요.")
       : t("하나만 끝내도 오늘 칸이 초록으로 채워져요.");
   return h("header", { class: "pane-head" },
-    h("div", { class: "ph-text" }, h("h1", {}, t("완료 기록")), h("p", { class: "ph-sub" }, `${so} · ${word}`)),
+    h("div", { class: "ph-text" }, h("h1", {}, t("완료 기록")), h("p", { class: "ph-sub" }, total === 0 ? `${t("첫 칸을 채워 볼까요?")} · ${word}` : word)),
     ranges);
 }
 

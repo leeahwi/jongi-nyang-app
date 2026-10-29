@@ -110,9 +110,9 @@ test("snooze §3: the choices and their times", () => {
   assert.equal(show(snoozeChoices(at(8, 17, 59), "periodic")), "5 2026-10-08 18:04 · 10 2026-10-08 18:09 · 30 2026-10-08 18:29 · 60 2026-10-08 18:59 · evening 2026-10-08 19:00 · morning 2026-10-09 09:00");
   assert.equal(show(snoozeChoices(at(8, 18), "task")), "5 2026-10-08 18:05 · 10 2026-10-08 18:10 · 30 2026-10-08 18:30 · 60 2026-10-08 19:00 · morning 2026-10-09 09:00 · tomorrow");
   assert.equal(show(snoozeChoices(at(9, 1), "task")), "5 2026-10-09 01:05 · 10 2026-10-09 01:10 · 30 2026-10-09 01:30 · 60 2026-10-09 02:00 · morning 2026-10-09 09:00 · tomorrow");
-  assert.deepEqual(snoozeChoices(now, "task", "ko").map((choice) => choice.title), ["5분 뒤", "10분 뒤", "30분 뒤", "1시간 뒤", "오늘 저녁 7시", "내일 아침 9시", "내일로 미루기"]);
-  assert.deepEqual(snoozeChoices(now, "task", "en").map((choice) => choice.title), ["In 5 min", "In 10 min", "In 30 min", "In 1 hour", "Tonight at 7 PM", "Tomorrow at 9 AM", "Move to tomorrow"]);
-  assert.deepEqual(snoozeChoices(now, "task", "nl").map((choice) => choice.title), ["Over 5 min", "Over 10 min", "Over 30 min", "Over 1 uur", "Vanavond om 19:00", "Morgen om 09:00", "Naar morgen"]);
+  assert.deepEqual(snoozeChoices(now, "task", "ko").map((choice) => choice.title), ["5분 뒤", "10분 뒤", "30분 뒤", "1시간 뒤", "오늘 저녁 7시", "내일 아침 9시", "내일 하기"]);
+  assert.deepEqual(snoozeChoices(now, "task", "en").map((choice) => choice.title), ["In 5 min", "In 10 min", "In 30 min", "In 1 hour", "Tonight at 7 PM", "Tomorrow at 9 AM", "Do tomorrow"]);
+  assert.deepEqual(snoozeChoices(now, "task", "nl").map((choice) => choice.title), ["Over 5 min", "Over 10 min", "Over 30 min", "Over 1 uur", "Vanavond om 19:00", "Morgen om 09:00", "Morgen doen"]);
   assert.equal(stamp(eventSnoozeAt(at(8, 15, 10), now)!), "2026-10-08 15:05");
   assert.equal(eventSnoozeAt(at(8, 14, 54), now), undefined);
 });
@@ -274,7 +274,7 @@ test("system notices: when they go, the toast and its links", () => {
   assert.equal(readNotifyLink(["https://example.com"]), undefined);
   const xml = toastXml({ kind: "tasks", ids: ["A"], title: "할 일 알림", lines: ["우유 & 빵 <사기>"] }, "ko");
   assert.match(xml, /<text>우유 &amp; 빵 &lt;사기&gt;<\/text>/);
-  assert.match(xml, /<action content="끝냄" activationType="protocol" arguments="jongi-nyang:done\?ids=A"\/>/);
+  assert.match(xml, /<action content="끝내기" activationType="protocol" arguments="jongi-nyang:done\?ids=A"\/>/);
   assert.match(xml, /<action content="10분 뒤" activationType="protocol" arguments="jongi-nyang:snooze\?ids=A&amp;minutes=10"\/>/);
   assert.match(toastXml({ kind: "alarm", title: "Alarm · 7:00 AM", lines: [] }, "en"), /scenario="alarm".*content="Stop".*content="Snooze"/);
 });

@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { Memo } from "../src/core/memo";
 import {
   bookmarkTip, cardTime, cardTitle, dateGroup, dayTime, editedLabel, findLink, findPhone, folderDeletedWords, footerWords, groupLabel, groupMemos, memoKind,
-  previewLine, tapePlace,
+  previewLine, previewRows, tapePlace,
 } from "../src/core/memoCards";
 import {
   deleteFolder, duplicateFolder, hasCheckedLines, inboxID, memosIn, mergeMemoFolders, moveMemo, paperOf, parseMemoFolders, pinAll, placementOf,
@@ -266,4 +266,18 @@ test("cards: the footer, a bookmark's label, the tape's place", () => {
     assert.deepEqual(tapePlace(id), place);
   }
   assert.notDeepEqual(tapePlace("m1"), tapePlace("m2"));
+});
+
+test("D30 a card's preview (#14): three lines at most, a checklist's first items, no empty lines", () => {
+  assert.deepEqual(previewRows("주간 회의\n\n첫째 줄\n   \n둘째 줄\n셋째 줄\n넷째 줄"), [{ text: "첫째 줄" }, { text: "둘째 줄" }, { text: "셋째 줄" }]);
+  assert.deepEqual(previewRows("짧은 메모\n한 줄뿐"), [{ text: "한 줄뿐" }]);
+  assert.deepEqual(previewRows("제목만"), []);
+  assert.deepEqual(previewRows("  \n\n"), []);
+  assert.deepEqual(previewRows("장보기\n메모 먼저\n- [ ] 우유\n- [x] 빵\n  * [X] 계란\n- [ ] 사과"),
+    [{ checked: false, text: "우유" }, { checked: true, text: "빵" }, { checked: true, text: "계란" }]);
+  assert.deepEqual(previewRows("- [ ] 첫 항목이 제목\n- [ ] 둘째\n- [ ]   \n- [x] 셋째"), [{ checked: false, text: "둘째" }, { checked: true, text: "셋째" }]);
+  assert.deepEqual(previewRows("목록\n- [ ] 하나\n- [ ] 둘\n- [ ] 셋", 2), [{ checked: false, text: "하나" }, { checked: false, text: "둘" }]);
+  assert.deepEqual(previewRows("a\r\n  b  \r\nc"), [{ text: "b" }, { text: "c" }]);
+  assert.deepEqual(previewRows("https://x.com\n010-1234-5678"), [{ text: "010-1234-5678" }]);
+  assert.equal(previewRows(`제목\n${"가".repeat(500)}`)[0].text.length, 300);
 });

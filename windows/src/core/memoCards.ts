@@ -216,6 +216,42 @@ export function previewLine(memo: Memo): string | undefined {
   return lines.slice(1).find((line) => !checklistLine(line))?.trim();
 }
 
+/** A row of a card's preview: a line's words, or a checklist item (`checked` set). */
+export interface PreviewRow { checked?: boolean; text: string }
+
+/**
+ * What a card shows under its title (D30, #14): a checklist memo its first `limit` items, ticked or not; any other memo
+ * its first `limit` lines with words after the title, trimmed (the card wraps them into at most `limit` lines, … at the
+ * end). Blank lines are skipped, so a short memo shows only what it has. Each row is cut at 300 characters (more never
+ * fits in three lines); a checklist stops reading at its `limit`-th item. Same rule as the Mac app.
+ */
+export function previewRows(text: string, limit = 3): PreviewRow[] {
+  const items: PreviewRow[] = [];
+  const lines: PreviewRow[] = [];
+  if (limit <= 0) return items;
+  const cut = (words: string) => (words.length > 300 ? words.slice(0, 300) : words);
+  let titled = false;
+  for (let start = 0; start <= text.length;) {
+    let end = text.indexOf("\n", start);
+    if (end < 0) end = text.length;
+    const line = text.slice(start, end);
+    start = end + 1;
+    if (!line.trim()) continue;
+    // The title: the first line with words (a checklist's first item is its title, not one of the rows).
+    if (!titled) { titled = true; continue; }
+    const item = checklistLine(line);
+    if (item) {
+      const words = item.text.trim();
+      if (!words) continue;
+      items.push({ checked: item.checked, text: cut(words) });
+      if (items.length === limit) return items;
+    } else if (lines.length < limit) {
+      lines.push({ text: cut(line.trim()) });
+    }
+  }
+  return items.length ? items : lines;
+}
+
 // ─── Tape and words ───────────────────────────────────────────────────────────
 
 /** A memo's tape: x from 20 % to 65 % of the card's width and a turn of ±2°, both from its id (the same on every redraw). */

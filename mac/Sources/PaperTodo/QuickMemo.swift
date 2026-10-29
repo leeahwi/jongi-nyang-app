@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import Combine
 import PaperCore
 import SwiftUI
 
@@ -18,10 +19,20 @@ final class QuickMemoController {
     private var seenChangeCount = NSPasteboard.general.changeCount
     private var changedAt: Date?
     private var watch: Timer?
+    private var subscriptions = Set<AnyCancellable>()
 
     init(model: AppModel) {
         self.model = model
-        // A copy is noticed within a few seconds (only while the setting is on).
+        // A copy is noticed within a few seconds — the pasteboard looked at only while the setting is on (#64: every
+        // 3 s all day, the setting off too).
+        model.$quickMemoClipboard.removeDuplicates().sink { [weak self] on in
+            DispatchQueue.main.async { self?.watchPasteboard(on) }
+        }.store(in: &subscriptions)
+    }
+
+    private func watchPasteboard(_ on: Bool) {
+        guard on else { watch?.invalidate(); watch = nil; return }
+        guard watch == nil else { return }
         let timer = Timer(timeInterval: 3, repeats: true) { _ in
             Task { @MainActor [weak self] in self?.notice() }
         }

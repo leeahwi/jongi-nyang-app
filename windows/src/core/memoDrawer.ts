@@ -3,7 +3,7 @@ import { clock, dayMonth } from "./lang";
 import type { Memo } from "./memo";
 import { memoTitle } from "./memo";
 import { isoDate } from "./notebook";
-import { matchRange } from "./search";
+import { fold, matchRange, prepareQuery } from "./search";
 
 /**
  * 메모 서랍 (1.28): memos from the screen's edge, one folder at a time. The memos stay in memos.json as
@@ -549,23 +549,20 @@ export function topicParticle(word: string): "은" | "는" {
 }
 
 /**
- * The drawer's footer (the shared words, memo-drawer-cases.md): "회사에 다섯 장" · "회사는 비어 있어요" · "고정한 메모
- * 세 장" · "고정한 메모가 없어요" · "모든 폴더에서 두 장" · "찾은 메모가 없어요" — en "5 notes in Work" · "Work is empty" ·
- * "3 pinned notes" · "No pinned notes" · "2 notes in all folders" · "No notes found"; nl "5 notities in Werk" · "Werk is
- * leeg" · "3 vastgezette notities" · "Geen vastgezette notities" · "2 notities in alle mappen" · "Geen notities gevonden".
+ * The drawer's footer in a sentence (as on the Mac): "회사에 다섯 장" · "고정한 메모 세 장" · "찾은 메모 두 장"; an empty
+ * folder or 고정 just "비어 있어요" (#39: the line in the middle says how to fill it), no hits "찾은 메모 0장" (the line in
+ * the middle says what was looked for) — en "5 notes in Work" · "3 pinned notes" · "2 notes found" · "Empty" · "0 notes
+ * found"; nl "5 notities in Werk" · "3 vastgezette notities" · "2 notities gevonden" · "Leeg" · "0 notities gevonden".
  */
 export function drawerFooter(kind: "folder" | "pinned" | "search", count: number, folder = "", lang: Lang = "ko"): string {
-  if (kind === "search") {
-    if (count === 0) return { ko: "찾은 메모가 없어요", en: "No notes found", nl: "Geen notities gevonden" }[lang];
-    return lang === "ko" ? `모든 폴더에서 ${sheetCount(count, lang)}` : lang === "en" ? `${sheetCount(count, lang)} in all folders` : `${sheetCount(count, lang)} in alle mappen`;
-  }
-  if (kind === "pinned") {
-    if (count === 0) return { ko: "고정한 메모가 없어요", en: "No pinned notes", nl: "Geen vastgezette notities" }[lang];
-    return lang === "ko" ? `고정한 메모 ${sheetCount(count, lang)}` : lang === "en" ? `${count} pinned ${count === 1 ? "note" : "notes"}` : `${count} vastgezette ${count === 1 ? "notitie" : "notities"}`;
-  }
-  if (count === 0) return { ko: `${folder}${topicParticle(folder)} 비어 있어요`, en: `${folder} is empty`, nl: `${folder} is leeg` }[lang];
+  if (kind === "search") return lang === "ko" ? `찾은 메모 ${sheetCount(count, lang)}` : lang === "en" ? `${sheetCount(count, lang)} found` : `${sheetCount(count, lang)} gevonden`;
+  if (count === 0) return emptyFooter(lang);
+  if (kind === "pinned") return lang === "ko" ? `고정한 메모 ${sheetCount(count, lang)}` : lang === "en" ? `${count} pinned ${count === 1 ? "note" : "notes"}` : `${count} vastgezette ${count === 1 ? "notitie" : "notities"}`;
   return lang === "ko" ? `${folder}에 ${sheetCount(count, lang)}` : `${sheetCount(count, lang)} in ${folder}`;
 }
+
+/** An empty folder's or 고정's footer (#39): "비어 있어요" · "Empty" · "Leeg". */
+export const emptyFooter = (lang: Lang = "ko"): string => ({ ko: "비어 있어요", en: "Empty", nl: "Leeg" }[lang]);
 
 // ─── Search (D12) ─────────────────────────────────────────────────────────────
 
@@ -579,18 +576,61 @@ export interface DrawerHit { memo: Memo; folder: string; pinned: boolean; text: 
  */
 export function drawerSearch(data: MemoFolders, memos: readonly Memo[], query: string, lang: Lang = "ko"): DrawerHit[] {
   if (!query.trim()) return [];
+  const prepared = prepareQuery(query);
   const namesMatch = new Set(folderHits(data, query, lang).map((folder) => folder.id));
+  keepSearchLines(memos);
   const hits: DrawerHit[] = [];
   for (const memo of memos) {
     const place = placementOf(data, memo.id);
-    const title = slipSummary(memo, lang).title;
-    const titleRange = matchRange(title, query);
+    const read = searchLines(memo, lang);
+    const title = read.title;
+    const titleRange = matchRange(title, prepared);
     if (titleRange) { hits.push({ memo, ...place, text: title, range: titleRange }); continue; }
-    const line = memo.text.split("\n").map((entry) => entry.trim()).find((entry) => matchRange(entry, query));
-    if (line !== undefined) hits.push({ memo, ...place, text: line, range: matchRange(line, query) });
+    // Without a lone consonant a line can match only where the folded query stands in the memo's folded text.
+    const maybe = !prepared.plain || foldedText(read).includes(prepared.joined);
+    let line: string | undefined;
+    let range: [number, number] | undefined;
+    if (maybe) {
+      read.lines ??= memo.text.split("\n").map((entry) => entry.trim());
+      for (const entry of read.lines) {
+        range = matchRange(entry, prepared);
+        if (range) { line = entry; break; }
+      }
+    }
+    if (line !== undefined) hits.push({ memo, ...place, text: line, range });
     else if (namesMatch.has(place.folder)) hits.push({ memo, ...place, text: title });
   }
   return hits;
+}
+
+/** A memo as the search reads it, kept per text: its title, its lines trimmed and every letter folded (these two
+ * once a search needs them). */
+interface SearchLines { text: string; lang: Lang; title: string; lines?: string[]; folded?: string }
+const searchRead = new Map<string, SearchLines>();
+
+function searchLines(memo: Memo, lang: Lang): SearchLines {
+  const known = searchRead.get(memo.id);
+  if (known && known.text === memo.text && known.lang === lang) return known;
+  const read: SearchLines = { text: memo.text, lang, title: slipSummary(memo, lang).title };
+  searchRead.set(memo.id, read);
+  return read;
+}
+
+/** Every letter folded one by one, as the search compares them (a capital A-Z and anything past ASCII but a
+ * Hangul syllable is folded; the rest is itself). */
+function foldedText(read: SearchLines): string {
+  read.folded ??= read.text.replace(/[A-Z]|[^\u0000-\u007f\uac00-\ud7a3]/gu, fold);
+  return read.folded;
+}
+
+/** The kept lines dropped (the stress check times a first search). */
+export function forgetSearchLines(): void { searchRead.clear(); }
+
+/** Only memos still there are kept (checked once there are a few more than them). */
+function keepSearchLines(memos: readonly Memo[]): void {
+  if (searchRead.size <= memos.length + 64) return;
+  const ids = new Set(memos.map((memo) => memo.id));
+  for (const id of searchRead.keys()) if (!ids.has(id)) searchRead.delete(id);
 }
 
 /** Folder names that match (the note's search lists them too). */

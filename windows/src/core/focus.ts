@@ -2,6 +2,7 @@ import { dayKey } from "./archive";
 import { durationText } from "./duration";
 import { isoDate } from "./notebook";
 import { plural, type Lang } from "./lang";
+import { awayText } from "./ribbon";
 
 /**
  * 집중 기록 (focus.jsonl in the storage folder, beside archive/): one JSON line per focus session on a
@@ -176,4 +177,14 @@ export function mergeFocus(current: string, imported: string): string {
   }
   if (added.length === 0) return current;
   return [...mine, ...added].join("\n") + "\n";
+}
+
+/**
+ * The focus card's line under the title: how long until it first, the clock time last, so the time left in the
+ * ring above isn't read beside a clock (#46): "40분 뒤 치과 · 15:30" · "Dentist in 40 min · 3:30 PM" ·
+ * "Tandarts over 40 min · 15:30". Same as the Mac's `Focus.nextLine`.
+ */
+export function focusNextLine(title: string, time: string, minutes: number, lang: Lang = "ko"): string {
+  const away = awayText(Math.max(1, minutes), lang);
+  return `${lang === "ko" ? `${away} ${title}` : `${title} ${away}`} · ${time}`;
 }

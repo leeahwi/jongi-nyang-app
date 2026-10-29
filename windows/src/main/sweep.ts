@@ -64,7 +64,7 @@ export class EveningSweep {
       durationMs: 0, snoozeEnabled: false, reduceMotion: false,
       sweep: {
         variant,
-        message: variant === "evening" ? t("오늘 {n}개 남았어요. 내일로 넘길까요?", { n }) : t("어제 남은 일이 {n}개 있어요. 오늘 할까요?", { n }),
+        message: variant === "evening" ? t("오늘도 수고했어요. 남은 {n}개는 내일로 넘길까요?", { n }) : t("어제 남은 일이 {n}개 있어요. 오늘 할까요?", { n }),
       },
     }, {
       onComplete: () => undefined, onSnooze: () => undefined, onOpen: () => this.hooks.openNote(),

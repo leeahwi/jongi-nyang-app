@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Alarm } from "../src/core/alarm";
 import type { CalendarEvent } from "../src/core/calendar";
-import { glanceCards, glanceOrigin, glanceTasks, glanceText, shortTitle, taskbarEdge, type GlanceTimer } from "../src/core/glance";
+import { glanceCards, glanceOrigin, glanceTasks, glanceText, shortTitle, taskbarEdge, timerLeftText, timerLength, type GlanceTimer } from "../src/core/glance";
 import type { TodoItem } from "../src/core/notebook";
 
 // Thursday 8 October 2026, 14:50.
@@ -21,7 +21,10 @@ const running: GlanceTimer = { remainingMs: 12 * 60_000 + 30_000, paused: false,
 
 test("glance words: the timer first, then the next thing within the hour, else nothing", () => {
   const dentist = event("치과", at(15, 30), at(16, 30));
-  assert.equal(glanceText([dentist], [], running, now, "ko"), "12:30");
+  // #46: the timer's time left as a length, not "12:30" (a clock time beside the others).
+  assert.equal(glanceText([dentist], [], running, now, "ko"), "13분 남음");
+  assert.equal(glanceText([dentist], [], running, now, "en"), "13 min left");
+  assert.equal(glanceText([dentist], [], running, now, "nl"), "nog 13 min");
   assert.equal(glanceText([dentist], [], undefined, now, "ko"), "치과 40분");
   assert.equal(glanceText([event("Dentist", at(15, 30), at(16, 30))], [], undefined, now, "en"), "Dentist 40 min");
   assert.equal(glanceText([event("Tandarts", at(15, 30), at(16, 30))], [], undefined, now, "nl"), "Tandarts 40 min");
@@ -35,6 +38,21 @@ test("glance words: the timer first, then the next thing within the hour, else n
   assert.equal(glanceText([event("곧", at(14, 50), at(15, 50))], [], undefined, new Date(2026, 9, 8, 14, 49, 30), "ko"), "곧 1분");
   // Exactly an hour still counts.
   assert.equal(glanceText([event("한 시간", at(15, 50), at(16, 50))], [], undefined, now, "ko"), "한 시간 60분");
+});
+
+test("timer time left: a length, never a clock's form (#46, the day strip's rule from #19)", () => {
+  const min = 60_000;
+  assert.deepEqual((["ko", "en", "nl"] as const).map((lang) => timerLength(20 * min + 50_000, lang)), ["21분", "21 min", "21 min"], "rounded up");
+  assert.deepEqual((["ko", "en", "nl"] as const).map((lang) => timerLength(65 * min, lang)), ["1시간 5분", "1 h 5 min", "1 u 5 min"]);
+  assert.deepEqual((["ko", "en", "nl"] as const).map((lang) => timerLength(60 * min, lang)), ["1시간", "1 h", "1 u"], "on the hour");
+  assert.deepEqual((["ko", "en", "nl"] as const).map((lang) => timerLength(59 * min + 30_000, lang)), ["1시간", "1 h", "1 u"], "59:30 rounds up to the hour");
+  assert.deepEqual((["ko", "en", "nl"] as const).map((lang) => timerLength(44_200, lang)), ["45초", "45 sec", "45 sec"], "the last minute in seconds");
+  assert.equal(timerLength(60_000, "ko"), "1분");
+  assert.equal(timerLength(0, "ko"), "0초");
+  assert.deepEqual((["ko", "en", "nl"] as const).map((lang) => timerLeftText(25 * min, lang)), ["25분 남음", "25 min left", "nog 25 min"]);
+  const card = glanceCards([], running, [], new Set(), now, "ko")[1];
+  assert.deepEqual([card.big, card.unit], ["13분", "남음"]);
+  assert.deepEqual((["en", "nl"] as const).map((lang) => glanceCards([], running, [], new Set(), now, lang)[1]).map((c) => [c.unit, c.unitFirst]), [["left", undefined], ["nog", true]]);
 });
 
 test("glance words: long titles are cut to 12 characters", () => {
@@ -56,13 +74,13 @@ test("glance cards: next event, timer, next alarm — the urgent one hot", () =>
   const en = glanceCards([event("Meeting", at(10, 0, 9), at(11, 0, 9))], running, alarms, new Set(), now, "en");
   assert.deepEqual(en.map((card) => [card.label, card.big, card.small, card.hot]), [
     ["Next event", "10:00 AM", "Tomorrow · Meeting", false],
-    ["Timer", "12:30", "Ends at 3:03 PM", true],
+    ["Timer", "13 min", "Ends at 3:03 PM", true],
     ["Next alarm", "7:00 AM", "Tomorrow · Weekdays", false],
   ]);
   const nl = glanceCards([event("Overleg", at(9, 0, 12), at(10, 0, 12))], { ...running, paused: true, caption: "Focus 1/4", countdown: false }, [], new Set(), now, "nl");
   assert.deepEqual(nl.map((card) => [card.label, card.big, card.small, card.hot, card.empty]), [
     ["Afspraak", "09:00", "ma · Overleg", false, false],
-    ["Timer", "12:30", "Focus 1/4 · Gepauzeerd", false, false],
+    ["Timer", "13 min", "Focus 1/4 · Gepauzeerd", false, false],
     ["Wekker", "—", "‘wekker 7:00’", false, true],
   ]);
   // An alarm within the hour is hot; an event later today says how long until it.

@@ -42,6 +42,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private var weeklyTimer: Timer?
     private var subscriptions = Set<AnyCancellable>()
     private let timerMenuItem = NSMenuItem(title: L("타이머"), action: nil, keyEquivalent: "")
+    /// 보기 → 스페이스 (1.45).
+    private let spacesMenuItem = NSMenuItem(title: L("스페이스"), action: nil, keyEquivalent: "")
     /// 책상: 달력 · 완료 기록 · 시계, the settings and 도움말 in one window.
     private var desk: DeskWindowController!
     /// The icon's centre relative to the note when it was folded, so unfolding mirrors it.
@@ -61,6 +63,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         PerfProbe.start(arguments: arguments)
         HandwritingFont.register()
         PerfProbe.mark("fonts")
+        // Every time in the app on the system's clock (24-hour or not, System Settings → General → Date & Time), and
+        // again when that changes; the views redraw on their next change (the note's clock ticks every minute).
+        AppLanguage.hourCycle = .system()
+        NotificationCenter.default.addObserver(forName: NSLocale.currentLocaleDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated {
+                AppLanguage.hourCycle = .system()
+                self?.model?.objectWillChange.send()
+            }
+        }
 
         let qaBuild = Bundle.main.bundleIdentifier?.hasSuffix(".QA") == true
         let demo = arguments.contains("--demo") || qaBuild
@@ -152,8 +163,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         PerfProbe.mark("window")
         archive = ArchiveStore(model: model)
         archive.start()
+        model.completedDays = { [weak archive] in Set(Archive.groupByDay(archive?.allEntries() ?? []).keys) }
         PerfProbe.mark("archive")
         desk = DeskWindowController(model: model, archive: archive, reminders: reminders, remembersFrame: !isolated)
+        desk.offscreen = arguments.contains("--offscreen")
         desk.onGuide = { [weak self] in self?.showGuide() }
         model.onDesk = { [weak self] pane in self?.desk.show(pane) }
         model.onReminderSettings = { [weak self] in self?.desk.show(.appearance) }
@@ -163,6 +176,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         model.onCalendar = { [weak self] day in self?.showCalendar(on: day) }
         model.onRepeatSettings = { [weak self] in self?.desk.show(.repeating) }
         pet = DesktopPetController(model: model, preferences: preferences, onOpenNote: { [weak self] in self?.showWindow() })
+        pet.offscreen = arguments.contains("--offscreen")
+        if PerfProbe.isOn { model.objectWillChange.sink { _ in PerfProbe.count("model") }.store(in: &subscriptions) }
         focusTimer = FocusTimerController(model: model, preferences: preferences)
         quickEntry = QuickEntryController(model: model)
         quickEntry.noteVisible = { [weak self] in
@@ -253,7 +268,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         PerfProbe.mark("controllers")
         window.level = model.alwaysOnTop ? .floating : .normal
         // `--offscreen` (the performance check): the note far off every screen, out of the user's way.
-        if arguments.contains("--offscreen") { window.setFrameOrigin(NSPoint(x: -40_000, y: 200)) }
+        if arguments.contains("--offscreen") {
+            window.keepsOffscreen = true
+            window.setFrameOrigin(NSPoint(x: -40_000, y: 200))
+        }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         PerfProbe.mark("ordered front")
@@ -280,10 +298,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         model.commitEditing()
+        // 메모 서랍: keys still waiting go to the model and the file now.
+        model.drawer.sendTyped()
+        model.saveMemosNow()
+        model.finishMemoFolderWrites()
         if model.hasUnsavedChanges { model.retrySave() }
         guard model.hasUnsavedChanges else { return .terminateNow }
         let answer = SlipAlert.run(symbol: "exclamationmark.circle", title: L("종이냥 종료"), message: L("아직 저장하지 못한 할 일이 있어요"),
-                                   detail: L("창으로 돌아가 목록을 텍스트로 내보내거나 저장 폴더를 확인해 주세요."),
+                                   detail: L("지금 끄면 저장하지 못한 할 일은 사라져요. 돌아가서 텍스트로 내보내 두세요."),
                                    choices: [.init(title: L("저장하지 않고 종료"), role: .danger),
                                              .init(title: L("돌아가기"), role: .primary, isDefault: true, isCancel: true)])
         return answer == 0 ? .terminateNow : .terminateCancel
@@ -353,9 +375,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         view.addItem(item(L("글자 작게"), #selector(smallerText), "-"))
         view.addItem(item(L("글자 크기 보통으로"), #selector(regularText), ""))
         view.addItem(.separator())
-        view.addItem(item(L("오늘 할 일"), #selector(showTodos), "1"))
+        view.addItem(item(L("오늘"), #selector(showTodos), "1"))
         view.addItem(item(L("앞으로"), #selector(showAhead), "2"))
         view.addItem(item(L("메모 서랍"), #selector(showMemos), "3"))
+        // 할 일 스페이스 (1.45, M12): 보기 → 스페이스, ⌥⌘0 모든 스페이스 and ⌥⌘1–9 the spaces in order (menu keys, so they
+        // work while the input line has the keyboard too). Hidden while there are none.
+        spacesMenuItem.submenu = NSMenu(title: L("스페이스"))
+        spacesMenuItem.submenu?.delegate = self
+        let allSpaces = item(SpaceWords.allSpaces(.current), #selector(showSpaceDigit(_:)), "0")
+        allSpaces.keyEquivalentModifierMask = [.command, .option]
+        allSpaces.tag = 0
+        spacesMenuItem.submenu?.addItem(allSpaces)
+        spacesMenuItem.submenu?.addItem(.separator())
+        for digit in 1...9 {
+            let row = item("", #selector(showSpaceDigit(_:)), "\(digit)")
+            row.keyEquivalentModifierMask = [.command, .option]
+            row.tag = digit
+            spacesMenuItem.submenu?.addItem(row)
+        }
+        view.addItem(spacesMenuItem)
         let newMemo = item(L("새 메모"), #selector(newMemo), "n")
         newMemo.keyEquivalentModifierMask = [.command, .shift]
         view.addItem(newMemo)
@@ -437,6 +475,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     /// The timer submenu reflects the running timer, so it is rebuilt each time it opens.
     func menuNeedsUpdate(_ menu: NSMenu) {
+        if menu === spacesMenuItem.submenu {
+            refreshSpacesMenu()
+            return
+        }
         if menu === viewMenu {
             // 다음 알람 오전 7:00, when one is on.
             let next = model.alarms.next()
@@ -523,6 +565,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             default: return false
             }
         }
+        // 할 일 스페이스 (1.45): 보기 → 스페이스 follows the spaces.
+        model.$todoSpaces.receive(on: RunLoop.main).sink { [weak self] _ in self?.refreshSpacesMenu() }.store(in: &subscriptions)
         // 저녁 정리.
         sweep = SweepController(model: model)
         sweep.petAnchor = { [weak self] in self?.pet.anchorFrame }
@@ -684,6 +728,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     /// ⌘1–⌘3 are the note's tabs, except typed in the desk, where ⌘1…⌘9 pick its panes (the
     /// menu items themselves, chosen with the pointer, still go to the note).
     private var typedInDesk: Bool { desk.isKey && NSApp.currentEvent?.type == .keyDown }
+    /// 보기 → 스페이스 as the spaces are now (also on every change: a hidden row's key doesn't match).
+    func refreshSpacesMenu() {
+        guard let menu = spacesMenuItem.submenu else { return }
+        let spaces = model.todoSpaces.visible
+        let shown = model.spaceShown
+        spacesMenuItem.isHidden = spaces.isEmpty
+        for row in menu.items where row.action == #selector(showSpaceDigit(_:)) {
+            if row.tag == 0 { row.state = shown == .all ? .on : .off; continue }
+            let space = row.tag <= spaces.count ? spaces[row.tag - 1] : nil
+            row.isHidden = space == nil
+            row.title = space?.name ?? ""
+            row.image = space.map { PaperTheme.spaceDot(.color($0.colorKey)) }
+            row.state = space.map { shown == .space($0.id) } == true ? .on : .off
+        }
+    }
+
+    /// ⌥⌘0–9: everything, or one space on 오늘 (a number past the last space does nothing).
+    @objc private func showSpaceDigit(_ sender: NSMenuItem) {
+        guard !model.todoSpaces.isEmpty, let shown = SpaceLens.forDigit(sender.tag, spaces: model.todoSpaces) else { return }
+        showWindow()
+        model.page = .todos
+        model.showSpace(shown)
+    }
+
     @objc private func showTodos() { if typedInDesk { desk.select(shortcut: 1) } else { showWindow(); model.page = .todos } }
     @objc private func showGuide() { showWindow(); model.showGuide() }
     @objc private func showAhead() { if typedInDesk { desk.select(shortcut: 2) } else { showWindow(); model.page = .ahead } }
@@ -734,8 +802,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         let preferences = UserDefaults.standard
         // `--weekly-now 2026-10-04T19:00:00+09:00` checks the Sunday cheer on any day.
         let now = argument(after: "--weekly-now").flatMap { ISO8601DateFormatter().date(from: $0) } ?? Date()
-        guard model.petVisible,
-              let count = Archive.weeklyLookBack(archive.allEntries(), now: now, lastShownWeek: preferences.string(forKey: "weekly.lastShown"))
+        let shown = preferences.string(forKey: "weekly.lastShown")
+        // The time first (#64: every ten minutes the whole record was copied to find out it wasn't Sunday evening).
+        guard model.petVisible, Archive.isLookBackTime(now: now, lastShownWeek: shown),
+              let count = Archive.weeklyLookBack(archive.allEntries(), now: now, lastShownWeek: shown)
         else { return }
         preferences.set(Archive.weekKey(now), forKey: "weekly.lastShown")
         pet.celebrate()

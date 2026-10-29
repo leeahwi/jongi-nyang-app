@@ -17,6 +17,8 @@ stage.append(toastRoom);
 const toast = toaster(toastRoom);
 let closing: number | undefined;
 let prefs: AppState["prefs"] | undefined;
+/** 할 일 스페이스: `#회사` works here as on the note (without the note's lens). */
+let spaces: AppState["todoSpaces"] | undefined;
 
 function close(): void {
   window.clearTimeout(closing);
@@ -28,10 +30,11 @@ function close(): void {
 const flow: FlowHost = { toast, page: () => "today" };
 const line = new InputLine({
   variant: "slip",
-  placeholder: () => ({ long: t("무엇이든 적어요 — 할 일, 일정, 타이머 40…"), short: t("무엇이든 적어요") }),
+  placeholder: () => ({ long: t("무엇이든 적어요: 할 일, 일정, ‘타이머 40’"), short: t("무엇이든 적어요") }),
   prefer: () => prefs?.intentPrefer ?? {},
-  commit: async (candidate, candidates, text) => {
-    const result = await commitReading(flow, candidate, candidates, text, "quick");
+  spaces: () => (spaces ? { data: spaces } : undefined),
+  commit: async (candidate, candidates, text, space) => {
+    const result = await commitReading(flow, candidate, candidates, text, "quick", space);
     if (!result.made) return false;
     if (result.inNote) close();
     else closing = window.setTimeout(close, 1500);
@@ -48,6 +51,7 @@ fitWindow(stage);
 
 function applyFont(state: AppState): void {
   prefs = state.prefs;
+  spaces = state.todoSpaces;
   document.documentElement.dataset.font = state.prefs.font;
   document.documentElement.style.setProperty("--body-size", `${bodyFontSize(state.prefs.font, "regular")}px`);
 }

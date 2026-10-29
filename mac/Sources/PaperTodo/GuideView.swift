@@ -30,11 +30,11 @@ struct GuideView: View {
     static var cards: [Card] {
         [
             Card(pose: .happy, title: L("종이냥에 오신 걸 환영해요"),
-                 body: L("하루에 한 장, 오늘 할 일만 가볍게 적는\n종이 노트예요. 적고, 체크하고, 끝!"),
+                 body: L("할 일과 일정을 종이 한 장에 적는\n노트예요. 적고, 체크하고, 끝!"),
                  keys: [(L("입력 줄"), "⌘N"), (L("완료"), L("네모 칸 누르기")), (L("어디서든 빠른 입력"), "⌃⌥N")]),
-            Card(pose: .curious, title: L("탭으로 나눠 두어요"),
+            Card(pose: .curious, title: L("날짜에 맞춰 알아서 옮겨 가요"),
                  body: L("마감이 있는 일은 ‘앞으로’에서 날짜별로 기다리다\n그날이 되면 오늘로 올라와요.\n날짜 없는 일은 맨 아래 ‘언젠가’, 생각은 ‘메모 서랍’에."),
-                 keys: [(L("오늘 · 앞으로"), "⌘1 · ⌘2"), (L("메모 서랍"), "⌘3"), (L("내일로 미루기"), "⌥→")]),
+                 keys: [(L("오늘 · 앞으로"), "⌘1 · ⌘2"), (L("메모 서랍"), "⌘3"), (L("내일 하기"), "⌥→")]),
             Card(pose: .stretch, title: L("아래 입력 줄에 무엇이든"),
                  body: L("‘내일 3시 회의’, ‘2시~4시 보고서’, ‘매일 물 마시기’처럼\n적으면 칩으로 알아들은 뜻을 보여 줘요.\nTab으로 다른 뜻, Return으로 넣기."),
                  keys: [(L("다른 뜻"), "Tab"), (L("되돌리기"), "⌘Z"), (L("검색"), "⌘F")]),
@@ -42,7 +42,7 @@ struct GuideView: View {
                  body: L("할 일에서 F를 누르면 바로 집중을 시작해요.\n화면 아래의 종이냥은 저녁이 되면\n남은 일을 내일로 넘길지 물어봐요."),
                  keys: [(L("이거 집중"), "F"), (L("설정"), "⌘,")]),
             Card(pose: .cheer, title: L("준비 끝!"),
-                 body: L("필요 없을 땐 작은 포스트잇으로 접어 두세요.\n어디서든 ⌃⌥J로 다시 불러요."),
+                 body: L("필요 없을 땐 작은 포스트잇으로 접어 둬요.\n어디서든 ⌃⌥J로 다시 불러요.\n아래 스위치를 끄면 로그인할 때 열리지 않아요."),
                  keys: [(L("작게 접기"), "⌘M"), (L("노트 보이기 · 숨기기"), "⌃⌥J")]),
         ]
     }
@@ -140,8 +140,10 @@ struct GuideView: View {
                     Button { last ? finish() : go(1) } label: {
                         Text(last ? "시작하기" : "다음")
                     }
-                    // A short note: no keycap, so 다음 · Volgende keeps its word.
-                    .buttonStyle(SlipButtonStyle(role: .primary, key: tight ? nil : "↩"))
+                    // Return presses it: its keycap inside, in a short note too. Its own width, so 다음 · Volgende
+                    // keeps its word (the ghosts and the spacer give way, 1.45).
+                    .buttonStyle(SlipButtonStyle(role: .primary, key: "↩"))
+                    .fixedSize()
                     .keyboardShortcut(.defaultAction)
                 }
                 .padding(.horizontal, 12)
@@ -155,7 +157,7 @@ struct GuideView: View {
             .slipShadow()
             // Taped on like every other slip.
             .overlay(alignment: .top) {
-                WashiTape(color: PaperTheme.tapeHoney).frame(width: 74, height: 20).offset(y: -9).accessibilityHidden(true)
+                WashiTape(kind: .todo).frame(width: 74, height: 20).offset(y: -9).accessibilityHidden(true)
             }
             .padding(tight ? 10 : 16)
             .accessibilityElement(children: .contain)

@@ -190,6 +190,22 @@ public struct Notebook: Codable, Equatable, Sendable {
         }
     }
 
+    /// 어제부터 in an undo/redo snapshot: these tasks' day, where the snapshot has the task on today's sheet (Carry.tracks)
+    /// without a valid day of its own. A snapshot without them isn't copied.
+    fileprivate mutating func stampMissing(_ days: [UUID: String], now: Date, calendar: Calendar) {
+        func stamp(_ index: Int, _ day: String) {
+            let item = items[index]
+            guard !Carry.valid(item.todaySince, today: day), Carry.tracks(item, now: now, calendar: calendar) else { return }
+            items[index].todaySince = day
+        }
+        // A few (an add, a check): found one by one; many (a day's turn, 저녁 정리): one pass.
+        if days.count <= 8 {
+            for (id, day) in days { if let index = items.firstIndex(where: { $0.id == id }) { stamp(index, day) } }
+        } else {
+            for index in items.indices { if let day = days[items[index].id] { stamp(index, day) } }
+        }
+    }
+
     fileprivate mutating func replace(_ item: TodoItem) {
         guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
         items[index] = item
@@ -310,11 +326,24 @@ public struct UndoableNotebook: Equatable, Sendable {
     /// Each step keeps a full copy of the list, so a long session must not grow without bound.
     static let undoLimit = 200
     private var redoStack: [Notebook]
+    /// 어제부터 (#63): every snapshot has a day on each task it has on today's sheet. They keep it as days go by (a
+    /// task's place without a deadline doesn't depend on the day, and an earlier day stays valid), so `stampToday`
+    /// leaves them alone until a list without its days was pushed, another writer's change merged, or the clock set back.
+    private var snapshotsStamped = true
+    /// The list has its days (`stampToday` ran after its last change).
+    private var listStamped = false
+    /// The day `stampToday` last ran for.
+    private var stampedDay = ""
 
     public init(notebook: Notebook = Notebook()) {
         self.notebook = notebook
         undoStack = []
         redoStack = []
+    }
+
+    /// The list and its steps (the 어제부터 bookkeeping above isn't part of it).
+    public static func == (lhs: UndoableNotebook, rhs: UndoableNotebook) -> Bool {
+        lhs.notebook == rhs.notebook && lhs.undoStack == rhs.undoStack && lhs.redoStack == rhs.redoStack
     }
 
     public var canUndo: Bool { !undoStack.isEmpty }
@@ -424,12 +453,27 @@ public struct UndoableNotebook: Equatable, Sendable {
 
     /// 어제부터 (1.38): the day each open task on today's sheet was first seen there. Bookkeeping like
     /// delivery: applied to every undo/redo snapshot, never an undo step of its own.
+    ///
+    /// #63: as Windows' `trackToday`, only the tasks the list stamps now go into the snapshots — a day where a snapshot
+    /// has the task on today's sheet without one; nothing is taken away from a snapshot (a snapshot that becomes the
+    /// list again is stamped as the list) — and only while a snapshot may be missing a day (`snapshotsStamped`).
+    /// Working out every snapshot's own stamps took 0.4–0.7 s per add or check with 2,000 to-dos and 200 steps of undo.
     public mutating func stampToday(now: Date, calendar: Calendar = .paper) {
+        let today = Archive.dayKey(now, calendar: calendar)
+        // A clock set back: a day later than today is no longer valid in the snapshots either.
+        if today < stampedDay { snapshotsStamped = false }
+        stampedDay = today
         let changes = Carry.stamps(notebook.items, now: now, calendar: calendar)
+        listStamped = true
         guard !changes.isEmpty else { return }
         notebook.stamp(changes)
-        for index in undoStack.indices { undoStack[index].stamp(Carry.stamps(undoStack[index].items, now: now, calendar: calendar)) }
-        for index in redoStack.indices { redoStack[index].stamp(Carry.stamps(redoStack[index].items, now: now, calendar: calendar)) }
+        guard !snapshotsStamped else { return }
+        let days = changes.compactMapValues { $0 }
+        if !days.isEmpty {
+            for index in undoStack.indices { undoStack[index].stampMissing(days, now: now, calendar: calendar) }
+            for index in redoStack.indices { redoStack[index].stampMissing(days, now: now, calendar: calendar) }
+        }
+        snapshotsStamped = true
     }
 
     /// Several changes as one undo step (모두 끝냄, 저녁 정리, a deleted row's 되돌리기 …).
@@ -503,6 +547,7 @@ public struct UndoableNotebook: Equatable, Sendable {
         guard let previous = undoStack.popLast() else { return false }
         redoStack.append(notebook)
         notebook = previous
+        swapStamped()
         return true
     }
 
@@ -511,13 +556,23 @@ public struct UndoableNotebook: Equatable, Sendable {
         guard let next = redoStack.popLast() else { return false }
         undoStack.append(notebook)
         notebook = next
+        swapStamped()
         return true
+    }
+
+    /// The list went onto a stack and a snapshot became the list.
+    private mutating func swapStamped() {
+        let snapshot = snapshotsStamped
+        snapshotsStamped = snapshot && listStamped
+        listStamped = snapshot
     }
 
     public mutating func replaceNotebook(_ notebook: Notebook) {
         self.notebook = notebook
         undoStack = []
         redoStack = []
+        snapshotsStamped = true
+        listStamped = false
     }
 
     /// Another writer changed the file — Claude through the extension (1.42), or another device: its version
@@ -533,6 +588,9 @@ public struct UndoableNotebook: Equatable, Sendable {
         notebook = incoming
         for index in undoStack.indices { undoStack[index].merge(changed: changed, added: added, removed: removed, order: order) }
         for index in redoStack.indices { redoStack[index].merge(changed: changed, added: added, removed: removed, order: order) }
+        // The other writer's tasks may come without their days, here and in every snapshot.
+        listStamped = false
+        snapshotsStamped = false
     }
 
     private mutating func perform<T: Equatable>(_ mutation: (inout Notebook) -> T) -> T {
@@ -542,6 +600,8 @@ public struct UndoableNotebook: Equatable, Sendable {
             undoStack.append(before)
             if undoStack.count > Self.undoLimit { undoStack.removeFirst(undoStack.count - Self.undoLimit) }
             redoStack.removeAll()
+            if !listStamped { snapshotsStamped = false }
+            listStamped = false
         }
         return result
     }

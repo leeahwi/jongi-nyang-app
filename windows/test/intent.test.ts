@@ -40,9 +40,9 @@ function notation(candidate: Candidate, lang: Lang): string {
 }
 
 const problemNames: Record<string, Record<Lang, string>> = {
-  alarmTime: { ko: "알람 시간을 알아듣지 못했어요", en: "Couldn’t read the alarm time", nl: "Kon de wektijd niet lezen" },
-  timerLength: { ko: "타이머 길이를 알아듣지 못했어요", en: "Couldn’t read the timer length", nl: "Kon de timerduur niet lezen" },
-  repeat: { ko: "반복을 알아듣지 못했어요", en: "Couldn’t read the repeat", nl: "Kon de herhaling niet lezen" },
+  alarmTime: { ko: "알람 시간을 알아듣지 못했어요. ‘/알람 7시’처럼 적어 보세요.", en: "Couldn’t read the alarm time. Try ‘/alarm 7am’.", nl: "De wektijd is niet duidelijk. Probeer ‘/wekker 7:00’." },
+  timerLength: { ko: "타이머 길이를 알아듣지 못했어요. ‘/타이머 40’처럼 적어 보세요.", en: "Couldn’t read the timer length. Try ‘/timer 40’.", nl: "De timerduur is niet duidelijk. Probeer ‘/timer 40’." },
+  repeat: { ko: "반복을 알아듣지 못했어요. ‘/반복 매일 물 마시기’처럼 적어 보세요.", en: "Couldn’t read the repeat. Try ‘/repeat every day drink water’.", nl: "De herhaling is niet duidelijk. Probeer ‘/herhaal elke dag water drinken’." },
 };
 
 /** [#, language, input, prefer, expected, problem] — copied from intent-cases.md. */

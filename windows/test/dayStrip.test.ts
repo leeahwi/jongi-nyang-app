@@ -5,7 +5,7 @@ import type { Candidate } from "../src/core/intent";
 import { langs } from "../src/core/lang";
 import type { TodoItem } from "../src/core/notebook";
 import {
-  awayText, columns, dragBounds, draggedSpan, edgeBand, followedSpan, isSoon, kicker, leftText, minutesUntil, newCandidates, nudged, ringText, rowLimit, scrollTop, slot,
+  awayText, columns, dragBounds, draggedSpan, edgeBand, followedSpan, isSoon, kicker, leftText, markWord, minutesUntil, newCandidates, nudged, ringText, rowLimit, scrollTop, slot, stripMarks,
   stretched, stripItems, stripSentence, stripSpans, stripState, wholeDayLink, type DragEdge, type Span, type StripItem, type StripKind,
 } from "../src/core/dayStrip";
 import { clockKey } from "../src/core/timeRange";
@@ -38,7 +38,7 @@ test("R1 something on now", () => {
   assert.ok(Math.abs(s.progress - 1 / 3) < 1e-4);
   assert.deepEqual(titles(s.rows), ["보고서 마무리", "치과"]);
   assert.deepEqual(langs.map((lang) => ringText(s.minutes, s.mode, lang).value), ["40", "40", "40"]);
-  assert.deepEqual(langs.map((lang) => ringText(s.minutes, s.mode, lang).caption), ["분 남음", "min left", "min over"]);
+  assert.deepEqual(langs.map((lang) => ringText(s.minutes, s.mode, lang).caption), ["분 남음", "min left", "min te gaan"]);
   assert.deepEqual(langs.map((lang) => kicker(s.mode, s.lead!, lang)), ["지금 · 13:00–14:00", "Now · 1:00–2:00 PM", "Nu · 13:00–14:00"]);
   assert.deepEqual(langs.map((lang) => kicker(s.mode, s.lead!, lang, true)), ["지금 · ~14:00", "Now · until 2:00 PM", "Nu · tot 14:00"]);
   assert.deepEqual(s.rows.map((row) => awayText(minutesUntil(at(13, 20), row.start))), ["40분 뒤", "2시간 뒤"]);
@@ -48,6 +48,21 @@ test("R1 something on now", () => {
     "Now 팀 회의, 40 min left. Next 2:00 PM 보고서 마무리, 3:30 PM 치과",
     "Nu 팀 회의, nog 40 min. Volgende 14:00 보고서 마무리, 15:30 치과",
   ]);
+});
+
+test("R8 the list's marks (#31): the to-dos the strip shows", () => {
+  const marked = (now: Date, list = tasks) => {
+    const marks = stripMarks(state(now, 2, day, list));
+    return Object.fromEntries(list.filter((item) => marks.has(item.id)).map((item) => [item.title, marks.get(item.id)]));
+  };
+  // #47: only 지금 — the to-dos up next sit under the list's own 다음 heading.
+  assert.deepEqual(marked(at(14, 20)), { "보고서 마무리": "now" });
+  assert.deepEqual(marked(at(13, 20)), {});
+  assert.deepEqual(marked(at(12, 40)), {}, "nothing on: the lead up next gets none");
+  const done = tasks.map((item, index) => (index === 0 ? { ...item, isCompleted: true } : item));
+  assert.deepEqual(marked(at(14, 20), done), {});
+  assert.deepEqual(langs.map((lang) => markWord("now", lang)), ["지금", "Now", "Nu"]);
+  assert.deepEqual(langs.map((lang) => markWord("next", lang)), ["다음", "Next", "Volgende"]);
 });
 
 test("R2 three rows: a reminder counts as an item", () => {
@@ -80,8 +95,18 @@ test("R4 nothing on, the next far; nothing left", () => {
   assert.equal(s.minutes, 150);
   assert.equal(s.progress, 0, "no arc over an hour away");
   assert.equal(isSoon(s.minutes), false);
-  assert.deepEqual(langs.map((lang) => ringText(150, "next", lang).value), ["2:30", "2:30", "2:30"]);
+  // 1.30: never a clock-like "2:30" — the rows' rule, the nearest whole hour from two hours away ("3시간 뒤").
+  assert.deepEqual(langs.map((lang) => ringText(150, "next", lang).value), ["3시간", "3 h", "3 u"]);
   assert.deepEqual(langs.map((lang) => ringText(150, "next", lang).caption), ["뒤", "away", "te gaan"]);
+  assert.equal(awayText(150, "ko"), "3시간 뒤", "the same as a row's when");
+  assert.deepEqual(langs.map((lang) => ringText(61, "next", lang).value), ["1시간", "1 h", "1 u"]);
+  assert.deepEqual(langs.map((lang) => ringText(61, "next", lang).caption), ["1분 뒤", "1 min away", "en 1 min"]);
+  assert.equal(awayText(61, "ko"), "1시간 1분 뒤", "61 as a row");
+  assert.deepEqual(langs.map((lang) => ringText(120, "next", lang).caption), ["뒤", "away", "te gaan"]);
+  for (const minutes of [60, 61, 99, 150, 600, 1439]) for (const lang of langs) {
+    const text = ringText(minutes, "next", lang);
+    assert.ok(!text.value.includes(":") && !text.caption.includes(":"), `no h:mm at ${minutes} (${lang})`);
+  }
   s = state(at(20, 30));
   assert.equal(s.mode, "nothing");
   assert.equal(s.lead, undefined);
@@ -140,9 +165,11 @@ test("R9 what isn't today", () => {
 test("R10 an hour or more", () => {
   const s = state(at(12, 40), 2, [event("긴 회의", [12, 0], [14, 0])], []);
   assert.equal(s.minutes, 80);
-  assert.deepEqual(langs.map((lang) => ringText(80, "now", lang).value), ["1:20", "1:20", "1:20"]);
-  assert.deepEqual(langs.map((lang) => ringText(80, "now", lang).caption), ["남음", "left", "over"]);
-  assert.deepEqual(langs.map((lang) => ringText(60, "now", lang).value), ["1:00", "1:00", "1:00"]);
+  assert.deepEqual(langs.map((lang) => ringText(80, "now", lang).value), ["1시간", "1 h", "1 u"]);
+  assert.deepEqual(langs.map((lang) => ringText(80, "now", lang).caption), ["20분 남음", "20 min left", "en 20 min"]);
+  assert.deepEqual(langs.map((lang) => ringText(60, "now", lang).value), ["1시간", "1 h", "1 u"]);
+  assert.deepEqual(langs.map((lang) => ringText(60, "now", lang).caption), ["남음", "left", "te gaan"]);
+  assert.equal(ringText(150, "now", "ko").caption, "30분 남음", "time left stays exact");
   assert.deepEqual(langs.map((lang) => ringText(59, "now", lang).value), ["59", "59", "59"]);
   assert.deepEqual(langs.map((lang) => leftText(80, lang)), ["1시간 20분 남음", "1 h 20 min left", "nog 1 u 20 min"]);
   assert.deepEqual(langs.map((lang) => leftText(60, lang)), ["1시간 남음", "1 h left", "nog 1 u"]);

@@ -106,7 +106,17 @@ extension PaperView {
                 ViewThatFits(in: .horizontal) { progressLine; Color.clear.frame(width: 0, height: 0) }
             }
             .padding(.top, 10)
+            // 1.45: the title and date first, as in 1.44; the space button takes what's left.
+            .layoutPriority(showsSpaceButton ? 1 : 0)
             Spacer(minLength: 0)
+            // A short note's one-line header: the dot and ▾ only, and none when even that doesn't fit (the band under the
+            // ribbon still says what's shown; 보기 → 스페이스 and ⌥⌘0–9 still pick).
+            if showsSpaceButton {
+                ViewThatFits(in: .horizontal) {
+                    SpaceHeaderButton(model: model, short: true).padding(.top, 9)
+                    Color.clear.frame(width: 0, height: 0)
+                }
+            }
             PeekingCat(nodding: mascotNod)
                 .scaleEffect(0.72, anchor: .bottomTrailing)
                 .frame(width: PeekingCat.size.width * 0.72, height: PeekingCat.size.height * 0.72, alignment: .bottomTrailing)
@@ -119,13 +129,23 @@ extension PaperView {
     private var titleBlock: some View {
         HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
-                TimelineView(.periodic(from: .now, by: 60)) { timeline in
-                    // 앞으로: the week ("이번 주 · 10월 4일 – 10일"); elsewhere today's date.
-                    Text(model.page == .ahead ? Ahead.weekTitle(now: timeline.date, language: .current) : AppLanguage.current.longDate(timeline.date))
-                        .font(.system(size: 11, weight: .semibold))
-                        .tracking(0.2)
-                        .foregroundStyle(PaperTheme.sageText)
-                        .lineLimit(1)
+                // 할 일 스페이스 (1.45): `모든 스페이스 ▾` at the end of the date line, as on Windows (W19), so a
+                // longer or shorter label (모든 스페이스 ↔ 회사만) never moves the title and the progress (#13).
+                HStack(alignment: .center, spacing: 8) {
+                    TimelineView(.periodic(from: .now, by: 60)) { timeline in
+                        // 앞으로: the week ("이번 주 · 10월 4일 – 10일"); elsewhere today's date.
+                        Text(model.page == .ahead ? Ahead.weekTitle(now: timeline.date, language: .current) : AppLanguage.current.longDate(timeline.date))
+                            .font(.system(size: 11, weight: .semibold))
+                            .tracking(0.2)
+                            .foregroundStyle(PaperTheme.sageText)
+                            .lineLimit(1)
+                    }
+                    .layoutPriority(1)
+                    if showsSpaceButton {
+                        Spacer(minLength: 4)
+                        // The 24 pt pill hangs over the date line's height, so the title sits where it did in 1.44.
+                        SpaceHeaderButton(model: model).frame(height: 14)
+                    }
                 }
                 // The progress sits beside the title when there's room, else under it.
                 ViewThatFits(in: .horizontal) {
@@ -135,6 +155,7 @@ extension PaperView {
                 }
             }
             .padding(.top, 12)
+            .frame(maxWidth: showsSpaceButton ? .infinity : nil, alignment: .leading)
             Spacer(minLength: 0)
             // Peeks over the sheet's top edge: its rule sits on the title block's bottom.
             PeekingCat(nodding: mascotNod)
@@ -143,6 +164,8 @@ extension PaperView {
         .padding(.leading, 20)
         .padding(.trailing, 14)
     }
+
+    private var showsSpaceButton: Bool { model.page == .todos && !model.todoSpaces.isEmpty }
 
     private var pageTitle: some View {
         Text(PageTab.title(model.page).handwritten)
@@ -192,7 +215,7 @@ extension PaperView {
     private func indexTabs(counts: Bool, tight: Bool, small: Bool) -> some View {
         HStack(alignment: .bottom, spacing: tight ? 2 : 4) {
             ForEach(PageTab.all, id: \.short) { tab in
-                IndexTab(title: tab.short, count: counts ? tabCount(tab.page) : nil, color: IndexTab.color(tab.page),
+                IndexTab(title: tab.short, count: counts ? tabCount(tab.page) : nil, color: IndexTab.color(tab.page), edge: IndexTab.edge(tab.page),
                          font: model.notebookFont, active: model.page == tab.page, targeted: model.dragOverPage == tab.page,
                          tight: tight, small: small) {
                     withAnimation(.easeOut(duration: 0.15)) { model.page = tab.page }
@@ -228,7 +251,7 @@ struct ProgressDonutLine: View {
                 .lineLimit(1)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(done == total ? L("오늘 할 일 \(total)개 모두 마침") : L("\(total)개 중 \(done)개 완료, \(total - done)개 남음"))
+        .accessibilityLabel(done == total ? L("오늘 할 일 \(total)개를 모두 끝냈어요") : L("\(total)개 중 \(done)개 끝냈어요, \(total - done)개 남았어요"))
     }
 }
 
@@ -280,13 +303,14 @@ private extension Int {
     var nonZero: Int? { self == 0 ? nil : self }
 }
 
-/// A washi-tape tab: rounded top corners, faint white stripes, the handwritten name and a small
-/// count. The active one stands 2 pt taller and joins the sheet through the band under the row;
+/// A paper tab: rounded top corners, a solid colour with a 1 pt edge (1.45, no stripes), the handwritten
+/// name and a small count, both in `tabInk`. The active one stands 2 pt taller and joins the sheet through the band under the row;
 /// the others sit a little lower. Tabs never overlap, so each one's outline shows whole.
 struct IndexTab: View {
     let title: String
     let count: Int?
     let color: Color
+    let edge: Color
     let font: NotebookFont
     let active: Bool
     /// A task is being dragged over this tab.
@@ -301,8 +325,6 @@ struct IndexTab: View {
     @State private var pointerOn = false
     private var hovering: Bool { pointerOn || previewHover }
     @Environment(\.colorSchemeContrast) private var contrast
-    /// At night every tab's name is in ink (ink2 on the darker tab colours is too faint).
-    @Environment(\.colorScheme) private var scheme
 
     /// The tab's handwritten label; English and Dutch words are longer, so a little smaller.
     static var handwritingSize: CGFloat { AppLanguage.current == .ko ? 19 : 16 }
@@ -314,6 +336,14 @@ struct IndexTab: View {
         }
     }
 
+    /// The tab's 1 pt edge, a step deeper than its colour (lighter at night).
+    static func edge(_ page: AppModel.Page) -> Color {
+        switch page {
+        case .todos: PaperTheme.tabTodayEdge
+        case .ahead: PaperTheme.tabAheadEdge
+        }
+    }
+
     private var height: CGFloat { active || targeted ? 30 : hovering ? 29 : 28 }
 
     var body: some View {
@@ -322,13 +352,13 @@ struct IndexTab: View {
                 Text(font == .clean ? title : title.handwritten)
                     .font(font == .clean ? .system(size: small ? 11.5 : 13, weight: active ? .semibold : .regular)
                           : Font(HandwritingFont.native(face: font == .brush ? .brush : .pen, size: small ? Self.handwritingSize - 3 : Self.handwritingSize)))
-                    .foregroundStyle(active || scheme == .dark ? PaperTheme.ink : PaperTheme.ink2)
+                    .foregroundStyle(PaperTheme.tabInk)
                     .lineLimit(1)
                     .fixedSize()
                 if let count {
                     Text("\(count)")
                         .font(.system(size: 10, weight: .semibold).monospacedDigit())
-                        .foregroundStyle(scheme == .dark ? PaperTheme.ink : PaperTheme.ink2)
+                        .foregroundStyle(PaperTheme.tabInk)
                         .fixedSize()
                 }
             }
@@ -338,20 +368,10 @@ struct IndexTab: View {
                 WashiTabShape()
                     .fill(color)
                     .overlay {
-                        // Faint white stripes, like the tape's weave.
-                        Canvas { context, size in
-                            var x: CGFloat = 0
-                            while x < size.width {
-                                context.fill(Path(CGRect(x: x, y: 0, width: 2, height: size.height)), with: .color(.white.opacity(scheme == .dark ? 0.07 : 0.18)))
-                                x += 6
-                            }
-                        }
-                        .clipShape(WashiTabShape())
-                    }
-                    .overlay {
-                        WashiTabShape()
-                            .stroke(targeted ? PaperTheme.sage : contrast == .increased ? PaperTheme.ink3 : Color.black.opacity(active ? 0.07 : 0.05),
-                                    lineWidth: targeted ? 1.5 : contrast == .increased ? 1 : 0.6)
+                        // The 1 pt edge, inside the tab (left, top, right; open at the bottom where it meets the band).
+                        WashiTabShape(inset: targeted ? 0.75 : 0.5)
+                            .stroke(targeted ? PaperTheme.sage : contrast == .increased ? PaperTheme.ink3 : edge,
+                                    lineWidth: targeted ? 1.5 : 1)
                     }
                     .brightness(active ? 0 : hovering ? -0.01 : -0.025)
             }
@@ -367,9 +387,13 @@ struct IndexTab: View {
     }
 }
 
-/// A tab with rounded top corners (radius 8), open at the bottom where it meets the sheet.
+/// A tab with rounded top corners (radius 8), open at the bottom where it meets the sheet. `inset` draws it that much
+/// inside the frame (on the left, top and right), so a stroke along it stays inside the tab.
 struct WashiTabShape: Shape {
-    func path(in rect: CGRect) -> Path {
+    var inset: CGFloat = 0
+
+    func path(in frame: CGRect) -> Path {
+        let rect = CGRect(x: frame.minX + inset, y: frame.minY + inset, width: max(0, frame.width - inset * 2), height: max(0, frame.height - inset))
         let radius = min(8, rect.height / 2, rect.width / 2)
         var path = Path()
         path.move(to: CGPoint(x: rect.minX, y: rect.maxY))

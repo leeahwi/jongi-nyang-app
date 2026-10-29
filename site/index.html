@@ -35,6 +35,7 @@
     <nav class="nav" aria-label="주요 메뉴">
       <a href="#tour">둘러보기</a>
       <a href="#features">기능</a>
+      <a href="#spaces">스페이스</a>
       <a href="#drawer">메모 서랍</a>
       <a href="#built">만든 방식</a>
       <a href="#faq">질문</a>
@@ -55,13 +56,13 @@
 <main id="main">
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap">
-      <a class="badge" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.44.0"><span class="dot" aria-hidden="true"></span>새 버전 · 메모가 화면 끝 서랍으로 옮겨 갔어요<span class="go" aria-hidden="true">→</span></a>
+      <a class="badge" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.45.0"><span class="dot" aria-hidden="true"></span>새 버전 · 할 일을 스페이스로 나눠요<span class="go" aria-hidden="true">→</span></a>
       <h1 id="hero-title">오늘 할 일,<br><span class="hand">종이 한 장</span>에.</h1>
       <p class="lede">할 일을 적고 체크하는 노트예요. 맨 위에는 지금 하는 일과 남은 시간이 보이고, 알림은 종이 고양이가 들고 와요. 계정 없이 내 컴퓨터에 파일로 저장해요.</p>
       <div class="cta">
-        <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.44.0">
+        <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.45.0">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
-          Mac용 내려받기 <small>1.44.0</small>
+          Mac용 내려받기 <small>1.45.0</small>
         </a>
         <div class="line" role="img" aria-label="입력 줄 예: ‘내일 3시 회의’라고 적으면 ‘일정 · 내일 15:00’으로 알아들어요" data-line='[["내일 3시 회의","일정 · 내일 15:00"],["금요일까지 보고서","할 일 · 마감 금요일"],["타이머 40","40분 타이머"],["알람 7시 평일","알람 · 평일 오전 7:00","clay"]]'>
           <span class="pen" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg></span>
@@ -69,7 +70,7 @@
           <span class="chip" aria-hidden="true">일정 · 내일 15:00</span>
         </div>
       </div>
-      <p class="alt">Windows 10/11에서도 써요. <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.29.0">Windows용 내려받기 1.29.0</a></p>
+      <p class="alt">Windows 10/11에서도 써요. <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.30.0">Windows용 내려받기 1.30.0</a></p>
     </div>
   </section>
 
@@ -265,9 +266,28 @@
         </article>
         <article class="tile reveal" style="--t: var(--tape-memo)">
           <div class="art top"><img src="assets/note-night.webp" width="640" height="976" alt="같은 노트를 밤 종이로 본 모습" loading="lazy"></div>
-          <div class="copy"><h3>밤 종이</h3><p>시스템을 어두운 모드로 두면 창이 모두 밤 종이로 바뀌어요. 불 끈 방에서 보는 종이 색이에요. 낮이든 밤이든 글자 대비는 WCAG AA 기준을 넘겨요.</p></div>
+          <div class="copy"><h3>밤 종이</h3><p>시스템을 어두운 모드로 두면 창이 모두 밤 종이로 바뀌어요. 불 끈 방에서 보는 종이 색이에요. 낮이든 밤이든 글자가 또렷하게 읽혀요(WCAG AA).</p></div>
         </article>
       </div>
+    </div>
+  </section>
+
+  <section id="spaces" aria-labelledby="spaces-title">
+    <div class="wrap">
+      <div class="head reveal">
+        <p class="eyebrow">할 일 스페이스</p>
+        <h2 id="spaces-title">나눠도 오늘은 한 장</h2>
+        <p>1.45(Windows 1.30)부터 할 일을 회사, 집, 공부처럼 스페이스로 나눠요. 오늘 한 장에는 그대로 모두 보이고, 줄 왼쪽 끝에 그 스페이스의 색 띠만 붙어요.</p>
+      </div>
+      <div class="stage reveal">
+        <div class="film-frame"><img src="assets/spaces-ko.webp" width="1200" height="700" alt="오늘 노트 두 장. 왼쪽은 할 일 줄 끝에 스페이스 색 띠가 붙어 있고, 오른쪽은 ‘회사만 보는 중 · 다른 할 일 4개는 숨겼어요’로 거른 같은 노트예요" loading="lazy" style="display:block;width:100%;height:auto"></div>
+      </div>
+      <ul class="points">
+        <li class="reveal"><strong>한 스페이스만 보기</strong><span>머리말의 ‘모든 스페이스 ▾’에서 고르거나 <kbd>⌥⌘1</kbd>–<kbd>9</kbd>(Windows는 <kbd>Ctrl+Shift+1</kbd>–<kbd>9</kbd>)를 눌러요. 다음 날 새벽 4시가 되면 다시 모두 보여요.</span></li>
+        <li class="reveal"><strong>적을 때 #</strong><span>‘견적서 보내기 금요일까지 #회사’처럼 적으면 회사 스페이스로 들어가요. ‘#회’나 초성 ‘#ㅎㅅ’만 적어도 알아들어요.</span></li>
+        <li class="reveal"><strong>옮기기와 관리</strong><span>할 일을 우클릭해 다른 스페이스로 옮겨요. 이름, 색, 순서는 책상 → 스페이스에서 정해요.</span></li>
+        <li class="reveal"><strong>만들지 않으면 그대로</strong><span>스페이스를 하나도 만들지 않으면 노트는 예전과 똑같아요. 알림과 고양이는 숨긴 할 일도 그대로 챙겨요.</span></li>
+      </ul>
     </div>
   </section>
 
@@ -364,21 +384,21 @@
       <div class="downloads">
         <div class="dl reveal">
           <h3>Mac</h3>
-          <p class="meta">1.44.0 · macOS 14 이상 · Apple Silicon · DMG</p>
+          <p class="meta">1.45.0 · macOS 14 이상 · Apple Silicon · DMG</p>
           <ol>
             <li>DMG를 열고 <strong>종이냥</strong>을 응용 프로그램 폴더로 끌어 놓아요.</li>
             <li>응용 프로그램 폴더에서 종이냥을 <strong>우클릭 → 열기</strong>. 막히면 시스템 설정 → 개인정보 보호 및 보안 → <strong>그래도 열기</strong>.</li>
           </ol>
-          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.44.0">Mac용 내려받기</a>
+          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.45.0">Mac용 내려받기</a>
         </div>
         <div class="dl reveal">
           <h3>Windows</h3>
-          <p class="meta">1.29.0 · Windows 10/11 x64 · 설치 파일 또는 무설치 zip</p>
+          <p class="meta">1.30.0 · Windows 10/11 x64 · 설치 파일 또는 무설치 zip</p>
           <ol>
-            <li><code>JongiNyang-1.29.0-x64.exe</code>를 실행해요.</li>
+            <li><code>JongiNyang-1.30.0-x64.exe</code>를 실행해요.</li>
             <li>SmartScreen이 뜨면 <strong>추가 정보 → 실행</strong>.</li>
           </ol>
-          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.29.0">Windows용 내려받기</a>
+          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.30.0">Windows용 내려받기</a>
         </div>
       </div>
     </div>
@@ -397,6 +417,7 @@
         <ul>
           <li><a href="#tour">둘러보기</a></li>
           <li><a href="#features">기능</a></li>
+          <li><a href="#spaces">스페이스</a></li>
           <li><a href="#drawer">메모 서랍</a></li>
           <li><a href="#download">내려받기</a></li>
           <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/CHANGELOG.md">변경 기록</a></li>
@@ -422,7 +443,7 @@
     </div>
     <div class="legal">
       <span>© 2026 leeAhwi · 소스 코드는 <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/LICENSE">Apache License 2.0</a></span>
-      <span>Mac 1.44.0 · Windows 1.29.0</span>
+      <span>Mac 1.45.0 · Windows 1.30.0</span>
     </div>
   </div>
 </footer>
