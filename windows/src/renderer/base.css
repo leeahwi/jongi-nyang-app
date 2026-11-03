@@ -1,5 +1,7 @@
 @font-face { font-family: "HanJang Pen"; src: url("../../assets/fonts/HanJangPen-Regular.ttf") format("truetype"); font-display: block; }
 @font-face { font-family: "HanJang Brush"; src: url("../../assets/fonts/HanJangBrush-Regular.ttf") format("truetype"); font-display: block; }
+/* 코드 글꼴 D2Coding (#143, NAVER, SIL OFL 1.1, unchanged): Hangul two Latin columns wide, for the drawer's code. */
+@font-face { font-family: "D2Coding"; src: url("../../assets/fonts/D2Coding-Regular.ttf") format("truetype"); font-display: block; }
 /* English and Dutch: Caveat (pen) and Kalam (marker) for Latin text, the Korean faces behind them for
    Hangul. Scaled so their capitals stand as tall as Hangul (Caveat runs small, Kalam large), with line
    metrics close to the Korean faces' (0.85 em up, 0.27 down, after the scaling) so rows, titles and
@@ -58,6 +60,10 @@
   --toast-strong: #cfe3c9;
   /* AI 연결's stamp on a row Claude added or changed today: blue-grey stamp ink (the Mac's PaperTheme.stamp). */
   --stamp: #4d5b86;
+  /* 백업 목록's kind chips (#140): 업데이트 전 lavender on the memo tint, 직접 honey (매일 sage, the ‘before’ ones clay). */
+  --lavender-text: #62559a;
+  --honey-text: #755e12;
+  --honey-2: #f5ebc6;
   /* 할 일 스페이스 (1.30): a space's band at a row's left edge, its dot in menus and chips — the deep side of the memo
      folders' eight colours, the Mac's own (spec M11), 3:1 or more on paper, paper-2 and card (test/contrast.test.ts). */
   --band-lavender: #897ccf;
@@ -97,6 +103,20 @@
   /* Room after handwritten text that ends in an ellipsis box: Caveat's and Kalam's d, e, f, k reach past
      their advance width, and overflow:hidden would crop that ink ("Ahead" read "Aheaa"). Used as end padding. */
   --ink-over: 0.25em;
+  /* The motion words both apps share (docs/plans/motion-audit.md §2; Mac `Motion` in PaperTheme.swift, JS `motion` in api.ts).
+     Every new movement uses one, runs once and ends — nothing repeats (#64, #67), and snapshots wait for the end.
+     살짝 quick: hover, a tab rising, fading out · 바뀜 change: switches, ⌄, a check's pop, folding · 등장 enter: slips,
+     toasts, new rows (rising 6 px with a fade) · 그리기 draw: the pencil line, the donut · 톡 bounce: the cat's bubble only.
+     --ease-out is SwiftUI's .easeOut (CSS ease-out); leaving uses --ease-in. (--m-size is the drawer's text size, hence motion-.) */
+  --motion-quick: 0.12s;
+  --motion-change: 0.16s;
+  --motion-enter: 0.18s;
+  --motion-draw: 0.22s;
+  --motion-bounce: 0.3s;
+  --motion-rise: 6px;
+  --ease-out: cubic-bezier(0, 0, 0.58, 1);
+  --ease-in: cubic-bezier(0.42, 0, 1, 1);
+  --ease-bounce: cubic-bezier(0.3, 1.5, 0.5, 1);
   color-scheme: light;
 }
 
@@ -146,6 +166,9 @@
   --toast-action: #8f4a30;
   --toast-strong: #3d6639;
   --stamp: #a9b6dc;
+  --lavender-text: #c6bcf0;
+  --honey-text: #e4c86e;
+  --honey-2: #463d22;
   --band-lavender: #9a8fd6;
   --band-pink: #d9828f;
   --band-mint: #6fae84;
@@ -250,8 +273,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .alert-row input[type="time"], .month-row select { height: 28px; border-radius: 7px; border: 1px solid var(--rule); background: var(--card); padding: 0 6px; font: 12.5px var(--ui); color: var(--ink); }
 .alert-row input:disabled { opacity: 0.45; }
 /* The paper switch (as on the Mac): off a rule track with a check-border edge, on sage; the knob card-white by day, ink at night. */
-.switch { width: 40px; height: 22px; border-radius: 11px; background: var(--rule); box-shadow: inset 0 0 0 1px var(--check-border); position: relative; flex: none; transition: background 0.15s; }
-.switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fffdf8; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); transition: transform 0.15s; }
+.switch { width: 40px; height: 22px; border-radius: 11px; background: var(--rule); box-shadow: inset 0 0 0 1px var(--check-border); position: relative; flex: none; transition: background var(--motion-change) var(--ease-out); }
+.switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fffdf8; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); transition: transform var(--motion-change) var(--ease-out); }
 :root[data-paper="night"] .switch::after { background: #ece6d6; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
 .switch[aria-checked="true"] { background: var(--sage); box-shadow: none; }
 .switch[aria-checked="true"]::after { transform: translateX(18px); }

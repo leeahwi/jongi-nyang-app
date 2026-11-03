@@ -106,6 +106,8 @@ api.on("desk:pane", (payload) => {
   const pane = readPane(value?.pane);
   if (pane) show(pane, value);
 });
+// #71: the desk shown or restored: the pane in front heard no state while it was hidden, and catches up now.
+document.addEventListener("visibilitychange", () => { if (!document.hidden) api.send("desk:shown"); });
 
 // Windows: the desk's own title strip (the sidebar runs up to the top; Windows draws − □ × over the
 // right end). Snapshots draw those three too, to see the layout.

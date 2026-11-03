@@ -1,3 +1,4 @@
+import PaperCore
 import SwiftUI
 
 enum NotebookFont: String, CaseIterable, Identifiable {
@@ -70,27 +71,38 @@ enum NotebookFont: String, CaseIterable, Identifiable {
     }
 }
 
-/// Four steps that all still fit the 44 pt ruled line.
-enum NotebookTextSize: String, CaseIterable, Identifiable {
-    case small, regular, large, extraLarge
+/// Seven steps that all still fit the 44 pt ruled line (#141): 1.45's four — 작게 · 보통 · 크게 · 아주 크게 — are the
+/// 1st, 3rd, 5th and 7th, so no one's size changes (PaperCore TextSteps, the same table as the Windows app).
+enum NotebookTextSize: Int, CaseIterable, Identifiable {
+    case small, smallish, regular, largish, large, larger, extraLarge
 
-    var id: String { rawValue }
+    var id: Int { rawValue }
     var title: String {
         switch self {
         case .small: L("작게")
+        case .smallish: L("조금 작게")
         case .regular: L("보통")
+        case .largish: L("조금 크게")
         case .large: L("크게")
+        case .larger: L("더 크게")
         case .extraLarge: L("아주 크게")
         }
     }
-    var scale: CGFloat {
-        switch self {
-        case .small: 0.87
-        case .regular: 1
-        case .large: 1.13
-        case .extraLarge: 1.26
-        }
+    var scale: CGFloat { CGFloat(TextSteps.noteScales[rawValue]) }
+    var larger: NotebookTextSize? { NotebookTextSize(rawValue: rawValue + 1) }
+    var smaller: NotebookTextSize? { NotebookTextSize(rawValue: rawValue - 1) }
+    /// `steps` steps up (down when negative), held at the ends.
+    func stepped(_ steps: Int) -> NotebookTextSize { NotebookTextSize(rawValue: TextSteps.clampNote(rawValue + steps))! }
+
+    /// Read from this Mac's settings: `textStep`, or 1.45's `textSize`.
+    static func saved(in preferences: UserDefaults) -> NotebookTextSize {
+        let step = preferences.object(forKey: "textStep") as? Int
+        return NotebookTextSize(rawValue: TextSteps.noteStep(saved: step, legacy: preferences.string(forKey: "textSize")))!
     }
-    var larger: NotebookTextSize? { Self.allCases.firstIndex(of: self).flatMap { Self.allCases.indices.contains($0 + 1) ? Self.allCases[$0 + 1] : nil } }
-    var smaller: NotebookTextSize? { Self.allCases.firstIndex(of: self).flatMap { $0 > 0 ? Self.allCases[$0 - 1] : nil } }
+
+    /// Written as its step, and as the nearest of 1.45's four for an older version.
+    func save(in preferences: UserDefaults) {
+        preferences.set(rawValue, forKey: "textStep")
+        preferences.set(TextSteps.noteLegacyName(rawValue), forKey: "textSize")
+    }
 }

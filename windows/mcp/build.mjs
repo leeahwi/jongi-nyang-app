@@ -15,12 +15,18 @@ const version = JSON.parse(await readFile(path.join(root, "package.json"), "utf8
 // Written beside the old files and swapped in at the end, so a copy taken meanwhile (the Mac build) is never half a file.
 const pack = path.join(dist, "pack");
 await rm(pack, { recursive: true, force: true });
-await build({
-  entryPoints: [path.join(here, "src/index.ts")], outfile: path.join(dist, "server/index.js.new"),
-  bundle: true, platform: "node", format: "cjs", target: "node18", logLevel: "warning", legalComments: "none",
-  define: { __VERSION__: JSON.stringify(version) },
-  banner: { js: `// 종이냥 for Claude ${version} — built from mcp/src (paper-todo-windows). © 2026 leeAhwi.` },
+// #174 (review L-07): two builds of the server. server/index.js ships (the .mcpb, both apps) with the tests' switches
+// compiled out (`__TEST_HOOKS__` false: no PAPERTODO_AI_* is read); server-test/index.js keeps them for npm run mcp:test
+// and mac/scripts/ai-check.sh, which point it at temporary folders. Never ship server-test.
+const server = (hooks, outfile) => build({
+  entryPoints: [path.join(here, "src/index.ts")], outfile,
+  // minifySyntax drops the `false ? …` branches, so the shipped file doesn't even name the switches (names and lines stay).
+  bundle: true, platform: "node", format: "cjs", target: "node18", logLevel: "warning", legalComments: "none", minifySyntax: true,
+  define: { __VERSION__: JSON.stringify(version), __TEST_HOOKS__: String(hooks) },
+  banner: { js: `// 종이냥 for Claude ${version}${hooks ? " (test build: never ship)" : ""} — built from mcp/src (paper-todo-windows). © 2026 leeAhwi.` },
 });
+await server(false, path.join(dist, "server/index.js.new"));
+await server(true, path.join(dist, "server-test/index.js"));
 
 // The bundle's folder: manifest (the app's version), the cat, the server.
 await mkdir(path.join(pack, "server"), { recursive: true });
@@ -44,9 +50,9 @@ if (process.argv.includes("--tests")) {
   const files = (await readdir(path.join(here, "test"))).filter((name) => name.endsWith(".test.ts"));
   await build({
     entryPoints: files.map((name) => path.join(here, "test", name)), outdir: out, outExtension: { ".js": ".mjs" },
-    bundle: true, platform: "node", format: "esm", target: "node20", logLevel: "warning",
+    bundle: true, platform: "node", format: "esm", target: "node20", logLevel: "warning", define: { __TEST_HOOKS__: "true" },
     // The SDK's client needs require() for its stdio spawn helper.
     banner: { js: "import { createRequire as __createRequire } from 'node:module'; const require = __createRequire(import.meta.url);" },
   });
 }
-console.log(`종이냥 for Claude ${version}: mcp/dist/server/index.js, mcp/dist/jongi-nyang.mcpb`);
+console.log(`종이냥 for Claude ${version}: mcp/dist/server/index.js, mcp/dist/jongi-nyang.mcpb (and the test build, mcp/dist/server-test/index.js)`);

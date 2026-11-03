@@ -1,4 +1,4 @@
-import { bodyFontSize, type AppState } from "../core/types";
+import { bodyFontSize, type AppState, type PrefsState } from "../core/types";
 import { InputLine, lineKeys } from "./inputLine";
 import { commitReading, type FlowHost } from "./intentFlow";
 import { appear, fitWindow, slipButton, slipHead, tape, toaster } from "./slip";
@@ -49,14 +49,14 @@ card.append(tape("todo"), head.element, h("div", { class: "slip-body" }, line.el
 line.field.setAttribute("aria-label", t("빠른 입력"));
 fitWindow(stage);
 
-function applyFont(state: AppState): void {
+function applyFont(state: PrefsState): void {
   prefs = state.prefs;
   spaces = state.todoSpaces;
   document.documentElement.dataset.font = state.prefs.font;
   document.documentElement.style.setProperty("--body-size", `${bodyFontSize(state.prefs.font, "regular")}px`);
 }
 
-api.on("state", (state) => applyFont(state as AppState));
+api.on("state:prefs", (state) => applyFont(state as PrefsState));
 api.on("quick:open", (payload) => {
   const { text } = (payload ?? {}) as { text?: string };
   window.clearTimeout(closing);

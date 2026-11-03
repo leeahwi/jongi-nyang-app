@@ -19,6 +19,15 @@ export const aiLogFileName = "ai-log.jsonl";
 /** Held for the few milliseconds of a read–change–write by the extension and (while AI 연결 is on) the app, on this device only. */
 export const aiLockFileName = "ai-write.lock";
 
+/**
+ * The extension's own small version (I1, docs/plans/mcp-plan.md): 1 before it had one, 2 since pages, memo
+ * folders and prompts. The app writes the one it carries into ai-link.json and the extension writes its own
+ * into each log line, so the extension can say when Claude Desktop's installed copy is older than the app,
+ * and the app can say so in 설정 › AI 연결. The Mac's AIConnect.extVersion is the same number (the Mac ships
+ * this extension).
+ */
+export const aiExtVersion = 2;
+
 export interface AiLink {
   v: 1;
   enabled: boolean;
@@ -29,7 +38,11 @@ export interface AiLink {
   /** "windows 1.27.0", "mac 1.42.0". */
   app: string;
   updatedAt: string;
+  /** The extension version the app carries (aiExtVersion); absent from apps before it (read as 1). */
+  ext?: number;
 }
+
+const isCount = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value > 0;
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const isLang = (value: unknown): value is Lang => value === "ko" || value === "en" || value === "nl";
@@ -43,12 +56,13 @@ export function parseAiLink(text: string): AiLink | undefined {
     v: 1, enabled: value.enabled === true, dataFolder: typeof value.dataFolder === "string" ? value.dataFolder : "",
     lang: isLang(value.lang) ? value.lang : "ko", app: typeof value.app === "string" ? value.app : "",
     updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : "",
+    ...(isCount(value.ext) ? { ext: value.ext } : {}),
   };
 }
 
 export function serializeAiLink(link: AiLink): string {
-  const { v, enabled, dataFolder, lang, app, updatedAt } = link;
-  return JSON.stringify({ v, enabled, dataFolder, lang, app, updatedAt }, null, 2) + "\n";
+  const { v, enabled, dataFolder, lang, app, updatedAt, ext } = link;
+  return JSON.stringify({ v, enabled, dataFolder, lang, app, updatedAt, ...(ext !== undefined ? { ext } : {}) }, null, 2) + "\n";
 }
 
 /** The words every tool answers with while AI 연결 is off (or was never turned on). */
@@ -86,8 +100,9 @@ export interface AiLogEntry {
   changes: AiChange[];
   /** An undo: the entry it took back. */
   undoes?: string;
+  /** The extension version that wrote it (aiExtVersion); absent before there was one (read as 1) and on the apps' undo lines. */
+  ext?: number;
 }
-
 
 function readChange(value: unknown): AiChange | undefined {
   if (!isObject(value) || typeof value.id !== "string") return undefined;
@@ -114,6 +129,7 @@ export function parseAiLog(text: string): AiLogEntry[] {
       v: 1, id: value.id, at: value.at, client: typeof value.client === "string" ? value.client : "Claude", tool: typeof value.tool === "string" ? value.tool : "",
       kind, target, count: typeof value.count === "number" ? value.count : changes.length, title: typeof value.title === "string" ? value.title : "", changes,
       ...(typeof value.undoes === "string" ? { undoes: value.undoes } : {}),
+      ...(isCount(value.ext) ? { ext: value.ext } : {}),
     });
   }
   return entries;
@@ -121,8 +137,21 @@ export function parseAiLog(text: string): AiLogEntry[] {
 
 /** One line of the log (no newline), keys in a fixed order. */
 export function aiLogLine(entry: AiLogEntry): string {
-  const { v, id, at, client, tool, kind, target, count, title, changes, undoes } = entry;
-  return JSON.stringify({ v, id, at, client, tool, kind, target, count, title, ...(undoes ? { undoes } : {}), changes });
+  const { v, id, at, client, tool, kind, target, count, title, changes, undoes, ext } = entry;
+  return JSON.stringify({ v, id, at, client, tool, kind, target, count, title, ...(undoes ? { undoes } : {}), ...(ext !== undefined ? { ext } : {}), changes });
+}
+
+/**
+ * Claude Desktop's installed extension is older than the one this app carries (M41): the newest entry Claude
+ * Desktop wrote ("Claude"; "Claude Code" runs the app's own copy) came from a lower version. Nothing from
+ * Claude Desktop yet: nothing to say. It clears with the first entry the reinstalled extension writes.
+ */
+export function aiExtOutdated(entries: readonly AiLogEntry[], ext = aiExtVersion): boolean {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index];
+    if (entry.client === "Claude" && (entry.kind === "add" || entry.kind === "change")) return (entry.ext ?? 1) < ext;
+  }
+  return false;
 }
 
 /** A new entry's frame: an id and the time now. */
@@ -169,7 +198,8 @@ export function recentAi(entries: readonly AiLogEntry[], now: Date): AiLogEntry[
 
 /**
  * The log rewritten once it grew past `maxBytes`: the lines of the last `days` days (broken lines go too).
- * Undefined while it is small enough, or when nothing would go.
+ * Undefined while it is small enough, or when nothing would go. The app trims with `maxBytes` 0 (#174, review I-01):
+ * whatever its size, nothing older than 30 days stays.
  */
 export function trimAiLog(text: string, now: Date, maxBytes = 1_000_000, days = 30): string | undefined {
   if (new TextEncoder().encode(text).length <= maxBytes) return undefined;

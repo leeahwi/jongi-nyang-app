@@ -11,19 +11,75 @@ public enum Backup {
     /// line is skipped, never a reason to refuse the backup) and merged line by line, by id.
     /// memo-folders.json (1.43, 메모 서랍) is merged by MemoFolders.merge (folders by id, placements by memo, newer wins);
     /// todo-spaces.json (1.45, 할 일 스페이스) by TodoSpaces.merge (S18: the same rules as two devices, this Mac's on a tie).
+    /// memo-trash.json (1.46, 지운 메모) by MemoTrash.merge (by memo id, the later deletion winning; emptied stays emptied).
     public static let dataFiles = ["todos.json", "memos.json", "repeats.json", "events.json", "alarms.json", Focus.fileName, MemoFolders.fileName,
-                                   TodoSpaces.fileName]
+                                   TodoSpaces.fileName, MemoTrash.fileName]
 
     public struct Contents: Equatable, Sendable {
         public var exportedAt: String
         public var from: String
         /// "todos.json", "archive/2026-10.jsonl", … → the file's text.
         public var files: [String: String]
+        /// B4 (optional, version still 1): why the copy was made and what it holds, so a list can show both.
+        public var reason: Reason?
+        public var counts: Counts?
 
-        public init(exportedAt: String, from: String, files: [String: String]) {
+        public init(exportedAt: String, from: String, files: [String: String], reason: Reason? = nil, counts: Counts? = nil) {
             self.exportedAt = exportedAt
             self.from = from
             self.files = files
+            self.reason = reason
+            self.counts = counts
+        }
+    }
+
+    /// What a copy holds, shortly (B4 `counts`): to-dos, memos, events and the record's lines.
+    public struct Counts: Equatable, Sendable {
+        public var todos = 0, memos = 0, events = 0, archive = 0
+
+        public init(todos: Int = 0, memos: Int = 0, events: Int = 0, archive: Int = 0) {
+            self.todos = todos
+            self.memos = memos
+            self.events = events
+            self.archive = archive
+        }
+
+        public init(_ files: [String: String]) {
+            let all = Backup.summary(files)
+            self.init(todos: all.todos, memos: all.memos, events: all.events, archive: all.archive)
+        }
+
+        /// `counts` as written by make: non-negative whole numbers (a missing one is 0); anything else nil.
+        public init?(json: Any?) {
+            guard let object = json as? [String: Any] else { return nil }
+            var values: [Int] = []
+            for key in ["todos", "memos", "events", "archive"] {
+                guard let value = object[key] else { values.append(0); continue }
+                guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+                      number.doubleValue == number.doubleValue.rounded(), number.intValue >= 0 else { return nil }
+                values.append(number.intValue)
+            }
+            self.init(todos: values[0], memos: values[1], events: values[2], archive: values[3])
+        }
+
+        var json: [String: Int] { ["todos": todos, "memos": memos, "events": events, "archive": archive] }
+
+        /// A list row's contents: "할 일 24개 · 메모 12장 · 일정 6개 · 기록 310개" (zeros left out; none: "비어 있어요") —
+        /// en "24 to-dos · 12 notes · 6 events · 310 in history" ("Empty"), nl "24 taken · 12 notities · 6 afspraken · 310 in geschiedenis" ("Leeg").
+        public func text(_ language: AppLanguage) -> String {
+            let values = [todos, memos, events, archive]
+            let parts: [String]
+            switch language {
+            case .ko:
+                parts = zip(["할 일 %d개", "메모 %d장", "일정 %d개", "기록 %d개"], values).filter { $0.1 > 0 }.map { String(format: $0.0, $0.1) }
+            case .en:
+                let nouns = [("to-do", "to-dos"), ("note", "notes"), ("event", "events"), ("in history", "in history")]
+                parts = zip(nouns, values).filter { $0.1 > 0 }.map { AppLanguage.plural($0.1, $0.0.0, $0.0.1) }
+            case .nl:
+                let nouns = [("taak", "taken"), ("notitie", "notities"), ("afspraak", "afspraken"), ("in geschiedenis", "in geschiedenis")]
+                parts = zip(nouns, values).filter { $0.1 > 0 }.map { AppLanguage.plural($0.1, $0.0.0, $0.0.1) }
+            }
+            return parts.isEmpty ? ["비어 있어요", "Empty", "Leeg"][language.index] : parts.joined(separator: " · ")
         }
     }
 
@@ -31,11 +87,16 @@ public enum Backup {
         case notBackup
         case newer
         case unreadable(String)
+        /// #173 (review L-05): past FileLimits.backupBytes (64MB) the file is not opened.
+        case tooLarge
 
         public var message: String { message(.ko) }
 
         public func message(_ language: AppLanguage) -> String {
             switch (self, language) {
+            case (.tooLarge, .ko): "파일이 너무 커서 열지 않았어요. 백업 파일은 64MB까지 열 수 있어요."
+            case (.tooLarge, .en): "This file is too big to open. Backup files can be up to 64 MB."
+            case (.tooLarge, .nl): "Dit bestand is te groot om te openen. Back-upbestanden mogen tot 64 MB zijn."
             case (.notBackup, .ko): "종이냥 백업 파일이 아니에요."
             case (.newer, .ko): "더 새 버전의 종이냥에서 만든 파일이에요. 종이냥을 업데이트해 주세요."
             case (.unreadable(let name), .ko): "백업 파일 안의 ‘\(name)’을 읽지 못했어요."
@@ -44,7 +105,7 @@ public enum Backup {
             case (.unreadable(let name), .en): "Couldn’t read ‘\(name)’ in the backup file."
             case (.notBackup, .nl): "Dit is geen back-upbestand van Jongi-nyang."
             case (.newer, .nl): "Dit bestand komt uit een nieuwere versie van Jongi-nyang. Werk Jongi-nyang bij."
-            case (.unreadable(let name), .nl): "Kon ‘\(name)’ in het back-upbestand niet lezen."
+            case (.unreadable(let name), .nl): "Het lukte niet om ‘\(name)’ in het back-upbestand te lezen."
             }
         }
     }
@@ -59,6 +120,117 @@ public enum Backup {
         return "\(name)-\(CalendarDraft.day(date, calendar: calendar)).jongi"
     }
 
+    // MARK: Automatic copies (backups/ on this device)
+
+    /// Why a copy was made. The raw values are the .jongi file's optional `reason` (B4); the same in backup.ts.
+    public enum Reason: String, CaseIterable, Sendable {
+        case daily, beforeImport, beforeFolderSwitch, beforeRestore, beforeUpdate, manual, export
+
+        /// The start of the copy's name in backups/ — Korean in every language (old copies are found by it); nil for 내보내기.
+        public var filePrefix: String? {
+            switch self {
+            case .daily: "매일"
+            case .beforeImport: "가져오기-전"
+            case .beforeFolderSwitch: "폴더-바꾸기-전"
+            case .beforeRestore: "되돌리기-전"
+            case .beforeUpdate: "업데이트-전"
+            case .manual: "직접"
+            case .export: nil
+            }
+        }
+
+        /// How many of this kind stay: 14 daily ones, 10 of each ‘before’ kind; nil = until deleted (직접).
+        public var keeps: Int? {
+            switch self {
+            case .daily: 14
+            case .beforeImport, .beforeFolderSwitch, .beforeRestore, .beforeUpdate: 10
+            case .manual, .export: nil
+            }
+        }
+    }
+
+    /// A copy in backups/, read from its name.
+    public struct Saved: Equatable, Sendable {
+        public var name: String
+        public var reason: Reason
+        public var date: Date
+    }
+
+    /// "매일-20261030-091200.jongi", "폴더-바꾸기-전-20261030-091200.jongi" (local time).
+    public static func savedName(_ reason: Reason, at date: Date, calendar: Calendar = .paper) -> String {
+        let p = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: date)
+        let stamp = String(format: "%04d%02d%02d-%02d%02d%02d", p.year!, p.month!, p.day!, p.hour!, p.minute!, p.second!)
+        return "\(reason.filePrefix ?? "직접")-\(stamp).jongi" // ko-only: file names
+    }
+
+    /// The kind and time in a copy's name; nil for any other file.
+    public static func saved(_ name: String, calendar: Calendar = .paper) -> Saved? {
+        guard name.hasSuffix(".jongi") else { return nil }
+        let stem = name.dropLast(6)
+        for reason in Reason.allCases {
+            guard let prefix = reason.filePrefix, stem.hasPrefix(prefix + "-") else { continue }
+            let stamp = stem.dropFirst(prefix.count + 1)
+            let digits = stamp.split(separator: "-")
+            guard digits.count == 2, digits[0].count == 8, digits[1].count == 6,
+                  digits.allSatisfy({ $0.allSatisfy(\.isASCII) && $0.allSatisfy(\.isNumber) }) else { continue }
+            let day = Array(digits[0]), clock = Array(digits[1])
+            let number = { (chars: ArraySlice<Character>) in Int(String(chars))! }
+            var parts = DateComponents()
+            parts.year = number(day[0..<4]); parts.month = number(day[4..<6]); parts.day = number(day[6..<8])
+            parts.hour = number(clock[0..<2]); parts.minute = number(clock[2..<4]); parts.second = number(clock[4..<6])
+            // A real moment only: month 13 or day 40 doesn't roll over into the next.
+            guard let date = calendar.date(from: parts),
+                  calendar.dateComponents([.month, .day], from: date) == DateComponents(month: parts.month, day: parts.day) else { continue }
+            return Saved(name: name, reason: reason, date: date)
+        }
+        return nil
+    }
+
+    /// The copies to remove: past the newest 14 daily ones and the newest 10 of each ‘before’ kind. 직접 and other files stay.
+    public static func prune(_ names: [String], calendar: Calendar = .paper) -> [String] {
+        let copies = names.compactMap { Self.saved($0, calendar: calendar) }
+        var remove: [String] = []
+        for reason in Reason.allCases {
+            guard let keeps = reason.keeps else { continue }
+            let kind = copies.filter { $0.reason == reason }.sorted { ($0.date, $0.name) > ($1.date, $1.name) }
+            remove += kind.dropFirst(keeps).map(\.name)
+        }
+        return remove.sorted()
+    }
+
+    /// The daily copy is due when something changed since the last copy and the newest daily one is from an earlier
+    /// day — the app's day, which ends at 4 a.m. (as the record's). Nothing changed: none, so the same copy doesn't pile up.
+    public static func isDue(now: Date, lastDaily: Date?, changed: Bool, calendar: Calendar = .paper) -> Bool {
+        guard changed else { return false }
+        guard let lastDaily else { return true }
+        return Archive.logicalDayStart(lastDaily, calendar: calendar) < Archive.logicalDayStart(now, calendar: calendar)
+    }
+
+    /// When a copy was made, by calendar day: "오늘 09:12" · "어제 21:40" · "10월 28일 08:55" · "2025년 12월 30일 08:55" —
+    /// en "Today 9:12 AM" · "Oct 28, 8:55 AM" · "Dec 30, 2025, 8:55 AM", nl "Vandaag 09:12" · "28 okt 08:55" · "30 dec 2025 08:55".
+    /// `midSentence`: en "today …" · "yesterday …", nl "vandaag …" · "gisteren …". The same as backup.ts savedWhen.
+    public static func savedWhen(_ date: Date, now: Date, language: AppLanguage = .ko, midSentence: Bool = false, calendar: Calendar = .paper) -> String {
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: now)).day ?? 99
+        let p = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        let time = language.clock(hour: p.hour!, minute: p.minute!)
+        if days == 0 || days == 1 {
+            let word = [["오늘", "Today", "Vandaag"], ["어제", "Yesterday", "Gisteren"]][days][language.index]
+            return "\(midSentence && language != .ko ? word.lowercased() : word) \(time)"
+        }
+        let year = p.year == calendar.component(.year, from: now) ? nil : p.year
+        return language.dayMonth(month: p.month!, day: p.day!, year: year) + (language == .en ? ", " : " ") + time
+    }
+
+    /// A copy's size: "220KB" · "2.9MB" (KB = 1024 bytes, rounded up below 1000 KB) — en "220 KB" · "2.9 MB", nl "220 kB" · "2,9 MB".
+    public static func sizeText(_ bytes: Int, language: AppLanguage = .ko) -> String {
+        let kilobytes = max(1, (bytes + 1023) / 1024)
+        let gap = language == .ko ? "" : " "
+        if kilobytes < 1000 { return "\(kilobytes)\(gap)\(language == .nl ? "kB" : "KB")" }
+        let megabytes = Double(bytes) / 1_048_576
+        let shown = megabytes >= 100 ? String(Int(megabytes.rounded())) : String(format: "%.1f", (megabytes * 10).rounded() / 10)
+        return (language == .nl ? shown.replacingOccurrences(of: ".", with: ",") : shown) + gap + "MB"
+    }
+
     /// When a backup was made, for the import question: "10월 8일 14:30", en "Oct 8, 2:30 PM", nl "8 okt 14:30";
     /// nil when it can't be read (Windows: exportedText).
     public static func exportedText(_ exportedAt: String, calendar: Calendar = .paper, language: AppLanguage = .ko) -> String? {
@@ -70,9 +242,15 @@ public enum Backup {
         return day + (language == .en ? ", " : " ") + language.clock(hour: p.hour!, minute: p.minute!)
     }
 
-    public static func make(files: [String: String], exportedAt: Date, from: String) -> String {
+    /// The backup file's text. With a reason (B4), also `"reason"` and `"counts"` (to-dos, memos, events, record lines);
+    /// `version` stays 1 and older versions read past both (they only look at format, version and files).
+    public static func make(files: [String: String], exportedAt: Date, from: String, reason: Reason? = nil) -> String {
         let iso = ISO8601DateFormatter()
-        let object: [String: Any] = ["format": format, "version": version, "exportedAt": iso.string(from: exportedAt), "from": from, "files": files]
+        var object: [String: Any] = ["format": format, "version": version, "exportedAt": iso.string(from: exportedAt), "from": from, "files": files]
+        if let reason {
+            object["reason"] = reason.rawValue
+            object["counts"] = Counts(files).json
+        }
         let data = try! JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes])
         return String(decoding: data, as: UTF8.self) + "\n"
     }
@@ -88,7 +266,8 @@ public enum Backup {
             texts[name] = text
         }
         try validate(texts)
-        return Contents(exportedAt: object["exportedAt"] as? String ?? "", from: object["from"] as? String ?? "", files: texts)
+        return Contents(exportedAt: object["exportedAt"] as? String ?? "", from: object["from"] as? String ?? "", files: texts,
+                        reason: (object["reason"] as? String).flatMap(Reason.init(rawValue:)), counts: Counts(json: object["counts"]))
     }
 
     /// Each known file reads; unknown names are left alone (and not written).
@@ -106,6 +285,7 @@ public enum Backup {
             case "alarms.json": ok = (try? Alarm.File.decode(data)) != nil
             case MemoFolders.fileName: ok = (try? MemoFolders.decode(data)) != nil
             case TodoSpaces.fileName: ok = (try? TodoSpaces.decode(data)) != nil
+            case MemoTrash.fileName: ok = (try? MemoTrash.decode(data)) != nil
             default:
                 guard isArchive(name) else { continue }
                 ok = lines(text).allSatisfy { (try? tolerant.decode(ArchiveEntry.self, from: Data($0.utf8))) != nil }
@@ -185,6 +365,12 @@ public enum Backup {
                 guard let theirs = try? MemoFolders.decode(Data(text.utf8)) else { continue }
                 guard let here = try? MemoFolders.decode(Data(mine.utf8)) else { result[name] = text; continue }
                 result[name] = MemoFolders.merge(here: here, theirs: theirs).encoded()
+            case MemoTrash.fileName:
+                // 지운 메모 (#120): joined as two devices' copies are (T5); mine unreadable: the backup's.
+                guard let theirs = try? MemoTrash.decode(Data(text.utf8)) else { continue }
+                guard let here = try? MemoTrash.decode(Data(mine.utf8)) else { result[name] = text; continue }
+                let merged = MemoTrash.merge(here: here, theirs: theirs)
+                result[name] = merged == here ? mine : merged.encoded()
             case TodoSpaces.fileName:
                 guard let theirs = try? TodoSpaces.decode(Data(text.utf8)) else { continue }
                 guard let here = try? TodoSpaces.decode(Data(mine.utf8)) else { result[name] = text; continue }

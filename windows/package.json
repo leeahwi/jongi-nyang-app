@@ -1,7 +1,7 @@
 {
   "name": "paper-todo-windows",
   "productName": "종이냥",
-  "version": "1.30.0",
+  "version": "1.31.0",
   "description": "종이 한 장처럼 작게 꺼내 쓰는 Windows 할 일 앱",
   "author": "leeAhwi",
   "main": "out/main.js",
@@ -17,7 +17,7 @@
     "mcp:test": "node mcp/build.mjs --tests && node --test out-test-mcp/",
     "pet-art": "electron tools/pet-art.cjs",
     "tray-icon": "electron tools/tray-icon.cjs",
-    "dist": "npm run typecheck && npm test && npm run mcp:test && node tools/build.mjs --production && electron-builder --win --x64"
+    "dist": "npm run typecheck && npm test && npm run mcp:test && node tools/build.mjs --production && electron-builder --win --x64 && node tools/checksums.mjs"
   },
   "build": {
     "appId": "com.noa.PaperTodo",
@@ -32,6 +32,7 @@
       "!out/**/*.map",
       "assets/**",
       "!assets/pet/*.png",
+      "!node_modules/**",
       "package.json"
     ],
     "extraResources": [
@@ -42,8 +43,19 @@
           "server/index.js",
           "jongi-nyang.mcpb"
         ]
+      },
+      {
+        "from": "../NOTICE",
+        "to": "NOTICE.txt"
       }
     ],
+    "electronFuses": {
+      "runAsNode": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    },
     "win": {
       "target": [
         "nsis",
@@ -59,15 +71,20 @@
     },
     "copyright": "© 2026 leeAhwi. All rights reserved."
   },
+  "dependencies": {
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.14",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  },
   "devDependencies": {
     "@anthropic-ai/mcpb": "^2.1.2",
-    "@modelcontextprotocol/sdk": "^1.32.2",
     "@types/node": "^20.19.43",
     "electron": "^44.4.5",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
-    "typescript": "^7.0.2",
-    "zod": "^4.6.7"
+    "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=22"

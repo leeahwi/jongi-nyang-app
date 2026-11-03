@@ -81,14 +81,14 @@ enum DeskPane: String, CaseIterable, Identifiable {
         switch self {
         case .calendar, .history: nil
         case .clock: L("알람을 맞추고, 뽀모도로 시간과 소리를 정해 바로 시작해요.")
-        case .appearance: L("언어와 종이 색, 글꼴과 글자 크기를 정해요.")
+        case .appearance: L("언어와 낮 · 밤, 노트의 글꼴과 글자 크기를 정해요.")
         case .notifications: L("주기 알림과 알림 모양을 정하고, 미리보기로 확인해요.")
         case .repeating: L("반복하는 날마다 목록에 한 줄씩 놓여요.")
         case .pet: L("종이냥을 보이거나 숨기고, 돌아다닐지, 말을 걸지 정해요.")
         case .events: L("일정을 적어 두면 오늘 할 일 위에 보이고, 시작 전에 알려 줘요.")
-        case .storage: L("할 일과 기록이 저장되는 곳, 다른 컴퓨터로 옮기는 백업이에요.")
+        case .storage: L("할 일과 기록이 저장되는 곳, 자동 백업과 다른 컴퓨터로 옮기는 백업이에요.")
         case .drawer: L("화면 끝에서 메모를 꺼내 보고, 바로 적고, 그 자리에서 고쳐요.")
-        case .spaces: L("할 일에 색을 붙여 나눠요. 오늘 한 장은 그대로예요.")
+        case .spaces: L("할 일을 회사 · 집처럼 나눠요. 오늘 한 장은 그대로예요.") // #53: the same words as Windows
         case .ai: L("Claude와 이야기하면서 할 일과 일정을 보고, 넣고, 고쳐요.")
         case .help: L("궁금한 걸 찾아보세요")
         }

@@ -3,6 +3,7 @@ import type { TimerPayload } from "../core/timerWidget";
 import { h, lang, paper, t } from "./api";
 import { chime } from "./chime";
 import { TabularClock } from "./tabularClock";
+import { sampled } from "./sampled";
 
 const api = paper();
 const bubbleSlot = document.querySelector<HTMLElement>(".bubble-slot")!;
@@ -77,6 +78,7 @@ function renderCat(): void {
   if (!cat.src.endsWith(source.replace("../..", ""))) cat.src = source;
   cat.classList.toggle("awake", !paused);
   cat.classList.toggle("asleep", paused);
+  sampled(cat, cat.hidden ? undefined : paused ? "asleep" : "awake");
 }
 
 function renderBoard(): void {

@@ -4,7 +4,8 @@
 # folder per size with scripts/perf-data.py and runs the bench on it. Nothing of the app's own data is read or written.
 #
 #   scripts/bench-app.sh [size …]      sizes: base 500 2000 5000 3y (default: base 2000 3y); RUNS=5; ONLY=core,model,…
-#   CHECK=1: the steps with a ceiling (#61–#63) fail the run when over it.
+#   CHECK=1: the steps with a ceiling (#61–#63, #68–#70) fail the run when over it. `first open` and `GPU draw` are a frame
+#   as on screen (Core Animation with Metal, nothing shown); `draw` renders on the CPU, far slower for translucent layers.
 #
 # base = the demo set (165 to-dos, 80 memos, 2,000 record lines over 300 days, 60 events);
 # 500/2000/5000 = that many to-dos with 9 spaces, 200 memos, a year of record (2,000 lines) and 60 events;

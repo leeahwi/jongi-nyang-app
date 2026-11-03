@@ -375,7 +375,10 @@ struct HistoryView: View {
                 .padding(.vertical, 12)
             } else {
                 ScrollView {
-                    VStack(spacing: 0) {
+                    // Lazy (#62): only the rows in the card's 200 pt are made. The chosen day is today when the pane
+                    // opens, and today holds every finished to-do still on the list — in the 2,000 to-do bench, 381 rows of
+                    // handwriting, half of the pane's first draw.
+                    LazyVStack(spacing: 0) {
                         ForEach(list, id: \.id) { entry in
                             HStack(spacing: 8) {
                                 Image(systemName: "checkmark")

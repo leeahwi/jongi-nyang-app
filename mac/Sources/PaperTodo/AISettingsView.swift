@@ -29,7 +29,9 @@ struct AISettingsPanel: View {
                         Button(L("Claude 데스크톱에 연결")) { ai.connectDesktop() }
                             .buttonStyle(PaperActionButtonStyle(primary: true))
                     }
-                    note(L("누르면 Claude가 ‘종이냥 for Claude’를 설치할지 물어봐요. Claude Code가 있으면 같이 연결해요."))
+                    note(ai.enabled && ai.desktopOutdated
+                         ? L("Claude 데스크톱의 확장이 이 앱보다 옛 판이에요. 다시 연결하면 새로 설치해요.")
+                         : L("누르면 Claude가 ‘종이냥 for Claude’를 설치할지 물어봐요. Claude Code가 있으면 같이 연결해요."))
                 }
                 .padding(.vertical, 9)
                 .settingsRow()
@@ -84,6 +86,22 @@ struct AISettingsPanel: View {
                         }
                     }
                 }
+                // #174: the log keeps 30 days; 기록 지우기 empties it now (after a slip).
+                SettingsSeparator()
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    Text(L("Claude가 한 일의 기록은 이 기기에 30일 동안 남아요.").keepingParticles)
+                        .font(.system(size: 11))
+                        .foregroundStyle(PaperTheme.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    // After the click that got here has finished (a modal loop inside a SwiftUI action can't size its slip).
+                    Button(L("기록 지우기")) { DispatchQueue.main.async { ai.askToClearLog() } }
+                        .buttonStyle(PaperActionButtonStyle())
+                        .fixedSize()
+                        .disabled(!ai.hasLog)
+                }
+                .padding(.vertical, 9)
+                .settingsRow()
             }
         }
         .onAppear { ai.reload() }

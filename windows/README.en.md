@@ -11,7 +11,7 @@
 
 - **Windows 10/11 (x64)** — this folder (`windows/`). Electron 44 + TypeScript, no outside UI libraries.
 - The **macOS version** lives in the [`mac/` folder](../mac). Same design, features and file format, so one shared folder gives you the same list on a Mac.
-- No internet, account or server: everything stays on this PC (or in a shared folder you choose). [Events](#events--calendar) live inside Jongi-nyang too, and a single [backup file](#backup--move) moves everything to another computer.
+- No account or server, and the app never goes online: everything stays on this PC (or in a shared folder you choose). If you turn on the AI connection, the to-dos, events and notes Claude reads go to Claude with the conversation (it's off at first). [Events](#events--calendar) live inside Jongi-nyang too, and a single [backup file](#backup--move) moves everything to another computer.
 - **Korean, English and Dutch.** Desk → Appearance → **App language**: Automatic (the system’s language) · 한국어 · English · Nederlands. Changing it restarts the app.
 - **Night paper**: when Windows is in dark mode, the paper turns the color of paper in a room with the light off (Desk → Appearance → Paper: Automatic · Day · Night).
 
@@ -37,6 +37,7 @@
 - [Install and run](#install-and-run)
 - [Shortcuts](#shortcuts)
 - [Where your data lives](#where-your-data-lives)
+- [Removing the app and your data](#removing-the-app-and-your-data)
 - [Development](#development)
 - [Differences from the macOS version](#differences-from-the-macos-version)
 - [Fonts and images](#fonts-and-images)
@@ -233,14 +234,15 @@ Since 1.27, Claude (Claude Desktop · Claude Code) can look at your to-dos, even
 
 In 1.28 the notepad’s Notes tab became the **Notes drawer**: pull your notes out from the edge of the screen, jot things down and edit them right there. Every note from the Notes tab is in the drawer’s ‘Notes’ folder (no file is changed), and the first launch says so once. 1.30 has the same behaviour, files and test cases (D1–D30) as Mac 1.45.
 
-- **Open · close**: `Ctrl+Shift+D` from any app (change or turn it off in Desk → Notes drawer), the handle at the screen’s edge (pale cream with a paw — hover for ‘Notes drawer · 5 notes edited today’; drag it up or down), ⋯ → Notes drawer, right-clicking the cat, the drawer button above the notepad, `Ctrl+3` or the notification area menu. It slides out over 180 ms, the full height above the taskbar of the screen your mouse is on, and clicking another app doesn’t close it. The same shortcut, `Esc` or × do.
+- **Open · close**: `Ctrl+Shift+D` from any app (change or turn it off in Desk → Notes drawer), the handle at the screen’s edge (pale cream with a paw — hover for ‘Notes drawer · 5 notes edited today’; drag it up or down), ⋯ → Notes drawer, right-clicking the cat, the drawer button above the notepad, `Ctrl+3` or the notification area menu. It slides out over 180 ms, the full height above the taskbar of the screen your mouse is on, and clicking another app doesn’t close it. The same shortcut, `Esc` or a click on the small bar in the middle of its inner edge do (drag the bar to change the width).
 - **The drawer**: one sheet of paper with paper cat ears on its top edge (a step darker than the notes). The header shows the folder’s name (handwritten) ▾ — click it or press `Ctrl+L` for the folder list —, search, keep-on-top and close. Write on the taped slip and press `Enter` for a new note at the top of the folder. At the bottom: ⚙ · ‘Work · 5 notes’ · the shortcut.
 - **Note cards (1.29)**: grouped by date like Apple Notes — Pinned · Today · Yesterday · This week · Last week · October · September 2025 (weeks start on Monday). Each card has a strip of tape in its folder’s colour, a handwritten title, up to three lines of preview (a checklist’s first three items, 1.30) and a short time (`6:02 PM` · `Tuesday` · `Oct 13`). What a note is gets a small chip, found in its words: a link (`youtube.com/watch`, click to open — a title that is only the address reads ‘youtube.com link’), a phone number (`010-1234-5678`, click to copy), a checklist (2/4 and a bar). Hover for Copy · Pin · ⋯; an open note has [Larger view · Copy · ⚙] ‘Edited 5:38 PM’ [Move to folder · Delete] under it. A folder with more than 20 notes gets a little denser.
 - **Menus**: everything has a right-click menu too (icons, the shortcuts that exist, delete last) — an empty spot (= the ⚙ at the bottom: New note · New note from clipboard · paper · backdrop · left/right · settings · help · Quit Jongi-nyang), a note (Open and edit · Larger view · Copy · Duplicate · Pin · Move to folder ▸ Recent · This note’s paper · Remove ticked lines · Delete), text you’re editing (Cut · Copy · Paste · Select all + This note), a bookmark (New note here · Rename · Color · Sort · Duplicate · Delete folder) and Pinned (Sort · Unpin all). `Shift+F10` and the Menu key open them as well.
 - **Folders**: the bookmarks at the side. The chosen one shows its name, the others their first letter; hover for ‘Shopping · 3 notes · Ctrl+3’. `+` for a new folder (a name, eight colours), drag to reorder or drop a note on a bookmark to move it; the pin bookmark is ‘Pinned’. Bookmarks and the handle are solid colours, no stripes (1.30). Sort by last edited · date created · title (per folder). `Ctrl+1`–`9` · `Ctrl+0`; `Ctrl+F` searches every folder.
-- **Paper and backdrop**: Day paper · Night paper · Kraft · Grid notebook, plus Auto, which follows the notepad’s day or night (1.29: each paper a step darker behind the notes, a 1 px edge on every note, darker grey text). One note can have its own paper (This note’s paper). Backdrop: Solid · Frosted · Strong (the screen behind shows through, blurred, on Windows 11) · None (only the notes, floating). Right or left, 260–480 wide (drag its inner edge).
+- **Paper and backdrop**: Day paper · Night paper · Kraft · Grid notebook, plus Auto, which follows the notepad’s day or night (1.29: each paper a step darker behind the notes, a 1 px edge on every note, darker grey text). One note can have its own paper (This note’s paper). Backdrop: Solid · Frosted · Strong (meant to let the screen behind show through, blurred, on Windows 11; not yet seen on a real PC) · None (only the notes, floating). Right or left, 260–480 wide (drag its inner edge).
 - **New look (1.30)**: whatever the font setting, card titles are 22 px handwriting, previews 13 px body ink one step lighter (darker than the old grey on all four papers), and an open note 14 px with 26 px lines. Cards, open notes and the larger view drop the ruled lines and the red margin; a strip of folder-coloured tape, a faint edge and shadow and a small torn edge at the top are left. No green box while editing, just the caret; a card picked with the keyboard gets a faint edge in its folder’s colour. Pinned shows a pin instead of a paw.
 - **Data**: the notes stay in `memos.json`; folders and places go in a new file beside it, `memo-folders.json`, so an older version saving the notes never wipes them. Changes on two devices merge entry by entry (the later one wins); backups and shared folders take it along. Quick note and `/note` go to the folder you last looked at.
+- **Markdown, font and size**: the open note is edited in CodeMirror 6, so bold, headings, lists, checklists and code look like themselves as you type. The marks show only on the line with the cursor (`Ctrl+Shift+R` shows them always). The format button and `Ctrl+B` · `Ctrl+I` · `Ctrl+K`; `Enter` on a list line starts the next item. One font (Clean · Pen · Marker · Monospaced) and one of four text sizes for the whole drawer, in Settings → Notes drawer. The file keeps the text as written.
 
 ![Notes drawer — Day paper · Night paper · Kraft · Grid notebook](../docs/screenshots/windows/en/drawer-themes.png)
 
@@ -248,17 +250,26 @@ In 1.28 the notepad’s Notes tab became the **Notes drawer**: pull your notes o
 
 ## To-do spaces
 
-Since 1.30 you can split to-dos into **spaces** like Work · Home · Study. The Today tab is still one page — split up, not split apart. Same behaviour, same file and same test cases as Mac 1.45 (S1–S22, `docs/plans/spaces-cases.json`).
+Since 1.30 you can split to-dos into **spaces** like Work · Home · Study. The Today tab is still one page — split up, not split apart. Same behaviour, same file and same test cases as Mac 1.45 (S1–S28, `docs/plans/spaces-cases.json`).
 
 - **Colour bands**: only to-dos with a space get a small band in its colour at the left end of the line; hover over it for the name. Without any space the notepad looks exactly like 1.29.
-- **One space at a time**: `All spaces ▾` in the Today header, or `Ctrl+Shift+1`–`9` in the notepad (`Ctrl+Shift+0` shows all). ‘Showing Work only · 4 other to-dos hidden · Show all’ stays on top, and what you write goes into that space. At 4 a.m. the next day it goes back to all. The tab’s number and reminders still count the hidden to-dos.
-- **`#` in the input line**: `Send the quote by Friday #work`; the start of the name (`#wo`) works too. A name that doesn’t exist yet becomes a new space when you put the line in. With a `#` in the line, `Shift+Tab` picks another space. Events · timers · alarms · notes get no space. Quick entry (`Ctrl+Alt+N`) works the same.
-- **Moving and managing**: right-click a to-do (or `Shift+F10` · the Menu key) → `Move to space ▸`, or the Space field on the reminder · repeat · deadline slip. Desk → Spaces makes, renames, colours (eight), reorders (drag) and deletes them (with Undo). On Windows the to-do’s right-click menu is now a paper menu like the Notes drawer’s.
+- **One space at a time**: `All spaces ▾` in the Today header, or `Ctrl+Shift+1`–`9` in the notepad (`Ctrl+Shift+0` shows all; on PCs that switch input language with `Ctrl+Shift` these may clash, not yet checked). The button turns into ‘Work only ▾’ and a faint line at the end of the list says ‘4 more in other spaces · Show all’; what you write goes into that space. At 4 a.m. the next day it goes back to all. The tab’s number and reminders still count the hidden to-dos.
+- **`#` in the input line**: `Send the quote by Friday #work`; the start of the name (`#wo`) works too. A name that doesn’t exist yet becomes a new space when you put the line in. With a `#` in the line, `Shift+Tab` picks another space. `#general` takes a to-do out of the spaces, into General (a space actually named ‘General’ comes first). Events · timers · alarms · notes get no space. Quick entry (`Ctrl+Alt+N`) works the same.
+- **Moving and managing**: right-click a to-do (or `Shift+F10` · the Menu key) → `Move to space ▸`, or the Space field on the reminder · repeat · deadline slip. Desk → Spaces makes, renames, colours (eight), reorders (drag) and deletes them (with Undo). The ‘General’ row at the top holds the to-dos in no space; only its name can change (1.30.1). On Windows the to-do’s right-click menu is now a paper menu like the Notes drawer’s.
 - **Data**: `todos.json` keeps its shape; the spaces and where each to-do is live beside it in the new `todo-spaces.json` (an older version saving the list never wipes them). When two devices change the same thing the later change wins; backups and shared folders take it along.
 
 | One sheet, mixed | Work only |
 | --- | --- |
-| ![Today: a space's colour band at the edge of each to-do](../docs/screenshots/windows/en/spaces-today.png) | ![Showing Work only, the other to-dos hidden](../docs/screenshots/windows/en/spaces-lens.png) |
+| ![Today: a space's colour band at the edge of each to-do](../docs/screenshots/windows/en/spaces-today.png) | ![Showing Work only: ‘5 more in other spaces · Show all’ at the end of the list](../docs/screenshots/windows/en/spaces-lens.png) |
+
+## Group by space · automatic backups (1.31)
+
+![A wide notepad with today's to-dos grouped into one column per space](../docs/screenshots/windows/spaces2b-board.png)
+
+- **Group by space**: turn it on from the `All spaces ▾` menu or with `Ctrl+Shift+G` on the notepad, and Today's to-dos gather by space as note cards or bookmarks. Widen the notepad and each space gets its own column (up to 1,200px), with `+ Add to Work` at the bottom to write straight into it.
+- **Drag to move**: drag a to-do onto another group or press `Ctrl+Alt+↑` · `Ctrl+Alt+↓`, and pick several with `Ctrl`-click or `Shift`-click to move them at once.
+- **Automatic backups**: once a day, and before anything overwrites the storage folder (an import or a restore, say), the folder is saved as a `.jongi` file. Backups go to this PC's `backups` folder, not the storage folder (14 daily, 10 of each kind made before overwriting); pick one to restore in Desk → **Storage & backup**.
+- **Notes drawer**: found notes are grouped by folder, and the folder name ▾ menu (`Ctrl+L`) offers titles only and the sort order. The drawer widens in the big view. Deleted notes stay for 30 days, and `Deleted notes` puts them back in their folder. `Ctrl+K` opens a link field, the checkboxes are larger, and four new drawer papers (hanji, sage, blossom, ink) join the others.
 
 ## Screens
 
@@ -342,6 +353,20 @@ npm start            # build, then run
 - **The same JSON format as the macOS version**, so the files carry on there. To move everything at once, see [Backup & move](#backup--move).
 - Since 1.16.0, the leftovers of the old Google integration (`google.json` · `calendar-cache.json` · `tasks-sync.json`) are removed at startup.
 
+## Removing the app and your data
+
+The uninstaller removes only the app; your lists stay. To remove everything:
+
+1. If you used the AI connection, disconnect it in Claude first. Remove ‘Jongi-nyang for Claude’ in Claude Desktop’s Settings → Extensions, and if you pasted the connect command into Claude Code, run `claude mcp remove jongi-nyang` in that same folder.
+2. Turn off ‘Open Jongi-nyang when Windows starts’ in Desk → Appearance → Startup. If the app is already gone, turn it off in Task Manager → Startup apps.
+3. Quit Jongi-nyang from the notification area and uninstall it in Settings → Apps → Installed apps. For the ZIP version, delete the folder you unzipped.
+4. Delete `%APPDATA%\PaperTodo\`. All the files above are there (lists, settings, AI connection record, `backups\`).
+5. Delete `%APPDATA%\종이냥\`: the window state (the last tab you opened) and caches Electron keeps.
+
+- If you used a shared folder, also delete `todos.json` · `memos.json` · `repeats.json` · `memo-folders.json` · `todo-spaces.json` · `events.json` · `alarms.json` · `focus.jsonl` · `archive\` there. The lists disappear on every device using that folder, Macs included.
+- Delete exported backup files (`.jongi`) wherever you saved them.
+- What is kept where, and what can leave your computer, is on the [privacy page](https://leeahwi.github.io/jongi-nyang-app/en/privacy.html).
+
 ## Development
 
 ```sh
@@ -356,6 +381,7 @@ npm run snapshot -- timeblock # only 1.24’s to-do times and snooze Off (day an
 npm run snapshot -- strip # only 1.25’s day ribbon, Your day and the timer width check (day and night, strip-*.png)
 npm run snapshot -- ai # only 1.27’s AI connection (stamps, notices, away, the desk pane; day and night, ai-*.png)
 npm run snapshot -- drawer # only the Notes drawer (the handle, date groups and cards on four papers, the open note, every menu, the four backdrops, a note’s own paper, a dense list, widths, sides, settings, the two-tab notepad, the move notice; snapshots/drawer/)
+npm run snapshot -- markdown # only the memo markdown, font and size shots (four sizes day · night, papers, faces, the largest size in a narrow drawer, the format bar, always-show marks; snapshots/drawer/drawer-md-*). On a Mac it stops at once if a window reaches a screen
 npm run mcp:build    # 종이냥 for Claude: mcp/dist/server/index.js (one file) and mcp/dist/jongi-nyang.mcpb
 npm run mcp:test     # the bundled server driven with the SDK client: M1–M12 · M16–M18 · 100 rounds of writing at once
 npm run perf         # a --demo run on a heavy sample data set: start time, idle CPU, input latency… (--quick · --long)
@@ -393,12 +419,13 @@ The **Cat talk** tables (`src/core/chatter.ts`) are generated by `generate.py` f
 - Showing one space is `Ctrl+Shift+1`–`9` · `Ctrl+Shift+0` (Mac `⌥⌘1`–`9` · `⌥⌘0`). `Ctrl+Alt+digit` was left alone because it clashes with layouts that type with AltGr. `All spaces ▾` sits at the end of the date line, clear of the cat.
 - The language restarts the app itself; the Mac sets the app’s own language for macOS and relaunches.
 
-> **Still to check on a real Windows PC**: this app was run with Electron on macOS to check every screen and behaviour (keyboard · drag and drop · quick add · shared-folder sync · note merging · reminders · cat talk) and to build the installer. Installing on real Windows, the notification area, click-through (the reminder slip’s check box), `Ctrl+Alt+N` focus, AltGr keyboards, the notes drawer’s Frosted and Strong backdrops, `Ctrl+Shift+0` against the input-language shortcut, the 12- or 24-hour clock read from the region setting, and `Shift+F10` · the Menu key haven’t been checked yet.
+> **Still to check on a real Windows PC**: this app was run with Electron on macOS to check the screens and main behaviour (keyboard · drag and drop · quick add · shared-folder sync · note merging · reminders · cat talk) and to build the installer. Installing on real Windows, the notification area, click-through (the reminder slip’s check box), `Ctrl+Alt+N` focus, AltGr keyboards, the notes drawer’s Frosted and Strong backdrops, `Ctrl+Shift+0` against the input-language shortcut, the 12- or 24-hour clock read from the region setting, and `Shift+F10` · the Menu key haven’t been checked yet.
 
 ## Fonts and images
 
 - The handwriting fonts **HanJang Pen / HanJang Brush** are Nanum Pen and Nanum Brush (SIL OFL 1.1) with narrower letters. License: `assets/fonts/OFL.txt`.
 - English and Dutch use **Caveat** (pen) and **Kalam** (marker), both SIL OFL 1.1 — `assets/fonts/Caveat-OFL.txt` and `assets/fonts/Kalam-OFL.txt`.
+- The Notes drawer's code font **D2Coding** (NAVER, 1.4.0 regular, unchanged) is SIL OFL 1.1 too — `assets/fonts/D2Coding-OFL.txt`.
 - The cat and the paper texture were made with an image generation tool (not a scan of real paper).
 
 ## License

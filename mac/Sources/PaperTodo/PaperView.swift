@@ -9,18 +9,24 @@ extension Notification.Name {
 struct PaperView: View {
     @ObservedObject var model: AppModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// The peeking cat nods when a task is checked off.
-    @State var mascotNod = false
     @State private var rowDrop: TaskRowDrop?
+    /// The 그 밖에 rows' ids handed to each row, kept while they stay the same (#61; see `todayList`).
+    @State private var keptRest = KeptIDs()
     /// Snapshots: the input line drawn with text in it.
     var previewLine: String?
     /// Snapshots: 앞으로 with a drag under way onto a day.
     var previewAheadDrag: (source: UUID, target: AheadDropTarget)?
     /// Snapshots: the 하루 띠 at a fixed time.
     var previewNow: Date?
+    /// Snapshots (2b): a row drawn as if dragged over another group.
+    var previewGroupDrag: (source: UUID, target: String)?
+    /// 2b: a row dragged among the groups.
+    @StateObject private var groupDrag = SpaceGroupDrag()
 
     /// The note's height: the 하루 띠's rows and its open day follow it.
     @State private var height: CGFloat = 560
+    /// The note's width: 2b's board (720 and more) leaves out the chips.
+    @State private var width: CGFloat = 420
     /// The list's rows (for the ruled paper under them); `.greatestFiniteMagnitude` once they fill the sheet.
     @State private var listHeight: CGFloat = 0
     /// The header's tools (pin, 책상, ⋯) as drawn, so the tab row's variants are measured against a stand-in of the
@@ -42,16 +48,37 @@ struct PaperView: View {
         }
     }
 
+    /// A row coming in or going (N3 · N4): 등장's 0.18 s, ease-out in, ease-in out; a lens change at once.
+    private var rowsAnimation: Animation? {
+        _ = model.visibleRowsVersion // the rows worked out first, whatever the order of reading
+        switch model.visibleRowsMotion {
+        case .enter: return Motion.animation(.enter, reduce: reduceMotion)
+        case .leave: return Motion.exit(.enter, reduce: reduceMotion)
+        case nil: return nil
+        }
+    }
+
+    /// The paper's red margin line, down the whole list.
+    private var marginLine: some View {
+        Rectangle()
+            .fill(PaperTheme.marginRule)
+            .frame(width: 0.6)
+            .padding(.leading, PaperTheme.margin)
+            .allowsHitTesting(false)
+    }
+
     private var note: some View {
         VStack(spacing: 0) {
-            // Above what follows: the cat's paws hang over the edge onto the ribbon or the list.
+            // Above what follows (the tab row's band and the space menu's pill).
             header.zIndex(1)
             if model.page == .ahead {
                 AheadPageView(model: model, previewDrag: previewAheadDrag, previewLine: previewLine)
             } else {
+                // 2b (H): the shortcut chips under the title while grouped (more than one group).
+                if model.showsSpaceGroups, case let groups = model.spaceGroups(now: previewNow ?? Date()), groups.count > 1, !SpaceBoard.fits(width: width, count: groups.count) {
+                    SpaceGroupChips(model: model, groups: groups)
+                }
                 DayStripView(model: model, calendar: model.calendar, noteHeight: height, compact: height < 470, now: previewNow)
-                // 할 일 스페이스 (1.45): what the list hides while one space shows (nothing otherwise).
-                SpaceLensBand(model: model)
                 todayList
                     .overlay(alignment: .bottom) { ToastHost(model: model) }
                 Group {
@@ -67,19 +94,16 @@ struct PaperView: View {
         }
         .background(PaperBackground())
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height = $0 }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .overlay {
             if model.showsGuide { GuideView(model: model).transition(.opacity) }
         }
         .foregroundStyle(PaperTheme.ink)
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: model.visibleItems.map(\.id))
+        .animation(rowsAnimation, value: model.visibleRowsVersion)
         .onChange(of: model.completedCount) { old, new in
             guard new > old, !reduceMotion else { return }
-            // A nod: 2° and a 2 pt dip, 400 ms there and back.
-            withAnimation(.easeOut(duration: 0.2)) { mascotNod = true }
-            Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(200))
-                withAnimation(.easeIn(duration: 0.2)) { mascotNod = false }
-            }
+            // #151: the cat left the header; the ear on top of the window twitches instead.
+            model.onTaskFinished?()
         }
         .onChange(of: model.page) { model.toast = nil }
         .onChange(of: compactHeader, initial: true) { _, compact in
@@ -101,7 +125,7 @@ struct PaperView: View {
         let calendar = model.calendar
         let now = previewNow ?? Date()
         guard calendar.showsStrip, !calendar.isDayOpen(now: now) else { return [:] }
-        let items = DayStrip.items(events: calendar.todayEvents(now: now), tasks: model.todayItems, now: now)
+        let items = DayStrip.items(events: calendar.todayEvents(now: now), tasks: model.lensedTodayItems, now: now)
         return DayStrip.marks(DayStrip.state(items, now: now, rows: DayStrip.rowLimit(width: Double(width), height: Double(height))))
     }
 
@@ -112,31 +136,57 @@ struct PaperView: View {
         let next = split.next.compactMap { byID[$0] }
         let rest = split.rest.compactMap { byID[$0] }
         // Worked out once here and handed to the rows (#61): each row asking the model filtered the whole sheet, twice.
-        let restIDs = rest.map(\.id)
+        // The same array as last time while the ids are the same: SwiftUI compares each row with what it was, and two
+        // copies of 2,000 ids were compared in full for every row built (one array, once).
+        let restIDs = keptRest.keep(rest.map(\.id))
         let firstID = visible.first?.id, lastID = visible.last?.id
         let shared = TaskRowShared(model)
+        let groups = model.showsSpaceGroups ? model.spaceGroups(now: previewNow ?? Date()) : nil
+        let cards = groups != nil && model.groupStyle == .card
+        // E's bookmarks sit over the margin line, as on Windows (it ran through their counts): the line goes under them.
+        let bookmarks = groups != nil && model.groupStyle == .bookmark
         return GeometryReader { geometry in
             let marks = stripMarks(width: geometry.size.width)
+            // 2b (I): a wide note shows the groups side by side, one column each.
+            let board = groups.map { SpaceBoard.fits(width: geometry.size.width, count: $0.count) } ?? false
+            Group {
+            if board, let groups {
+                SpaceBoard(model: model, drag: groupDrag, rowDrop: $rowDrop, groups: groups, byID: byID, shared: shared)
+                    .onAppear { if let drag = previewGroupDrag { groupDrag.preview(drag.source, onto: drag.target) } }
+            } else {
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
                     VStack(spacing: 0) {
                       // Lazy (1.39): only the rows on screen are built and laid out — the whole sheet was, on every
                       // key press and tab switch.
                       LazyVStack(spacing: 0) {
+                        // 2b: one group per space instead of 다음 · 그 밖에 (the 하루 띠 already shows what's next).
+                        if let groups {
+                            SpaceGroupRows(model: model, drag: groupDrag, rowDrop: $rowDrop, groups: groups, byID: byID, marks: marks, shared: shared)
+                        } else {
                         if split.showsHeaders {
                             GroupHeader(title: L("다음"), count: next.count).padding(.top, 4)
                         }
+                        // Each row in a ZStack with its id on it (#61): ↑ to the last row scrolls with scrollTo(id), which looks
+                        // for the id through the rows in order, and a bare row was built (its body worked out) to see whether
+                        // an id was inside it — every row above the last, 0.24–0.3 s with 2,000, and from then on all of
+                        // them were gone over on every change. A ZStack is one view that isn't looked into.
                         ForEach(next) { item in
-                            TaskRow(item: item, model: model, rowDrop: $rowDrop, ruled: true, draggable: false, nextTime: split.times[item.id],
-                                    stripMark: marks[item.id.uuidString], edges: RowEdges(item.id, first: firstID, last: lastID), shared: shared)
+                            ZStack {
+                                TaskRow(item: item, model: model, rowDrop: $rowDrop, ruled: true, draggable: false, nextTime: split.times[item.id],
+                                        stripMark: marks[item.id.uuidString], edges: RowEdges(item.id, first: firstID, last: lastID), shared: shared)
+                            }.id(item.id).transition(.paperRow)
                         }
                         if split.showsHeaders {
                             // Not "오늘 할 일" again under the page title of that name.
                             GroupHeader(title: L("그 밖에"), count: rest.count).padding(.top, 8)
                         }
                         ForEach(rest) { item in
-                            TaskRow(item: item, model: model, rowDrop: $rowDrop, ruled: true, stripMark: marks[item.id.uuidString], groupRows: restIDs,
-                                    edges: RowEdges(item.id, first: firstID, last: lastID), shared: shared)
+                            ZStack {
+                                TaskRow(item: item, model: model, rowDrop: $rowDrop, ruled: true, stripMark: marks[item.id.uuidString], groupRows: restIDs,
+                                        edges: RowEdges(item.id, first: firstID, last: lastID), shared: shared)
+                            }.id(item.id).transition(.paperRow)
+                        }
                         }
                         if model.todayItems.isEmpty {
                             EmptySheetNote(pose: .happy, text: L("오늘 할 일을 한 줄 적어 볼까요?"))
@@ -145,6 +195,8 @@ struct PaperView: View {
                             allDoneNote
                                 .transition(.opacity.combined(with: .move(edge: .top)))
                         }
+                        // 할 일 스페이스 (#87): while one space shows, how many the others hold — a faint line at the end.
+                        SpaceMoreLine(model: model)
                       }
                       // Rows as tall as the sheet or taller are kept as one value: the rules below are one row then,
                       // whatever the rows add up to. The lazy stack's height is a guess that moves by a point or so on
@@ -157,12 +209,10 @@ struct PaperView: View {
                         PaperRules().frame(height: max(PaperTheme.rowHeight, geometry.size.height - listHeight))
                     }
                     .frame(maxWidth: .infinity, minHeight: geometry.size.height, alignment: .top)
+                    .background(alignment: .leading) { if bookmarks { marginLine } }
                     .overlay(alignment: .leading) {
-                        Rectangle()
-                            .fill(PaperTheme.marginRule)
-                            .frame(width: 0.6)
-                            .padding(.leading, PaperTheme.margin)
-                            .allowsHitTesting(false)
+                        // F's cards are their own paper: no margin line through them.
+                        if !cards && !bookmarks { marginLine }
                     }
                 }
                 .scrollIndicators(.never) // never a legacy scroller: its 17 pt gutter shifted the rules and meta
@@ -171,7 +221,21 @@ struct PaperView: View {
                     guard let id else { return }
                     withAnimation(reduceMotion ? nil : .easeOut(duration: 0.2)) { proxy.scrollTo(id, anchor: .center) }
                 }
+                // 2b: the groups' frames while a row is dragged among them; a chip's group scrolled to.
+                .onPreferenceChange(SpaceGroupFramesKey.self) { groupDrag.groupFrames = $0 }
+                .onPreferenceChange(SpaceRowFramesKey.self) { groupDrag.rowFrames = $0 }
+                .onChange(of: model.groupToReveal) { _, key in
+                    guard let key else { return }
+                    model.groupToReveal = nil
+                    withAnimation(reduceMotion ? nil : .easeOut(duration: 0.25)) { proxy.scrollTo("space-group-" + key, anchor: .top) }
+                }
+                .onAppear {
+                    if let drag = previewGroupDrag { groupDrag.preview(drag.source, onto: drag.target) }
+                }
             }
+            }
+            }
+            .onChange(of: board, initial: true) { _, wide in model.spaceBoardShown = wide }
         }
     }
 
@@ -409,6 +473,16 @@ enum TaskRowStyle {
     var titleGap: CGFloat { self == .sheet ? 17 : 6 }
 }
 
+/// An array of ids kept as it was while what it holds stays the same, so comparing it with itself is one look (#61).
+final class KeptIDs {
+    private var ids: [UUID] = []
+
+    func keep(_ new: [UUID]) -> [UUID] {
+        if new != ids { ids = new }
+        return ids
+    }
+}
+
 /// Whether a row is the first or the last of today's visible rows: 위로 · 아래로 이동 can't go further.
 struct RowEdges: Equatable {
     var first: Bool
@@ -431,9 +505,12 @@ struct TaskRowShared {
     let textSize: NotebookTextSize
     let dueStyle: DueStyle
     let focusPicking: Bool
+    /// #168: the rows picked when there are several.
+    let multi: Set<UUID>
 
     init(_ model: AppModel) {
         selected = model.selectedTaskID
+        multi = model.multiSelected
         pick = model.todayPickID
         editRequest = model.editRequestID
         editingReminder = model.editingTaskReminderID
@@ -461,7 +538,7 @@ struct TaskRowLook: Equatable {
 
     @MainActor
     init(_ item: TodoItem, model: AppModel, shared: TaskRowShared, edges: RowEdges) {
-        selected = shared.selected == item.id
+        selected = shared.selected == item.id || shared.multi.contains(item.id)
         picked = shared.pick == item.id
         editRequested = shared.editRequest == item.id
         editingReminder = shared.editingReminder == item.id
@@ -527,13 +604,17 @@ struct TaskRow: View {
     var groupRows: [UUID]?
     var style: TaskRowStyle = .sheet
     var aheadMeta: AheadMeta?
+    /// 2b: the space's band at the left end (F's cards leave it out: the tape says the space).
+    var band = true
+    /// 2b (I): a board column's row — the time and deadline on a small line under the title.
+    var metaBelow = false
     /// 앞으로: the drag reports where the pointer is, and its end, to the page (days are drop targets).
     var onDragPoint: ((CGPoint) -> Void)?
     var onDragEnd: ((Bool) -> Void)?
     @State private var strikeProgress: CGFloat = 0
     /// The row's width: narrow rows (1.38) show the move buttons as arrows only, so the title keeps some room.
     @State private var rowWidth: CGFloat = 420
-    @State private var checkPop = false
+    @State private var checkPops = 0
     @State private var showingReminderEditor = false
     @State private var editorOnDeadline = false
     @State private var editorOnTime = false
@@ -546,7 +627,9 @@ struct TaskRow: View {
     init(item: TodoItem, onShelf: Bool = false, model: AppModel, rowDrop: Binding<TaskRowDrop?>, previewHover: Bool = false,
          ruled: Bool = false, draggable: Bool = true, nextTime: Date? = nil, stripMark: DayStrip.Mode? = nil, groupRows: [UUID]? = nil,
          edges: RowEdges? = nil, shared: TaskRowShared? = nil, style: TaskRowStyle = .sheet, aheadMeta: AheadMeta? = nil,
-         onDragPoint: ((CGPoint) -> Void)? = nil, onDragEnd: ((Bool) -> Void)? = nil) {
+         onDragPoint: ((CGPoint) -> Void)? = nil, onDragEnd: ((Bool) -> Void)? = nil, band: Bool = true, metaBelow: Bool = false) {
+        self.band = band
+        self.metaBelow = metaBelow
         self.item = item
         self.onShelf = onShelf
         self.model = model
@@ -593,7 +676,7 @@ struct TaskRow: View {
                 }
                 .frame(width: style.box, height: style.box)
                 // Checking: the box fills sage with a short pop (0.85 → 1, 160 ms).
-                .scaleEffect(checkPop ? 0.85 : 1)
+                .checkPop(checkPops)
                 .rotationEffect(.degrees(style == .sheet ? -2 : 0))
                 .frame(width: style.checkColumn, height: style.height)
                 .contentShape(Rectangle())
@@ -603,29 +686,33 @@ struct TaskRow: View {
             .accessibilityLabel("\(item.title) 완료")
             .accessibilityValue(item.isCompleted ? L("완료됨") : L("미완료"))
 
-            taskContent
-                .font(look.font.bodyFont(style == .sheet ? look.textSize : look.textSize.smaller ?? .small))
-                .tint(PaperTheme.sage)
-                .padding(.leading, style.titleGap)
-                .padding(.trailing, 8)
+            VStack(alignment: .leading, spacing: 0) {
+                taskContent
+                    .font(look.font.bodyFont(style == .sheet ? look.textSize : look.textSize.stepped(-2)))
+                    .tint(PaperTheme.sage)
+                // 2b (I): in a narrow column the time and deadline go on a small line under the title.
+                if showsMetaBelow { metaLine }
+            }
+            .padding(.leading, style.titleGap)
+            .padding(.trailing, 8)
             // One place at the end of the row: what the task has (deadline, alert, repeat) as quiet
             // text, and on hover the same place turns into its buttons. Nothing covers the title;
             // at rest the title keeps the full width, and only the hovered row makes room.
             Group {
                 if offersFocus && (showsActions || isSelected) { focusPickButton.transition(.opacity) }
-                else if showsActions { actionBar.transition(.opacity) } else { meta.transition(.opacity) }
+                else if showsActions { actionBar.transition(.opacity) } else if !metaBelow { meta.transition(.opacity) }
             }
             .animation(.easeOut(duration: 0.12), value: showsActions)
             .layoutPriority(1)
             Color.clear.frame(width: style == .sheet ? 14 : 4)
         }
-        .frame(height: style.height)
+        .frame(height: showsMetaBelow ? style.height + 16 : style.height)
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { rowWidth = $0 }
         .contentShape(Rectangle())
         .background(rowBackground)
         .overlay(alignment: .leading) {
-            // 할 일 스페이스 (1.45): the space's colour band on 오늘's rows only (phase 1).
-            if style == .sheet && !onShelf, let space = look.space {
+            // 할 일 스페이스 (1.45): the space's colour band on 오늘's rows, and (2a, A2) 앞으로's.
+            if band, (style == .sheet && !onShelf) || style == .inset, let space = look.space {
                 SpaceBand(space: space, height: style.height, faded: item.isCompleted)
             }
         }
@@ -639,9 +726,9 @@ struct TaskRow: View {
         .opacity(rowDrop?.source == item.id ? 0.55 : 1)
         .onHover { hovering = $0 }
         .onTapGesture {
-            // A click on the row's empty area picks it for the keyboard.
+            // A click on the row's empty area picks it for the keyboard; #168: ⌘ adds or takes it away, ⇧ a range.
             NSApp.keyWindow?.makeFirstResponder(nil)
-            model.selectedTaskID = item.id
+            model.clickRow(item.id, modifiers: NSEvent.modifierFlags)
         }
         .onChange(of: look.editRequested) { _, requested in
             guard requested else { return }
@@ -683,15 +770,15 @@ struct TaskRow: View {
         .onReceive(NotificationCenter.default.publisher(for: .paperCommitEditing)) { _ in commitEdit() }
         .onAppear { strikeProgress = item.isCompleted ? 1 : 0 }
         .onChange(of: item.isCompleted) { _, completed in
-            // Checking draws the pencil line left to right (220 ms); unchecking clears it at once.
-            guard completed, !reduceMotion else {
+            // 체크 한 번: the box pops (160 ms), the pencil line follows 80 ms later, left to right (220 ms);
+            // unchecking clears it at once.
+            guard completed, Motion.animation(.change, reduce: reduceMotion) != nil else {
                 strikeProgress = completed ? 1 : 0
                 return
             }
             strikeProgress = 0
-            withAnimation(.easeOut(duration: 0.22)) { strikeProgress = 1 }
-            checkPop = true
-            withAnimation(.easeOut(duration: 0.16)) { checkPop = false }
+            withAnimation(Motion.strike(reduce: reduceMotion)) { strikeProgress = 1 }
+            checkPops += 1
         }
     }
 
@@ -738,11 +825,18 @@ struct TaskRow: View {
     private var dragHandle: some View {
         PaperTaskDragHandle { offset in
             guard onDragPoint == nil else { return }
-            rowDrop = TaskRowDrop.destination(source: item.id, rows: groupRows ?? model.visibleItems.map(\.id), offsetFromSourceTop: offset)
+            // #167: only a new place is written (each write drew the whole sheet again, on every move).
+            let place = TaskRowDrop.destination(source: item.id, rows: groupRows ?? model.visibleItems.map(\.id), offsetFromSourceTop: offset)
+            if place != rowDrop { rowDrop = place }
         } onFinish: { accepted in
             if let onDragEnd { return onDragEnd(accepted) }
             if accepted, let drop = rowDrop {
-                model.move(drop.source, relativeTo: drop.target, after: drop.after)
+                // #168: a picked row takes every picked row with it, together.
+                if model.multiSelected.contains(item.id) {
+                    model.dropTodos(model.pickedRows(including: item.id), toGroup: nil, relativeTo: drop.target, after: drop.after)
+                } else {
+                    model.move(drop.source, relativeTo: drop.target, after: drop.after)
+                }
             }
             rowDrop = nil
         } onTabHover: { page in
@@ -754,6 +848,8 @@ struct TaskRow: View {
             model.dropTask(item.id, on: page)
         } onPoint: { point in
             onDragPoint?(point)
+        } badge: {
+            model.dragBadge(for: item.id)
         }
             .frame(width: style.handle, height: style.height)
             .opacity(hovering || rowDrop?.source == item.id ? 1 : 0)
@@ -823,18 +919,44 @@ struct TaskRow: View {
     /// 할 일 골라 집중…: open rows offer 집중 (on hover, or always on the selected row).
     private var offersFocus: Bool { look.focusPicking && !item.isCompleted && !editing }
 
+    /// 2b (I): the row has a time or deadline to show on the line under its title.
+    private var showsMetaBelow: Bool {
+        guard metaBelow, !editing else { return false }
+        return shownRange != nil || hasReminder || nextTime != nil || (series != nil && !item.isCompleted) || (item.dueDate != nil && !item.isCompleted)
+    }
+
+    /// 2b (I): the time, then the deadline, small, under the title (the row's end keeps only its buttons on hover).
+    private var metaLine: some View {
+        HStack(spacing: 8) {
+            timeCaption
+            if let due = item.dueDate, !item.isCompleted { dueCaption(due) }
+        }
+        .frame(height: 18)
+        .padding(.top, -2)
+    }
+
     /// At rest: the deadline and the alert or repeat, as quiet text.
     private var meta: some View {
         HStack(spacing: 10) {
             if !item.isCompleted, let stripMark { StripMarkTag(mode: stripMark) }
             if !item.isCompleted && !onShelf { carriedTag }
             if !item.isCompleted { SentToCalendarMark(calendar: model.calendar, taskID: item.id) }
-            if let aheadMeta, let due = item.dueDate, !item.isCompleted {
-                aheadCaption(aheadMeta, due: due)
-            } else if let due = item.dueDate, !item.isCompleted { dueCaption(due) }
-            if let range = shownRange { rangeCaption(range) }
-            else if hasReminder || nextTime != nil || (series != nil && !item.isCompleted) { reminderTimeCaption }
+            if let aheadMeta {
+                // 앞으로 (#48): the flag is the row's last column, so the flags line up; a time comes before it.
+                timeCaption
+                if let due = item.dueDate, !item.isCompleted { aheadCaption(aheadMeta, due: due) }
+            } else {
+                if let due = item.dueDate, !item.isCompleted { dueCaption(due) }
+                timeCaption
+            }
         }
+    }
+
+    /// The task's time on its day, else its alert or repeat.
+    @ViewBuilder
+    private var timeCaption: some View {
+        if let range = shownRange { rangeCaption(range) }
+        else if hasReminder || nextTime != nil || (series != nil && !item.isCompleted) { reminderTimeCaption }
     }
 
     /// 1.39: a range on a day takes the bell's place at the end of the row.

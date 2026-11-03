@@ -17,7 +17,7 @@ extension AppModel {
 
     /// At launch: the file, or no spaces; an unreadable one is moved aside with one notice (S21).
     func loadTodoSpaces(now: Date = Date()) {
-        guard let data = try? Data(contentsOf: todoSpacesURL) else {
+        guard let data = try? SafeFile.sharedData(todoSpacesURL) else {
             todoSpaces = TodoSpaces()
             knownSpacesData = nil
             return
@@ -42,7 +42,7 @@ extension AppModel {
     /// Another device changed the file: merged in — the file's copy is the one already there, this Mac's comes in (W3).
     /// One that doesn't read may be half synced: it's read again on the next checks, and moved aside on the third (W21).
     func catchUpTodoSpaces() {
-        guard let data = try? Data(contentsOf: todoSpacesURL), data != knownSpacesData else { return }
+        guard let data = try? SafeFile.sharedData(todoSpacesURL), data != knownSpacesData else { return }
         guard let theirs = try? TodoSpaces.decode(data) else {
             spacesBadReads += 1
             if spacesBadReads >= 3 {
@@ -65,7 +65,10 @@ extension AppModel {
         var spaces = todoSpaces
         change(&spaces, now)
         // Never pruned against a list that couldn't be read (it's empty then).
-        if !items.isEmpty { spaces = spaces.pruned(todoIDs: Set(items.map(\.id.uuidString)), now: now) }
+        // The rules' spaces: never against a repeats.json that couldn't be read (S36).
+        if !items.isEmpty {
+            spaces = spaces.pruned(todoIDs: Set(items.map(\.id.uuidString)), seriesIDs: repeatsUnreadable ? nil : Set(series.map(\.id)), now: now)
+        }
         if spaces != todoSpaces { todoSpaces = spaces }
         // The lens goes with its space (S12).
         if let lens = spaceLens, lens.spaceId != SpaceLens.none, spaces.space(lens.spaceId) == nil { spaceLens = nil }
@@ -74,7 +77,7 @@ extension AppModel {
         defer { PerfProbe.io("todo-spaces", since: started) }
         do {
             try spaces.save(to: todoSpacesURL)
-            knownSpacesData = try? Data(contentsOf: todoSpacesURL)
+            knownSpacesData = try? SafeFile.sharedData(todoSpacesURL)
         } catch {
             storageError = Self.saveProblem(L("스페이스를 저장하지 못했어요."))
         }
@@ -95,6 +98,16 @@ extension AppModel {
         todayItems.reduce(0) { $0 + (!$1.isCompleted && shown.includes(spaceIndex[$1.id]?.id) ? 1 : 0) }
     }
 
+    /// 2a (A1, A3–A5): today's sheet as the lens shows it (finished ones too) — the day strip, the timetable, the 오늘 창.
+    var lensedTodayItems: [TodoItem] {
+        let shown = spaceShown
+        let today = todayItems
+        return shown == .all ? today : today.filter { shown.includes(spaceIndex[$0.id]?.id) }
+    }
+
+    /// The space of a strip item's to-do (an event has none).
+    func spaceOf(taskID: String?) -> TodoSpaces.Space? { taskID.flatMap(UUID.init(uuidString:)).flatMap { spaceIndex[$0] } }
+
     /// The band's N: open to-dos the lens hides.
     var hiddenOpenCount: Int {
         let shown = spaceShown
@@ -102,16 +115,25 @@ extension AppModel {
         return todayItems.reduce(0) { $0 + (!$1.isCompleted && !shown.includes(spaceIndex[$1.id]?.id) ? 1 : 0) }
     }
 
-    /// The name of what's shown (nil: 스페이스 없음), for the band and the header button.
+    /// The name of what's shown — a space's, or 일반's (#89); nil showing everything.
     func spaceName(_ shown: SpaceLens.Shown) -> String? {
-        if case .space(let id) = shown { return todoSpaces.space(id)?.name }
-        return nil
+        switch shown {
+        case .space(let id): todoSpaces.space(id)?.name
+        case .noSpace: generalName
+        case .all: nil
+        }
     }
+
+    /// 일반 — the to-dos in no space — as it's called now: renamed, or ‘일반’ · ‘General’ · ‘Algemeen’ (#89).
+    var generalName: String { todoSpaces.generalName(.current) }
 
     /// A line read for its space: the lens counts on the note's 오늘 sheet and in 빠른 입력 (M16).
     func spaceReading(_ text: String, lens: Bool) -> SpaceToken.Reading {
-        SpaceToken.read(text, spaces: todoSpaces, lens: lens ? spaceShown : .all)
+        SpaceToken.read(text, spaces: todoSpaces, lens: lens ? lineShown : .all)
     }
+
+    /// The space the note's line writes into: a board column's `+ 회사에 넣기` (2b, I), else the lens's.
+    var lineShown: SpaceLens.Shown { lineSpace ?? spaceShown }
 
     // MARK: Changing
 
@@ -132,19 +154,24 @@ extension AppModel {
         spaceLens = nil
     }
 
-    /// Moves a to-do (nil: 스페이스 없음), with the toast and its 되돌리기.
-    func moveTodo(_ id: UUID, toSpace space: String?, toast: Bool = true) {
+    /// Moves a to-do (nil: 일반), with the toast and its 되돌리기.
+    /// `alsoTakeBack` (2b, a drop between rows): what the toast's 되돌리기 undoes besides the space — the row's place.
+    func moveTodo(_ id: UUID, toSpace space: String?, toast: Bool = true, alsoTakeBack: (() -> Void)? = nil) {
         let before = todoSpaces.items[id.uuidString]
         let was = spaceIndex[id]?.id
         guard was != space else { return }
         changeTodoSpaces { spaces, now in spaces.move(id.uuidString, to: space, now: now) }
         guard toast else { return }
-        let name = todoSpaces.space(space)?.name ?? SpaceWords.noSpace(.current)
+        let name = todoSpaces.space(space)?.name ?? generalName
         var shown = PaperToast(symbol: "square.stack", text: SpaceWords.moved(to: name, language: .current))
         shown.action = L("되돌리기")
-        shown.takeBack = { [weak self] in self?.putBack(id, before: before) }
+        shown.takeBack = { [weak self] in
+            self?.putBack(id, before: before)
+            alsoTakeBack?()
+        }
         shown.perform = { [weak self] in
             self?.putBack(id, before: before)
+            alsoTakeBack?()
             self?.toast = nil
         }
         self.toast = shown
@@ -177,6 +204,11 @@ extension AppModel {
 
     func renameTodoSpace(_ id: String, to name: String) {
         changeTodoSpaces { spaces, now in spaces.rename(id, to: name, now: now) }
+    }
+
+    /// 일반 renamed (#89); blank or a default name: back to the default.
+    func renameGeneral(to name: String) {
+        changeTodoSpaces { spaces, now in spaces.renameGeneral(to: name, now: now) }
     }
 
     func recolorTodoSpace(_ id: String, to color: TodoSpaces.Color) {
@@ -224,9 +256,33 @@ extension AppModel {
         }
     }
 
-    /// The line's commit taken back: a space it made goes too, when nothing else is in it.
+    // MARK: Repeat rules' spaces (2a)
+
+    /// A rule's live space (nil: 일반).
+    func ruleSpace(_ seriesID: String?) -> TodoSpaces.Space? { todoSpaces.space(todoSpaces.seriesSpaceID(of: seriesID)) }
+
+    /// A9: a rule's space (nil: 일반); its open to-dos move with it. Nothing written when nothing changes (no file is
+    /// made for someone without spaces).
+    func setRuleSpace(_ seriesID: String, to space: String?) {
+        let copies = items.filter { $0.seriesID == seriesID && !$0.isCompleted }.map(\.id.uuidString)
+        var trial = todoSpaces
+        trial.setSeriesSpace(seriesID, to: space, copies: copies, now: Date())
+        guard trial != todoSpaces else { return }
+        changeTodoSpaces { spaces, now in spaces.setSeriesSpace(seriesID, to: space, copies: copies, now: now) }
+    }
+
+    /// A10: to-dos just made from rules go to their rule's space.
+    func placeMadeCopies(_ made: [TodoItem]) {
+        let list = made.compactMap { item in item.seriesID.map { (todo: item.id.uuidString, series: $0) } }
+        guard list.contains(where: { todoSpaces.seriesSpaceID(of: $0.series) != nil }) else { return }
+        changeTodoSpaces { spaces, now in spaces.placeCopies(list, now: now) }
+    }
+
+    /// The line's commit taken back: a space it made goes too, when nothing else is in it — no to-do on the list (the
+    /// taken-back one's entry stays in the file until it's pruned) and no repeat rule (2a).
     func takeBackMadeSpace(_ id: String) {
-        guard !spaceIndex.values.contains(where: { $0.id == id }) else { return }
+        guard !items.contains(where: { spaceIndex[$0.id]?.id == id }),
+              !series.contains(where: { todoSpaces.seriesSpaceID(of: $0.id) == id }) else { return }
         changeTodoSpaces { spaces, now in _ = spaces.deleteSpace(id, now: now) }
     }
 }
@@ -316,7 +372,7 @@ struct SpaceBand: View {
 
 @MainActor
 enum SpaceMenus {
-    /// `모든 스페이스 ▾`: 모든 스페이스 (N), the spaces (colour, name, open count, ⌥⌘1–9), 스페이스 없음 (N), 스페이스 관리….
+    /// `모든 스페이스 ▾`: 모든 스페이스 (N), the spaces (colour, name, open count, ⌥⌘1–9), 일반 (N), 스페이스 관리….
     static func header(_ model: AppModel) -> [DrawerMenuItem] {
         let shown = model.spaceShown
         let language = AppLanguage.current
@@ -331,31 +387,50 @@ enum SpaceMenus {
             row.detail = SpaceWords.grouped(model.openCount(.space(space.id)), .current)
             items.append(row)
         }
-        var none = DrawerMenuItem.action(SpaceWords.noSpace(language), symbol: nil, checked: shown == .noSpace) { model.showSpace(.noSpace) }
+        var none = DrawerMenuItem.action(model.todoSpaces.generalName(language), symbol: nil, checked: shown == .noSpace) { model.showSpace(.noSpace) }
         none.dot = .empty
         none.detail = SpaceWords.grouped(model.openCount(.noSpace), .current)
         items.append(none)
         items.append(.separator)
+        // 2b: 스페이스별로 묶기 (⌥⌘G), this Mac's.
+        items.append(.action(L("스페이스별로 묶기"), symbol: nil, key: ("g", [.command, .option]), checked: model.groupBySpace) { model.toggleGroupBySpace() })
         items.append(.action(L("스페이스 관리…"), symbol: "slider.horizontal.3") { model.showDesk(.spaces) })
         return items
     }
 
-    /// A row's 스페이스로 옮기기 ▸: the spaces (✓ the one it's in), 스페이스 없음, 새 스페이스… (the editor's field: no
+    /// A row's 스페이스로 옮기기 ▸: the spaces (✓ the one it's in), 일반, 새 스페이스… (the editor's field: no
     /// 새 스페이스…, W18).
     static func move(_ model: AppModel, _ id: UUID, offerNew: Bool = true) -> [DrawerMenuItem] {
+        // #168: the row's menu moves every picked row when it's one of them; the editor's field, its one to-do.
+        let rows = offerNew ? model.pickedRows(including: id) : [id]
         let current = model.spaceOf(id)?.id
         var items: [DrawerMenuItem] = model.todoSpaces.visible.map { space in
-            var row = DrawerMenuItem.action(space.name, symbol: nil, checked: current == space.id) { model.moveTodo(id, toSpace: space.id) }
+            // #168: every picked row when this one is one of them.
+            var row = DrawerMenuItem.action(space.name, symbol: nil, checked: current == space.id) { model.moveTodos(rows, toSpace: space.id) }
             row.dot = .color(space.colorKey)
             return row
         }
         if !items.isEmpty {
             items.append(.separator)
-            var none = DrawerMenuItem.action(SpaceWords.noSpace(.current), symbol: nil, checked: current == nil) { model.moveTodo(id, toSpace: nil) }
+            var none = DrawerMenuItem.action(model.generalName, symbol: nil, checked: current == nil) { model.moveTodos(rows, toSpace: nil) }
             none.dot = .empty
             items.append(none)
         }
         if offerNew { items.append(.action(L("새 스페이스…"), symbol: "plus") { model.newTodoSpace(moving: id) }) }
+        return items
+    }
+
+    /// 2a (A11): the rule editor's 스페이스 field — the spaces (✓ the one picked), 일반; `pick` keeps it until 저장.
+    static func pick(_ model: AppModel, current: String?, _ pick: @escaping (String?) -> Void) -> [DrawerMenuItem] {
+        var items: [DrawerMenuItem] = model.todoSpaces.visible.map { space in
+            var row = DrawerMenuItem.action(space.name, symbol: nil, checked: current == space.id) { pick(space.id) }
+            row.dot = .color(space.colorKey)
+            return row
+        }
+        items.append(.separator)
+        var none = DrawerMenuItem.action(model.generalName, symbol: nil, checked: current == nil) { pick(nil) }
+        none.dot = .empty
+        items.append(none)
         return items
     }
 
@@ -421,7 +496,7 @@ struct SpaceMenuArea: NSViewRepresentable {
         view.toolTip = label
     }
 
-    final class ButtonView: NSView {
+    final class ButtonView: NSView, HeaderClickable {
         var items: @MainActor () -> [DrawerMenuItem] = { [] }
         var font: NotebookFont = .pen
 
@@ -435,6 +510,9 @@ struct SpaceMenuArea: NSViewRepresentable {
 
         override var isFlipped: Bool { true }
         override func hitTest(_ point: NSPoint) -> NSView? { frame.contains(point) ? self : nil }
+        /// The first click opens it too: the note is often not in front (another app was), and without this the
+        /// click only brought the note forward — 모든 스페이스 ▾ seemed dead.
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
         override func mouseDown(with event: NSEvent) { open() }
         override func accessibilityPerformPress() -> Bool { open(); return true }
 
@@ -448,9 +526,55 @@ struct SpaceMenuArea: NSViewRepresentable {
     }
 }
 
+/// 2a (A11): `스페이스  ● 회사 ⌃⌄` in the rule editor (desk → 반복): a click opens the spaces and 일반; applied on 저장.
+struct RuleSpaceField: View {
+    @ObservedObject var model: AppModel
+    @Binding var space: String?
+
+    var body: some View {
+        let picked = model.todoSpaces.space(space)
+        let name = picked?.name ?? model.generalName
+        HStack(spacing: 8) {
+            // One space here: "Space" (the desk's pane is "Spaces", M24).
+            Text(String(localized: "스페이스", table: "Reminder"))
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(PaperTheme.ink2)
+            HStack(spacing: 5) {
+                if let picked {
+                    RoundedRectangle(cornerRadius: 2).fill(PaperTheme.space(picked.colorKey)).frame(width: 8, height: 8)
+                } else {
+                    RoundedRectangle(cornerRadius: 2).strokeBorder(PaperTheme.ink3, lineWidth: 1).frame(width: 8, height: 8)
+                }
+                Text(name).lineLimit(1)
+                Image(systemName: "chevron.up.chevron.down").font(.system(size: 8, weight: .semibold)).foregroundStyle(PaperTheme.ink3)
+            }
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(PaperTheme.ink)
+            .padding(.horizontal, 8)
+            .frame(height: 24)
+            .background(PaperTheme.paper2, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .fixedSize()
+            .overlay { SpaceMenuArea(label: name, items: { SpaceMenus.pick(model, current: space) { space = $0 } }, font: model.notebookFont) }
+            .accessibilityLabel(String(localized: "스페이스", table: "Reminder") + " " + name)
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+/// 2a (A3, A6): a small round dot in a space's band colour (the day strip's titles, the focus card's line).
+struct SpaceDotView: View {
+    let space: TodoSpaces.Space
+    var size: CGFloat = 6
+
+    var body: some View {
+        Circle().fill(PaperTheme.space(space.colorKey)).frame(width: size, height: size).accessibilityHidden(true)
+    }
+}
+
 // MARK: - The header's button and the band over the list
 
-/// `● 모든 스페이스 ▾` · `● 회사만 ▾` · `스페이스 없음 ▾` (W11): a click opens the popup. A narrow note keeps the dot and ▾.
+/// `● 모든 스페이스 ▾` · `● 회사만 ▾` · `일반만 ▾` (#89): a click opens the popup. A narrow note keeps the dot and ▾. A
+/// screen reader hears what the list hides too (#87): "회사만 보는 중, 다른 스페이스에 4개 더".
 struct SpaceHeaderButton: View {
     @ObservedObject var model: AppModel
     /// The dot and ▾ only (the compact header).
@@ -459,18 +583,16 @@ struct SpaceHeaderButton: View {
     var body: some View {
         let shown = model.spaceShown
         let space = model.todoSpaces.space(shown.lensID)
-        let title: String = switch shown {
-        case .all: SpaceWords.allSpaces(.current)
-        case .noSpace: SpaceWords.noSpace(.current)
-        case .space: SpaceWords.only(space?.name ?? "", language: .current)
-        }
+        let name = model.spaceName(shown)
+        let title = name.map { SpaceWords.only($0, language: .current) } ?? SpaceWords.allSpaces(.current)
+        let spoken = name.map { SpaceWords.lensLabel($0, hidden: model.hiddenOpenCount, language: .current) } ?? title
         ViewThatFits(in: .horizontal) {
             if !short { pill(title, shown: shown, space: space, short: false) }
             pill(title, shown: shown, space: space, short: true)
         }
         .overlay { SpaceMenuArea(label: title, items: { SpaceMenus.header(model) }, font: model.notebookFont) }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(L("스페이스") + ": " + title)
+        .accessibilityLabel(L("스페이스") + ": " + spoken)
     }
 
     private func pill(_ title: String, shown: SpaceLens.Shown, space: TodoSpaces.Space?, short: Bool) -> some View {
@@ -512,47 +634,44 @@ struct SpaceHeaderButton: View {
     }
 }
 
-/// Over the list while one space shows: `회사만 보는 중 · 다른 할 일 4개는 숨겼어요` and `모두 보기` (N = 0: no count).
-struct SpaceLensBand: View {
+/// #87: at the end of 오늘's list while one space shows, one small faint line — `다른 스페이스에 4개 더 · 모두 보기`
+/// (the open to-dos the lens hides; no line for none). 모두 보기 shows everything again, as ⌥⌘0 does. It replaced the
+/// band over the list, which said again, larger, what the header's `회사만 ▾` says.
+struct SpaceMoreLine: View {
     @ObservedObject var model: AppModel
+    /// 2a (A1): another screen's N (앞으로's hidden to-dos ahead); nil: 오늘's.
+    var hidden: Int?
+    /// Where the words start: under the rows' titles.
+    var leading: CGFloat = PaperTheme.margin + 17
 
     var body: some View {
-        let shown = model.spaceShown
-        if shown != .all {
-            let space = model.todoSpaces.space(shown.lensID)
-            let hidden = model.hiddenOpenCount
-            let words = [SpaceWords.showing(space?.name, language: .current)] + (hidden > 0 ? [SpaceWords.hidden(hidden, language: .current)] : [])
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text(words.joined(separator: " · ").keepingParticles)
-                    .font(.system(size: 11.5, weight: .medium))
-                    .foregroundStyle(PaperTheme.ink)
-                    // Two lines at most: a text sized to its words would make the whole note taller (its minimum).
-                    .lineLimit(2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        let hidden = self.hidden ?? model.hiddenOpenCount
+        if hidden > 0 {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                Text(SpaceWords.more(hidden, language: .current))
+                    .foregroundStyle(PaperTheme.ink3)
+                    .truncationMode(.tail)
+                Text("·").foregroundStyle(PaperTheme.ink3).accessibilityHidden(true)
                 Button { model.showSpace(.all) } label: {
                     Text(L("모두 보기"))
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .foregroundStyle(PaperTheme.ink)
-                        .lineLimit(1)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(PaperTheme.ink2)
                         .fixedSize()
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .layoutPriority(1)
                 .help(L("모두 보기") + " (⌥⌘0)")
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background {
-                RoundedRectangle(cornerRadius: 9, style: .continuous).fill(PaperTheme.paper2)
-                if let space { RoundedRectangle(cornerRadius: 9, style: .continuous).fill(PaperTheme.space(space.colorKey).opacity(0.12)) }
+            .font(.system(size: 11))
+            .lineLimit(1)
+            .padding(.leading, leading)
+            .padding(.trailing, 16)
+            .frame(maxWidth: .infinity, minHeight: PaperTheme.rowHeight, alignment: .leading)
+            // A row of the paper: ruled like the rows above and the lines below.
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(PaperTheme.rule).frame(height: 0.6).padding(.leading, 18).padding(.trailing, 20).accessibilityHidden(true)
             }
-            .overlay {
-                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                    .strokeBorder(space.map { PaperTheme.space($0.colorKey).opacity(0.45) } ?? PaperTheme.rule, lineWidth: 1)
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 6)
-            .padding(.bottom, 2)
             .accessibilityElement(children: .contain)
         }
     }

@@ -1,0 +1,14 @@
+{
+  "about": "책갈피 글자 공유 사례 (#116, docs/plans/drawer-ux-plan.md B4). names = 보이는 책갈피 이름(순서대로), picked = 고른 책갈피 자리(null: 없음, 찾는 중). expect = 책갈피에 쓰는 글자. 고른 책갈피는 이름 전체(D-2). 고르지 않은 책갈피는 첫 글자, 다른 고르지 않은 책갈피와 첫 글자가 겹치면 두 글자(최대 두 글자, 겹쳐도 더 늘리지 않아요). 글자는 칸을 건너뛰고 세고, 겹침은 대소문자를 가리지 않고 봐요. Mac MemoFolders.bookmarkLetters, Windows core/memoDrawer.ts bookmarkLetters가 이 파일을 읽어요.",
+  "cases": [
+    {"id": "B1", "about": "겹치지 않으면 첫 글자, 고른 책갈피는 이름", "names": ["메모", "회사", "집", "장보기", "공부"], "picked": 1, "expect": ["메", "회사", "집", "장", "공"]},
+    {"id": "B2", "about": "영어 Shopping · Study: 두 글자", "names": ["Notes", "Work", "Home", "Shopping", "Study"], "picked": 1, "expect": ["N", "Work", "H", "Sh", "St"]},
+    {"id": "B3", "about": "고른 책갈피와는 겹쳐도 한 글자(고른 쪽은 이름 전체)", "names": ["Notes", "Shopping", "Study"], "picked": 1, "expect": ["N", "Shopping", "S"]},
+    {"id": "B4", "about": "한국어 장보기 · 장소", "names": ["장보기", "장소", "회사"], "picked": null, "expect": ["장보", "장소", "회"]},
+    {"id": "B5", "about": "대소문자는 같은 글자로 봐요, 쓰는 건 이름 그대로", "names": ["shop", "Study"], "picked": null, "expect": ["sh", "St"]},
+    {"id": "B6", "about": "두 글자도 같으면 그대로 두 글자", "names": ["Shop", "Shopping"], "picked": null, "expect": ["Sh", "Sh"]},
+    {"id": "B7", "about": "칸은 건너뛰고 세요", "names": ["A list", "A plan"], "picked": null, "expect": ["Al", "Ap"]},
+    {"id": "B8", "about": "셋이 겹치면 셋 모두 두 글자", "names": ["Werk", "Wonen", "Winkel", "Huis"], "picked": 3, "expect": ["We", "Wo", "Wi", "Huis"]},
+    {"id": "B9", "about": "빈 이름은 빈 글자", "names": ["", "Xmas"], "picked": null, "expect": ["", "X"]}
+  ]
+}

@@ -78,6 +78,8 @@ const takesClicks = () => ignoreLog.length > 0 && !ignoreLog[ignoreLog.length - 
 
 ipcMain.on("lang:get", (event) => { event.returnValue = "ko"; });
 ipcMain.on("paper:get", (event) => { event.returnValue = false; });
+// The preload asks for the clock as each page loads (2df9d80c); unanswered, the page never places the slip.
+ipcMain.on("clock:get", (event) => { event.returnValue = "h24"; });
 
 const tasks = [{ id: "a", title: "책 10쪽 읽기", scheduledAt: new Date().toISOString() }, { id: "b", title: "물 마시기", scheduledAt: new Date().toISOString() }];
 const base = { tasks, preview: false, canComplete: true, font: "pen", durationMs: 30_000, snoozeEnabled: true, reduceMotion: false };
@@ -105,13 +107,28 @@ const cases = [
   // at all, so only the pointer's place on the screen can tell. Then it moves off the slip: clicks pass again.
   { name: "paper · due · pointer resting on the check before the slip came, never moves", kind: "due", style: "paper", still: true, clickAt: 2900, thenLeave: true },
   { name: "compact · due · pointer resting on the check before the slip came, never moves", kind: "due", style: "compact", still: true, clickAt: 600, thenLeave: true },
+  // The cat style (#1's own report) with a moving pointer and with one that never moves.
+  { name: "character · due · pointer comes in during the walk-in, keeps moving over the slip", kind: "due", style: "character", enterAt: 700, wiggle: true, clickAt: 2900 },
+  { name: "character · due · pointer resting on the check before the slip came, never moves", kind: "due", style: "character", still: true, clickAt: 2900, thenLeave: true },
 ];
+
+/** Where each style's first check box sits in its window (page pixels), from the cases run so far. */
+const checkAt = {};
 
 async function runCase(ReminderPopup, entry) {
   const popup = new ReminderPopup(rendererOut);
   const completed = [];
   ignoreLog = [];
   globalThis.__probeCursor = undefined;
+  // A resting pointer is on the screen before the slip comes: when this style's check box was measured in an
+  // earlier case, the cursor sits on it from the start (the compact slip opens at once and asks right away).
+  const early = entry.still && checkAt[entry.style];
+  if (early) {
+    globalThis.__probeCursor = {
+      get x() { return popup.snapshotWindow.getContentBounds().x + early.x; },
+      get y() { return popup.snapshotWindow.getContentBounds().y + early.y; },
+    };
+  }
   const handlers = { onComplete: (id) => completed.push(id), onCompleteAll: (ids) => completed.push(...ids), onSnooze() {}, onOpen() {}, onSweep() {} };
   popup.show({ ...kinds[entry.kind], style: entry.style }, handlers);
   const window = popup.snapshotWindow;
@@ -130,9 +147,12 @@ async function runCase(ReminderPopup, entry) {
     const r = check.getBoundingClientRect();
     return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
   })()`);
+  if (!entry.still) checkAt[entry.style] ??= target;
   const until = async (ms) => { const wait = placed + ms - Date.now(); if (wait > 0) await sleep(wait); };
   let atEnter = false;
-  if (entry.still) {
+  if (entry.still && early) {
+    if (early.x !== target.x || early.y !== target.y) throw new Error(`the check box moved: ${early.x},${early.y} → ${target.x},${target.y}`);
+  } else if (entry.still) {
     const content = window.getContentBounds();
     globalThis.__probeCursor = { x: content.x + target.x, y: content.y + target.y };
   } else {
@@ -176,6 +196,7 @@ async function runCase(ReminderPopup, entry) {
   const pass = clickable && reached && leftOK;
   const log = ignoreLog.map((step) => `${step.at - placed}ms:${step.ignore ? "ignore" : "clicks"}`).join(" ");
   console.log(`${pass ? "PASS" : "FAIL"}  ${entry.name}`);
+  if (entry.still) console.log(`      resting pointer: ${early ? "on the check before the slip came" : "set once the slip was measured (later than a real pointer)"}`);
   console.log(`      window at ${bounds.x},${bounds.y}, opacity ${window.getOpacity()}; reduced motion ${reduce}; slip open when the pointer came in: ${atEnter}; open at the click: ${facts.open}`);
   console.log(`      window at the click: ${clickable ? "takes clicks" : "CLICK-THROUGH (the OS gives the click to the window behind)"}; click reached the check: ${reached}${entry.kind === "sweep" ? "" : ` (onComplete: ${completed.join(",") || "none"})`}`);
   if (entry.thenLeave) console.log(`      after the pointer moved off the slip: ${leftOK ? "click-through again" : "STILL TAKES CLICKS over the empty window"}`);

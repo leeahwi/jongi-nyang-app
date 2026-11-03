@@ -9,8 +9,10 @@ import { timerLeftText } from "../core/glance";
 import { hasEventWord } from "../core/intent";
 import { dayRibbon, hourLabel, type Ribbon } from "../core/ribbon";
 import { focusMinutes, rangeOf, rangeText as taskRangeText } from "../core/timeRange";
-import type { AppState } from "../core/types";
-import { edgeFade, h, icon, lang, paper, reduceMotion, t } from "./api";
+import type { TodosState } from "../core/types";
+import type { TodoItem } from "../core/notebook";
+import { spaceColor, type TodoSpace } from "../core/todoSpaces";
+import { edgeFade, h, holdMs, icon, lang, motion, paper, reduceMotion, t } from "./api";
 import { commitReading, type FlowHost } from "./intentFlow";
 
 /**
@@ -30,7 +32,7 @@ import { commitReading, type FlowHost } from "./intentFlow";
 const api = paper();
 
 export interface StripHost {
-  state: () => AppState;
+  state: () => TodosState;
   /** Today's events (around the logical day) as occurrences. */
   occurrences: (now: Date) => CalendarEvent[];
   /** A task's row on its page, selected and flashed. */
@@ -42,6 +44,10 @@ export interface StripHost {
   room: () => number;
   /** Draw the note again (a drag has landed: what came in meanwhile shows now). */
   redraw: () => void;
+  /** 2a (A3): the to-dos the strip shows — the note's lens's (every to-do without one). */
+  tasks: () => TodoItem[];
+  /** A to-do's live space (its dot, its block's edge). */
+  spaceOf: (id: string) => TodoSpace | undefined;
 }
 
 const pct = (value: number) => `${(value * 100).toFixed(3)}%`;
@@ -109,10 +115,14 @@ export class DayStripView {
     const now = this.moment();
     this.now = now;
     const events = this.host.occurrences(now);
-    const ribbon = dayRibbon(events, state.items, now, lang());
+    // 2a (A3, A4, S38): one space showing — the other to-dos aren't on the strip or the timetable at all; now and next
+    // are picked from the rest and every event.
+    const tasks = this.host.tasks();
+    const ribbon = dayRibbon(events, tasks, now, lang());
     if (!ribbon) { this.drawnKey = ""; this.marks = new Map(); this.closePopover(); return false; }
-    const items = stripItems(events, state.items, now);
+    const items = stripItems(events, tasks, now);
     this.items = items;
+    const spaces = items.map((item) => { const space = item.taskId ? this.host.spaceOf(item.taskId) : undefined; return space ? [space.id, space.name, space.color] : 0; });
     const narrow = window.innerWidth <= 400;
     const compact = window.innerHeight < 470;
     const open = this.isOpen(now);
@@ -121,7 +131,7 @@ export class DayStripView {
     const focusing = state.focus?.taskId && state.timer ? state.focus.taskId : undefined;
     const key = JSON.stringify([lang(), open, narrow, compact, open ? window.innerHeight : 0, ribbon.startHour, ribbon.endHour, ribbon.now, ribbon.hours, ribbon.bars, ribbon.blocks, ribbon.allDay, ribbon.more,
       strip.mode, strip.minutes, strip.lead && [strip.lead.id, strip.lead.title, strip.lead.start, strip.lead.end, strip.lead.event?.location], strip.rows.map((row) => [row.id, row.title, row.start, minutesUntil(now, row.start)]),
-      open ? items.map((item) => [item.id, item.title, item.start, item.end, item.done, item.event?.location, item.event?.color]) : 0, focusing, this.ticking, state.prefs.font, state.ai?.marks]);
+      open ? items.map((item) => [item.id, item.title, item.start, item.end, item.done, item.event?.location, item.event?.color]) : 0, focusing, this.ticking, state.prefs.font, state.ai?.marks, spaces]);
     if (key === this.drawnKey && this.element.childElementCount > 0) return true;
     this.drawnKey = key;
     const keepScroll = open && this.scroller?.isConnected ? this.scroller.scrollTop : undefined;
@@ -277,7 +287,7 @@ export class DayStripView {
     title.addEventListener("click", (event) => { event.stopPropagation(); this.open(item); });
     title.addEventListener("contextmenu", (event) => this.menu(event, item));
     // The box only for a to-do going on now (tick it and the strip moves on).
-    const titleRow = h("div", { class: "lead-row" }, strip.mode === "now" && item.kind === "task" && item.taskId ? this.checkbox(item.taskId) : null, title, this.stamp(item));
+    const titleRow = h("div", { class: "lead-row" }, strip.mode === "now" && item.kind === "task" && item.taskId ? this.checkbox(item.taskId) : null, this.spaceDot(item), title, this.stamp(item));
     const column = h("div", { class: "lead-text" }, kick, titleRow, this.subLine(item, now));
     // The full kicker when it fits, else the short one ("지금 · ~14:00"); the caption a little smaller when it's long.
     requestAnimationFrame(() => {
@@ -312,7 +322,7 @@ export class DayStripView {
       if (this.ticking) return;
       this.ticking = id;
       box.classList.add("ticked");
-      setTimeout(() => { void api.act({ type: "toggle", id }); this.ticking = undefined; }, reduceMotion() ? 0 : 450);
+      setTimeout(() => { void api.act({ type: "toggle", id }); this.ticking = undefined; }, holdMs(motion.dayStripHold));
     });
     return box;
   }
@@ -325,11 +335,20 @@ export class DayStripView {
       const time = clockText(item.start, lang());
       const away = awayText(minutes, lang());
       const row = h("button", { class: `strip-row ${item.kind}`, title: this.tooltip(item), "aria-label": `${time} ${item.title}, ${away}` },
-        h("span", { class: "sr-time" }, time), this.mark(item), h("span", { class: "sr-title" }, item.title), this.stamp(item), h("span", { class: `sr-away${isSoon(minutes) ? " soon" : ""}` }, away));
+        h("span", { class: "sr-time" }, time), this.mark(item), this.spaceDot(item), h("span", { class: "sr-title" }, item.title), this.stamp(item), h("span", { class: `sr-away${isSoon(minutes) ? " soon" : ""}` }, away));
       row.addEventListener("click", (event) => { event.stopPropagation(); this.open(item); });
       row.addEventListener("contextmenu", (event) => this.menu(event, item));
       return row;
     }));
+  }
+
+  /** 2a (A3): a to-do in a space — a small round dot in its band's colour before the title (일반 and events: none). */
+  private spaceDot(item: StripItem): HTMLElement | null {
+    const space = item.taskId ? this.host.spaceOf(item.taskId) : undefined;
+    if (!space) return null;
+    const dot = h("i", { class: "sp-dot", title: space.name, role: "img", "aria-label": t("스페이스 {name}", { name: space.name }) });
+    dot.style.setProperty("--band", `var(--band-${spaceColor(space.color)})`);
+    return dot;
   }
 
   /** AI 연결: "Claude" after the title of an event or a to-do Claude added or changed today. */
@@ -505,6 +524,9 @@ export class DayStripView {
       element.classList.toggle("done", item.done);
       element.classList.toggle("late", overdue);
       element.classList.toggle("tall", height >= 40);
+      // 2a (A4): a to-do in a space has its left edge, 3 px, in its band's colour.
+      const space = item.taskId ? this.host.spaceOf(item.taskId) : undefined;
+      if (space) { element.classList.add("spaced"); element.style.setProperty("--band", `var(--band-${spaceColor(space.color)})`); }
       const range = rangeOf(this.host.state().items.find((entry) => entry.id === item.taskId) ?? { timeStart: undefined });
       const timeText = (start: number, end: number) => taskRangeText({ start: start % 1440, end: end % 1440 }, lang());
       const time = h("span", { class: "tb-time" }, timeText(entry.start, entry.end));

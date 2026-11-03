@@ -6,10 +6,16 @@ import { test } from "node:test";
 import { makeBackup, mergeFiles, parseBackup, replaceFiles } from "../src/core/backup";
 import { parseNotebook, serializeNotebook } from "../src/core/notebook";
 import {
-  activeLens, addSpace, deleteSpace, emptyTodoSpaces, findSpaceToken, inLens, lensFor, lensForDigit, lensNone, liveSpaces, mergeTodoSpaces, moveTodo,
-  newSpaceID, nextSpaceColor, objectParticle, parseTodoSpaces, pruneTodoSpaces, readLens, readLine, recolorSpace, renameSpace, reorderSpaces, restoreSpace,
+  activeLens, addSpace, deleteSpace, emptyTodoSpaces, findSpaceToken, generalName, groupedCount, inLens, lensFor, lensForDigit, lensNone, liveSpaces, mergeTodoSpaces, moveTodo,
+  newSpaceID, nextSpaceColor, objectParticle, parseTodoSpaces, pruneTodoSpaces, readLens, readLine, recolorSpace, renameGeneral, renameSpace, reorderSpaces, restoreSpace,
   roParticle, serializeTodoSpaces, spaceChoices, spaceIndex, spaceIndexOf, spaceLineProblem, spaceOf, takesSpace, type SpaceChoice, type TodoSpaces,
+  findSpace, lensTasks, placeSeriesCopies, seriesSpaceOf, setSeriesSpace,
 } from "../src/core/todoSpaces";
+import { aheadLens, aheadSections } from "../src/core/ahead";
+import { badgeWords, extendSelection, movedBlock, movedManyWords, noSelection, oneSelected, orderedSelection, rangeSelection, restoredOrder, toggleSelection } from "../src/core/selection";
+import { boardFits, groupItems, groupOpen, groupSpace, movedOrder, narrowNote, neighborGroup, returnPoint, spaceGroups, wideNote, type SpaceGroup } from "../src/core/spaceGroups";
+import type { CalendarEvent } from "../src/core/calendar";
+import { stripItems, stripState } from "../src/core/dayStrip";
 import { Store } from "../src/main/store";
 
 // 할 일 스페이스: the shared cases S1–S22, verbatim from docs/plans/spaces-phase1.md §6 (the Mac's TodoSpacesTests.swift).
@@ -211,7 +217,7 @@ test("S15: A renames 회사 ‘업무’ at 10:00, B ‘직장’ at 10:02 → �
   assert.equal(liveSpaces(mergeTodoSpaces(tie, b))[0].name, "업무");
 });
 
-test("S16: unknown keys (top series, a space's icon, an entry's pin) — read and written, the same bytes", () => {
+test("S16: unknown keys (a rule's at, a space's icon, an entry's pin) — read and written, the same bytes", () => {
   const text = `{
   "items": {
     "T1": {
@@ -223,7 +229,8 @@ test("S16: unknown keys (top series, a space's icon, an entry's pin) — read an
   "series": {
     "R1": {
       "at": "2026-10-28T09:01:00Z",
-      "space": "s-b"
+      "space": "s-b",
+      "updatedAt": "2026-10-28T09:01:00Z"
     }
   },
   "spaces": [
@@ -252,6 +259,8 @@ test("S16: unknown keys (top series, a space's icon, an entry's pin) — read an
   const moved = moveTodo(data, "T2", "s-a", at("2026-10-28T09:02:00Z"));
   const again = serializeTodoSpaces(moved);
   assert.ok(again.includes('"pin": true') && again.includes('"icon": "briefcase"') && again.includes('"series": {'));
+  assert.equal(data.series?.R1.space, "s-b");
+  assert.equal(data.series?.R1.extra?.at, "2026-10-28T09:01:00Z");
   // A colour this version doesn't know is kept as written.
   assert.equal(data.spaces[1].color, "teal");
 });
@@ -397,10 +406,11 @@ const fixture = fs.existsSync(fixturePath) ? JSON.parse(fs.readFileSync(fixtureP
 const fileOf = (value: unknown) => parseTodoSpaces(JSON.stringify(value));
 const choiceText = (entry: SpaceChoice) => (entry.kind === "space" ? entry.id : entry.kind === "new" ? `new:${entry.name}` : "none");
 
-test("shared fixture: the input lines (S1–S10, S19, S20, W5)", { skip: !fixture }, () => {
+test("shared fixture: the input lines (S1–S10, S19, S20, S27, S28, W5)", { skip: !fixture }, () => {
   for (const line of fixture.lines) {
     let data = line.noSpaces ? emptyTodoSpaces() : fileOf(fixture.file);
     if (line.addSpace) data = { ...data, spaces: [...data.spaces, line.addSpace] };
+    if (line.general) data = { ...data, general: fileOf({ general: line.general }).general };
     const read = readLine(line.text, data, line.lens ?? undefined, new Date(fixture.now));
     const label = `${line.case} ${line.text}`;
     const expect = line.expect;
@@ -409,12 +419,14 @@ test("shared fixture: the input lines (S1–S10, S19, S20, W5)", { skip: !fixtur
       assert.equal(spaceLineProblem(line.text, data), expect.hint, label);
       continue;
     }
-    const candidate = read.candidates[0] as { kind: string; title: string };
+    // S29: a repeat whose title reads as an event (`주간 회의`) is the line's second reading — Tab picks it.
+    const reading = (expect.kind === "repeat" ? read.candidates.find((entry) => entry.kind === "repeat") : undefined) ?? read.candidates[0];
+    const candidate = reading as { kind: string; title: string };
     assert.equal(candidate.kind, expect.kind, label);
     assert.equal(candidate.title, expect.title, label);
     assert.deepEqual(read.choices.map(choiceText), expect.choices, label);
     const picked = read.choices[0];
-    const takes = takesSpace(read.candidates[0]);
+    const takes = takesSpace(reading);
     assert.equal(takes && picked?.kind === "space" ? picked.id : null, expect.space, label);
     if (expect.newSpace) {
       assert.ok(takes && picked?.kind === "new", label);
@@ -451,4 +463,258 @@ test("shared fixture: merges (S13–S15, W3), S16 bytes, the cleanup (S17, S22),
   assert.deepEqual(pruned.spaces.map((entry) => entry.id).sort(), [...prune.expectSpaces].sort());
   for (const text of fixture.unreadable) assert.throws(() => parseTodoSpaces(text), JSON.stringify(text));
   for (const text of fixture.readable) assert.doesNotThrow(() => parseTodoSpaces(text), text);
+});
+
+// ─── 일반: the to-dos in no space, and its name (#89, S23–S28) ─────────────────
+
+const generalOf = (value: unknown) => (value ? fileOf({ general: value }).general : undefined);
+const shownNames = (data: TodoSpaces) => ({ ko: generalName(data, "ko"), en: generalName(data, "en"), nl: generalName(data, "nl") });
+
+test("shared fixture: 일반 renamed, back to the default, merged, and in the file (S23–S26)", { skip: !fixture }, () => {
+  const general = fixture.general;
+  assert.deepEqual(shownNames(fileOf(fixture.file)), general.names);
+  for (const entry of general.renames) {
+    const data = { ...fileOf(fixture.file), ...(entry.general ? { general: generalOf(entry.general) } : {}) };
+    const renamed = renameGeneral(data, entry.to, new Date(entry.now));
+    const label = `${entry.case} ‘${entry.to}’`;
+    assert.deepEqual(renamed.general, generalOf(entry.expect), label);
+    assert.deepEqual(shownNames(renamed), entry.shown, label);
+  }
+  for (const entry of general.merges) {
+    const side = (value: unknown) => ({ ...fileOf(fixture.file), ...(value ? { general: generalOf(value) } : {}) });
+    assert.deepEqual(mergeTodoSpaces(side(entry.existing), side(entry.incoming)).general, generalOf(entry.expect), `${entry.case} ${entry.note ?? ""}`);
+  }
+  const read = parseTodoSpaces(general.S26);
+  assert.equal(serializeTodoSpaces(read), general.S26);
+  assert.deepEqual(shownNames(read), general.S26names);
+  assert.equal(read.general?.extra?.icon, "tray");
+  const again = parseTodoSpaces(serializeTodoSpaces(renameGeneral(read, "개인", new Date(fixture.now))));
+  assert.equal(again.general?.name, "개인");
+  assert.equal(again.general?.extra?.icon, "tray");
+  // A `general` this version can't read stays as it was, and reads as the default.
+  const odd = parseTodoSpaces(general.S26odd);
+  assert.equal(serializeTodoSpaces(odd), general.S26odd);
+  assert.equal(generalName(odd, "en"), "General");
+  // Not renamed: no key in the file.
+  assert.equal(serializeTodoSpaces(fileOf(fixture.file)).includes('"general"'), false);
+});
+
+// ─── 2a: repeat rules' spaces (S32–S36), the 앞으로 tab (S37) and the day strip (S38) ─────────
+
+const seriesOf = (value: unknown) => (value ? fileOf({ series: value }).series : undefined);
+const seriesSpaces = (data: TodoSpaces) => (data.series ? Object.fromEntries(Object.entries(data.series).map(([id, place]) => [id, place.space])) : null);
+const placesOf = (data: TodoSpaces) => Object.fromEntries(Object.entries(data.items).map(([id, place]) => [id, { space: place.space, at: place.at }]));
+
+test("shared fixture: repeat rules' spaces — merged, in the file, set, given to new to-dos, cleaned up (S32–S36)", { skip: !fixture }, () => {
+  const series = fixture.series;
+  const base = fileOf(fixture.file);
+  for (const entry of series.merges) {
+    const side = (value: unknown) => ({ ...base, ...(value ? { series: seriesOf(value) } : {}) });
+    const merged = mergeTodoSpaces(side(entry.existing), side(entry.incoming));
+    assert.deepEqual(seriesSpaces(merged), entry.expect, `${entry.case} ${entry.note ?? ""}`);
+  }
+  // S16 (the phase-1 fixture) reads its `series` now.
+  assert.equal(parseTodoSpaces(fixture.S16).series?.["daily-water"]?.space, "s-b");
+  assert.deepEqual(parseTodoSpaces(fixture.general.S26).series, {});
+  // S33: bytes, an unknown key in a rule, an odd `series`, entries it can't read.
+  const read = parseTodoSpaces(series.S33);
+  assert.equal(serializeTodoSpaces(read), series.S33);
+  assert.equal(read.series?.["4C2B7A10-0D3E-4F5A-8B6C-7D8E9F0A1B2C"]?.extra?.pin, true);
+  const changed = setSeriesSpace(read, "4C2B7A10-0D3E-4F5A-8B6C-7D8E9F0A1B2C", null, [], new Date(fixture.now));
+  assert.equal(parseTodoSpaces(serializeTodoSpaces(changed)).series?.["4C2B7A10-0D3E-4F5A-8B6C-7D8E9F0A1B2C"]?.extra?.pin, true);
+  const odd = parseTodoSpaces(series.S33odd);
+  assert.equal(serializeTodoSpaces(odd), series.S33odd);
+  assert.equal(odd.series, undefined);
+  const oddSet = setSeriesSpace({ ...odd, spaces: base.spaces }, "R", "s-a", [], new Date(fixture.now));
+  assert.equal(oddSet.extra?.series, undefined);
+  assert.equal(oddSet.series?.R.space, "s-a");
+  assert.deepEqual(seriesSpaces(parseTodoSpaces(series.S33dropped)), series.S33droppedExpect);
+  // S34: a rule's space set (its open to-dos move with it).
+  for (const entry of series.sets) {
+    const data = { ...base, items: fileOf({ items: entry.items }).items, ...(entry.series ? { series: seriesOf(entry.series) } : {}) };
+    const after = setSeriesSpace(data, entry.seriesID, entry.to, entry.copies, new Date(entry.now));
+    const label = `${entry.case} ${entry.note ?? ""}`;
+    assert.deepEqual(after.series ? Object.fromEntries(Object.entries(after.series).map(([id, place]) => [id, { space: place.space, updatedAt: place.updatedAt }])) : null, entry.expect, label);
+    assert.deepEqual(placesOf(after), entry.expectItems, label);
+  }
+  // S35: to-dos made from rules take the rule's space; moving one moves only it.
+  const copies = series.copies;
+  const ready = deleteSpace({ ...base, series: seriesOf(copies.series) }, copies.deleteSpace, new Date(copies.now)).data;
+  const placed = placeSeriesCopies(ready, copies.made, new Date(copies.now));
+  assert.deepEqual(placesOf(placed), copies.expectItems);
+  const moved = moveTodo(placed, copies.thenMove.todo, copies.thenMove.to, new Date(copies.thenMove.now));
+  assert.deepEqual(placesOf(moved), copies.expectAfterMove.items);
+  assert.deepEqual(seriesSpaces(moved), copies.expectAfterMove.series);
+  assert.equal(seriesSpaceOf(moved, "old-rule"), undefined);
+  // S36: rules gone from repeats.json for more than 30 days are dropped on save; not when repeats.json couldn't be read.
+  const prune = series.prune;
+  const withRules = { ...base, series: seriesOf(prune.series) };
+  assert.deepEqual(Object.keys(pruneTodoSpaces(withRules, new Set(), new Date(prune.now), new Set(prune.seriesIDs)).series ?? {}).sort(), prune.expect);
+  assert.deepEqual(Object.keys(pruneTodoSpaces(withRules, new Set(), new Date(prune.now)).series ?? {}).sort(), prune.expectWithoutRepeats);
+});
+
+const lensOf = (value: string | null) => value ?? undefined;
+const spaceLookup = (spaces: Record<string, string>) => (id: string) => spaces[id];
+
+test("shared fixture: the lens on the 앞으로 tab — to-dos only, counts after the lens, the hidden ones (S37)", { skip: !fixture }, () => {
+  const ahead = fixture.ahead;
+  const now = new Date(fixture.now);
+  const items = parseNotebook(JSON.stringify({ items: ahead.todos })).items;
+  for (const entry of ahead.cases) {
+    const lensed = aheadLens(items, spaceLookup(ahead.spaces), lensOf(entry.lens), now);
+    const sections = aheadSections(lensed.items, [], now, "ko");
+    const label = `${entry.case} ${entry.lens}`;
+    assert.deepEqual(Object.fromEntries(sections.map((section) => [section.kind === "laterOn" ? "later" : section.kind, section.count])), entry.expect.counts, label);
+    assert.deepEqual(Object.fromEntries(sections.flatMap((section) => section.days ?? []).map((day) => [day.day, day.tasks.map((task) => task.id)])), entry.expect.days, label);
+    assert.equal(lensed.hidden, entry.expect.hidden, label);
+  }
+});
+
+test("shared fixture: the lens on the day strip — now and next from the lens's to-dos and every event (S38)", { skip: !fixture }, () => {
+  const strip = fixture.strip;
+  const now = new Date(fixture.now);
+  const items = parseNotebook(JSON.stringify({ items: strip.todos })).items;
+  const events: CalendarEvent[] = strip.events.map((event: { title: string; start: string; end: string }, index: number) => ({
+    key: `local/e${index}@2026-10-28`, calendarId: "local", title: event.title, allDay: false, start: new Date(event.start), end: new Date(event.end),
+    color: "#888888", eventId: `e${index}`, canEdit: true, recurring: false,
+  }));
+  const data = fileOf(fixture.file);
+  const index = new Map(Object.entries(strip.spaces as Record<string, string>).map(([todo, id]) => [todo, findSpace(data, id)!]));
+  for (const entry of strip.cases) {
+    const state = stripState(stripItems(events, lensTasks(items, index, lensOf(entry.lens)), now), now, 3);
+    const label = `${entry.case} ${entry.lens}`;
+    assert.equal(state.mode, entry.expect.mode, label);
+    assert.equal(state.lead?.title, entry.expect.lead, label);
+    assert.deepEqual(state.rows.map((row) => row.title), entry.expect.rows, label);
+  }
+});
+
+// ─── 2b: 스페이스별로 묶기 (S39–S44) ─────────────────────────────────────────
+
+test("shared fixture: the groups — order, inside a group, empty ones hidden, the lens, drops and 되돌리기, the keys (S39–S44)", { skip: !fixture }, () => {
+  const grouping = fixture.groups;
+  const now = new Date(fixture.now);
+  const data = fileOf(fixture.file);
+  const items = parseNotebook(JSON.stringify({ items: grouping.todos })).items;
+  const byID = new Map(items.map((item) => [item.id, item]));
+  const kst = (ms: number) => new Intl.DateTimeFormat("en-GB", { timeZone: fixture.timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(ms));
+  type Want = { space: string | null; titles: string[]; open: number; done: number; next: string | null };
+  const shape = (groups: SpaceGroup[]): Want[] => groups.map((group) => ({
+    space: group.space ?? null, titles: groupItems(group).map((item) => item.title), open: groupOpen(group), done: group.done.length,
+    next: group.next === undefined ? null : kst(group.next),
+  }));
+  const groupsOf = (order: readonly string[], spaces: Record<string, string | undefined>, lens: string | undefined) =>
+    spaceGroups(order.map((id) => byID.get(id)!), data, (id) => spaces[id], lens, now);
+  const order = items.map((item) => item.id);
+  for (const entry of grouping.cases) {
+    assert.deepEqual(shape(groupsOf(order, grouping.spaces, lensOf(entry.lens))), entry.expect, `${entry.case} ${entry.lens}`);
+  }
+  for (const entry of grouping.drops) {
+    const label = `${entry.case} ${entry.note}`;
+    const back = returnPoint(entry.id, order);
+    const after = entry.relativeTo ? movedOrder(order, entry.id, entry.relativeTo, entry.after) : order;
+    const spaces = { ...grouping.spaces, [entry.id]: groupSpace(entry.to) ?? undefined };
+    assert.deepEqual(shape(groupsOf(after, spaces, undefined)), entry.expect, label);
+    // 되돌리기: its space and its place in the list as they were.
+    const undone = back ? movedOrder(after, entry.id, back.targetID, back.after) : after;
+    assert.deepEqual(undone, order, label);
+    assert.deepEqual(shape(groupsOf(undone, grouping.spaces, undefined)), grouping.cases[0].expect, label);
+  }
+  for (const entry of grouping.keys) {
+    const groups = groupsOf(order, grouping.spaces, lensOf(entry.lens));
+    assert.equal(neighborGroup(entry.id, entry.direction === "up" ? -1 : 1, groups) ?? null, entry.to, `${entry.case} ${entry.direction} ${entry.note ?? ""}`);
+  }
+  // S46–S48 (#168): several picked, moved at once, and 되돌리기.
+  const multi = fixture.multi;
+  const rows: string[] = multi.rows;
+  for (const entry of multi.selection) {
+    let selection = noSelection();
+    for (const [kind, value] of entry.steps as [string, string | number][]) {
+      if (kind === "click") selection = oneSelected(value as string);
+      else if (kind === "toggle") selection = toggleSelection(selection, value as string, rows);
+      else if (kind === "range") selection = rangeSelection(selection, value as string, rows);
+      else if (kind === "extend") selection = extendSelection(selection, value as number, rows);
+      else selection = noSelection();
+    }
+    const label = `S46 ${entry.note ?? JSON.stringify(entry.steps)}`;
+    assert.deepEqual(orderedSelection(selection, rows), entry.expect.ids, label);
+    assert.equal(selection.focus ?? null, entry.expect.focus, label);
+    assert.equal(selection.anchor ?? null, entry.expect.anchor, label);
+  }
+  for (const entry of multi.moves) {
+    const label = `S47 ${entry.note}`;
+    const after = entry.relativeTo ? movedBlock(order, entry.ids, entry.relativeTo, entry.after) : order;
+    const spaces: Record<string, string | undefined> = { ...grouping.spaces };
+    let moved = 0;
+    for (const id of entry.ids as string[]) { const to = groupSpace(entry.to) ?? undefined; if (spaces[id] !== to) { spaces[id] = to; moved += 1; } }
+    assert.equal(moved, entry.moved, label);
+    assert.deepEqual(shape(groupsOf(after, spaces, undefined)), entry.expect, label);
+    const undone = restoredOrder(after, entry.ids, order);
+    assert.deepEqual(undone, order, label);
+    assert.deepEqual(shape(groupsOf(undone, grouping.spaces, undefined)), grouping.cases[0].expect, label);
+  }
+  for (const entry of multi.keys) {
+    const groups = groupsOf(order, grouping.spaces, undefined);
+    const target = neighborGroup(entry.focus, entry.direction === "up" ? -1 : 1, groups);
+    assert.equal(target ?? null, entry.to, `S48 ${entry.note ?? ""}`);
+    const moved = target === undefined ? 0 : (entry.ids as string[]).filter((id) => grouping.spaces[id] !== (groupSpace(target) ?? undefined)).length;
+    assert.equal(moved, entry.moved, `S48 moved ${entry.note ?? ""}`);
+  }
+  assert.equal(movedManyWords(3, "집", "ko"), "3개를 집으로 옮겼어요");
+  assert.equal(movedManyWords(3, "Home", "en"), "Moved 3 to Home");
+  assert.equal(movedManyWords(3, "Thuis", "nl"), "3 verplaatst naar Thuis");
+  assert.equal(badgeWords(3, "ko"), "3개");
+  // S45: columns only when every one gets 220; the note's widest grouped and not.
+  assert.equal(wideNote, grouping.board.maxWidth.grouped);
+  assert.equal(narrowNote, grouping.board.maxWidth.plain);
+  for (const entry of grouping.board.cases) assert.equal(boardFits(entry.width, entry.count), entry.columns, `S45 ${entry.count} at ${entry.width}`);
+});
+
+test("rules' spaces in the store: a line's repeat, its new to-do, the rule's editor, a rule deleted", () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-series-"));
+  const store = new Store(directory);
+  store.changeSpaces((data) => addSpace(addSpace(data, "회사", "s-a", "pink"), "집", "s-b", "mint"));
+  const now = new Date();
+  // A rule with a space: today's new copy goes there (S35).
+  const id = store.saveSeries({ title: "물 마시기", rule: { kind: "daily" }, space: "s-a" }, now)!;
+  const copy = store.items.find((item) => item.seriesID === id)!;
+  assert.equal(seriesSpaceOf(store.todoSpaces, id), "s-a");
+  assert.equal(spaceOf(store.todoSpaces, copy.id), "s-a");
+  // The rule's editor moves it, and its open copy with it (S34).
+  store.saveSeries({ seriesID: id, rule: { kind: "daily" }, space: "s-b" }, now);
+  assert.equal(seriesSpaceOf(store.todoSpaces, id), "s-b");
+  assert.equal(spaceOf(store.todoSpaces, copy.id), "s-b");
+  // Moving the copy moves only it.
+  store.changeSpaces((data) => moveTodo(data, copy.id, "s-a"));
+  assert.equal(seriesSpaceOf(store.todoSpaces, id), "s-b");
+  // From a to-do's editor, the rule takes the to-do's space.
+  store.mutate((history) => history.addTo("보고서", undefined));
+  const task = store.items.find((item) => item.title === "보고서")!;
+  store.changeSpaces((data) => moveTodo(data, task.id, "s-a"));
+  const fromTask = store.saveSeries({ taskID: task.id, rule: { kind: "weekly", weekdays: [1] } }, now)!;
+  assert.equal(seriesSpaceOf(store.todoSpaces, fromTask), "s-a");
+  // Stopping a rule keeps its entry (되돌리기 brings the space back with it).
+  store.deleteSeries(id);
+  assert.equal(seriesSpaceOf(parseTodoSpaces(fs.readFileSync(path.join(directory, "todo-spaces.json"), "utf8")), id), "s-b");
+});
+
+test("일반 in the store: renamed through the shared folder, the later name wins (S25)", () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-spaces-"));
+  const store = new Store(directory);
+  store.changeSpaces((data) => addSpace(data, "회사", "s-a", "pink"));
+  store.changeSpaces((data) => renameGeneral(data, "기타", at("2026-10-28T10:00:00Z")));
+  const saved = parseTodoSpaces(fs.readFileSync(path.join(directory, "todo-spaces.json"), "utf8"));
+  assert.equal(saved.general?.name, "기타");
+  // Another device renames it later: merged on the next change here.
+  fs.writeFileSync(path.join(directory, "todo-spaces.json"), serializeTodoSpaces(renameGeneral(saved, "개인", at("2026-10-28T10:05:00Z"))), "utf8");
+  store.changeSpaces((data) => addSpace(data, "집", "s-b", "mint"));
+  assert.equal(generalName(store.todoSpaces), "개인");
+  assert.equal(generalName(store.state().todoSpaces, "en"), "개인");
+});
+
+test("#87: counts grouped as the Mac writes them", () => {
+  assert.equal(groupedCount(4), "4");
+  assert.equal(groupedCount(1466), "1,466");
+  assert.equal(groupedCount(1466, "nl"), "1.466");
+  assert.equal(groupedCount(1234567, "en"), "1,234,567");
 });

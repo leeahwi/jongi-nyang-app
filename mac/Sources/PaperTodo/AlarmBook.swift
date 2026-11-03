@@ -112,7 +112,7 @@ final class AlarmBook: ObservableObject {
     // MARK: The file
 
     private func load() {
-        guard let data = try? Data(contentsOf: url) else {
+        guard let data = try? SafeFile.sharedData(url) else {
             alarms = []
             known = nil
             return
@@ -129,7 +129,7 @@ final class AlarmBook: ObservableObject {
 
     /// Another device wrote alarms.json (a shared folder is checked every two seconds).
     func reloadIfChanged() {
-        guard let data = try? Data(contentsOf: url), data != known else { return }
+        guard let data = try? SafeFile.sharedData(url), data != known else { return }
         load()
     }
 

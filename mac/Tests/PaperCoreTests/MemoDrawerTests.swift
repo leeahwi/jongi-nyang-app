@@ -634,6 +634,142 @@ private enum MemoDrawerTests {
             try equal(try MemoFolders.decode(Data(file.utf8)).folder("work")?.updatedAt, at("2026-10-26T09:00:00Z"), "fractional seconds still read")
         }
 
+        // #116: the bookmarks' letters, the shared cases B1… (the Windows app reads the same file).
+        let lettersFile = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/drawer-bookmark-cases.json"))) as! [String: Any]
+        for entry in lettersFile["cases"] as! [[String: Any]] {
+            try test("\(entry["id"]!) \(entry["about"]!)") {
+                try equal(MemoFolders.bookmarkLetters(entry["names"] as! [String], picked: entry["picked"] as? Int), entry["expect"] as! [String], "letters")
+            }
+        }
+
+        // #113: 크게 보기's width and letter count, the shared cases W1… C1… N1… (the Windows app reads the same file).
+        let bigFile = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/drawer-big-cases.json"))) as! [String: Any]
+        for entry in bigFile["width"] as! [[String: Any]] {
+            try test("\(entry["id"]!) \(entry["about"]!)") {
+                try equal(MemoCards.bigWidth(user: entry["user"] as! Double, screen: entry["screen"] as! Double, chrome: entry["chrome"] as! Double),
+                          entry["expect"] as! Double, "width")
+            }
+        }
+        for entry in bigFile["count"] as! [[String: Any]] {
+            try test("\(entry["id"]!) \(entry["about"]!)") { try equal(MemoCards.characterCount(entry["text"] as! String), entry["expect"] as! Int, "count") }
+        }
+        for entry in bigFile["words"] as! [[String: Any]] {
+            try test("\(entry["id"]!) \(entry["count"]!)") {
+                for language in AppLanguage.allCases {
+                    try equal(MemoCards.characters(entry["count"] as! Int, language: language), entry[language.rawValue] as! String, "words \(language)")
+                }
+            }
+        }
+
+        // #114: 메모 찾기's results by folder, scope and filters; the found line; the times; the footer — the shared cases
+        // F1… P1… T1… R1… (the Windows app reads the same file).
+        let findFile = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/drawer-search-cases.json"))) as! [String: Any]
+        let findFolders = try MemoFolders.decode(JSONSerialization.data(withJSONObject: findFile["folders"]!))
+        let findMemos = (findFile["memos"] as! [[String: String]]).map { Memo(id: $0["id"]!, text: $0["text"]!, createdAt: at($0["updatedAt"]!), updatedAt: at($0["updatedAt"]!)) }
+        for entry in findFile["cases"] as! [[String: Any]] {
+            try test("\(entry["id"]!) \(entry["about"]!)") {
+                let scope: MemoFolders.Tab? = (entry["scope"] as? String) == "pinned" ? .pinned
+                    : ((entry["scope"] as? [String: String])?["folder"]).map { .folder($0) }
+                let filters = MemoFolders.SearchFilters(names: entry["filters"] as! [String])
+                for index in [nil, MemoFolders.SearchIndex()] {
+                    let groups = findFolders.find(entry["query"] as! String, memos: findMemos, scope: scope, filters: filters, index: index)
+                    let expected = (entry["expect"] as! [[String: Any]]).map { "\($0["folder"]!):" + ($0["ids"] as! [String]).joined(separator: ",") }
+                    try equal(groups.map { "\($0.folderID):" + $0.hits.map(\.memoID).joined(separator: ",") }, expected, "groups")
+                }
+            }
+        }
+        for entry in findFile["snippets"] as! [[String: String]] {
+            try test("\(entry["id"]!) \(entry["about"]!)") {
+                let line = entry["line"]!
+                let shown = MemoFolders.snippet(line, range: Search.match(Search.Query(entry["query"]!), in: line))
+                try equal(shown.text, entry["expect"]!, "snippet")
+                let scalars = Array(shown.text.unicodeScalars)
+                try equal(shown.range.map { String(String.UnicodeScalarView(scalars[$0])) }, entry["mark"]!, "mark")
+            }
+        }
+        let findNow = at(findFile["now"] as! String)
+        for entry in findFile["times"] as! [[String: String]] {
+            try test("\(entry["id"]!) \(entry["about"]!)") {
+                for language in AppLanguage.allCases {
+                    try equal(MemoCards.foundTime(at(entry["at"]!), now: findNow, language: language), entry[language.rawValue]!, "time \(language)")
+                }
+            }
+        }
+        for entry in findFile["footer"] as! [[String: Any]] {
+            try test("\(entry["id"]!) \(entry["count"]!) · \(entry["folders"]!)") {
+                for language in AppLanguage.allCases {
+                    try equal(MemoFolders.searchFooter(count: entry["count"] as! Int, folders: entry["folders"] as! Int, language: language),
+                              entry[language.rawValue] as! String, "footer \(language)")
+                }
+            }
+        }
+
+        // #115: a folder's 보기 in memo-folders.json, the shared cases V1… (the Windows app reads the same file).
+        let viewFile = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/drawer-view-cases.json"))) as! [String: Any]
+        let viewNow = at(viewFile["now"] as! String)
+        func lines(_ value: Any?) -> String { (value as! [String]).joined(separator: "\n") + "\n" }
+        for entry in viewFile["cases"] as! [[String: Any]] {
+            try test("\(entry["id"]!) \(entry["about"]!)") {
+                var data = try MemoFolders.decode(Data(lines(entry["input"]).utf8))
+                if let op = entry["op"] as? [String: Any] {
+                    if let set = op["setView"] as? [String] { data.setView(set[0], MemoFolders.View(rawValue: set[1])!, now: viewNow) }
+                    if let theirs = op["merge"] { data = MemoFolders.merge(here: data, theirs: try MemoFolders.decode(Data(lines(theirs).utf8))) }
+                    if let copy = op["duplicate"] as? [String] { data.duplicateFolder(copy[0], as: copy[1], copies: [], now: viewNow) }
+                }
+                try equal(data.encoded(), lines(entry["expect"]), "file")
+                for (id, view) in entry["views"] as! [String: String] { try equal(data.view(of: id).rawValue, view, "view of \(id)") }
+            }
+        }
+
+        // #120: 지운 메모 in memo-trash.json, the shared cases T1… N1… A1… R1… (the Windows app reads the same file).
+        let trashFile = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/drawer-trash-cases.json"))) as! [String: Any]
+        let trashNow = at(trashFile["now"] as! String)
+        for entry in trashFile["cases"] as! [[String: Any]] {
+            try test("\(entry["id"]!) \(entry["about"]!)") {
+                var trash = entry["input"] is NSNull ? MemoTrash() : try MemoTrash.decode(Data(lines(entry["input"]).utf8))
+                for op in entry["ops"] as! [[String: Any]] {
+                    if let delete = op["delete"] as? [String: Any] {
+                        let m = delete["memo"] as! [String: String]
+                        trash.add(Memo(id: m["id"]!, text: m["text"]!, createdAt: at(m["createdAt"]!), updatedAt: at(m["updatedAt"]!)),
+                                  folder: delete["folder"] as! String, pinned: delete["pinned"] as! Bool, paper: delete["paper"] as? String, now: trashNow)
+                    }
+                    if let id = op["restore"] as? String {
+                        let back = trash.remove(id, now: trashNow)
+                        let wanted = op["returns"] as! [String: Any]
+                        try equal(back?.folder, wanted["folder"] as? String, "folder")
+                        try equal(back?.pinned, wanted["pinned"] as? Bool, "pinned")
+                        try equal(back?.paper, wanted["paper"] as? String, "paper")
+                        try equal(back?.memo.text, wanted["text"] as? String, "text")
+                        try equal(back.map { MemoFolders.iso($0.memo.updatedAt) }, wanted["updatedAt"] as? String, "updatedAt")
+                    }
+                    if op["empty"] != nil { trash.empty(now: trashNow) }
+                    if let alive = op["prune"] as? [String] { trash = trash.pruned(now: trashNow, alive: Set(alive)) }
+                    if let theirs = op["merge"] { trash = MemoTrash.merge(here: trash, theirs: try MemoTrash.decode(Data(lines(theirs).utf8))) }
+                }
+                try equal(trash.encoded(), lines(entry["expect"]), "file")
+                try equal(try MemoTrash.decode(Data(trash.encoded().utf8)).encoded(), trash.encoded(), "read back")
+            }
+        }
+        for entry in trashFile["words"] as! [[String: Any]] {
+            try test("\(entry["id"]!) \(entry["count"]!)") {
+                let menu = entry["menu"] as! [String: String], question = entry["question"] as! [String: String]
+                for language in AppLanguage.allCases {
+                    try equal(MemoTrash.menuLabel(entry["count"] as! Int, language: language), menu[language.rawValue]!, "menu \(language)")
+                    try equal(MemoTrash.emptyQuestion(entry["count"] as! Int, language: language), question[language.rawValue]!, "question \(language)")
+                }
+            }
+        }
+        for entry in trashFile["ago"] as! [[String: String]] {
+            try test("\(entry["id"]!) \(entry["at"]!)") {
+                for language in AppLanguage.allCases { try equal(MemoTrash.ago(at(entry["at"]!), now: trashNow, language: language), entry[language.rawValue]!, "ago \(language)") }
+            }
+        }
+        for entry in trashFile["restored"] as! [[String: String]] {
+            try test("\(entry["id"]!) \(entry["folder"]!)") {
+                for language in AppLanguage.allCases { try equal(MemoTrash.restored(to: entry["folder"]!, language: language), entry[language.rawValue]!, "restored \(language)") }
+            }
+        }
+
         print("\(count) memo drawer checks passed")
     }
 }

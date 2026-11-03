@@ -12,6 +12,10 @@ public enum AIConnect {
     /// Past this the app rewrites the log with the last 30 days.
     public static let logLimit = 1_000_000
     public static let keepDays = 30
+    /// The extension's own small version (I1, docs/plans/mcp-plan.md), the same number as the Windows core's
+    /// `aiExtVersion` (this app ships that extension): written into ai-link.json, and the extension writes its
+    /// own into each log line, so an older Claude Desktop copy can be told apart.
+    public static let extVersion = 2
 
     // MARK: ai-link.json
 
@@ -22,6 +26,8 @@ public enum AIConnect {
         public var lang: String
         public var app: String
         public var updatedAt: String
+        /// The extension version this app carries (absent from apps before it).
+        public var ext: Int?
 
         public init(enabled: Bool, dataFolder: String, lang: AppLanguage, app: String, now: Date = Date()) {
             v = 1
@@ -30,6 +36,7 @@ public enum AIConnect {
             self.lang = lang.rawValue
             self.app = app
             updatedAt = AIConnect.isoText(now)
+            ext = AIConnect.extVersion
         }
 
         public func encoded() -> Data {
@@ -127,11 +134,13 @@ public enum AIConnect {
         public var title: String
         public var undoes: String?
         public var changes: [Change]
+        /// The extension version that wrote it (absent before there was one, read as 1, and on undo lines).
+        public var ext: Int?
 
         public init(id: String, at: Date, client: String = "Claude", tool: String = "", kind: Kind, target: Target, count: Int? = nil,
-                    title: String = "", undoes: String? = nil, changes: [Change] = []) {
+                    title: String = "", undoes: String? = nil, changes: [Change] = [], ext: Int? = nil) {
             self.id = id; self.at = at; self.client = client; self.tool = tool; self.kind = kind; self.target = target
-            self.count = count ?? changes.count; self.title = title; self.undoes = undoes; self.changes = changes
+            self.count = count ?? changes.count; self.title = title; self.undoes = undoes; self.changes = changes; self.ext = ext
         }
 
         /// Something Claude did (not the app's own undo, not a kind this version doesn't know).
@@ -149,6 +158,7 @@ public enum AIConnect {
                 }),
             ]
             if let undoes { object["undoes"] = .string(undoes) }
+            if let ext { object["ext"] = .number(Double(ext)) }
             return JSONValue.object(object).text
         }
     }
@@ -178,7 +188,16 @@ public enum AIConnect {
         return Entry(id: id, at: at, client: o["client"]?.string ?? "Claude", tool: o["tool"]?.string ?? "",
                      kind: Kind(rawValue: kindText) ?? .unknown, target: Target(rawValue: o["target"]?.string ?? "") ?? .unknown,
                      count: o["count"]?.number.map { max(0, Int($0)) } ?? changes.count,
-                     title: o["title"]?.string ?? "", undoes: o["undoes"]?.string, changes: changes)
+                     title: o["title"]?.string ?? "", undoes: o["undoes"]?.string, changes: changes,
+                     ext: o["ext"]?.number.flatMap { $0 >= 1 && $0 == $0.rounded() ? Int($0) : nil })
+    }
+
+    /// Claude Desktop's installed extension is older than the one this app carries (M41): the newest entry
+    /// Claude Desktop wrote ("Claude"; "Claude Code" runs the app's own copy) came from a lower version.
+    /// Nothing from Claude Desktop yet: nothing to say. Clears with the first line the reinstalled one writes.
+    public static func extOutdated(_ entries: [Entry], ext: Int = extVersion) -> Bool {
+        guard let last = entries.last(where: { $0.client == "Claude" && ($0.kind == .add || $0.kind == .change) }) else { return false }
+        return (last.ext ?? 1) < ext
     }
 
     /// Entries an undo (by this app or another) has taken back.

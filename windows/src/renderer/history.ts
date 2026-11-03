@@ -1,8 +1,9 @@
 import { currentStreak, dayKey, groupByDay, heatLevel, heatLevelTitlesIn, logicalDayStart, longestStreak, type ArchiveEntry } from "../core/archive";
 import { clock, longDate as longDateIn, monthName, monthShort, monthTitle as langMonthTitle, shortDate, weekdayLetter, weekdayShort } from "../core/lang";
-import type { AppState } from "../core/types";
+import type { PrefsState } from "../core/types";
 import { focusByTask, focusDay, focusTime, focusTotal, focusTotals, sessionsText, type FocusRecord } from "../core/focus";
 import { edgeFade, h, icon, lang, paper, t } from "./api";
+import { paneSight } from "./paneSight";
 
 const api = paper();
 const app = document.getElementById("app")!;
@@ -302,7 +303,10 @@ window.addEventListener("keydown", (event) => {
   document.querySelector<HTMLButtonElement>(`.cell[data-key="${selected}"]`)?.focus();
 });
 
-api.on("history:changed", () => void refresh());
+// #79: the desk hidden or minimized, or another pane in front: a change only marks the record stale, and it is
+// fetched and drawn once when 완료 기록 is in sight again.
+const sight = paneSight("history", () => void refresh());
+api.on("history:changed", () => sight.draw(() => void refresh()));
 // Search → 완료 기록 on a day: that day chosen (a day older than the last year shows its year).
 api.on("desk:pane", (payload) => {
   const { pane, day } = (payload ?? {}) as { pane?: unknown; day?: unknown };
@@ -314,7 +318,7 @@ api.on("desk:pane", (payload) => {
   render();
   document.querySelector<HTMLElement>(`.cell[data-key="${day}"]`)?.scrollIntoView({ block: "nearest" });
 });
-api.on("state", (state) => { document.documentElement.dataset.font = (state as AppState).prefs.font; });
+api.on("state:prefs", (state) => { document.documentElement.dataset.font = (state as PrefsState).prefs.font; });
 void api.getState().then((state) => {
   document.documentElement.dataset.font = state.prefs.font;
   archivePath = state.storage.archivePath;

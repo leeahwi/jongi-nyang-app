@@ -103,6 +103,15 @@
 - Desk → Appearance → **Language**: Automatic · 한국어 · English · Nederlands. Automatic follows your Mac's language order (English when none of the three is there); changing it restarts Jongi-nyang.
 - Menus, settings, help, reminders, cat talk, dates and times are all in that language. English and Dutch handwriting uses Caveat (pen) and Kalam (marker); titles written in Korean still show in Korean handwriting.
 
+### 🧺 Group by space · automatic backups (1.46)
+![A wide notepad with today's to-dos grouped into one column per space](../docs/screenshots/mac/spaces2b-board.png)
+
+- **Group by space**: turn it on from the `All spaces ▾` menu or View → Spaces (`⌥⌘G`), and Today's to-dos gather by space as note cards or bookmarks. Widen the notepad and each space gets its own column (up to 1,200pt), with `+ Add to Work` under each one.
+- **Drag to move**: drag a to-do onto another group or press `⌥⌘↑` · `⌥⌘↓`, and pick several with `⌘`-click or `⇧`-click to move them at once. The colour band and showing one space also reach the Ahead tab, the day ribbon, the Today window and repeating to-dos.
+- **Automatic backups**: once a day, and before anything overwrites the storage folder (an import or a restore, say), the folder is saved as a `.jongi` file. Backups go to this Mac's `backups` folder, not the storage folder (14 daily, 10 of each kind made before overwriting); choose one to restore in Desk → **Storage & backup**.
+- **Notes drawer**: search results are grouped by folder and filtered with the `Unticked` · `Links` · `Pinned` chips. Each folder can show titles only, and the drawer widens in the big view. Deleted notes stay for 30 days; bring them back from the folder name ▾ → `Deleted notes`. `⌘K` opens a link field under the note, and the checkboxes are larger.
+- **Papers and fonts**: four new drawer papers (hanji, sage, blossom, ink), and you can set the note text size, line spacing, paragraph spacing and code font (D2Coding).
+
 ### 🗄 Notes drawer (1.43 – 1.44)
 ![The notes drawer: date groups and cards](../docs/screenshots/mac/en/drawer-list-day.png)
 

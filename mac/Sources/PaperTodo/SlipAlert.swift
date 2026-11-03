@@ -28,12 +28,7 @@ enum SlipAlert {
             picked = index
             NSApp.stopModal()
         })
-        let anchor = NSApp.keyWindow ?? NSApp.mainWindow
-        if let anchor, anchor.isVisible {
-            panel.placeSlip(topCenter: NSPoint(x: anchor.frame.midX, y: anchor.frame.maxY - 90))
-        } else if let area = (NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main)?.visibleFrame {
-            panel.placeSlip(topCenter: NSPoint(x: area.midX, y: area.maxY - area.height / 4))
-        }
+        place(panel)
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
         NSApp.runModal(for: panel)
@@ -51,18 +46,58 @@ enum SlipAlert {
             result = name
             NSApp.stopModal()
         })
-        let anchor = NSApp.keyWindow ?? NSApp.mainWindow
-        if let anchor, anchor.isVisible {
-            panel.placeSlip(topCenter: NSPoint(x: anchor.frame.midX, y: anchor.frame.maxY - 90))
-        } else if let area = (NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main)?.visibleFrame {
-            panel.placeSlip(topCenter: NSPoint(x: area.midX, y: area.maxY - area.height / 4))
-        }
+        place(panel)
         NSApp.activate(ignoringOtherApps: true)
         panel.makeKeyAndOrderFront(nil)
         NSApp.runModal(for: panel)
         panel.orderOut(nil)
         let clean = result.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
         return clean?.isEmpty == false ? clean : nil
+    }
+
+    /// A slip of its own (the shortcut list, #86), shown like the questions: over the window in front, till `done`.
+    static func present<V: View>(title: String, _ content: (@escaping () -> Void) -> V) {
+        let panel = ModalSlipPanel(nonactivating: false)
+        panel.title = title
+        panel.level = .modalPanel
+        panel.show(content { NSApp.stopModal() })
+        panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+        if ProcessInfo.processInfo.environment["PAPERTODO_OFFSCREEN"] == "1" {
+            panel.setFrameOrigin(NSPoint(x: -40_000, y: -40_000))
+        } else {
+            placeTall(panel)
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
+        NSApp.runModal(for: panel)
+        panel.orderOut(nil)
+    }
+
+    private static func placeTall(_ panel: SlipPanel) {
+        // A tall slip: its top near the top of the screen (above the window in front), so all of it is on screen.
+        let anchor = (NSApp.keyWindow ?? NSApp.mainWindow).flatMap { $0.isVisible ? $0 : nil }
+        let point = anchor.map { NSPoint(x: $0.frame.midX, y: $0.frame.maxY) } ?? NSEvent.mouseLocation
+        if let area = (NSScreen.screens.first { $0.frame.contains(point) } ?? NSScreen.main)?.visibleFrame {
+            panel.placeSlip(topCenter: NSPoint(x: anchor?.frame.midX ?? area.midX, y: area.maxY - 24))
+        }
+    }
+
+    /// Under the desk (or the note), or on the screen with the pointer; far off every screen in a check
+    /// (`PAPERTODO_OFFSCREEN`, the test copies of scripts/perf*.sh).
+    private static func place(_ panel: SlipPanel) {
+        // On the Space the user is looking at, a full-screen desk's too: a modal slip on another Space leaves the app
+        // waiting for an answer nobody can see.
+        panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+        if ProcessInfo.processInfo.environment["PAPERTODO_OFFSCREEN"] == "1" {
+            panel.setFrameOrigin(NSPoint(x: -40_000, y: -40_000))
+            return
+        }
+        let anchor = NSApp.keyWindow ?? NSApp.mainWindow
+        if let anchor, anchor.isVisible {
+            panel.placeSlip(topCenter: NSPoint(x: anchor.frame.midX, y: anchor.frame.maxY - 90))
+        } else if let area = (NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main)?.visibleFrame {
+            panel.placeSlip(topCenter: NSPoint(x: area.midX, y: area.maxY - area.height / 4))
+        }
     }
 
     /// Something went wrong: the reason and 확인.

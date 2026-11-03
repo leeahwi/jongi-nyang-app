@@ -11,3 +11,30 @@ textarea.ruled {
 textarea.ruled::placeholder { font: 14px var(--ui); color: var(--ink-3); opacity: 1; line-height: var(--line); }
 textarea.ruled:focus-visible { outline: none; }
 textarea.ruled::-webkit-scrollbar { width: 6px; }
+.memo-body { position: relative; }
+
+/* #117: the folder the memo goes into — a chip at the foot (colour, name, ▾); a click lists the folders over the lines. */
+.qm-folder { display: inline-flex; align-items: center; gap: 5px; max-width: 150px; height: 22px; padding: 0 8px; flex: none;
+  border-radius: 999px; background: var(--card); box-shadow: inset 0 0 0 1px var(--rule-strong); font: 500 11.5px var(--ui); color: var(--ink-2); }
+.qm-folder:hover, .qm-folder[aria-expanded="true"] { color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink-3); }
+.qm-folder:focus-visible { outline: 2px solid var(--sage); outline-offset: 1px; }
+.qm-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qm-chev { display: inline-flex; color: var(--ink-3); }
+.qm-sq { width: 10px; height: 10px; border-radius: 2.5px; flex: none; background: var(--fa); box-shadow: inset 0 0 0 1px var(--fe); }
+.qm-list { position: absolute; left: 12px; bottom: 2px; z-index: 2; min-width: 170px; max-width: calc(100% - 24px); max-height: 152px; overflow-y: auto;
+  padding: 4px; border-radius: 10px; background: var(--card); box-shadow: 0 0 0 0.5px var(--rule-strong), 0 6px 18px rgba(40, 30, 10, 0.18); }
+.qm-list[hidden] { display: none; }
+.qm-row { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 8px; border-radius: 7px; font: 13px var(--ui); color: var(--ink); cursor: default; outline: none; }
+.qm-row:hover, .qm-row:focus { background: color-mix(in srgb, var(--sage) 12%, transparent); }
+.qm-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qm-tick { display: inline-flex; color: var(--sage-text); }
+:root[data-paper="night"] .qm-list { box-shadow: 0 0 0 0.5px var(--rule-strong), 0 6px 18px rgba(0, 0, 0, 0.5); }
+/* The folders' colours as their day bookmarks (the Mac's menu squares are the same). */
+.fc-lavender { --fa: #dcd8f3; --fe: #9d92d8; }
+.fc-pink { --fa: #f2d3d6; --fe: #d79aa2; }
+.fc-mint { --fa: #cfe6d6; --fe: #86b896; }
+.fc-yellow { --fa: #f3e3a0; --fe: #c3b273; }
+.fc-sky { --fa: #d6e5f4; --fe: #8fb0da; }
+.fc-peach { --fa: #f6dccb; --fe: #c8a793; }
+.fc-sand { --fa: #ebe2cf; --fe: #b6aa94; }
+.fc-gray { --fa: #e2e0da; --fe: #aeaca6; }

@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="ko" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>개인정보 안내 — 종이냥</title>
+<meta name="description" content="종이냥이 무엇을 어디에 저장하고, 언제 기기 밖으로 나갈 수 있는지 적어 둔 안내예요. 계정 · 서버 · 사용 통계가 없어요.">
+<meta name="theme-color" content="#fbf9f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#2a2924" media="(prefers-color-scheme: dark)">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="alternate" hreflang="ko" href="https://leeahwi.github.io/jongi-nyang-app/privacy.html">
+<link rel="alternate" hreflang="en" href="https://leeahwi.github.io/jongi-nyang-app/en/privacy.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="개인정보 안내 — 종이냥">
+<meta property="og:description" content="계정 · 서버 · 사용 통계 없이, 내 컴퓨터에 파일로.">
+<meta property="og:image" content="https://leeahwi.github.io/jongi-nyang-app/assets/og-ko.png">
+<meta property="og:url" content="https://leeahwi.github.io/jongi-nyang-app/privacy.html">
+<script>(function(d){d.className=d.className.replace("no-js","js");try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t)}catch(e){}})(document.documentElement)</script>
+<link rel="preload" href="assets/fonts/HanJangPen-site.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/fonts/fonts.css">
+<link rel="stylesheet" href="assets/style.css">
+<script src="assets/site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./" aria-label="종이냥 처음으로"><img src="assets/cat.webp" alt="" width="30" height="30">종이냥</a>
+    <nav class="nav" aria-label="주요 메뉴">
+      <a href="./#tour">둘러보기</a>
+      <a href="./#features">기능</a>
+      <a href="./#spaces">스페이스</a>
+      <a href="./#drawer">메모 서랍</a>
+      <a href="./#built">만든 방식</a>
+      <a href="./#faq">질문</a>
+      <a href="https://github.com/leeahwi/jongi-nyang-app">GitHub</a>
+    </nav>
+    <div class="tools">
+      <div class="theme" role="group" aria-label="화면 밝기">
+        <button type="button" data-theme-set="auto" aria-pressed="true" title="시스템 따라가기"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg><span class="sr">시스템 따라가기</span></button>
+        <button type="button" data-theme-set="light" aria-pressed="false" title="낮 종이"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="2.8"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg><span class="sr">낮 종이</span></button>
+        <button type="button" data-theme-set="dark" aria-pressed="false" title="밤 종이"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M13.5 9.6A5.6 5.6 0 0 1 6.4 2.5a5.6 5.6 0 1 0 7.1 7.1z"/></svg><span class="sr">밤 종이</span></button>
+      </div>
+      <a class="lang" href="en/privacy.html" hreflang="en" lang="en">EN</a>
+      <a class="btn primary small" href="./#download">내려받기</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero page-hero" aria-labelledby="page-title">
+    <div class="wrap">
+      <p class="eyebrow">개인정보</p>
+      <h1 id="page-title">내 기록은<br><span class="hand">내 컴퓨터에.</span></h1>
+      <p class="lede">종이냥에는 계정도 서버도 없어서 모으는 정보가 없어요. 무엇이 어디에 저장되고, 언제 기기 밖으로 나갈 수 있는지 여기에 모두 적어 둘게요.</p>
+      <p class="alt">Mac 1.45 · Windows 1.30 기준 · 2026년 10월 30일</p>
+    </div>
+  </section>
+
+  <section aria-label="개인정보 안내">
+    <div class="wrap doc">
+      <ul class="points">
+        <li><strong>모으지 않아요</strong><span>회원 가입, 사용 통계, 오류 보고, 광고가 없어요. 앱은 스스로 인터넷에 연결하지 않아요.</span></li>
+        <li><strong>파일로 저장해요</strong><span>할 일, 메모, 일정은 내 컴퓨터의 폴더에 파일로 있어요. 폴더는 내가 바꿀 수 있어요.</span></li>
+        <li><strong>AI 연결은 켤 때만</strong><span>처음에는 꺼져 있어요. 켜면 Claude가 읽은 내용이 대화와 함께 Claude로 가요.</span></li>
+        <li><strong>사이트도 조용히</strong><span>쿠키와 분석 도구가 없고, 글꼴과 그림도 이 사이트에서 받아요.</span></li>
+      </ul>
+
+      <h2 id="stored">저장되는 곳</h2>
+      <p>모두 내 컴퓨터 안에 있어요. 종이냥을 만든 사람에게도 보이지 않아요.</p>
+      <dl class="where">
+        <div>
+          <dt>할 일 · 메모 · 일정 · 알람 · 반복 · 스페이스 · 완료 기록 · 집중 기록</dt>
+          <dd>
+            <p>저장 폴더에 JSON 파일로 있어요. 처음에는 앱 폴더이고, 책상 → 저장과 백업에서 다른 폴더로 바꿀 수 있어요.</p>
+            <p>Mac <code>~/Library/Application Support/com.noa.PaperTodo/</code></p>
+            <p>Windows <code>%APPDATA%\PaperTodo\</code></p>
+          </dd>
+        </div>
+        <div>
+          <dt>설정</dt>
+          <dd>
+            <p>글꼴, 알림, 고른 저장 폴더 같은 설정은 기기마다 따로 있고 공유 폴더로 가지 않아요.</p>
+            <p>Mac <code>~/Library/Preferences/com.noa.PaperTodo.plist</code></p>
+            <p>Windows <code>%APPDATA%\PaperTodo\settings.json</code>, <code>storage.json</code></p>
+          </dd>
+        </div>
+        <div>
+          <dt>AI 연결 설정과 기록</dt>
+          <dd><p><code>ai-link.json</code>과 <code>ai-log.jsonl</code>이에요. 공유 폴더를 써도 이 기기의 앱 폴더(위의 기본 폴더)에 남아요.</p></dd>
+        </div>
+        <div>
+          <dt>자동 백업</dt>
+          <dd><p>하루 한 번, 그리고 가져오기나 되돌리기처럼 덮어쓰기 전마다 저장 폴더를 앱 폴더의 <code>backups</code>에 백업 파일(.jongi)로 남겨요. 매일 백업은 14개, 덮어쓰기 전 백업은 종류마다 10개만 남겨요. 공유 폴더를 써도 이 기기에만 있어요.</p></dd>
+        </div>
+        <div>
+          <dt>Windows의 화면 상태</dt>
+          <dd><p>Windows 앱의 바탕인 Electron이 <code>%APPDATA%\종이냥\</code>에 마지막으로 연 탭 같은 화면 상태와 캐시를 둬요.</p></dd>
+        </div>
+      </dl>
+
+      <h2 id="not-sent">밖으로 보내지 않아요</h2>
+      <ul>
+        <li>두 앱에는 인터넷에 연결하는 코드가 없어요. 사용 통계, 오류 보고, 광고, 업데이트 확인도 없어요.</li>
+        <li>링크를 눌렀을 때만 기본 브라우저가 열려요. 메모 속 링크나 Claude 데스크톱을 내려받는 곳이 그래요.</li>
+        <li>알림과 알람은 이 컴퓨터 안에서만 울려요.</li>
+      </ul>
+
+      <h2 id="ai">AI 연결을 켜면</h2>
+      <p>종이냥 for Claude는 Claude 데스크톱이나 Claude Code와 이야기하면서 할 일을 보고 넣는 기능이에요. 처음에는 꺼져 있고, 책상 → AI 연결에서 켜요.</p>
+      <ul>
+        <li>켜 두면 Claude가 대화에 필요할 때 이 컴퓨터에서 종이냥 for Claude를 실행해요. 저장 폴더의 할 일 · 일정 · 알람 · 메모 · 집중 기록 · 완료 기록을 읽고, 할 일 · 일정 · 메모를 넣어요. 할 일과 반복하지 않는 일정은 바뀌기 전과 후를 보여 주고 확인을 받은 뒤에 고쳐요. 지우지는 않아요.</li>
+        <li><strong>Claude가 읽은 내용은 대화의 일부로 Claude에게 가요.</strong> 그 대화는 내 Claude 계정의 설정과 Anthropic의 개인정보 처리방침에 따라 다뤄져요.</li>
+        <li>종이냥 for Claude는 스스로 인터넷에 연결하지 않아요. 종이냥의 저장 폴더와 앱 폴더의 파일만 읽고 써요.</li>
+        <li>Claude가 넣거나 고친 것은 바뀌기 전과 후를 <code>ai-log.jsonl</code>에 한 줄씩 남겨요. 되돌리기와 ‘최근 AI 작업’이 이 기록을 써요. 이 기기에만 있고, 1MB를 넘으면 최근 30일만 남겨요.</li>
+        <li>스위치를 끄면 Claude는 종이냥의 파일을 아무것도 읽거나 쓰지 못해요.</li>
+      </ul>
+
+      <h2 id="shared">공유 폴더와 백업 파일</h2>
+      <ul>
+        <li>iCloud Drive, OneDrive, Dropbox 같은 공유 폴더를 저장 폴더로 고르면, 파일을 다른 기기로 옮기는 건 그 서비스예요. 그 서비스의 약관과 개인정보 정책을 따라요.</li>
+        <li>종이냥은 그 서비스에 로그인하거나 직접 연결하지 않아요. 폴더 안의 파일만 읽고 써요.</li>
+        <li>백업 파일(.jongi)은 내가 고른 곳에 저장돼요. 할 일 · 메모 · 일정 · 기록이 모두 들어 있어서, 다른 사람에게 보내면 그 내용을 모두 볼 수 있어요.</li>
+      </ul>
+
+      <h2 id="site">이 사이트</h2>
+      <ul>
+        <li>쿠키와 분석 도구를 쓰지 않아요.</li>
+        <li>글꼴, 그림, 영상은 모두 이 사이트에서 받아요. 페이지를 여는 동안 다른 곳으로 가는 요청이 없어요.</li>
+        <li>낮 종이나 밤 종이를 고르면 그 선택만 이 브라우저에 남아요(localStorage). ‘시스템 따라가기’를 누르면 지워져요.</li>
+        <li>사이트는 GitHub Pages에서 열리고, 내려받기와 문서 링크는 GitHub으로 이어져요. 그때의 접속 기록은 GitHub이 자기 정책에 따라 다뤄요.</li>
+      </ul>
+
+      <h2 id="delete">모두 지우고 싶을 때</h2>
+      <p>종이냥이 남기는 것은 위의 폴더와 설정이 전부예요. 아래 순서로 지우면 아무것도 남지 않아요. 앱만 지우면 목록은 그대로 남아요.</p>
+      <h3>Mac</h3>
+      <ol>
+        <li>AI 연결을 썼다면 Claude에서 먼저 떼요. Claude 데스크톱의 설정 → 확장 프로그램에서 ‘종이냥 for Claude’를 지우고, Claude Code에 연결했다면 <code>claude mcp remove -s user jongi-nyang</code>을 실행해요.</li>
+        <li>책상 → 꾸미기 → 시작에서 ‘로그인할 때 같이 열기’를 꺼요. 앱을 먼저 지웠다면 시스템 설정 → 일반 → 로그인 항목에서 지워요.</li>
+        <li>종이냥을 종료하고 응용 프로그램 폴더의 종이냥을 휴지통으로 옮겨요.</li>
+        <li><code>~/Library/Application Support/com.noa.PaperTodo/</code> 폴더를 지워요. 목록, AI 연결 기록, 자동 백업이 모두 여기 있어요.</li>
+        <li>설정을 지워요. 터미널에서 <code>defaults delete com.noa.PaperTodo</code>를 실행하면 <code>~/Library/Preferences/com.noa.PaperTodo.plist</code>가 지워져요.</li>
+      </ol>
+      <h3>Windows</h3>
+      <ol>
+        <li>AI 연결을 썼다면 Claude에서 먼저 떼요. Claude 데스크톱의 설정 → 확장 프로그램에서 ‘종이냥 for Claude’를 지우고, Claude Code에 연결 명령을 붙여 넣었다면 그 폴더에서 <code>claude mcp remove jongi-nyang</code>을 실행해요.</li>
+        <li>책상 → 꾸미기 → 시작에서 ‘컴퓨터를 켤 때 같이 열기’를 꺼요. 앱을 먼저 지웠다면 작업 관리자 → 시작 앱에서 꺼요.</li>
+        <li>알림 영역에서 종이냥을 종료하고, 설정 → 앱 → 설치된 앱에서 종이냥을 제거해요. ZIP으로 받았다면 푼 폴더를 지워요. 제거해도 목록은 남아요.</li>
+        <li><code>%APPDATA%\PaperTodo\</code> 폴더를 지워요. 목록, 설정, AI 연결 기록, 자동 백업이 모두 여기 있어요.</li>
+        <li><code>%APPDATA%\종이냥\</code> 폴더(화면 상태와 캐시)를 지워요.</li>
+      </ol>
+      <h3>두 앱 모두</h3>
+      <ul>
+        <li>공유 폴더를 썼다면 그 폴더의 <code>todos.json</code>, <code>memos.json</code>, <code>repeats.json</code>, <code>memo-folders.json</code>, <code>todo-spaces.json</code>, <code>events.json</code>, <code>alarms.json</code>, <code>focus.jsonl</code>, <code>archive</code> 폴더를 지워요. 같은 폴더를 쓰는 다른 기기에서도 목록이 사라져요.</li>
+        <li>내보낸 백업 파일(.jongi)은 저장한 곳에서 따로 지워요.</li>
+      </ul>
+
+      <h2 id="contact">묻고 싶을 때</h2>
+      <p><a href="https://github.com/leeahwi/jongi-nyang-app/issues">GitHub 이슈</a>에 남겨 주세요. 누구나 볼 수 있는 곳이라 개인 정보는 적지 말아 주세요.</p>
+
+      <h2 id="changes">이 안내가 바뀌면</h2>
+      <p>앱이 다루는 정보가 바뀌면 이 쪽을 고치고 위의 날짜를 바꿔요. 고친 기록은 GitHub 저장소에 남아요.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div class="about">
+        <a class="brand" href="./"><img src="assets/cat.webp" alt="" width="30" height="30" loading="lazy">종이냥</a>
+        <p>종이 한 장처럼 꺼내 쓰는 할 일 앱과 종이 고양이. macOS와 Windows.</p>
+      </div>
+      <div>
+        <h4>앱</h4>
+        <ul>
+          <li><a href="./#tour">둘러보기</a></li>
+          <li><a href="./#features">기능</a></li>
+          <li><a href="./#spaces">스페이스</a></li>
+          <li><a href="./#drawer">메모 서랍</a></li>
+          <li><a href="./#download">내려받기</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/CHANGELOG.md">변경 기록</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>문서</h4>
+        <ul>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/design-process.md">디자인 과정</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/engineering.md">엔지니어링</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/architecture.md">구조</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/decisions.md">결정 기록</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>다른 곳</h4>
+        <ul>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app">GitHub 저장소</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/releases">릴리스</a></li>
+          <li><a href="en/privacy.html" hreflang="en" lang="en">English</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="legal">
+      <span>© 2026 leeAhwi · 소스 코드는 <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/LICENSE">Apache License 2.0</a> · <a href="privacy.html" aria-current="page">개인정보</a></span>
+      <span>Mac 1.46.0 · Windows 1.31.0</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

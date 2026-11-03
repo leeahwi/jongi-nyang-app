@@ -9,6 +9,12 @@ enum PetAction: Equatable {
     case walk(from: CGFloat, to: CGFloat)
 
     var isResting: Bool { self == .sit || self == .sleep }
+
+    /// "tilt", "walk" … (the performance log's frame counts per clip).
+    var name: String {
+        if case .walk = self { return "walk" }
+        return "\(self)"
+    }
 }
 
 struct PetActivity: Equatable {
@@ -42,6 +48,18 @@ struct PetFrame {
 @MainActor
 enum PetMotion {
     nonisolated static let walkSpeed: CGFloat = 24
+
+    /// How often a clip needs a new frame (#64), nil when it holds one picture throughout. Each frame wakes the app and
+    /// lays the cat out again, and the cat's frames were most of what the app does at rest: a blink is one picture for
+    /// 0.2 s, and a tilt, a stretch, grooming, a yawn or a sip of tea move a degree or a few points over seconds, which
+    /// 30 frames a second draw as smoothly. Hops, cheers and walks keep 60.
+    nonisolated static func frameInterval(of action: PetAction) -> TimeInterval? {
+        switch action {
+        case .sit, .sleep, .blink: nil
+        case .tilt, .stretch, .groom, .yawn, .tea: 1.0 / 30
+        case .hop, .happy, .cheer, .walk: 1.0 / 60
+        }
+    }
 
     nonisolated static func duration(of action: PetAction) -> TimeInterval {
         switch action {

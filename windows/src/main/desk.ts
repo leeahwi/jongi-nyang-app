@@ -2,6 +2,7 @@ import { BrowserWindow, screen, type WebFrameMain } from "electron";
 import path from "node:path";
 import { deskFrame, deskSize, deskTitleBar, pageOfPane, paneForShortcut, readPane, type DeskPage, type DeskPane } from "../core/desk";
 import { deskTitle } from "../renderer/deskPanes";
+import { offscreen, offscreenEnabled } from "./env";
 import type { Store } from "./store";
 
 /** What may come with a pane: the day to show on 달력, the topic or search on 도움말. */
@@ -37,6 +38,11 @@ export class Desk {
       guide: () => void;
       /** Ctrl+F (outside 도움말, which searches its topics): the note's search slip. */
       search?: () => void;
+      /**
+       * The desk shown or restored, or turned to another pane (before its pages hear "desk:pane"; `showing` when it is
+       * about to show too): the pages now in sight catch up with what they did not hear while out of it (#71, `outOfSight`).
+       */
+      inSight?: (showing: boolean) => void;
     },
   ) {}
 
@@ -51,6 +57,7 @@ export class Desk {
     this.current = pane;
     const existing = this.browserWindow;
     if (existing) {
+      this.options.inSight?.(show);
       this.sendAll("desk:pane", { pane, ...extra });
       existing.setTitle(deskTitle(pane));
       this.store.remember({ desk: { ...this.frame(existing), pane } });
@@ -68,12 +75,17 @@ export class Desk {
       const area = display.workArea;
       return frame.x! < area.x + area.width && area.x < frame.x! + frame.width && frame.y! < area.y + area.height && area.y < frame.y! + frame.height;
     });
+    // Off-screen runs (perf, #92): far off every display, frameless and allowed there, so macOS never pulls it back on.
+    const away = offscreenEnabled && !this.options.snapshots;
     const window = new BrowserWindow({
-      width: frame.width, height: frame.height, useContentSize: true, ...(fits ? { x: frame.x, y: frame.y } : {}),
+      width: frame.width, height: frame.height, useContentSize: true, ...(away ? { x: offscreen.x + 300, y: offscreen.y + 100 } : fits ? { x: frame.x, y: frame.y } : {}),
       minWidth: deskSize.minWidth, minHeight: deskSize.minHeight + strip, fullscreenable: false,
       ...(this.options.chrome === "overlay" ? { titleBarStyle: "hidden" as const, titleBarOverlay: { color: this.options.background(), symbolColor: this.options.symbols(), height: deskTitleBar } } : {}),
       title: deskTitle(pane), show: false, autoHideMenuBar: true, backgroundColor: this.options.background(),
-      icon: this.options.icon, enableLargerThanScreen: this.options.snapshots,
+      icon: this.options.icon, enableLargerThanScreen: this.options.snapshots || away,
+      // Snapshots draw their own title strip ("preview"), and a window with a frame placed far off the screens is
+      // pulled back onto one by macOS when it shows (a run on a Mac put the desk on the screen): none there.
+      ...(this.options.snapshots || away ? { frame: false } : {}),
       // Every pane's frame gets the preload (window.paper), like a window of its own.
       webPreferences: { ...this.options.webPreferences(), nodeIntegrationInSubFrames: true },
     });
@@ -88,11 +100,16 @@ export class Desk {
     void window.loadFile(path.join(this.rendererDirectory, "desk.html"), { query });
     window.once("ready-to-show", () => { if (show) window.show(); });
     const remember = () => {
-      if (this.options.snapshots || window.isDestroyed() || window.isMinimized() || window.isMaximized()) return;
+      if (this.options.snapshots || away || window.isDestroyed() || window.isMinimized() || window.isMaximized()) return;
       this.store.remember({ desk: { ...this.frame(window), pane: this.current } });
     };
     window.on("moved", remember);
     window.on("resized", remember);
+    // Shown or restored some other way (the taskbar, Alt+Tab). The sidebar's page says so too, when its document turns
+    // visible: "show" does not come for a window shown off-screen on a Mac (perf runs).
+    window.on("show", () => this.options.inSight?.(false));
+    window.on("restore", () => this.options.inSight?.(false));
+    window.webContents.ipc.on("desk:shown", () => this.options.inSight?.(false));
     window.on("closed", () => { if (this.window === window) { this.window = undefined; this.loaded = undefined; } });
     // The desk's own keys, wherever the focus is (the sidebar or inside a pane's frame).
     window.webContents.on("before-input-event", (event, input) => {
@@ -152,6 +169,19 @@ export class Desk {
     const window = this.browserWindow;
     if (!window) return undefined;
     return window.webContents.mainFrame.frames.find((frame) => frame.url.includes(`/${pageFile[page]}`));
+  }
+
+  /**
+   * #71: whether `frame` is a page of the desk out of sight — the desk hidden or minimized (unless `showing`: about to
+   * show), or another pane in front. Such a page hears no state; it catches up when the desk calls `inSight`. Snapshots
+   * draw hidden windows, so there every page is in sight (as their pages think too: no background throttling).
+   */
+  outOfSight(frame: WebFrameMain, showing = false): boolean {
+    const window = this.browserWindow;
+    if (!window || this.options.snapshots) return false;
+    const page = (Object.keys(pageFile) as DeskPage[]).find((name) => frame.url.includes(`/${pageFile[name]}`));
+    if (!page || !this.owns(frame)) return false;
+    return (!showing && (!window.isVisible() || window.isMinimized())) || page !== pageOfPane(this.current);
   }
 
   /** The frame showing the pane now. */

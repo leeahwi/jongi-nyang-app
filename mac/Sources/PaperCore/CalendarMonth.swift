@@ -86,27 +86,81 @@ public enum CalendarMonth {
     /// (`ranges: false` leaves them as before — the month cells).
     public static func dayTasks(_ day: String, _ tasks: [TodoItem], now: Date = Date(), ranges: Bool = true, calendar: Calendar = .paper,
                                 language: AppLanguage = .ko) -> [DayTask] {
-        var reminders: [(Date, DayTask)] = []
-        var deadlines: [DayTask] = []
+        dayTasks(on: [day], tasks, now: now, ranges: ranges, calendar: calendar, language: language)[day] ?? []
+    }
+
+    /// `dayTasks` for several days from one pass over the to-dos (#68: the month asked once per cell, two or three
+    /// times): a to-do goes to the day of its range, of its deadline and of its alert, each day taking it once and
+    /// in the same way as `dayTasks` of that day alone.
+    public static func dayTasks(on days: Set<String>, _ tasks: [TodoItem], now: Date = Date(), ranges: Bool = true,
+                                calendar: Calendar = .paper, language: AppLanguage = .ko) -> [String: [DayTask]] {
+        var reminders: [String: [(Date, DayTask)]] = [:]
+        var deadlines: [String: [DayTask]] = [:]
         for task in tasks where !task.isCompleted {
+            // The day its range is on (that day shows it as its range, and only so).
+            var rangeDay: String?
             if ranges, let range = task.timeRange, let start = TimeBlock.interval(of: task, now: now, calendar: calendar)?.start,
-               TimeBlock.day(of: task, now: now, calendar: calendar) == day {
-                reminders.append((start, DayTask(title: task.title, kind: .range, time: range.text(language), taskId: task.id)))
-            } else if task.dueDate == day {
-                deadlines.append(DayTask(title: task.title, kind: .deadline, time: nil, taskId: task.id))
-            } else if let at = task.reminderAt, CalendarDraft.day(at, calendar: calendar) == day {
-                reminders.append((at, DayTask(title: task.title, kind: .reminder, time: clock(at, calendar: calendar, language: language), taskId: task.id)))
+               let day = TimeBlock.day(of: task, now: now, calendar: calendar) {
+                rangeDay = day
+                if days.contains(day) {
+                    reminders[day, default: []].append((start, DayTask(title: task.title, kind: .range, time: range.text(language), taskId: task.id)))
+                }
+            }
+            if let due = task.dueDate, due != rangeDay, days.contains(due) {
+                deadlines[due, default: []].append(DayTask(title: task.title, kind: .deadline, time: nil, taskId: task.id))
+            }
+            if let at = task.reminderAt {
+                let day = CalendarDraft.day(at, calendar: calendar)
+                if day != rangeDay, day != task.dueDate, days.contains(day) {
+                    reminders[day, default: []].append((at, DayTask(title: task.title, kind: .reminder,
+                                                                    time: clock(at, calendar: calendar, language: language), taskId: task.id)))
+                }
             }
         }
-        return reminders.sorted { $0.0 < $1.0 }.map(\.1) + deadlines.sorted { $0.title < $1.title }
+        var found: [String: [DayTask]] = [:]
+        for day in Set(reminders.keys).union(deadlines.keys) {
+            found[day] = (reminders[day] ?? []).sorted { $0.0 < $1.0 }.map(\.1) + (deadlines[day] ?? []).sorted { $0.title < $1.title }
+        }
+        return found
     }
 
     /// What a month cell shows: the day's events, then its deadlines; the first `limit` and how many more.
     public static func cellItems(_ day: String, events: [CalendarEvent], tasks: [TodoItem], limit: Int = 3,
                                  calendar: Calendar = .paper) -> (items: [CellItem], more: Int) {
-        let all = eventsOn(day, events, calendar: calendar).map(CellItem.event)
-            + dayTasks(day, tasks, ranges: false, calendar: calendar).filter { $0.kind == .deadline }.map(CellItem.task)
-        return (Array(all.prefix(limit)), max(0, all.count - limit))
+        Page(days: [day], events: events, tasks: tasks, ranges: false, calendar: calendar).cell(day, limit: limit)
+    }
+
+    /// A page of the calendar worked out once (#68): each day's events (`eventsOn`), to-dos (`dayTasks`) and month
+    /// cell (`cellItems`). The month window used to expand every repeating event and read every to-do two or three
+    /// times per cell, on every change of the model.
+    public struct Page: Sendable {
+        private var events: [String: [CalendarEvent]] = [:]
+        private var tasks: [String: [DayTask]] = [:]
+        /// The cells' to-dos: unfinished ones due that day, by title (`dayTasks(ranges: false)`'s deadlines).
+        private var deadlines: [String: [DayTask]] = [:]
+
+        /// `days`: every day asked about later (the page's, and the chosen one); another day has nothing.
+        /// `ranges: false`: the cells only (no day's own to-dos).
+        public init(days: [String], events: [CalendarEvent], tasks: [TodoItem], now: Date = Date(), ranges: Bool = true,
+                    calendar: Calendar = .paper, language: AppLanguage = .ko) {
+            let wanted = Set(days)
+            for day in wanted { self.events[day] = CalendarMonth.eventsOn(day, events, calendar: calendar) }
+            if ranges { self.tasks = CalendarMonth.dayTasks(on: wanted, tasks, now: now, calendar: calendar, language: language) }
+            for task in tasks where !task.isCompleted {
+                guard let due = task.dueDate, wanted.contains(due) else { continue }
+                deadlines[due, default: []].append(DayTask(title: task.title, kind: .deadline, time: nil, taskId: task.id))
+            }
+            deadlines = deadlines.mapValues { $0.sorted { $0.title < $1.title } }
+        }
+
+        public func events(on day: String) -> [CalendarEvent] { events[day] ?? [] }
+        public func tasks(on day: String) -> [DayTask] { tasks[day] ?? [] }
+
+        /// What a month cell shows: the day's events, then its deadlines; the first `limit` and how many more.
+        public func cell(_ day: String, limit: Int = 3) -> (items: [CellItem], more: Int) {
+            let all = events(on: day).map(CellItem.event) + (deadlines[day] ?? []).map(CellItem.task)
+            return (Array(all.prefix(limit)), max(0, all.count - limit))
+        }
     }
 
     /// 새 일정 on a day: the next half hour if it's today (21:00 once that runs into tomorrow), else 09:00.

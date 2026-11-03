@@ -348,9 +348,10 @@ struct CalendarEventSheet: View {
 /// 종일: a small paper switch (sage when on).
 private struct AllDaySwitch: View {
     @Binding var on: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Button { withAnimation(.easeOut(duration: 0.14)) { on.toggle() } } label: {
+        Button { withAnimation(Motion.animation(.change, reduce: reduceMotion)) { on.toggle() } } label: {
             HStack(spacing: 6) {
                 Text("종일").font(.system(size: 12, weight: .medium)).foregroundStyle(PaperTheme.ink2)
                 PaperSwitch(on: on, small: true) { on.toggle() }

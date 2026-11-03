@@ -1,6 +1,7 @@
 import { BrowserWindow, globalShortcut, ipcMain, nativeTheme, screen, type Rectangle } from "electron";
 import os from "node:os";
 import path from "node:path";
+import { bigDrawerWidth } from "../core/memoCards";
 import { changedToday, clampDrawerWidth, drawerLook, shortcutLabel, type DrawerBackdrop } from "../core/memoDrawer";
 import { t } from "../i18n";
 import { offscreen, offscreenEnabled, shortcutsDisabled } from "./env";
@@ -23,7 +24,7 @@ export interface DrawerHooks {
 /**
  * 메모 서랍 (1.28): a frameless, transparent window at the screen's edge, as tall as the work area of the
  * display under the mouse, on the chosen side. Made the first time it opens and only hidden afterwards.
- * It stays open until its shortcut, Esc (twice) or ×: clicking another app never closes it; with 위에 고정
+ * It stays open until its shortcut, Esc (twice) or the small bar on its inner edge (#83): clicking another app never closes it; with 위에 고정
  * on (the default) it floats above other windows, off it goes behind them like any window. Only the paper,
  * the bookmarks and the cat catch the mouse; the rest of the window lets clicks through.
  *
@@ -52,6 +53,7 @@ export class MemoDrawer {
     ipcMain.on("drawer:interactive", (event, value: unknown) => { if (fromDrawer(event)) this.setInteractive(value === true); });
     ipcMain.on("drawer:resize", (event, screenX: unknown, done: unknown) => { if (fromDrawer(event) && typeof screenX === "number") this.resizeTo(screenX, done === true); });
     ipcMain.on("drawer:shape", (event, rects: unknown) => { if (fromDrawer(event)) this.setShape(rects); });
+    ipcMain.on("drawer:big", (event, on: unknown) => { if (fromDrawer(event)) this.setBig(on === true); });
     // The page going away (quitting) with typed text it hasn't sent yet: taken and written before the page goes on.
     ipcMain.on("memo:flush", (event, action: unknown) => {
       const update = action as { type?: unknown; id?: unknown; text?: unknown; from?: unknown } | undefined;
@@ -68,8 +70,8 @@ export class MemoDrawer {
       if (key === "drawerPinned") this.applyPinned();
       if (key === "drawerSide" || key === "drawerWidth") { if (this.open) this.place(); this.placeHandle(); }
       if (key === "drawerSide" && this.open && this.loaded && this.window && !this.window.isDestroyed()) this.window.webContents.send("drawer:open", { slide: false, side: this.store.prefs.drawerSide, look: this.look() });
-      if (key === "drawerHandle" || key === "drawerSide" || key === "drawerTheme") this.updateHandle();
-      if (key === "drawerTheme") this.sendLook();
+      if (key === "drawerHandle" || key === "drawerSide" || key === "drawerTheme" || key === "drawerNightPaper") this.updateHandle();
+      if (key === "drawerTheme" || key === "drawerNightPaper") this.sendLook();
       if (key === "drawerBackdrop") this.applyBackdrop();
     });
     // Windows' "transparency effects" switched: 반투명 · 강하게 follow.
@@ -118,6 +120,9 @@ export class MemoDrawer {
   close(): void {
     if (!this.open) return;
     this.open = false;
+    // 크게 보기 ends with the drawer (#113): it comes out at the user's width next time.
+    this.big = false;
+    this.stopSlide();
     const window = this.window;
     if (!window || window.isDestroyed()) return;
     window.webContents.send("drawer:shut", { slide: !this.hooks.reduceMotion() && !offscreenEnabled });
@@ -163,7 +168,7 @@ export class MemoDrawer {
 
   // ─── Where it goes ─────────────────────────────────────────────────────────
 
-  private look() { return drawerLook(this.store.prefs.drawerTheme, this.hooks.night()); }
+  private look() { return drawerLook(this.store.prefs.drawerTheme, this.hooks.night(), this.store.prefs.drawerNightPaper); }
 
   /** 자동 follows the note's paper: the page hears the look again when the paper changes. */
   sendLook(): void {
@@ -237,19 +242,64 @@ export class MemoDrawer {
     return screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   }
 
-  /** Against the chosen edge of the work area, its whole height. */
+  /** Against the chosen edge of the work area, its whole height; as wide as the user made it, or 크게 보기's width. */
   private place(): void {
     const window = this.window;
     if (!window || window.isDestroyed()) return;
-    const area = this.workArea();
-    this.area = area;
-    const width = clampDrawerWidth(this.store.prefs.drawerWidth) + drawerChrome.tabs;
-    const x = this.store.prefs.drawerSide === "left" ? area.x : area.x + area.width - width;
-    window.setBounds({ x: Math.round(x), y: Math.round(area.y), width, height: Math.round(area.height) });
+    this.stopSlide();
+    window.setBounds(this.bounds(this.area = this.workArea()));
   }
 
-  /** The inner edge dragged to `screenX`: the paper's width follows (260–480), kept when the drag ends. */
+  private bounds(area: Rectangle): Rectangle {
+    const user = clampDrawerWidth(this.store.prefs.drawerWidth);
+    const width = (this.big ? bigDrawerWidth(user, area.width, drawerChrome.tabs) : user) + drawerChrome.tabs;
+    const x = this.store.prefs.drawerSide === "left" ? area.x : area.x + area.width - width;
+    return { x: Math.round(x), y: Math.round(area.y), width, height: Math.round(area.height) };
+  }
+
+  // ─── 크게 보기 (#113) ────────────────────────────────────────────────────────
+
+  /** A memo shown big: the drawer wider toward the screen (up to 640, bigDrawerWidth). */
+  private big = false;
+  private slideTimer?: NodeJS.Timeout;
+
+  /**
+   * 크게 보기 came or went: the window widens along its inner edge, or goes back to the user's width, in 180 ms (the
+   * page's paper follows the window) — at once when the system asks for less motion. The width setting never changes.
+   */
+  private setBig(on: boolean): void {
+    if (on === this.big) return;
+    this.big = on;
+    const window = this.window;
+    if (!this.open || !window || window.isDestroyed()) return;
+    const area = this.area ?? this.workArea();
+    const target = this.bounds(area);
+    if (this.hooks.reduceMotion() || offscreenEnabled) { this.place(); return; }
+    this.stopSlide();
+    const from = window.getBounds();
+    const started = Date.now();
+    const step = () => {
+      if (window.isDestroyed()) return this.stopSlide();
+      const t = Math.min(1, (Date.now() - started) / 180);
+      const eased = 1 - (1 - t) ** 3;
+      const width = Math.round(from.width + (target.width - from.width) * eased);
+      const x = this.store.prefs.drawerSide === "left" ? target.x : target.x + target.width - width;
+      window.setBounds({ x, y: target.y, width, height: target.height });
+      if (t >= 1) this.stopSlide();
+    };
+    this.slideTimer = setInterval(step, 16);
+    step();
+  }
+
+  private stopSlide(): void {
+    clearInterval(this.slideTimer);
+    this.slideTimer = undefined;
+  }
+
+  /** The inner edge dragged to `screenX`: the paper's width follows (260–480), kept when the drag ends. Not while a memo
+   * is shown big (#113: its width is the big one). */
   private resizeTo(screenX: number, done: boolean): void {
+    if (this.big) return;
     const area = this.area ?? this.workArea();
     const raw = this.store.prefs.drawerSide === "left" ? screenX - area.x - drawerChrome.tabs : area.x + area.width - screenX;
     const width = clampDrawerWidth(raw);
@@ -282,6 +332,9 @@ export class MemoDrawer {
       width: clampDrawerWidth(this.store.prefs.drawerWidth) + drawerChrome.tabs, height: area.height, show: false, frame: false, transparent: true, resizable: false,
       movable: false, minimizable: false, maximizable: false, fullscreenable: false, skipTaskbar: true, hasShadow: false, backgroundColor: "#00000000",
       title: t("메모 서랍"),
+      // Off-screen runs (snapshots, tests, #92): macOS pulls a window placed off every display back onto one unless it may
+      // be larger than the screen (only macOS reads this).
+      enableLargerThanScreen: offscreenEnabled,
       webPreferences: { preload: path.join(__dirname, "preload.js"), sandbox: true, contextIsolation: true, backgroundThrottling: !offscreenEnabled },
     });
     window.setVisibleOnAllWorkspaces(true);
@@ -359,6 +412,7 @@ export class MemoDrawer {
     const handle = new BrowserWindow({
       ...handleSize, show: false, frame: false, transparent: true, resizable: false, movable: false, minimizable: false, maximizable: false, fullscreenable: false,
       focusable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false, backgroundColor: "#00000000", title: t("메모 서랍 열기"),
+      enableLargerThanScreen: offscreenEnabled, // off-screen runs stay off-screen on a Mac (#92)
       webPreferences: { preload: path.join(__dirname, "preload.js"), sandbox: true, contextIsolation: true, backgroundThrottling: true },
     });
     // Every desktop, but not over full-screen apps.

@@ -8,10 +8,11 @@ import type { SearchGroup } from "./core/search";
 
 // Only these channels cross the bridge; renderers get no direct access to Node or Electron.
 const listen = new Set([
-  "state", "note:focus-new", "note:commit-editing", "note:row-command", "note:event-sheet", "calendar:event-sheet",
+  "state", "state:memos", "state:prefs", "note:focus-new", "note:commit-editing", "note:row-command", "note:event-sheet", "calendar:event-sheet",
   "popup:show", "popup:retain", "popup:reset", "floating:summary", "history:changed", "pet:state", "timer:state", "timer:chime", "quick:open",
   "quickMemo:open", "quickMemo:blur", "timerSheet:open", "ring:show", "ring:hush", "note:toast", "confirm:show", "glance:open",
   "desk:pane", "paper", "focus:chime", "note:notice", "note:row-menu", "drawer:open", "drawer:shut", "drawer:look", "drawer:backdrop", "handle:state",
+  "ears:twitch", "ears:preview",
 ]);
 const send = new Set([
   "popup:interactive", "popup:complete", "popup:complete-all", "popup:snooze", "popup:snooze-until", "popup:tomorrow", "popup:event-again", "popup:sweep", "popup:open", "popup:open-event", "popup:closed",
@@ -21,7 +22,8 @@ const send = new Set([
   "timer:drag-start", "timer:drag", "timer:drag-end", "quick:close",
   "quickMemo:draft", "quickMemo:close", "quickMemo:save", "timerSheet:start", "timerSheet:close", "ring:ready", "ring:stop", "ring:snooze",
   "slip:size", "confirm:answer", "confirm:ready", "glance:close", "glance:size",
-  "drawer:close", "drawer:hidden", "drawer:interactive", "drawer:resize", "drawer:shape", "handle:open", "handle:drag",
+  "drawer:close", "drawer:hidden", "drawer:interactive", "drawer:resize", "drawer:shape", "drawer:big", "handle:open", "handle:drag",
+  "ears:interactive", "ears:twitch", "desk:shown",
 ]);
 
 /** The app's language, asked once as the page loads (the main process chose it at launch). */
@@ -44,7 +46,9 @@ ipcRenderer.on("paper", (_event, value: unknown) => {
   for (const listener of paperListeners) listener(night);
 });
 
-let wantsState = false;
+/** #71: the parts of the state this page listens for (each on its own channel; see StateKind). */
+const stateKinds: Record<string, string> = { state: "todos", "state:memos": "memos", "state:prefs": "prefs" };
+const wanted = new Set<string>();
 
 const api = {
   platform: process.platform,
@@ -71,8 +75,10 @@ const api = {
   on(channel: string, callback: (...args: unknown[]) => void): void {
     if (!listen.has(channel)) return;
     ipcRenderer.on(channel, (_event, ...args) => callback(...args));
-    // The app's state goes only to pages that listen for it (the cat, the bubbles and the timer don't).
-    if (channel === "state" && !wantsState) { wantsState = true; ipcRenderer.send("state:want"); }
+    // The app's state goes only to pages that listen for it (the cat, the bubbles and the timer don't), and only the part
+    // they listen for (#71).
+    const kind = stateKinds[channel];
+    if (kind && !wanted.has(kind)) { wanted.add(kind); ipcRenderer.send("state:want", kind); }
   },
   send(channel: string, ...args: unknown[]): void {
     if (send.has(channel)) ipcRenderer.send(channel, ...args);

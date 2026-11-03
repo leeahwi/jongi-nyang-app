@@ -24,6 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     /// The menu bar's cat face and its 오늘 창.
     private var todayWindow: TodayWindowController!
     private var floatingMascot: FloatingMascotController!
+    /// The cat's ears standing on the note's top edge (#151).
+    private var noteEars: NoteEarsController!
     private var archive: ArchiveStore!
     private var pet: DesktopPetController!
     private var focusTimer: FocusTimerController!
@@ -57,7 +59,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private var sweep: SweepController!
     private var notices: SystemNoticeController!
     private var noteHotKey: GlobalHotKey?
-    private let arguments = ProcessInfo.processInfo.arguments
+    /// 윈도우 → 노트 보이기 · 숨기기, with the note's key.
+    private let noteMenuItem = NSMenuItem(title: L("노트 보이기 · 숨기기"), action: nil, keyEquivalent: "")
+    /// The real app (not a snapshot or test run): the keys from anywhere are claimed.
+    private var globalKeysLive = false
+    /// The note's recorder is listening: its key is let go meanwhile.
+    private var noteHotKeyPaused = false
+    private let arguments = TestHooks.arguments
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         PerfProbe.start(arguments: arguments)
@@ -86,9 +94,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         let storage = specifiedPath.map { URL(fileURLWithPath: $0) }
             ?? (qaBuild ? qaStorage : isolated ? FileManager.default.temporaryDirectory.appendingPathComponent("PaperTodo-preview-\(UUID().uuidString).json") : (shared ?? directory).appendingPathComponent("todos.json"))
         let preferences = qaBuild ? UserDefaults(suiteName: "PaperTodo.QA")! : isolated ? UserDefaults(suiteName: "PaperTodo.Preview")! : .standard
+        // 자동 백업 (#139): this Mac's backups (a temporary folder for previews and test runs), and — before the list is
+        // read and maybe rewritten in a newer format — a copy on the first launch of a new version.
+        let backupsFolder = isolated ? FileManager.default.temporaryDirectory.appendingPathComponent("PaperTodo-preview-backups-\(UUID().uuidString)", isDirectory: true)
+            : directory.appendingPathComponent("backups", isDirectory: true)
+        if !isolated {
+            BackupBook.beforeUpdate(storage: storage.deletingLastPathComponent(), defaultFolder: backupsFolder, preferences: preferences,
+                                    version: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
+        }
         model = AppModel(storageURL: storage, isolated: isolated, demo: demo, preferences: preferences)
         PerfProbe.mark("model")
         model.sharedFolder = shared
+        model.backups = BackupBook(storageFolder: storage.deletingLastPathComponent(), defaultFolder: backupsFolder,
+                                   preferences: preferences)
+        if !isolated { model.backups?.start() }
         // 종이 색 (자동 · 낮 · 밤) before the first window, so nothing opens in the wrong colours.
         model.paperColor.apply()
         if !isolated {
@@ -100,6 +119,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             model.onResetStorage = { [weak self] in
                 guard let self else { return }
                 StorageFolder.switchTo(nil, defaultFolder: directory, current: current, model: self.model, preferences: .standard)
+            }
+            // #195: after a move, once, where the list went (when the note is up).
+            if let moved = StorageFolder.movedNotice(.standard) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+                    var toast = PaperToast(symbol: "folder", text: moved)
+                    toast.seconds = 8
+                    self?.model.toast = toast
+                }
             }
         }
         // AI 연결: ai-link.json and ai-log.jsonl in this app's settings folder (its own bundle id's), never in a
@@ -133,7 +160,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         window.isMovableByWindowBackground = false
         window.backgroundColor = NSColor(PaperTheme.paper)
         window.contentMinSize = NSSize(width: 350, height: 400)
-        window.contentMaxSize = NSSize(width: 720, height: 1200)
+        // 2b (S45): 1,200 wide while 오늘 is grouped by space, else 720.
+        window.contentMaxSize = NSSize(width: model.showsSpaceGroups ? SpaceGroups.wideNote : SpaceGroups.narrowNote, height: 1200)
+        model.onNoteWidthCap = { [weak self] in self?.applyNoteWidthCap() }
         window.delegate = self
         window.collectionBehavior = [.fullScreenAuxiliary]
         let hosting = NSHostingView(rootView: PaperView(model: model).ignoresSafeArea())
@@ -197,6 +226,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         memoDrawer.onShortcutChange = { [weak self] in self?.updateDrawerMenuItem() }
         if !arguments.contains("--snapshot") { memoDrawer.start() }
         if arguments.contains("--open-drawer") { DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.memoDrawer.open() } }
+        // Checks (a test copy, off-screen): `--open-desk spaces` opens the desk on that pane a second after start.
+        if let pane = argument(after: "--open-desk").flatMap(DeskPane.init(rawValue:)) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.desk.show(pane) }
+        }
         // 1.43: the 메모 tab became the drawer — once per Mac, where the memos went.
         if !isolated || arguments.contains("--move-notice") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.showMoveNotice() }
@@ -272,7 +305,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             window.keepsOffscreen = true
             window.setFrameOrigin(NSPoint(x: -40_000, y: 200))
         }
+        // The ears follow the note from here on (off-screen with it in the checks).
+        noteEars = NoteEarsController(note: window)
+        model.onTaskFinished = { [weak self] in self?.noteEars.twitch(0) }
         window.makeKeyAndOrderFront(nil)
+        noteEars.sync()
         NSApp.activate(ignoringOtherApps: true)
         PerfProbe.mark("ordered front")
         buildTodayWindow()
@@ -393,6 +430,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             row.tag = digit
             spacesMenuItem.submenu?.addItem(row)
         }
+        // 2b: 스페이스별로 묶기 ⌥⌘G (in this submenu, so it's gone with it while there are no spaces).
+        spacesMenuItem.submenu?.addItem(.separator())
+        let grouping = item(L("스페이스별로 묶기"), #selector(toggleSpaceGroups), "g")
+        grouping.keyEquivalentModifierMask = [.command, .option]
+        spacesMenuItem.submenu?.addItem(grouping)
         view.addItem(spacesMenuItem)
         let newMemo = item(L("새 메모"), #selector(newMemo), "n")
         newMemo.keyEquivalentModifierMask = [.command, .shift]
@@ -420,9 +462,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         windowRoot.submenu = windowMenu
         menu.addItem(windowRoot)
         windowMenu.addItem(item(L("노트 보기"), #selector(showWindow), "0"))
-        let toggle = item(L("노트 보이기 · 숨기기"), #selector(toggleNoteFromMenu), "j")
-        toggle.keyEquivalentModifierMask = [.control, .option]
-        windowMenu.addItem(toggle)
+        // Its key is the one chosen in 책상 → 꾸미기 → 빠른 입력 (registerNoteHotKey), none while it's off.
+        noteMenuItem.action = #selector(toggleNoteFromMenu)
+        noteMenuItem.target = self
+        windowMenu.addItem(noteMenuItem)
         windowMenu.addItem(item(L("포스트잇으로 접기"), #selector(collapseToIcon), "m"))
         windowMenu.addItem(item(L("책상"), #selector(openCalendar), ""))
         drawerMenuItem.action = #selector(toggleMemoDrawer)
@@ -496,6 +539,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(togglePet) { menuItem.state = model.petVisible ? .on : .off }
+        if menuItem.action == #selector(toggleSpaceGroups) { menuItem.state = model.groupBySpace ? .on : .off }
         if menuItem.action == #selector(dockRight) { menuItem.state = NoteDocking.side(of: window, preferences: model.preferences) == .right ? .on : .off }
         if menuItem.action == #selector(dockLeft) { menuItem.state = NoteDocking.side(of: window, preferences: model.preferences) == .left ? .on : .off }
         return switch menuItem.action {
@@ -528,12 +572,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     @objc private func dockFocus() { focusTimer.command(.countdown(minutes: 25)) }
     @objc private func dockTimer() { focusTimer.command(.countdown(minutes: 5)) }
 
-    /// ⌃⌥J: the note comes up, or goes away when it's already in front.
+    /// The note's key (⌃⌥J unless changed): the note on screen goes away at once, even with another app in front (#85);
+    /// hidden, folded, in the Dock or covered by other windows, it comes forward (NoteToggle in PaperCore).
     private func toggleNote() {
-        if window.isVisible && !window.isMiniaturized && NSApp.isActive && window.isKeyWindow {
+        let action = NoteToggle.action(visible: window.isVisible, minimized: window.isMiniaturized, folded: floatingMascot?.isVisible == true,
+                                       uncovered: window.occlusionState.contains(.visible))
+        switch action {
+        case .hide:
             model.commitEditing()
             window.orderOut(nil)
-        } else {
+            noteEars.sync()
+        case .bringForward:
             showWindow()
         }
     }
@@ -621,20 +670,41 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         if !isolated || arguments.contains("--live-test") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.askLoginLater() }
         }
-        guard !isolated else { return }
-        // ⌃⌥J.
-        model.$noteHotKeyEnabled.removeDuplicates().sink { [weak self] enabled in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                if enabled, self.noteHotKey == nil {
-                    self.noteHotKey = GlobalHotKey(keyCode: kVK_ANSI_J, modifiers: controlKey | optionKey) { [weak self] in self?.toggleNote() }
-                } else if !enabled {
-                    self.noteHotKey?.unregister()
-                    self.noteHotKey = nil
-                }
-                self.model.noteHotKeyRegistered = !enabled || self.noteHotKey != nil
-            }
+        // The note's key (⌃⌥J unless changed, #85): the 윈도우 menu shows it in every run; only the real app claims it.
+        globalKeysLive = !isolated
+        Publishers.CombineLatest(model.$noteHotKeyEnabled, model.$noteShortcut).dropFirst().sink { [weak self] _ in
+            DispatchQueue.main.async { self?.registerNoteHotKey() }
         }.store(in: &subscriptions)
+        registerNoteHotKey()
+        // The note's recorder (책상 → 꾸미기 → 빠른 입력): the app's keys from anywhere step aside while a key is pressed,
+        // so the one pressed reaches the field (or is refused there).
+        model.onPauseGlobalKeys = { [weak self] paused in
+            guard let self else { return }
+            self.noteHotKeyPaused = paused
+            self.registerNoteHotKey()
+            self.memoDrawer.pauseShortcut(paused)
+            guard self.globalKeysLive else { return }
+            self.quickEntry.setEnabled(!paused && self.model.quickEntryEnabled)
+            self.quickMemo.setEnabled(!paused && self.model.quickMemoEnabled)
+        }
+    }
+
+    /// Claims the note's key as it is now (none while off or paused) and shows it in the 윈도우 menu.
+    private func registerNoteHotKey() {
+        noteHotKey?.unregister()
+        noteHotKey = nil
+        let key = model.noteShortcutShown
+        if globalKeysLive, !noteHotKeyPaused, let key {
+            noteHotKey = GlobalHotKey(keyCode: key.keyCode, modifiers: key.modifiers) { [weak self] in self?.toggleNote() }
+        }
+        let registered = !globalKeysLive || key == nil || noteHotKeyPaused || noteHotKey != nil
+        if model.noteHotKeyRegistered != registered { model.noteHotKeyRegistered = registered }
+        if let menuKey = key?.menuKey {
+            noteMenuItem.keyEquivalent = menuKey.0
+            noteMenuItem.keyEquivalentModifierMask = menuKey.1
+        } else {
+            noteMenuItem.keyEquivalent = ""
+        }
     }
 
     /// 컴퓨터 켤 때 같이 열까요? — after the third start by hand with the login item off, the cat asks once.
@@ -672,6 +742,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         floatingMascot?.hide()
         if window.isMiniaturized { window.deminiaturize(nil) }
         window.makeKeyAndOrderFront(nil)
+        noteEars?.sync()
         NSApp.activate(ignoringOtherApps: true)
     }
     private func installHeaderDoubleClick() {
@@ -698,6 +769,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         model.commitEditing()
         let frame = window.frame
         window.orderOut(nil)
+        noteEars.sync()
         floatingMascot.show(near: frame, anchoredAt: anchor)
         collapseAnchorInNote = floatingMascot.iconCenter.map { NSPoint(x: $0.x - frame.minX, y: $0.y - frame.minY) }
         if let path = argument(after: "--icon-snapshot") {
@@ -750,6 +822,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         showWindow()
         model.page = .todos
         model.showSpace(shown)
+    }
+
+    /// 2b (S45): the note's widest — 1,200 while grouped, else 720. Grouping turned off (or the last space gone) while it
+    /// is wider: back to 720, the right edge kept when docked on the right, and still on its screen (an `--offscreen`
+    /// note stays where it was put).
+    private func applyNoteWidthCap() {
+        guard let window else { return }
+        let wide = model.showsSpaceGroups
+        let cap = wide ? SpaceGroups.wideNote : SpaceGroups.narrowNote
+        window.contentMaxSize = NSSize(width: cap, height: window.contentMaxSize.height)
+        let content = window.contentRect(forFrameRect: window.frame)
+        guard !wide, content.width > cap else { return }
+        let extra = content.width - cap
+        var frame = window.frame
+        frame.size.width -= extra
+        if NoteDocking.side(of: window, preferences: model.preferences) == .right { frame.origin.x += extra }
+        if !window.keepsOffscreen, let visible = (window.screen ?? NSScreen.main)?.visibleFrame {
+            frame.origin.x = min(max(frame.origin.x, visible.minX), visible.maxX - frame.width)
+        }
+        window.setFrame(frame, display: true)
+    }
+
+    /// ⌥⌘G: 스페이스별로 묶기 on or off (nothing while there are no spaces).
+    @objc private func toggleSpaceGroups() {
+        guard !model.todoSpaces.isEmpty else { return }
+        model.toggleGroupBySpace()
     }
 
     @objc private func showTodos() { if typedInDesk { desk.select(shortcut: 1) } else { showWindow(); model.page = .todos } }

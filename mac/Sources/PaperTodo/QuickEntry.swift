@@ -120,7 +120,7 @@ struct QuickEntryView: View {
                                 onEscape: { onClose(); return true },
                                 onUndo: undo,
                                 accessibilityLabel: L("빠른 입력"))
-                        .frame(height: 34)
+                        .growing(oneLine: 34)
                         .padding(.bottom, 4)
                         .overlay(alignment: .bottom) {
                             Rectangle().fill(focused || !text.isEmpty ? PaperTheme.sage : PaperTheme.rule).frame(height: 1.5)

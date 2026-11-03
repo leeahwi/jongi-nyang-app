@@ -89,8 +89,11 @@ public enum TodayGlance {
     /// The 다음 일정 card's line under the time: "40분 뒤 · 치과" · "in 40 min · Dentist" · "over 40 min · Tandarts".
     /// The time away comes first, so a long title gives way to the ellipsis instead of it (as on Windows).
     public static func eventLine(title: String, minutes: Int, language: AppLanguage) -> String {
-        // Non-breaking spaces keep "in 40 min" whole when the card wraps.
-        DayRibbon.away(minutes, language: language).replacingOccurrences(of: " ", with: "\u{00A0}") + "\u{00A0}· " + shortTitle(title, limit: 14)
+        // Non-breaking spaces keep "in 40 min" whole when the card wraps, and a word joiner after each number keeps
+        // "3시간 40분 뒤" whole too (Korean may break between a number and the syllable after it: ‘40’ / ‘분 뒤’, #136).
+        DayRibbon.away(minutes, language: language).replacingOccurrences(of: " ", with: "\u{00A0}")
+            .replacingOccurrences(of: "([0-9])(?=\\p{L})", with: "$1\u{2060}", options: .regularExpression)
+            + "\u{00A0}· " + shortTitle(title, limit: 14)
     }
 
     /// The 다음 알람 card's line: "내일 · 평일" · "Tomorrow · Weekdays" · "Morgen · Doordeweeks";
@@ -103,9 +106,9 @@ public enum TodayGlance {
     }
 
     /// Hints on an empty card: what to type in the line below.
-    /// Timer `“타이머 25”` · `“timer 25”` · `‘timer 25’`; alarm `“알람 7시”` · `“alarm 7am”` · `‘wekker 7:00’`.
-    public static func timerHint(_ language: AppLanguage) -> String { ["“타이머 25”", "“timer 25”", "‘timer 25’"][language.index] }
-    public static func alarmHint(_ language: AppLanguage) -> String { ["“알람 7시”", "“alarm 7am”", "‘wekker 7:00’"][language.index] }
+    /// Timer `‘타이머 25’` · `‘timer 25’`; alarm `‘알람 7시’` · `‘alarm 7am’` · `‘wekker 7:00’` — quoted as the app quotes what to type (#52).
+    public static func timerHint(_ language: AppLanguage) -> String { ["‘타이머 25’", "‘timer 25’", "‘timer 25’"][language.index] }
+    public static func alarmHint(_ language: AppLanguage) -> String { ["‘알람 7시’", "‘alarm 7am’", "‘wekker 7:00’"][language.index] }
 
     /// What an empty card puts into the line (1.38): "타이머 25" · "timer 25"; "알람 7시" · "alarm 7am" · "wekker 7:00".
     public static func timerWords(_ language: AppLanguage) -> String { language == .ko ? "타이머 25" : "timer 25" }

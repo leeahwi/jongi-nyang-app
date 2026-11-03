@@ -72,19 +72,24 @@ export function hourLabel(hour: number, lang: Lang = "ko"): string {
 }
 
 /**
+ * When an open task is due today (ms), for 다음 and 2b's groups (S40): a time today that isn't over, by its start, or a
+ * reminder later today; undefined otherwise.
+ */
+export function dueToday(item: TodoItem, now: Date): number | undefined {
+  if (item.isCompleted) return undefined;
+  const times = rangeToday(item, now);
+  if (times) return times.end.getTime() > now.getTime() ? times.start.getTime() : undefined;
+  const end = logicalDayStart(now).getTime() + 24 * hourMs;
+  const at = item.reminderAt ? Date.parse(item.reminderAt) : NaN;
+  return at > now.getTime() && at < end ? at : undefined;
+}
+
+/**
  * The 다음 group (at most `limit`), soonest first: open tasks with a time today that isn't over (by its start),
  * and open tasks with a reminder later today (by the reminder).
  */
 export function upNext(items: readonly TodoItem[], now: Date, limit = 3): TodoItem[] {
-  const end = logicalDayStart(now).getTime() + 24 * hourMs;
-  const when = (item: TodoItem): number | undefined => {
-    if (item.isCompleted) return undefined;
-    const times = rangeToday(item, now);
-    if (times) return times.end.getTime() > now.getTime() ? times.start.getTime() : undefined;
-    const at = item.reminderAt ? Date.parse(item.reminderAt) : NaN;
-    return at > now.getTime() && at < end ? at : undefined;
-  };
-  return items.map((item, index) => ({ item, at: when(item), index }))
+  return items.map((item, index) => ({ item, at: dueToday(item, now), index }))
     .filter((entry): entry is { item: TodoItem; at: number; index: number } => entry.at !== undefined)
     .sort((a, b) => a.at - b.at || a.index - b.index)
     .slice(0, limit).map((entry) => entry.item);

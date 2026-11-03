@@ -230,6 +230,14 @@ private enum AIConnectTests {
             try expect(AIConnect.trimmed(added + "\n", now: now) == nil, "small: untouched")
         }
 
+        try test("#174: the app keeps 30 days whatever the log's size") {
+            let old = line("old", at(1, 12).addingTimeInterval(-40 * 86_400), changes: [])
+            let new = line("new", at(27, 12), changes: [])
+            try equal(AIConnect.trimmed(old + "\n" + new + "\n", now: now, limit: 0), new + "\n", "small, but older than 30 days")
+            try equal(AIConnect.trimmed(old + "\n", now: now, limit: 0), "", "all old")
+            try expect(AIConnect.trimmed(new + "\n", now: now, limit: 0) == nil, "nothing older: untouched")
+        }
+
         try test("the cat: now and then, not twice in two hours") {
             let entry = AIConnect.parse(added)[0]
             try equal(AIText.catLine(entry, lastSaid: nil, now: now, random: { 0.2 }, .ko), "Claude가 할 일 두 개 놓고 갔어요.", "ko two")
@@ -312,6 +320,24 @@ private enum AIConnectTests {
             try expect(AIConnect.movablePlace("/Volumes/종이냥/종이냥.app"), "disk image")
             try expect(AIConnect.movablePlace("/private/var/folders/x/AppTranslocation/Y/d/종이냥.app"), "translocated")
             try expect(!AIConnect.movablePlace("/Applications/종이냥.app"), "Applications")
+        }
+
+        try test("M41: the extension's version in ai-link.json and the log; Claude Desktop's copy older than the app's") {
+            try equal(AIConnect.extVersion, 2, "the same number as the Windows core's aiExtVersion")
+            let link = String(decoding: AIConnect.Link(enabled: true, dataFolder: "/x", lang: .ko, app: "mac 1.46.0", now: now).encoded(), as: UTF8.self)
+            try expect(link.contains("\"ext\" : 2"), "link: \(link)")
+            let old = line("old", now, changes: [(taskA, nil, todo(taskA, "보고서 쓰기"))])
+            let fresh = String(old.dropLast()) + ",\"ext\":2}"
+            let parsed = AIConnect.parse(fresh)[0]
+            try equal(parsed.ext, 2, "read")
+            try expect(parsed.line().contains("\"ext\":2"), "written back: \(parsed.line())")
+            try equal(AIConnect.parse(old)[0].ext, nil, "none before")
+            try expect(!AIConnect.extOutdated([]), "nothing from Claude Desktop yet")
+            try expect(AIConnect.extOutdated(AIConnect.parse(old)), "no version: the one before versions")
+            try expect(!AIConnect.extOutdated(AIConnect.parse(old + "\n" + fresh)), "the newest line counts")
+            let code = line("code", now, client: "Claude Code", changes: [(taskB, nil, todo(taskB, "x"))])
+            try expect(!AIConnect.extOutdated(AIConnect.parse(fresh + "\n" + code)), "Claude Code runs the app's own copy")
+            try expect(AIConnect.extOutdated(AIConnect.parse(old + "\n" + code)), "…and doesn't hide an old Claude Desktop")
         }
 
         print("\(count) AI connection tests passed")

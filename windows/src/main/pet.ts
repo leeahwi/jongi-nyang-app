@@ -9,7 +9,7 @@ import type { ChatterEvents } from "../core/calendar";
 import { isQuietHour, nextChatterDelay, pettedChatter, pickChatter, type ChatterContext, type ChatterLine, type ChatterPose } from "../core/chatter";
 import { key as dueKey } from "../core/deadline";
 import { lang, t } from "../i18n";
-import { offscreen } from "./env";
+import { offscreen, offscreenEnabled } from "./env";
 import type { PetMemory, Store } from "./store";
 
 export interface PetHooks {
@@ -125,6 +125,9 @@ export class DesktopPet {
       width: 400, height: stripHeight, show: false, frame: false, transparent: true, resizable: false, minimizable: false, maximizable: false,
       fullscreenable: false, focusable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false,
       backgroundColor: "#00000000", title: t("종이냥"),
+      // Off-screen runs (snapshots, tests): macOS pulls a window placed off every display back onto one unless it may be
+      // larger than the screen (only macOS reads this).
+      enableLargerThanScreen: offscreenEnabled,
       webPreferences: { preload: path.join(__dirname, "preload.js"), sandbox: true, contextIsolation: true, backgroundThrottling: false },
     });
     // Every desktop, but not over full-screen apps (videos, presentations).
@@ -466,7 +469,7 @@ export class DesktopPet {
     // Click-through everywhere except over the cat.
     ipcMain.on("pet:interactive", (event, interactive: boolean) => { if (fromPet(event)) this.setInteractive(Boolean(interactive)); });
     ipcMain.on("pet:click", (event) => { if (fromPet(event)) this.petted(); });
-    ipcMain.on("pet:answer", (event, index: number) => { if (fromPet(event)) this.answer(Number(index)); });
+    ipcMain.on("pet:answer", (event, index: unknown) => { if (fromPet(event) && Number.isInteger(index)) this.answer(index as number); });
     ipcMain.on("pet:open-note", (event) => { if (fromPet(event)) this.hooks.openNote(); });
     ipcMain.on("pet:menu", (event) => { if (fromPet(event)) this.menu().popup({ window: this.window }); });
     // While dragging along the floor the renderer moves the cat itself; main hears where it landed.

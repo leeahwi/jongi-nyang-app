@@ -106,11 +106,14 @@ const cardLabels: Record<GlanceCardKind, readonly [string, string, string]> = {
   timer: ["타이머", "Timer", "Timer"],
   alarm: ["다음 알람", "Next alarm", "Wekker"],
 };
-/** An empty card's line: none today, or what to type in the line below (the same words as the Mac's). */
+/**
+ * An empty card's line: none today, or what to type in the line below (the same words as the Mac's), quoted as the
+ * app quotes what to type — ‘알람 7시’ (#52, docs/writing.md), in every language.
+ */
 const emptyLines: Record<GlanceCardKind, readonly [string, string, string]> = {
   event: ["오늘은 없어요", "None today", "Niets vandaag"],
-  timer: ["“타이머 25”", "“timer 25”", "‘timer 25’"],
-  alarm: ["“알람 7시”", "“alarm 7am”", "‘wekker 7:00’"],
+  timer: ["‘타이머 25’", "‘timer 25’", "‘timer 25’"],
+  alarm: ["‘알람 7시’", "‘alarm 7am’", "‘wekker 7:00’"],
 };
 /** What the empty timer card suggests typing: "타이머 25", "timer 25", "timer 25". */
 export const timerHint = (lang: Lang = "ko"): string => (lang === "ko" ? "타이머 25" : "timer 25");

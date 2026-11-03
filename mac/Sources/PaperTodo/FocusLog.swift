@@ -23,7 +23,7 @@ final class FocusLog: ObservableObject {
         let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
         let date = values?.contentModificationDate, size = values?.fileSize ?? 0
         if let cache, cache.date == date, cache.size == size { return cache.records }
-        let records = Focus.parse((try? String(contentsOf: url, encoding: .utf8)) ?? "")
+        let records = Focus.parse((try? SafeFile.text(url)) ?? "") // #173: a link or a file past 32MB reads as none
         cache = (date, size, records)
         return records
     }
@@ -32,7 +32,8 @@ final class FocusLog: ObservableObject {
         guard model?.savingStopped != true else { return }
         do {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let existing = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+            try SafeFile.check(url) // #173: never appended through a link, nor onto a file past 32MB
+            let existing = (try? SafeFile.text(url)) ?? ""
             if FileManager.default.fileExists(atPath: url.path), let handle = try? FileHandle(forWritingTo: url) {
                 defer { try? handle.close() }
                 try handle.seekToEnd()

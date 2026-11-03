@@ -11,7 +11,8 @@
 .c3 b { font: 600 17px/22px var(--ui); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Up to two lines (between words), so "Tomorrow · Weekdays" or a title with its time keeps both. */
 .c3 .c3-unit { font: 500 10.5px var(--ui); color: inherit; }
-.c3-small { font: 500 10.5px/14px var(--ui); color: var(--ink-2); font-variant-numeric: tabular-nums; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+/* #136: Korean words stay whole (keep-all), so "3시간 40분 뒤" doesn't break as "40" / "분 뒤" (glance.ts keepTogether). */
+.c3-small { font: 500 10.5px/14px var(--ui); color: var(--ink-2); font-variant-numeric: tabular-nums; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; word-break: keep-all; overflow-wrap: anywhere; }
 .c3.empty b { color: var(--ink-3); font-weight: 500; }
 .c3.empty .c3-small { color: var(--ink-3); }
 .c3.hot { border-color: var(--clay); background: var(--clay-2); }
@@ -34,13 +35,16 @@
 .g-head { font: 600 10.5px/14px var(--ui); letter-spacing: 0.04em; color: var(--ink-3); padding: 4px 2px 1px; }
 .g-row { position: relative; display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 32px; border-radius: 8px; }
 .g-row:hover { background: color-mix(in srgb, var(--sage) 5%, transparent); }
+/* T3 (as the note's N4): a finished row folds away when its hold ends (0.18 s, ease-in); Reduce Motion: at once. */
+.g-row.leaving { animation: g-row-out var(--motion-enter) var(--ease-in) forwards; overflow: hidden; pointer-events: none; }
+@keyframes g-row-out { to { height: 0; min-height: 0; opacity: 0; } }
 .g-row .check { width: 28px; height: 30px; display: grid; place-items: center; flex: none; }
 .g-row .box { width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid var(--check-border); display: grid; place-items: center; color: var(--on-sage); transform: rotate(-3deg); }
 .g-row .box .icon { opacity: 0; }
 .g-row:hover .box { border-color: var(--ink-2); }
 .g-row.done .box { background: var(--sage); border-color: var(--sage); }
 .g-row.done .box .icon { opacity: 1; }
-.g-row.pop .box { animation: g-pop 0.16s ease-out; }
+.g-row.pop .box { animation: g-pop var(--motion-change) var(--ease-out); }
 @keyframes g-pop { from { transform: rotate(-3deg) scale(0.85); } }
 .g-row .label { position: relative; flex: 1; min-width: 0; font-family: var(--body-font); font-size: calc(var(--body-size) * 0.84); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); padding-right: var(--ink-over); }
 :root[data-font="clean"] .g-row .label { font-size: 13.5px; }
@@ -48,12 +52,29 @@
 .g-row .strike { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; clip-path: inset(0 100% 0 0); }
 .g-row .strike path { fill: none; stroke: color-mix(in srgb, var(--ink) 62%, transparent); stroke-width: 1.25; stroke-linecap: round; }
 .g-row.done .strike { clip-path: inset(0 0 0 0); }
-.g-row.pop .strike { transition: clip-path 0.22s ease-out 0.08s; }
+.g-row.pop .strike { transition: clip-path var(--motion-draw) var(--ease-out) 0.08s; }
 .g-row .meta { flex: none; display: inline-flex; align-items: center; gap: 4px; padding-right: 6px; font: 500 11px var(--ui); color: var(--sage-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .g-empty { padding: 6px 4px; font: 500 12px var(--ui); color: var(--ink-3); }
-/* "외 3개 · 노트에서 보기": a small sage pill under the rows. */
-.g-more { justify-self: start; height: 22px; padding: 0 9px; margin: 2px 0 0 2px; border-radius: 11px; font: 600 11px var(--ui); color: var(--sage-text); background: color-mix(in srgb, var(--sage) 10%, transparent); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.g-more:hover { background: color-mix(in srgb, var(--sage) 16%, transparent); }
+/* "외 3개 · 노트에서 보기": a sage text link under the rows, as on the Mac (#52). */
+.g-more { justify-self: start; height: 24px; padding: 0 2px; margin: 0 0 0 2px; border-radius: 4px; font: 500 11.5px var(--ui); color: var(--sage-text); background: none; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.g-more:hover { text-decoration: underline; text-underline-offset: 2px; }
+/* 2a (A5): a space's band at the row's left end (4 px, about 55 % of the row, round on the right; faded when done),
+   and under the to-dos the lens's small line (● 회사만 · 다른 스페이스에 N개 더 · 모두 보기). */
+.g-band { position: absolute; left: -8px; top: 22.5%; height: 55%; width: 4px; border-radius: 0 2px 2px 0; background: var(--band); }
+.g-row.done .g-band { opacity: 0.45; }
+.g-lens { display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 24px; padding: 0 2px; overflow: hidden; font: 500 11px var(--ui); color: var(--ink-3); white-space: nowrap; }
+.g-lens-sep { flex: none; }
+.g-lens-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; margin-right: 1px; background: var(--band); }
+.g-lens-dot.none { background: none; box-shadow: inset 0 0 0 1px var(--ink-3); }
+.g-lens-name { flex: none; color: var(--ink-2); font-weight: 600; }
+/* A16: never cut — the part after the name goes to its own line under it (12px in) when one line can't hold it. */
+.g-lens-tail { flex: none; display: flex; align-items: center; gap: 4px; }
+.g-lens.two { flex-wrap: wrap; row-gap: 0; padding-bottom: 3px; }
+.g-lens.two .g-lens-tail { flex-basis: 100%; height: 20px; padding-left: 12px; }
+.g-lens.two .g-lens-tail > .g-lens-sep:first-child { display: none; }
+.g-lens-more { flex: none; }
+.g-lens-all { flex: none; padding: 0; background: none; font: 600 11px var(--ui); color: var(--ink-2); }
+.g-lens-all:hover { text-decoration: underline; text-underline-offset: 2px; }
 
 /* The input line, with its toast over it. */
 .g-line { position: relative; }

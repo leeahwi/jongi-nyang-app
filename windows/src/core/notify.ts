@@ -30,16 +30,30 @@ export function wantsSystemNotice(setting: SystemNotifySetting, context: NotifyC
 
 export const notifyScheme = "jongi-nyang";
 
-export type NotifyAction = { kind: "open" } | { kind: "done"; ids: string[] } | { kind: "snooze"; ids: string[]; minutes: number } | { kind: "alarmStop" } | { kind: "alarmSnooze" };
+/**
+ * An alarm's buttons carry `nonce` (#172, review L-03): a value made fresh for that one notification, so a web page or
+ * a document opening `jongi-nyang:alarm-stop` can't silence a ringing alarm. Without the right one the link only opens
+ * the note (`acceptNotifyAction`).
+ */
+export type NotifyAction = { kind: "open" } | { kind: "done"; ids: string[] } | { kind: "snooze"; ids: string[]; minutes: number } | { kind: "alarmStop"; nonce?: string } | { kind: "alarmSnooze"; nonce?: string };
 
-/** The link a toast's button opens: "jongi-nyang:done?ids=A,B", "jongi-nyang:snooze?ids=A&minutes=10", "jongi-nyang:open". */
+/** A notification's one-time value: 32 hex digits from the system's random source. */
+export function makeNonce(): string {
+  const bytes = new Uint8Array(16);
+  globalThis.crypto.getRandomValues(bytes);
+  return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+const noncePattern = /^[0-9a-f]{32}$/;
+
+/** The link a toast's button opens: "jongi-nyang:done?ids=A,B", "jongi-nyang:snooze?ids=A&minutes=10", "jongi-nyang:open",
+ *  "jongi-nyang:alarm-stop?n=<nonce>". */
 export function notifyLink(action: NotifyAction): string {
   switch (action.kind) {
     case "open": return `${notifyScheme}:open`;
     case "done": return `${notifyScheme}:done?ids=${action.ids.map(encodeURIComponent).join(",")}`;
     case "snooze": return `${notifyScheme}:snooze?ids=${action.ids.map(encodeURIComponent).join(",")}&minutes=${action.minutes}`;
-    case "alarmStop": return `${notifyScheme}:alarm-stop`;
-    case "alarmSnooze": return `${notifyScheme}:alarm-snooze`;
+    case "alarmStop": return `${notifyScheme}:alarm-stop${action.nonce ? `?n=${action.nonce}` : ""}`;
+    case "alarmSnooze": return `${notifyScheme}:alarm-snooze${action.nonce ? `?n=${action.nonce}` : ""}`;
   }
 }
 
@@ -60,10 +74,24 @@ export function readNotifyLink(argv: readonly string[]): NotifyAction | undefine
       const minutes = Number(params.get("minutes"));
       return ids.length && Number.isInteger(minutes) && minutes > 0 && minutes <= 240 ? { kind: "snooze", ids, minutes } : undefined;
     }
-    case "alarm-stop": return { kind: "alarmStop" };
-    case "alarm-snooze": return { kind: "alarmSnooze" };
+    case "alarm-stop":
+    case "alarm-snooze": {
+      const nonce = params.get("n");
+      const kind = head.replace(/\/+$/, "") === "alarm-stop" ? "alarmStop" : "alarmSnooze";
+      return nonce && noncePattern.test(nonce) ? { kind, nonce } : { kind };
+    }
     default: return undefined;
   }
+}
+
+/**
+ * What a link may do: an alarm's 끄기 · 다시 알림 only with the nonce of the notification that is out now (`expected`,
+ * undefined when no alarm is ringing); anything else about an alarm just opens the note. Tasks' links need their ids
+ * (UUIDs) and change only those, as before.
+ */
+export function acceptNotifyAction(action: NotifyAction, expected: string | undefined): NotifyAction {
+  if (action.kind !== "alarmStop" && action.kind !== "alarmSnooze") return action;
+  return expected !== undefined && action.nonce === expected ? action : { kind: "open" };
 }
 
 const escape = (text: string) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
@@ -79,11 +107,11 @@ const words: Record<Lang, { done: string; later: string; stop: string; again: st
  * The Windows toast (its XML): the title and the lines, a click opens the note, and the buttons —
  * a task's 끝냄 · 10분 뒤, an alarm's 끄기 · 다시 알림 — each opening our link.
  */
-export function toastXml(notice: { title: string; lines: string[]; kind: "tasks"; ids: string[] } | { title: string; lines: string[]; kind: "alarm" }, lang: Lang = "ko"): string {
+export function toastXml(notice: { title: string; lines: string[]; kind: "tasks"; ids: string[] } | { title: string; lines: string[]; kind: "alarm"; nonce: string }, lang: Lang = "ko"): string {
   const word = words[lang];
   const actions = notice.kind === "tasks"
     ? [[word.done, notifyLink({ kind: "done", ids: notice.ids })], [word.later, notifyLink({ kind: "snooze", ids: notice.ids, minutes: 10 })]]
-    : [[word.stop, notifyLink({ kind: "alarmStop" })], [word.again, notifyLink({ kind: "alarmSnooze" })]];
+    : [[word.stop, notifyLink({ kind: "alarmStop", nonce: notice.nonce })], [word.again, notifyLink({ kind: "alarmSnooze", nonce: notice.nonce })]];
   const text = [notice.title, ...notice.lines.slice(0, 2)].map((line) => `<text>${escape(line)}</text>`).join("");
   return `<toast activationType="protocol" launch="${escape(notifyLink({ kind: "open" }))}"${notice.kind === "alarm" ? ' scenario="alarm"' : ""}>`
     + `<visual><binding template="ToastGeneric">${text}</binding></visual>`

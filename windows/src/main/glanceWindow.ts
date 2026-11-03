@@ -95,6 +95,9 @@ export class GlanceWindow {
     const window = new BrowserWindow({
       ...this.size, show: false, frame: false, transparent: true, resizable: false, movable: false, minimizable: false, maximizable: false,
       fullscreenable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false, backgroundColor: "#00000000", title: t("오늘 창"),
+      // Off-screen runs (snapshots, tests): macOS pulls a window placed off every display back onto one unless it may be
+      // larger than the screen (only macOS reads this).
+      enableLargerThanScreen: offscreenEnabled,
       webPreferences: { preload: path.join(__dirname, "preload.js"), sandbox: true, contextIsolation: true, backgroundThrottling: !offscreenEnabled },
     });
     window.setVisibleOnAllWorkspaces(true);

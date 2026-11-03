@@ -17,7 +17,7 @@ swiftc -O -parse-as-library \
     Sources/PaperCore/QuickParse.swift Sources/PaperCore/Duration.swift Sources/PaperCore/Alarm.swift \
     Sources/PaperCore/CalendarDay.swift Sources/PaperCore/CalendarDraft.swift Sources/PaperCore/LocalEvent.swift \
     Sources/PaperCore/Memo.swift Sources/PaperCore/MemoFolders.swift Sources/PaperCore/MemoFolderSearch.swift \
-    Sources/PaperCore/MemoCards.swift Sources/PaperCore/TextMerge.swift Sources/PaperCore/Intent.swift \
+    Sources/PaperCore/MemoCards.swift Sources/PaperCore/MemoMarkdown.swift Sources/PaperCore/TextMerge.swift Sources/PaperCore/Intent.swift \
     Sources/PaperCore/DayRibbon.swift Sources/PaperCore/Ahead.swift Sources/PaperCore/Convenience.swift \
     Sources/PaperCore/PetChatter.swift Sources/PaperCore/BubbleText.swift Sources/PaperCore/PetAsk.swift \
     Tests/PaperCoreTests/MemoStressBench.swift \

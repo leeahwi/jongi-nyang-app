@@ -11,7 +11,7 @@
 
 - **Windows 10/11 (x64)** — deze map (`windows/`). Electron 44 + TypeScript, geen externe UI-bibliotheken.
 - De **macOS-versie** staat in de map [`mac/`](../mac). Hetzelfde ontwerp, dezelfde functies en hetzelfde bestandsformaat, dus met één gedeelde map heb je dezelfde lijst op een Mac.
-- Geen internet, account of server: alles blijft op deze pc (of in een gesynchroniseerde map die je zelf kiest). Ook [afspraken](#afspraken-en-kalender) bewaart Jongi-nyang zelf, en met één [back-upbestand](#back-up--verhuizen) verhuis je alles naar een andere computer.
+- Geen account of server, en de app gaat nooit online: alles blijft op deze pc (of in een gedeelde map die je zelf kiest). Zet je de AI-koppeling aan, dan gaat wat Claude leest mee met het gesprek naar Claude (standaard uit). Ook [afspraken](#afspraken-en-kalender) bewaart Jongi-nyang zelf, en met één [back-upbestand](#back-up--verhuizen) verhuis je alles naar een andere computer.
 - **Koreaans, Engels en Nederlands.** Bureau → Weergave → **Taal van de app**: Automatisch (de taal van het systeem) · 한국어 · English · Nederlands. Na een wijziging start de app opnieuw.
 - **Nachtpapier**: staat Windows in de donkere modus, dan krijgt het papier de kleur van papier in een kamer met het licht uit (Bureau → Weergave → Papier: Automatisch · Dag · Nacht).
 
@@ -37,6 +37,7 @@
 - [Installeren en starten](#installeren-en-starten)
 - [Sneltoetsen](#sneltoetsen)
 - [Waar je gegevens staan](#waar-je-gegevens-staan)
+- [De app en je gegevens verwijderen](#de-app-en-je-gegevens-verwijderen)
 - [Ontwikkeling](#ontwikkeling)
 - [Verschillen met de macOS-versie](#verschillen-met-de-macos-versie)
 - [Lettertypen en afbeeldingen](#lettertypen-en-afbeeldingen)
@@ -233,14 +234,15 @@ Sinds 1.27 kan Claude (Claude Desktop · Claude Code) tijdens een gesprek je tak
 
 In 1.28 werd het tabblad Notities de **notitielade**: haal je notities uit de rand van het scherm, schrijf meteen en bewerk ze ter plekke. Alle notities van het tabblad staan in de map ‘Notities’ van de lade (geen bestand verandert), en de eerste start zegt dat één keer. 1.30 heeft hetzelfde gedrag, dezelfde bestanden en testgevallen (D1–D30) als Mac 1.45.
 
-- **Openen · sluiten**: `Ctrl+Shift+D` vanuit elke app (wijzigen of uitzetten in Bureau → Notitielade), het handvat aan de schermrand (lichtcrème met een pootje — beweeg erover voor het aantal notities dat je vandaag bewerkte; sleep hem omhoog of omlaag), ⋯ → Notitielade, rechtsklikken op de kat de ladeknop boven het notitieblok, `Ctrl+3` of het menu in het systeemvak. Hij schuift in 180 ms uit, zo hoog als het scherm boven de taakbalk waar je muis is, en een andere app aanklikken sluit hem niet. Dezelfde sneltoets, `Esc` of × wel.
+- **Openen · sluiten**: `Ctrl+Shift+D` vanuit elke app (wijzigen of uitzetten in Bureau → Notitielade), het handvat aan de schermrand (lichtcrème met een pootje — beweeg erover voor het aantal notities dat je vandaag bewerkte; sleep hem omhoog of omlaag), ⋯ → Notitielade, rechtsklikken op de kat de ladeknop boven het notitieblok, `Ctrl+3` of het menu in het systeemvak. Hij schuift in 180 ms uit, zo hoog als het scherm boven de taakbalk waar je muis is, en een andere app aanklikken sluit hem niet. Dezelfde sneltoets, `Esc` of een klik op het balkje midden op de binnenrand wel (sleep het balkje om de breedte te veranderen).
 - **De lade**: één vel papier met papieren kattenoortjes aan de bovenrand (een tint donkerder dan de notities). In de kop de naam van de map (handgeschreven) ▾ — klik erop of druk op `Ctrl+L` voor de mappenlijst —, zoeken, bovenop houden en sluiten. Schrijf op het briefje met plakband en druk op `Enter` voor een nieuwe notitie bovenaan de map. Onderaan: ⚙ · ‘Werk · 5 notities’ · de sneltoets.
 - **Notitiekaarten (1.29)**: per datum gegroepeerd zoals in Apple Notities — Vastgezet · Vandaag · Gisteren · Deze week · Vorige week · oktober · september 2025 (weken beginnen op maandag). Elke kaart heeft een stukje plakband in de kleur van de map, een handgeschreven titel, tot drie regels voorproefje (bij een checklist de eerste drie punten, 1.30) en een korte tijd (`18:02` · `dinsdag` · `13 okt`). Wat een notitie is krijgt een klein label, gevonden in de tekst: een link (`youtube.com/watch`, klik om te openen — een titel die alleen het adres is heet ‘youtube.com-link’), een telefoonnummer (`010-1234-5678`, klik om te kopiëren), een checklist (2/4 en een balkje). Beweeg erover voor Kopiëren · Vastzetten · ⋯; onder een open notitie [Groter bekijken · Kopiëren · ⚙] ‘Bewerkt 18:02’ [Naar map verplaatsen · Verwijderen]. Een map met meer dan 20 notities wordt iets compacter.
 - **Menu’s**: alles heeft ook een rechtsklikmenu (pictogrammen, de sneltoetsen die er zijn, verwijderen onderaan) — een lege plek (= de ⚙ onderaan: Nieuwe notitie · Nieuwe notitie van klembord · papier · achtergrond · links/rechts · instellingen · help · Jongi-nyang afsluiten), een notitie (Openen en bewerken · Groter bekijken · Kopiëren · Dupliceren · Vastzetten · Naar map verplaatsen ▸ Recent · Papier van deze notitie · Afgevinkte regels verwijderen · Verwijderen), tekst die je bewerkt (Knippen · Kopiëren · Plakken · Alles selecteren + Deze notitie), een bladwijzer (Nieuwe notitie hier · Hernoemen · Kleur · Sorteren · Dupliceren · Map verwijderen) en Vastgezet (Sorteren · Alles losmaken). `Shift+F10` en de menutoets openen ze ook.
 - **Mappen**: de bladwijzers opzij. De gekozen toont zijn naam, de andere hun eerste letter; beweeg erover voor ‘Boodschappen · 3 notities · Ctrl+3’. `+` voor een nieuwe map (naam, acht kleuren), sleep om te ordenen of zet een notitie op een bladwijzer; de punaisebladwijzer is ‘Vastgezet’. Bladwijzers en het handvat zijn effen, zonder strepen (1.30). Sorteren op laatst bewerkt · aanmaakdatum · titel (per map). `Ctrl+1`–`9` · `Ctrl+0`; `Ctrl+F` zoekt in alle mappen.
-- **Papier en achtergrond**: Dagpapier · Nachtpapier · Kraftpapier · Ruitjesschrift, en Automatisch, dat dag of nacht van het notitieblok volgt (1.29: elk papier een tint donkerder achter de notities, een rand van 1 px om elke notitie, donkerder grijze tekst). Eén notitie kan eigen papier krijgen (Papier van deze notitie). Achtergrond: Dekkend · Mat · Sterk (het scherm erachter schemert wazig door, in Windows 11) · Geen (alleen de notities zweven). Rechts of links, 260–480 breed (sleep de binnenrand).
+- **Papier en achtergrond**: Dagpapier · Nachtpapier · Kraftpapier · Ruitjesschrift, en Automatisch, dat dag of nacht van het notitieblok volgt (1.29: elk papier een tint donkerder achter de notities, een rand van 1 px om elke notitie, donkerder grijze tekst). Eén notitie kan eigen papier krijgen (Papier van deze notitie). Achtergrond: Dekkend · Mat · Sterk (bedoeld om het scherm erachter wazig te laten doorschemeren in Windows 11; nog niet op een echte pc gezien) · Geen (alleen de notities zweven). Rechts of links, 260–480 breed (sleep de binnenrand).
 - **Nieuw uiterlijk (1.30)**: los van de lettertype-instelling zijn kaarttitels 22 px handschrift, voorbeelden 13 px inkt één stap lichter (donkerder dan het oude grijs op alle vier papiersoorten) en een open notitie 14 px met regels van 26 px. Kaarten, open notities en de grote weergave hebben geen lijntjes en rode kantlijn meer; er blijven een stukje plakband in de kleur van de map, een lichte rand en schaduw en een klein afgescheurd randje bovenaan. Geen groene rand tijdens het bewerken, alleen de cursor; een kaart die je met het toetsenbord kiest krijgt een lichte rand in de kleur van de map. Vastgezet toont een punaise in plaats van een pootje.
 - **Gegevens**: de notities blijven in `memos.json`; mappen en plaatsen staan in een nieuw bestand ernaast, `memo-folders.json`, zodat een oudere versie die de notities bewaart ze nooit wist. Wijzigingen op twee apparaten worden per item samengevoegd (de laatste wint); back-ups en gedeelde mappen nemen het mee. Snelle notitie en `/notitie` gaan naar de map die je het laatst bekeek.
+- **Markdown, lettertype en grootte**: een geopende notitie bewerk je in CodeMirror 6, dus vet, koppen, lijsten, checklists en code zie je al tijdens het typen. De tekens zie je alleen op de regel met de cursor (`Ctrl+Shift+R` toont ze altijd). De opmaakknop en `Ctrl+B` · `Ctrl+I` · `Ctrl+K`; `Enter` op een lijstregel begint het volgende item. Eén lettertype (Strak · Pen · Stift · Vaste breedte) en een van vier tekstgroottes voor de hele lade, in Instellingen → Notitielade. Het bestand bewaart de tekst zoals je hem schrijft.
 
 ![Notitielade — dagpapier · nachtpapier · kraftpapier · ruitjesschrift](../docs/screenshots/windows/nl/drawer-themes.png)
 
@@ -248,17 +250,26 @@ In 1.28 werd het tabblad Notities de **notitielade**: haal je notities uit de ra
 
 ## Takenruimtes
 
-Vanaf 1.30 verdeel je taken in **ruimtes** zoals Werk · Thuis · Studie. Het tabblad Vandaag blijft één pagina — verdeeld, niet versnipperd. Zelfde gedrag, zelfde bestand en zelfde testgevallen als Mac 1.45 (S1–S22, `docs/plans/spaces-cases.json`).
+Vanaf 1.30 verdeel je taken in **ruimtes** zoals Werk · Thuis · Studie. Het tabblad Vandaag blijft één pagina — verdeeld, niet versnipperd. Zelfde gedrag, zelfde bestand en zelfde testgevallen als Mac 1.45 (S1–S28, `docs/plans/spaces-cases.json`).
 
 - **Kleurbanden**: alleen taken met een ruimte krijgen links op de regel een smalle band in die kleur; beweeg erover voor de naam. Zonder ruimtes ziet het notitieblok er precies zo uit als in 1.29.
-- **Eén ruimte tegelijk**: `Alle ruimtes ▾` in de kop van Vandaag, of `Ctrl+Shift+1`–`9` in het notitieblok (`Ctrl+Shift+0` toont alles). Bovenaan staat ‘Alleen Werk zichtbaar · 4 andere taken verborgen · Alles tonen’, en wat je schrijft komt in die ruimte. Om 4 uur ’s nachts gaat het terug naar alles. Het getal op het tabblad en herinneringen tellen de verborgen taken mee.
-- **`#` in de invoerregel**: `Offerte sturen voor vrijdag #werk`; het begin van de naam (`#we`) werkt ook. Een naam die nog niet bestaat wordt een nieuwe ruimte als je de regel invoert. Met een `#` in de regel kies je met `Shift+Tab` een andere ruimte. Afspraken · timers · wekkers · notities krijgen geen ruimte. Snelle invoer (`Ctrl+Alt+N`) werkt net zo.
-- **Verplaatsen en beheren**: rechtsklik op een taak (of `Shift+F10` · de menutoets) → `Naar ruimte verplaatsen ▸`, of het veld Ruimte op het herinnering-briefje. In Bureau → Ruimtes maak, hernoem, kleur (acht kleuren), sorteer (slepen) en verwijder je ze (met Ongedaan maken). Op Windows is het rechtsklikmenu van een taak nu een papieren menu, zoals dat van de notitielade.
+- **Eén ruimte tegelijk**: `Alle ruimtes ▾` in de kop van Vandaag, of `Ctrl+Shift+1`–`9` in het notitieblok (`Ctrl+Shift+0` toont alles; op pc’s die de invoertaal met `Ctrl+Shift` wisselen kan dat botsen, nog niet gecontroleerd). De knop wordt ‘Alleen Werk ▾’ en onderaan de lijst staat een lichte regel ‘Nog 4 in andere ruimtes · Alles tonen’; wat je schrijft komt in die ruimte. Om 4 uur ’s nachts gaat het terug naar alles. Het getal op het tabblad en herinneringen tellen de verborgen taken mee.
+- **`#` in de invoerregel**: `Offerte sturen voor vrijdag #werk`; het begin van de naam (`#we`) werkt ook. Een naam die nog niet bestaat wordt een nieuwe ruimte als je de regel invoert. Met een `#` in de regel kies je met `Shift+Tab` een andere ruimte. `#algemeen` haalt een taak uit de ruimtes, naar Algemeen (een ruimte die echt ‘Algemeen’ heet gaat voor). Afspraken · timers · wekkers · notities krijgen geen ruimte. Snelle invoer (`Ctrl+Alt+N`) werkt net zo.
+- **Verplaatsen en beheren**: rechtsklik op een taak (of `Shift+F10` · de menutoets) → `Naar ruimte verplaatsen ▸`, of het veld Ruimte op het herinnering-briefje. In Bureau → Ruimtes maak, hernoem, kleur (acht kleuren), sorteer (slepen) en verwijder je ze (met Ongedaan maken). De regel ‘Algemeen’ bovenaan bevat de taken zonder ruimte; alleen de naam kun je wijzigen (1.30.1). Op Windows is het rechtsklikmenu van een taak nu een papieren menu, zoals dat van de notitielade.
 - **Gegevens**: `todos.json` blijft hetzelfde; de ruimtes en waar elke taak staat, staan ernaast in het nieuwe `todo-spaces.json` (een oudere versie die de lijst bewaart wist ze nooit). Wijzigen twee apparaten hetzelfde, dan wint de latere wijziging; back-ups en gedeelde mappen nemen het mee.
 
 | Eén vel, gemengd | Alleen Werk |
 | --- | --- |
-| ![Vandaag: de kleurbalk van een ruimte aan de rand van elke taak](../docs/screenshots/windows/nl/spaces-today.png) | ![Alleen Werk, de andere taken verborgen](../docs/screenshots/windows/nl/spaces-lens.png) |
+| ![Vandaag: de kleurbalk van een ruimte aan de rand van elke taak](../docs/screenshots/windows/nl/spaces-today.png) | ![Alleen Werk: onderaan de lijst ‘Nog 5 in andere ruimtes · Alles tonen’](../docs/screenshots/windows/nl/spaces-lens.png) |
+
+## Groeperen per ruimte · automatische back-ups (1.31)
+
+![Een breed notitieblok met de taken van vandaag in één kolom per ruimte](../docs/screenshots/windows/spaces2b-board.png)
+
+- **Groeperen per ruimte**: zet het aan via het menu `Alle ruimtes ▾` of met `Ctrl+Shift+G` op het notitieblok, en de taken van Vandaag komen per ruimte bij elkaar, als briefjes of als bladwijzers. Maak het notitieblok breder en elke ruimte krijgt een eigen kolom (tot 1.200 px), met onderaan een knop om er meteen iets in te zetten.
+- **Slepen om te verplaatsen**: sleep een taak naar een andere groep of druk op `Ctrl+Alt+↑` · `Ctrl+Alt+↓`, en kies er meerdere met `Ctrl`-klik of `Shift`-klik om ze in één keer te verplaatsen.
+- **Automatische back-ups**: één keer per dag, en voordat iets de opslagmap overschrijft (zoals importeren of terugzetten), wordt de map als `.jongi`-bestand bewaard. Back-ups komen in de map `backups` op deze pc, niet in de opslagmap (14 dagelijkse, 10 van elke soort van vóór het overschrijven); kies er een om terug te zetten in Bureau → **Opslag & back-up**.
+- **Notitielade**: gevonden notities staan per map bij elkaar, en het mapnaam-menu ▾ (`Ctrl+L`) biedt alleen titels en de sortering. In de grote weergave wordt de lade breder. Verwijderde notities blijven 30 dagen bewaard en zijn terug te zetten naar hun map. `Ctrl+K` opent een linkveld, de vinkjes zijn groter, en er zijn vier nieuwe ladepapieren (hanji, salie, bloesem, inkt).
 
 ## Schermen
 
@@ -342,6 +353,20 @@ npm start            # bouwen en starten
 - **Hetzelfde JSON-formaat als de macOS-versie**, dus de bestanden werken daar gewoon verder. Alles in één keer verhuizen? Zie [Back-up & verhuizen](#back-up--verhuizen).
 - Sinds 1.16.0 worden de restanten van de oude Google-koppeling (`google.json` · `calendar-cache.json` · `tasks-sync.json`) bij het starten verwijderd.
 
+## De app en je gegevens verwijderen
+
+Het verwijderprogramma haalt alleen de app weg; je lijsten blijven staan. Zo verwijder je alles:
+
+1. Gebruikte je de AI-koppeling, maak die dan eerst los in Claude. Verwijder ‘Jongi-nyang for Claude’ in Claude Desktop onder Instellingen → Extensies, en heb je het koppelcommando in Claude Code geplakt, voer dan in diezelfde map `claude mcp remove jongi-nyang` uit.
+2. Zet ‘Jongi-nyang openen bij het starten van Windows’ uit in Bureau → Weergave → Opstarten. Is de app al weg, zet het dan uit in Taakbeheer → Opstart-apps.
+3. Sluit Jongi-nyang af via het systeemvak en verwijder hem in Instellingen → Apps → Geïnstalleerde apps. Bij de ZIP-versie verwijder je de uitgepakte map.
+4. Verwijder `%APPDATA%\PaperTodo\`. Alle bestanden hierboven staan daar (lijsten, instellingen, AI-logboek, `backups\`).
+5. Verwijder `%APPDATA%\종이냥\`: de venstertoestand (het laatst geopende tabblad) en caches van Electron.
+
+- Gebruikte je een gedeelde map, verwijder daar dan ook `todos.json` · `memos.json` · `repeats.json` · `memo-folders.json` · `todo-spaces.json` · `events.json` · `alarms.json` · `focus.jsonl` · `archive\`. De lijsten verdwijnen op elk apparaat dat die map gebruikt, ook op een Mac.
+- Verwijder geëxporteerde back-ups (`.jongi`) waar je ze bewaarde.
+- Wat waar bewaard blijft en wat je computer kan verlaten, staat op de [privacypagina](https://leeahwi.github.io/jongi-nyang-app/en/privacy.html) (Engels).
+
 ## Ontwikkeling
 
 ```sh
@@ -356,6 +381,7 @@ npm run snapshot -- timeblock # alleen de tijden van taken en sluimeren Uit van 
 npm run snapshot -- strip # alleen de dagbalk, Je dag en de breedtecontrole van de timer van 1.25 (dag en nacht, strip-*.png)
 npm run snapshot -- ai # alleen de AI-koppeling van 1.27 (stempels, meldingen, weg geweest, het bureauvak; dag en nacht, ai-*.png)
 npm run snapshot -- drawer # alleen de notitielade (het handvat, datumgroepen en kaarten op vier papiersoorten, de open notitie, elk menu, de vier achtergronden, eigen papier van een notitie, een compacte lijst, breedtes, kanten, instellingen, het notitieblok met twee tabbladen, de verhuismelding; snapshots/drawer/)
+npm run snapshot -- markdown # alleen markdown, lettertype en grootte (vier groottes dag · nacht, papier, lettertypes, de grootste maat in een smalle lade, de opmaakbalk, tekens altijd tonen; snapshots/drawer/drawer-md-*). Op een Mac stopt het meteen als er een venster op een scherm komt
 npm run mcp:build    # 종이냥 for Claude: mcp/dist/server/index.js (één bestand) en mcp/dist/jongi-nyang.mcpb
 npm run mcp:test     # de gebundelde server aangestuurd met de SDK-client: M1–M12 · M16–M18 · 100 rondes tegelijk schrijven
 npm run perf         # een --demo-run met zware voorbeeldgegevens: starttijd, CPU in rust, invoervertraging… (--quick · --long)
@@ -393,12 +419,13 @@ De tabellen van **Kattenpraat** (`src/core/chatter.ts`) worden door `generate.py
 - Eén ruimte bekijken doe je met `Ctrl+Shift+1`–`9` · `Ctrl+Shift+0` (Mac `⌥⌘1`–`9` · `⌥⌘0`). `Ctrl+Alt+cijfer` is niet gebruikt, omdat dat botst met indelingen die met AltGr typen. `Alle ruimtes ▾` staat aan het eind van de datumregel, uit de buurt van de kat.
 - Bij een andere taal start de app zichzelf opnieuw; de Mac stelt de eigen taal van de app in voor macOS en start opnieuw.
 
-> **Nog te controleren op een echte Windows-pc**: deze app is met Electron op macOS gedraaid om elk scherm en elk gedrag te controleren (toetsenbord · slepen · snel toevoegen · synchroniseren via een gedeelde map · notities samenvoegen · herinneringen · kattenpraat) en om het installatiebestand te bouwen. Installeren op echte Windows, het systeemvak, doorklikken (het vinkje op het herinneringsbriefje), de focus bij `Ctrl+Alt+N`, AltGr-toetsenborden, de achtergronden Mat en Sterk van de notitielade, `Ctrl+Shift+0` naast de sneltoets voor de invoertaal, de 12- of 24-uursklok uit de regio-instelling, en `Shift+F10` · de menutoets zijn nog niet gecontroleerd.
+> **Nog te controleren op een echte Windows-pc**: deze app is met Electron op macOS gedraaid om de schermen en het belangrijkste gedrag te controleren (toetsenbord · slepen · snel toevoegen · synchroniseren via een gedeelde map · notities samenvoegen · herinneringen · kattenpraat) en om het installatiebestand te bouwen. Installeren op echte Windows, het systeemvak, doorklikken (het vinkje op het herinneringsbriefje), de focus bij `Ctrl+Alt+N`, AltGr-toetsenborden, de achtergronden Mat en Sterk van de notitielade, `Ctrl+Shift+0` naast de sneltoets voor de invoertaal, de 12- of 24-uursklok uit de regio-instelling, en `Shift+F10` · de menutoets zijn nog niet gecontroleerd.
 
 ## Lettertypen en afbeeldingen
 
 - De handschriftlettertypen **HanJang Pen / HanJang Brush** zijn Nanum Pen en Nanum Brush (SIL OFL 1.1) met smallere letters. Licentie: `assets/fonts/OFL.txt`.
 - Engels en Nederlands gebruiken **Caveat** (pen) en **Kalam** (stift), allebei SIL OFL 1.1 — `assets/fonts/Caveat-OFL.txt` en `assets/fonts/Kalam-OFL.txt`.
+- Het codelettertype van de Notitielade, **D2Coding** (NAVER, 1.4.0 normaal, ongewijzigd), is ook SIL OFL 1.1 — `assets/fonts/D2Coding-OFL.txt`.
 - De kat en de papierstructuur zijn met een tool voor beeldgeneratie gemaakt (geen scan van echt papier).
 
 ## Licentie

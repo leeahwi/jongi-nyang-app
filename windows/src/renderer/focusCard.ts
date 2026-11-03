@@ -1,7 +1,8 @@
 import { clock as timerClock } from "../core/focusTimer";
 import { TabularClock } from "./tabularClock";
 import type { TodoItem } from "../core/notebook";
-import type { AppState, FocusCommand, FocusView } from "../core/types";
+import type { FocusCommand, FocusView, TodosState } from "../core/types";
+import { spaceColor, type TodoSpace } from "../core/todoSpaces";
 import { h, icon, paper, reduceMotion, t } from "./api";
 
 /**
@@ -29,6 +30,8 @@ export interface FocusCardHost {
   toastHome: HTMLElement;
   /** The note is back (the tabs measure themselves again). */
   shown?(): void;
+  /** 2a (A6): the to-do's live space — its small line over the title (일반: none). */
+  spaceOf?(id: string): TodoSpace | undefined;
 }
 
 export class FocusCard {
@@ -44,6 +47,8 @@ export class FocusCard {
   /** ⏸ / ▶ under the time (Space). */
   private readonly play = h("button", { class: "fc-play" });
   private readonly task = h("div", { class: "fc-task" });
+  /** 2a (A6): `● 회사` over the title. */
+  private readonly spaceLine = h("div", { class: "fc-space", hidden: "" });
   private readonly nextLine = h("div", { class: "fc-next" });
   private readonly buttons = h("div", { class: "fc-btns" });
   private readonly restToggle = h("button", { class: "fc-rest", "aria-expanded": "false" });
@@ -51,7 +56,7 @@ export class FocusCard {
   private readonly cat = h("img", { class: "fc-cat", src: "../../assets/pet/256/cheer.png", alt: "", draggable: "false" });
   private readonly body: HTMLElement;
   private view?: FocusView;
-  private state?: AppState;
+  private state?: TodosState;
   private ticker?: number;
   private expanded = false;
   /** Tasks checked in the folded list while it was open: they stay, struck through. */
@@ -71,7 +76,7 @@ export class FocusCard {
     const close = h("button", { class: "quiet fc-close", title: t("집중 그만두기 (Esc)"), "aria-label": t("집중 그만두기") }, icon("close", 15));
     close.addEventListener("click", () => this.send({ kind: "askStop" }));
     this.restToggle.addEventListener("click", () => { this.expanded = !this.expanded; this.render(); });
-    this.body = h("div", { class: "fc-body" }, this.ring, this.task, this.nextLine, this.buttons);
+    this.body = h("div", { class: "fc-body" }, this.ring, this.spaceLine, this.task, this.nextLine, this.buttons);
     this.element = h("div", { class: "focus-card", role: "region", "aria-label": t("집중") },
       // The round dots at the right of the top line, before × (as the mock and the Mac).
       h("div", { class: "fc-top" }, this.kicker, h("span", { class: "spacer" }), this.dots, close),
@@ -87,7 +92,7 @@ export class FocusCard {
   get visible(): boolean { return !this.element.hidden; }
 
   /** A new state: the card shows while a session is on. */
-  update(state: AppState): void {
+  update(state: TodosState): void {
     this.state = state;
     const view = state.focus;
     const was = this.view;
@@ -180,6 +185,17 @@ export class FocusCard {
     // The title: the task in the hand.
     if (this.task.textContent !== view.title) this.task.textContent = view.title;
     this.task.title = view.title;
+    // 2a (A6): its space, small, over the title (a to-do in 일반, or a focus on no to-do: no line).
+    const space = view.taskId ? this.host.spaceOf?.(view.taskId) : undefined;
+    const spaceKey = space ? `${space.id}|${space.name}|${space.color}` : "";
+    if (this.spaceLine.dataset.key !== spaceKey) {
+      this.spaceLine.dataset.key = spaceKey;
+      this.spaceLine.hidden = !space;
+      const dot = h("i", { class: "fc-space-dot", "aria-hidden": "true" });
+      if (space) dot.style.setProperty("--band", `var(--band-${spaceColor(space.color)})`);
+      this.spaceLine.replaceChildren(...(space ? [dot, h("span", {}, space.name)] : []));
+      this.spaceLine.setAttribute("aria-label", space ? t("스페이스 {name}", { name: space.name }) : "");
+    }
     const next = this.host.next();
     this.nextLine.textContent = next ?? "";
     this.nextLine.hidden = !next;

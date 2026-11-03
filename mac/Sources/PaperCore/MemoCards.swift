@@ -15,15 +15,36 @@ public enum MemoCards {
         case phone(String)
     }
 
-    /// The first kind found, checklist before link before phone; nil for plain text.
+    /// The first kind found, checklist before link before phone; nil for plain text. Read in the words without marks
+    /// (#84): a `[words](url)` link is a link named by its words (before any bare address), and a number in a link's
+    /// address is no phone.
     public static func kind(_ text: String) -> Kind? {
         if let progress = Checklist.progress(text) { return .checklist(done: progress.done, total: progress.total) }
-        if let link = link(in: text) { return .link(url: link.url, label: link.label) }
-        if let phone = phone(in: text) { return .phone(phone) }
+        for written in MemoMarkdown.links(text) {
+            if let found = link(in: written.url) { return .link(url: found.url, label: written.label) }
+        }
+        let plain = MemoMarkdown.plain(text)
+        if let link = link(in: plain) { return .link(url: link.url, label: link.label) }
+        if let phone = phone(in: plain) { return .phone(phone) }
         return nil
     }
 
-    private static let urlPattern = try! NSRegularExpression(pattern: "https?://\\S+", options: [.caseInsensitive])
+    /// 메모 찾기's 링크 chip (#114): a web address anywhere in the memo — a `[words](url)` link or a bare one — whatever
+    /// kind its card shows (a checklist with a link in it has one too).
+    public static func hasLink(_ text: String) -> Bool {
+        guard text.range(of: "http", options: .caseInsensitive) != nil else { return false }
+        return MemoMarkdown.links(text).contains { link(in: $0.url) != nil } || link(in: MemoMarkdown.plain(text)) != nil
+    }
+
+    /// The time a search result shows (#114): its day as a date, today the clock — never `어제` or a weekday, as the
+    /// results are in folders, not days. `10월 21일` · `Oct 21` · `21 okt`; another year adds it.
+    public static func foundTime(_ date: Date, now: Date, calendar: Calendar = .current, language: AppLanguage = .ko) -> String {
+        let p = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+        if calendar.isDate(date, inSameDayAs: now) { return language.spokenTime(hour: p.hour!, minute: p.minute!) }
+        return language.dayMonth(month: p.month!, day: p.day!, year: p.year == calendar.component(.year, from: now) ? nil : p.year)
+    }
+
+    private static let urlPattern = try!NSRegularExpression(pattern: "https?://\\S+", options: [.caseInsensitive])
     private static let trailing: Set<Character> = [".", ",", ";", ":", "!", "?", ")", "]", "}", ">", "'", "\"", "’", "”"]
 
     /// The first link with a host: trailing punctuation taken off; the chip's label is the host (lower-case, no
@@ -80,10 +101,10 @@ public enum MemoCards {
 
     // MARK: What a card says
 
-    /// The card's title: the memo's first line (a checklist's box taken off), or `youtube.com 링크` when that line is
-    /// only a link (D25b).
+    /// The card's title: the memo's first line (a checklist's box taken off) without its marks (#84), or
+    /// `youtube.com 링크` when that line is only a link (D25b).
     public static func title(_ text: String, language: AppLanguage = .ko) -> String {
-        let title = Checklist.summary(text, language: language).title
+        let title = MemoMarkdown.title(text, language: language)
         if titleIsLink(title), let label = label(stripped(title)) {
             let host = label.split(separator: "/", maxSplits: 1).first.map(String.init) ?? label
             return ["\(host) 링크", "\(host) link", "\(host)-link"][language.index]
@@ -102,53 +123,22 @@ public enum MemoCards {
         return url
     }
 
-    /// One line under the title: the first non-empty line after it that isn't a checklist line; nil when there's none.
+    /// One line under the title: the first row after it that isn't a checklist item; nil when there's none.
     public static func preview(_ text: String) -> String? {
-        let lines = Checklist.split(text)
-        guard let start = lines.firstIndex(where: { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else { return nil }
-        for line in lines[(start + 1)...] {
-            let body = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            if body.isEmpty || Checklist.parse(line) != nil { continue }
-            return body
-        }
-        return nil
+        MemoMarkdown.rows(text, limit: 1, withItems: false).first?.text
     }
 
-    /// A row of a card's preview: a line's words, or a checklist item (`checked` set).
-    public struct PreviewRow: Equatable, Sendable {
-        public var checked: Bool?
-        public var text: String
-        public init(checked: Bool? = nil, text: String) { self.checked = checked; self.text = text }
-    }
+    /// A row of a card's preview: a line's words, or a checklist item (`checked` set); `code` a code block's line.
+    public typealias PreviewRow = MemoMarkdown.Row
 
     /// What a card shows under its title (D30, #14): a checklist memo its first `limit` items, ticked or not; any other
     /// memo its first `limit` lines with words after the title, trimmed (the card wraps them into at most `limit` lines,
     /// … at the end). Blank lines are skipped, so a short memo shows only what it has. Each row is cut at 300
-    /// characters (more never fits in three lines); a checklist stops reading at its `limit`-th item.
+    /// characters (more never fits in three lines); a checklist stops reading at its `limit`-th item. #84: the rows are
+    /// read without marks — a list item `• `, a numbered one its number, a code block its first line (MemoMarkdown).
     public static func previewRows(_ text: String, limit: Int = 3) -> [PreviewRow] {
-        guard limit > 0 else { return [] }
-        var items: [PreviewRow] = [], lines: [PreviewRow] = []
-        var titled = false
-        for line in text.unicodeScalars.split(separator: "\n", omittingEmptySubsequences: true).lazy.map({ String(String.UnicodeScalarView($0)) }) {
-            if let item = Checklist.parse(line) {
-                let words = item.text.trimmingCharacters(in: .whitespaces)
-                guard !words.isEmpty else { continue }
-                // A checklist title is its first item's words (Checklist.summary), not one of the rows.
-                if !titled { titled = true; continue }
-                items.append(PreviewRow(checked: item.checked, text: cut(words)))
-                if items.count == limit { return items }
-                continue
-            }
-            guard lines.count < limit || !titled else { continue }
-            let body = line.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !body.isEmpty else { continue }
-            if !titled { titled = true; continue }
-            lines.append(PreviewRow(text: cut(body)))
-        }
-        return items.isEmpty ? lines : items
+        MemoMarkdown.rows(text, limit: limit)
     }
-
-    private static func cut(_ text: String) -> String { text.count > 300 ? String(text.prefix(300)) : text }
 
     // MARK: Groups (D22–D24)
 
@@ -297,5 +287,31 @@ public enum MemoCards {
             }
             return a.offset < b.offset
         }.map(\.element)
+    }
+
+    // MARK: 크게 보기 (#113)
+
+    /// 크게 보기 (#113, C2 A): the paper while a memo is shown big — 640 at most, or 45 % of the screen's width when that
+    /// is less, never narrower than the width the drawer was given, and never wider than the screen leaves beside the
+    /// drawer's own chrome (`chrome`: the bookmarks and the shadow, 48 pt on the Mac, 34 px on Windows). Whole points.
+    /// The shared cases W1… in docs/plans/drawer-big-cases.json (Windows: bigDrawerWidth).
+    public static func bigWidth(user: Double, screen: Double, chrome: Double) -> Double {
+        let wide = max(user, min(640, (screen * 0.45).rounded(.down)))
+        return max(0, min(wide, (screen - chrome).rounded(.down)))
+    }
+
+    /// The letters in a memo for 크게 보기's bar (#113): every character as it is seen (an emoji with its skin tone is
+    /// one), line breaks left out. The shared cases C1….
+    public static func characterCount(_ text: String) -> Int {
+        text.reduce(0) { $0 + ($1 == "\n" || $1 == "\r\n" || $1 == "\r" ? 0 : 1) }
+    }
+
+    /// "412자" · "412 characters" · "412 tekens" (one: "1 character" · "1 teken").
+    public static func characters(_ count: Int, language: AppLanguage = .ko) -> String {
+        switch language {
+        case .ko: "\(count)자"
+        case .en: AppLanguage.plural(count, "character", "characters")
+        case .nl: AppLanguage.plural(count, "teken", "tekens")
+        }
     }
 }

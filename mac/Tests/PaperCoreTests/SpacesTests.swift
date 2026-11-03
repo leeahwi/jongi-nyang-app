@@ -53,11 +53,16 @@ private enum SpacesTests {
                 if let extra = entry["addSpace"] as? [String: Any] {
                     spaces.spaces += try TodoSpaces.decode(json(["spaces": [extra]])).spaces
                 }
+                if let general = entry["general"] as? [String: Any] {
+                    spaces.general = try TodoSpaces.decode(json(["general": general])).general
+                }
                 let lens: SpaceLens.Shown = (entry["lens"] as? String).map { $0 == SpaceLens.none ? .noSpace : .space($0) } ?? .all
                 let expected = entry["expect"] as! [String: Any]
                 let reading = SpaceToken.read(entry["text"] as! String, spaces: spaces, lens: lens)
                 let candidates = Intent.read(reading.text, now: now, calendar: calendar, language: .ko)
-                guard let first = candidates.first else {
+                // S29: a repeat whose title sounds like an event (회의) is the second reading (Tab) — picked by its kind.
+                let picked = expected["kind"] as? String == "repeat" ? candidates.first { $0.kind == .repeating } : candidates.first
+                guard let first = picked else {
                     try equal(false, expected["added"] as! Bool, "added")
                     try equal(reading.token != nil ? SpaceWords.needsTitle() : nil, expected["hint"] as? String, "hint")
                     return
@@ -67,12 +72,13 @@ private enum SpacesTests {
                 let title: String = switch first {
                 case .todo(let parsed): parsed.title
                 case .event(let event): event.title
+                case .repeating(let guess): guess.title
                 default: ""
                 }
                 try equal(title, expected["title"] as! String, "title")
                 try equal(reading.choices.map(choiceText), expected["choices"] as! [String], "choices")
-                // The space a made to-do takes (M4: only a to-do takes one).
-                let choice = first.kind == .todo ? reading.choices.first : nil
+                // The space a made to-do takes: only a to-do takes one, and (2a, A12) a repeat's rule.
+                let choice = [.todo, .repeating].contains(first.kind) ? reading.choices.first : nil
                 switch choice {
                 case .space(let id): try equal(id, expected["space"] as? String, "space")
                 case .new(let made):
@@ -143,7 +149,8 @@ private enum SpacesTests {
         try test("S16 unknown keys survive a read and a write, byte for byte") {
             let read = try TodoSpaces.decode(Data(canonical.utf8))
             try equal(read.encoded(), canonical, "bytes")
-            try equal(read.extra["series"] != nil, true, "series kept")
+            try equal(read.series?["daily-water"]?.space, "s-b", "series read (2a)")
+            try equal(read.extra["series"] == nil, true, "series not an unknown key")
             try equal(read.space("s-a")?.extra["icon"], .string("briefcase"), "icon")
             try equal(read.items["0B1C5E2A-6F3D-4C8B-9A7E-1D2F3A4B5C6D"]?.extra["pin"], .bool(true), "pin")
             // An unknown colour is kept and drawn lavender; a tombstone isn't shown.
@@ -156,6 +163,56 @@ private enum SpacesTests {
             try equal(again.extra, read.extra, "top-level kept after a change")
             try equal(again.space("s-a")?.extra["icon"], .string("briefcase"), "icon after a change")
             try equal(again.space("s-a")?.name, "직장", "renamed")
+        }
+
+        // MARK: S23–S26: 일반's name (#89)
+
+        let general = cases["general"] as! [String: Any]
+        func generalOf(_ value: Any?) throws -> TodoSpaces.General? {
+            guard let value = value as? [String: Any] else { return nil }
+            return try TodoSpaces.decode(json(["general": value])).general
+        }
+        func shownNames(_ spaces: TodoSpaces) -> [String: String] {
+            ["ko": spaces.generalName(.ko), "en": spaces.generalName(.en), "nl": spaces.generalName(.nl)]
+        }
+        try test("S23–S24 일반 renamed; blank or a default name: back to the default") {
+            try equal(shownNames(base), general["names"] as! [String: String], "default names")
+            for entry in general["renames"] as! [[String: Any]] {
+                var spaces = base
+                spaces.general = try generalOf(entry["general"])
+                spaces.renameGeneral(to: entry["to"] as! String, now: at(entry["now"] as! String))
+                let label = "\(entry["case"]!) ‘\(entry["to"]!)’"
+                try equal(spaces.general, try generalOf(entry["expect"]), label)
+                try equal(shownNames(spaces), entry["shown"] as! [String: String], label + " shown")
+            }
+        }
+        try test("S25 일반's name merged: the later one, the file's on the same second") {
+            for entry in general["merges"] as! [[String: Any]] {
+                var existing = base, incoming = base
+                existing.general = try generalOf(entry["existing"])
+                incoming.general = try generalOf(entry["incoming"])
+                try equal(TodoSpaces.merge(existing: existing, incoming: incoming).general, try generalOf(entry["expect"]), "\(entry["case"]!) \((entry["note"] as? String) ?? "")")
+            }
+        }
+        try test("S26 일반's name in the file: byte for byte, its unknown keys and an odd one kept") {
+            let text = general["S26"] as! String
+            let read = try TodoSpaces.decode(Data(text.utf8))
+            try equal(read.encoded(), text, "bytes")
+            try equal(shownNames(read), general["S26names"] as! [String: String], "names")
+            try equal(read.general?.extra["icon"], .string("tray"), "unknown key in it")
+            try equal(read.series, [:], "an empty series kept (2a)")
+            var renamed = read
+            renamed.renameGeneral(to: "개인", now: now)
+            let again = try TodoSpaces.decode(Data(renamed.encoded().utf8))
+            try equal(again.general?.extra["icon"], .string("tray"), "kept after a rename")
+            try equal(again.general?.name, "개인", "renamed")
+            // A `general` this version can't read stays as it was, and reads as the default.
+            let odd = general["S26odd"] as! String
+            let oddRead = try TodoSpaces.decode(Data(odd.utf8))
+            try equal(oddRead.encoded(), odd, "odd bytes")
+            try equal(oddRead.generalName(.en), "General", "odd: the default")
+            // Not renamed: no key.
+            try equal(base.encoded().contains("\"general\""), false, "no key by default")
         }
 
         // MARK: S17, S22: pruning
@@ -215,6 +272,285 @@ private enum SpacesTests {
             }
             try equal(TodoSpaces.asideName(at("2026-10-28T09:00:00Z")), "todo-spaces.json.unreadable-20261028-090000", "aside name")
             try equal(TodoSpaces().encoded(), "{\n  \"items\": {},\n  \"spaces\": [],\n  \"version\": 1\n}\n", "empty file")
+        }
+
+        // MARK: S32–S36: the repeat rules' spaces (2a)
+
+        let rules = cases["series"] as! [String: Any]
+        func seriesOf(_ value: Any?) throws -> [String: TodoSpaces.SeriesPlace]? {
+            guard let value = value as? [String: Any] else { return nil }
+            return try TodoSpaces.decode(json(["series": value])).series
+        }
+        func spacesOf(_ series: [String: TodoSpaces.SeriesPlace]?) -> [String: String?]? {
+            series?.mapValues { $0.space }
+        }
+        func expectedSpaces(_ value: Any?) -> [String: String?]? {
+            (value as? [String: Any])?.mapValues { $0 as? String }
+        }
+        try test("S32 rules' spaces merged: the later one, the file's on the same second") {
+            for entry in rules["merges"] as! [[String: Any]] {
+                var existing = base, incoming = base
+                existing.series = try seriesOf(entry["existing"])
+                incoming.series = try seriesOf(entry["incoming"])
+                let merged = TodoSpaces.merge(existing: existing, incoming: incoming)
+                try equal(spacesOf(merged.series), expectedSpaces(entry["expect"]), "S32 \((entry["note"] as? String) ?? "")")
+            }
+        }
+        try test("S33 rules' spaces in the file: byte for byte, unknown keys kept, an odd series kept, unreadable entries out") {
+            let text = rules["S33"] as! String
+            let read = try TodoSpaces.decode(Data(text.utf8))
+            try equal(read.encoded(), text, "bytes")
+            try equal(read.series?["4C2B7A10-0D3E-4F5A-8B6C-7D8E9F0A1B2C"]?.extra["pin"], .bool(true), "unknown key in a rule")
+            try equal(read.series?["daily-water"].map { $0.space == nil }, true, "null kept")
+            var changed = read
+            changed.setSeriesSpace("4C2B7A10-0D3E-4F5A-8B6C-7D8E9F0A1B2C", to: nil, now: now)
+            let again = try TodoSpaces.decode(Data(changed.encoded().utf8))
+            try equal(again.series?["4C2B7A10-0D3E-4F5A-8B6C-7D8E9F0A1B2C"]?.extra["pin"], .bool(true), "kept after a change")
+            let odd = rules["S33odd"] as! String
+            var oddRead = try TodoSpaces.decode(Data(odd.utf8))
+            try equal(oddRead.encoded(), odd, "odd bytes")
+            try equal(oddRead.series == nil, true, "odd: no rules")
+            oddRead.setSeriesSpace("daily-water", to: "s-gone", now: now)
+            try equal(oddRead.encoded(), odd, "odd: nothing for a gone space")
+            var withSpace = oddRead
+            withSpace.spaces = base.spaces
+            withSpace.setSeriesSpace("daily-water", to: "s-a", now: now)
+            try equal(withSpace.extra["series"] == nil, true, "odd: replaced once a rule has a space")
+            try equal(withSpace.seriesSpaceID(of: "daily-water"), "s-a", "odd: the new one")
+            let dropped = try TodoSpaces.decode(Data((rules["S33dropped"] as! String).utf8))
+            try equal(spacesOf(dropped.series), expectedSpaces(rules["S33droppedExpect"]), "unreadable entries out")
+        }
+        func places(_ value: Any?) throws -> [String: TodoSpaces.Place] {
+            try file(value as? [String: Any] ?? [:]).items
+        }
+        try test("S34 a rule's space set; its open to-dos move with it") {
+            for entry in rules["sets"] as! [[String: Any]] {
+                let label = "S34 \(entry["to"] ?? "nil") \((entry["note"] as? String) ?? "")"
+                var spaces = base
+                spaces.series = try seriesOf(entry["series"])
+                spaces.items = try places(entry["items"])
+                spaces.setSeriesSpace(entry["seriesID"] as! String, to: entry["to"] as? String, copies: entry["copies"] as! [String],
+                                      now: at(entry["now"] as! String))
+                try equal(spaces.series, try seriesOf(entry["expect"]), label)
+                try equal(spaces.items, try places(entry["expectItems"]), label + " items")
+            }
+        }
+        try test("S35 to-dos made from a rule go to its space; moving one moves only it") {
+            let copies = rules["copies"] as! [String: Any]
+            var spaces = base
+            spaces.series = try seriesOf(copies["series"])
+            _ = spaces.deleteSpace(copies["deleteSpace"] as! String, now: now)
+            let made = (copies["made"] as! [[String: String]]).map { (todo: $0["todo"]!, series: $0["series"]!) }
+            spaces.placeCopies(made, now: at(copies["now"] as! String))
+            try equal(spaces.items, try places(copies["expectItems"]), "placed")
+            let move = copies["thenMove"] as! [String: String]
+            spaces.move(move["todo"]!, to: move["to"], now: at(move["now"]!))
+            let after = copies["expectAfterMove"] as! [String: Any]
+            try equal(spaces.items, try places(after["items"]), "moved")
+            try equal(spacesOf(spaces.series), expectedSpaces(after["series"]), "the rule as it was")
+        }
+        try test("S36 rules gone from repeats.json for more than 30 days go at a save; not when repeats.json didn't read") {
+            let prune = rules["prune"] as! [String: Any]
+            var spaces = base
+            spaces.series = try seriesOf(prune["series"])
+            let when = at(prune["now"] as! String)
+            let pruned = spaces.pruned(todoIDs: [], seriesIDs: Set(prune["seriesIDs"] as! [String]), now: when)
+            try equal(pruned.series?.keys.sorted(), prune["expect"] as? [String], "pruned")
+            try equal(spaces.pruned(todoIDs: [], seriesIDs: nil, now: when).series?.keys.sorted(), prune["expectWithoutRepeats"] as? [String], "unreadable repeats")
+        }
+
+        // MARK: S37–S38: the lens on the 앞으로 tab and the day strip (2a)
+
+        let todoDecoder = JSONDecoder()
+        todoDecoder.dateDecodingStrategy = .iso8601
+        func todos(_ block: [String: Any]) throws -> [TodoItem] {
+            try todoDecoder.decode([TodoItem].self, from: json(block["todos"]!))
+        }
+        func lensOf(_ value: Any?) -> SpaceLens.Shown {
+            (value as? String).map { $0 == SpaceLens.none ? .noSpace : .space($0) } ?? .all
+        }
+        let ahead = cases["ahead"] as! [String: Any]
+        let aheadItems = try todos(ahead)
+        let aheadSpaces = ahead["spaces"] as! [String: String]
+        for entry in ahead["cases"] as! [[String: Any]] {
+            try test("S37 앞으로 under the lens \(entry["lens"] as? String ?? "all")") {
+                let shown = lensOf(entry["lens"])
+                let lensed = Ahead.lensed(aheadItems, now: now, calendar: calendar) { shown.includes(aheadSpaces[$0.id.uuidString]) }
+                let sections = Ahead.sections(items: lensed.items, events: [], now: now, calendar: calendar, language: .ko)
+                let expected = entry["expect"] as! [String: Any]
+                var counts: [String: Int] = [:]
+                for section in sections { counts[section.kind.rawValue] = section.count }
+                try equal(counts, expected["counts"] as! [String: Int], "counts")
+                var days: [String: [String]] = [:]
+                for day in sections.flatMap(\.days) where !day.tasks.isEmpty { days[day.date] = day.tasks.map(\.uuidString) }
+                try equal(days, expected["days"] as! [String: [String]], "days")
+                try equal(lensed.hidden, expected["hidden"] as! Int, "hidden")
+            }
+        }
+        let strip = cases["strip"] as! [String: Any]
+        let stripItems = try todos(strip)
+        let stripSpaces = strip["spaces"] as! [String: String]
+        let events = (strip["events"] as! [[String: String]]).enumerated().map { index, event in
+            CalendarEvent(key: "local/e\(index)@2026-10-28", calendarId: "local", title: event["title"]!, allDay: false,
+                          start: at(event["start"]!), end: at(event["end"]!), color: "#7a9e7e")
+        }
+        for entry in strip["cases"] as! [[String: Any]] {
+            try test("S38 the day strip under the lens \(entry["lens"] as? String ?? "all")") {
+                let shown = lensOf(entry["lens"])
+                let tasks = stripItems.filter { shown.includes(stripSpaces[$0.id.uuidString]) }
+                let state = DayStrip.state(DayStrip.items(events: events, tasks: tasks, now: now, calendar: calendar), now: now, rows: 3)
+                let expected = entry["expect"] as! [String: Any]
+                try equal("\(state.mode)", expected["mode"] as! String, "mode")
+                try equal(state.lead?.title, expected["lead"] as? String, "lead")
+                try equal(state.rows.map(\.title), expected["rows"] as! [String], "rows")
+            }
+        }
+
+        // MARK: S39–S44: 스페이스별로 묶기 (2b)
+
+        let grouping = cases["groups"] as! [String: Any]
+        let groupItems = try todos(grouping)
+        let groupSpaces = grouping["spaces"] as! [String: String]
+        let kst = DateFormatter()
+        kst.calendar = calendar
+        kst.timeZone = calendar.timeZone
+        kst.dateFormat = "HH:mm"
+        let titleOf = Dictionary(uniqueKeysWithValues: groupItems.map { ($0.id, $0.title) })
+        func groupsOf(_ items: [TodoItem], _ spaceMap: [String: String], lens: SpaceLens.Shown) -> [SpaceGroups.Group] {
+            SpaceGroups.groups(items, spaces: base, shown: lens, now: now, calendar: calendar) { spaceMap[$0.uuidString] }
+        }
+        func checkGroups(_ groups: [SpaceGroups.Group], _ expected: [[String: Any]]) throws {
+            try equal(groups.count, expected.count, "group count")
+            for (group, want) in zip(groups, expected) {
+                try equal(group.space, want["space"] as? String, "space")
+                try equal(group.items.map { titleOf[$0]! }, want["titles"] as! [String], "titles of \(group.id)")
+                try equal(group.open, want["open"] as! Int, "open of \(group.id)")
+                try equal(group.done.count, want["done"] as! Int, "done of \(group.id)")
+                try equal(group.next.map { kst.string(from: $0) }, want["next"] as? String, "next of \(group.id)")
+            }
+        }
+        for entry in grouping["cases"] as! [[String: Any]] {
+            try test("\(entry["case"]!) the groups under the lens \(entry["lens"] as? String ?? "all")") {
+                try checkGroups(groupsOf(groupItems, groupSpaces, lens: lensOf(entry["lens"])), entry["expect"] as! [[String: Any]])
+            }
+        }
+        let firstCase = (grouping["cases"] as! [[String: Any]])[0]["expect"] as! [[String: Any]]
+        for entry in grouping["drops"] as! [[String: Any]] {
+            try test("S43 a drop: \(entry["note"]!)") {
+                let id = UUID(uuidString: entry["id"] as! String)!
+                let to = SpaceGroups.space(entry["to"] as! String)
+                var order = groupItems.map(\.id)
+                let back = SpaceGroups.returnPoint(of: id, in: order)
+                if let target = (entry["relativeTo"] as? String).flatMap(UUID.init(uuidString:)) {
+                    order = SpaceGroups.moved(order, id, relativeTo: target, after: entry["after"] as! Bool)
+                }
+                var map = groupSpaces
+                let was = map[id.uuidString]
+                map[id.uuidString] = to
+                let byID = Dictionary(uniqueKeysWithValues: groupItems.map { ($0.id, $0) })
+                try checkGroups(groupsOf(order.compactMap { byID[$0] }, map, lens: .all), entry["expect"] as! [[String: Any]])
+                // 되돌리기: its space and its place in the list as they were.
+                map[id.uuidString] = was
+                if let back { order = SpaceGroups.moved(order, id, relativeTo: back.target, after: back.after) }
+                try equal(order, groupItems.map(\.id), "the list's order after 되돌리기")
+                try checkGroups(groupsOf(order.compactMap { byID[$0] }, map, lens: .all), firstCase)
+            }
+        }
+        for entry in grouping["keys"] as! [[String: Any]] {
+            try test("S44 ⌥⌘\(entry["direction"] as! String == "up" ? "↑" : "↓") \(entry["note"] as? String ?? "")") {
+                let groups = groupsOf(groupItems, groupSpaces, lens: lensOf(entry["lens"]))
+                let target = SpaceGroups.neighbor(of: UUID(uuidString: entry["id"] as! String)!, step: entry["direction"] as! String == "up" ? -1 : 1, in: groups)
+                try equal(target, entry["to"] as? String, "the group it goes to")
+            }
+        }
+
+        let board = grouping["board"] as! [String: Any]
+        let widths = board["maxWidth"] as! [String: Double]
+        try test("S45 the note's widest: 1,200 grouped, 720 not") {
+            try equal(SpaceGroups.wideNote, widths["grouped"]!, "grouped")
+            try equal(SpaceGroups.narrowNote, widths["plain"]!, "plain")
+        }
+        for entry in board["cases"] as! [[String: Any]] {
+            try test("S45 \(entry["count"]!) groups at \(entry["width"]!): \((entry["columns"] as! Bool) ? "columns" : "cards")") {
+                try equal(SpaceGroups.boardFits(width: entry["width"] as! Double, count: entry["count"] as! Int), entry["columns"] as! Bool, "columns")
+            }
+        }
+
+        // MARK: S46–S48: several to-dos picked and moved at once (#168)
+
+        let multi = cases["multi"] as! [String: Any]
+        let names = multi["rows"] as! [String]
+        let rowIDs = names.indices.map { UUID(uuidString: String(format: "E0000000-0000-4000-8000-%012d", $0 + 1))! }
+        let nameOf = Dictionary(uniqueKeysWithValues: zip(rowIDs, names))
+        let idOf = Dictionary(uniqueKeysWithValues: zip(names, rowIDs))
+        for entry in multi["selection"] as! [[String: Any]] {
+            try test("S46 picking: \(entry["note"] as? String ?? "\(entry["steps"]!)")") {
+                var selection = ListSelection()
+                for step in entry["steps"] as! [[Any]] {
+                    switch step[0] as! String {
+                    case "click": selection.click(idOf[step[1] as! String]!)
+                    case "toggle": selection.toggle(idOf[step[1] as! String]!, order: rowIDs)
+                    case "range": selection.range(to: idOf[step[1] as! String]!, order: rowIDs)
+                    case "extend": selection.extend(step[1] as! Int, order: rowIDs)
+                    default: selection.clear()
+                    }
+                }
+                let want = entry["expect"] as! [String: Any]
+                try equal(selection.ordered(rowIDs).map { nameOf[$0]! }, want["ids"] as! [String], "ids")
+                try equal(selection.focus.map { nameOf[$0]! }, want["focus"] as? String, "focus")
+                try equal(selection.anchor.map { nameOf[$0]! }, want["anchor"] as? String, "anchor")
+            }
+        }
+        let byID = Dictionary(uniqueKeysWithValues: groupItems.map { ($0.id, $0) })
+        let listOrder = groupItems.map(\.id)
+        for entry in multi["moves"] as! [[String: Any]] {
+            try test("S47 several moved: \(entry["note"]!)") {
+                let ids = (entry["ids"] as! [String]).map { UUID(uuidString: $0)! }
+                let to = SpaceGroups.space(entry["to"] as! String)
+                var order = listOrder
+                if let target = (entry["relativeTo"] as? String).flatMap(UUID.init(uuidString:)) {
+                    order = SpaceGroups.movedBlock(order, ids, relativeTo: target, after: entry["after"] as! Bool)
+                }
+                var map = groupSpaces
+                var moved = 0
+                for id in ids where map[id.uuidString] != to { map[id.uuidString] = to; moved += 1 }
+                try equal(moved, entry["moved"] as! Int, "moved")
+                try checkGroups(groupsOf(order.compactMap { byID[$0] }, map, lens: .all), entry["expect"] as! [[String: Any]])
+                // 되돌리기: every space and place as it was.
+                order = SpaceGroups.restored(order, ids, previous: listOrder)
+                try equal(order, listOrder, "the list's order after 되돌리기")
+                try checkGroups(groupsOf(order.compactMap { byID[$0] }, groupSpaces, lens: .all), firstCase)
+            }
+        }
+        for entry in multi["keys"] as! [[String: Any]] {
+            try test("S48 ⌥⌘\(entry["direction"] as! String == "up" ? "↑" : "↓") with several picked \(entry["note"] as? String ?? "")") {
+                let ids = (entry["ids"] as! [String]).map { UUID(uuidString: $0)! }
+                let focus = UUID(uuidString: entry["focus"] as! String)!
+                let selection = ListSelection(anchor: focus, focus: focus, ids: Set(ids))
+                let groups = groupsOf(groupItems, groupSpaces, lens: .all)
+                let target = SpaceGroups.neighbor(of: selection, step: entry["direction"] as! String == "up" ? -1 : 1, in: groups)
+                try equal(target, entry["to"] as? String, "the group")
+                let moved = target.map { key in ids.filter { groupSpaces[$0.uuidString] != SpaceGroups.space(key) }.count } ?? 0
+                try equal(moved, entry["moved"] as! Int, "moved")
+            }
+        }
+        try test("#168 words: 3개를 집으로 옮겼어요, one as before, the badge") {
+            try equal(SpaceWords.moved(3, to: "집", language: .ko), "3개를 집으로 옮겼어요", "ko")
+            try equal(SpaceWords.moved(3, to: "Home", language: .en), "Moved 3 to Home", "en")
+            try equal(SpaceWords.moved(3, to: "Thuis", language: .nl), "3 verplaatst naar Thuis", "nl")
+            try equal(SpaceWords.moved(1, to: "회사", language: .ko), "회사로 옮겼어요", "one")
+            try equal(SpaceWords.badge(3, language: .ko), "3개", "badge")
+        }
+
+        try test("#168 reorder: the list in a given order as one undo step; the same order changes nothing") {
+            var history = UndoableNotebook(notebook: Notebook())
+            for title in ["가", "나", "다", "라"] { _ = history.add(title, shelf: nil) }
+            let ids = history.notebook.items.map(\.id)
+            try equal(history.reorder(ids), false, "same order")
+            try equal(history.reorder([ids[2], ids[0]]), true, "changed")
+            try equal(history.notebook.items.map(\.title), ["다", "가", "나", "라"], "order")
+            _ = history.undo()
+            try equal(history.notebook.items.map(\.title), ["가", "나", "다", "라"], "undone")
         }
 
         // MARK: The Mac's own cases
@@ -341,15 +677,18 @@ private enum SpacesTests {
             try equal(SpaceWords.moved(to: "Work"), "Work로 옮겼어요", "Latin")
             try equal(SpaceWords.moved(to: "Team"), "Team으로 옮겼어요", "m")
             try equal(SpaceWords.moved(to: "2030"), "2030으로 옮겼어요", "영")
-            try equal(SpaceWords.moved(to: "스페이스 없음"), "스페이스 없음으로 옮겼어요", "none")
+            try equal(SpaceWords.moved(to: "일반"), "일반으로 옮겼어요", "일반")
+            try equal(SpaceWords.moved(to: base.generalName(.en), language: .en), "Moved to General", "General")
             try equal(SpaceWords.deleted("회사"), "스페이스 ‘회사’를 지웠어요", "를")
             try equal(SpaceWords.deleted("집"), "스페이스 ‘집’을 지웠어요", "을")
             try equal(SpaceWords.showing("회사"), "회사만 보는 중", "showing")
-            try equal(SpaceWords.showing(nil, language: .en), "Showing to-dos without a space", "showing none")
-            try equal(SpaceWords.hidden(1, language: .en), "1 other to-do hidden", "en one")
-            try equal(SpaceWords.hidden(4, language: .nl), "4 andere taken verborgen", "nl many")
-            try equal(SpaceWords.hidden(1466), "다른 할 일 1,466개는 숨겼어요", "grouped")
-            try equal(SpaceWords.hidden(1466, language: .nl), "1.466 andere taken verborgen", "nl grouped")
+            try equal(SpaceWords.showing("Algemeen", language: .nl), "Alleen Algemeen zichtbaar", "showing 일반")
+            try equal(SpaceWords.more(4), "다른 스페이스에 4개 더", "#87 ko")
+            try equal(SpaceWords.more(1, language: .en), "1 more in other spaces", "#87 en")
+            try equal(SpaceWords.more(1466, language: .nl), "Nog 1.466 in andere ruimtes", "#87 nl grouped")
+            try equal(SpaceWords.lensLabel("회사", hidden: 4), "회사만 보는 중, 다른 스페이스에 4개 더", "#87 label")
+            try equal(SpaceWords.lensLabel("Work", hidden: 0, language: .en), "Showing Work only", "#87 label, none hidden")
+            try equal(SpaceWords.lensLabel("Werk", hidden: 1466, language: .nl), "Alleen Werk zichtbaar, nog 1.466 in andere ruimtes", "#87 label nl")
             try equal(SpaceWords.writeIn("Werk", language: .nl), "Naar Werk: een taak, afspraak", "nl hint")
             try equal(SpaceWords.only("Work", language: .en), "Work only", "button")
         }

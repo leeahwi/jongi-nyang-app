@@ -3,11 +3,11 @@ import type { Lang } from "./lang";
 /**
  * Where the list lives. By default next to the settings (%APPDATA%\PaperTodo); a chosen folder
  * (OneDrive, Dropbox, iCloud Drive…) lets several computers share one list. Only the data moves
- * there — todos.json, memos.json, repeats.json, events.json, alarms.json, memo-folders.json (메모 서랍, 1.28), todo-spaces.json (할 일 스페이스, 1.30) and archive/ —
+ * there — todos.json, memos.json, repeats.json, events.json, alarms.json, memo-folders.json (메모 서랍, 1.28), todo-spaces.json (할 일 스페이스, 1.30), memo-trash.json (지운 메모, 1.31) and archive/ —
  * settings stay on each device.
  * The chosen folder is kept in storage.json beside settings.json.
  */
-export const sharedFiles = ["todos.json", "memos.json", "repeats.json", "events.json", "alarms.json", "memo-folders.json", "todo-spaces.json"] as const;
+export const sharedFiles = ["todos.json", "memos.json", "repeats.json", "events.json", "alarms.json", "memo-folders.json", "todo-spaces.json", "memo-trash.json"] as const;
 export type SharedFile = typeof sharedFiles[number];
 export const storageFileName = "storage.json";
 
@@ -22,6 +22,30 @@ export function parseStorageFile(text: string): string | undefined {
 
 export function serializeStorageFile(folder: string | undefined): string {
   return JSON.stringify(folder ? { folder } : {}, null, 2) + "\n";
+}
+
+/**
+ * #195: what a move leaves for the restarted app (storage-moved.json beside settings.json), said once as a toast and then
+ * removed: the folder's name only (never its path; none = back to this PC's own place), and whether this list went
+ * there (`moved`) or the folder's own list is used now (`folder`).
+ */
+export const movedFileName = "storage-moved.json";
+export interface StorageMoved { folder?: string; kept: "moved" | "folder" }
+
+export function serializeMoved(moved: StorageMoved): string {
+  return JSON.stringify(moved.folder ? { folder: moved.folder, kept: moved.kept } : { kept: moved.kept }) + "\n";
+}
+
+export function parseMoved(text: string): StorageMoved | undefined {
+  try {
+    const value = JSON.parse(text) as { folder?: unknown; kept?: unknown };
+    if (value.kept !== "moved" && value.kept !== "folder") return undefined;
+    // A name, not a path: anything after the last separator only, and not too long for a toast.
+    const folder = typeof value.folder === "string" ? value.folder.split(/[\\/]/).filter(Boolean).pop()?.slice(0, 80) : undefined;
+    return folder ? { folder, kept: value.kept } : { kept: value.kept };
+  } catch {
+    return undefined;
+  }
 }
 
 /** Windows paths compare without case and without a trailing separator. */

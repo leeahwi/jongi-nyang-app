@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { focusFileName, focusLine, parseFocus, type FocusRecord } from "../core/focus";
+import { appendSafely, readTextIfSafe } from "./safeFiles";
 
 /**
  * 집중 기록: focus.jsonl in the storage folder, one line per session (see core/focus.ts). Lines are
@@ -30,7 +31,8 @@ export class FocusLog {
           if (last.toString() !== "\n") lead = "\n";
         }
       } catch { /* a new file */ }
-      fs.appendFileSync(this.file, `${lead}${focusLine(record)}\n`, "utf8");
+      // #173: never through a link, nor onto a file past the size limit (that one is shown as a storage problem).
+      appendSafely(this.file, `${lead}${focusLine(record)}\n`);
       this.cache = undefined;
       return true;
     } catch {
@@ -45,7 +47,7 @@ export class FocusLog {
     try { const stat = fs.statSync(this.file); stamp = `${stat.size}:${stat.mtimeMs}`; } catch { return []; }
     if (this.cache?.stamp === stamp) return this.cache.records;
     let records: FocusRecord[] = [];
-    try { records = parseFocus(fs.readFileSync(this.file, "utf8")); } catch { /* unreadable now: none */ }
+    try { records = parseFocus(readTextIfSafe(this.file) ?? ""); } catch { /* unreadable now: none */ }
     this.cache = { stamp, records };
     return records;
   }

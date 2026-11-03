@@ -4,7 +4,8 @@
 // (default: all). `long` adds memos of 10 KB, 100 KB and 1 MB and a 2,000-line checklist to 500 memos.
 //   node tools/perf-memo.mjs [tier …] [--out=file.json]
 // Per tier: the drawer's first open and reopen, idle CPU with it open, scrolling the list (frame times), opening the top
-// memo, typing in it (each key to its frame) and the redraw when the keys pause (long tasks), memory.
+// memo, typing in it (each key to its frame) and the redraw when the keys pause (long tasks), memory. Every window off every
+// screen (PAPERTODO_OFFSCREEN); on a Mac a window on a screen stops the run (tools/offscreen-watch.mjs, #92).
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -13,6 +14,7 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { writePerfData } from "./perf-data.mjs";
 import { writeMemoStressData } from "./memo-stress-data.mjs";
+import { watchWindows } from "./offscreen-watch.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -73,10 +75,11 @@ async function launch(name, memoOptions) {
   const inspectPort = portBase++;
   const started = Date.now();
   const child = spawn(electronBinary, [root, "--demo", `--remote-debugging-port=${debugPort}`, `--inspect=${inspectPort}`, `--user-data-dir=${path.join(folder, "user-data")}`, "--disable-backgrounding-occluded-windows"], {
-    env: { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== "ELECTRON_RUN_AS_NODE")), PAPERTODO_NO_SHORTCUTS: "1", PAPERTODO_DEMO_DATA: data, PAPERTODO_LANG: "ko", TMPDIR: tmp },
+    env: { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== "ELECTRON_RUN_AS_NODE")), PAPERTODO_NO_SHORTCUTS: "1", PAPERTODO_OFFSCREEN: "1", PAPERTODO_DEMO_DATA: data, PAPERTODO_LANG: "ko", TMPDIR: tmp },
     stdio: ["ignore", "ignore", "pipe"],
   });
   children.add(child);
+  watchWindows(child, (why) => { console.error(`perf-memo: ${why}`); process.exit(1); });
   child.on("exit", () => children.delete(child));
   let stderr = "";
   child.stderr.on("data", (chunk) => { stderr += chunk; });
@@ -86,6 +89,13 @@ async function launch(name, memoOptions) {
   const main = await connect(mainTarget.webSocketDebuggerUrl);
   while (!(await evaluate(main, `Boolean(process.mainModule)`))) await sleep(10);
   await evaluate(main, `globalThis.__e = process.mainModule.require("electron"); true`);
+  // Any window with no off-screen place of its own is moved off every screen before it shows (as tools/perf.mjs does).
+  await evaluate(main, `(() => {
+    const proto = __e.BrowserWindow.prototype;
+    const away = (window) => { const [x, y] = window.getPosition(); if (x > -20000) window.setPosition(-40000 + 100, -40000 + 100); };
+    for (const name of ["show", "showInactive"]) { const original = proto[name]; proto[name] = function (...args) { away(this); return original.apply(this, args); }; }
+    return true;
+  })()`);
   let noteTarget;
   for (let tries = 0; tries < 800 && !noteTarget; tries += 1) { noteTarget = (await json(debugPort, "list"))?.find((target) => target.url.endsWith("note.html")); if (!noteTarget) await sleep(20); }
   if (!noteTarget) throw new Error(`no note page\n${stderr}`);
@@ -245,9 +255,10 @@ for (const tier of tiers) {
       await ensureOpen(run, page);
       await watchLong(page);
       const opened = await clickTimed(page, `.it[data-id="${id}"]`);
-      await until(page, `document.querySelector('.it.open textarea.editor') !== null`, 60000);
+      await until(page, `document.querySelector('.it.open textarea.editor, .it.open .cm-content') !== null`, 60000);
       await sleep(600);
-      const focused = await evaluate(page, `(() => { const field = document.querySelector('.it.open textarea.editor'); if (!field) return false; field.focus(); field.setSelectionRange(field.value.length, field.value.length); return document.activeElement === field; })()`);
+      // The editor: a textarea up to 1.30, CodeMirror from 1.31 (#84; it opens with the caret at the end).
+      const focused = await evaluate(page, `(() => { const field = document.querySelector('.it.open textarea.editor'); if (field) { field.focus(); field.setSelectionRange(field.value.length, field.value.length); return document.activeElement === field; } const editor = document.querySelector('.it.open .cm-content'); if (!editor) return false; if (!editor.contains(document.activeElement)) editor.focus(); return editor.contains(document.activeElement); })()`);
       const keys = focused ? await type(page, "가나다라마바사아자차abcdefghij") : [];
       const long = await evaluate(page, `window.__long`);
       out.typing[id] = { openSyncMs: round(opened?.sync ?? NaN), openFrameMs: round(opened?.frame ?? NaN), visible: opened?.visible, focused, keys: keys.length ? stats(keys) : null, longTasks: long.length, longestTaskMs: round(Math.max(0, ...long)) };

@@ -134,6 +134,14 @@ enum DesignSnapshots {
                         .padding(12).frame(width: 420).background(PaperTheme.paper),
                        size: nil, to: output.appendingPathComponent("line-\(name).png"))
         }
+        // #162: pasted lines — the line grows to 4 lines under the chips, then holds (the rest scrolls inside).
+        for (name, text) in [("lines-3", t("장보기 목록\n\n우유 · 달걀 · 빵", "shopping list\n\nmilk · eggs · bread", "boodschappenlijst\n\nmelk · eieren · brood")),
+                             ("lines-6", t("장보기 목록\n우유\n달걀\n빵\n사과\n휴지", "shopping list\nmilk\neggs\nbread\napples\ntissues",
+                                           "boodschappenlijst\nmelk\neieren\nbrood\nappels\ntissues"))] {
+            try render(IntentLineView(model: model, page: .todos, previewText: text, previewFocused: true)
+                        .padding(12).frame(width: 420).background(PaperTheme.paper),
+                       size: nil, to: output.appendingPathComponent("line-\(name).png"))
+        }
         let eventCommit = IntentCommit(text: "", candidates: model.intentCandidates(t("내일 3시 회의", "meeting tomorrow 3pm", "morgen om 3 uur overleg")),
                                        index: 0, key: nil, made: .nothing, page: .todos)
         model.toast = model.makeToast(for: eventCommit, onChange: { _ in })
@@ -300,15 +308,28 @@ enum DesignSnapshots {
         model.calendar.showForSnapshot(snapshotEvents)
         try zoom(PaperView(model: model), size: NSSize(width: 350, height: 400), height: 120, to: output.appendingPathComponent("header-narrow.png"))
         try zoom(PaperView(model: model), size: NSSize(width: 720, height: 600), height: 120, to: output.appendingPathComponent("header-wide.png"))
-        // The header cat peeking over its edge, awake and (23:00–05:00) asleep, nodding — up close.
-        try zoom(HStack(alignment: .bottom, spacing: 24) {
-            PeekingCat(hour: 10)
-            PeekingCat(nodding: true, hour: 10)
-            PeekingCat(hour: 23)
-        }
-        .padding(.horizontal, 20).padding(.top, 24).padding(.bottom, 14)
-        .frame(width: 320, height: 110, alignment: .bottom)
-        .background(PaperBackground()), size: NSSize(width: 320, height: 110), height: 110, to: output.appendingPathComponent("header-cat.png"))
+        // #151: no cat in the header; the drawer's ears on the window's top edge instead — the note as on the desktop
+        // (its corners, edge and shadow drawn here as the window's), wide, narrow and short, one ear mid-twitch, and the
+        // ears alone up close on light and dark desktops (their hairline edge).
+        try render(noteWithEars(PaperView(model: model), size: NSSize(width: 420, height: 560)), size: nil, to: output.appendingPathComponent("note-ears.png"))
+        try render(noteWithEars(PaperView(model: model), size: NSSize(width: 350, height: 560)), size: nil, to: output.appendingPathComponent("note-ears-narrow.png"))
+        try render(noteWithEars(PaperView(model: model), size: NSSize(width: 350, height: 400)), size: nil, to: output.appendingPathComponent("note-ears-small.png"))
+        try zoom(noteWithEars(PaperView(model: model), size: NSSize(width: 420, height: 560), tilt: [-4, 0]), size: NSSize(width: 468, height: 627), height: 150,
+                 to: output.appendingPathComponent("note-ears-twitch.png"))
+        try zoom(HStack(spacing: 0) {
+            ForEach(["#ffffff", "#fbf9f3", "#cdd6de", "#2a2924", "#000000"], id: \.self) { hex in
+                ZStack(alignment: .top) {
+                    Color(nsColor: NSColor(paperHex: hex)!)
+                    VStack(spacing: 0) {
+                        NoteEarsView(state: NoteEarsState())
+                        PaperBackground().frame(width: NoteEarsPlacement.width, height: 14)
+                            .padding(.top, -NoteEarsPlacement.overlap).zIndex(-1)
+                    }
+                    .padding(.top, 12)
+                }
+                .frame(width: 120, height: 60)
+            }
+        }, size: NSSize(width: 600, height: 60), height: 60, to: output.appendingPathComponent("note-ears-edge.png"))
         model.calendar.showForSnapshot([])
         // Deadlines: this week, overdue, this month.
         model.setDue(model.items[2].id, to: Deadline.day(for: .thisWeek, now: Date(), language: .current))
@@ -480,15 +501,53 @@ enum DesignSnapshots {
         let full = NSSize(width: DeskMetrics.size.width, height: 1500)
         // 저장과 백업 (1.45): the sample's temporary folder drawn as the default one, never a real path.
         FolderPath.standIn = (folder.path, NSHomeDirectory() + "/Library/Application Support/com.noa.PaperTodo")
+        // 자동 백업 · 백업 목록 (#139 · #140): eight made-up copies in the sample's own backups folder (never this Mac's),
+        // drawn on a fixed morning so ‘오늘 09:12’ reads the same every time.
+        let sampleBackups = try sampleBackupBook(folder: folder, preferences: preferences)
+        model.backups = sampleBackups
         for pane in [DeskPane.appearance, .notifications, .repeating, .pet, .events, .storage] {
             try desk(pane, "desk-\(pane.rawValue)")
             try desk(pane, "desk-\(pane.rawValue)-full", size: full)
         }
+        // #195: 저장 위치's footnote (a move copies the list there and restarts) on the narrowest desk, and the toast the
+        // restarted app shows once (the sample folder's name).
+        try desk(.storage, "desk-narrow-storage", size: DeskMetrics.minimum)
+        model.toast = PaperToast(symbol: "folder", text: StorageFolder.movedText(folder: t("종이냥", "Jongi-nyang", "Jongi-nyang"), moved: true))
+        try render(PaperView(model: model), size: NSSize(width: 420, height: 560), to: output.appendingPathComponent("note-storage-moved.png"))
+        model.toast = nil
         // …and a shared one in iCloud Drive: its name first, then the folder's.
         model.sharedFolder = folder
         FolderPath.standIn = (folder.path, NSHomeDirectory() + "/Library/Mobile Documents/com~apple~CloudDocs/종이냥")
         try desk(.storage, "desk-storage-shared")
+        // The restore question (#140), on a shared folder (its extra line) and on this Mac's.
+        let restoring = sampleBackups.entries[2]
+        let restoreCopy = try Backup.parse(String(contentsOf: restoring.url, encoding: .utf8))
+        for (name, shared) in [("backup-restore", false), ("backup-restore-shared", true)] {
+            let when = Backup.savedWhen(restoring.date, now: sampleBackups.now(), language: .current, midSentence: true)
+            try slip(SlipAlertView(symbol: "clock.arrow.circlepath", title: String(localized: "되돌리기", table: "Settings"), message: L("\(when) 백업으로 되돌릴까요?"),
+                                   detail: BackupController.restoreDetail(restoreCopy, shared: shared), choices: BackupController.importChoices,
+                                   cat: .curious, width: .medium),
+                     to: output.appendingPathComponent("\(name).png"))
+        }
         model.sharedFolder = nil
+        FolderPath.standIn = (folder.path, NSHomeDirectory() + "/Library/Application Support/com.noa.PaperTodo")
+        // 자동 백업 off, with the whole list open, and with nothing yet.
+        sampleBackups.auto = false
+        try render(VStack(alignment: .leading, spacing: 20) {
+            AutoBackupGroup(book: sampleBackups, model: model)
+            BackupListGroup(book: sampleBackups, model: model, expanded: true)
+        }.environment(\.settingsTint, DeskPane.storage.tint).padding(DeskMetrics.gutter).frame(width: DeskMetrics.column + 2 * DeskMetrics.gutter).background(PaperTheme.paper),
+                   size: nil, to: output.appendingPathComponent("desk-backups-open.png"))
+        sampleBackups.auto = true
+        let noBackups = folder.appendingPathComponent("no-backups", isDirectory: true)
+        let emptyBackups = BackupBook(storageFolder: folder, defaultFolder: noBackups, preferences: preferences)
+        // Drawn as the default folder too.
+        FolderPath.standIn = (noBackups.path, NSHomeDirectory() + "/Library/Application Support/com.noa.PaperTodo/backups")
+        try render(VStack(alignment: .leading, spacing: 20) {
+            AutoBackupGroup(book: emptyBackups, model: model)
+            BackupListGroup(book: emptyBackups, model: model)
+        }.environment(\.settingsTint, DeskPane.storage.tint).padding(DeskMetrics.gutter).frame(width: DeskMetrics.column + 2 * DeskMetrics.gutter).background(PaperTheme.paper),
+                   size: nil, to: output.appendingPathComponent("desk-backups-empty.png"))
         FolderPath.standIn = (folder.path, NSHomeDirectory() + "/Library/Application Support/com.noa.PaperTodo")
         // 1.43.1: 메모 서랍 has its own pane (it was a group at the bottom of 꾸미기).
         try desk(.drawer, "desk-drawer-pane")
@@ -905,6 +964,8 @@ enum DesignSnapshots {
         try renderMemoDrawer(folder: folder, output: output)
         // 1.45: 할 일 스페이스.
         try renderSpaces(folder: folder, preferences: preferences, output: output)
+        // 1.45.1: the note's key (#85) and the shortcut list (#86).
+        try renderShortcuts(model: model, output: output)
         // 1.35: the menu bar item (its words in each state) and the 오늘 창 below it.
         try renderTodayWindow(model: model, alarms: sampleAlarms, events: snapshotEvents, output: output)
         print("Rendered note (3 fonts + minimum size), editor, settings and 3 reminders to \(output.path)")
@@ -927,6 +988,7 @@ enum DesignSnapshots {
         notebook.toggle(id: done.id)
         try NotebookFile(url: storage).save(notebook)
         let model = AppModel(storageURL: storage, isolated: true, preferences: preferences)
+        keptModels.append(model)
         model.paperColor = night ? .night : .day
         // 어제부터 · 3일째 (stamps written as another day would have).
         model.mutate { history in
@@ -1155,7 +1217,63 @@ enum DesignSnapshots {
         }
     }
 
+    /// The note as it stands on the desktop with its ears (#151): the window's rounded corners, edge and shadow over a
+    /// desktop of the paper's mode (the mock's: light grey-blue by day, slate at night), the ears' panel flush with the
+    /// window's right edge, its foot over the window's top edge.
+    static func noteWithEars<V: View>(_ note: V, size: NSSize, tilt: [CGFloat] = [0, 0]) -> some View {
+        let margin: CGFloat = 24
+        let top = margin + NoteEarsPlacement.height - NoteEarsPlacement.overlap
+        let window = RoundedRectangle(cornerRadius: 16, style: .continuous)
+        let desktop = night ? ["#3b4048", "#2c3036"] : ["#dfe5ea", "#cdd6de"]
+        return ZStack(alignment: .topLeading) {
+            LinearGradient(colors: desktop.map { Color(nsColor: NSColor(paperHex: $0)!) }, startPoint: .topLeading, endPoint: .bottomTrailing)
+            note.frame(width: size.width, height: size.height)
+                .clipShape(window)
+                .overlay(window.strokeBorder(night ? Color.white.opacity(0.16) : Color.black.opacity(0.12), lineWidth: 0.5))
+                .shadow(color: .black.opacity(night ? 0.45 : 0.2), radius: 14, y: 8)
+                .offset(x: margin, y: top)
+            NoteEarsView(state: NoteEarsState(), previewTilt: tilt)
+                .offset(x: margin + size.width - NoteEarsPlacement.width, y: margin)
+        }
+        .frame(width: size.width + margin * 2, height: size.height + top + margin, alignment: .topLeading)
+    }
+
     /// A slip as it floats on screen: with its margins (tape, shadow) on the desk colour.
+    /// 백업 목록's sample (#140): eight made-up copies — kinds, counts and sizes like a few weeks of use — in a folder of
+    /// the sample's own, seen on a fixed morning (10월 30일 10:00). Made-up records pad them to their sizes.
+    static func sampleBackupBook(folder: URL, preferences: UserDefaults) throws -> BackupBook {
+        let backups = folder.appendingPathComponent("backups", isDirectory: true)
+        try FileManager.default.createDirectory(at: backups, withIntermediateDirectories: true)
+        let calendar = Calendar.paper
+        func at(_ day: Int, _ hour: Int, _ minute: Int) -> Date {
+            calendar.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour, minute: minute))!
+        }
+        let samples: [(Backup.Reason, Date, Backup.Counts, Int)] = [
+            (.daily, at(30, 9, 12), .init(todos: 24, memos: 12, events: 6, archive: 310), 220),
+            (.beforeImport, at(29, 21, 40), .init(todos: 22, memos: 12, events: 6, archive: 305), 216),
+            (.daily, at(28, 8, 55), .init(todos: 19, memos: 11, events: 5, archive: 298), 209),
+            (.beforeUpdate, at(27, 10, 2), .init(todos: 18, memos: 11, events: 5, archive: 290), 204),
+            (.manual, at(25, 18, 30), .init(todos: 16, memos: 10, events: 4, archive: 281), 198),
+            (.daily, at(24, 9, 5), .init(todos: 15, memos: 10, events: 4, archive: 276), 195),
+            (.beforeFolderSwitch, at(23, 20, 15), .init(todos: 15, memos: 9, events: 4, archive: 270), 191),
+            (.daily, at(22, 8, 40), .init(todos: 14, memos: 9, events: 3, archive: 266), 188),
+        ]
+        let iso = ISO8601DateFormatter()
+        for (index, (reason, date, counts, kilobytes)) in samples.enumerated() {
+            let line = { (n: Int) in ##"{"completedAt":"2026-10-01T10:00:00Z","createdAt":"2026-10-01T09:00:00Z","id":"sample-\##(index)-\##(n)","title":"보고서 쓰기"}"## }
+            var record = "", n = 0
+            while record.utf8.count < kilobytes * 1024 * 100 / 115 - 400 { record += line(n) + "\n"; n += 1 }  // quotes are escaped in the file
+            let object: [String: Any] = ["format": Backup.format, "version": Backup.version, "exportedAt": iso.string(from: date), "from": "macOS 1.46.0",
+                                         "reason": reason.rawValue, "counts": ["todos": counts.todos, "memos": counts.memos, "events": counts.events, "archive": counts.archive],
+                                         "files": ["archive/2026-10.jsonl": record]]
+            try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]).write(to: backups.appendingPathComponent(Backup.savedName(reason, at: date)))
+        }
+        let book = BackupBook(storageFolder: folder, defaultFolder: backups, preferences: preferences)
+        book.now = { at(30, 10, 0) }
+        book.refresh(readingNow: true)
+        return book
+    }
+
     static func slip<V: View>(_ view: V, to url: URL) throws {
         try render(view.padding(SlipMetrics.margin).background(PaperTheme.desk), size: nil, to: url)
     }
@@ -1216,6 +1334,11 @@ enum DesignSnapshots {
         try bitmap.representation(using: .png, properties: [:])!.write(to: url)
         window.close()
     }
+
+    /// The models the scenes were drawn from, kept until the run ends (#59). A drawn view can redraw after its
+    /// picture is taken — the drawer's undo toast clears itself 6 seconds later, while a later scene is being drawn —
+    /// and the drawer holds its model `unowned`, as in the app, where the model outlives it.
+    static var keptModels: [AppModel] = []
 
     /// `PAPERTODO_ONLY=note-,ahead` draws only the files whose names contain one of the words (quick
     /// checks while working); unset draws everything.

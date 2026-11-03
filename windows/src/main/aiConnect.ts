@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  advanceSeen, aiAwayText, aiCatLine, aiEntry, aiLinkFileName, aiLockFileName, aiLogFileName, aiLogLine, aiMarks, aiToastText, aiUndoText,
+  advanceSeen, aiAwayText, aiCatLine, aiEntry, aiExtOutdated, aiExtVersion, aiLinkFileName, aiLockFileName, aiLogFileName, aiLogLine, aiMarks, aiToastText, aiUndoText,
   awayCount, isAiWork, parseAiLog, recentAi, serializeAiLink, trimAiLog, undoEntry, undoneIds, unseenAi, type AiLogEntry, type AiSeen,
 } from "../core/ai";
 import { dayKey } from "../core/archive";
@@ -9,6 +9,7 @@ import { clock } from "../core/lang";
 import type { AiView, NoteNotice } from "../core/types";
 import { lang } from "../i18n";
 import type { Store } from "./store";
+import { appendSafely, readTextSafely, writeFileAtomically } from "./safeFiles";
 
 /**
  * AI 연결 (1.27, 종이냥 for Claude): the app's side. It writes ai-link.json (on or off, the data folder, the
@@ -47,16 +48,19 @@ export class AiConnection {
   private latest?: { id: string; history: unknown; depth: number };
   /** Entries that came while the note was hidden: shown as 자리 비운 사이 when it comes back. */
   private waiting = false;
+  /** There is something in ai-log.jsonl (기록 지우기 has something to clear). */
+  private hasLog = false;
 
   constructor(private readonly store: Store, private readonly settings: string, private readonly hooks: AiHooks, readonly files: AiFiles, private readonly appLabel: string) {}
 
   get enabled(): boolean { return this.store.prefs.aiEnabled; }
   private get logPath(): string { return path.join(this.settings, aiLogFileName); }
 
-  /** At launch: the link written, and while on, the log read and what came meanwhile said once (M15). */
+  /** At launch: the link written, the log's old lines dropped (on or off), and while on, the log read and what came meanwhile said once (M15). */
   start(): void {
     this.writeLink();
     this.apply();
+    this.trimOld();
     if (!this.enabled) return;
     this.read();
     this.tell("away");
@@ -75,12 +79,11 @@ export class AiConnection {
 
   /** ai-link.json, written whole (temporary file, then renamed). Also after the storage folder moved. */
   writeLink(): void {
-    const text = serializeAiLink({ v: 1, enabled: this.enabled, dataFolder: this.store.dataDirectory, lang: lang(), app: this.appLabel, updatedAt: new Date().toISOString().replace(/\.\d{3}Z$/, "Z") });
+    const text = serializeAiLink({ v: 1, enabled: this.enabled, dataFolder: this.store.dataDirectory, lang: lang(), app: this.appLabel, updatedAt: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"), ext: aiExtVersion });
     const file = path.join(this.settings, aiLinkFileName);
     try {
       if (fs.existsSync(file) && fs.readFileSync(file, "utf8").replace(/"updatedAt": "[^"]*"/, "") === text.replace(/"updatedAt": "[^"]*"/, "")) return;
-      fs.writeFileSync(`${file}.tmp`, text, "utf8");
-      fs.renameSync(`${file}.tmp`, file);
+      writeFileAtomically(file, text); // #173: a random temporary name, made new
     } catch {
       // The settings folder can't be written: Claude will say it's off, which is the safe side.
     }
@@ -113,18 +116,25 @@ export class AiConnection {
     clearTimeout(this.timer);
   }
 
-  /** Reads the log when it changed since the last read (and trims it past 1 MB to the last 30 days). */
+  /** #174 (review I-01): lines older than 30 days go, whatever the log's size. The text as it is now ("" without a log). */
+  private trimOld(): string {
+    let text = "";
+    try { text = readTextSafely(this.logPath); } catch { this.hasLog = false; return ""; }
+    const trimmed = trimAiLog(text, new Date(), 0);
+    if (trimmed !== undefined) {
+      try { writeFileAtomically(this.logPath, trimmed); text = trimmed; } catch { /* next time */ }
+    }
+    this.hasLog = text.trim().length > 0;
+    return text;
+  }
+
+  /** Reads the log when it changed since the last read (and drops its lines older than 30 days). */
   private read(): void {
     let stat: fs.Stats;
-    try { stat = fs.statSync(this.logPath); } catch { this.entries = []; this.recentEntries = []; this.readStamp = ""; return; }
+    try { stat = fs.statSync(this.logPath); } catch { this.entries = []; this.recentEntries = []; this.readStamp = ""; this.hasLog = false; return; }
     const stamp = `${stat.size}:${stat.mtimeMs}`;
     if (stamp === this.readStamp) return;
-    let text = "";
-    try { text = fs.readFileSync(this.logPath, "utf8"); } catch { return; }
-    const trimmed = trimAiLog(text, new Date());
-    if (trimmed !== undefined) {
-      try { fs.writeFileSync(`${this.logPath}.tmp`, trimmed, "utf8"); fs.renameSync(`${this.logPath}.tmp`, this.logPath); text = trimmed; } catch { /* next time */ }
-    }
+    const text = this.trimOld();
     this.readStamp = stamp;
     this.entries = parseAiLog(text);
     const since = Date.now() - 3 * 86_400_000;
@@ -135,7 +145,7 @@ export class AiConnection {
     if (!this.enabled) return;
     this.read();
     // The data first, so the toast's item is already on the list (Claude writes the file before the log).
-    this.store.catchUp(["todos.json", "events.json", "memos.json"]);
+    this.store.catchUp(["todos.json", "events.json", "memos.json", "memo-folders.json"]);
     this.tell(this.hooks.noteVisible() && !this.waiting ? "live" : "away");
     this.hooks.changed();
   }
@@ -224,7 +234,7 @@ export class AiConnection {
     }
     if (outcome.undone > 0) {
       const line = aiLogLine(aiEntry({ client: "app", tool: "undo", kind: "undo", target: entry.target, title: entry.title, undoes: entry.id, changes: outcome.written, count: outcome.undone }));
-      try { fs.appendFileSync(this.logPath, `${line}\n`, "utf8"); } catch { /* the list changed all the same */ }
+      try { appendSafely(this.logPath, `${line}\n`); } catch { /* the list changed all the same */ }
       this.read();
     }
     const text = aiUndoText(outcome.undone, outcome.left, lang());
@@ -235,6 +245,26 @@ export class AiConnection {
       clearTimeout(this.undoNoteTimer);
       this.undoNoteTimer = setTimeout(() => { this.undoNote = undefined; this.hooks.changed(); }, 8000);
     }
+    this.hooks.changed();
+  }
+
+  /**
+   * 기록 지우기 (#174, review I-01): ai-log.jsonl emptied — the recent list, its 되돌리기 and the stamps go with it;
+   * the to-dos, events and memos stay as they are. The extension starts a new log with its next change.
+   */
+  clearLog(): void {
+    try {
+      writeFileAtomically(this.logPath, "");
+    } catch {
+      return;
+    }
+    this.entries = [];
+    this.recentEntries = [];
+    this.readStamp = "";
+    this.latest = undefined;
+    this.undoNote = undefined;
+    this.waiting = false;
+    this.hasLog = false;
     this.hooks.changed();
   }
 
@@ -253,7 +283,7 @@ export class AiConnection {
 
   view(now = new Date()): AiView {
     const enabled = this.enabled;
-    if (!enabled && this.recentEntries.length === 0) return { enabled, marks: [], recent: [], command: this.command, copied: this.copied };
+    if (!enabled && this.recentEntries.length === 0) return { enabled, marks: [], recent: [], command: this.command, copied: this.copied, hasLog: this.hasLog };
     const undoNote = this.undoNote ? { undoNote: this.undoNote } : {};
     const today = dayKey(now);
     const entries = this.recentEntries;
@@ -264,12 +294,13 @@ export class AiConnection {
       const at = new Date(entry.at);
       return { id: entry.id, day: dayKey(at) === today ? "today" as const : "yesterday" as const, time: clock(at.getHours(), at.getMinutes(), lang()), text: aiToastText(entry, lang()), undone: undone.has(entry.id) };
     });
-    return { enabled, marks: [...marks], recent, command: this.command, copied: this.copied, ...undoNote };
+    return { enabled, marks: [...marks], recent, command: this.command, copied: this.copied, hasLog: this.hasLog, ...(enabled && aiExtOutdated(this.entries) ? { outdated: true } : {}), ...undoNote };
   }
 
-  /** Snapshots: a log written by hand, read as if Claude had written it (and already seen: no toast of its own). */
+  /** Snapshots: a log written by hand, read as if Claude (the current extension) had written it (and already seen: no toast of its own). */
   seedForSnapshots(entries: AiLogEntry[]): void {
-    fs.writeFileSync(this.logPath, entries.length ? entries.map(aiLogLine).join("\n") + "\n" : "", "utf8");
+    const current = entries.map((entry) => (entry.client === "app" || entry.ext !== undefined ? entry : { ...entry, ext: aiExtVersion }));
+    fs.writeFileSync(this.logPath, current.length ? current.map(aiLogLine).join("\n") + "\n" : "", "utf8");
     this.readStamp = "";
     this.read();
     this.seen(advanceSeen(this.seenNow(), this.entries));

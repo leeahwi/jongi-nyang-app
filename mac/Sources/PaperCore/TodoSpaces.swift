@@ -6,12 +6,17 @@ import Foundation
 /// doesn't know, so the place can't live on the to-do). Same file, rules and cases (S1–S22,
 /// docs/plans/spaces-phase1.md, docs/plans/spaces-cases.json) as the Windows app (todoSpaces.ts):
 ///
-///     { "items": { "<todo id>": { "at": "…", "space": "s-7f3a9c" | null } },
+///     { "general": { "name": "기타", "updatedAt": "…" },
+///       "items": { "<todo id>": { "at": "…", "space": "s-7f3a9c" | null } },
+///       "series": { "<repeat rule id>": { "space": "s-7f3a9c" | null, "updatedAt": "…" } },
 ///       "spaces": [{ "color": "pink", "id": "s-7f3a9c", "name": "회사", "order": 0, "updatedAt": "…" }, …],
 ///       "version": 1 }
 ///
-/// A to-do without an entry has no space; `space: null` is a move to 스페이스 없음 (kept so it wins a merge). A deleted
-/// space stays as a tombstone for 30 days. Keys this version doesn't know are kept where they were.
+/// A to-do without an entry has no space: it's in 일반 (#89 — the to-dos in no space, named ‘일반’ · ‘General’ ·
+/// ‘Algemeen’ until renamed; `general` is in the file only once it's been renamed). `space: null` is a move to 일반 (kept
+/// so it wins a merge). A deleted space stays as a tombstone for 30 days. A repeat rule's space (2a, `series`; repeats.json
+/// keeps its shape for the same reason as todos.json) is where the to-dos made from it go. Keys this version doesn't know
+/// are kept where they were.
 public struct TodoSpaces: Equatable, Sendable {
     public static let fileName = "todo-spaces.json"
     /// Tombstones and the entries of to-dos that are gone are kept this long (S17, S22).
@@ -54,17 +59,81 @@ public struct TodoSpaces: Equatable, Sendable {
         }
     }
 
+    /// 일반's name once renamed (#89, S23–S26). `name` "" is back to the default — kept with its time, so the reset wins a
+    /// merge (as `space: null` does).
+    public struct General: Equatable, Sendable {
+        public var name: String
+        public var updatedAt: Date
+        public var extra: [String: KeptJSON]
+
+        public init(name: String, updatedAt: Date, extra: [String: KeptJSON] = [:]) {
+            self.name = name
+            self.updatedAt = updatedAt
+            self.extra = extra
+        }
+    }
+
+    /// A repeat rule's space (2a, A7): the to-dos made from it go there. `space` nil: moved to 일반 (written as `null`,
+    /// kept so the move wins a merge).
+    public struct SeriesPlace: Equatable, Sendable {
+        public var space: String?
+        public var updatedAt: Date
+        public var extra: [String: KeptJSON]
+
+        public init(space: String?, updatedAt: Date, extra: [String: KeptJSON] = [:]) {
+            self.space = space
+            self.updatedAt = updatedAt
+            self.extra = extra
+        }
+    }
+
     public var version: Int
     public var spaces: [Space]
     /// By to-do id as todos.json writes it (an upper-case UUID in both apps).
     public var items: [String: Place]
+    /// nil: never renamed (no `general` key in the file).
+    public var general: General?
+    /// By repeat rule id (repeats.json's series). nil: no `series` key in the file (a present one is written back as
+    /// read, `{}` too).
+    public var series: [String: SeriesPlace]?
     public var extra: [String: KeptJSON]
 
-    public init(version: Int = 1, spaces: [Space] = [], items: [String: Place] = [:], extra: [String: KeptJSON] = [:]) {
+    public init(version: Int = 1, spaces: [Space] = [], items: [String: Place] = [:], general: General? = nil,
+                series: [String: SeriesPlace]? = nil, extra: [String: KeptJSON] = [:]) {
         self.version = version
         self.spaces = spaces
         self.items = items
+        self.general = general
+        self.series = series
         self.extra = extra
+    }
+
+    // MARK: 일반 — the to-dos in no space (#89)
+
+    /// The default names, ko · en · nl.
+    public static let generalDefaults = ["일반", "General", "Algemeen"]
+
+    public static func defaultGeneralName(_ language: AppLanguage) -> String { generalDefaults[language.index] }
+
+    /// The name it was renamed to; nil while it's the default.
+    public var generalRenamed: String? {
+        guard let name = general?.name, !name.isEmpty else { return nil }
+        return name
+    }
+
+    /// 일반 as shown: the renamed name, or the default in the app's language.
+    public func generalName(_ language: AppLanguage) -> String { generalRenamed ?? Self.defaultGeneralName(language) }
+
+    /// The names `#` finds it by (S27): the renamed one, or the default in every language.
+    public var generalNames: [String] { generalRenamed.map { [$0] } ?? Self.generalDefaults }
+
+    /// 일반 renamed (S23); blank or any language's default name: back to the default (S24 — nothing written when it is
+    /// the default already).
+    public mutating func renameGeneral(to name: String, now: Date) {
+        var clean = MemoFolders.cleanName(name)
+        if Self.generalDefaults.contains(where: { SpaceToken.normal($0) == SpaceToken.normal(clean) }) { clean = "" }
+        guard clean != (general?.name ?? "") else { return }
+        general = General(name: clean, updatedAt: Self.second(now), extra: general?.extra ?? [:])
     }
 
     // MARK: Reading where things are
@@ -190,13 +259,52 @@ public struct TodoSpaces: Equatable, Sendable {
         items[todoID] = place
     }
 
-    /// S17, S22: entries of to-dos that are gone and tombstones, each more than 30 days old, dropped before a write.
-    public func pruned(todoIDs: Set<String>, now: Date) -> TodoSpaces {
+    /// S17, S22, S36: entries of to-dos that are gone and tombstones, each more than 30 days old, dropped before a write;
+    /// so are the spaces of rules no longer in repeats.json (`seriesIDs`; nil when repeats.json couldn't be read: none
+    /// dropped).
+    public func pruned(todoIDs: Set<String>, seriesIDs: Set<String>? = nil, now: Date) -> TodoSpaces {
         let cutoff = now.addingTimeInterval(-Double(Self.keepDays) * 86_400)
         var copy = self
         copy.items = items.filter { todoIDs.contains($0.key) || $0.value.at >= cutoff }
         copy.spaces = spaces.filter { !$0.deleted || $0.updatedAt >= cutoff }
+        if let seriesIDs, let series {
+            copy.series = series.filter { seriesIDs.contains($0.key) || $0.value.updatedAt >= cutoff }
+        }
         return copy
+    }
+
+    // MARK: Repeat rules' spaces (2a, A7–A10)
+
+    /// A rule's live space (S35: a deleted one reads as 일반).
+    public func seriesSpaceID(of seriesID: String?) -> String? {
+        guard let seriesID, let place = series?[seriesID]?.space, space(place) != nil else { return nil }
+        return place
+    }
+
+    /// S34: a rule moved to a space, or to 일반 (nil: an entry, so it wins a merge). Nothing for a space that isn't live,
+    /// the one it has, or 일반 without an entry. Its open to-dos (`copies`) move with it, by the to-dos' own rule (W20).
+    public mutating func setSeriesSpace(_ seriesID: String, to spaceID: String?, copies: [String] = [], now: Date) {
+        if let spaceID, space(spaceID) == nil { return }
+        let current = series?[seriesID]
+        if current.map({ $0.space != spaceID }) ?? (spaceID != nil) {
+            // A `series` this version couldn't read (kept as an unknown key) gives way to the one written now (S33odd).
+            if series == nil { extra["series"] = nil }
+            var place = current ?? SeriesPlace(space: spaceID, updatedAt: now)
+            place.space = spaceID
+            place.updatedAt = Self.second(now)
+            var rules = series ?? [:]
+            rules[seriesID] = place
+            series = rules
+        }
+        for todo in copies { move(todo, to: spaceID, now: now) }
+    }
+
+    /// S35: to-dos just made from rules (to-do id, rule id), each put in its rule's live space; 일반, no entry or a gone
+    /// space: nothing.
+    public mutating func placeCopies(_ made: [(todo: String, series: String)], now: Date) {
+        for copy in made {
+            if let space = seriesSpaceID(of: copy.series) { move(copy.todo, to: space, now: now) }
+        }
     }
 
     // MARK: Merging (S13–S15, W3)
@@ -218,9 +326,25 @@ public struct TodoSpaces: Equatable, Sendable {
             if let mine = items[todo], their.at <= mine.at { continue }
             items[todo] = their
         }
+        // 일반's name (S25): the later one; on the same second the file's stays.
+        var general = existing.general
+        if let their = incoming.general, general.map({ their.updatedAt > $0.updatedAt }) ?? true { general = their }
+        // The rules' spaces (S32): by rule id, the same way.
+        var series = existing.series
+        if let theirs = incoming.series {
+            var merged = series ?? [:]
+            for (id, their) in theirs {
+                if let mine = merged[id], their.updatedAt <= mine.updatedAt { continue }
+                merged[id] = their
+            }
+            series = merged
+        }
         var extra = existing.extra
         for (key, value) in incoming.extra where extra[key] == nil { extra[key] = value }
-        return TodoSpaces(version: max(existing.version, incoming.version), spaces: spaces, items: items, extra: extra)
+        if general != nil { extra["general"] = nil }
+        if series != nil { extra["series"] = nil }
+        return TodoSpaces(version: max(existing.version, incoming.version), spaces: spaces, items: items, general: general,
+                          series: series, extra: extra)
     }
 
     // MARK: The file
@@ -230,6 +354,8 @@ public struct TodoSpaces: Equatable, Sendable {
     static let fileKeys: Set<String> = ["version", "spaces", "items"]
     static let spaceKeys: Set<String> = ["id", "name", "color", "order", "updatedAt", "deleted"]
     static let placeKeys: Set<String> = ["space", "at"]
+    static let generalKeys: Set<String> = ["name", "updatedAt"]
+    static let seriesKeys: Set<String> = ["space", "updatedAt"]
 
     /// The file read: throws when it isn't the spaces file at all (S21: kept aside, started afresh). Entries it can't
     /// use are left out; everything else, unknown keys too, is kept as read (S16).
@@ -264,7 +390,34 @@ public struct TodoSpaces: Equatable, Sendable {
             }
             items[todo] = Place(space: space, at: date(p["at"]), extra: unknown(p, placeKeys))
         }
-        return TodoSpaces(version: integer(object["version"]) ?? 1, spaces: spaces, items: items, extra: unknown(object, fileKeys))
+        // 일반's name; a `general` this version can't read stays as it was, with the other unknown keys.
+        var extra = unknown(object, fileKeys)
+        var general: General?
+        if let g = object["general"] as? [String: Any], let name = g["name"] as? String {
+            general = General(name: name, updatedAt: date(g["updatedAt"]), extra: unknown(g, generalKeys))
+            extra["general"] = nil
+        }
+        // The rules' spaces (A7): a `series` that isn't an object stays as it was, with the other unknown keys (S33odd);
+        // entries it can't use are left out, as the to-dos' are (S33dropped).
+        var series: [String: SeriesPlace]?
+        if let list = object["series"] as? [String: Any] {
+            var read: [String: SeriesPlace] = [:]
+            for (id, entry) in list {
+                guard let p = entry as? [String: Any] else { continue }
+                let space: String?
+                if p["space"] is NSNull {
+                    space = nil
+                } else if let value = p["space"] as? String, !value.isEmpty {
+                    space = value
+                } else {
+                    continue
+                }
+                read[id] = SeriesPlace(space: space, updatedAt: date(p["updatedAt"]), extra: unknown(p, seriesKeys))
+            }
+            series = read
+            extra["series"] = nil
+        }
+        return TodoSpaces(version: integer(object["version"]) ?? 1, spaces: spaces, items: items, general: general, series: series, extra: extra)
     }
 
     private static func integer(_ value: Any?) -> Int? {
@@ -336,6 +489,22 @@ public struct TodoSpaces: Equatable, Sendable {
         top["version"] = .int(version)
         top["spaces"] = .array(list)
         top["items"] = .object(places)
+        if let general {
+            var fields = general.extra
+            fields["name"] = .string(general.name)
+            fields["updatedAt"] = .string(Self.iso(general.updatedAt))
+            top["general"] = .object(fields)
+        }
+        if let series {
+            var rules: [String: KeptJSON] = [:]
+            for (id, place) in series {
+                var fields = place.extra
+                fields["space"] = place.space.map(KeptJSON.string) ?? .null
+                fields["updatedAt"] = .string(Self.iso(place.updatedAt))
+                rules[id] = .object(fields)
+            }
+            top["series"] = .object(rules)
+        }
         return KeptJSON.object(top).pretty() + "\n"
     }
 
@@ -477,22 +646,26 @@ public enum SpaceToken {
         case noSpace
     }
 
-    /// S1–S4, S20: the spaces a token could mean, best first — the whole name, then names it starts (space order), then
-    /// names whose first consonants it starts (`#ㅎㅅ`); none of these: a new space by that name. 스페이스 없음 always
-    /// comes last.
+    /// S1–S4, S20, S27, S28: what a token could mean, best first — the whole name, then names it starts (space order),
+    /// then names whose first consonants it starts (`#ㅎㅅ`). 일반 (`.noSpace`) is found by its names too (`#일반`, `#gen`,
+    /// `#ㅇㅂ`; once renamed, by that name only), after the spaces of the same step — so a space with the same name comes
+    /// first (S28). Nothing found: a new space by that name. 일반 comes last when it wasn't found.
     public static func choices(_ token: String, in spaces: TodoSpaces) -> [Choice] {
         let typed = normal(token)
-        let live = spaces.visible
-        var found: [String] = []
-        func add(_ space: TodoSpaces.Space) { if !found.contains(space.id) { found.append(space.id) } }
-        let names = live.map { ($0, normal($0.name)) }
-        for (space, name) in names where name == typed { add(space) }
-        for (space, name) in names where name.hasPrefix(typed) { add(space) }
+        let names = spaces.visible.map { ($0, normal($0.name)) }
+        let general = spaces.generalNames.map(normal)
+        var found: [Choice] = []
+        func add(_ choice: Choice) { if !found.contains(choice) { found.append(choice) } }
+        for (space, name) in names where name == typed { add(.space(space.id)) }
+        if general.contains(typed) { add(.noSpace) }
+        for (space, name) in names where name.hasPrefix(typed) { add(.space(space.id)) }
+        if general.contains(where: { $0.hasPrefix(typed) }) { add(.noSpace) }
         if onlyInitials(typed) {
-            for (space, name) in names where initialsOf(name).hasPrefix(typed) { add(space) }
+            for (space, name) in names where initialsOf(name).hasPrefix(typed) { add(.space(space.id)) }
+            if general.contains(where: { initialsOf($0).hasPrefix(typed) }) { add(.noSpace) }
         }
-        let picks: [Choice] = found.isEmpty ? [.new(MemoFolders.cleanName(token))] : found.map { .space($0) }
-        return picks + [.noSpace]
+        let picks: [Choice] = found.isEmpty ? [.new(MemoFolders.cleanName(token))] : found
+        return picks.contains(.noSpace) ? picks : picks + [.noSpace]
     }
 
     public struct Reading: Equatable, Sendable {
@@ -614,21 +787,25 @@ public enum SpaceWords {
         }
     }
 
-    /// The band's first words: "회사만 보는 중" · "Showing Work only" · "Alleen Werk zichtbaar"; 스페이스 없음:
-    /// "스페이스 없는 할 일만 보는 중" · "Showing to-dos without a space" · "Alleen taken zonder ruimte".
-    public static func showing(_ name: String?, language: AppLanguage = .ko) -> String {
-        guard let name else { return ["스페이스 없는 할 일만 보는 중", "Showing to-dos without a space", "Alleen taken zonder ruimte"][language.index] }
-        return ["\(name)만 보는 중", "Showing \(name) only", "Alleen \(name) zichtbaar"][language.index]
+    /// "회사만 보는 중" · "Showing Work only" · "Alleen Werk zichtbaar" (일반 too, by its name) — the header button's
+    /// spoken label.
+    public static func showing(_ name: String, language: AppLanguage = .ko) -> String {
+        ["\(name)만 보는 중", "Showing \(name) only", "Alleen \(name) zichtbaar"][language.index]
     }
 
-    /// "다른 할 일 4개는 숨겼어요" · "4 other to-dos hidden" · "4 andere taken verborgen".
-    public static func hidden(_ count: Int, language: AppLanguage = .ko) -> String {
+    /// #87, the faint line at the end of the list while one space shows: "다른 스페이스에 4개 더" · "4 more in other
+    /// spaces" · "Nog 4 in andere ruimtes" (followed by 모두 보기; no line for 0).
+    public static func more(_ count: Int, language: AppLanguage = .ko) -> String {
         let n = grouped(count, language)
-        return switch language {
-        case .ko: "다른 할 일 \(n)개는 숨겼어요"
-        case .en: "\(n) other \(count == 1 ? "to-do" : "to-dos") hidden"
-        case .nl: "\(n) andere \(count == 1 ? "taak" : "taken") verborgen"
-        }
+        return ["다른 스페이스에 \(n)개 더", "\(n) more in other spaces", "Nog \(n) in andere ruimtes"][language.index]
+    }
+
+    /// The header button for a screen reader while one space shows (#87): "회사만 보는 중, 다른 스페이스에 4개 더".
+    public static func lensLabel(_ name: String, hidden: Int, language: AppLanguage = .ko) -> String {
+        let showing = showing(name, language: language)
+        guard hidden > 0 else { return showing }
+        let n = grouped(hidden, language)
+        return [", 다른 스페이스에 \(n)개 더", ", \(n) more in other spaces", ", nog \(n) in andere ruimtes"].map { showing + $0 }[language.index]
     }
 
     /// 1,466 (ko, en) · 1.466 (nl), as the tab's count is written.
@@ -642,7 +819,7 @@ public enum SpaceWords {
         return (count < 0 ? "-" : "") + out
     }
 
-    /// The header button: "회사만" · "Work only" · "Alleen Werk"; 스페이스 없음 as it is.
+    /// The header button: "회사만" · "Work only" · "Alleen Werk" (일반: "일반만").
     public static func only(_ name: String, language: AppLanguage = .ko) -> String {
         ["\(name)만", "\(name) only", "Alleen \(name)"][language.index]
     }
@@ -662,9 +839,6 @@ public enum SpaceWords {
     public static func newSpace(_ name: String, language: AppLanguage = .ko) -> String {
         ["새 스페이스 ‘\(name)’", "New space ‘\(name)’", "Nieuwe ruimte ‘\(name)’"][language.index]
     }
-
-    /// "스페이스 없음" · "No space" · "Geen ruimte".
-    public static func noSpace(_ language: AppLanguage = .ko) -> String { ["스페이스 없음", "No space", "Geen ruimte"][language.index] }
 
     /// "모든 스페이스" · "All spaces" · "Alle ruimtes".
     public static func allSpaces(_ language: AppLanguage = .ko) -> String { ["모든 스페이스", "All spaces", "Alle ruimtes"][language.index] }

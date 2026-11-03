@@ -14,11 +14,16 @@ import type { Alarm } from "./alarm";
 import type { IntentKind, IntentPrefer } from "./intent";
 import type { AheadTarget } from "./ahead";
 import type { DeskPane, PaperSetting } from "./desk";
-import type { DrawerBackdrop, DrawerSide, DrawerTheme, FolderSort, MemoFolders, MemoPaper } from "./memoDrawer";
+import type { DrawerBackdrop, DrawerSide, DrawerTheme, FolderSort, FolderView, MemoFolders, MemoPaper } from "./memoDrawer";
 import type { SpaceChoice, SpaceLens, TodoSpaces } from "./todoSpaces";
+import type { MemoTrash } from "./memoTrash";
+import type { BackupCounts, BackupReason } from "./backup";
+import { clampNote, noteScales, type CodeFont, type LineSpacing, type ParagraphSpacing } from "./textSteps";
 
 export type NotebookFont = "pen" | "brush" | "clean";
 export type TextSize = "small" | "regular" | "large" | "extraLarge";
+/** 메모 글꼴 (#84): the drawer's face for memo words — 기본 글씨 · 손글씨 펜 · 손글씨 붓 · 고정폭. */
+export type DrawerFont = "clean" | "pen" | "brush" | "mono";
 export type ReminderStyle = "compact" | "paper" | "character";
 
 export interface Prefs {
@@ -27,6 +32,8 @@ export interface Prefs {
   /** 종이 색: 자동 (the system's light or dark) · 낮 · 밤 — every window follows it at once. */
   paper: PaperSetting;
   font: NotebookFont;
+  /** 노트 글꼴 (#141): seven steps (0–6, textSteps.ts); `textSize` keeps the nearest of 1.30's four for an older version. */
+  textStep: number;
   textSize: TextSize;
   reminderStyle: ReminderStyle;
   hideCompleted: boolean;
@@ -100,8 +107,10 @@ export interface Prefs {
   starredTask: string;
   /** 시스템 알림으로도 보내기: "missed" when a reminder or alarm couldn't be shown here, "always", or "off" (see notify.ts). */
   systemNotify: SystemNotify;
-  /** Ctrl+Alt+J anywhere shows or hides the note. */
+  /** The note's key anywhere shows or hides it (#85): the switch, and the key (an Electron accelerator, Ctrl+Alt+J
+   *  unless changed; kept while the switch is off, so on brings it back). */
   noteHotkey: boolean;
+  noteShortcut: string;
   /** 빠른 메모를 열 때 복사한 글 넣기. */
   quickMemoClipboard: boolean;
   /** 작업 표시줄에 남은 개수: the taskbar button's small badge (Windows). */
@@ -126,6 +135,8 @@ export interface Prefs {
   drawerHandle: boolean;
   drawerHandleY: number;
   drawerTheme: DrawerTheme;
+  /** 밤에는 밤 종이로 (#142): undefined before 1.31 — read from drawerTheme (`auto` on, a paper by name off). */
+  drawerNightPaper?: boolean;
   drawerLastFolder: string;
   drawerPinned: boolean;
   /** 1.28: the one-time slip saying the memo tab's memos are in the drawer was dealt with on this device (M1–M3). */
@@ -134,10 +145,33 @@ export interface Prefs {
    *  last two folders a memo was moved to (폴더로 옮기기 ▸ 최근), newest first. */
   drawerBackdrop: DrawerBackdrop;
   drawerPinnedSort: FolderSort;
+  /** #115: the 고정 bookmark's 보기 (카드 · 제목만), this device's as its 정렬 is. */
+  drawerPinnedView: FolderView;
   drawerRecentMoves: string[];
+  /** 메모 글꼴 · 크기 (#84), this device's: one face and one size step for every memo in the drawer. */
+  drawerFont: DrawerFont;
+  /** #141: 12–20 px (`drawerTextSize` keeps the nearest of 1.30's four), 줄 간격 and 문단 간격. */
+  drawerTextPt: number;
+  drawerTextSize: TextSize;
+  drawerLineHeight: LineSpacing;
+  drawerParagraph: ParagraphSpacing;
+  /** 코드 글꼴 (#143): the system's fixed-width face or the bundled D2Coding. */
+  drawerCodeFont: CodeFont;
+  /** #84 (2026-10-30): 기호 늘 보이기 (Ctrl+Shift+R), and 끝낸 항목 아래로 보내기 (on unless turned off). */
+  drawerShowMarks: boolean;
+  drawerDoneToBottom: boolean;
   /** 할 일 스페이스 (1.30), this device's: the space 오늘 shows alone and the logical day it was picked (none: all). */
   spaceLens: SpaceLens | null;
+  /** 2b 스페이스별로 묶기 (1.31), this device's: on or off, 메모지 (F, `card`) or 책갈피 (E, `bookmark`), the folded groups and
+   *  the groups whose finished rows are open (F), by space id (`none`: 일반). */
+  spaceGroups: boolean;
+  spaceGroupStyle: SpaceGroupStyle;
+  spaceGroupsFolded: string[];
+  spaceGroupsDoneOpen: string[];
 }
+
+/** 2b: how 오늘's groups look — F 묶음 메모지 (the default) or E 책갈피 머리말. */
+export type SpaceGroupStyle = "card" | "bookmark";
 
 export type SystemNotify = "missed" | "always" | "off";
 
@@ -157,6 +191,7 @@ export const defaultPrefs: Prefs = {
   language: "auto",
   paper: "auto",
   font: "pen",
+  textStep: 2,
   textSize: "regular",
   reminderStyle: "paper",
   hideCompleted: false,
@@ -205,6 +240,7 @@ export const defaultPrefs: Prefs = {
   starredTask: "",
   systemNotify: "missed",
   noteHotkey: true,
+  noteShortcut: "Control+Alt+J",
   quickMemoClipboard: false,
   taskbarBadge: false,
   manualLaunches: 0,
@@ -225,8 +261,21 @@ export const defaultPrefs: Prefs = {
   drawerMoveNoticeShown: false,
   drawerBackdrop: "solid",
   drawerPinnedSort: "edited",
+  drawerPinnedView: "cards",
   drawerRecentMoves: [],
+  drawerFont: "clean",
+  drawerTextPt: 14,
+  drawerTextSize: "regular",
+  drawerLineHeight: "regular",
+  drawerParagraph: "regular",
+  drawerCodeFont: "system",
+  drawerShowMarks: false,
+  drawerDoneToBottom: true,
   spaceLens: null,
+  spaceGroups: false,
+  spaceGroupStyle: "card",
+  spaceGroupsFolded: [],
+  spaceGroupsDoneOpen: [],
 }
 
 export function pomodoroSettings(prefs: Prefs): PomodoroSettings {
@@ -246,6 +295,12 @@ export const textSizeTitles: Record<Lang, Record<TextSize, string>> = {
 };
 export const textSizeTitle: Record<TextSize, string> = textSizeTitles.ko;
 export const textScale: Record<TextSize, number> = { small: 0.87, regular: 1, large: 1.13, extraLarge: 1.26 };
+/** 노트 글꼴 (#141): the seven steps' names, small to large (1.30's four are the 1st, 3rd, 5th and 7th). */
+export const textStepTitles: Record<Lang, string[]> = {
+  ko: ["작게", "조금 작게", "보통", "조금 크게", "크게", "더 크게", "아주 크게"],
+  en: ["Small", "Slightly smaller", "Regular", "Slightly larger", "Large", "Larger", "Extra large"],
+  nl: ["Klein", "Iets kleiner", "Normaal", "Iets groter", "Groot", "Groter", "Extra groot"],
+};
 export const fontTitles: Record<Lang, Record<NotebookFont, string>> = {
   ko: { pen: "손글씨 펜", brush: "손글씨 붓", clean: "기본 글씨" },
   en: { pen: "Pen", brush: "Marker", clean: "Clean" },
@@ -278,11 +333,38 @@ export const styleDetails: Record<Lang, Record<ReminderStyle, string>> = {
 };
 export const styleDetail: Record<ReminderStyle, string> = styleDetails.ko;
 
-export function bodyFontSize(font: NotebookFont, size: TextSize): number {
-  return Math.round(baseFontSize[font] * textScale[size]);
+/** The note's words: a 1.30 size name, or one of the seven steps (#141). */
+export function bodyFontSize(font: NotebookFont, size: TextSize | number): number {
+  return Math.round(baseFontSize[font] * (typeof size === "number" ? noteScales[clampNote(size)] : textScale[size]));
 }
 
-/** Everything a window needs to draw itself; sent from the main process on every change. */
+/**
+ * #71: what a page hears of the state as it changes (`getState()` still gives all of it), on its own channel:
+ * - `todos` ("state"): everything but the memos — the note, 달력, the 오늘 창, 설정.
+ * - `memos` ("state:memos"): the memos, their folders, 지운 메모 (#120) and the settings — the 메모 서랍.
+ * - `prefs` ("state:prefs"): the settings and the spaces — the pages that follow the font (빠른 입력 · 빠른 메모, the
+ *   alarm, the timer's sheet, 완료 기록, 도움말).
+ * A page hears its part only when that part changed (or the day turned).
+ */
+export type StateKind = "todos" | "memos" | "prefs";
+export type TodosState = Omit<AppState, "memos" | "memoFolders" | "memoTrash">;
+export type MemosState = Pick<AppState, "memos" | "memoFolders" | "memoTrash" | "prefs">;
+export type PrefsState = Pick<AppState, "prefs" | "todoSpaces">;
+export const stateChannels: Record<StateKind, string> = { todos: "state", memos: "state:memos", prefs: "state:prefs" };
+
+export function readStateKind(value: unknown): StateKind {
+  return value === "memos" || value === "prefs" ? value : "todos";
+}
+
+/** `kind`'s part of the whole state. */
+export function stateSlice(state: AppState, kind: StateKind): TodosState | MemosState | PrefsState {
+  if (kind === "memos") return { memos: state.memos, memoFolders: state.memoFolders, memoTrash: state.memoTrash, prefs: state.prefs };
+  if (kind === "prefs") return { prefs: state.prefs, todoSpaces: state.todoSpaces };
+  const { memos: _memos, memoFolders: _folders, memoTrash: _trash, ...rest } = state;
+  return rest;
+}
+
+/** Everything a window needs to draw itself; `getState()` gives it whole, and each change its part (StateKind). */
 export interface AppState {
   items: TodoItem[];
   canUndo: boolean;
@@ -298,7 +380,7 @@ export interface AppState {
   shortcutProblem?: string;
   /** The same for Ctrl+Alt+M (빠른 메모). */
   memoShortcutProblem?: string;
-  /** The same for Ctrl+Alt+J (노트 보이기 · 숨기기). */
+  /** The same for the note's key (노트 보이기 · 숨기기, Ctrl+Alt+J unless changed). */
   noteShortcutProblem?: string;
   /** The same for 메모 서랍's shortcut. */
   drawerShortcutProblem?: string;
@@ -306,6 +388,8 @@ export interface AppState {
   drawerBackdropNote?: string;
   /** 메모 서랍: the folders and each memo's place (memo-folders.json). */
   memoFolders: MemoFolders;
+  /** 지운 메모 (#120): deleted memos kept 30 days, newest deleted first. */
+  memoTrash: MemoTrash;
   /** 할 일 스페이스: the spaces (todo-spaces.json; `items` left empty here — see spaceOf). */
   todoSpaces: TodoSpaces;
   /** Each to-do's live space: `<todo id>\t<space id>` lines (packSpaceOf; read with spaceIndexOf). */
@@ -326,6 +410,28 @@ export interface AppState {
   focus?: FocusView;
   /** AI 연결: on or off, the rows Claude touched today, its recent work, the Claude Code command. */
   ai: AiView;
+  /** 자동 백업 and 백업 목록 (책상 → 저장과 백업, #139 · #140). */
+  backups: BackupsView;
+}
+
+/** One copy in the backup folder: its file name, kind, when (ISO), size in bytes, and what it holds once known. */
+export interface BackupEntry { name: string; reason: BackupReason; at: string; size: number; counts?: BackupCounts }
+
+export interface BackupsView {
+  /** The daily copy's switch. */
+  auto: boolean;
+  /** Where copies go now, and whether that is a chosen folder; `missing`: the chosen one isn't there (the default is used). */
+  folder: string;
+  custom: boolean;
+  missing: boolean;
+  /** The last copy couldn't be written. */
+  failed: boolean;
+  /** The storage folder is a shared one (the restore question says the other devices' list changes too). */
+  shared: boolean;
+  /** Newest first. */
+  entries: BackupEntry[];
+  /** Their sizes together (bytes). */
+  total: number;
 }
 
 /** One entry of 설정 › AI 연결 › 최근 AI 작업: when, what (the toast's words), and whether it was undone. */
@@ -342,6 +448,10 @@ export interface AiView {
   copied: boolean;
   /** How the last 되돌리기 went (shown under its entry for a few seconds). */
   undoNote?: { id: string; text: string };
+  /** Claude Desktop's installed extension is older than the one this app carries (aiExtOutdated): connect again. */
+  outdated?: boolean;
+  /** #174: there is a log to clear (기록 지우기). */
+  hasLog?: boolean;
 }
 
 /** A running (`endsAt`) or paused (`pausedRemainingMs`) timer, and its caption ("집중 1/4", "타이머"). */
@@ -407,6 +517,8 @@ export interface PopupTask {
   /** Event alerts: when it ends and where. */
   endsAt?: string;
   location?: string;
+  /** 저녁 정리: how long it has stayed on 오늘 — "어제부터", "4일째" (#51, as on the Mac). */
+  carried?: string;
 }
 
 /** Where a line was typed: the note's page (a to-do goes to that page's default), or 빠른 입력 and the 오늘 창 (today). */
@@ -449,7 +561,7 @@ export interface PopupPayload {
   /** An event's alert: 5분 전에 다시 while that is still ahead. */
   eventAgain?: boolean;
   /** 저녁 정리 (or its morning version): the cat's question and the tasks, each one ticked to go along. */
-  sweep?: { variant: "evening" | "morning"; message: string };
+  sweep?: { variant: "evening" | "morning"; message: string; /** The cat beside the question (#51); not over the desktop cat. */ cat?: boolean };
 }
 
 export type Action =
@@ -468,7 +580,7 @@ export type Action =
   | { type: "setReminder"; id: string; at?: string }
   /** 시간 정하기 · 시간 지우기 (no start) · a drag on the ribbon: minutes after midnight; the reminder follows (timeRange.ts). */
   | { type: "setRange"; id: string; start?: number; end?: number }
-  | { type: "saveSeries"; taskID?: string; seriesID?: string; title?: string; rule: RepeatRule; remindAt?: string }
+  | { type: "saveSeries"; taskID?: string; seriesID?: string; title?: string; rule: RepeatRule; remindAt?: string; /** 2a (A11): the rule's space from its editor (null: 일반); left out: as it is. */ space?: string | null }
   | { type: "deleteSeries"; id: string }
   /** 되돌리기 after 반복 그만하기: the rule back, and its open copies in it again. */
   | { type: "restoreSeries"; series: Series; todos: string[] }
@@ -485,6 +597,9 @@ export type Action =
   | { type: "memoDelete"; id: string }
   | { type: "memoClose"; id: string }
   | { type: "memoRestore" }
+  /** 지운 메모 (#120): one back where it was; 지금 모두 비우기. */
+  | { type: "memoUntrash"; id: string }
+  | { type: "memoTrashEmpty" }
   | { type: "editingReminder"; id?: string }
   | { type: "setPref"; key: keyof Prefs; value: Prefs[keyof Prefs] }
   | { type: "collapse"; anchor?: { x: number; y: number } }
@@ -495,10 +610,14 @@ export type Action =
   | { type: "aiUndo"; id: string }
   | { type: "aiConnectDesktop" }
   | { type: "aiCopyCommand" }
+  /** 기록 지우기 (#174): ai-log.jsonl emptied, after the slip's yes. */
+  | { type: "aiClearLog" }
   | { type: "openHistory"; day?: string }
   /** 검색: the note's search slip (from the desk's sidebar). */
   | { type: "openSearch" }
   | { type: "openHelp"; topic?: string }
+  /** Ctrl+/ in the drawer (#118): its keys on a slip. */
+  | { type: "drawerShortcuts" }
   /** 책상's sidebar: a pane chosen (a click, ↑ ↓). */
   | { type: "deskPane"; pane: DeskPane }
   /** 사용 안내 (the first-launch cards) on the note, from the desk's sidebar. */
@@ -528,6 +647,15 @@ export type Action =
   /** 백업 · 옮기기: 내보내기… and 가져오기… (Settings → 꾸미기, the ⋯ menu, the tray). */
   | { type: "exportBackup" }
   | { type: "importBackup" }
+  /** 자동 백업 · 백업 목록 (#139 · #140): the switch, 지금 백업하기, the backup folder's row, and a copy's 되돌리기… and menu. */
+  | { type: "setBackupAuto"; on: boolean }
+  | { type: "backupNow" }
+  | { type: "chooseBackupFolder" }
+  | { type: "resetBackupFolder" }
+  | { type: "openBackupFolder" }
+  | { type: "restoreBackup"; name: string }
+  | { type: "showBackup"; name: string }
+  | { type: "deleteBackup"; name: string }
   /** A task in the 달력 window's day panel: the note, on its page, with the task selected. */
   | { type: "calendarShowTask"; id: string }
   | ({ type: "quickEvent"; title: string } & ParsedWhen)
@@ -557,6 +685,8 @@ export type Action =
   | { type: "drawerView"; view: string }
   /** 1.29: 정렬 (고정's is a device setting), 복제 of a folder (its memos copied), a memo's own paper (none: 서랍 따라). */
   | { type: "folderSort"; id: string; sort: FolderSort }
+  /** #115: 보기 · 이 폴더 (고정's is a device setting). */
+  | { type: "folderView"; id: string; view: FolderView }
   | { type: "folderDuplicate"; id: string; newID: string }
   | { type: "memoPaper"; id: string; paper?: MemoPaper }
   /** 고정 모두 풀기 and its 되돌리기. */
@@ -572,14 +702,21 @@ export type Action =
   /** The drawer's text menu: 오려 두기 · 복사하기 · 붙여넣기 · 모두 선택 in the page that asked. */
   | { type: "editCommand"; command: "cut" | "copy" | "paste" | "selectAll" }
   /** 할 일 스페이스 (1.30): a new space (and a to-do moved into it), a new name, colour or order, deleted (its to-dos to
-   *  스페이스 없음) and its 되돌리기, to-dos moved (null: 스페이스 없음), and the lens (none: 모든 스페이스). */
+   *  일반) and its 되돌리기, to-dos moved (null: 일반), 일반 renamed (blank: back to the default, #89), and the lens
+   *  (none: 모든 스페이스). */
   | { type: "spaceAdd"; id: string; name: string; color?: string; todo?: string }
   | { type: "spaceRename"; id: string; name: string }
+  | { type: "generalRename"; name: string }
   | { type: "spaceColor"; id: string; color: string }
   | { type: "spaceDelete"; id: string }
   | { type: "spaceRestore"; id: string; todos: string[] }
   | { type: "spaceOrder"; ids: string[] }
   | { type: "todoSpace"; ids: string[]; space: string | null }
+  /** 2b (J): a to-do dropped on another group — its head, or before or after one of its rows. */
+  | { type: "groupDrop"; id: string; space: string | null; targetID?: string; after?: boolean; ids?: string[] }
+  /** #168: several picked to-dos put together before or after a row (in the list's order), and that taken back. */
+  | { type: "moveMany"; ids: string[]; targetID: string; after: boolean }
+  | { type: "restoreOrder"; ids: string[]; previous: string[] }
   | { type: "spaceLens"; space?: string }
   /** The desk's 스페이스 pane (스페이스 관리…). */
   | { type: "openSpaces" }

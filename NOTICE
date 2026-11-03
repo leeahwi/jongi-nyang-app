@@ -3,6 +3,7 @@ Copyright 2026 leeAhwi
 
 This product is licensed under the Apache License, Version 2.0 (see LICENSE),
 except for the third-party components listed below, which keep their own licenses.
+The lists of npm packages come from `node windows/tools/bundled-packages.mjs`.
 
 -------------------------------------------------------------------------------
 Bundled fonts — SIL Open Font License, Version 1.1
@@ -45,6 +46,31 @@ SIL Open Font License 1.1, whose full text is kept next to the font files.
    License: mac/Sources/PaperTodo/Assets/Fonts/Kalam-OFL.txt,
             windows/assets/fonts/Kalam-OFL.txt
 
+5. D2Coding (the Notes drawer's code font)
+   Copyright (c) 2015, NAVER Corporation (https://www.navercorp.com),
+   with Reserved Font Name D2Coding.
+   Version 1.4.0, regular weight only (the standard build, no ligatures),
+   unchanged (so it keeps its name), from NAVER's releases at
+   https://github.com/naver/d2codingfont.
+     mac/Sources/PaperTodo/Assets/Fonts/D2Coding-Regular.ttf,
+     windows/assets/fonts/D2Coding-Regular.ttf
+   License: mac/Sources/PaperTodo/Assets/Fonts/D2Coding-OFL.txt,
+            windows/assets/fonts/D2Coding-OFL.txt
+
+-------------------------------------------------------------------------------
+Website fonts (site/) — SIL Open Font License, Version 1.1
+-------------------------------------------------------------------------------
+
+6. Pretendard Variable 1.3.9
+   Copyright (c) 2021 Kil Hyung-jin, with Reserved Font Name Pretendard.
+   The font's own unicode-range pieces, unchanged: site/assets/fonts/pretendard/
+   License: site/assets/fonts/OFL-Pretendard.txt
+
+7. HanJang Pen and Caveat, cut down to the characters the site uses
+   (tools/site-check/hand-font.py): site/assets/fonts/HanJangPen-site.woff2,
+   site/assets/fonts/Caveat-500-site.woff2
+   License: site/assets/fonts/OFL-HanJangPen.txt, site/assets/fonts/OFL-Caveat.txt
+
 -------------------------------------------------------------------------------
 Artwork
 -------------------------------------------------------------------------------
@@ -58,13 +84,124 @@ licensed with it under the Apache License 2.0.
 Release builds
 -------------------------------------------------------------------------------
 
-The macOS app uses only Apple system frameworks. The Windows installer built
-from windows/ bundles Electron (MIT License) and Chromium and their
-dependencies; their license files are included inside the installed app
-(LICENSE.electron.txt, LICENSES.chromium.html). The build tools in
-windows/package.json (electron-builder, esbuild, TypeScript) are used at build
-time only and are not part of this repository.
+macOS app
+  Apple system frameworks only; mac/Package.swift has no package
+  dependencies. Since 1.42 the app also carries Jongi-nyang for Claude
+  (Contents/Resources/mcp/: server/index.js and jongi-nyang.mcpb), the same
+  files as the Windows app; see "Jongi-nyang for Claude" below.
+
+Windows installer and ZIP (windows/, electron-builder)
+  - Electron 44.10.0 (MIT License) with Chromium and their dependencies; their
+    license files are included inside the installed app (LICENSE.electron.txt,
+    LICENSES.chromium.html).
+  - The app's code (out/), bundled by esbuild, contains these npm packages
+    (MIT License, see the MIT text below):
+      @codemirror/commands 6.11.1, @codemirror/language 6.13.1,
+      @codemirror/state 6.7.6, @codemirror/streamparser 6.0.0,
+      @codemirror/view 6.43.14
+        Copyright (C) 2018-2021 by Marijn Haverbeke and others
+      @lezer/common 1.5.4, @lezer/highlight 1.2.5, style-mod 4.1.4
+        Copyright (C) 2018 by Marijn Haverbeke and others
+      @marijn/find-cluster-break 1.0.4
+        Copyright (C) 2024 by Marijn Haverbeke
+      crelt 1.0.7
+        Copyright (C) 2020 by Marijn Haverbeke
+      w3c-keyname 2.2.8
+        Copyright (C) 2016 by Marijn Haverbeke and others
+  - The fonts listed above (windows/assets/fonts/) and Jongi-nyang for Claude
+    (resources/mcp/).
+  - This NOTICE, as resources/NOTICE.txt.
+
+Jongi-nyang for Claude (windows/mcp/ → mcp/dist/server/index.js, packed into
+jongi-nyang.mcpb; shipped in both apps)
+  Bundled by esbuild, with these npm packages:
+      @modelcontextprotocol/sdk 1.32.2   MIT    Copyright (c) 2024 Anthropic, PBC
+      ajv 8.20.0                         MIT    Copyright (c) 2015-2021 Evgeny Poberezkin
+      ajv-formats 3.0.1                  MIT    Copyright (c) 2020 Evgeny Poberezkin
+      fast-deep-equal 3.1.3              MIT    Copyright (c) 2017 Evgeny Poberezkin
+      json-schema-traverse 1.0.0         MIT    Copyright (c) 2017 Evgeny Poberezkin
+      zod 4.6.7                          MIT    Copyright (c) 2025 Colin McDonnell
+      zod-to-json-schema 3.25.2          ISC    Copyright (c) 2020, Stefan Terdell
+      fast-uri 3.1.9                     BSD-3-Clause
+        Copyright (c) 2011-2021, Gary Court
+        Copyright (c) 2021-present The Fastify team
+
+Build tools in windows/package.json (electron-builder, esbuild, TypeScript,
+@anthropic-ai/mcpb) are used at build time only and are not shipped.
 
 The released apps show "© 2026 leeAhwi. All rights reserved." in their About
 and Help screens, as shipped. The source code in this repository is offered
 under the Apache License 2.0 as stated above.
+
+-------------------------------------------------------------------------------
+MIT License (the packages marked MIT above)
+-------------------------------------------------------------------------------
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+-------------------------------------------------------------------------------
+ISC License (zod-to-json-schema)
+-------------------------------------------------------------------------------
+
+Copyright (c) 2020, Stefan Terdell
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+-------------------------------------------------------------------------------
+BSD 3-Clause License (fast-uri)
+-------------------------------------------------------------------------------
+
+Copyright (c) 2011-2021, Gary Court until https://github.com/garycourt/uri-js/commit/a1acf730b4bba3f1097c9f52e7d9d3aba8cdcaae
+Copyright (c) 2021-present The Fastify team <https://github.com/fastify/fastify#team>
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * The names of any contributors may not be used to endorse or promote
+      products derived from this software without specific prior written
+      permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDERS AND CONTRIBUTORS BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+The complete list of contributors can be found at:
+- https://github.com/garycourt/uri-js/graphs/contributors

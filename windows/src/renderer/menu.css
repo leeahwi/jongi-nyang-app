@@ -10,6 +10,9 @@
 .menu button.mi > .sq, .menu button.mi > .sq-paper { margin: 0 2px; }
 .menu button.mi:hover, .menu button.mi:focus-visible, .menu button.mi.open { background: var(--d-hover); outline: none; }
 .menu button.mi.danger, .menu button.mi.danger > .ico { color: var(--d-danger); }
+/* A submenu in the menu's place (#49): ‘‹ 스페이스로 옮기기’ on top, quieter than the choices, goes back. */
+.menu button.mi.back { font-weight: 600; color: var(--d-meta); }
+.menu button.mi.back > .ico { color: var(--d-meta); }
 .menu button.mi[aria-checked="true"] > .tick { color: var(--d-sub); }
 .menu button.mi > .tick { margin-left: auto; padding-left: 10px; display: flex; flex: none; }
 .menu .sep { height: 0.5px; margin: 4px 6px; background: var(--d-menu-edge); flex: none; }
@@ -18,6 +21,7 @@
 .menu .mh .icon { color: var(--d-icon); flex: none; }
 .menu .mh b { font-family: var(--d-hand); font-size: 18px; line-height: 22px; font-weight: 400; color: var(--d-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding-right: var(--ink-over); }
 :root[data-font="clean"] .menu .mh b { font: 600 13px var(--ui); }
+.menu .mh .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-size: 12px; }
 .menu .mh .c { margin-left: auto; padding-left: 10px; white-space: nowrap; }
 .menu .sq { width: 12px; height: 12px; border-radius: 3px; background: var(--a); box-shadow: inset 0 0 0 1px var(--e); flex: none; }
 .menu .cnt { margin-left: auto; padding-left: 10px; font-size: 11px; color: var(--d-meta); font-variant-numeric: tabular-nums; flex: none; }

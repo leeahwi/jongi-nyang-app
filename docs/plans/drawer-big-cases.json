@@ -1,0 +1,25 @@
+{
+  "about": "크게 보기 공유 사례 (#113, docs/plans/drawer-ux-plan.md C2 A안). width: 크게 볼 때의 서랍 종이 폭 = 최대 640과 화면 폭의 45%(소수점 버림) 중 작은 것, 사용자 폭보다 좁아지지 않고, 화면 폭에서 서랍의 다른 부분(chrome: Mac 그림자 14 + 책갈피 34 = 48, Windows 책갈피 34)을 뺀 것보다 넓어지지 않아요. 작게 하면 사용자 폭으로 돌아가요(폭 설정은 그대로). count: 크게 볼 때 아래 줄의 글자 수 = 보이는 글자 하나하나(피부색이 붙은 이모지도 하나), 줄 바꿈은 빼고, 칸은 세요. words: 그 글자 수의 말. Mac MemoCards.bigWidth · characterCount · characters, Windows core/memoCards.ts bigDrawerWidth · characterCount · characterWords가 이 파일을 읽어요.",
+  "width": [
+    {"id": "W1", "about": "1440 폭 화면: 640", "user": 300, "screen": 1440, "chrome": 48, "expect": 640},
+    {"id": "W2", "about": "1280 폭 화면: 45%인 576, 서랍 전체가 화면의 절반을 넘지 않아요", "user": 300, "screen": 1280, "chrome": 48, "expect": 576},
+    {"id": "W3", "about": "1366 폭: 45%는 614.7 → 614", "user": 300, "screen": 1366, "chrome": 34, "expect": 614},
+    {"id": "W4", "about": "사용자 폭이 더 넓으면 사용자 폭", "user": 480, "screen": 900, "chrome": 48, "expect": 480},
+    {"id": "W5", "about": "좁은 화면: 사용자 폭 그대로", "user": 300, "screen": 600, "chrome": 34, "expect": 300},
+    {"id": "W6", "about": "아주 좁은 화면: 화면 밖으로 나가지 않아요", "user": 480, "screen": 500, "chrome": 34, "expect": 466},
+    {"id": "W7", "about": "넓은 화면에서 가장 좁은 사용자 폭도 640", "user": 260, "screen": 2560, "chrome": 48, "expect": 640}
+  ],
+  "count": [
+    {"id": "C1", "about": "빈 메모", "text": "", "expect": 0},
+    {"id": "C2", "about": "한국어와 칸", "text": "작은 정원의 일 년", "expect": 10},
+    {"id": "C3", "about": "줄 바꿈은 빼요", "text": "첫 줄\n둘째 줄", "expect": 7},
+    {"id": "C4", "about": "\\r\\n도 줄 바꿈", "text": "a\r\nb\rc", "expect": 3},
+    {"id": "C5", "about": "피부색이 붙은 이모지는 한 글자", "text": "👍🏽 ok", "expect": 4},
+    {"id": "C6", "about": "마크다운 기호도 글자", "text": "- [x] 우유", "expect": 8}
+  ],
+  "words": [
+    {"id": "N1", "count": 0, "ko": "0자", "en": "0 characters", "nl": "0 tekens"},
+    {"id": "N2", "count": 1, "ko": "1자", "en": "1 character", "nl": "1 teken"},
+    {"id": "N3", "count": 412, "ko": "412자", "en": "412 characters", "nl": "412 tekens"}
+  ]
+}

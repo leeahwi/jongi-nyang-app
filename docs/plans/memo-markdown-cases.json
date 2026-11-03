@@ -1,0 +1,1018 @@
+{
+  "about": "메모 마크다운 공유 사례 (docs/plans/memo-markdown.md). spans: kind, from, to (UTF-16, to 미포함), level. mark = 옅게 칠할 기호, url = 맨 주소(밑줄만). plain = 기호를 뺀 글(검색 · 카드). title · preview가 있으면 카드 제목 · 미리보기 줄. 순서: from 오름차순, 같은 from이면 긴 것 먼저, 그다음 kind 이름순. edits: 서식 · ↩ · 붙여넣기의 글 바꾸기(‸ 커서, « » 고른 범위; expect null은 할 일 없음). done: 체크와 끝낸 항목 아래로. tick(#133): 고치는 칸에서 `line` 줄의 상자를 누름(move = 끝낸 항목 아래로), 커서 · 고른 범위는 제 글을 따라가요. tickKey: 체크 키(⇧⌘U · Ctrl+Shift+U)로 커서 줄의 상자. linkSet(#135): 링크 칸에 `url`을 적고 Return(빈 주소는 링크 빼기).",
+  "cases": [
+    {
+      "about": "굵게: 기호는 옅게, 안은 굵게",
+      "id": "M1",
+      "plain": "장보기\n우유 사기",
+      "preview": [
+        "우유 사기"
+      ],
+      "spans": [
+        {
+          "from": 4,
+          "kind": "mark",
+          "to": 6
+        },
+        {
+          "from": 6,
+          "kind": "bold",
+          "to": 8
+        },
+        {
+          "from": 8,
+          "kind": "mark",
+          "to": 10
+        }
+      ],
+      "text": "장보기\n**우유** 사기",
+      "title": "장보기"
+    },
+    {
+      "about": "제목 줄: `# ` 뒤에 칸이 있어야 해요",
+      "id": "M2",
+      "plain": "회의 메모\n안건 세 가지",
+      "preview": [
+        "안건 세 가지"
+      ],
+      "spans": [
+        {
+          "from": 0,
+          "kind": "heading",
+          "level": 1,
+          "to": 7
+        },
+        {
+          "from": 0,
+          "kind": "mark",
+          "to": 2
+        }
+      ],
+      "text": "# 회의 메모\n안건 세 가지",
+      "title": "회의 메모"
+    },
+    {
+      "about": "`#회사`처럼 칸이 없으면 글자 그대로",
+      "id": "M3",
+      "plain": "#회사 일정 정리",
+      "spans": [],
+      "text": "#회사 일정 정리"
+    },
+    {
+      "about": "목록과 한 단계 안의 목록",
+      "id": "M4",
+      "plain": "할 일\n우유\n저지방",
+      "preview": [
+        "• 우유",
+        "• 저지방"
+      ],
+      "spans": [
+        {
+          "from": 4,
+          "kind": "list",
+          "level": 1,
+          "to": 8
+        },
+        {
+          "from": 4,
+          "kind": "mark",
+          "to": 6
+        },
+        {
+          "from": 9,
+          "kind": "list",
+          "level": 2,
+          "to": 16
+        },
+        {
+          "from": 11,
+          "kind": "mark",
+          "to": 13
+        }
+      ],
+      "text": "할 일\n- 우유\n  - 저지방"
+    },
+    {
+      "about": "번호 목록: 숫자는 옅게, 고쳐 쓰지 않아요",
+      "id": "M5",
+      "plain": "순서\n셋째",
+      "preview": [
+        "3. 셋째"
+      ],
+      "spans": [
+        {
+          "from": 3,
+          "kind": "olist",
+          "level": 1,
+          "to": 8
+        },
+        {
+          "from": 3,
+          "kind": "mark",
+          "to": 6
+        }
+      ],
+      "text": "순서\n3. 셋째"
+    },
+    {
+      "about": "인용",
+      "id": "M6",
+      "plain": "메모\n나중에 다시 보기",
+      "preview": [
+        "나중에 다시 보기"
+      ],
+      "spans": [
+        {
+          "from": 3,
+          "kind": "quote",
+          "to": 14
+        },
+        {
+          "from": 3,
+          "kind": "mark",
+          "to": 5
+        }
+      ],
+      "text": "메모\n> 나중에 다시 보기"
+    },
+    {
+      "about": "코드 블록: 울타리는 옅게, 안은 고정폭",
+      "id": "M7",
+      "plain": "명령\nls -la",
+      "preview": [
+        "ls -la"
+      ],
+      "spans": [
+        {
+          "from": 3,
+          "kind": "codeblock",
+          "to": 17
+        },
+        {
+          "from": 3,
+          "kind": "mark",
+          "to": 6
+        },
+        {
+          "from": 14,
+          "kind": "mark",
+          "to": 17
+        }
+      ],
+      "text": "명령\n```\nls -la\n```"
+    },
+    {
+      "about": "줄 안 코드",
+      "id": "M8",
+      "plain": "npm test 돌리기",
+      "spans": [
+        {
+          "from": 0,
+          "kind": "mark",
+          "to": 1
+        },
+        {
+          "from": 1,
+          "kind": "code",
+          "to": 9
+        },
+        {
+          "from": 9,
+          "kind": "mark",
+          "to": 10
+        }
+      ],
+      "text": "`npm test` 돌리기",
+      "title": "npm test 돌리기"
+    },
+    {
+      "about": "짝이 없으면 글자 그대로",
+      "id": "M9",
+      "plain": "**굵게만 열고",
+      "spans": [],
+      "text": "**굵게만 열고"
+    },
+    {
+      "about": "`_`는 낱말 안에서 무시",
+      "id": "M10",
+      "plain": "변수 snake_case_name 확인",
+      "spans": [],
+      "text": "변수 snake_case_name 확인"
+    },
+    {
+      "about": "링크: 글은 링크, 주소는 옅게",
+      "id": "M11",
+      "kind": {
+        "label": "가게",
+        "link": "https://x.com"
+      },
+      "plain": "가게 예약",
+      "spans": [
+        {
+          "from": 0,
+          "kind": "mark",
+          "to": 1
+        },
+        {
+          "from": 1,
+          "kind": "link",
+          "to": 3
+        },
+        {
+          "from": 3,
+          "kind": "mark",
+          "to": 4
+        },
+        {
+          "from": 4,
+          "kind": "linkurl",
+          "to": 19
+        },
+        {
+          "from": 4,
+          "kind": "mark",
+          "to": 19
+        }
+      ],
+      "text": "[가게](https://x.com) 예약",
+      "title": "가게 예약"
+    },
+    {
+      "about": "취소선",
+      "id": "M12",
+      "plain": "어제 일",
+      "spans": [
+        {
+          "from": 0,
+          "kind": "mark",
+          "to": 2
+        },
+        {
+          "from": 2,
+          "kind": "strike",
+          "to": 6
+        },
+        {
+          "from": 6,
+          "kind": "mark",
+          "to": 8
+        }
+      ],
+      "text": "~~어제 일~~"
+    },
+    {
+      "about": "굵게 + 기울임",
+      "id": "M13",
+      "plain": "둘 다",
+      "spans": [
+        {
+          "from": 0,
+          "kind": "mark",
+          "to": 3
+        },
+        {
+          "from": 3,
+          "kind": "bold",
+          "to": 6
+        },
+        {
+          "from": 3,
+          "kind": "italic",
+          "to": 6
+        },
+        {
+          "from": 6,
+          "kind": "mark",
+          "to": 9
+        }
+      ],
+      "text": "***둘 다***"
+    },
+    {
+      "about": "줄 하나가 `---`면 가로줄",
+      "id": "M14",
+      "plain": "제목\n본문",
+      "preview": [
+        "본문"
+      ],
+      "spans": [
+        {
+          "from": 3,
+          "kind": "mark",
+          "to": 6
+        },
+        {
+          "from": 3,
+          "kind": "rule",
+          "to": 6
+        }
+      ],
+      "text": "제목\n---\n본문"
+    },
+    {
+      "about": "코드 안에서는 다른 꾸미기를 하지 않아요",
+      "id": "M15",
+      "plain": "a **b** c",
+      "spans": [
+        {
+          "from": 0,
+          "kind": "mark",
+          "to": 1
+        },
+        {
+          "from": 1,
+          "kind": "code",
+          "to": 10
+        },
+        {
+          "from": 10,
+          "kind": "mark",
+          "to": 11
+        }
+      ],
+      "text": "`a **b** c`"
+    },
+    {
+      "about": "기울임 `_`는 낱말 밖에서",
+      "id": "M16",
+      "plain": "천천히 읽기",
+      "spans": [
+        {
+          "from": 0,
+          "kind": "mark",
+          "to": 1
+        },
+        {
+          "from": 1,
+          "kind": "italic",
+          "to": 4
+        },
+        {
+          "from": 4,
+          "kind": "mark",
+          "to": 5
+        }
+      ],
+      "text": "_천천히_ 읽기"
+    },
+    {
+      "about": "체크 목록 줄: 상자는 그대로, 항목 안의 꾸밈만",
+      "id": "M17",
+      "kind": {
+        "checklist": "1/2"
+      },
+      "plain": "장보기\n- [ ] 우유\n- [x] 빵",
+      "preview": [
+        "우유",
+        "빵"
+      ],
+      "spans": [
+        {
+          "from": 10,
+          "kind": "mark",
+          "to": 12
+        },
+        {
+          "from": 12,
+          "kind": "bold",
+          "to": 14
+        },
+        {
+          "from": 14,
+          "kind": "mark",
+          "to": 16
+        }
+      ],
+      "text": "장보기\n- [ ] **우유**\n- [x] 빵",
+      "title": "장보기"
+    },
+    {
+      "about": "닫지 않은 코드 블록은 메모 끝까지",
+      "id": "M18",
+      "plain": "코드\nnpm test",
+      "preview": [
+        "npm test"
+      ],
+      "spans": [
+        {
+          "from": 3,
+          "kind": "codeblock",
+          "to": 15
+        },
+        {
+          "from": 3,
+          "kind": "mark",
+          "to": 6
+        }
+      ],
+      "text": "코드\n```\nnpm test"
+    },
+    {
+      "about": "맨 URL은 밑줄만, 그 안의 `*` · `_`는 꾸미지 않아요",
+      "id": "M19",
+      "plain": "https://x.com/*a*/b_c_ 보기",
+      "spans": [
+        {
+          "from": 0,
+          "kind": "url",
+          "to": 22
+        }
+      ],
+      "text": "https://x.com/*a*/b_c_ 보기"
+    },
+    {
+      "about": "제목 단계 둘 · 셋, `####`는 글자 그대로",
+      "id": "M20",
+      "plain": "둘\n셋\n#### 넷",
+      "preview": [
+        "셋",
+        "#### 넷"
+      ],
+      "spans": [
+        {
+          "from": 0,
+          "kind": "heading",
+          "level": 2,
+          "to": 4
+        },
+        {
+          "from": 0,
+          "kind": "mark",
+          "to": 3
+        },
+        {
+          "from": 5,
+          "kind": "heading",
+          "level": 3,
+          "to": 10
+        },
+        {
+          "from": 5,
+          "kind": "mark",
+          "to": 9
+        }
+      ],
+      "text": "## 둘\n### 셋\n#### 넷",
+      "title": "둘"
+    },
+    {
+      "about": "굵게 안의 코드",
+      "id": "M21",
+      "plain": "a b c",
+      "spans": [
+        {
+          "from": 0,
+          "kind": "mark",
+          "to": 2
+        },
+        {
+          "from": 2,
+          "kind": "bold",
+          "to": 9
+        },
+        {
+          "from": 4,
+          "kind": "mark",
+          "to": 5
+        },
+        {
+          "from": 5,
+          "kind": "code",
+          "to": 6
+        },
+        {
+          "from": 6,
+          "kind": "mark",
+          "to": 7
+        },
+        {
+          "from": 9,
+          "kind": "mark",
+          "to": 11
+        }
+      ],
+      "text": "**a `b` c**"
+    },
+    {
+      "about": "`1)` 번호와 탭 한 번 안의 목록",
+      "id": "M22",
+      "plain": "할 일\n첫째\n안",
+      "preview": [
+        "1) 첫째",
+        "• 안"
+      ],
+      "spans": [
+        {
+          "from": 4,
+          "kind": "olist",
+          "level": 1,
+          "to": 9
+        },
+        {
+          "from": 4,
+          "kind": "mark",
+          "to": 7
+        },
+        {
+          "from": 10,
+          "kind": "list",
+          "level": 2,
+          "to": 14
+        },
+        {
+          "from": 11,
+          "kind": "mark",
+          "to": 13
+        }
+      ],
+      "text": "할 일\n1) 첫째\n\t- 안"
+    },
+    {
+      "about": "물결 하나는 글자 그대로",
+      "id": "M23",
+      "plain": "~단일~ 물결",
+      "spans": [],
+      "text": "~단일~ 물결"
+    },
+    {
+      "about": "종류는 기호를 뺀 글로: 굵게 쓴 전화번호",
+      "id": "M24",
+      "kind": {
+        "phone": "010-1234-5678"
+      },
+      "plain": "연락\n010-1234-5678",
+      "spans": [
+        {
+          "from": 3,
+          "kind": "mark",
+          "to": 5
+        },
+        {
+          "from": 5,
+          "kind": "bold",
+          "to": 18
+        },
+        {
+          "from": 18,
+          "kind": "mark",
+          "to": 20
+        }
+      ],
+      "text": "연락\n**010-1234-5678**"
+    },
+    {
+      "about": "`* `는 목록, 그 뒤의 `*…*`는 기울임",
+      "id": "M25",
+      "plain": "항목 기울임",
+      "spans": [
+        {
+          "from": 0,
+          "kind": "list",
+          "level": 1,
+          "to": 10
+        },
+        {
+          "from": 0,
+          "kind": "mark",
+          "to": 2
+        },
+        {
+          "from": 5,
+          "kind": "mark",
+          "to": 6
+        },
+        {
+          "from": 6,
+          "kind": "italic",
+          "to": 9
+        },
+        {
+          "from": 9,
+          "kind": "mark",
+          "to": 10
+        }
+      ],
+      "text": "* 항목 *기울임*",
+      "title": "항목 기울임"
+    },
+    {
+      "about": "여는 기호 뒤가 칸이면 글자 그대로",
+      "id": "M26",
+      "plain": "** 굵게**",
+      "spans": [],
+      "text": "** 굵게**"
+    },
+    {
+      "about": "링크 주소에 칸이 있으면 글자 그대로",
+      "id": "M27",
+      "plain": "[가게](x y)",
+      "spans": [],
+      "text": "[가게](x y)"
+    },
+    {
+      "about": "맨 URL 끝의 문장 부호는 밑줄 밖, 종류는 링크",
+      "id": "M28",
+      "kind": {
+        "label": "x.com/a",
+        "link": "https://x.com/a"
+      },
+      "plain": "자료 https://x.com/a.",
+      "spans": [
+        {
+          "from": 3,
+          "kind": "url",
+          "to": 18
+        }
+      ],
+      "text": "자료 https://x.com/a."
+    }
+  ],
+  "edits": [
+    {
+      "about": "↩ 목록 줄: 다음 줄에 같은 글머리",
+      "id": "E1",
+      "op": "enter",
+      "text": "장보기\n- 우유‸",
+      "expect": "장보기\n- 우유\n- ‸"
+    },
+    {
+      "about": "↩ 번호: 다음 번호(+1), 구분 기호 그대로",
+      "id": "E2",
+      "op": "enter",
+      "text": "1. 첫째\n2) 둘째‸",
+      "expect": "1. 첫째\n2) 둘째\n3) ‸"
+    },
+    {
+      "about": "↩ 체크: 빈 상자로 이어져요(끝낸 줄에서도)",
+      "id": "E3",
+      "op": "enter",
+      "text": "- [x] 빵‸",
+      "expect": "- [x] 빵\n- [ ] ‸"
+    },
+    {
+      "about": "↩ 빈 항목: 글머리를 빼고 목록을 끝내요",
+      "id": "E5",
+      "op": "enter",
+      "text": "- 우유\n- ‸",
+      "expect": "- 우유\n‸"
+    },
+    {
+      "about": "↩ 글 가운데: 뒤의 글이 새 항목으로",
+      "id": "E6",
+      "op": "enter",
+      "text": "- 우유‸ 두 통",
+      "expect": "- 우유\n- ‸ 두 통"
+    },
+    {
+      "about": "↩ 보통 줄 · 코드 블록 안: 할 일 없음(그냥 줄바꿈)",
+      "id": "E7",
+      "op": "enter",
+      "text": "```\n- 코드‸",
+      "expect": null
+    },
+    {
+      "about": "제목 돌리기: 없음 → # → ## → ### → 없음",
+      "id": "E8",
+      "op": "heading",
+      "text": "회의‸",
+      "expect": "# 회의‸",
+      "level": "cycle"
+    },
+    {
+      "about": "제목 돌리기: ### 다음은 없음",
+      "id": "E9",
+      "op": "heading",
+      "text": "### 회의‸",
+      "expect": "회의‸",
+      "level": "cycle"
+    },
+    {
+      "about": "⌥⌘2: 제목 2로 바꾸기",
+      "id": "E10",
+      "op": "heading",
+      "text": "# 회‸의",
+      "expect": "## 회‸의",
+      "level": 2
+    },
+    {
+      "about": "⌘B: 고른 글을 굵게",
+      "id": "E11",
+      "op": "wrap",
+      "text": "«우유» 사기",
+      "expect": "**«우유»** 사기",
+      "mark": "**"
+    },
+    {
+      "about": "⌘B 한 번 더: 굵게 풀기",
+      "id": "E12",
+      "op": "wrap",
+      "text": "**«우유»** 사기",
+      "expect": "«우유» 사기",
+      "mark": "**"
+    },
+    {
+      "about": "⌘I 고른 글이 없으면 짝을 넣고 그 사이에 커서",
+      "id": "E13",
+      "op": "wrap",
+      "text": "사기 ‸",
+      "expect": "사기 *‸*",
+      "mark": "*"
+    },
+    {
+      "about": "⌘I가 굵게의 별 하나를 기울임으로 읽지 않아요",
+      "id": "E14",
+      "op": "wrap",
+      "text": "**«우유»**",
+      "expect": "***«우유»***",
+      "mark": "*"
+    },
+    {
+      "about": "기호까지 고른 채 한 번 더: 풀기",
+      "id": "E15",
+      "op": "wrap",
+      "text": "«~~어제~~»",
+      "expect": "«어제»",
+      "mark": "~~"
+    },
+    {
+      "about": "목록 켜기: 여러 줄, 빈 줄은 그대로",
+      "id": "E16",
+      "op": "line",
+      "text": "«우유\n\n달걀»",
+      "expect": "«- 우유\n\n- 달걀»",
+      "kind": "list"
+    },
+    {
+      "about": "목록 끄기: 모든 줄이 목록일 때",
+      "id": "E17",
+      "op": "line",
+      "text": "«- 우유\n- 달걀»",
+      "expect": "«우유\n달걀»",
+      "kind": "list"
+    },
+    {
+      "about": "번호 켜기: 다른 글머리를 바꾸고 1부터",
+      "id": "E18",
+      "op": "line",
+      "text": "«- 우유\n* 달걀»",
+      "expect": "«1. 우유\n2. 달걀»",
+      "kind": "olist"
+    },
+    {
+      "about": "⇧⌘L 체크: 들여쓰기는 그대로",
+      "id": "E19",
+      "op": "line",
+      "text": "  - 우유‸",
+      "expect": "  - [ ] 우유‸",
+      "kind": "check"
+    },
+    {
+      "about": "인용 켜기",
+      "id": "E20",
+      "op": "line",
+      "text": "비 오면‸",
+      "expect": "> 비 오면‸",
+      "kind": "quote"
+    },
+    {
+      "about": "가로줄: 다음 줄에, 커서는 그 아래",
+      "id": "E21",
+      "op": "rule",
+      "text": "제목‸",
+      "expect": "제목\n---\n‸"
+    },
+    {
+      "about": "⌘K: 고른 글이 링크 글, 커서는 빈 주소에",
+      "id": "E22",
+      "op": "link",
+      "text": "«지도» 보기",
+      "expect": "[지도](‸) 보기"
+    },
+    {
+      "about": "Tab: 목록 한 단계 안으로",
+      "id": "E23",
+      "op": "indent",
+      "text": "- 우유‸",
+      "expect": "  - 우유‸"
+    },
+    {
+      "about": "⇧Tab: 한 단계 밖으로",
+      "id": "E24",
+      "op": "outdent",
+      "text": "  - 우유‸",
+      "expect": "- 우유‸"
+    },
+    {
+      "about": "Tab: 셋째 단계에서 더 들어가지 않아요",
+      "id": "E25",
+      "op": "indent",
+      "text": "    - 우유‸",
+      "expect": "    - 우유‸"
+    },
+    {
+      "about": "⌥↑: 줄을 위로",
+      "id": "E26",
+      "op": "moveUp",
+      "text": "가\n나‸",
+      "expect": "나‸\n가"
+    },
+    {
+      "about": "⌥↓: 고른 두 줄을 아래로",
+      "id": "E27",
+      "op": "moveDown",
+      "text": "«가\n나»\n다",
+      "expect": "다\n«가\n나»"
+    },
+    {
+      "about": "붙여넣기: 글을 고른 채 URL이면 링크",
+      "id": "E28",
+      "op": "paste",
+      "text": "«지도» 보기",
+      "expect": "[지도](https://example.com/map)‸ 보기",
+      "pasted": "https://example.com/map"
+    },
+    {
+      "about": "붙여넣기: 빈 줄에 여러 줄 코드면 코드 블록",
+      "id": "E29",
+      "op": "paste",
+      "text": "명령\n‸",
+      "expect": "명령\n```\nif (ok) {\n  run();\n}\n```\n‸",
+      "pasted": "if (ok) {\n  run();\n}\n"
+    },
+    {
+      "about": "붙여넣기: 글이 있는 줄이나 보통 글은 그대로",
+      "id": "E30",
+      "op": "paste",
+      "text": "메모 ‸",
+      "expect": null,
+      "pasted": "첫째 줄\n둘째 줄"
+    },
+    {
+      "about": "상자 누르기(#133): 끝낸 항목은 아래로, 커서는 제 줄에 그대로",
+      "id": "E31",
+      "op": "tick",
+      "text": "- [ ] 우유\n- [ ] 달걀‸",
+      "line": 0,
+      "move": true,
+      "expect": "- [ ] 달걀‸\n- [x] 우유"
+    },
+    {
+      "about": "상자 누르기: 커서가 그 줄에 있으면 줄과 함께 가요",
+      "id": "E32",
+      "op": "tick",
+      "text": "장보기\n- [ ] 우‸유\n- [ ] 빵",
+      "line": 1,
+      "move": true,
+      "expect": "장보기\n- [ ] 빵\n- [x] 우‸유"
+    },
+    {
+      "about": "상자 누르기: 다시 풀면 끝낸 항목들 바로 위로, 고른 범위도 따라가요",
+      "id": "E33",
+      "op": "tick",
+      "text": "- [ ] 달걀\n- [x] 빵\n- [x] «우유»",
+      "line": 2,
+      "move": true,
+      "expect": "- [ ] 달걀\n- [ ] «우유»\n- [x] 빵"
+    },
+    {
+      "about": "상자 누르기: 설정을 끄면 제자리",
+      "id": "E34",
+      "op": "tick",
+      "text": "- [x] 우유‸",
+      "line": 0,
+      "move": false,
+      "expect": "- [ ] 우유‸"
+    },
+    {
+      "about": "상자 누르기: 체크 줄이 아니면 할 일 없음",
+      "id": "E35",
+      "op": "tick",
+      "text": "- 우유‸",
+      "line": 0,
+      "move": true,
+      "expect": null
+    },
+    {
+      "about": "체크 키(⇧⌘U · Ctrl+Shift+U): 커서 줄의 상자를 체크, 끝낸 항목은 아래로, 커서는 제 글을 따라가요",
+      "id": "E36",
+      "op": "tickKey",
+      "text": "- [ ] 우유\n- [ ] 달‸걀\n- [ ] 빵",
+      "move": true,
+      "expect": "- [ ] 우유\n- [ ] 빵\n- [x] 달‸걀"
+    },
+    {
+      "about": "체크 키: 끝낸 항목에서 누르면 풀려서 끝낸 항목들 바로 위로",
+      "id": "E37",
+      "op": "tickKey",
+      "text": "- [ ] 빵\n- [x] 달걀\n- [x] 우‸유",
+      "move": true,
+      "expect": "- [ ] 빵\n- [ ] 우‸유\n- [x] 달걀"
+    },
+    {
+      "about": "체크 키: 들여 쓴 체크 줄도, 설정을 끄면 제자리",
+      "id": "E38",
+      "op": "tickKey",
+      "text": "장보기\n  - [ ] 우유‸\n  - [ ] 빵",
+      "move": false,
+      "expect": "장보기\n  - [x] 우유‸\n  - [ ] 빵"
+    },
+    {
+      "about": "체크 키: 체크 줄이 아니면 할 일 없음",
+      "id": "E39",
+      "op": "tickKey",
+      "text": "- [ ] 우유\n그냥 줄‸",
+      "move": true,
+      "expect": null
+    },
+    {
+      "about": "링크 칸(⌘K · Ctrl+K, #135): 고른 글에 주소를 넣고 Return, 칸 없는 주소는 https://",
+      "id": "E40",
+      "op": "linkSet",
+      "text": "«지도» 보기",
+      "url": "example.com/map",
+      "expect": "[지도](https://example.com/map)‸ 보기"
+    },
+    {
+      "about": "링크 칸: 링크 안에서 ⌘K는 주소 고치기, 주소 안의 칸은 %20",
+      "id": "E41",
+      "op": "linkSet",
+      "text": "[지‸도](https://old.example) 보기",
+      "url": "https://new.example/a b",
+      "expect": "[지도](https://new.example/a%20b)‸ 보기"
+    },
+    {
+      "about": "링크 칸: 링크 안에서 주소를 비우고 Return(링크 빼기)이면 글만 남고 골라져요",
+      "id": "E42",
+      "op": "linkSet",
+      "text": "[지‸도](https://old.example) 보기",
+      "url": "",
+      "expect": "«지도» 보기"
+    },
+    {
+      "about": "링크 칸: 링크 전체를 고른 채로도 주소 고치기, mailto: 그대로",
+      "id": "E43",
+      "op": "linkSet",
+      "text": "«[지도](https://a.example)» 보기",
+      "url": "mailto:shop@example.com",
+      "expect": "[지도](mailto:shop@example.com)‸ 보기"
+    },
+    {
+      "about": "링크 칸: 고른 글이 없고 링크 밖이면 주소만 넣어요",
+      "id": "E44",
+      "op": "linkSet",
+      "text": "주소: ‸",
+      "url": "example.com",
+      "expect": "주소: https://example.com‸"
+    },
+    {
+      "about": "링크 칸: 링크 밖에서 빈 주소는 할 일 없음",
+      "id": "E45",
+      "op": "linkSet",
+      "text": "«지도» 보기",
+      "url": "  ",
+      "expect": null
+    },
+    {
+      "about": "링크 칸: 두 줄에 걸친 글은 링크가 되지 않아요",
+      "id": "E46",
+      "op": "linkSet",
+      "text": "«지도\n보기»",
+      "url": "example.com",
+      "expect": null
+    }
+  ],
+  "done": [
+    {
+      "about": "끝낸 항목은 목록 묶음 맨 아래로",
+      "id": "D1",
+      "text": "장보기\n- [ ] 우유\n- [ ] 달걀\n- [ ] 빵\n\n- [ ] 다른 목록",
+      "line": 1,
+      "move": true,
+      "expect": "장보기\n- [ ] 달걀\n- [ ] 빵\n- [x] 우유\n\n- [ ] 다른 목록"
+    },
+    {
+      "about": "다시 풀면 끝낸 항목들 바로 위로",
+      "id": "D2",
+      "text": "- [ ] 달걀\n- [x] 빵\n- [x] 우유",
+      "line": 2,
+      "move": true,
+      "expect": "- [ ] 달걀\n- [ ] 우유\n- [x] 빵"
+    },
+    {
+      "about": "설정을 끄면 제자리",
+      "id": "D3",
+      "text": "- [ ] 우유\n- [ ] 달걀",
+      "line": 0,
+      "move": false,
+      "expect": "- [x] 우유\n- [ ] 달걀"
+    },
+    {
+      "about": "체크 줄이 아닌 줄은 그대로",
+      "id": "D4",
+      "text": "- 우유\n- [ ] 달걀",
+      "line": 0,
+      "move": true,
+      "expect": "- 우유\n- [ ] 달걀"
+    }
+  ]
+}

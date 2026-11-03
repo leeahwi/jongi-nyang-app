@@ -42,6 +42,10 @@ struct AheadPageView: View {
     /// 46 pt; English needs a little more for "Tomorrow".
     static var dateColumn: CGFloat { AppLanguage.current == .en ? 56 : 46 }
     static let columnGap: CGFloat = 10
+    /// Where a row's title starts (the end line's words line up with it).
+    static var titleLeading: CGFloat {
+        inset + dateColumn + columnGap + TaskRowStyle.inset.handle + TaskRowStyle.inset.checkColumn + TaskRowStyle.inset.titleGap
+    }
     private var shownTarget: AheadDropTarget? { drag != nil ? target : previewDrag?.target }
 
     var body: some View {
@@ -71,7 +75,8 @@ struct AheadPageView: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(withEmptyDays(sections, now: now), id: \.kind) { section in
                         GroupHeader(title: section.title, count: section.count > 0 ? section.count : nil, leading: Self.inset)
-                            .padding(.top, section.kind == sections.first?.kind ? 2 : 10)
+                            // #48: the first one too sits clear of the cat's shelf above it (its count read as the cat's).
+                            .padding(.top, 10)
                             .background(frameReader(section.kind == .someday ? .someday : nil))
                         switch section.kind {
                         case .thisWeek, .nextWeek:
@@ -84,6 +89,10 @@ struct AheadPageView: View {
                     }
                     if sections.isEmpty && dragging == nil {
                         EmptySheetNote(pose: .curious, text: Ahead.emptyText(.current))
+                    }
+                    // 2a (A1, A2): while one space shows, the to-dos ahead it hides — `다른 스페이스에 N개 더 · 모두 보기`.
+                    if dragging == nil {
+                        SpaceMoreLine(model: model, hidden: model.aheadLensed(now: now).hidden, leading: Self.titleLeading)
                     }
                     Color.clear.frame(height: 12)
                 }

@@ -103,6 +103,15 @@
 - Bureau → Weergave → **Taal**: Automatisch · 한국어 · English · Nederlands. Automatisch volgt de taalvolgorde van je Mac (Engels als geen van de drie erin staat); na een wijziging start Jongi-nyang opnieuw.
 - Menu’s, instellingen, help, herinneringen, kattenpraat, datums en tijden: alles in die taal. Engels en Nederlands handschrift gebruikt Caveat (pen) en Kalam (stift); titels die je in het Koreaans schrijft, blijven in Koreaans handschrift.
 
+### 🧺 Groeperen per ruimte · automatische back-ups (1.46)
+![Een breed notitieblok met de taken van vandaag in één kolom per ruimte](../docs/screenshots/mac/spaces2b-board.png)
+
+- **Groeperen per ruimte**: zet het aan via het menu `Alle ruimtes ▾` of Weergave → Ruimtes (`⌥⌘G`), en de taken van Vandaag komen per ruimte bij elkaar, als briefjes of als bladwijzers. Maak het notitieblok breder en elke ruimte krijgt een eigen kolom (tot 1.200 pt), met een knop om er meteen iets in te zetten.
+- **Slepen om te verplaatsen**: sleep een taak naar een andere groep of druk op `⌥⌘↑` · `⌥⌘↓`, en kies er meerdere met `⌘`-klik of `⇧`-klik om ze in één keer te verplaatsen. De kleurbalk en één ruimte tonen werken nu ook in Vooruit, de dagbalk, het venster Vandaag en bij herhaalde taken.
+- **Automatische back-ups**: één keer per dag, en voordat iets de opslagmap overschrijft (zoals importeren of terugzetten), wordt de map als `.jongi`-bestand bewaard. Back-ups komen in de map `backups` op deze Mac, niet in de opslagmap (14 dagelijkse, 10 van elke soort van vóór het overschrijven); kies er een om terug te zetten in Bureau → **Opslag & back-up**.
+- **Notitielade**: zoekresultaten staan per map bij elkaar en zijn te filteren met chips. Per map kun je alleen de titels tonen, en in de grote weergave wordt de lade breder. Verwijderde notities blijven 30 dagen bewaard en zijn terug te zetten via het mapnaam-menu ▾. `⌘K` opent een linkveld onder de notitie, en de vinkjes zijn groter.
+- **Papier en lettertypen**: vier nieuwe ladepapieren (hanji, salie, bloesem, inkt), en je kiest de tekstgrootte, regelafstand, alinea-afstand en het codelettertype (D2Coding).
+
 ### 🗄 Notitielade (1.43 – 1.44)
 ![De notitielade: groepen op datum en kaarten](../docs/screenshots/mac/en/drawer-list-day.png)
 

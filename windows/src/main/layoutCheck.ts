@@ -80,7 +80,8 @@ function check(options: LayoutCheckOptions): LayoutReport {
     }
     // Wrapped text must break between words: a word split over two lines reads badly.
     const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.3;
-    if (ownText(element) && style.whiteSpace !== "nowrap" && html.getBoundingClientRect().height > lineHeight * 1.6) {
+    // A link's address has no spaces to break at: it wraps where it must (#141: the drawer's 20 px in its narrowest width).
+    if (ownText(element) && style.whiteSpace !== "nowrap" && !html.matches(".md-link") && html.getBoundingClientRect().height > lineHeight * 1.6) {
       for (const node of element.childNodes) {
         if (node.nodeType !== Node.TEXT_NODE || node.textContent!.length > 600) continue;
         const text = node.textContent!;

@@ -58,17 +58,21 @@ extension AppModel {
 
     /// 모두 끝냄 (two or more at once): one undo step, `3개 끝냈어요 · 되돌리기`.
     func completeTasks(_ ids: [UUID]) {
-        let open = ids.filter { id in items.contains { $0.id == id && !$0.isCompleted } }
+        // #70: a set of the open ones, not a search of the list per id.
+        let unfinished = Set(items.lazy.filter { !$0.isCompleted }.map(\.id))
+        var seen = Set<UUID>()
+        let open = ids.filter { unfinished.contains($0) && seen.insert($0).inserted }
         guard !open.isEmpty else { return }
         guard open.count > 1 else { return completeTask(open[0]) }
         let now = Date()
-        mutate { history in history.batch { notebook in for id in open { notebook.toggle(id: id, now: now) } } }
+        mutate { history in history.batch { notebook in notebook.toggle(ids: Set(open), now: now) } }
         let after = history.notebook
         offerUndo(symbol: "checkmark", text: L("\(open.count)개 끝냈어요"), after: after) { [weak self] in
             guard let self else { return }
             self.mutate { history in
                 history.batch { notebook in
-                    for id in open where notebook.items.contains(where: { $0.id == id && $0.isCompleted }) { notebook.toggle(id: id) }
+                    let done = Set(notebook.items.lazy.filter(\.isCompleted).map(\.id))
+                    notebook.toggle(ids: Set(open).intersection(done))
                 }
             }
         }
@@ -109,22 +113,25 @@ extension AppModel {
 
     /// Moves the chosen tasks to tomorrow or 언젠가 as one undo step, with the toast.
     func sweep(_ ids: [UUID], someday: Bool, now: Date = Date()) {
-        let chosen = ids.filter { id in items.contains { $0.id == id && !$0.isCompleted } }
+        // #70: sets and one pass over the list, not a search of the list per id (500 took 0.5–0.9 s).
+        let unfinished = Set(items.lazy.filter { !$0.isCompleted }.map(\.id))
+        let chosen = ids.filter { unfinished.contains($0) }
         guard !chosen.isEmpty else { return }
         let tomorrow = DateMove.tomorrow(now: now)
-        let before = items.filter { chosen.contains($0.id) }
+        let picked = Set(chosen)
+        let before = items.filter { picked.contains($0.id) }
+        // 언젠가로 as saveForLater, 내일로 as schedule.
+        let place: (dueDate: String?, shelf: ShelfPin?) = someday ? (nil, .later) : (tomorrow, nil)
         mutate { history in
-            history.batch { notebook in
-                for id in chosen {
-                    if someday { notebook.saveForLater(id: id) } else { notebook.schedule(id: id, dueDate: tomorrow) }
-                }
-            }
+            history.batch { notebook in notebook.restorePlaces(Dictionary(uniqueKeysWithValues: picked.map { ($0, place) })) }
         }
         let after = history.notebook
         offerUndo(symbol: someday ? "tray.and.arrow.down" : "arrow.right", text: Sweep.movedText(count: chosen.count, someday: someday, language: .current),
                   after: after) { [weak self] in
             self?.mutate { history in
-                history.batch { notebook in for item in before { notebook.restorePlace(id: item.id, dueDate: item.dueDate, shelf: item.shelf) } }
+                history.batch { notebook in
+                    notebook.restorePlaces(Dictionary(before.map { ($0.id, (dueDate: $0.dueDate, shelf: $0.shelf)) }, uniquingKeysWith: { first, _ in first }))
+                }
             }
         }
     }

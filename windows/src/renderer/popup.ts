@@ -185,25 +185,37 @@ function completeAll(current: Session, tasks: PopupTask[]): void {
 }
 
 /**
- * 저녁 정리: "오늘도 수고했어요. 남은 3개는 내일로 넘길까요?", the tasks (each ticked; untick one to leave it), and
- * 내일로 · 언젠가로 · 그대로 두기 (the morning version: 오늘 할게요 keeps them). It stays until answered.
+ * 저녁 정리: "오늘도 수고했어요. 남은 3개는 내일로 넘길까요?" beside the cat (the tea cat; the morning one is happy),
+ * then ‘넘길 할 일 3’ and the tasks (each ticked; untick one to leave it, the count follows), how long each has stayed
+ * on 오늘 at its end (‘어제부터’ · ‘4일째’), and 그대로 두기 · 언젠가로 · 내일로 (the morning version: 언젠가로 · 내일로 ·
+ * 오늘 할게요) — one filled button. The same slip as the Mac's (#51). Over the desktop cat it has no cat of its own.
+ * It stays until answered.
  */
 function buildSweep(current: Session, bubble: HTMLDivElement): HTMLDivElement {
   const { payload } = current;
   const sweep = payload.sweep!;
   const evening = sweep.variant === "evening";
   const chosen = new Set(current.tasks.map((task) => task.id));
-  const head = slipHead({ icon: evening ? "moon" : "sun", tint: "sage", title: evening ? t("저녁 정리") : t("아침 정리"), context: `· ${t("{n}개", { n: current.tasks.length }, "count")}`, onClose: () => api.send("popup:sweep", "keep", []), closeLabel: t("닫기") });
+  const head = slipHead({ icon: evening ? "moon" : "sun", tint: "sage", title: evening ? t("저녁 정리") : t("아침 정리"), onClose: () => api.send("popup:sweep", "keep", []), closeLabel: t("닫기") });
   const body = h("div", { class: "slip-body sweep" });
-  body.append(h("div", { class: "sweep-msg" }, sweep.message));
+  const question = h("div", { class: "sweep-msg" }, sweep.message);
+  const cat = h("img", { class: "sweep-cat", src: `../../assets/pet/256/${evening ? "tea" : "happy"}.png`, alt: "", "aria-hidden": "true", draggable: "false" });
+  body.append(sweep.cat ? h("div", { class: "sweep-ask" }, cat, question) : question);
+  const count = h("span", { class: "group-count" }, String(chosen.size));
+  body.append(h("div", { class: "sweep-head", role: "heading", "aria-level": "3" }, h("span", { class: "group-name" }, t("넘길 할 일")), count));
   const rows = h("div", { class: "rows sweep-rows", role: "group", "aria-label": t("넘길 할 일") });
   const buttons: HTMLButtonElement[] = [];
-  const refresh = () => { for (const button of buttons) button.disabled = chosen.size === 0; };
+  const refresh = () => {
+    for (const button of buttons) button.disabled = chosen.size === 0;
+    count.textContent = String(chosen.size);
+  };
   for (const task of current.tasks) {
     const title = task.title || t("제목 없는 할 일");
     // #32: a round pick (filled lavender with →: 넘겨요), not the square sage ✓ that means 끝냈어요.
     const box = h("button", { class: "check carry-pick", role: "checkbox", "aria-checked": "true", "aria-label": title }, h("span", {}, icon("arrowRight", 11, 2.8)));
-    const row = h("div", { class: "task picked", "data-id": task.id }, box, h("span", { class: "open-task sweep-title", title }, title), h("span", { class: "when" }));
+    const when = h("span", { class: "when" }, task.carried ?? "");
+    if (task.carried) when.title = t("{text} 오늘 할 일에 있어요", { text: task.carried });
+    const row = h("div", { class: "task picked", "data-id": task.id }, box, h("span", { class: "open-task sweep-title", title }, title), when);
     const flip = () => {
       if (chosen.has(task.id)) chosen.delete(task.id); else chosen.add(task.id);
       row.classList.toggle("picked", chosen.has(task.id));
@@ -218,10 +230,11 @@ function buildSweep(current: Session, bubble: HTMLDivElement): HTMLDivElement {
   const answer = (choice: "tomorrow" | "someday" | "keep") => api.send("popup:sweep", choice, [...chosen]);
   const foot = h("div", { class: "slip-foot" });
   const tomorrow = slipButton(t("내일로"), evening ? "primary" : "ghost", () => answer("tomorrow"));
+  tomorrow.title = t("할 일을 내일로 옮겨요");
   const someday = slipButton(t("언젠가로"), "ghost", () => answer("someday"));
   buttons.push(tomorrow, someday);
   if (evening) foot.append(slipButton(t("그대로 두기"), "ghost", () => answer("keep")), h("span", { class: "spacer" }), someday, tomorrow);
-  else foot.append(tomorrow, someday, h("span", { class: "spacer" }), slipButton(t("오늘 할게요"), "primary", () => answer("keep")));
+  else foot.append(h("span", { class: "spacer" }), someday, tomorrow, slipButton(t("오늘 할게요"), "primary", () => answer("keep")));
   bubble.append(tape("todo"), head.element, body, foot);
   bubble.classList.add("sweep-bubble");
   watchPointer(current, bubble);

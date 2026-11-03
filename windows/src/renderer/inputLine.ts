@@ -1,5 +1,5 @@
 import { chipText, intentProblem, readIntent, slashHint, slashOf, type Candidate, type IntentKind, type IntentPrefer } from "../core/intent";
-import { findSpace, readSpaceLine, spaceColor, spaceLineProblem, takesSpace, type SpaceChoice, type SpaceToken, type TodoSpaces } from "../core/todoSpaces";
+import { findSpace, generalName, readSpaceLine, spaceColor, spaceLineProblem, takesSpace, type SpaceChoice, type SpaceToken, type TodoSpaces } from "../core/todoSpaces";
 import { h, icon, lang, t } from "./api";
 import { keyCap } from "./slip";
 
@@ -154,13 +154,13 @@ export class InputLine {
     return candidate && takesSpace(candidate) ? this.spaceChoices[this.spacePicked] : undefined;
   }
 
-  /** ● 회사 · + 새 스페이스 ‘회사’ · 스페이스 없음, after the picked to-do's chip; a click (or Shift+Tab) the next one. */
+  /** ● 회사 · + 새 스페이스 ‘회사’ · 일반, after the picked to-do's chip; a click (or Shift+Tab) the next one. */
   private spaceChip(): HTMLElement | undefined {
     const choice = this.pickedSpace();
     const spaces = this.options.spaces?.();
     if (!choice || !spaces) return undefined;
     const space = choice.kind === "space" ? findSpace(spaces.data, choice.id) : undefined;
-    const label = choice.kind === "new" ? t("새 스페이스 ‘{name}’", { name: choice.name }) : space?.name ?? t("스페이스 없음");
+    const label = choice.kind === "new" ? t("새 스페이스 ‘{name}’", { name: choice.name }) : space?.name ?? generalName(spaces.data, lang());
     const mark = choice.kind === "new" ? icon("plus", 12, 2.2) : h("span", { class: "space-dot" });
     if (space) mark.style.setProperty("--band", `var(--band-${spaceColor(space.color)})`);
     const element = h("button", { class: `chip space-chip${choice.kind === "new" ? " new" : ""}`, tabindex: "-1", title: this.spaceChoices.length > 1 ? t("Shift+Tab 다른 스페이스") : label }, mark, h("span", {}, label));

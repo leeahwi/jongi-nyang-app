@@ -228,7 +228,7 @@ test("백업 in English and Dutch (same cases as CoreTests.swift)", () => {
   assert.deepEqual([backupMessages.en.notBackup, backupMessages.en.tooNew, backupMessages.en.unreadable("todos.json")],
     ["This isn’t a Jongi-nyang backup file.", "This file comes from a newer version of Jongi-nyang. Please update Jongi-nyang.", "Couldn’t read ‘todos.json’ in the backup file."]);
   assert.deepEqual([backupMessages.nl.notBackup, backupMessages.nl.tooNew, backupMessages.nl.unreadable("todos.json")],
-    ["Dit is geen back-upbestand van Jongi-nyang.", "Dit bestand komt uit een nieuwere versie van Jongi-nyang. Werk Jongi-nyang bij.", "Kon ‘todos.json’ in het back-upbestand niet lezen."]);
+    ["Dit is geen back-upbestand van Jongi-nyang.", "Dit bestand komt uit een nieuwere versie van Jongi-nyang. Werk Jongi-nyang bij.", "Het lukte niet om ‘todos.json’ in het back-upbestand te lezen."]);
   assert.deepEqual(parseBackup("hello", "en"), { error: "This isn’t a Jongi-nyang backup file." });
   assert.deepEqual(parseBackup(`{"format":"jongi-nyang-backup","version":2,"files":{}}`, "nl"), { error: "Dit bestand komt uit een nieuwere versie van Jongi-nyang. Werk Jongi-nyang bij." });
   const counts = { todos: 2, memos: 1, repeats: 0, events: 3, alarms: 0, archive: 3 };

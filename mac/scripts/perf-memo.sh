@@ -8,6 +8,10 @@
 # PROFILE=1 samples typing. PERF_MEMO_OUT=<folder> keeps the build and logs elsewhere (one folder per build, to compare
 # two builds run by turns).
 #
+# #132: opening a memo (↩) has a ceiling, OPEN_CEILING ms (default 200; 1.45 opened in 50–160 ms, the first markdown
+# build in 260–370): a slower open is listed at the end and the run exits 1. Only on a quiet Mac — an open measured while
+# the 1-minute load is over CEILING_LOAD (default 6) is printed, not held to it.
+#
 # Per tier: start, the drawer's first open and reopen, idle with it open, stepping through the list with ↓ (each step
 # selects and scrolls), opening a memo (↩), typing in it (each key to its frame) and the saves after, memory. `long`
 # also opens and types in memos of 10 KB, 100 KB and 1 MB and opens a 2,000-line checklist.
@@ -19,6 +23,9 @@ for arg in "$@"; do
     case "$arg" in --no-build) build=0 ;; --build-only) only=1 ;; *) tiers+=("$arg") ;; esac
 done
 [ ${#tiers[@]} -eq 0 ] && tiers=(50 500 2000 5000 long)
+ceiling="${OPEN_CEILING:-200}"
+ceiling_load="${CEILING_LOAD:-6}"
+over=()
 bundle_id=com.noa.PaperTodo.MemoStress
 mkdir -p "$out"
 app="$out/MemoStress.app"
@@ -84,6 +91,13 @@ launch() {
     for _ in $(seq 1 100); do pid=$(pgrep -f "$app/Contents/MacOS/PaperTodo" | head -1 || true); [ -n "$pid" ] && break; sleep 0.05; done
     for _ in $(seq 1 300); do grep -q '^noteVisible' "$log" 2>/dev/null && break; sleep 0.1; done
     sleep 1.5
+    offscreen_check
+}
+# Every window of the test copy must be off the screens (x 40,000 points away), as scripts/perf-idle.sh checks.
+offscreen_check() {
+    if "$probe" windows "$pid" 2>/dev/null | tr -d '\n' | grep -Eq 'X = "?-?[0-9]{1,4}"?;'; then
+        echo "a window of the test copy is on a screen: stopping"; exit 1
+    fi
 }
 
 median() { sort -n | awk '{a[NR]=$1} END {if (NR==0) print "-"; else if (NR%2) print a[(NR+1)/2]; else printf "%.2f\n", (a[NR/2]+a[NR/2+1])/2}'; }
@@ -101,6 +115,18 @@ settle() {
     sleep 0.5
 }
 between() { awk -v from="# $1" -v to="# $2" '$0==from{on=1;next} $0==to{on=0} on' "$log"; }
+# ceiling <what> <ms>: an open over OPEN_CEILING on a quiet Mac is kept for the end (#132).
+ceiling() {
+    local load; load=$(sysctl -n vm.loadavg | awk '{print $2}')
+    [ -n "$2" ] || return 0
+    if awk -v v="$2" -v c="$ceiling" 'BEGIN {exit !(v > c)}'; then
+        if awk -v l="$load" -v m="$ceiling_load" 'BEGIN {exit !(l <= m)}'; then
+            over+=("$tier · $1: $2 ms (load $load)")
+        else
+            echo "  ($1 over the ${ceiling} ms ceiling at load $load: not counted)"
+        fi
+    fi
+}
 vals() { between "$1" "$2" | awk -v p="$3" 'index($0, p) == 1 {print $NF}'; }
 first() { vals "$@" | head -1; }
 drawer_menu() { "$probe" menu "$pid" "윈도우" "메모 서랍" >/dev/null 2>&1 || true; }
@@ -130,7 +156,7 @@ for tier in "${tiers[@]}"; do
     echo "-- tier $tier"
     echo "  start → note visible: $(grep '^noteVisible' "$log" | awk '{print $NF}') ms · $("$probe" mem "$pid")"
     "$probe" front "$pid"; sleep 0.5
-    mark open1; drawer_menu; settle open1 "drawer " 1 30; mark open1-end
+    mark open1; drawer_menu; settle open1 "drawer " 1 30; mark open1-end; offscreen_check
     echo "  drawer first open: $(first open1 open1-end "drawer ") ms"
     # The quick-write slip has the keys: a new memo there writes memos.json and memo-folders.json (its place).
     sleep 1
@@ -147,9 +173,20 @@ for tier in "${tiers[@]}"; do
     sleep 2
     echo "  idle, drawer open (20 s): $("$probe" sample "$pid" 20)"
     # The marker memo on top: opened through accessibility, closed with Esc — then ↓ steps from it.
+    # The accessibility walk can stall on a busy Mac: each try is given 30 s, then the keys do it instead (⌘F, the
+    # marker's words, ↓, ↩ — the search opens it in its folder and ends).
     pressed=0
-    for _ in 1 2 3 4 5; do "$probe" press "$pid" "맨 위 메모" >/dev/null 2>&1 && { pressed=1; break; }; sleep 2; done
-    [ "$pressed" = 1 ] || echo "  (marker not found: the steps below did not reach the list)"
+    for _ in 1 2; do
+        "$probe" press "$pid" "맨 위 메모" >/dev/null 2>&1 & presser=$!
+        for _ in $(seq 1 30); do kill -0 "$presser" 2>/dev/null || break; sleep 1; done
+        kill "$presser" 2>/dev/null || true
+        wait "$presser" 2>/dev/null && { pressed=1; break; }
+        sleep 2
+    done
+    if [ "$pressed" = 0 ]; then
+        key 3 cmd; sleep 0.8; "$probe" type "$pid" "맨 위 메모" 60; sleep 1.5; key 125; sleep 0.8; key 36; sleep 1.5
+        echo "  (marker opened with the keys: the accessibility press did not answer)"
+    fi
     sleep 1
     mark esc; key 53; settle esc "key 53" 1 10; mark esc-end
     echo "  collapse (Esc): $(first esc esc-end "key 53") ms"
@@ -158,6 +195,7 @@ for tier in "${tiers[@]}"; do
             mark "down-$name"; key 125; settle "down-$name" "key 125" 1 20; mark "down-$name-end"
             mark "open-$name"; key 36; settle "open-$name" "key 36" 1 60; mark "open-$name-end"
             echo "  open $name memo (↩): $(first "open-$name" "open-$name-end" "key 36") ms (↓ to it $(first "down-$name" "down-$name-end" "key 125") ms)"
+            ceiling "open $name memo" "$(first "open-$name" "open-$name-end" "key 36")"
             sleep 1
             type_into "$name" "가나다라마바사아자차abcdefghij"
             [ "$name" = 1MB ] && echo "  idle, 1 MB memo open (20 s): $("$probe" sample "$pid" 20)"
@@ -181,6 +219,7 @@ for tier in "${tiers[@]}"; do
         sleep 1
         mark open-top; key 36; settle open-top "key 36" 1 30; mark open-top-end
         echo "  open the top memo (↩): $(first open-top open-top-end "key 36") ms"
+        ceiling "open the top memo" "$(first open-top open-top-end "key 36")"
         sleep 1
         type_into "a short memo" "가나다라마바사아자차abcdefghij"
         key 53; sleep 1
@@ -189,3 +228,9 @@ for tier in "${tiers[@]}"; do
     cp "$log" "$out/perf-$tier.log"
     stop
 done
+if [ ${#over[@]} -gt 0 ]; then
+    echo "== over the ${ceiling} ms open ceiling (#132):"
+    printf '  %s\n' "${over[@]}"
+    exit 1
+fi
+echo "== every open under the ${ceiling} ms ceiling (or measured under load)"

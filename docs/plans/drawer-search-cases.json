@@ -1,0 +1,65 @@
+{
+  "about": "메모 찾기 결과 공유 사례 (#114, docs/plans/drawer-ux-plan.md B1). 찾는 곳(scope): null = 모든 폴더(기본), {\"folder\": id} = 그 폴더만, \"pinned\" = 고정만. 거르기(filters): open = 체크하지 않은 체크 줄이 있는 메모, link = 웹 주소가 있는 메모(맨 주소나 [글](주소)), pinned = 고정한 메모. 여럿이면 모두 맞는 메모만. 찾는 말이 있으면 거른 메모 안에서 지금처럼 찾고(초성 · 폴더 이름까지), 없으면 거르기만으로 고르고(찾은 줄 없이 제목), 둘 다 없으면 결과가 없어요. 결과는 폴더별로 묶고, 묶음은 첫 결과가 나온 차례(메모는 새것부터), 묶음 안은 메모 차례예요. memos는 새것부터 적혀 있어요. snippets: 찾은 줄이 길면 찾은 말이 17번째 글자부터 시작할 때 8글자 앞(그 사이 첫 칸 뒤)에서 자르고 앞에 …를 붙여요. 글자는 유니코드 스칼라로 세요. times: 결과의 날짜(오늘은 시각, 그 밖은 날짜, ‘어제’ · 요일 없이). footer: 아래 줄(폴더가 둘 이상이면 폴더 수). Mac MemoFolders.find · snippet · MemoCards.foundTime · MemoFolders.searchFooter, Windows core/drawerFind.ts가 이 파일을 읽어요.",
+  "folders": {
+    "v": 1,
+    "folders": [
+      { "id": "inbox", "name": "메모", "color": "lavender", "order": 0, "updatedAt": "2026-10-01T00:00:00Z" },
+      { "id": "shop", "name": "장보기", "color": "mint", "order": 1, "updatedAt": "2026-10-01T00:00:00Z" },
+      { "id": "trip", "name": "여행", "color": "peach", "order": 2, "updatedAt": "2026-10-01T00:00:00Z" },
+      { "id": "work", "name": "회사", "color": "pink", "order": 3, "updatedAt": "2026-10-01T00:00:00Z" }
+    ],
+    "placement": {
+      "m1": { "folder": "shop", "pinned": true, "at": "2026-10-01T00:00:00Z" },
+      "m2": { "folder": "shop", "pinned": false, "at": "2026-10-01T00:00:00Z" },
+      "m4": { "folder": "trip", "pinned": false, "at": "2026-10-01T00:00:00Z" },
+      "m5": { "folder": "work", "pinned": false, "at": "2026-10-01T00:00:00Z" },
+      "m6": { "folder": "work", "pinned": true, "at": "2026-10-01T00:00:00Z" }
+    },
+    "updatedAt": "2026-10-01T00:00:00Z"
+  },
+  "memos": [
+    { "id": "m1", "text": "주말 장보기\n- [x] 우유 두 팩\n- [ ] 사과 한 봉지", "updatedAt": "2026-10-27T00:20:00Z" },
+    { "id": "m5", "text": "읽을 링크\nhttps://example.com/read", "updatedAt": "2026-10-26T03:00:00Z" },
+    { "id": "m6", "text": "회의 준비\n- [ ] 자료 출력\n[지도](https://example.com/map)", "updatedAt": "2026-10-25T03:00:00Z" },
+    { "id": "m7", "text": "택배 받기", "updatedAt": "2026-10-24T03:00:00Z" },
+    { "id": "m2", "text": "냉장고에 있는 것\n두부, 우유 반 팩, 달걀 네 개", "updatedAt": "2026-10-21T03:00:00Z" },
+    { "id": "m3", "text": "카페 메뉴 생각\n오트 우유 라테는 조금 더 싸게", "updatedAt": "2026-09-03T03:00:00Z" },
+    { "id": "m4", "text": "아침 식당 목록\n시장 골목 끝에 있는 국숫집은 아침 일곱 시부터 열고 우유 빙수가 유명한 집", "updatedAt": "2026-08-17T03:00:00Z" }
+  ],
+  "cases": [
+    {"id": "F1", "about": "모든 폴더: 폴더별로 묶고, 가장 새 결과의 폴더부터", "query": "우유", "scope": null, "filters": [], "expect": [{"folder": "shop", "ids": ["m1", "m2"]}, {"folder": "inbox", "ids": ["m3"]}, {"folder": "trip", "ids": ["m4"]}]},
+    {"id": "F2", "about": "이 폴더만", "query": "우유", "scope": {"folder": "shop"}, "filters": [], "expect": [{"folder": "shop", "ids": ["m1", "m2"]}]},
+    {"id": "F3", "about": "고정만", "query": "우유", "scope": "pinned", "filters": [], "expect": [{"folder": "shop", "ids": ["m1"]}]},
+    {"id": "F4", "about": "말 없이 체크 남음만: 아직 안 끝낸 목록 모음", "query": "", "scope": null, "filters": ["open"], "expect": [{"folder": "shop", "ids": ["m1"]}, {"folder": "work", "ids": ["m6"]}]},
+    {"id": "F5", "about": "링크: 맨 주소도, [글](주소)도", "query": "", "scope": null, "filters": ["link"], "expect": [{"folder": "work", "ids": ["m5", "m6"]}]},
+    {"id": "F6", "about": "고정 거르기", "query": "", "scope": null, "filters": ["pinned"], "expect": [{"folder": "shop", "ids": ["m1"]}, {"folder": "work", "ids": ["m6"]}]},
+    {"id": "F7", "about": "거르기 둘은 둘 다 맞는 메모", "query": "", "scope": null, "filters": ["open", "link"], "expect": [{"folder": "work", "ids": ["m6"]}]},
+    {"id": "F8", "about": "말과 거르기 함께", "query": "우유", "scope": null, "filters": ["pinned"], "expect": [{"folder": "shop", "ids": ["m1"]}]},
+    {"id": "F9", "about": "초성", "query": "ㅇㅇ", "scope": null, "filters": [], "expect": [{"folder": "shop", "ids": ["m1", "m2"]}, {"folder": "work", "ids": ["m5"]}, {"folder": "inbox", "ids": ["m3"]}, {"folder": "trip", "ids": ["m4"]}]},
+    {"id": "F10", "about": "폴더 이름이 맞으면 그 폴더의 메모", "query": "회사", "scope": null, "filters": [], "expect": [{"folder": "work", "ids": ["m5", "m6"]}]},
+    {"id": "F11", "about": "맞는 게 없으면 묶음도 없어요", "query": "얼룩말", "scope": null, "filters": [], "expect": []},
+    {"id": "F12", "about": "말도 거르기도 없으면 결과가 없어요", "query": "  ", "scope": null, "filters": [], "expect": []},
+    {"id": "F13", "about": "이 폴더만 + 거르기", "query": "", "scope": {"folder": "work"}, "filters": ["open"], "expect": [{"folder": "work", "ids": ["m6"]}]}
+  ],
+  "snippets": [
+    {"id": "P1", "about": "멀리 있는 말은 8글자 앞의 첫 칸 뒤부터", "line": "시장 골목 끝에 있는 국숫집은 아침 일곱 시부터 열고 우유 빙수가 유명한 집", "query": "우유", "expect": "…시부터 열고 우유 빙수가 유명한 집", "mark": "우유"},
+    {"id": "P2", "about": "앞쪽(16글자 안)이면 그대로", "line": "두부, 우유 반 팩, 달걀 네 개", "query": "우유", "expect": "두부, 우유 반 팩, 달걀 네 개", "mark": "우유"},
+    {"id": "P3", "about": "칸이 없으면 8글자 앞에서", "line": "abcdefghijklmnopqrstuvwxyz우유", "query": "우유", "expect": "…stuvwxyz우유", "mark": "우유"},
+    {"id": "P4", "about": "초성으로 찾은 말도 같은 자리", "line": "시장 골목 끝에 있는 국숫집은 아침 일곱 시부터 열고 우유 빙수", "query": "ㅇㅇ", "expect": "…시부터 열고 우유 빙수", "mark": "우유"},
+    {"id": "P5", "about": "대소문자를 가리지 않고 찾은 말", "line": "Notes from the long weekly planning meeting about Milk", "query": "milk", "expect": "…about Milk", "mark": "Milk"}
+  ],
+  "now": "2026-10-27T05:00:00Z",
+  "times": [
+    {"id": "T1", "about": "오늘은 시각", "at": "2026-10-27T00:20:00Z", "ko": "오전 9:20", "en": "9:20 AM", "nl": "09:20"},
+    {"id": "T2", "about": "어제도 날짜", "at": "2026-10-26T03:00:00Z", "ko": "10월 26일", "en": "Oct 26", "nl": "26 okt"},
+    {"id": "T3", "about": "이번 주도 날짜", "at": "2026-10-24T03:00:00Z", "ko": "10월 24일", "en": "Oct 24", "nl": "24 okt"},
+    {"id": "T4", "about": "다른 해는 해까지", "at": "2025-12-31T03:00:00Z", "ko": "2025년 12월 31일", "en": "Dec 31, 2025", "nl": "31 dec 2025"}
+  ],
+  "footer": [
+    {"id": "R1", "count": 4, "folders": 3, "ko": "찾은 메모 네 장 · 폴더 3개", "en": "4 notes found · 3 folders", "nl": "4 notities gevonden · 3 mappen"},
+    {"id": "R2", "count": 2, "folders": 1, "ko": "찾은 메모 두 장", "en": "2 notes found", "nl": "2 notities gevonden"},
+    {"id": "R3", "count": 0, "folders": 0, "ko": "찾은 메모 0장", "en": "0 notes found", "nl": "0 notities gevonden"},
+    {"id": "R4", "count": 12, "folders": 2, "ko": "찾은 메모 12장 · 폴더 2개", "en": "12 notes found · 2 folders", "nl": "12 notities gevonden · 2 mappen"},
+    {"id": "R5", "count": 1, "folders": 1, "ko": "찾은 메모 한 장", "en": "1 note found", "nl": "1 notitie gevonden"}
+  ]
+}

@@ -5,7 +5,7 @@
   --card: #fffdf8;
   --ink: #2f2e2a;
   --ink-2: #625f56;
-  --ink-3: #726e64;
+  --ink-3: #706c62; /* 4.6:1 on --paper-2 (tools/site-check/contrast.py) */
   --rule: #e6e0d2;
   --rule-2: #d9d2c1;
   --sage: #5c7a5a;
@@ -23,7 +23,7 @@
   --tape-alarm: #ecc4bc;
   --shadow-s: 0 1px 2px rgba(47, 46, 42, .06);
   --shadow: 0 1px 2px rgba(47, 46, 42, .05), 0 12px 32px -8px rgba(47, 46, 42, .14);
-  --hand: "Nanum Pen Script", "Caveat", cursive;
+  --hand: "HanJang Pen", "Caveat", cursive; /* fonts/fonts.css: served from the site itself */
   --sans: "Pretendard Variable", Pretendard, system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Segoe UI", sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   color-scheme: light;
@@ -356,6 +356,11 @@ h3 { font-size: 18px; line-height: 1.35; font-weight: 650; letter-spacing: -.015
 .dl ol { margin: 0 0 6px; padding-left: 20px; color: var(--ink-2); font-size: 15px; }
 .dl code { font: 13px var(--mono); }
 .dl .btn { align-self: flex-start; margin-top: auto; }
+.dl .files { margin: 0; color: var(--ink-3); font-size: 14px; }
+.dl.check { grid-column: 1 / -1; }
+.dl.check p, .dl.check ul { margin: 0; color: var(--ink-2); font-size: 15px; }
+.dl.check ul { padding-left: 20px; display: grid; gap: 6px; }
+.dl.check code { overflow-wrap: anywhere; }
 @media (max-width: 760px) { .downloads { grid-template-columns: 1fr; } }
 
 /* ---------- Footer ---------- */
@@ -369,6 +374,28 @@ footer { border-top: 1px solid var(--rule); padding: 56px 0 40px; font-size: 14.
 .legal { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--rule); color: var(--ink-3); font-size: 13.5px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; }
 .legal a { color: inherit; }
 @media (max-width: 860px) { .foot { grid-template-columns: 1fr 1fr; } .foot .about { grid-column: 1 / -1; } }
+
+/* ---------- Text pages (privacy) ---------- */
+.page-hero { padding-bottom: 8px; }
+.page-hero h1 { font-size: clamp(38px, 6vw, 64px); }
+.doc { max-width: 760px; margin: 0 auto; }
+.doc .points { margin: 0 0 8px; }
+.doc h2 { font-size: clamp(24px, 3vw, 30px); letter-spacing: -.03em; margin: 64px 0 14px; scroll-margin-top: 80px; }
+.doc h3 { margin: 28px 0 6px; }
+.doc p, .doc li { color: var(--ink-2); }
+.doc p { margin: 0 0 14px; }
+.doc ul, .doc ol { margin: 0 0 14px; padding-left: 22px; }
+.doc li + li { margin-top: 8px; }
+.doc strong { color: var(--ink); }
+.doc code { font: .86em var(--mono); background: var(--paper-2); border: 1px solid var(--rule); border-radius: 6px; padding: 1px 5px; overflow-wrap: anywhere; word-break: normal; }
+.where { margin: 18px 0 0; border-top: 1px solid var(--rule); }
+.where > div { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 6px 24px; padding: 18px 0; border-bottom: 1px solid var(--rule); }
+.where dt { font-weight: 650; color: var(--ink); letter-spacing: -.01em; }
+.where dd { margin: 0; color: var(--ink-2); font-size: 15.5px; }
+.where dd p { margin: 0 0 6px; }
+.where dd p:last-child { margin-bottom: 0; }
+.doc .updated { color: var(--ink-3); font-size: 14.5px; margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--rule); }
+@media (max-width: 760px) { .where > div { grid-template-columns: minmax(0, 1fr); } }
 
 /* Small caps labels: monospace suits Latin; Korean reads better in the text face without tracking. */
 :lang(ko) .slide .kicker, :lang(ko) .pane-head, :lang(ko) .foot h4, :lang(ko) .mini .meta { font-family: var(--sans); letter-spacing: 0; font-weight: 600; }

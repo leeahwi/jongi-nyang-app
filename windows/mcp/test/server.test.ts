@@ -6,66 +6,24 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
-import { after, test } from "node:test";
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { aiLockFileName, parseAiLog, serializeAiLink, type AiLink } from "../../src/core/ai";
-import { parseEvents, serializeEvents, type LocalEvent } from "../../src/core/events";
+import { test } from "node:test";
+import { aiLockFileName, serializeAiLink } from "../../src/core/ai";
+import { parseEvents, serializeEvents } from "../../src/core/events";
 import { parseMemos } from "../../src/core/memo";
-import { parseNotebook, serializeNotebook, type TodoItem } from "../../src/core/notebook";
+import { parseNotebook, serializeNotebook } from "../../src/core/notebook";
 import { Store } from "../../src/main/store";
+import { assertNoPath, call, connect, event, logOf, setup, stderrOf, task, temporary, todos, writeTodos } from "./helpers";
 
 /**
- * 종이냥 for Claude: the real bundled server (mcp/dist/server/index.js) over stdio with the SDK's client,
+ * 종이냥 for Claude: the real bundled server (mcp/dist/server/index.js) over stdio with the SDK's client (helpers.ts),
  * on temporary folders only (PAPERTODO_AI_HOME). Cases M1–M12 and M16–M18 of the shared AI connection spec,
- * and the app's Store writing todos.json while the extension adds to it.
+ * M32–M34 (tool marks, all or nothing, no paths in errors), and the app's Store writing todos.json while the
+ * extension adds to it. The newer cases (M19–M41) are in cases.test.ts and size.test.ts.
  */
-
-const server = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")), "../mcp/dist/server/index.js");
-const temporary = () => fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-ai-"));
-const clients: Client[] = [];
-after(async () => { for (const client of clients) await client.close(); });
-
-interface Setup { home: string; data: string; clockFile: string; env: Record<string, string> }
-
-/** A settings folder (and a data folder: the same one, or a separate "shared" one) with ai-link.json. */
-function setup(options: { link?: Partial<AiLink> | null; shared?: boolean; now?: string; lang?: string } = {}): Setup {
-  const home = temporary();
-  const data = options.shared ? temporary() : home;
-  const clockFile = path.join(home, "clock.txt");
-  fs.writeFileSync(clockFile, options.now ?? "2026-10-27T10:00:00+09:00");
-  if (options.link !== null) {
-    const link: AiLink = { v: 1, enabled: true, dataFolder: data, lang: "ko", app: "windows 1.27.0", updatedAt: "2026-10-27T00:00:00Z", ...options.link };
-    fs.writeFileSync(path.join(home, "ai-link.json"), serializeAiLink(link));
-  }
-  return { home, data, clockFile, env: { PAPERTODO_AI_HOME: home, PAPERTODO_AI_CLOCK: clockFile, TZ: "Asia/Seoul", LANG: options.lang ?? "ko_KR.UTF-8" } };
-}
-
-async function connect(env: Record<string, string>, command = process.execPath, name = "paper-todo-test"): Promise<Client> {
-  const client = new Client({ name, version: "1.0.0" });
-  const base = Object.fromEntries(Object.entries(process.env).filter(([key, value]) => value !== undefined && !key.startsWith("PAPERTODO_"))) as Record<string, string>;
-  await client.connect(new StdioClientTransport({ command, args: [server], env: { ...base, ...env }, stderr: "pipe" }));
-  clients.push(client);
-  return client;
-}
-
-type Result = { text: string; data: Record<string, unknown>; error: boolean };
-async function call(client: Client, name: string, args: Record<string, unknown> = {}): Promise<Result> {
-  const result = await client.callTool({ name, arguments: args }) as { content: { type: string; text: string }[]; structuredContent?: Record<string, unknown>; isError?: boolean };
-  return { text: result.content.map((part) => part.text).join("\n"), data: result.structuredContent ?? {}, error: Boolean(result.isError) };
-}
-
-const todos = (folder: string): TodoItem[] => parseNotebook(fs.readFileSync(path.join(folder, "todos.json"), "utf8")).items;
-const logOf = (home: string) => parseAiLog(fs.existsSync(path.join(home, "ai-log.jsonl")) ? fs.readFileSync(path.join(home, "ai-log.jsonl"), "utf8") : "");
-const task = (fields: Partial<TodoItem> & { title: string }): TodoItem => ({ id: crypto.randomUUID().toUpperCase(), isCompleted: false, createdAt: "2026-10-20T00:00:00Z", ...fields });
-const writeTodos = (folder: string, items: TodoItem[]) => fs.writeFileSync(path.join(folder, "todos.json"), serializeNotebook({ items }));
-const event = (fields: Partial<LocalEvent> & { title: string; date: string }): LocalEvent => ({
-  id: crypto.randomUUID().toUpperCase(), allDay: false, days: 1, start: 600, end: 660, repeat: "none", skip: [], color: "blue",
-  createdAt: "2026-10-20T00:00:00Z", updatedAt: "2026-10-20T00:00:00Z", ...fields,
-});
 
 const allTools: [string, Record<string, unknown>][] = [
   ["get_today", {}], ["list_todos", {}], ["list_events", { from: "2026-10-27" }], ["list_memos", {}], ["get_focus", {}], ["search_history", {}],
+  ["get_memo", { id: "ABCDEFGH" }], ["list_memo_folders", {}], ["list_repeats", {}],
   ["add_todos", { items: [{ title: "x" }] }], ["add_event", { title: "x", date: "2026-10-28", start: "10:00" }], ["add_memo", { text: "x" }],
   ["preview_changes", { changes: [{ kind: "todo", id: "A", set: { title: "y" } }] }], ["apply_changes", { token: "ABCDEF" }],
 ];
@@ -168,9 +126,10 @@ test("M7–M8: the same title on the same day isn't added twice; 21 at once is r
   assert.deepEqual((result.data.added as { title: string }[]).map((entry) => entry.title), ["장보기", "새 일"]);
   const skipped = result.data.skipped as { title: string; id: string }[];
   assert.equal(skipped.length, 3);
-  assert.equal(skipped[0].id, existing.id);
+  // Short ids (P1): the first 8 characters.
+  assert.equal(skipped[0].id, existing.id.slice(0, 8));
   assert.match(result.text, /이미 있어서 넣지 않았어요/);
-  assert.match(result.text, new RegExp(`id ${existing.id}`));
+  assert.match(result.text, new RegExp(`id ${existing.id.slice(0, 8)}$`, "m"));
   const many = await call(client, "add_todos", { items: Array.from({ length: 21 }, (_, index) => ({ title: `할 일 ${index}` })) });
   assert.equal(many.error, true);
   assert.match(many.text, /20개까지/);
@@ -265,8 +224,11 @@ test("M12: repeating events, deleting and unknown fields are refused at the prev
   const repeat = await call(client, "preview_changes", { changes: [{ kind: "event", id: weekly.id, set: { title: "회의" } }] });
   assert.equal(repeat.error, true);
   assert.match(repeat.text, /반복 일정은 고칠 수 없어요/);
+  // A key that isn't a task's field (delete) is refused by the schema itself now (C3, M38), before the tool runs.
   const remove = await call(client, "preview_changes", { changes: [{ kind: "todo", id: item.id, set: { delete: true } }] });
-  assert.match(remove.text, /지우기는 할 수 없어요/);
+  assert.equal(remove.error, true);
+  assert.match(remove.text, /Unrecognized key: "delete"/);
+  assert.equal(todos(data)[0].title, "보고서");
   const unknown = await call(client, "preview_changes", { changes: [{ kind: "todo", id: "NOPE", set: { title: "x" } }] });
   assert.match(unknown.text, /이 id의 할 일이 없어요: NOPE/);
   assert.equal(repeat.data.token, undefined);
@@ -390,4 +352,157 @@ test("the Claude Code command: the app's own Electron runs the server as Node", 
   assert.equal(client.getServerVersion()?.name, "jongi-nyang");
   assert.equal((await call(client, "add_todos", { items: [{ title: "Electron으로" }] })).error, false);
   assert.equal(logOf(home)[0].client, "Claude Code");
+});
+
+test("M32: tools/list marks reading, adding and changing; apply_changes asks a person on every call in Claude Code", async () => {
+  const { env } = setup();
+  const client = await connect(env);
+  const tools = Object.fromEntries((await client.listTools()).tools.map((tool) => [tool.name, tool]));
+  for (const name of ["get_today", "list_todos", "list_events", "list_memos", "get_memo", "list_memo_folders", "list_repeats", "get_focus", "search_history", "preview_changes"]) {
+    assert.equal(tools[name].annotations?.readOnlyHint, true, name);
+    assert.equal(tools[name].annotations?.openWorldHint, false, name);
+    assert.equal(tools[name]._meta?.["anthropic/requiresUserInteraction"], undefined, name);
+  }
+  for (const name of ["add_todos", "add_event", "add_memo"]) {
+    const marks = tools[name].annotations;
+    assert.deepEqual([marks?.readOnlyHint, marks?.destructiveHint, marks?.idempotentHint, marks?.openWorldHint], [false, false, true, false], name);
+    assert.equal(tools[name]._meta?.["anthropic/requiresUserInteraction"], undefined, name);
+  }
+  const apply = tools.apply_changes;
+  assert.deepEqual([apply.annotations?.readOnlyHint, apply.annotations?.destructiveHint, apply.annotations?.idempotentHint, apply.annotations?.openWorldHint], [false, true, false, false]);
+  // The JSON Boolean true exactly: Claude Code ignores any other value.
+  assert.equal(apply._meta?.["anthropic/requiresUserInteraction"], true);
+  for (const tool of Object.values(tools)) assert.ok(tool.title && tool.annotations?.title, `${tool.name} has a title`);
+});
+
+/**
+ * A to-do and an event, both previewed for a change. todos.json is written as another program might (not
+ * the app's bytes), so putting it back has to be byte for byte. `extra` gives the server's test hooks.
+ */
+async function previewBoth(extra: (data: string) => Record<string, string> = () => ({})) {
+  const prepared = setup({ now: "2026-10-27T10:00:00+09:00" });
+  const { env, data } = prepared;
+  const report = task({ title: "보고서 쓰기", timeStart: "15:00", timeEnd: "16:00" });
+  const meeting = event({ title: "팀 회의", date: "2026-10-28", start: 600, end: 660 });
+  fs.writeFileSync(path.join(data, "todos.json"), `${JSON.stringify({ items: [report] }, null, 4)}\n\n`);
+  fs.writeFileSync(path.join(data, "events.json"), serializeEvents([meeting]));
+  const before = { todos: fs.readFileSync(path.join(data, "todos.json")), events: fs.readFileSync(path.join(data, "events.json")) };
+  const client = await connect({ ...env, ...extra(data) });
+  const preview = await call(client, "preview_changes", { changes: [
+    { kind: "todo", id: report.id, set: { title: "보고서 마무리" } },
+    { kind: "event", id: meeting.id, set: { start: "11:00" } },
+  ] });
+  assert.equal(preview.error, false, preview.text);
+  return { ...prepared, client, meeting, before, token: preview.data.token as string };
+}
+const leftovers = (folder: string) => fs.readdirSync(folder).filter((name) => name.endsWith(".tmp"));
+
+test("M33: the event changes between the check and the write: nothing is applied, not the to-do either, nothing logged (#110)", async () => {
+  // The race file lands on events.json after both files were read and checked, just before the write.
+  const { data, home, client, meeting, before, token } = await previewBoth((data) => ({ PAPERTODO_AI_RACE: path.join(data, "events.json.race") }));
+  const moved = { ...meeting, title: "팀 회의 (앱에서 옮김)", start: 720, end: 780, updatedAt: "2026-10-27T01:01:00Z" };
+  fs.writeFileSync(path.join(data, "events.json.race"), serializeEvents([moved]));
+  const applied = await call(client, "apply_changes", { token });
+  assert.equal(applied.error, true, applied.text);
+  assert.equal(applied.data.error, "ITEM_CHANGED");
+  assert.match(applied.text, /미리보기 뒤에 바뀐 항목이 있어서 적용하지 않았어요: ‘팀 회의’\. .*\(코드 ITEM_CHANGED\)$/);
+  assert.equal(fs.existsSync(path.join(data, "events.json.race")), false, "the race happened");
+  assert.ok(fs.readFileSync(path.join(data, "todos.json")).equals(before.todos), "the to-do is as it was, byte for byte");
+  assert.equal(parseEvents(fs.readFileSync(path.join(data, "events.json"), "utf8"))[0].title, "팀 회의 (앱에서 옮김)", "the app's change stays");
+  assert.equal(logOf(home).length, 0, "nothing logged");
+  assert.deepEqual(leftovers(data), []);
+});
+
+test("M33: a write that fails halfway puts the first file's previous bytes back and logs nothing (#110)", async () => {
+  const { data, home, client, before, token } = await previewBoth(() => ({ PAPERTODO_AI_BREAK: "events.json" }));
+  const applied = await call(client, "apply_changes", { token });
+  assert.equal(applied.error, true, applied.text);
+  assert.equal(applied.data.error, "FILE_NOT_FOUND");
+  assert.match(applied.text, /^events\.json을 쓸 자리를 찾지 못했어요\. .*아무것도 바뀌지 않았어요\. \(코드 FILE_NOT_FOUND\)$/);
+  assertNoPath(applied.text, "apply_changes", home, data);
+  assert.ok(fs.readFileSync(path.join(data, "todos.json")).equals(before.todos), "todos.json has its previous bytes back");
+  assert.ok(fs.readFileSync(path.join(data, "events.json")).equals(before.events), "events.json untouched");
+  assert.equal(logOf(home).length, 0, "nothing logged as applied");
+  assert.deepEqual(leftovers(data), []);
+  assert.equal(fs.existsSync(path.join(home, aiLockFileName)), false, "the lock is let go");
+});
+
+test("M34: every failure is a fixed code and sentence — no path, home folder or user name, in the answer, stderr or the log (#109)", async () => {
+  const { env, home } = setup();
+  // A storage folder whose path holds the user's name (fictional data only).
+  const data = path.join(temporary(), os.userInfo().username, "종이냥 저장");
+  fs.mkdirSync(data, { recursive: true });
+  const relink = (folder: string, lang: "ko" | "en" | "nl" = "ko") =>
+    fs.writeFileSync(path.join(home, "ai-link.json"), serializeAiLink({ v: 1, enabled: true, dataFolder: folder, lang, app: "windows 1.30.1", updatedAt: "2026-10-27T00:00:00Z" }));
+  relink(data);
+  const client = await connect(env);
+  const failing = async (name: string, args: Record<string, unknown>, code: string, sentence?: RegExp) => {
+    const result = await call(client, name, args);
+    const label = `${name} → ${code}`;
+    assert.equal(result.error, true, `${label}: ${result.text}`);
+    assert.equal(result.data.error, code, `${label}: ${result.text}`);
+    assert.match(result.text, new RegExp(`\\((코드|code) ${code}\\)$`), label);
+    if (sentence) assert.match(result.text, sentence, label);
+    assertNoPath(result.text, label, home, data);
+    return result;
+  };
+  const folderInstead = (name: string) => { fs.mkdirSync(path.join(data, name)); fs.writeFileSync(path.join(data, name, "안.txt"), "x"); };
+  const clear = (name: string) => fs.rmSync(path.join(data, name), { recursive: true, force: true });
+
+  // A folder where a data file should be (EISDIR), for every tool that opens one.
+  for (const name of ["todos.json", "events.json", "memos.json"]) folderInstead(name);
+  const isFolder = (file: string) => new RegExp(`^${file.replace(".", "\\.")} 자리에 파일이 아닌 것이 있어서 읽거나 쓰지 못했어요\\. 아무것도 바뀌지 않았어요\\.`);
+  const todoTools: [string, Record<string, unknown>][] = [["get_today", {}], ["list_todos", {}], ["search_history", {}], ["add_todos", { items: [{ title: "x" }] }],
+    ["preview_changes", { changes: [{ kind: "todo", id: "A", set: { title: "y" } }] }]];
+  for (const [name, args] of todoTools) await failing(name, args, "FILE_IS_FOLDER", isFolder("todos.json"));
+  for (const [name, args] of [["list_events", { from: "2026-10-27" }], ["add_event", { title: "x", date: "2026-10-28", start: "10:00" }]] as const) await failing(name, args, "FILE_IS_FOLDER", isFolder("events.json"));
+  for (const [name, args] of [["list_memos", {}], ["add_memo", { text: "x" }]] as const) await failing(name, args, "FILE_IS_FOLDER", isFolder("memos.json"));
+  // The same in English and Dutch.
+  relink(data, "en");
+  await failing("get_today", {}, "FILE_IS_FOLDER", /^todos\.json isn’t a file, so it couldn’t be read or written\. Nothing was changed\./);
+  relink(data, "nl");
+  await failing("add_memo", { text: "x" }, "FILE_IS_FOLDER", /^memos\.json is geen bestand, dus het kon niet worden gelezen of geschreven\. Er is niets gewijzigd\./);
+  relink(data);
+  for (const name of ["todos.json", "events.json", "memos.json"]) clear(name);
+
+  // No permission (EACCES): reading and writing refused, the file untouched. (Not as root, not on Windows.)
+  if (process.platform !== "win32" && process.getuid?.() !== 0) {
+    writeTodos(data, [task({ title: "잠긴 할 일" })]);
+    const locked = fs.readFileSync(path.join(data, "todos.json"));
+    fs.chmodSync(path.join(data, "todos.json"), 0o000);
+    try {
+      await failing("get_today", {}, "FILE_NO_ACCESS", /^todos\.json을 열 권한이 없어서/);
+      await failing("add_todos", { items: [{ title: "x" }] }, "FILE_NO_ACCESS");
+    } finally { fs.chmodSync(path.join(data, "todos.json"), 0o644); }
+    assert.ok(fs.readFileSync(path.join(data, "todos.json")).equals(locked));
+    clear("todos.json");
+  }
+
+  // Broken JSON (with the folder's path inside it): the parser's text never goes out.
+  fs.writeFileSync(path.join(data, "events.json"), `{ "events": [ ${data} `);
+  await failing("list_events", { from: "2026-10-27" }, "FILE_UNREADABLE", /^events\.json을 읽지 못해서 손대지 않았어요/);
+  await failing("add_event", { title: "x", date: "2026-10-28", start: "10:00" }, "FILE_UNREADABLE");
+  clear("events.json");
+
+  // The storage folder is gone (ENOENT on the write).
+  relink(path.join(data, "없는 폴더"));
+  await failing("add_todos", { items: [{ title: "x" }] }, "FILE_NOT_FOUND", /^todos\.json을 쓸 자리를 찾지 못했어요/);
+  await failing("add_memo", { text: "x" }, "FILE_NOT_FOUND");
+  relink(data);
+
+  // A conflict: changed in the app after the preview.
+  const item = task({ title: "보고서" });
+  writeTodos(data, [item]);
+  const preview = await call(client, "preview_changes", { changes: [{ kind: "todo", id: item.id, set: { title: "보고서 끝" } }] });
+  writeTodos(data, [{ ...item, title: "보고서 (앱)" }]);
+  await failing("apply_changes", { token: preview.data.token as string }, "ITEM_CHANGED");
+
+  // What works still works, and its log line has no path either.
+  assert.equal((await call(client, "add_todos", { items: [{ title: "다시 됨" }] })).error, false);
+  assert.equal(logOf(home).length, 1);
+  assertNoPath(fs.readFileSync(path.join(home, "ai-log.jsonl"), "utf8"), "ai-log.jsonl", home, data);
+  // stderr (Claude's MCP log on this device) gets the codes for finding the cause — still no path.
+  const stderr = stderrOf.get(client)!();
+  assert.match(stderr, /jongi-nyang: FILE_IS_FOLDER EISDIR todos\.json/);
+  assertNoPath(stderr, "stderr", home, data);
 });

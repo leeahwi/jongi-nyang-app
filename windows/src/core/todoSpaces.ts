@@ -11,12 +11,15 @@ import { isoDate } from "./notebook";
  * todos.json drops keys it doesn't know, so the place can't live on the to-do). The same file, rules and
  * cases (S1–S22, docs/plans/spaces-phase1.md) as the macOS app:
  *
- *   { "items": { "<todo id>": { "at": "…", "space": "s-7f3a9c" | null } },
+ *   { "general": { "name": "기타", "updatedAt": "…" },
+ *     "items": { "<todo id>": { "at": "…", "space": "s-7f3a9c" | null } },
  *     "spaces": [{ "color": "pink", "id": "s-7f3a9c", "name": "회사", "order": 0, "updatedAt": "…" }, …],
  *     "version": 1 }
  *
- * A to-do without an entry has no space; `space: null` is a move to 스페이스 없음 (kept so it wins a merge).
- * A deleted space stays as a tombstone for 30 days. Keys this version doesn't know are kept where they were.
+ * A to-do without an entry has no space: it's in 일반 (#89 — the to-dos in no space, named ‘일반’ · ‘General’ ·
+ * ‘Algemeen’ until renamed; `general` is in the file only once it's been renamed). `space: null` is a move to 일반
+ * (kept so it wins a merge). A deleted space stays as a tombstone for 30 days. Keys this version doesn't know are
+ * kept where they were.
  */
 
 export const todoSpacesFileName = "todo-spaces.json";
@@ -31,7 +34,12 @@ export interface TodoSpace {
   extra?: Extra;
 }
 export interface SpacePlace { space: string | null; at: string; extra?: Extra }
-export interface TodoSpaces { version: number; spaces: TodoSpace[]; items: Record<string, SpacePlace>; extra?: Extra }
+/** 일반's name once renamed (#89, S23–S26); `name` "" is back to the default, kept with its time so the reset wins a merge. */
+export interface GeneralName { name: string; updatedAt: string; extra?: Extra }
+/** A repeat rule's space (2a, A7): its new to-dos go there; `space: null` is a move to 일반 (kept so it wins a merge). */
+export interface SeriesPlace { space: string | null; updatedAt: string; extra?: Extra }
+/** `general` absent: never renamed. `series` absent: no rule ever had a space (written as read: `{}` stays `{}`). */
+export interface TodoSpaces { version: number; spaces: TodoSpace[]; items: Record<string, SpacePlace>; general?: GeneralName; series?: Record<string, SeriesPlace>; extra?: Extra }
 
 const epoch = "1970-01-01T00:00:00Z";
 const keepDays = 30;
@@ -54,6 +62,8 @@ function extraOf(entry: Json, known: readonly string[]): Extra | undefined {
 const fileKeys = ["version", "spaces", "items"];
 const spaceKeys = ["id", "name", "color", "order", "updatedAt", "deleted"];
 const placeKeys = ["space", "at"];
+const generalKeys = ["name", "updatedAt"];
+const seriesKeys = ["space", "updatedAt"];
 
 /** A space's name as kept: one line, trimmed, at most 40 characters (as a memo folder's). */
 export function cleanSpaceName(name: string): string {
@@ -87,9 +97,25 @@ export function parseTodoSpaces(text: string): TodoSpaces {
     const extra = extraOf(entry, placeKeys);
     items[id] = { space: entry.space as string | null, at: readTime(entry.at), ...(extra ? { extra } : {}) };
   }
-  const extra = extraOf(value, fileKeys);
+  // 일반's name; a `general` this version can't read stays as it was, with the other unknown keys.
+  const raw = value.general;
+  const general: GeneralName | undefined = isObject(raw) && typeof raw.name === "string"
+    ? { name: raw.name, updatedAt: readTime(raw.updatedAt), ...(extraOf(raw, generalKeys) ? { extra: extraOf(raw, generalKeys) } : {}) }
+    : undefined;
+  // The rules' spaces (A7): a `series` that isn't an object stays as it was, with the other unknown keys (S33odd);
+  // entries it can't use are left out, as the to-dos' are (S33dropped).
+  let series: Record<string, SeriesPlace> | undefined;
+  if (isObject(value.series)) {
+    series = {};
+    for (const [id, entry] of Object.entries(value.series)) {
+      if (!isObject(entry) || !(entry.space === null || (typeof entry.space === "string" && entry.space))) continue;
+      const extra = extraOf(entry, seriesKeys);
+      series[id] = { space: entry.space as string | null, updatedAt: readTime(entry.updatedAt), ...(extra ? { extra } : {}) };
+    }
+  }
+  const extra = extraOf(value, [...fileKeys, ...(general ? ["general"] : []), ...(series ? ["series"] : [])]);
   const version = typeof value.version === "number" && Number.isFinite(value.version) ? value.version : 1;
-  return { version, spaces, items, ...(extra ? { extra } : {}) };
+  return { version, spaces, items, ...(general ? { general } : {}), ...(series ? { series } : {}), ...(extra ? { extra } : {}) };
 }
 
 // ─── Writing: the same bytes as the Mac (spec W2) ────────────────────────────
@@ -140,7 +166,39 @@ export function serializeTodoSpaces(data: TodoSpaces): string {
   }));
   const items: Json = {};
   for (const [id, place] of Object.entries(data.items)) items[id] = { ...place.extra, space: place.space, at: place.at };
-  return `${pretty({ ...data.extra, version: data.version, spaces, items }, "")}\n`;
+  const general = data.general ? { general: { ...data.general.extra, name: data.general.name, updatedAt: data.general.updatedAt } } : {};
+  let series: { series?: Json } = {};
+  if (data.series) {
+    const entries: Json = {};
+    for (const [id, place] of Object.entries(data.series)) entries[id] = { ...place.extra, space: place.space, updatedAt: place.updatedAt };
+    series = { series: entries };
+  }
+  return `${pretty({ ...data.extra, version: data.version, spaces, items, ...general, ...series }, "")}\n`;
+}
+
+// ─── 일반: the to-dos in no space (#89) ──────────────────────────────────────
+
+/** The default names, ko · en · nl. */
+export const generalDefaults: Record<Lang, string> = { ko: "일반", en: "General", nl: "Algemeen" };
+
+/** The name it was renamed to; undefined while it's the default. */
+export const generalRenamed = (data: TodoSpaces): string | undefined => data.general?.name || undefined;
+
+/** 일반 as shown: the renamed name, or the default in the app's language. */
+export const generalName = (data: TodoSpaces, lang: Lang = "ko"): string => generalRenamed(data) ?? generalDefaults[lang];
+
+/** The names `#` finds it by (S27): the renamed one, or the default in every language. */
+export function generalNames(data: TodoSpaces): string[] {
+  const renamed = generalRenamed(data);
+  return renamed ? [renamed] : Object.values(generalDefaults);
+}
+
+/** 일반 renamed (S23); blank or any language's default name: back to the default (S24 — nothing when it is the default already). */
+export function renameGeneral(data: TodoSpaces, name: string, now = new Date()): TodoSpaces {
+  let clean = cleanSpaceName(name);
+  if (Object.values(generalDefaults).some((entry) => normal(entry) === normal(clean))) clean = "";
+  if (clean === (data.general?.name ?? "")) return data;
+  return { ...data, general: { ...data.general, name: clean, updatedAt: isoDate(now) } };
 }
 
 // ─── Reading where things are ────────────────────────────────────────────────
@@ -275,16 +333,63 @@ export function moveTodo(data: TodoSpaces, todoID: string, space: string | null,
   return { ...data, items: { ...data.items, [todoID]: { ...current, space, at: isoDate(now) } } };
 }
 
-/** S17, S22: entries of to-dos that are gone and tombstones, each more than 30 days old, dropped before a write. */
-export function pruneTodoSpaces(data: TodoSpaces, todoIDs: ReadonlySet<string>, now = new Date()): TodoSpaces {
+/**
+ * S17, S22, S36: entries of to-dos that are gone and tombstones, each more than 30 days old, dropped before a write;
+ * so are the spaces of rules no longer in repeats.json (`seriesIDs`; undefined when repeats.json couldn't be read:
+ * none dropped).
+ */
+export function pruneTodoSpaces(data: TodoSpaces, todoIDs: ReadonlySet<string>, now = new Date(), seriesIDs?: ReadonlySet<string>): TodoSpaces {
   const cutoff = now.getTime() - keepDays * day;
   const old = (time: string) => Date.parse(time) < cutoff;
   const gone = Object.keys(data.items).filter((id) => !todoIDs.has(id) && old(data.items[id].at));
   const tombstones = data.spaces.filter((space) => space.deleted && old(space.updatedAt));
-  if (gone.length === 0 && tombstones.length === 0) return data;
+  const rules = seriesIDs && data.series ? Object.keys(data.series).filter((id) => !seriesIDs.has(id) && old(data.series![id].updatedAt)) : [];
+  if (gone.length === 0 && tombstones.length === 0 && rules.length === 0) return data;
   const items = { ...data.items };
   for (const id of gone) delete items[id];
-  return { ...data, spaces: data.spaces.filter((space) => !tombstones.includes(space)), items };
+  let series = data.series;
+  if (rules.length) {
+    series = { ...data.series };
+    for (const id of rules) delete series[id];
+  }
+  return { ...data, spaces: data.spaces.filter((space) => !tombstones.includes(space)), items, ...(series ? { series } : {}) };
+}
+
+// ─── Repeat rules' spaces (2a, A7–A10) ──────────────────────────────────────
+
+/** A rule's live space (S35: a deleted one reads as 일반). */
+export function seriesSpaceOf(data: TodoSpaces, seriesID: string | undefined): string | undefined {
+  const place = seriesID ? data.series?.[seriesID]?.space : undefined;
+  return place && findSpace(data, place) ? place : undefined;
+}
+
+/**
+ * S34: a rule moved to a space, or to 일반 (null: an entry, so it wins a merge). Nothing for a space that isn't live,
+ * the one it has, or 일반 without an entry. Its open to-dos (`copies`) move with it, by the to-dos' own rule (W20).
+ */
+export function setSeriesSpace(data: TodoSpaces, seriesID: string, space: string | null, copies: readonly string[] = [], now = new Date()): TodoSpaces {
+  if (space !== null && !findSpace(data, space)) return data;
+  const current = data.series?.[seriesID];
+  let next = data;
+  if (!(current ? current.space === space : space === null)) {
+    // A `series` this version couldn't read (kept as an unknown key) gives way to the one written now (S33odd).
+    let extra = data.extra;
+    if (!data.series && extra && "series" in extra) {
+      const { series: _odd, ...rest } = extra;
+      extra = Object.keys(rest).length ? rest : undefined;
+    }
+    const { extra: _old, ...rest } = data;
+    next = { ...rest, ...(extra ? { extra } : {}), series: { ...data.series, [seriesID]: { ...current, space, updatedAt: isoDate(now) } } };
+  }
+  return copies.reduce((result, todo) => moveTodo(result, todo, space, now), next);
+}
+
+/** S35: to-dos just made from rules (`made`), each put in its rule's live space; 일반, no entry or a gone space: nothing. */
+export function placeSeriesCopies(data: TodoSpaces, made: readonly { todo: string; series: string }[], now = new Date()): TodoSpaces {
+  return made.reduce((result, { todo, series }) => {
+    const space = seriesSpaceOf(result, series);
+    return space ? moveTodo(result, todo, space, now) : result;
+  }, data);
 }
 
 /**
@@ -302,8 +407,28 @@ export function mergeTodoSpaces(existing: TodoSpaces, incoming: TodoSpaces): Tod
     const other = items[id];
     if (!other || place.at > other.at) items[id] = place;
   }
-  const extra = existing.extra || incoming.extra ? { ...incoming.extra, ...existing.extra } : undefined;
-  return { version: Math.max(existing.version, incoming.version), spaces: [...spaces.values()], items, ...(extra ? { extra } : {}) };
+  // 일반's name (S25): the later one; on the same second the file's stays.
+  const general = incoming.general && (!existing.general || incoming.general.updatedAt > existing.general.updatedAt) ? incoming.general : existing.general;
+  // The rules' spaces (S32): by rule id, the same way.
+  let series: Record<string, SeriesPlace> | undefined;
+  if (existing.series || incoming.series) {
+    series = { ...existing.series };
+    for (const [id, place] of Object.entries(incoming.series ?? {})) {
+      const other = series[id];
+      if (!other || place.updatedAt > other.updatedAt) series[id] = place;
+    }
+  }
+  let extra = existing.extra || incoming.extra ? { ...incoming.extra, ...existing.extra } : undefined;
+  for (const key of [...(general ? ["general"] : []), ...(series ? ["series"] : [])]) {
+    if (extra && key in extra) {
+      const { [key]: _odd, ...rest } = extra;
+      extra = Object.keys(rest).length ? rest : undefined;
+    }
+  }
+  return {
+    version: Math.max(existing.version, incoming.version), spaces: [...spaces.values()], items,
+    ...(general ? { general } : {}), ...(series ? { series } : {}), ...(extra ? { extra } : {}),
+  };
 }
 
 // ─── The `#` in the input line ───────────────────────────────────────────────
@@ -346,20 +471,31 @@ const onlyInitials = (text: string) => /^[ㄱ-ㅎ]+$/u.test(text);
 export type SpaceChoice = { kind: "space"; id: string } | { kind: "new"; name: string } | { kind: "none" };
 
 /**
- * S1–S4, S20: the spaces a token could mean, best first — the whole name, then names it starts (space order),
- * then names whose first consonants it starts (`#ㅎㅅ`); none of these: a new space by that name. 스페이스 없음
- * always comes last (⇧Tab reaches it).
+ * S1–S4, S20, S27, S28: what a token could mean, best first — the whole name, then names it starts (space
+ * order), then names whose first consonants it starts (`#ㅎㅅ`). 일반 (`none`) is found by its names too
+ * (`#일반`, `#gen`, `#ㅇㅂ`; once renamed, by that name only), after the spaces of the same step — so a space
+ * with the same name comes first (S28). Nothing found: a new space by that name. 일반 comes last when it wasn't
+ * found (⇧Tab reaches it).
  */
 export function spaceChoices(data: TodoSpaces, token: string): SpaceChoice[] {
   const typed = normal(token);
-  const spaces = liveSpaces(data);
+  const spaces = liveSpaces(data).map((space) => ({ id: space.id, name: normal(space.name) }));
+  const general = generalNames(data).map(normal);
   const found: string[] = [];
-  const add = (space: TodoSpace) => { if (!found.includes(space.id)) found.push(space.id); };
-  for (const space of spaces) if (normal(space.name) === typed) add(space);
-  for (const space of spaces) if (normal(space.name).startsWith(typed)) add(space);
-  if (onlyInitials(typed)) for (const space of spaces) if (initialsOf(normal(space.name)).startsWith(typed)) add(space);
-  const choices: SpaceChoice[] = found.length ? found.map((id) => ({ kind: "space", id })) : [{ kind: "new", name: cleanSpaceName(token) }];
-  return [...choices, { kind: "none" }];
+  const add = (id: string) => { if (!found.includes(id)) found.push(id); };
+  const none = "\u0000none";
+  for (const space of spaces) if (space.name === typed) add(space.id);
+  if (general.includes(typed)) add(none);
+  for (const space of spaces) if (space.name.startsWith(typed)) add(space.id);
+  if (general.some((name) => name.startsWith(typed))) add(none);
+  if (onlyInitials(typed)) {
+    for (const space of spaces) if (initialsOf(space.name).startsWith(typed)) add(space.id);
+    if (general.some((name) => initialsOf(name).startsWith(typed))) add(none);
+  }
+  const choices: SpaceChoice[] = found.length
+    ? found.map((id) => (id === none ? { kind: "none" } : { kind: "space", id }))
+    : [{ kind: "new", name: cleanSpaceName(token) }];
+  return found.includes(none) ? choices : [...choices, { kind: "none" }];
 }
 
 /**
@@ -389,8 +525,8 @@ export function spaceLineProblem(text: string, data: TodoSpaces, lang: Lang = "k
   return { ko: "할 일 내용을 적어 주세요", en: "Write what the to-do is", nl: "Schrijf wat de taak is" }[lang];
 }
 
-/** Only a to-do takes a space (S9): an event, timer, alarm, memo or repeat loses the token and gets none. */
-export const takesSpace = (candidate: Candidate): boolean => candidate.kind === "todo";
+/** A to-do or a repeat takes a space (S9; 2a S29: the repeat's rule takes it); an event, timer, alarm or memo loses the token and gets none. */
+export const takesSpace = (candidate: Candidate): boolean => candidate.kind === "todo" || candidate.kind === "repeat";
 
 // ─── 한 스페이스만 보기 (a device setting) ────────────────────────────────────
 
@@ -420,6 +556,14 @@ export function activeLens(lens: SpaceLens | undefined, data: TodoSpaces, now = 
 export const inLens = (lens: string | undefined, space: string | undefined): boolean =>
   lens === undefined || (lens === lensNone ? space === undefined : space === lens);
 
+/**
+ * 2a (A1–A5): the to-dos a screen shows under the lens — the day strip and the timetable (S38: their now and next are
+ * picked from these and every event), the 앞으로 tab (S37), the tray's 오늘 창. `index` is each to-do's live space.
+ */
+export function lensTasks<T extends { id: string }>(tasks: readonly T[], index: ReadonlyMap<string, TodoSpace>, lens: string | undefined): T[] {
+  return lens === undefined ? [...tasks] : tasks.filter((task) => inLens(lens, index.get(task.id)?.id));
+}
+
 /** W8: Ctrl+Shift+1–9 → the spaces in order, 0 → all (undefined); a digit with no space → nothing to do (null). */
 export function lensForDigit(data: TodoSpaces, digit: number): string | undefined | null {
   if (digit === 0) return undefined;
@@ -448,3 +592,9 @@ export const objectParticle = (word: string): "를" | "을" => (finalOf(word) ==
 export const toSpaceWords = (name: string, lang: Lang = "ko"): string => (lang === "ko" ? `${name}${roParticle(name)}` : name);
 /** ‘회사’를 · ‘집’을 in Korean, ‘Work’ in English and Dutch. */
 export const spaceObjectWords = (name: string, lang: Lang = "ko"): string => (lang === "ko" ? `‘${name}’${objectParticle(name)}` : `‘${name}’`);
+
+/** 1,466 (ko, en) · 1.466 (nl) — the lens's counts, as the Mac writes them (M20). */
+export function groupedCount(count: number, lang: Lang = "ko"): string {
+  const digits = String(Math.abs(Math.trunc(count))).replace(/\B(?=(\d{3})+(?!\d))/g, lang === "nl" ? "." : ",");
+  return count < 0 ? `-${digits}` : digits;
+}

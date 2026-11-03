@@ -1,8 +1,10 @@
 import type { Lang } from "./lang";
 import { clock, dayMonth } from "./lang";
 import type { Memo } from "./memo";
+import type { DrawerFont, TextSize } from "./types";
 import { memoTitle } from "./memo";
 import { isoDate } from "./notebook";
+import { markdownPlain, markdownTitle } from "./memoMarkdown";
 import { fold, matchRange, prepareQuery } from "./search";
 
 /**
@@ -38,6 +40,8 @@ export interface MemoFolder {
   id: string; name: string; /** A FolderColor; an unknown key is kept as written. */ color: string; order: number; updatedAt: string; deleted?: boolean;
   /** 정렬 (1.29): "created" · "title" · a newer version's value (kept, read as 고친 순); absent = "edited". */
   sort?: string;
+  /** 보기 (#115): "titles" (제목만) · a newer version's value (kept, read as 카드); absent = "cards". */
+  view?: string;
   extra?: Extra;
 }
 export interface MemoPlacement {
@@ -53,9 +57,15 @@ export type FolderSort = "edited" | "created" | "title";
 export const folderSorts: FolderSort[] = ["edited", "created", "title"];
 export const readSort = (value: unknown): FolderSort => (value === "created" || value === "title" ? value : "edited");
 export const sortOf = (folder: MemoFolder | undefined): FolderSort => readSort(folder?.sort);
-/** A memo's own paper (이 메모의 종이); undefined = 서랍 따라 (the drawer's). */
-export type MemoPaper = "day" | "night" | "kraft" | "grid";
-export const memoPapers: MemoPaper[] = ["day", "night", "kraft", "grid"];
+/** 보기 (#115, B2): cards (the default) · 제목만, one line a memo. */
+export type FolderView = "cards" | "titles";
+export const folderViews: FolderView[] = ["cards", "titles"];
+export const readView = (value: unknown): FolderView => (value === "titles" ? "titles" : "cards");
+export const viewOf = (folder: MemoFolder | undefined): FolderView => readView(folder?.view);
+/** A memo's own paper (이 메모의 종이); undefined = 서랍 따라 (the drawer's). #142: 한지 · 쑥색 · 벚꽃 · 먹색 too (an older
+ *  version reads a paper it doesn't know as 서랍 따라). */
+export type MemoPaper = "day" | "night" | "kraft" | "grid" | "hanji" | "sage" | "blossom" | "ink";
+export const memoPapers: MemoPaper[] = ["day", "night", "kraft", "grid", "hanji", "sage", "blossom", "ink"];
 export const readMemoPaper = (value: unknown): MemoPaper | undefined => ((memoPapers as unknown[]).includes(value) ? value as MemoPaper : undefined);
 
 const epoch = "1970-01-01T00:00:00Z";
@@ -97,6 +107,7 @@ export function parseMemoFolders(text: string, lang: Lang = "ko"): MemoFolders {
       updatedAt: isTime(entry.updatedAt) ? entry.updatedAt : epoch,
       ...(entry.deleted === true && entry.id !== inboxID ? { deleted: true } : {}),
       ...(typeof entry.sort === "string" && entry.sort !== "edited" ? { sort: entry.sort } : {}),
+      ...(typeof entry.view === "string" && entry.view !== "cards" ? { view: entry.view } : {}),
       ...(extra ? { extra } : {}),
     });
   });
@@ -117,7 +128,7 @@ export function parseMemoFolders(text: string, lang: Lang = "ko"): MemoFolders {
 }
 
 const fileKeys = ["v", "folders", "placement", "updatedAt"];
-const folderKeys = ["id", "name", "color", "order", "updatedAt", "deleted", "sort"];
+const folderKeys = ["id", "name", "color", "order", "updatedAt", "deleted", "sort", "view"];
 const placementKeys = ["folder", "pinned", "at", "paper"];
 /** The keys this version doesn't know, as read (none: undefined). */
 function extraOf(entry: Json, known: readonly string[]): Extra | undefined {
@@ -127,7 +138,7 @@ function extraOf(entry: Json, known: readonly string[]): Extra | undefined {
 
 const byKey = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 /** A kept value on one line (D18): objects `{ "a": 1 }` with sorted keys, arrays `[1, "x"]`, numbers in their shortest form. */
-function compactJSON(value: unknown): string {
+export function compactJSON(value: unknown): string {
   if (value === null || value === undefined) return "null";
   if (typeof value === "string") return jsonString(value);
   if (typeof value === "boolean") return value ? "true" : "false";
@@ -144,7 +155,7 @@ const extraText = (extra: Extra | undefined): string =>
   extra ? Object.keys(extra).sort(byKey).map((key) => `, ${jsonString(key)}: ${compactJSON(extra[key])}`).join("") : "";
 
 /** A JSON string as both apps write it: only `"`, `\` and control characters escaped (non-ASCII and `/` as they are). */
-function jsonString(value: string): string {
+export function jsonString(value: string): string {
   return `"${value.replace(/["\\\u0000-\u001f]/g, (character) => {
     if (character === '"') return '\\"';
     if (character === "\\") return "\\\\";
@@ -163,7 +174,7 @@ function jsonString(value: string): string {
 export function serializeMemoFolders(data: MemoFolders): string {
   const folders = [...data.folders].sort(byOrder).map((folder) =>
     `    { "id": ${jsonString(folder.id)}, "name": ${jsonString(folder.name)}, "color": ${jsonString(folder.color)}, "order": ${JSON.stringify(folder.order)}, "updatedAt": ${jsonString(folder.updatedAt)}` +
-    `${folder.sort !== undefined && folder.sort !== "edited" ? `, "sort": ${jsonString(folder.sort)}` : ""}${folder.deleted ? ', "deleted": true' : ""}${extraText(folder.extra)} }`);
+    `${folder.sort !== undefined && folder.sort !== "edited" ? `, "sort": ${jsonString(folder.sort)}` : ""}${folder.view !== undefined && folder.view !== "cards" ? `, "view": ${jsonString(folder.view)}` : ""}${folder.deleted ? ', "deleted": true' : ""}${extraText(folder.extra)} }`);
   const ids = Object.keys(data.placement).sort(byKey);
   const placement = ids.map((id) => {
     const entry = data.placement[id];
@@ -185,6 +196,22 @@ const byOrder = (a: MemoFolder, b: MemoFolder) => a.order - b.order || (a.id < b
 /** Folders shown as bookmarks, in order (deleted ones left out); the inbox is always among them. */
 export function visibleFolders(data: MemoFolders): MemoFolder[] {
   return data.folders.filter((folder) => !folder.deleted).sort(byOrder);
+}
+
+/**
+ * What each visible bookmark shows (#116, D-2): the picked one its name; the others their first letter, or two where
+ * another un-picked one starts with the same letter (Shopping · Study → Sh · St), never more. Letters are counted past
+ * spaces and compared without case. The shared cases B1… in docs/plans/drawer-bookmark-cases.json (the Mac's
+ * MemoFolders.bookmarkLetters).
+ */
+export function bookmarkLetters(names: readonly string[], picked: number | null): string[] {
+  const letters = (name: string, count: number) => Array.from(name.replace(/\s+/g, "")).slice(0, count).join("");
+  const firsts = names.map((name) => letters(name, 1).toLowerCase());
+  return names.map((name, index) => {
+    if (index === picked) return name;
+    const shared = firsts[index] !== "" && firsts.some((first, other) => other !== index && other !== picked && first === firsts[index]);
+    return letters(name, shared ? 2 : 1);
+  });
 }
 
 /** The name shown: the inbox's untouched default reads in the app's language. */
@@ -325,6 +352,26 @@ export function setFolderSort(data: MemoFolders, id: string, sort: FolderSort, n
   }, now);
 }
 
+/**
+ * 보기 (#115): "cards" (카드) is written as no key; like 정렬 a change of the folder (its `updatedAt`), so the newer copy
+ * of the folder wins a merge. A value a newer version wrote is replaced only when one is picked here. The shared cases
+ * V1… in docs/plans/drawer-view-cases.json (the Mac's MemoFolders.setView).
+ */
+export function setFolderView(data: MemoFolders, id: string, view: FolderView, now = new Date()): MemoFolders {
+  const folder = data.folders.find((entry) => entry.id === id && !entry.deleted);
+  const raw = view === "cards" ? undefined : view;
+  if (!folder || folder.view === raw) return data;
+  const at = isoDate(now);
+  return touched({
+    ...data,
+    folders: data.folders.map((entry) => {
+      if (entry !== folder) return entry;
+      const { view: _old, ...rest } = entry;
+      return raw === undefined ? { ...rest, updatedAt: at } : { ...rest, view: raw, updatedAt: at };
+    }),
+  }, now);
+}
+
 /** D17: 이 메모의 종이 — a paper, or undefined (서랍 따라: no key); a change of the placement (its `at`), like 고정. */
 export function setMemoPaper(data: MemoFolders, memoID: string, paper: MemoPaper | undefined, now = new Date()): MemoFolders {
   const entry = data.placement[memoID];
@@ -375,7 +422,7 @@ export function duplicateFolder(data: MemoFolders, id: string, newID: string, co
   const at = isoDate(now);
   const order = source.order + 1;
   const folders = data.folders.map((folder) => (!folder.deleted && folder.id !== id && folder.order >= order ? { ...folder, order: folder.order + 1, updatedAt: at } : folder));
-  folders.push({ id: newID, name: copyName(data, source, lang), color: source.color, order, updatedAt: at, ...(source.sort !== undefined ? { sort: source.sort } : {}) });
+  folders.push({ id: newID, name: copyName(data, source, lang), color: source.color, order, updatedAt: at, ...(source.sort !== undefined ? { sort: source.sort } : {}), ...(source.view !== undefined ? { view: source.view } : {}) });
   const placement = { ...data.placement };
   for (const [original, copy] of copies) {
     const place = placementOf(data, original);
@@ -572,15 +619,17 @@ export interface DrawerHit { memo: Memo; folder: string; pinned: boolean; text: 
 /**
  * D12: every folder's memos that match, in the memos' order — the same matching as the note's memo search
  * (whole syllables or first consonants, case and accents ignored): the title, else the first line that
- * matches (trimmed, as written); else a memo whose folder's name matches, with its title and nothing marked.
+ * matches (trimmed, without its marks — #84); else a memo whose folder's name matches, with its title and nothing marked.
  */
-export function drawerSearch(data: MemoFolders, memos: readonly Memo[], query: string, lang: Lang = "ko"): DrawerHit[] {
+export function drawerSearch(data: MemoFolders, memos: readonly Memo[], query: string, lang: Lang = "ko", keep?: (memo: Memo) => boolean): DrawerHit[] {
   if (!query.trim()) return [];
   const prepared = prepareQuery(query);
   const namesMatch = new Set(folderHits(data, query, lang).map((folder) => folder.id));
   keepSearchLines(memos);
   const hits: DrawerHit[] = [];
   for (const memo of memos) {
+    // #114: only these memos are looked at (the lines of the others stay known for the next search).
+    if (keep && !keep(memo)) continue;
     const place = placementOf(data, memo.id);
     const read = searchLines(memo, lang);
     const title = read.title;
@@ -591,7 +640,7 @@ export function drawerSearch(data: MemoFolders, memos: readonly Memo[], query: s
     let line: string | undefined;
     let range: [number, number] | undefined;
     if (maybe) {
-      read.lines ??= memo.text.split("\n").map((entry) => entry.trim());
+      read.lines ??= plainOf(read).split("\n").map((entry) => entry.trim());
       for (const entry of read.lines) {
         range = matchRange(entry, prepared);
         if (range) { line = entry; break; }
@@ -605,13 +654,15 @@ export function drawerSearch(data: MemoFolders, memos: readonly Memo[], query: s
 
 /** A memo as the search reads it, kept per text: its title, its lines trimmed and every letter folded (these two
  * once a search needs them). */
-interface SearchLines { text: string; lang: Lang; title: string; lines?: string[]; folded?: string }
+interface SearchLines { text: string; lang: Lang; title: string; plain?: string; lines?: string[]; folded?: string }
+/** The memo's words without marks (#84: `**보고서**` is found as 보고서, and its line shown so). */
+const plainOf = (read: SearchLines): string => (read.plain ??= markdownPlain(read.text));
 const searchRead = new Map<string, SearchLines>();
 
 function searchLines(memo: Memo, lang: Lang): SearchLines {
   const known = searchRead.get(memo.id);
   if (known && known.text === memo.text && known.lang === lang) return known;
-  const read: SearchLines = { text: memo.text, lang, title: slipSummary(memo, lang).title };
+  const read: SearchLines = { text: memo.text, lang, title: markdownTitle(memo.text, lang) };
   searchRead.set(memo.id, read);
   return read;
 }
@@ -619,7 +670,7 @@ function searchLines(memo: Memo, lang: Lang): SearchLines {
 /** Every letter folded one by one, as the search compares them (a capital A-Z and anything past ASCII but a
  * Hangul syllable is folded; the rest is itself). */
 function foldedText(read: SearchLines): string {
-  read.folded ??= read.text.replace(/[A-Z]|[^\u0000-\u007f\uac00-\ud7a3]/gu, fold);
+  read.folded ??= plainOf(read).replace(/[A-Z]|[^\u0000-\u007f\uac00-\ud7a3]/gu, fold);
   return read.folded;
 }
 
@@ -663,16 +714,17 @@ const keyOfCode = (code: string): string | undefined => {
 /**
  * A key pressed while recording, as an Electron accelerator ("Control+Shift+D", modifiers in that order).
  * Only modifiers so far: waiting. A key needs Ctrl, Alt or Win with it (Shift alone isn't enough, F-keys
- * aside); the app's own three are refused.
+ * aside); the app's own keys are refused: `refused`, the drawer's three unless given (the note's recorder and the drawer's
+ * pass theirs, see refusedFor in shortcuts.ts).
  */
-export function readShortcut(press: KeyPress): ShortcutReading {
+export function readShortcut(press: KeyPress, refused: readonly string[] = reservedShortcuts): ShortcutReading {
   if (["Control", "Shift", "Alt", "Meta", "OS", "AltGraph"].includes(press.key)) return { problem: "waiting" };
   const key = keyOfCode(press.code);
   if (!key) return { problem: "key" };
   const fkey = /^F\d+$/.test(key);
   if (!press.ctrlKey && !press.altKey && !press.metaKey && !fkey) return { problem: "modifier" };
   const accelerator = [press.ctrlKey && "Control", press.altKey && "Alt", press.shiftKey && "Shift", press.metaKey && "Super", key].filter(Boolean).join("+");
-  return reservedShortcuts.includes(accelerator) ? { problem: "reserved" } : { accelerator };
+  return refused.includes(accelerator) ? { problem: "reserved" } : { accelerator };
 }
 
 /** "Control+Shift+D" as people read it: "Ctrl+Shift+D" ("Super" is the Windows key: "Win"). */
@@ -694,13 +746,47 @@ export type DrawerSide = "right" | "left";
 export type DrawerBackdrop = "solid" | "frost" | "strong" | "none";
 export const drawerBackdrops: DrawerBackdrop[] = ["solid", "frost", "strong", "none"];
 export const readDrawerBackdrop = (value: unknown): DrawerBackdrop => ((drawerBackdrops as unknown[]).includes(value) ? value as DrawerBackdrop : "solid");
-export type DrawerTheme = "auto" | "day" | "night" | "kraft" | "grid";
-export const drawerThemes: DrawerTheme[] = ["auto", "day", "night", "kraft", "grid"];
+/** The drawer's paper as written (`drawerTheme`): a paper, or `auto` — 낮 종이 with 밤에는 밤 종이로 on (#142). */
+export type DrawerTheme = "auto" | MemoPaper;
+export const drawerThemes: DrawerTheme[] = ["auto", ...memoPapers];
+/** The papers that are dark already: 밤에는 밤 종이로 leaves them as they are. */
+export const darkPapers: MemoPaper[] = ["night", "ink"];
 export const drawerWidth = { min: 260, max: 480, default: 300 };
 export const clampDrawerWidth = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) ? Math.round(Math.min(drawerWidth.max, Math.max(drawerWidth.min, value))) : drawerWidth.default);
-/** 자동 follows the note's paper (낮 / 밤). */
-export const drawerLook = (theme: DrawerTheme, night: boolean): Exclude<DrawerTheme, "auto"> => (theme === "auto" ? (night ? "night" : "day") : theme);
+/**
+ * 서랍 종이 (#142, settings plan P3): the paper picked for the day and whether it gives way to 밤 종이 at night. `auto`
+ * (1.30's 자동) is 낮 종이 with the switch on; a paper picked by name stayed as it was at night, so the switch is off
+ * until it is turned on (`drawerNightPaper`, absent before 1.31). The same rule as the Mac (settings-cases.json).
+ */
+export function drawerPaper(theme: DrawerTheme, nightPaper: boolean | undefined): { paper: MemoPaper; nightPaper: boolean } {
+  if (theme === "auto") return { paper: "day", nightPaper: true };
+  if (theme === "day") return { paper: "day", nightPaper: false };
+  return { paper: theme, nightPaper: nightPaper ?? false };
+}
+/** What `drawerTheme` is written as: `auto` for 낮 종이 with the switch on, so 1.30 still follows the note's day and night. */
+export const drawerThemeValue = (paper: MemoPaper, nightPaper: boolean): DrawerTheme => (paper === "day" && nightPaper ? "auto" : paper);
+/** The paper drawn: a light paper turns to 밤 종이 at night when the switch is on; a dark paper stays. */
+export function drawerLook(theme: DrawerTheme, night: boolean, nightPaper?: boolean): MemoPaper {
+  const picked = drawerPaper(theme, nightPaper);
+  return night && picked.nightPaper && !darkPapers.includes(picked.paper) ? "night" : picked.paper;
+}
 export const readDrawerTheme = (value: unknown): DrawerTheme => ((drawerThemes as unknown[]).includes(value) ? value as DrawerTheme : "auto");
+
+/** 메모 글꼴 · 크기 (#84, docs/plans/memo-markdown.md): the faces and the size steps, kept within what the drawer knows. */
+export const drawerFonts: DrawerFont[] = ["clean", "pen", "brush", "mono"];
+export const drawerTextSizes: TextSize[] = ["small", "regular", "large", "extraLarge"];
+export const readDrawerFont = (value: unknown): DrawerFont => ((drawerFonts as unknown[]).includes(value) ? value as DrawerFont : "clean");
+export const readDrawerTextSize = (value: unknown): TextSize => ((drawerTextSizes as unknown[]).includes(value) ? value as TextSize : "regular");
+/**
+ * A size step's numbers (px, the same as the Mac's pt): the words 13 · 14 · 16 · 18 on lines of × 1.85 (24 · 26 · 30 · 33;
+ * 보통 as in 1.30), a card's preview 12 · 13 · 14 · 15 on 18 · 20 · 22 · 23 (always the plain face, so three lines cut alike).
+ */
+export function drawerTextMetrics(size: TextSize): { body: number; line: number; preview: number; previewLine: number } {
+  const index = Math.max(0, drawerTextSizes.indexOf(size));
+  const body = [13, 14, 16, 18][index];
+  const preview = [12, 13, 14, 15][index];
+  return { body, line: Math.round(body * 1.85), preview, previewLine: Math.round((preview * 20) / 13) };
+}
 
 // ─── The memo tab gone (1.28): the one-time move notice (M1–M3) ──────────────
 

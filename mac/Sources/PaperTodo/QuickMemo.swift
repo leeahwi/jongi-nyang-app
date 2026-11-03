@@ -5,7 +5,8 @@ import PaperCore
 import SwiftUI
 
 /// 빠른 메모: ⌃⌥M from any app (or the pet, ⋯, 파일 메뉴) opens a paper slip for a few lines.
-/// ⌘Return puts them at the top of 메모 as a new memo; Esc or clicking elsewhere closes it and
+/// ⌘Return puts them at the top of the folder on its chip (#117: the drawer's last folder unless another is picked) as a
+/// new memo; ⌥⌘Return does too and keeps the slip open, empty, for the next; Esc or clicking elsewhere closes it and
 /// keeps the text for next time (even after a restart: `quickMemo.draft`).
 @MainActor
 final class QuickMemoController {
@@ -97,8 +98,9 @@ final class QuickMemoController {
     }
 }
 
-/// 빠른 메모 on a slip (lavender tape): ruled handwriting lines every 40 pt, `esc 닫기` and
-/// 메모에 넣기 ⌘↩. Esc or clicking away keeps what was written for next time.
+/// 빠른 메모 on a slip (lavender tape): ruled handwriting lines every 40 pt; at the foot the folder it goes into (a chip,
+/// #117), `esc 닫기` and 넣기 ⌘↩ (⌥⌘↩ puts it in and keeps writing). Esc or clicking away keeps what was written for next
+/// time.
 struct QuickMemoView: View {
     static let lineHeight: CGFloat = 40
     static let lines = 4
@@ -107,20 +109,23 @@ struct QuickMemoView: View {
     /// The copied text came in: selected, so typing replaces it.
     var selectAll = false
     @State private var text: String
+    /// The folder the memo goes into: the drawer's last one, unless another is picked on the chip.
+    @State private var folder: String
 
-    init(model: AppModel, text: String? = nil, selectAll: Bool = false, onClose: @escaping () -> Void = {}) {
+    init(model: AppModel, text: String? = nil, selectAll: Bool = false, folder: String? = nil, onClose: @escaping () -> Void = {}) {
         self.model = model
         self.onClose = onClose
         self.selectAll = selectAll
         _text = State(initialValue: text ?? model.quickMemoDraft)
+        _folder = State(initialValue: folder ?? model.memoFolders.lastFolder(model.drawer.lastFolder))
     }
 
     var body: some View {
         PaperSlip(kind: .memo, width: SlipWidth.medium.rawValue) {
             VStack(alignment: .leading, spacing: 0) {
                 SlipHeader(kind: .memo, symbol: "note.text", title: L("빠른 메모"), context: selectAll ? L("복사한 글을 넣었어요") : L("쓰던 글은 남아요"), onClose: close)
-                MemoTextView(text: $text, font: model.notebookFont.handNSFont(24), onSubmit: add, onEscape: close, lineHeight: Self.lineHeight,
-                             selectAll: selectAll)
+                MemoTextView(text: $text, font: model.notebookFont.handNSFont(24), onSubmit: { add() }, onSubmitAndKeep: { add(keep: true) },
+                             onEscape: close, lineHeight: Self.lineHeight, selectAll: selectAll)
                     .accessibilityLabel("빠른 메모")
                     .frame(height: Self.lineHeight * CGFloat(Self.lines))
                     .background(alignment: .top) {
@@ -137,19 +142,25 @@ struct QuickMemoView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
                 SlipFooter {
+                    QuickMemoFolderChip(model: model, folder: $folder)
                     KeyHint(key: "Esc", label: L("닫기"))
                 } trailing: {
-                    Button(L("메모에 넣기"), action: add)
+                    Button(L("넣기")) { add() }
                         .buttonStyle(SlipButtonStyle(role: .primary, key: "⌘↩"))
                         .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .help(L("⌘↩ 넣기 · ⌥⌘↩ 넣고 계속 적기"))
                 }
             }
         }
         .onChange(of: text) { _, value in model.quickMemoDraft = value }
         // Also when the focus isn't in the text (the editor handles these itself first).
         .background {
-            Button("메모에 넣기", action: add)
+            Button("넣기") { add() }
                 .keyboardShortcut(.return, modifiers: .command)
+                .opacity(0)
+                .accessibilityHidden(true)
+            Button("넣고 계속 적기") { add(keep: true) }
+                .keyboardShortcut(.return, modifiers: [.command, .option])
                 .opacity(0)
                 .accessibilityHidden(true)
             Button("닫기", action: close)
@@ -159,9 +170,13 @@ struct QuickMemoView: View {
         }
     }
 
-    /// ⌘Return: a new memo with the text (blank just closes).
-    private func add() {
-        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let id = model.addMemo(text: text) {
+    /// ⌘Return: a new memo with the text in the chip's folder (blank just closes). ⌥⌘Return (`keep`, Craft's ‘넣고
+    /// 계속’): the same, and the slip stays open, empty, on the same folder.
+    private func add(keep: Bool = false) {
+        let blank = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if keep && blank { return }
+        let target = model.memoFolders.folder(folder) == nil ? nil : folder
+        if !blank, let id = model.addMemo(text: text, folder: target) {
             // 1.43: it went into 메모 서랍 — the note's toast offers 열기.
             let added = MemoMove.addedToast(.current)
             var toast = PaperToast(symbol: "note.text", text: added.text)
@@ -174,7 +189,7 @@ struct QuickMemoView: View {
         }
         text = ""
         model.quickMemoDraft = ""
-        onClose()
+        if !keep { onClose() }
     }
 
     /// Esc: closes; the draft stays.
@@ -190,6 +205,8 @@ struct MemoTextView: NSViewRepresentable {
     @Binding var text: String
     let font: NSFont
     var onSubmit: () -> Void = {}
+    /// ⌥⌘Return (빠른 메모's 넣고 계속 적기).
+    var onSubmitAndKeep: () -> Void = {}
     var onEscape: () -> Void = {}
     /// Every line this tall (the slip's ruled lines), or the font's own.
     var lineHeight: CGFloat?
@@ -236,6 +253,7 @@ struct MemoTextView: NSViewRepresentable {
         }
         view.delegate = context.coordinator
         view.onSubmit = { context.coordinator.parent.onSubmit() }
+        view.onSubmitAndKeep = { context.coordinator.parent.onSubmitAndKeep() }
         view.onEscape = { context.coordinator.parent.onEscape() }
         view.selectsAll = selectAll
         scroll.documentView = view
@@ -264,6 +282,7 @@ struct MemoTextView: NSViewRepresentable {
 
     final class KeyTextView: NSTextView {
         var onSubmit: () -> Void = {}
+        var onSubmitAndKeep: () -> Void = {}
         var onEscape: () -> Void = {}
         var selectsAll = false
 
@@ -282,7 +301,7 @@ struct MemoTextView: NSViewRepresentable {
         private func handled(_ event: NSEvent) -> Bool {
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             if (event.keyCode == UInt16(kVK_Return) || event.keyCode == UInt16(kVK_ANSI_KeypadEnter)) && flags.contains(.command) {
-                onSubmit()
+                if flags.contains(.option) { onSubmitAndKeep() } else { onSubmit() }
                 return true
             }
             if event.keyCode == UInt16(kVK_Escape) && !hasMarkedText() {
@@ -299,6 +318,51 @@ struct MemoTextView: NSViewRepresentable {
 
         override func keyDown(with event: NSEvent) {
             if !handled(event) { super.keyDown(with: event) }
+        }
+    }
+}
+
+/// #117: where 빠른 메모 puts the memo — the folder's colour and name with ▾; a click lists the folders (the drawer's
+/// folder list, without 고정), the one picked checked. Picked for this slip only; the next one starts on the drawer's last
+/// folder again.
+struct QuickMemoFolderChip: View {
+    let model: AppModel
+    @Binding var folder: String
+
+    var body: some View {
+        let folders = model.memoFolders.visible
+        let current = folders.first { $0.id == folder } ?? folders.first
+        HStack(spacing: 5) {
+            if let current {
+                RoundedRectangle(cornerRadius: 2.5, style: .continuous)
+                    .fill(DrawerPalette.day.tab(current.colorKey).a)
+                    .overlay { RoundedRectangle(cornerRadius: 2.5, style: .continuous).strokeBorder(DrawerPalette.day.tab(current.colorKey).edge, lineWidth: 1) }
+                    .frame(width: 10, height: 10)
+            }
+            Text(current?.displayName(.current) ?? "")
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(PaperTheme.ink2)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Image(systemName: "chevron.down")
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundStyle(PaperTheme.ink3)
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 22)
+        .frame(maxWidth: 150)
+        .background(PaperTheme.card, in: Capsule())
+        .overlay { Capsule().strokeBorder(PaperTheme.rule, lineWidth: 1) }
+        .fixedSize()
+        .overlay {
+            // The drawer's menus (system look, keyboard, VoiceOver): a click or Space opens the folder list under it.
+            DrawerMenuButtonArea(drawer: model.drawer, label: L("넣을 폴더") + ", " + (current?.displayName(.current) ?? ""), items: {
+                folders.map { entry in
+                    var item = DrawerMenuItem.action(entry.displayName(.current), symbol: nil, checked: entry.id == folder) { folder = entry.id }
+                    item.square = entry.colorKey
+                    return item
+                }
+            }, keyboard: true)
         }
     }
 }

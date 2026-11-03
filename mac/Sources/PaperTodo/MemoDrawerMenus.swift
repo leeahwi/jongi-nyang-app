@@ -3,7 +3,7 @@ import PaperCore
 import SwiftUI
 
 // 메모 서랍's menus (1.44, mock/v2): the folder list under the name, the ⚙ / empty-area menu, a memo's menu (⋯ and
-// right-click), a bookmark's menu, the open memo's ⚙ and 폴더로 옮기기, and the section added to the text menu. Each is
+// right-click; the open memo's ⋯ too, #112), a bookmark's menu, 폴더로 옮기기, and the section added to the text menu. Each is
 // built once as `DrawerMenuItem`s: the app turns them into a real NSMenu (system look, keyboard, VoiceOver), the
 // snapshots draw the same items so their words can be checked at 2×. Rows have icons; shortcuts only where the drawer
 // already has them; destructive last; what doesn't apply is left out.
@@ -38,8 +38,9 @@ struct DrawerMenuItem {
     var keyText: String?
     var checked = false
     var destructive = false
-    /// The header's title in handwriting (a memo's title).
-    var handwritten = false
+    /// The header's title as a quiet grey line in the system's face (a memo's title, #104: it only says what the menu
+    /// is about; in handwriting it mixed with the menu's words).
+    var quiet = false
     var action: () -> Void = {}
 
     static func action(_ title: String, symbol: String?, key: (String, NSEvent.ModifierFlags)? = nil, keyText: String? = nil,
@@ -93,9 +94,18 @@ struct DrawerSwatch: Identifiable {
 enum DrawerMenus {
     static func cmd(_ key: String, _ more: NSEvent.ModifierFlags = []) -> (String, NSEvent.ModifierFlags) { (key, more.union(.command)) }
 
-    /// The folder list (the name's ▾, ⌘L): colour, name, count, ⌘1–9; 고정 with its count; 새 폴더….
+    /// The folder list (the name's ▾, ⌘L): #115 first how the folder shown looks — 보기 · 이 폴더 (카드 · 제목만) and 정렬 —
+    /// then colour, name, count, ⌘1–9; 고정 with its count; 새 폴더….
     static func folderList(_ drawer: MemoDrawer) -> [DrawerMenuItem] {
-        var items: [DrawerMenuItem] = [.section(L("폴더"))]
+        var items: [DrawerMenuItem] = []
+        if !drawer.searching {
+            items.append(.section(drawer.tab == .pinned ? L("보기 · 고정") : L("보기 · 이 폴더")))
+            items += view(drawer, drawer.tab)
+            items.append(.section(L("정렬")))
+            items += sort(drawer, drawer.tab)
+            items.append(.separator)
+        }
+        items.append(.section(L("폴더")))
         for (index, folder) in drawer.folders.visible.enumerated() {
             var item = DrawerMenuItem.action(folder.displayName(.current), symbol: nil, key: index < 9 ? cmd("\(index + 1)") : nil,
                                              checked: drawer.tab == .folder(folder.id) && !drawer.searching) { drawer.show(.folder(folder.id)) }
@@ -109,23 +119,32 @@ enum DrawerMenus {
         items.append(pinned)
         items.append(.separator)
         items.append(.action(L("새 폴더…"), symbol: "plus") { drawer.newFolder() })
+        // #120: 지운 메모 at the bottom, only when there are some.
+        if let trash = trashRow(drawer) { items += [.separator, trash] }
         return items
+    }
+
+    /// `지운 메모 세 장`: opens the slip of deleted memos (#120); nil when there are none.
+    static func trashRow(_ drawer: MemoDrawer) -> DrawerMenuItem? {
+        let count = drawer.trashEntries.count
+        guard count > 0 else { return nil }
+        return .action(MemoTrash.menuLabel(count, language: .current), symbol: "trash") { drawer.openTrash() }
     }
 
     /// The footer's ⚙ = a right-click on the drawer's empty area or header.
     static func drawer(_ drawer: MemoDrawer) -> [DrawerMenuItem] {
-        let auto = drawer.theme == .auto
+        // #142: the paper picked for the day (밤에는 밤 종이로 is in 책상 → 메모 서랍).
         let papers: [DrawerSwatch] = MemoDrawer.Theme.allCases.map { theme in
-            let look: DrawerSwatch.Look = theme == .auto ? .split : .paper(theme.palette(.light).kind)
-            return DrawerSwatch(id: theme.rawValue, label: theme.short, look: look, picked: drawer.theme == theme || (auto && theme == .auto)) { drawer.theme = theme }
+            DrawerSwatch(id: theme.rawValue, label: theme.short, look: .paper(theme.paperPalette.kind), picked: drawer.theme == theme) { drawer.theme = theme }
         }
-        let kind = drawer.theme.palette(drawer.model.paperColor == .night ? .dark : .light).kind
+        let kind = drawer.palette.kind
         let backdrops = MemoDrawer.Backdrop.allCases.map { backdrop in
             DrawerSwatch(id: backdrop.rawValue, label: backdrop.title, look: .backdrop(backdrop, kind), picked: drawer.backdrop == backdrop) { drawer.backdrop = backdrop }
         }
         return [
             .action(L("새 메모"), symbol: "plus", key: cmd("n")) { drawer.newMemo() },
             .action(L("복사한 글로 새 메모"), symbol: "doc.on.clipboard") { drawer.newFromClipboard() },
+        ] + (trashRow(drawer).map { [$0] } ?? []) + [
             .separator,
             .section(L("종이")),
             .swatches(papers),
@@ -135,6 +154,11 @@ enum DrawerMenus {
             drawer.side == .right
                 ? .action(L("왼쪽에 두기"), symbol: "sidebar.left") { drawer.side = .left }
                 : .action(L("오른쪽에 두기"), symbol: "sidebar.right") { drawer.side = .right },
+            // #111: from the header (its pin read as 고정); also in Desk → 메모 서랍.
+            .action(L("다른 창 위에 띄우기"), symbol: "pin", checked: drawer.pinned) {
+                drawer.pinned.toggle()
+                drawer.onPin()
+            },
             .action(L("메모 서랍 설정…"), symbol: "gearshape", key: cmd(",")) { drawer.openSettings() },
             .action(L("도움말"), symbol: "questionmark.circle") { drawer.openHelp() },
             .separator,
@@ -147,7 +171,7 @@ enum DrawerMenus {
         guard let memo = drawer.memo(id) else { return [] }
         let pinned = drawer.folders.isPinned(id)
         var header = DrawerMenuItem(kind: .header, title: MemoCards.title(memo.text, language: .current), symbol: "doc.text")
-        header.handwritten = true
+        header.quiet = true
         var items: [DrawerMenuItem] = [
             header,
             .separator,
@@ -158,7 +182,7 @@ enum DrawerMenus {
             .action(L("복제"), symbol: "plus.square.on.square") { drawer.duplicate(id) },
             .separator,
             .action(String(localized: "고정", table: "Drawer"), symbol: "pin", checked: pinned) { drawer.togglePin(id) },
-            .submenu(L("폴더로 옮기기"), symbol: "tray.and.arrow.down", move(drawer, id)),
+            .submenu(L("폴더로 옮기기"), symbol: "folder", move(drawer, id)),
             .separator,
             .section(L("이 메모의 종이")),
             .swatches(paperSwatches(drawer, id)),
@@ -203,19 +227,12 @@ enum DrawerMenus {
         return items
     }
 
-    /// The open memo's ⚙: 고정 · 이 메모의 종이 · 체크한 줄 지우기.
-    static func memoGear(_ drawer: MemoDrawer, _ id: String) -> [DrawerMenuItem] {
+    /// ⇧⌘M (#118): the memo's title on top, then 폴더로 옮기기's rows (최근, the other folders, 새 폴더…).
+    static func moveList(_ drawer: MemoDrawer, _ id: String) -> [DrawerMenuItem] {
         guard let memo = drawer.memo(id) else { return [] }
-        var items: [DrawerMenuItem] = [
-            .action(String(localized: "고정", table: "Drawer"), symbol: "pin", checked: drawer.folders.isPinned(id)) { drawer.togglePin(id) },
-            .separator,
-            .section(L("이 메모의 종이")),
-            .swatches(paperSwatches(drawer, id)),
-        ]
-        if Checklist.progress(memo.text)?.done ?? 0 > 0 {
-            items += [.separator, .action(L("체크한 줄 지우기"), symbol: "checklist.unchecked") { drawer.clearChecked(id) }]
-        }
-        return items
+        var header = DrawerMenuItem(kind: .header, title: MemoCards.title(memo.text, language: .current), symbol: "doc.text")
+        header.quiet = true
+        return [header, .separator] + move(drawer, id)
     }
 
     /// A bookmark's menu: the folder (colour, name, count) on top; 여기에 새 메모; 이름 바꾸기 · 색 · 정렬 · 복제;
@@ -237,6 +254,7 @@ enum DrawerMenus {
             .separator,
             .action(L("이름 바꾸기"), symbol: "character.cursor.ibeam") { drawer.editFolder(id) },
             .submenu(L("색"), symbol: "paintpalette", colors),
+            .submenu(L("보기"), symbol: "list.bullet.rectangle", view(drawer, .folder(id))),
             .submenu(L("정렬"), symbol: "arrow.up.arrow.down", sort(drawer, .folder(id))),
             .action(L("복제"), symbol: "plus.square.on.square") { drawer.duplicateFolder(id) },
         ]
@@ -251,11 +269,21 @@ enum DrawerMenus {
         var header = DrawerMenuItem(kind: .header, title: L("고정"))
         header.pin = true
         header.detail = MemoFolders.sheetCount(drawer.folders.pinnedMemos(drawer.memos).count, language: .current)
-        var items: [DrawerMenuItem] = [header, .separator, .submenu(L("정렬"), symbol: "arrow.up.arrow.down", sort(drawer, .pinned))]
+        var items: [DrawerMenuItem] = [header, .separator, .submenu(L("보기"), symbol: "list.bullet.rectangle", view(drawer, .pinned)),
+                                       .submenu(L("정렬"), symbol: "arrow.up.arrow.down", sort(drawer, .pinned))]
         if !drawer.folders.pinnedMemos(drawer.memos).isEmpty {
             items += [.separator, .action(L("고정 모두 풀기"), symbol: "pin.slash", destructive: false) { drawer.unpinAll() }]
         }
         return items
+    }
+
+    /// 보기 (#115): 카드 · 제목만.
+    static func view(_ drawer: MemoDrawer, _ tab: MemoFolders.Tab) -> [DrawerMenuItem] {
+        let current = drawer.view(of: tab)
+        return [
+            .action(L("카드"), symbol: "rectangle.grid.1x2", checked: current == .cards) { drawer.setView(.cards, for: tab) },
+            .action(L("제목만"), symbol: "list.bullet", checked: current == .titles) { drawer.setView(.titles, for: tab) },
+        ]
     }
 
     /// 정렬 ▸: 고친 순 · 만든 순 · 제목 순.
@@ -274,7 +302,7 @@ enum DrawerMenus {
         guard let memo = drawer.memo(id) else { return [] }
         var items: [DrawerMenuItem] = [
             .section(L("이 메모")),
-            .submenu(L("폴더로 옮기기"), symbol: "tray.and.arrow.down", move(drawer, id)),
+            .submenu(L("폴더로 옮기기"), symbol: "folder", move(drawer, id)),
             .submenu(L("이 메모의 종이"), symbol: "doc.richtext", [.swatches(paperSwatches(drawer, id))]),
         ]
         if Checklist.progress(memo.text)?.done ?? 0 > 0 {
@@ -295,26 +323,22 @@ extension MemoFolders.Sort {
 }
 
 extension MemoFolders.Paper {
-    /// The swatch's word: 낮 · 밤 · 크라프트 · 모눈.
-    var short: String {
-        switch self {
-        case .day: L("낮")
-        case .night: L("밤")
-        case .kraft: L("크라프트")
-        case .grid: L("모눈")
-        }
-    }
+    /// The swatch's word: 낮 · 밤 · 크라프트 · 모눈 · 한지 · 쑥색 · 벚꽃 · 먹색.
+    var short: String { MemoDrawer.Theme(rawValue: rawValue)!.short }
 }
 
 extension MemoDrawer.Theme {
-    /// The swatch's word: 자동 · 낮 · 밤 · 크라프트 · 모눈.
+    /// The swatch's word: 낮 · 밤 · 크라프트 · 모눈 · 한지 · 쑥색 · 벚꽃 · 먹색.
     var short: String {
         switch self {
-        case .auto: String(localized: "자동", table: "Drawer")
         case .day: L("낮")
         case .night: L("밤")
         case .kraft: L("크라프트")
         case .grid: L("모눈")
+        case .hanji: L("한지")
+        case .sage: L("쑥색")
+        case .blossom: L("벚꽃")
+        case .ink: L("먹색")
         }
     }
 }
@@ -486,9 +510,13 @@ private final class SwatchRowView: NSView {
 
     override func hitTest(_ point: NSPoint) -> NSView? { frame.contains(point) ? self : nil }
 
+    /// A swatch's place: its column across, its line down (#142: five a line), in this view's bottom-up coordinates.
     private func frame(of index: Int) -> NSRect {
-        let x = DrawerSwatchRow.inset + CGFloat(index) * (DrawerSwatchRow.cell + DrawerSwatchRow.gap)
-        return NSRect(x: x, y: 0, width: DrawerSwatchRow.cell, height: bounds.height)
+        let per = DrawerSwatchRow.perLine
+        let lines = max(1, (swatches.count + per - 1) / per)
+        let height = bounds.height / CGFloat(lines)
+        let x = DrawerSwatchRow.inset + CGFloat(index % per) * (DrawerSwatchRow.cell + DrawerSwatchRow.gap)
+        return NSRect(x: x, y: bounds.height - CGFloat(index / per + 1) * height, width: DrawerSwatchRow.cell, height: height)
     }
 
     private func index(at point: NSPoint) -> Int? {
@@ -516,33 +544,43 @@ struct DrawerSwatchRow: View {
     static let cell: CGFloat = 50
     static let gap: CGFloat = 4
     static let inset: CGFloat = 14
+    /// At most five a line (#142: eight papers, nine with ‘서랍과 같게’, take a second line).
+    static let perLine = 5
 
     var body: some View {
-        HStack(spacing: Self.gap) {
-            ForEach(Array(swatches.enumerated()), id: \.element.id) { index, swatch in
-                VStack(spacing: 3) {
-                    DrawerSwatchSample(look: swatch.look)
-                        .frame(width: 44, height: 30)
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                        .overlay { RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5) }
-                        .padding(2)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .strokeBorder(swatch.picked ? Color.accentColor : Color.primary.opacity(hovered == index ? 0.35 : 0), lineWidth: swatch.picked ? 2 : 1)
-                        }
-                    Text(swatch.label)
-                        .font(.system(size: 10.5, weight: swatch.picked ? .semibold : .regular))
-                        .foregroundStyle(swatch.picked ? Color.primary : Color.secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .frame(width: Self.cell)
+        VStack(alignment: .leading, spacing: Self.gap) {
+            ForEach(Array(stride(from: 0, to: swatches.count, by: Self.perLine)), id: \.self) { start in
+                HStack(spacing: Self.gap) {
+                    ForEach(start..<min(start + Self.perLine, swatches.count), id: \.self) { index in
+                        cell(index, swatches[index])
+                    }
                 }
-                .frame(width: Self.cell)
             }
         }
         .padding(.horizontal, Self.inset)
         .padding(.top, 3)
         .padding(.bottom, 6)
+    }
+
+    private func cell(_ index: Int, _ swatch: DrawerSwatch) -> some View {
+        VStack(spacing: 3) {
+            DrawerSwatchSample(look: swatch.look)
+                .frame(width: 44, height: 30)
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                .overlay { RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Color.primary.opacity(0.2), lineWidth: 0.5) }
+                .padding(2)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(swatch.picked ? Color.accentColor : Color.primary.opacity(hovered == index ? 0.35 : 0), lineWidth: swatch.picked ? 2 : 1)
+                }
+            Text(swatch.label)
+                .font(.system(size: 10.5, weight: swatch.picked ? .semibold : .regular))
+                .foregroundStyle(swatch.picked ? Color.primary : Color.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: Self.cell)
+        }
+        .frame(width: Self.cell)
     }
 }
 
@@ -638,8 +676,8 @@ struct DrawerMenuHeader: View {
             } else if let symbol = item.symbol {
                 Image(systemName: symbol).font(.system(size: 12)).foregroundStyle(.secondary)
             }
-            if item.handwritten {
-                Text(item.title.handwritten).font(font.handFont(MemoDrawerView.hand(18))).lineLimit(1)
+            if item.quiet {
+                Text(item.title).font(.system(size: 12)).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail)
             } else {
                 Text(item.title).font(.system(size: 13, weight: .semibold)).lineLimit(1)
             }
@@ -749,6 +787,8 @@ struct DrawerContextArea: NSViewRepresentable {
             return self
         }
 
+        /// The drawer stays open over other apps: a right-click there opens the menu without a click to bring it forward first.
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
         override func rightMouseDown(with event: NSEvent) { open(event) }
         override func mouseDown(with event: NSEvent) { if event.modifierFlags.contains(.control) { open(event) } }
 
@@ -771,6 +811,10 @@ struct DrawerMenuButtonArea: NSViewRepresentable {
     let items: @MainActor () -> [DrawerMenuItem]
     /// Gives the drawer a way to open it from the keyboard (⌘L for the folder list).
     var register: ((@escaping () -> Void) -> Void)?
+    /// Gives the drawer a way to open another menu under it (⇧⌘M's 폴더로 옮기기 under the folder's name).
+    var registerPop: ((@escaping ([DrawerMenuItem]) -> Void) -> Void)?
+    /// A key view: Tab reaches it (full keyboard access), Space · ↩ · ↓ open it, the focus ring round it (#112).
+    var keyboard = false
 
     func makeNSView(context: Context) -> ButtonView {
         let view = ButtonView()
@@ -783,14 +827,17 @@ struct DrawerMenuButtonArea: NSViewRepresentable {
     private func update(_ view: ButtonView) {
         view.drawer = drawer
         view.items = items
+        view.keyboard = keyboard
         view.setAccessibilityLabel(label)
         view.toolTip = label
         register? { [weak view] in view?.open() }
+        registerPop? { [weak view] items in view?.pop(items) }
     }
 
     final class ButtonView: NSView {
         weak var drawer: MemoDrawer?
         var items: @MainActor () -> [DrawerMenuItem] = { [] }
+        var keyboard = false
 
         override init(frame: NSRect) {
             super.init(frame: frame)
@@ -802,13 +849,26 @@ struct DrawerMenuButtonArea: NSViewRepresentable {
 
         override var isFlipped: Bool { true }
         override func hitTest(_ point: NSPoint) -> NSView? { frame.contains(point) ? self : nil }
+        /// The first click opens it, though another app is in front (as with the note's 모든 스페이스 ▾).
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
         override func mouseDown(with event: NSEvent) { open() }
         override func rightMouseDown(with event: NSEvent) { open() }
         override func accessibilityPerformPress() -> Bool { open(); return true }
+        override var acceptsFirstResponder: Bool { keyboard }
+        override var canBecomeKeyView: Bool { keyboard && NSApp.isFullKeyboardAccessEnabled }
+        override var focusRingMaskBounds: NSRect { bounds }
+        override func drawFocusRingMask() { NSBezierPath(roundedRect: bounds, xRadius: bounds.height / 2, yRadius: bounds.height / 2).fill() }
+        override func keyDown(with event: NSEvent) {
+            let open = [" ", "\r", "\u{3}"].contains(event.characters ?? "") || event.keyCode == 125
+            guard keyboard, open, event.modifierFlags.intersection([.command, .option, .control]).isEmpty else { return super.keyDown(with: event) }
+            self.open()
+        }
 
-        func open() {
+        func open() { pop(items()) }
+
+        func pop(_ items: [DrawerMenuItem]) {
             guard let drawer, window != nil else { return }
-            DrawerMenuBuilder.pop(items(), drawer: drawer, under: self)
+            DrawerMenuBuilder.pop(items, drawer: drawer, under: self)
         }
     }
 }

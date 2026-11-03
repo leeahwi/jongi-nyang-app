@@ -6,7 +6,7 @@ import { contrast, tokensIn } from "../src/core/contrast";
 import { folderColors } from "../src/core/memoDrawer";
 
 /**
- * 메모 서랍's four papers (src/renderer/drawer.css, 1.29 colours): every text colour on what it sits on at 4.5:1,
+ * 메모 서랍's eight papers (src/renderer/drawer.css, 1.29 colours; #142 한지 · 쑥색 · 벚꽃 · 먹색): every text colour on what it sits on at 4.5:1,
  * every mark (an icon, a checkbox's edge, a tick, the selection ring, the progress bar, the paw, the open memo's
  * 3 px line in each folder's colour) at 3:1 — and each folder colour's bookmark name on its colour (solid since 1.30), the
  * 고정 bookmark's paw on its own colour, and the screen-edge handle's paw on its cream (one colour on every paper). The
@@ -24,6 +24,9 @@ const block = (look: string) => {
   assert.ok(css.slice(start, open).includes(`.it[data-sheet="${look}"]`), `${look}: a memo's own paper uses the same block`);
   return tokensIn(css.slice(open, css.indexOf("}", open)));
 };
+
+/** The papers (#142: 한지 · 쑥색 · 벚꽃 · 먹색 too, the Mac's colours). */
+const looks = ["day", "night", "kraft", "grid", "hanji", "sage", "blossom", "ink"];
 
 type Need = "text" | "ui" | "line" | "edge" | "sheet";
 // The open memo's line: a mark (3:1), kept at 3.2:1 or more as the spec measured it.
@@ -63,9 +66,19 @@ const pairs: [string, string, Need, string][] = [
   ["d-open", "d-card", "ui", "the default open line"],
   ["d-card", "d-paper", "sheet", "a sheet on the drawer (a step darker, as the mock: day 1.35 · night 1.53 · kraft 1.90 · grid 1.26)"],
   ["d-card-edge", "d-card", "edge", "a sheet's 1 px edge"],
+  // #82: 새 폴더 is an empty bookmark — the sheet's paper, a dashed edge in the open checkbox's colour, a + in the secondary ink.
+  ["d-preview", "d-card", "ui", "the empty bookmark's + (#82)"],
+  ["d-box", "d-card", "ui", "the empty bookmark's dashed edge on its paper (#82)"],
+  // #83: the close bar on the inner edge, at rest and under the pointer; under 바탕 없음 on a pill of sheet paper.
+  ["d-closebar", "d-paper", "ui", "the close bar at rest, a short line (#83, #111)"],
+  ["d-closebar", "d-card", "ui", "the close bar on its pill, 바탕 없음 (#83)"],
+  // #135: the link field on its pill (heading, keys, 링크 빼기); #117: the quick-write slip's hint, where it goes.
+  ["d-meta", "d-pill", "text", "the link field's heading and keys (#135)"],
+  ["d-preview", "d-pill", "text", "the link field's 링크 빼기 (#135)"],
+  ["d-preview", "d-qk", "text", "the quick-write hint: where it goes (#117)"],
 ];
 
-for (const look of ["day", "night", "kraft", "grid"]) {
+for (const look of looks) {
   test(`drawer contrast: ${look} paper — text 4.5:1, marks 3:1, every bookmark's name, edge and open line`, () => {
     const tokens = block(look);
     const lines = [`${look}: fg on bg = ratio (needs) · where`];
@@ -81,7 +94,7 @@ for (const look of ["day", "night", "kraft", "grid"]) {
     check("d-pintab-ink", "d-pintab", "ui", "the paw on the 고정 bookmark (1.30)");
     for (const color of folderColors) {
       check(`c-${color}-ink`, `c-${color}-a`, "text", `the ${color} bookmark's name`);
-      check(`c-${color}-line`, "d-card", "line", `the open or picked ${color} memo's 3 px line and ring`);
+      check(`c-${color}-line`, "d-card", "line", `the open ${color} memo's 3 px line and the picked one's 2 px edge (#118)`);
       check(`c-${color}-edge`, "d-paper", "edge", `the ${color} bookmark's 1 px edge on the drawer`);
     }
     console.log(lines.join("\n"));
@@ -97,6 +110,13 @@ test("drawer contrast (1.30): no stripes on the bookmarks or the handle; the han
   const ratio = contrast(handle["handle-paw"], handle["handle-fill"]);
   console.log(`handle: --handle-paw on --handle-fill = ${ratio.toFixed(2)} (3) · the paw on the cream, every paper`);
   assert.ok(ratio >= 3);
+  // #111 · #164: the close tab is the same cream as the handle; its › 4.5:1 on it.
+  const barAt = css.indexOf(".closebar {");
+  const bar = tokensIn(css.slice(barAt, css.indexOf("}", barAt)));
+  assert.deepEqual([bar["handle-fill"], bar["handle-edge"], bar["handle-paw"]], ["#f6e7b0", "#e2cf86", "#5e4a12"]);
+  const arrow = contrast(bar["handle-paw"], bar["handle-fill"]);
+  console.log(`close tab: › on its cream = ${arrow.toFixed(2)} (4.5)`);
+  assert.ok(arrow >= 4.5);
   // 고정 follows the note's 오늘 tab on day and night paper.
   assert.deepEqual([block("day")["d-pintab"], block("day")["d-pintab-edge"]], ["#f6dc7c", "#dcc062"]);
   assert.deepEqual([block("night")["d-pintab"], block("night")["d-pintab-edge"], block("night")["d-pintab-ink"]], ["#c4a245", "#d6b65a", "#1f1d18"]);
@@ -105,14 +125,33 @@ test("drawer contrast (1.30): no stripes on the bookmarks or the handle; the han
 // #14 (option B): a card's preview is the ink one step lighter over its sheet — day 78 %, night 86 % (the mock), kraft 84 %
 // and grid 80 % — written as the colour that makes, the same as the Mac's DrawerPalette.preview; and on every paper it
 // reads better than the grey (--d-preview) it replaced.
-const peekStrength: Record<string, number> = { day: 0.78, night: 0.86, kraft: 0.84, grid: 0.8 };
+const peekStrength: Record<string, number> = { day: 0.78, night: 0.86, kraft: 0.84, grid: 0.8, hanji: 0.8, sage: 0.84, blossom: 0.82, ink: 0.86 };
 const blend = (fg: string, alpha: number, bg: string) => "#" + [1, 3, 5].map((i) => Math.round(parseInt(fg.slice(i, i + 2), 16) * alpha + parseInt(bg.slice(i, i + 2), 16) * (1 - alpha)).toString(16).padStart(2, "0")).join("");
-for (const look of ["day", "night", "kraft", "grid"]) {
+for (const look of looks) {
   test(`drawer contrast (#14): ${look} preview is the ink at ${peekStrength[look] * 100} % and reads better than before`, () => {
     const tokens = block(look);
     assert.equal(tokens["d-peek"], blend(tokens["d-ink"], peekStrength[look], tokens["d-card"]));
     const now = contrast(tokens["d-peek"], tokens["d-card"]), before = contrast(tokens["d-preview"], tokens["d-card"]);
     console.log(`${look}: preview --d-peek on --d-card = ${now.toFixed(2)} (was --d-preview ${before.toFixed(2)})`);
     assert.ok(now >= 4.5 && now > before);
+  });
+}
+
+// #82 · #83: the + under the pointer (ink on the sheet with 6 % ink over it), and the close bar on the see-through
+// paper (반투명 82 %, 강하게 62 % over the window's material, taken as #ececec — #2a2a2a under night paper — as the
+// Mac's check does): 3:1 on every paper. The bar's colour is the Mac's DrawerPalette.closeBar.
+const macCloseBar: Record<string, string> = { day: "#7b766a", night: "#8e897d", kraft: "#6a583f", grid: "#74808b", hanji: "#847f74", sage: "#768170", blossom: "#8c767b", ink: "#757c8c" };
+for (const look of looks) {
+  test(`drawer contrast (#82, #83): ${look} — the + under the pointer, the close bar on the see-through paper`, () => {
+    const tokens = block(look);
+    assert.equal(tokens["d-closebar"], macCloseBar[look], "the same colour as the Mac's closeBar");
+    const material = look === "night" || look === "ink" ? "#2a2a2a" : "#ececec";
+    const rows: [string, number][] = [
+      ["the + under the pointer: --d-ink on the 6 % tint", contrast(tokens["d-ink"], blend(tokens["d-ink"], 0.06, tokens["d-card"]))],
+      ["the close bar on the 반투명 paper (82 %)", contrast(tokens["d-closebar"], blend(tokens["d-paper"], 0.82, material))],
+      ["the close bar on the 강하게 paper (62 %)", contrast(tokens["d-closebar"], blend(tokens["d-paper"], 0.62, material))],
+    ];
+    for (const [where, ratio] of rows) console.log(`${look}: ${ratio >= 3 ? "ok  " : "FAIL"} ${ratio.toFixed(2)} (3) · ${where}`);
+    assert.deepEqual(rows.filter(([, ratio]) => ratio < 3).map(([where]) => where), []);
   });
 }

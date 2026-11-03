@@ -16,6 +16,8 @@ final class FocusTimerState: ObservableObject {
     @Published var restOpen = false
     /// Counts the times a focus stretch or break ran out (the card's primary button pulses once).
     @Published var timeUps = 0
+    /// 다 했어요 was pressed: the card's title is being struck through before the session ends (F4).
+    @Published var finishing = false
 
     /// 집중 on a to-do is under way (the note shows the focus card).
     var isFocusing: Bool { session?.isFocus == true }
@@ -170,12 +172,23 @@ final class FocusTimerController {
     }
 
     private func perform(_ step: FocusStep, at now: Date) {
-        guard var session = state.session else { return }
+        // F4: while 다 했어요 strikes the title through, the card takes no other step.
+        guard var session = state.session, !state.finishing else { return }
         switch step {
         case .done:
-            let task = session.taskId.flatMap(UUID.init(uuidString:))
-            end(done: true, at: now)
-            if let task { model.completeTask(task) }
+            // F4 (as on Windows): the card's title is struck through (그리기, 0.22 s), and 0.42 s after the press the task is
+            // checked and the session ends. At once under Reduce Motion, in snapshots and without the card.
+            if session.isFocus && !Motion.reduced && SlipMotion.enabled {
+                state.finishing = true
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(for: .milliseconds(420))
+                    guard let self, self.state.finishing else { return }
+                    self.state.finishing = false
+                    self.finish(at: Date())
+                }
+            } else {
+                finish(at: now)
+            }
         case .more:
             session.more(at: now)
             setSession(session)
@@ -213,7 +226,16 @@ final class FocusTimerController {
 
     /// Ends what's running: its stretch goes into the record (a minute or more), the tag goes,
     /// and after a focus the held task alerts come.
+    /// 다 했어요: the session ends done and its to-do is checked.
+    private func finish(at now: Date) {
+        guard let session = state.session else { return }
+        let task = session.taskId.flatMap(UUID.init(uuidString:))
+        end(done: true, at: now)
+        if let task { model.completeTask(task) }
+    }
+
     private func end(done: Bool = false, at now: Date) {
+        state.finishing = false
         guard let session = state.session else { return }
         if let record = session.record(done: done, at: now) { model.focusLog.append(record) }
         setSession(nil)
@@ -298,11 +320,11 @@ final class FocusTimerController {
 
     private func say(_ text: String, for seconds: TimeInterval = 6) {
         messageTask?.cancel()
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { state.message = text }
+        withAnimation(Motion.animation(.bounce, reduce: Motion.reduced)) { state.message = text }
         messageTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled else { return }
-            withAnimation(.easeIn(duration: 0.15)) { self?.state.message = nil }
+            withAnimation(Motion.exit(.quick, reduce: Motion.reduced)) { self?.state.message = nil }
         }
     }
 

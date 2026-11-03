@@ -8,7 +8,7 @@
 
 macOS · Windows · 무료 · 계정 없이
 
-[**Mac 내려받기**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.45.0) &nbsp;·&nbsp; [**Windows 내려받기**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.30.0) &nbsp;·&nbsp; [소개 페이지](https://leeahwi.github.io/jongi-nyang-app/) &nbsp;·&nbsp; [English](README.en.md)
+[**Mac 내려받기**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.46.0) &nbsp;·&nbsp; [**Windows 내려받기**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.31.0) &nbsp;·&nbsp; [소개 페이지](https://leeahwi.github.io/jongi-nyang-app/) &nbsp;·&nbsp; [English](README.en.md)
 
 [![Mac](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=mac-*&label=Mac&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![Windows](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=windows-*&label=Windows&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![CI](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml/badge.svg)](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml)
 
@@ -55,6 +55,8 @@ macOS · Windows · 무료 · 계정 없이
 
 어떤 앱을 쓰다가도 <kbd>⇧⌘D</kbd>(Windows <kbd>Ctrl+Shift+D</kbd>)로 화면 끝에서 꺼냅니다. 메모는 날짜별로 묶이고, 링크 · 전화번호 · 체크 목록이 카드에 작게 보입니다. 우클릭으로 폴더를 옮기고, 메모마다 종이를 바꿉니다.
 
+1.46(Windows 1.31)부터 메모는 마크다운으로 쓰고, 찾기 결과는 폴더별로 묶이며, 폴더마다 제목만 보기를 고를 수 있습니다. 크게 보기에서는 서랍이 넓어지고, 체크 상자는 커졌고, <kbd>⌘K</kbd>(Windows <kbd>Ctrl+K</kbd>)로 메모 아래에 링크 칸이 뜹니다. 지운 메모는 30일 동안 남아 원래 폴더로 되돌릴 수 있습니다. 서랍 종이는 한지, 쑥색, 벚꽃, 먹색이 더해져 여덟 가지이고, 메모 글자 크기, 줄 간격, 코드 글꼴(D2Coding)도 고릅니다.
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/cards/drawer-ko-dark.png">
   <img src="docs/readme/cards/drawer-ko-light.png" width="800" alt="날짜로 묶인 메모 서랍과 메모 우클릭 메뉴">
@@ -68,6 +70,12 @@ macOS · Windows · 무료 · 계정 없이
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/cards/spaces-ko-dark.png">
   <img src="docs/readme/cards/spaces-ko-light.png" width="800" alt="오늘 노트 두 장: 왼쪽은 할 일 줄 끝에 스페이스 색 띠가 붙은 노트, 오른쪽은 ‘회사만 보는 중 · 다른 할 일 4개는 숨겼어요’로 거른 같은 노트">
 </picture>
+
+### 스페이스별로 묶기
+
+1.46(Windows 1.31)부터 `모든 스페이스 ▾` 메뉴나 <kbd>⌥⌘G</kbd>(Windows <kbd>Ctrl+Shift+G</kbd>)로 오늘 할 일을 스페이스마다 묶어 봅니다. 모양은 메모지 카드와 책갈피 두 가지이고, 노트를 넓히면 스페이스마다 한 칸씩 나란히 놓입니다(1,200px까지). 할 일을 다른 묶음으로 끌어 놓으면 그 스페이스로 옮겨지고, 여러 개를 골라 한 번에 옮길 수도 있습니다. 색 띠와 한 스페이스만 보기는 앞으로 탭, 하루 띠, 오늘 창, 반복 할 일에도 걸립니다.
+
+<img src="docs/screenshots/mac/spaces2b-board.png" width="800" alt="넓은 노트에서 오늘 할 일을 회사, 집, 공부, 일반 네 칸으로 묶어 본 모습">
 
 ### 종이 고양이
 
@@ -93,8 +101,9 @@ Claude 데스크톱이나 Claude Code와 대화하면서 할 일, 일정, 메모
 
 ## 설치
 
-- **macOS** 14 이상, Apple Silicon — [v1.45.0 DMG](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.45.0)를 열어 앱을 응용 프로그램 폴더로 옮깁니다. Intel Mac은 소스에서 빌드합니다.
-- **Windows** 10/11, x64 — [v1.30.0](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.30.0)의 설치 파일(`.exe`)을 실행하거나 ZIP을 풀어 씁니다.
+- **macOS** 14 이상, Apple Silicon — [v1.46.0 DMG](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.46.0)를 열어 앱을 응용 프로그램 폴더로 옮깁니다. Intel Mac은 소스에서 빌드합니다.
+- **Windows** 10/11, x64 — [v1.31.0](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.31.0)의 설치 파일(`.exe`)을 실행하거나 ZIP을 풀어 씁니다.
+- 내려받은 파일은 릴리스의 `SHA256SUMS` 파일과 대어 확인할 수 있습니다. macOS는 `shasum -a 256 파일`, Windows PowerShell은 `Get-FileHash 파일 -Algorithm SHA256`으로 값을 봅니다.
 - 다른 버전은 [릴리스 목록](https://github.com/leeahwi/jongi-nyang-app/releases)에 있습니다.
 
 macOS 배포본은 Developer ID 서명과 공증을 받지 않았고, Windows 배포본에는 코드 서명이 없습니다. 처음 실행할 때 차단되면 macOS는 **시스템 설정 → 개인정보 보호 및 보안 → 그래도 열기**, Windows SmartScreen은 **추가 정보 → 실행**을 선택합니다.
@@ -105,8 +114,9 @@ macOS 배포본은 Developer ID 서명과 공증을 받지 않았고, Windows �
 
 - **저장 위치 변경:** 앱의 **책상 → 저장과 백업**에서 폴더를 선택합니다.
 - **기기 간 공유:** iCloud Drive, OneDrive, Dropbox 등의 동기화 폴더를 선택하면 macOS와 Windows에서 같은 데이터를 사용할 수 있습니다. 파일 전달은 해당 클라우드 서비스가 담당합니다.
+- **자동 백업:** 하루 한 번, 그리고 가져오기나 되돌리기처럼 덮어쓰기 전마다 저장 폴더를 `.jongi` 파일로 남깁니다(1.46, Windows 1.31). 백업은 저장 폴더가 아니라 이 컴퓨터의 `backups` 폴더에 쌓이고, **책상 → 저장과 백업**에서 무엇을 되돌릴지 골라 되돌립니다.
 - **백업과 이전:** 할 일, 메모와 메모 폴더, 일정, 알람, 완료 기록과 집중 기록을 `.jongi` 파일로 내보내고 다른 기기에서 가져옵니다.
-- **파일:** 할 일은 `todos.json`, 메모는 `memos.json`, 메모 서랍의 폴더 · 고정 · 정렬 · 메모의 종이는 `memo-folders.json`, 할 일 스페이스는 `todo-spaces.json`에 있습니다. AI 연결 설정(`ai-link.json`)과 Claude가 한 일의 기록(`ai-log.jsonl`)은 공유 폴더를 써도 각 기기의 설정 폴더에 둡니다.
+- **파일:** 할 일은 `todos.json`, 메모는 `memos.json`, 메모 서랍의 폴더 · 고정 · 정렬 · 메모의 종이는 `memo-folders.json`, 할 일 스페이스는 `todo-spaces.json`, 지운 메모는 `memo-trash.json`에 있습니다. AI 연결 설정(`ai-link.json`)과 Claude가 한 일의 기록(`ai-log.jsonl`)은 공유 폴더를 써도 각 기기의 설정 폴더에 둡니다.
 
 공유 폴더의 동시 편집 처리 방식은 [아키텍처 문서](docs/architecture.md)에 설명되어 있습니다. 알림과 알람은 실행 중인 각 기기에서 울립니다.
 

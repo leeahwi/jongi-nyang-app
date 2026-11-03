@@ -1,5 +1,5 @@
 {
-  "about": "할 일 스페이스 1단계의 공유 사례 S1–S22 (spaces-phase1.md §6). 두 앱이 같은 입력에서 같은 기대값을 내요. Mac: mac/scripts/test-spaces.sh가 이 파일을 읽어요.",
+  "about": "할 일 스페이스의 공유 사례: 1단계 S1–S28 (spaces-phase1.md §6), 2a S29–S38 · 2b S39–S45 (spaces-phase2.md) · 여러 개 옮기기 S46–S48 (#168). 두 앱이 같은 입력에서 같은 기대값을 내요. Mac: mac/scripts/test-spaces.sh가 이 파일을 읽어요.",
   "timeZone": "Asia/Seoul",
   "now": "2026-10-28T01:00:00Z",
   "file": {
@@ -28,8 +28,53 @@
     { "case": "S20", "addSpace": { "color": "sky", "id": "s-d", "name": "A 업무", "order": 3, "updatedAt": "2026-10-01T00:00:00Z" }, "text": "보고 #a", "lens": null, "expect": { "added": true, "kind": "todo", "title": "보고", "space": "s-d", "choices": ["s-d", "none"] } },
     { "case": "W5", "text": "이슈 #12 확인 #회사", "lens": null, "expect": { "added": true, "kind": "todo", "title": "이슈 #12 확인", "space": "s-a", "choices": ["s-a", "none"] } },
     { "case": "W5", "text": "##제목 정리", "lens": null, "expect": { "added": true, "kind": "todo", "title": "##제목 정리", "space": null, "choices": [] } },
-    { "case": "S19", "note": "M2: 스페이스가 0개면 #를 읽지 않아요", "noSpaces": true, "text": "빨래 #세탁", "lens": null, "expect": { "added": true, "kind": "todo", "title": "빨래 #세탁", "space": null, "choices": [] } }
+    { "case": "S19", "note": "M2: 스페이스가 0개면 #를 읽지 않아요", "noSpaces": true, "text": "빨래 #세탁", "lens": null, "expect": { "added": true, "kind": "todo", "title": "빨래 #세탁", "space": null, "choices": [] } },
+    { "case": "S27", "text": "빨래 #일반", "lens": null, "expect": { "added": true, "kind": "todo", "title": "빨래", "space": null, "choices": ["none"] } },
+    { "case": "S27", "text": "빨래 #일", "lens": null, "expect": { "added": true, "kind": "todo", "title": "빨래", "space": null, "choices": ["none"] } },
+    { "case": "S27", "text": "빨래 #ㅇㅂ", "lens": null, "expect": { "added": true, "kind": "todo", "title": "빨래", "space": null, "choices": ["none"] } },
+    { "case": "S27", "text": "빨래 #general", "lens": null, "expect": { "added": true, "kind": "todo", "title": "빨래", "space": null, "choices": ["none"] } },
+    { "case": "S27", "text": "빨래 #Alg", "lens": null, "expect": { "added": true, "kind": "todo", "title": "빨래", "space": null, "choices": ["none"] } },
+    { "case": "S27", "note": "보는 중이어도 #가 이겨요(S8)", "text": "빨래 #일반", "lens": "s-a", "expect": { "added": true, "kind": "todo", "title": "빨래", "space": null, "choices": ["none"] } },
+    { "case": "S27", "general": { "name": "기타", "updatedAt": "2026-10-20T00:00:00Z" }, "text": "빨래 #기타", "lens": null, "expect": { "added": true, "kind": "todo", "title": "빨래", "space": null, "choices": ["none"] } },
+    { "case": "S27", "note": "이름을 바꾸면 기본 이름으로는 찾지 않아요", "general": { "name": "기타", "updatedAt": "2026-10-20T00:00:00Z" }, "text": "빨래 #일반", "lens": null, "expect": { "added": true, "kind": "todo", "title": "빨래", "space": null, "newSpace": { "name": "일반", "color": "lavender" }, "choices": ["new:일반", "none"] } },
+    { "case": "S27", "note": "비운 이름은 기본 이름", "general": { "name": "", "updatedAt": "2026-10-21T00:00:00Z" }, "text": "빨래 #일반", "lens": null, "expect": { "added": true, "kind": "todo", "title": "빨래", "space": null, "choices": ["none"] } },
+    { "case": "S27", "note": "M2: 스페이스가 0개면 #일반도 읽지 않아요", "noSpaces": true, "text": "빨래 #일반", "lens": null, "expect": { "added": true, "kind": "todo", "title": "빨래 #일반", "space": null, "choices": [] } },
+    { "case": "S28", "note": "같은 이름의 스페이스가 먼저, ⇧Tab으로 일반", "addSpace": { "color": "sky", "id": "s-e", "name": "일반", "order": 3, "updatedAt": "2026-10-01T00:00:00Z" }, "text": "빨래 #일반", "lens": null, "expect": { "added": true, "kind": "todo", "title": "빨래", "space": "s-e", "choices": ["s-e", "none"] } },
+    { "case": "S28", "note": "이름 전체가 같은 일반이 앞부분만 같은 스페이스보다 먼저", "addSpace": { "color": "sky", "id": "s-e", "name": "일반 업무", "order": 3, "updatedAt": "2026-10-01T00:00:00Z" }, "text": "빨래 #일반", "lens": null, "expect": { "added": true, "kind": "todo", "title": "빨래", "space": null, "choices": ["none", "s-e"] } },
+    { "case": "S28", "note": "일반을 스페이스와 같은 이름으로 바꿔도 스페이스가 먼저", "general": { "name": "회사", "updatedAt": "2026-10-20T00:00:00Z" }, "text": "빨래 #회사", "lens": null, "expect": { "added": true, "kind": "todo", "title": "빨래", "space": "s-a", "choices": ["s-a", "none"] } },
+    {"case": "S29", "note": "반복 규칙과 첫 할 일 모두 회사. 회의는 일정으로 먼저 읽혀서 반복은 두 번째 뜻(Tab)이에요: 검사는 kind가 repeat인 뜻을 골라요", "text": "매주 월요일 주간 회의 #회사", "lens": null, "expect": {"added": true, "kind": "repeat", "title": "주간 회의", "space": "s-a", "choices": ["s-a", "none"]}},
+    {"case": "S29", "text": "매일 물 마시기 #집", "lens": null, "expect": {"added": true, "kind": "repeat", "title": "물 마시기", "space": "s-b", "choices": ["s-b", "none"]}},
+    {"case": "S30", "note": "렌즈 안에서 #없이 새 반복: 렌즈의 스페이스", "text": "매일 물 마시기", "lens": "s-a", "expect": {"added": true, "kind": "repeat", "title": "물 마시기", "space": "s-a", "choices": ["s-a"]}},
+    {"case": "S30", "note": "#가 이겨요(S8)", "text": "매일 물 마시기 #집", "lens": "s-a", "expect": {"added": true, "kind": "repeat", "title": "물 마시기", "space": "s-b", "choices": ["s-b", "none"]}},
+    {"case": "S30", "note": "일반만 보는 중: 일반", "text": "매일 물 마시기", "lens": "none", "expect": {"added": true, "kind": "repeat", "title": "물 마시기", "space": null, "choices": []}},
+    {"case": "S31", "text": "매일 빨래 #세탁", "lens": null, "expect": {"added": true, "kind": "repeat", "title": "빨래", "space": null, "newSpace": {"name": "세탁", "color": "lavender"}, "choices": ["new:세탁", "none"]}}
   ],
+  "general": {
+    "about": "S23–S26: 일반(스페이스 없는 할 일)의 이름. 파일 맨 위 `general`은 이름을 바꾼 뒤에만 있어요. name \"\"은 기본 이름으로 되돌림이에요(합치기에서 이기도록 남겨요).",
+    "names": { "ko": "일반", "en": "General", "nl": "Algemeen" },
+    "renames": [
+      { "case": "S23", "general": null, "to": "기타", "now": "2026-10-28T01:00:00Z", "expect": { "name": "기타", "updatedAt": "2026-10-28T01:00:00Z" }, "shown": { "ko": "기타", "en": "기타", "nl": "기타" } },
+      { "case": "S23", "general": { "name": "기타", "updatedAt": "2026-10-01T00:00:00Z" }, "to": "  개인\n일  ", "now": "2026-10-28T01:00:00.700Z", "expect": { "name": "개인 일", "updatedAt": "2026-10-28T01:00:00Z" }, "shown": { "ko": "개인 일", "en": "개인 일", "nl": "개인 일" } },
+      { "case": "S23", "note": "같은 이름: 바뀌지 않음", "general": { "name": "기타", "updatedAt": "2026-10-01T00:00:00Z" }, "to": "기타", "now": "2026-10-28T01:00:00Z", "expect": { "name": "기타", "updatedAt": "2026-10-01T00:00:00Z" }, "shown": { "ko": "기타", "en": "기타", "nl": "기타" } },
+      { "case": "S24", "general": { "name": "기타", "updatedAt": "2026-10-01T00:00:00Z" }, "to": "   ", "now": "2026-10-28T01:00:00Z", "expect": { "name": "", "updatedAt": "2026-10-28T01:00:00Z" }, "shown": { "ko": "일반", "en": "General", "nl": "Algemeen" } },
+      { "case": "S24", "note": "어느 말의 기본 이름이든 기본으로", "general": { "name": "기타", "updatedAt": "2026-10-01T00:00:00Z" }, "to": "general", "now": "2026-10-28T01:00:00Z", "expect": { "name": "", "updatedAt": "2026-10-28T01:00:00Z" }, "shown": { "ko": "일반", "en": "General", "nl": "Algemeen" } },
+      { "case": "S24", "general": { "name": "기타", "updatedAt": "2026-10-01T00:00:00Z" }, "to": "Algemeen", "now": "2026-10-28T01:00:00Z", "expect": { "name": "", "updatedAt": "2026-10-28T01:00:00Z" }, "shown": { "ko": "일반", "en": "General", "nl": "Algemeen" } },
+      { "case": "S24", "note": "이미 기본이면 아무것도 쓰지 않음", "general": null, "to": "", "now": "2026-10-28T01:00:00Z", "expect": null, "shown": { "ko": "일반", "en": "General", "nl": "Algemeen" } },
+      { "case": "S24", "general": null, "to": "일반", "now": "2026-10-28T01:00:00Z", "expect": null, "shown": { "ko": "일반", "en": "General", "nl": "Algemeen" } }
+    ],
+    "merges": [
+      { "case": "S25", "existing": { "name": "기타", "updatedAt": "2026-10-28T01:00:00Z" }, "incoming": { "name": "개인", "updatedAt": "2026-10-28T01:02:00Z" }, "expect": { "name": "개인", "updatedAt": "2026-10-28T01:02:00Z" } },
+      { "case": "S25", "existing": { "name": "개인", "updatedAt": "2026-10-28T01:02:00Z" }, "incoming": { "name": "기타", "updatedAt": "2026-10-28T01:00:00Z" }, "expect": { "name": "개인", "updatedAt": "2026-10-28T01:02:00Z" } },
+      { "case": "S25", "note": "나중에 비운 쪽이 이겨요", "existing": { "name": "기타", "updatedAt": "2026-10-28T01:02:00Z" }, "incoming": { "name": "", "updatedAt": "2026-10-28T01:05:00Z" }, "expect": { "name": "", "updatedAt": "2026-10-28T01:05:00Z" } },
+      { "case": "S25", "existing": null, "incoming": { "name": "기타", "updatedAt": "2026-10-28T01:00:00Z" }, "expect": { "name": "기타", "updatedAt": "2026-10-28T01:00:00Z" } },
+      { "case": "S25", "existing": { "name": "기타", "updatedAt": "2026-10-28T01:00:00Z" }, "incoming": null, "expect": { "name": "기타", "updatedAt": "2026-10-28T01:00:00Z" } },
+      { "case": "S25", "note": "같은 초면 파일의 것", "existing": { "name": "기타", "updatedAt": "2026-10-28T01:00:00Z" }, "incoming": { "name": "개인", "updatedAt": "2026-10-28T01:00:00Z" }, "expect": { "name": "기타", "updatedAt": "2026-10-28T01:00:00Z" } },
+      { "case": "S25", "existing": null, "incoming": null, "expect": null }
+    ],
+    "S26": "{\n  \"general\": {\n    \"icon\": \"tray\",\n    \"name\": \"기타 \\\"묶음\\\"\",\n    \"updatedAt\": \"2026-10-27T23:00:00Z\"\n  },\n  \"items\": {},\n  \"series\": {},\n  \"spaces\": [\n    {\n      \"color\": \"pink\",\n      \"id\": \"s-a\",\n      \"name\": \"회사\",\n      \"order\": 0,\n      \"updatedAt\": \"2026-10-01T00:00:00Z\"\n    }\n  ],\n  \"version\": 1\n}\n",
+    "S26names": { "ko": "기타 \"묶음\"", "en": "기타 \"묶음\"", "nl": "기타 \"묶음\"" },
+    "S26odd": "{\n  \"general\": \"일반\",\n  \"items\": {},\n  \"spaces\": [],\n  \"version\": 1\n}\n"
+  },
   "lens": [
     { "case": "S11", "lens": { "day": "2026-10-27", "spaceId": "s-a" }, "now": "2026-10-27T18:59:00Z", "expect": "s-a" },
     { "case": "S11", "lens": { "day": "2026-10-27", "spaceId": "s-a" }, "now": "2026-10-27T19:00:00Z", "expect": null },
@@ -49,7 +94,7 @@
     { "case": "S15", "existing": { "name": "업무", "updatedAt": "2026-10-28T01:00:00Z" }, "incoming": { "name": "직장", "updatedAt": "2026-10-28T01:02:00Z" }, "expect": "직장" },
     { "case": "S15", "existing": { "name": "직장", "updatedAt": "2026-10-28T01:02:00Z" }, "incoming": { "name": "업무", "updatedAt": "2026-10-28T01:00:00Z" }, "expect": "직장" }
   ],
-  "S16": "{\n  \"items\": {\n    \"0B1C5E2A-6F3D-4C8B-9A7E-1D2F3A4B5C6D\": {\n      \"at\": \"2026-10-28T00:01:00Z\",\n      \"pin\": true,\n      \"space\": \"s-a\"\n    },\n    \"7E8F9A0B-1C2D-4E3F-8A9B-0C1D2E3F4A5B\": {\n      \"at\": \"2026-10-28T00:02:00Z\",\n      \"space\": null\n    }\n  },\n  \"series\": {\n    \"daily-water\": {\n      \"at\": \"2026-10-27T23:00:00Z\",\n      \"space\": \"s-b\"\n    }\n  },\n  \"spaces\": [\n    {\n      \"color\": \"pink\",\n      \"icon\": \"briefcase\",\n      \"id\": \"s-a\",\n      \"name\": \"회사\",\n      \"order\": 0,\n      \"updatedAt\": \"2026-10-01T00:00:00Z\"\n    },\n    {\n      \"color\": \"mint\",\n      \"id\": \"s-b\",\n      \"name\": \"집 \\\"우리\\\"\",\n      \"order\": 1,\n      \"tags\": [],\n      \"updatedAt\": \"2026-10-01T00:00:00Z\"\n    },\n    {\n      \"color\": \"teal\",\n      \"deleted\": true,\n      \"id\": \"s-c\",\n      \"name\": \"공부\",\n      \"order\": 2,\n      \"updatedAt\": \"2026-10-20T00:00:00Z\",\n      \"weight\": 2.5\n    }\n  ],\n  \"version\": 1\n}\n",
+  "S16": "{\n  \"items\": {\n    \"0B1C5E2A-6F3D-4C8B-9A7E-1D2F3A4B5C6D\": {\n      \"at\": \"2026-10-28T00:01:00Z\",\n      \"pin\": true,\n      \"space\": \"s-a\"\n    },\n    \"7E8F9A0B-1C2D-4E3F-8A9B-0C1D2E3F4A5B\": {\n      \"at\": \"2026-10-28T00:02:00Z\",\n      \"space\": null\n    }\n  },\n  \"series\": {\n    \"daily-water\": {\n      \"space\": \"s-b\",\n      \"updatedAt\": \"2026-10-27T23:00:00Z\"\n    }\n  },\n  \"spaces\": [\n    {\n      \"color\": \"pink\",\n      \"icon\": \"briefcase\",\n      \"id\": \"s-a\",\n      \"name\": \"회사\",\n      \"order\": 0,\n      \"updatedAt\": \"2026-10-01T00:00:00Z\"\n    },\n    {\n      \"color\": \"mint\",\n      \"id\": \"s-b\",\n      \"name\": \"집 \\\"우리\\\"\",\n      \"order\": 1,\n      \"tags\": [],\n      \"updatedAt\": \"2026-10-01T00:00:00Z\"\n    },\n    {\n      \"color\": \"teal\",\n      \"deleted\": true,\n      \"id\": \"s-c\",\n      \"name\": \"공부\",\n      \"order\": 2,\n      \"updatedAt\": \"2026-10-20T00:00:00Z\",\n      \"weight\": 2.5\n    }\n  ],\n  \"version\": 1\n}\n",
   "prune": {
     "case": "S17 · S22",
     "now": "2026-10-28T01:00:00Z",
@@ -65,5 +110,824 @@
     "expectSpaces": ["s-a", "s-new"]
   },
   "unreadable": ["{ not json", "[]", "{\"spaces\": 3}", "{\"items\": []}", ""],
-  "readable": ["{}", "{\"spaces\": []}"]
+  "readable": ["{}", "{\"spaces\": []}"],
+  "series": {
+    "about": "S32–S36 (spaces-phase2.md 2a): 반복 규칙의 스페이스. todo-spaces.json 맨 위 `series`: { \"<series id>\": { \"space\": \"s-…\" | null, \"updatedAt\": \"…\" } }. `series`가 파일에 없으면 null이에요. 기대값의 맵은 규칙 id → 스페이스(null은 일반으로 옮김)예요.",
+    "merges": [
+      {
+        "case": "S32",
+        "existing": {
+          "W": {
+            "space": "s-a",
+            "updatedAt": "2026-10-28T01:00:00Z"
+          }
+        },
+        "incoming": {
+          "W": {
+            "space": "s-b",
+            "updatedAt": "2026-10-28T01:05:00Z"
+          }
+        },
+        "expect": {
+          "W": "s-b"
+        }
+      },
+      {
+        "case": "S32",
+        "existing": {
+          "W": {
+            "space": "s-b",
+            "updatedAt": "2026-10-28T01:05:00Z"
+          }
+        },
+        "incoming": {
+          "W": {
+            "space": "s-a",
+            "updatedAt": "2026-10-28T01:00:00Z"
+          }
+        },
+        "expect": {
+          "W": "s-b"
+        }
+      },
+      {
+        "case": "S32",
+        "note": "나중에 일반으로 옮긴 쪽이 이겨요",
+        "existing": {
+          "W": {
+            "space": null,
+            "updatedAt": "2026-10-28T01:05:00Z"
+          }
+        },
+        "incoming": {
+          "W": {
+            "space": "s-a",
+            "updatedAt": "2026-10-28T01:00:00Z"
+          }
+        },
+        "expect": {
+          "W": null
+        }
+      },
+      {
+        "case": "S32",
+        "note": "같은 초면 파일의 것",
+        "existing": {
+          "W": {
+            "space": "s-a",
+            "updatedAt": "2026-10-28T01:00:00Z"
+          }
+        },
+        "incoming": {
+          "W": {
+            "space": "s-b",
+            "updatedAt": "2026-10-28T01:00:00Z"
+          }
+        },
+        "expect": {
+          "W": "s-a"
+        }
+      },
+      {
+        "case": "S32",
+        "note": "서로 다른 규칙은 모두",
+        "existing": {
+          "W": {
+            "space": "s-a",
+            "updatedAt": "2026-10-28T01:00:00Z"
+          }
+        },
+        "incoming": {
+          "M": {
+            "space": "s-b",
+            "updatedAt": "2026-10-28T01:00:00Z"
+          }
+        },
+        "expect": {
+          "M": "s-b",
+          "W": "s-a"
+        }
+      },
+      {
+        "case": "S32",
+        "note": "한쪽에만 있으면 그쪽",
+        "existing": null,
+        "incoming": {
+          "W": {
+            "space": "s-b",
+            "updatedAt": "2026-10-28T01:00:00Z"
+          }
+        },
+        "expect": {
+          "W": "s-b"
+        }
+      },
+      {
+        "case": "S32",
+        "existing": {
+          "W": {
+            "space": "s-b",
+            "updatedAt": "2026-10-28T01:00:00Z"
+          }
+        },
+        "incoming": null,
+        "expect": {
+          "W": "s-b"
+        }
+      },
+      {
+        "case": "S32",
+        "existing": null,
+        "incoming": null,
+        "expect": null
+      }
+    ],
+    "S33": "{\n  \"items\": {},\n  \"series\": {\n    \"4C2B7A10-0D3E-4F5A-8B6C-7D8E9F0A1B2C\": {\n      \"pin\": true,\n      \"space\": \"s-a\",\n      \"updatedAt\": \"2026-10-27T23:00:00Z\"\n    },\n    \"daily-water\": {\n      \"space\": null,\n      \"updatedAt\": \"2026-10-27T23:30:00Z\"\n    }\n  },\n  \"spaces\": [\n    {\n      \"color\": \"pink\",\n      \"id\": \"s-a\",\n      \"name\": \"회사\",\n      \"order\": 0,\n      \"updatedAt\": \"2026-10-01T00:00:00Z\"\n    }\n  ],\n  \"version\": 1\n}\n",
+    "S33note": "모르는 키(규칙의 pin)는 남고, 읽고 쓰면 바이트가 같아요. `series`가 객체가 아니면 맨 위의 모르는 키로 그대로 두어요(S33odd). 읽지 못하는 규칙 항목은 빠져요(S33dropped → z만).",
+    "S33odd": "{\n  \"items\": {},\n  \"series\": [],\n  \"spaces\": [],\n  \"version\": 1\n}\n",
+    "S33dropped": "{\"items\": {}, \"series\": {\"x\": \"회사\", \"y\": {\"space\": 3, \"updatedAt\": \"2026-10-27T23:00:00Z\"}, \"z\": {\"space\": \"s-a\", \"updatedAt\": \"2026-10-27T23:00:00Z\"}}, \"spaces\": [{\"color\": \"pink\", \"id\": \"s-a\", \"name\": \"회사\", \"order\": 0, \"updatedAt\": \"2026-10-01T00:00:00Z\"}], \"version\": 1}",
+    "S33droppedExpect": {
+      "z": "s-a"
+    },
+    "sets": [
+      {
+        "case": "S34",
+        "series": null,
+        "items": {},
+        "seriesID": "daily-water",
+        "to": "s-a",
+        "copies": [],
+        "now": "2026-10-28T01:00:00Z",
+        "expect": {
+          "daily-water": {
+            "space": "s-a",
+            "updatedAt": "2026-10-28T01:00:00Z"
+          }
+        },
+        "expectItems": {}
+      },
+      {
+        "case": "S34",
+        "note": "같은 스페이스: 바뀌지 않음",
+        "series": {
+          "daily-water": {
+            "space": "s-a",
+            "updatedAt": "2026-10-01T00:00:00Z"
+          }
+        },
+        "items": {},
+        "seriesID": "daily-water",
+        "to": "s-a",
+        "copies": [],
+        "now": "2026-10-28T01:00:00Z",
+        "expect": {
+          "daily-water": {
+            "space": "s-a",
+            "updatedAt": "2026-10-01T00:00:00Z"
+          }
+        },
+        "expectItems": {}
+      },
+      {
+        "case": "S34",
+        "note": "항목 없이 일반으로: 아무것도 쓰지 않음",
+        "series": null,
+        "items": {},
+        "seriesID": "daily-water",
+        "to": null,
+        "copies": [],
+        "now": "2026-10-28T01:00:00Z",
+        "expect": null,
+        "expectItems": {}
+      },
+      {
+        "case": "S34",
+        "series": {
+          "daily-water": {
+            "space": "s-a",
+            "updatedAt": "2026-10-01T00:00:00Z"
+          }
+        },
+        "items": {},
+        "seriesID": "daily-water",
+        "to": null,
+        "copies": [],
+        "now": "2026-10-28T01:00:00Z",
+        "expect": {
+          "daily-water": {
+            "space": null,
+            "updatedAt": "2026-10-28T01:00:00Z"
+          }
+        },
+        "expectItems": {}
+      },
+      {
+        "case": "S34",
+        "note": "살아 있지 않은 스페이스: 아무것도",
+        "series": null,
+        "items": {},
+        "seriesID": "daily-water",
+        "to": "s-gone",
+        "copies": [],
+        "now": "2026-10-28T01:00:00Z",
+        "expect": null,
+        "expectItems": {}
+      },
+      {
+        "case": "S34",
+        "note": "규칙의 끝내지 않은 할 일도 함께 옮겨요",
+        "series": {
+          "daily-water": {
+            "space": "s-b",
+            "updatedAt": "2026-10-01T00:00:00Z"
+          }
+        },
+        "items": {
+          "T1": {
+            "space": "s-b",
+            "at": "2026-10-01T00:00:00Z"
+          }
+        },
+        "seriesID": "daily-water",
+        "to": "s-a",
+        "copies": [
+          "T1",
+          "T2"
+        ],
+        "now": "2026-10-28T01:00:00Z",
+        "expect": {
+          "daily-water": {
+            "space": "s-a",
+            "updatedAt": "2026-10-28T01:00:00Z"
+          }
+        },
+        "expectItems": {
+          "T1": {
+            "space": "s-a",
+            "at": "2026-10-28T01:00:00Z"
+          },
+          "T2": {
+            "space": "s-a",
+            "at": "2026-10-28T01:00:00Z"
+          }
+        }
+      },
+      {
+        "case": "S34",
+        "note": "일반으로: 자리가 있던 할 일만 null, 없던 할 일은 그대로",
+        "series": {
+          "daily-water": {
+            "space": "s-b",
+            "updatedAt": "2026-10-01T00:00:00Z"
+          }
+        },
+        "items": {
+          "T1": {
+            "space": "s-b",
+            "at": "2026-10-01T00:00:00Z"
+          }
+        },
+        "seriesID": "daily-water",
+        "to": null,
+        "copies": [
+          "T1",
+          "T2"
+        ],
+        "now": "2026-10-28T01:00:00Z",
+        "expect": {
+          "daily-water": {
+            "space": null,
+            "updatedAt": "2026-10-28T01:00:00Z"
+          }
+        },
+        "expectItems": {
+          "T1": {
+            "space": null,
+            "at": "2026-10-28T01:00:00Z"
+          }
+        }
+      }
+    ],
+    "copies": {
+      "case": "S35",
+      "note": "규칙에서 새로 만든 할 일은 규칙의 스페이스로. 일반 · 항목 없음 · 지운 스페이스는 자리를 쓰지 않아요. 그 할 일 하나를 옮기면 그것만(규칙은 그대로).",
+      "deleteSpace": "s-c",
+      "series": {
+        "daily-water": {
+          "space": "s-b",
+          "updatedAt": "2026-10-01T00:00:00Z"
+        },
+        "weekly-meeting": {
+          "space": null,
+          "updatedAt": "2026-10-01T00:00:00Z"
+        },
+        "old-rule": {
+          "space": "s-c",
+          "updatedAt": "2026-10-01T00:00:00Z"
+        }
+      },
+      "made": [
+        {
+          "todo": "T1",
+          "series": "daily-water"
+        },
+        {
+          "todo": "T2",
+          "series": "weekly-meeting"
+        },
+        {
+          "todo": "T3",
+          "series": "old-rule"
+        },
+        {
+          "todo": "T4",
+          "series": "no-entry"
+        }
+      ],
+      "now": "2026-10-28T01:00:00Z",
+      "expectItems": {
+        "T1": {
+          "space": "s-b",
+          "at": "2026-10-28T01:00:00Z"
+        }
+      },
+      "thenMove": {
+        "todo": "T1",
+        "to": "s-a",
+        "now": "2026-10-28T01:10:00Z"
+      },
+      "expectAfterMove": {
+        "items": {
+          "T1": {
+            "space": "s-a",
+            "at": "2026-10-28T01:10:00Z"
+          }
+        },
+        "series": {
+          "daily-water": "s-b",
+          "old-rule": "s-c",
+          "weekly-meeting": null
+        }
+      }
+    },
+    "prune": {
+      "case": "S36",
+      "note": "repeats.json에 없는 규칙의 항목은 30일이 넘으면 저장할 때 빠져요(정확히 30일은 남아요). repeats.json을 읽지 못했으면(seriesIDs null) 빼지 않아요.",
+      "now": "2026-10-28T01:00:00Z",
+      "seriesIDs": [
+        "LIVE"
+      ],
+      "series": {
+        "GONE-31": {
+          "space": "s-a",
+          "updatedAt": "2026-09-27T01:00:00Z"
+        },
+        "GONE-30": {
+          "space": "s-a",
+          "updatedAt": "2026-09-28T01:00:00Z"
+        },
+        "GONE-29": {
+          "space": null,
+          "updatedAt": "2026-09-29T01:00:00Z"
+        },
+        "LIVE": {
+          "space": "s-a",
+          "updatedAt": "2026-08-01T00:00:00Z"
+        }
+      },
+      "expect": [
+        "GONE-29",
+        "GONE-30",
+        "LIVE"
+      ],
+      "expectWithoutRepeats": [
+        "GONE-29",
+        "GONE-30",
+        "GONE-31",
+        "LIVE"
+      ]
+    }
+  },
+  "ahead": {
+    "about": "S37 (2a 앞으로 탭): 렌즈가 할 일만 걸러요(일정은 그대로). 날짜 칸 · 묶음의 수는 거른 뒤의 수, `hidden`은 렌즈가 숨긴 앞으로의 끝내지 않은 할 일(맨 아래 한 줄의 N). 묶음 이름은 thisWeek · nextWeek · later · someday이고, 비어 있는 묶음은 없어요. 지금은 위의 `now`(10월 28일 수요일 10:00, ko 주는 일요일부터). `spaces`는 할 일 id → 스페이스(없으면 일반).",
+    "todos": [
+      {
+        "id": "A0000000-0000-4000-8000-000000000001",
+        "title": "견적서",
+        "isCompleted": false,
+        "createdAt": "2026-10-20T00:00:00Z",
+        "dueDate": "2026-10-29"
+      },
+      {
+        "id": "A0000000-0000-4000-8000-000000000002",
+        "title": "장보기",
+        "isCompleted": false,
+        "createdAt": "2026-10-20T00:00:00Z",
+        "dueDate": "2026-10-29"
+      },
+      {
+        "id": "A0000000-0000-4000-8000-000000000003",
+        "title": "세금 신고",
+        "isCompleted": false,
+        "createdAt": "2026-10-20T00:00:00Z",
+        "dueDate": "2026-11-20"
+      },
+      {
+        "id": "A0000000-0000-4000-8000-000000000004",
+        "title": "책 정리",
+        "isCompleted": false,
+        "createdAt": "2026-10-20T00:00:00Z",
+        "shelf": "later"
+      },
+      {
+        "id": "A0000000-0000-4000-8000-000000000005",
+        "title": "운동",
+        "isCompleted": false,
+        "createdAt": "2026-10-20T00:00:00Z",
+        "dueDate": "2026-11-03"
+      },
+      {
+        "id": "A0000000-0000-4000-8000-000000000006",
+        "title": "끝낸 일",
+        "isCompleted": true,
+        "createdAt": "2026-10-20T00:00:00Z",
+        "dueDate": "2026-10-30",
+        "completedAt": "2026-10-27T01:00:00Z"
+      },
+      {
+        "id": "A0000000-0000-4000-8000-000000000007",
+        "title": "오늘 할 일",
+        "isCompleted": false,
+        "createdAt": "2026-10-28T00:30:00Z"
+      }
+    ],
+    "spaces": {
+      "A0000000-0000-4000-8000-000000000001": "s-a",
+      "A0000000-0000-4000-8000-000000000002": "s-b",
+      "A0000000-0000-4000-8000-000000000003": "s-a",
+      "A0000000-0000-4000-8000-000000000005": "s-b",
+      "A0000000-0000-4000-8000-000000000006": "s-b",
+      "A0000000-0000-4000-8000-000000000007": "s-b"
+    },
+    "cases": [
+      {
+        "case": "S37",
+        "lens": null,
+        "expect": {
+          "counts": {
+            "thisWeek": 2,
+            "nextWeek": 1,
+            "later": 1,
+            "someday": 1
+          },
+          "days": {
+            "2026-10-29": [
+              "A0000000-0000-4000-8000-000000000001",
+              "A0000000-0000-4000-8000-000000000002"
+            ],
+            "2026-11-03": [
+              "A0000000-0000-4000-8000-000000000005"
+            ]
+          },
+          "hidden": 0
+        }
+      },
+      {
+        "case": "S37",
+        "lens": "s-a",
+        "expect": {
+          "counts": {
+            "thisWeek": 1,
+            "later": 1
+          },
+          "days": {
+            "2026-10-29": [
+              "A0000000-0000-4000-8000-000000000001"
+            ]
+          },
+          "hidden": 3
+        }
+      },
+      {
+        "case": "S37",
+        "lens": "s-b",
+        "expect": {
+          "counts": {
+            "thisWeek": 1,
+            "nextWeek": 1
+          },
+          "days": {
+            "2026-10-29": [
+              "A0000000-0000-4000-8000-000000000002"
+            ],
+            "2026-11-03": [
+              "A0000000-0000-4000-8000-000000000005"
+            ]
+          },
+          "hidden": 3
+        }
+      },
+      {
+        "case": "S37",
+        "lens": "none",
+        "expect": {
+          "counts": {
+            "someday": 1
+          },
+          "days": {},
+          "hidden": 4
+        }
+      },
+      {
+        "case": "S37",
+        "note": "할 일이 하나도 없는 스페이스",
+        "lens": "s-c",
+        "expect": {
+          "counts": {},
+          "days": {},
+          "hidden": 5
+        }
+      }
+    ]
+  },
+  "strip": {
+    "about": "S38 (2a 하루 띠): 렌즈 밖의 할 일은 하루 띠 · 일정표에 없어요. ‘지금’과 ‘다음’은 렌즈 안의 할 일과 모든 일정에서 골라요. 지금은 10:00(KST). `lead`는 크게 보이는 것(지금 또는 다음)의 제목, `rows`는 그 아래 줄(최대 3)의 제목이에요. `spaces`는 할 일 id → 스페이스(없으면 일반).",
+    "events": [
+      {
+        "title": "팀 회의",
+        "start": "2026-10-28T02:30:00Z",
+        "end": "2026-10-28T03:00:00Z"
+      }
+    ],
+    "todos": [
+      {
+        "id": "B0000000-0000-4000-8000-000000000001",
+        "title": "보고서 쓰기",
+        "isCompleted": false,
+        "createdAt": "2026-10-28T00:00:00Z",
+        "timeStart": "10:30",
+        "timeEnd": "11:00"
+      },
+      {
+        "id": "B0000000-0000-4000-8000-000000000002",
+        "title": "빨래 개기",
+        "isCompleted": false,
+        "createdAt": "2026-10-28T00:00:00Z",
+        "timeStart": "11:00",
+        "timeEnd": "11:20"
+      },
+      {
+        "id": "B0000000-0000-4000-8000-000000000003",
+        "title": "약 먹기",
+        "isCompleted": false,
+        "createdAt": "2026-10-28T00:00:00Z",
+        "reminderAt": "2026-10-28T01:20:00Z"
+      },
+      {
+        "id": "B0000000-0000-4000-8000-000000000004",
+        "title": "기획안",
+        "isCompleted": false,
+        "createdAt": "2026-10-28T00:00:00Z",
+        "timeStart": "09:30",
+        "timeEnd": "10:30"
+      }
+    ],
+    "spaces": {
+      "B0000000-0000-4000-8000-000000000001": "s-a",
+      "B0000000-0000-4000-8000-000000000002": "s-b",
+      "B0000000-0000-4000-8000-000000000004": "s-b"
+    },
+    "cases": [
+      {
+        "case": "S38",
+        "lens": null,
+        "expect": {
+          "mode": "now",
+          "lead": "기획안",
+          "rows": [
+            "약 먹기",
+            "보고서 쓰기",
+            "빨래 개기"
+          ]
+        }
+      },
+      {
+        "case": "S38",
+        "note": "회사: 기획안(집)이 숨어 ‘다음’이 보고서 쓰기, 일정은 그대로",
+        "lens": "s-a",
+        "expect": {
+          "mode": "next",
+          "lead": "보고서 쓰기",
+          "rows": [
+            "팀 회의"
+          ]
+        }
+      },
+      {
+        "case": "S38",
+        "lens": "s-b",
+        "expect": {
+          "mode": "now",
+          "lead": "기획안",
+          "rows": [
+            "빨래 개기",
+            "팀 회의"
+          ]
+        }
+      },
+      {
+        "case": "S38",
+        "lens": "none",
+        "expect": {
+          "mode": "next",
+          "lead": "약 먹기",
+          "rows": [
+            "팀 회의"
+          ]
+        }
+      },
+      {
+        "case": "S38",
+        "note": "할 일이 없는 스페이스: 일정만",
+        "lens": "s-c",
+        "expect": {
+          "mode": "next",
+          "lead": "팀 회의",
+          "rows": []
+        }
+      }
+    ]
+  },
+  "groups": {
+    "about": "S39–S44 (spaces-phase2.md 2b): 스페이스별로 묶기. 지금은 위의 `now`(10:00 KST). `todos`는 오늘 목록의 순서, `spaces`는 할 일 id → 스페이스(없으면 일반). 기대값은 보이는 묶음을 위에서부터: `space`(일반은 null), `titles`(묶음 안 순서), `open` · `done`(남은 수 · 끝낸 수), `next`(그 묶음에서 아직 오지 않은 가장 가까운 시각, KST HH:mm, 없으면 null). 시간이 있는 할 일은 끝내지 않았고 오늘 아직 끝나지 않은 시간(시작 시각으로) 또는 오늘 아직 오지 않은 알림이 있는 할 일이에요(‘다음’ 묶음과 같은 말, 세 개로 자르지 않아요). `drops`는 끌어 옮기기: `id`를 `to` 묶음(일반은 \"none\")으로, `relativeTo`가 있으면 그 줄의 앞(`after` false) · 뒤에, 없으면 머리말에 놓아요. 되돌리면 처음 묶음 그대로예요. `keys`는 ⌥⌘↑ · ⌥⌘↓(Windows Ctrl+Alt+↑↓): 보이는 묶음 가운데 위 · 아래 묶음(`to`, 일반은 \"none\"), 없으면 null(아무 일 없음).",
+    "todos": [
+      { "id": "C0000000-0000-4000-8000-000000000001", "title": "메모 정리", "isCompleted": false, "createdAt": "2026-10-28T00:00:00Z" },
+      { "id": "C0000000-0000-4000-8000-000000000002", "title": "주간 보고서", "isCompleted": false, "createdAt": "2026-10-28T00:00:00Z" },
+      { "id": "C0000000-0000-4000-8000-000000000003", "title": "빨래 개기", "isCompleted": false, "createdAt": "2026-10-28T00:00:00Z", "timeStart": "19:00", "timeEnd": "19:30" },
+      { "id": "C0000000-0000-4000-8000-000000000004", "title": "견적서 보내기", "isCompleted": false, "createdAt": "2026-10-28T00:00:00Z", "reminderAt": "2026-10-28T04:43:00Z" },
+      { "id": "C0000000-0000-4000-8000-000000000005", "title": "회의록", "isCompleted": true, "createdAt": "2026-10-28T00:00:00Z", "completedAt": "2026-10-28T00:30:00Z" },
+      { "id": "C0000000-0000-4000-8000-000000000006", "title": "화분 물 주기", "isCompleted": false, "createdAt": "2026-10-28T00:00:00Z" },
+      { "id": "C0000000-0000-4000-8000-000000000007", "title": "기획안", "isCompleted": false, "createdAt": "2026-10-28T00:00:00Z", "timeStart": "11:00", "timeEnd": "12:00" },
+      { "id": "C0000000-0000-4000-8000-000000000008", "title": "커피 한 잔", "isCompleted": true, "createdAt": "2026-10-28T00:00:00Z", "completedAt": "2026-10-28T00:10:00Z" },
+      { "id": "C0000000-0000-4000-8000-000000000009", "title": "장보기", "isCompleted": false, "createdAt": "2026-10-28T00:00:00Z", "reminderAt": "2026-10-27T23:00:00Z" },
+      { "id": "C0000000-0000-4000-8000-000000000010", "title": "점심 예약", "isCompleted": false, "createdAt": "2026-10-28T00:00:00Z", "timeStart": "09:00", "timeEnd": "09:30" },
+      { "id": "C0000000-0000-4000-8000-000000000011", "title": "메일 답장", "isCompleted": false, "createdAt": "2026-10-28T00:00:00Z", "timeStart": "09:30", "timeEnd": "10:30" }
+    ],
+    "spaces": {
+      "C0000000-0000-4000-8000-000000000002": "s-a",
+      "C0000000-0000-4000-8000-000000000003": "s-b",
+      "C0000000-0000-4000-8000-000000000004": "s-a",
+      "C0000000-0000-4000-8000-000000000005": "s-a",
+      "C0000000-0000-4000-8000-000000000006": "s-b",
+      "C0000000-0000-4000-8000-000000000007": "s-a",
+      "C0000000-0000-4000-8000-000000000009": "s-b",
+      "C0000000-0000-4000-8000-000000000010": "s-a",
+      "C0000000-0000-4000-8000-000000000011": "s-a"
+    },
+    "cases": [
+      {
+        "case": "S39 · S40 · S41",
+        "note": "묶음 순서는 책상의 순서, 맨 끝이 일반. 공부는 할 일이 없어 숨어요. 묶음 안은 시간 있는 할 일(시각 순, 하는 중인 메일 답장이 먼저) → 나머지(목록 순서, 지난 알림 · 끝난 시간도 여기) → 끝낸 할 일. 하는 중인 일은 ‘다음’ 시각이 아니에요",
+        "lens": null,
+        "expect": [
+          { "space": "s-a", "titles": ["메일 답장", "기획안", "견적서 보내기", "주간 보고서", "점심 예약", "회의록"], "open": 5, "done": 1, "next": "11:00" },
+          { "space": "s-b", "titles": ["빨래 개기", "화분 물 주기", "장보기"], "open": 3, "done": 0, "next": "19:00" },
+          { "space": null, "titles": ["메모 정리", "커피 한 잔"], "open": 1, "done": 1, "next": null }
+        ]
+      },
+      { "case": "S42", "note": "렌즈 중에는 그 묶음 하나만", "lens": "s-b", "expect": [{ "space": "s-b", "titles": ["빨래 개기", "화분 물 주기", "장보기"], "open": 3, "done": 0, "next": "19:00" }] },
+      { "case": "S42", "lens": "none", "expect": [{ "space": null, "titles": ["메모 정리", "커피 한 잔"], "open": 1, "done": 1, "next": null }] },
+      { "case": "S42", "note": "할 일이 없는 스페이스: 묶음도 없어요", "lens": "s-c", "expect": [] }
+    ],
+    "drops": [
+      {
+        "case": "S43", "note": "집 머리말에 놓기: 집으로 옮기고, 묶음 안에서는 목록 순서대로",
+        "id": "C0000000-0000-4000-8000-000000000002", "to": "s-b", "relativeTo": null, "after": false,
+        "expect": [
+          { "space": "s-a", "titles": ["메일 답장", "기획안", "견적서 보내기", "점심 예약", "회의록"], "open": 4, "done": 1, "next": "11:00" },
+          { "space": "s-b", "titles": ["빨래 개기", "주간 보고서", "화분 물 주기", "장보기"], "open": 4, "done": 0, "next": "19:00" },
+          { "space": null, "titles": ["메모 정리", "커피 한 잔"], "open": 1, "done": 1, "next": null }
+        ]
+      },
+      {
+        "case": "S43", "note": "집의 장보기 앞에 놓기: 그 자리로",
+        "id": "C0000000-0000-4000-8000-000000000002", "to": "s-b", "relativeTo": "C0000000-0000-4000-8000-000000000009", "after": false,
+        "expect": [
+          { "space": "s-a", "titles": ["메일 답장", "기획안", "견적서 보내기", "점심 예약", "회의록"], "open": 4, "done": 1, "next": "11:00" },
+          { "space": "s-b", "titles": ["빨래 개기", "화분 물 주기", "주간 보고서", "장보기"], "open": 4, "done": 0, "next": "19:00" },
+          { "space": null, "titles": ["메모 정리", "커피 한 잔"], "open": 1, "done": 1, "next": null }
+        ]
+      },
+      {
+        "case": "S43", "note": "시간 있는 할 일은 놓은 자리보다 시각이 먼저예요",
+        "id": "C0000000-0000-4000-8000-000000000004", "to": "none", "relativeTo": "C0000000-0000-4000-8000-000000000001", "after": true,
+        "expect": [
+          { "space": "s-a", "titles": ["메일 답장", "기획안", "주간 보고서", "점심 예약", "회의록"], "open": 4, "done": 1, "next": "11:00" },
+          { "space": "s-b", "titles": ["빨래 개기", "화분 물 주기", "장보기"], "open": 3, "done": 0, "next": "19:00" },
+          { "space": null, "titles": ["견적서 보내기", "메모 정리", "커피 한 잔"], "open": 2, "done": 1, "next": "13:43" }
+        ]
+      },
+      {
+        "case": "S43", "note": "같은 묶음 안: 스페이스는 그대로, 순서만",
+        "id": "C0000000-0000-4000-8000-000000000010", "to": "s-a", "relativeTo": "C0000000-0000-4000-8000-000000000002", "after": false,
+        "expect": [
+          { "space": "s-a", "titles": ["메일 답장", "기획안", "견적서 보내기", "점심 예약", "주간 보고서", "회의록"], "open": 5, "done": 1, "next": "11:00" },
+          { "space": "s-b", "titles": ["빨래 개기", "화분 물 주기", "장보기"], "open": 3, "done": 0, "next": "19:00" },
+          { "space": null, "titles": ["메모 정리", "커피 한 잔"], "open": 1, "done": 1, "next": null }
+        ]
+      },
+      {
+        "case": "S43", "note": "끝낸 할 일만 남은 묶음도 보여요",
+        "id": "C0000000-0000-4000-8000-000000000001", "to": "s-b", "relativeTo": null, "after": false,
+        "expect": [
+          { "space": "s-a", "titles": ["메일 답장", "기획안", "견적서 보내기", "주간 보고서", "점심 예약", "회의록"], "open": 5, "done": 1, "next": "11:00" },
+          { "space": "s-b", "titles": ["빨래 개기", "메모 정리", "화분 물 주기", "장보기"], "open": 4, "done": 0, "next": "19:00" },
+          { "space": null, "titles": ["커피 한 잔"], "open": 0, "done": 1, "next": null }
+        ]
+      }
+    ],
+    "keys": [
+      { "case": "S44", "id": "C0000000-0000-4000-8000-000000000002", "direction": "down", "lens": null, "to": "s-b" },
+      { "case": "S44", "note": "공부는 비어 있어 건너뛰어요", "id": "C0000000-0000-4000-8000-000000000006", "direction": "down", "lens": null, "to": "none" },
+      { "case": "S44", "id": "C0000000-0000-4000-8000-000000000006", "direction": "up", "lens": null, "to": "s-a" },
+      { "case": "S44", "note": "맨 위 묶음에서 ↑: 아무 일 없음", "id": "C0000000-0000-4000-8000-000000000002", "direction": "up", "lens": null, "to": null },
+      { "case": "S44", "note": "맨 아래 묶음에서 ↓: 아무 일 없음", "id": "C0000000-0000-4000-8000-000000000001", "direction": "down", "lens": null, "to": null },
+      { "case": "S44", "note": "렌즈 중에는 묶음이 하나라 아무 일 없음", "id": "C0000000-0000-4000-8000-000000000006", "direction": "down", "lens": "s-b", "to": null }
+    ],
+    "board": {
+      "about": "S45: 넓은 노트(720 이상)에서 칸마다 220 이상이 될 때만 칸으로 보여요: 칸 수 × 220 + 칸 사이 10 × (칸 수 − 1) + 양옆 14 × 2 ≤ 노트 폭. 아니면 고른 모양(메모지 · 책갈피)이에요. 묶기가 켜져 있으면 노트를 1,200까지 넓힐 수 있고, 꺼져 있으면 720까지예요(`maxWidth`).",
+      "maxWidth": { "grouped": 1200, "plain": 720 },
+      "cases": [
+        { "width": 420, "count": 1, "columns": false, "note": "좁은 노트는 묶음이 하나여도 칸이 아니에요" },
+        { "width": 719, "count": 1, "columns": false },
+        { "width": 720, "count": 1, "columns": true, "note": "렌즈 중인 넓은 노트: 칸 하나" },
+        { "width": 720, "count": 3, "columns": true, "note": "3 × 220 + 20 + 28 = 708" },
+        { "width": 720, "count": 4, "columns": false, "note": "4칸은 938이 필요해서 메모지 · 책갈피로" },
+        { "width": 937, "count": 4, "columns": false },
+        { "width": 938, "count": 4, "columns": true },
+        { "width": 1200, "count": 4, "columns": true },
+        { "width": 1200, "count": 5, "columns": true, "note": "1,168" },
+        { "width": 1200, "count": 6, "columns": false, "note": "1,398이 필요해요" },
+        { "width": 1200, "count": 0, "columns": false }
+      ]
+    }
+  },
+  "multi": {
+    "about": "S46–S48 (#168): 여러 할 일 고르기와 한 번에 옮기기. `rows`는 보이는 순서의 줄 이름이에요. 고르기의 단계: click(누르기) · toggle(⌘ · Ctrl 누르기) · range(⇧ 누르기) · extend(⇧↑ −1 · ⇧↓ +1) · clear(Esc). 기대값 `ids`는 보이는 순서, 없으면 null. 옮기기는 `groups`의 할 일과 스페이스를 써요: `ids`를 `to` 묶음(일반은 \"none\")으로, `relativeTo`가 있으면 그 줄 앞(`after` false) · 뒤에 목록 순서대로 한 덩어리로 놓아요. `moved`는 실제로 스페이스가 바뀐 수(토스트의 N)예요. 되돌리면 스페이스와 자리 모두 처음 그대로예요(`groups`의 첫 사례).",
+    "rows": ["가", "나", "다", "라", "마", "바"],
+    "selection": [
+      { "case": "S46", "note": "누르기는 하나만", "steps": [["click", "나"]], "expect": { "ids": ["나"], "focus": "나", "anchor": "나" } },
+      { "case": "S46", "note": "⌘ 누르기로 더하기", "steps": [["click", "나"], ["toggle", "라"]], "expect": { "ids": ["나", "라"], "focus": "라", "anchor": "라" } },
+      { "case": "S46", "note": "⌘ 누르기로 빼기: 남은 첫 줄이 키보드 줄", "steps": [["click", "나"], ["toggle", "라"], ["toggle", "마"], ["toggle", "라"]], "expect": { "ids": ["나", "마"], "focus": "나", "anchor": "라" } },
+      { "case": "S46", "note": "하나뿐인 줄을 ⌘ 누르기로 빼면 없음", "steps": [["click", "나"], ["toggle", "나"]], "expect": { "ids": [], "focus": null, "anchor": "나" } },
+      { "case": "S46", "note": "⇧ 누르기는 앵커부터 그 줄까지", "steps": [["click", "나"], ["range", "마"]], "expect": { "ids": ["나", "다", "라", "마"], "focus": "마", "anchor": "나" } },
+      { "case": "S46", "note": "⇧ 누르기는 위로도", "steps": [["click", "마"], ["range", "나"]], "expect": { "ids": ["나", "다", "라", "마"], "focus": "나", "anchor": "마" } },
+      { "case": "S46", "note": "⌘ 누른 줄이 새 앵커", "steps": [["click", "나"], ["toggle", "라"], ["range", "바"]], "expect": { "ids": ["라", "마", "바"], "focus": "바", "anchor": "라" } },
+      { "case": "S46", "note": "앵커가 없으면 ⇧ 누르기는 누르기", "steps": [["range", "다"]], "expect": { "ids": ["다"], "focus": "다", "anchor": "다" } },
+      { "case": "S46", "note": "⇧↓ 두 번", "steps": [["click", "다"], ["extend", 1], ["extend", 1]], "expect": { "ids": ["다", "라", "마"], "focus": "마", "anchor": "다" } },
+      { "case": "S46", "note": "⇧↑ 두 번", "steps": [["click", "다"], ["extend", -1], ["extend", -1]], "expect": { "ids": ["가", "나", "다"], "focus": "가", "anchor": "다" } },
+      { "case": "S46", "note": "⇧↑ 다음 ⇧↓는 줄어들어요", "steps": [["click", "라"], ["extend", -1], ["extend", 1]], "expect": { "ids": ["라"], "focus": "라", "anchor": "라" } },
+      { "case": "S46", "note": "끝에서 더 가지 않아요", "steps": [["click", "바"], ["extend", 1]], "expect": { "ids": ["바"], "focus": "바", "anchor": "바" } },
+      { "case": "S46", "note": "아무것도 없을 때 ⇧↓는 첫 줄, ⇧↑는 끝 줄", "steps": [["extend", 1]], "expect": { "ids": ["가"], "focus": "가", "anchor": "가" } },
+      { "case": "S46", "steps": [["extend", -1]], "expect": { "ids": ["바"], "focus": "바", "anchor": "바" } },
+      { "case": "S46", "note": "Esc는 모두 풀어요", "steps": [["click", "나"], ["range", "라"], ["clear"]], "expect": { "ids": [], "focus": null, "anchor": null } }
+    ],
+    "moves": [
+      {
+        "case": "S47", "note": "메뉴로 셋을 집으로: 이미 집인 빨래 개기는 그대로라 2개, 자리는 그대로",
+        "ids": ["C0000000-0000-4000-8000-000000000002", "C0000000-0000-4000-8000-000000000001", "C0000000-0000-4000-8000-000000000003"], "to": "s-b", "relativeTo": null, "after": false,
+        "moved": 2,
+        "expect": [
+          { "space": "s-a", "titles": ["메일 답장", "기획안", "견적서 보내기", "점심 예약", "회의록"], "open": 4, "done": 1, "next": "11:00" },
+          { "space": "s-b", "titles": ["빨래 개기", "메모 정리", "주간 보고서", "화분 물 주기", "장보기"], "open": 5, "done": 0, "next": "19:00" },
+          { "space": null, "titles": ["커피 한 잔"], "open": 0, "done": 1, "next": null }
+        ]
+      },
+      {
+        "case": "S47", "note": "둘을 끌어 집의 장보기 앞에: 목록 순서대로 한 덩어리",
+        "ids": ["C0000000-0000-4000-8000-000000000010", "C0000000-0000-4000-8000-000000000002"], "to": "s-b", "relativeTo": "C0000000-0000-4000-8000-000000000009", "after": false,
+        "moved": 2,
+        "expect": [
+          { "space": "s-a", "titles": ["메일 답장", "기획안", "견적서 보내기", "회의록"], "open": 3, "done": 1, "next": "11:00" },
+          { "space": "s-b", "titles": ["빨래 개기", "화분 물 주기", "주간 보고서", "점심 예약", "장보기"], "open": 5, "done": 0, "next": "19:00" },
+          { "space": null, "titles": ["메모 정리", "커피 한 잔"], "open": 1, "done": 1, "next": null }
+        ]
+      },
+      {
+        "case": "S47", "note": "놓는 줄이 고른 것 가운데 하나면 자리는 그대로, 스페이스만",
+        "ids": ["C0000000-0000-4000-8000-000000000002", "C0000000-0000-4000-8000-000000000006"], "to": "none", "relativeTo": "C0000000-0000-4000-8000-000000000006", "after": true,
+        "moved": 2,
+        "expect": [
+          { "space": "s-a", "titles": ["메일 답장", "기획안", "견적서 보내기", "점심 예약", "회의록"], "open": 4, "done": 1, "next": "11:00" },
+          { "space": "s-b", "titles": ["빨래 개기", "장보기"], "open": 2, "done": 0, "next": "19:00" },
+          { "space": null, "titles": ["메모 정리", "주간 보고서", "화분 물 주기", "커피 한 잔"], "open": 3, "done": 1, "next": null }
+        ]
+      }
+    ],
+    "keys": [
+      { "case": "S48", "note": "고른 줄 모두가 키보드 줄의 아래 묶음으로", "ids": ["C0000000-0000-4000-8000-000000000002", "C0000000-0000-4000-8000-000000000006"], "focus": "C0000000-0000-4000-8000-000000000006", "direction": "down", "to": "none", "moved": 2 },
+      { "case": "S48", "ids": ["C0000000-0000-4000-8000-000000000002", "C0000000-0000-4000-8000-000000000006"], "focus": "C0000000-0000-4000-8000-000000000002", "direction": "down", "to": "s-b", "moved": 1 },
+      { "case": "S48", "note": "맨 위 묶음에서 ↑: 아무 일 없음", "ids": ["C0000000-0000-4000-8000-000000000002", "C0000000-0000-4000-8000-000000000006"], "focus": "C0000000-0000-4000-8000-000000000002", "direction": "up", "to": null, "moved": 0 }
+    ]
+  }
 }

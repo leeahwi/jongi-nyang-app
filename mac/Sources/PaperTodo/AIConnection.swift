@@ -26,6 +26,10 @@ final class AIConnection: ObservableObject {
     /// Claude Code: connecting now, and whether it knows this app's program (the path it was given is this one).
     @Published private(set) var codeBusy = false
     @Published private(set) var codeLinked = false
+    /// Claude Desktop's installed extension is older than the one this app carries (AIConnect.extOutdated).
+    @Published private(set) var desktopOutdated = false
+    /// #174: there is something in ai-log.jsonl (기록 지우기 has something to clear).
+    @Published private(set) var hasLog = false
 
     let settingsFolder: URL
     let dataFolder: URL
@@ -116,8 +120,12 @@ final class AIConnection: ObservableObject {
     /// Reads the log again and works out the list, the undone entries and the day's marks.
     func reload(now: Date = Date()) {
         guard live else { return }
-        let text = (try? String(contentsOf: logURL, encoding: .utf8)) ?? ""
+        let text = trimOldLines(now: now)
+        if hasLog != !text.isEmpty { hasLog = !text.isEmpty }
         show(AIConnect.parse(text), now: now)
+        // From the real log only (previews and snapshots show entries as if from the current extension).
+        let outdated = AIConnect.extOutdated(entries)
+        if outdated != desktopOutdated { desktopOutdated = outdated }
     }
 
     /// Previews and snapshots: these entries instead of the log.
@@ -150,12 +158,14 @@ final class AIConnection: ObservableObject {
         return Set(saved["ids"] as? [String] ?? [])
     }
 
-    /// At launch: the link, a trim when the log grew past 1 MB, and one notice for what Claude did meanwhile.
+    /// At launch: the link, the log's lines older than 30 days dropped (on or off), and one notice for what Claude
+    /// did meanwhile.
     func launch() {
         guard live else { return }
         writeLink()
+        let text = trimOldLines(now: Date())
+        hasLog = !text.isEmpty
         guard enabled else { return }
-        trimLogIfNeeded()
         reload()
         let unseen = AIConnect.unseen(entries, after: seen)
         seen = AIConnect.advance(seen, over: unseen)
@@ -304,13 +314,33 @@ final class AIConnection: ObservableObject {
         _ = data.withUnsafeBytes { write(descriptor, $0.baseAddress, data.count) }
     }
 
-    /// Past 1 MB the log keeps its last 30 days. Skipped when the extension wrote meanwhile.
-    private func trimLogIfNeeded() {
-        guard let size = (try? logURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize, size > AIConnect.logLimit,
-              let text = try? String(contentsOf: logURL, encoding: .utf8),
-              let trimmed = AIConnect.trimmed(text, now: Date()) else { return }
-        guard (try? logURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize == size else { return }
+    /// #174 (review I-01): the log keeps its last 30 days, whatever its size. Returns the log's text as it is now
+    /// ("" without one). Not written when the extension wrote meanwhile (the next read trims it).
+    private func trimOldLines(now: Date) -> String {
+        guard let text = try? String(contentsOf: logURL, encoding: .utf8) else { return "" }
+        let size = text.utf8.count
+        guard let trimmed = AIConnect.trimmed(text, now: now, limit: 0) else { return text }
+        guard (try? logURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize == size else { return text }
         try? Data(trimmed.utf8).write(to: logURL, options: .atomic)
+        return trimmed
+    }
+
+    /// 기록 지우기 (#174, review I-01): after a yes on the slip, ai-log.jsonl is emptied — the recent list, its 되돌리기
+    /// and the stamps go with it; the to-dos, events and memos stay. The extension starts a new log with its next change.
+    func askToClearLog() {
+        let answer = SlipAlert.run(symbol: "trash", title: L("기록 지우기"), message: L("Claude가 한 일의 기록을 지울까요?"),
+                                   detail: L("최근 AI 작업과 그 되돌리기가 함께 사라져요. 할 일 · 일정 · 메모는 그대로예요."),
+                                   choices: [.init(title: L("취소"), isCancel: true),
+                                             .init(title: L("지우기"), role: .primary, isDefault: true)])
+        if answer == 1 { clearLog() }
+    }
+
+    func clearLog() {
+        guard live else { return }
+        guard (try? Data().write(to: logURL, options: .atomic)) != nil else { return }
+        latest = nil
+        hasLog = false
+        show([])
     }
 
     // MARK: Connecting

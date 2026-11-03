@@ -1,5 +1,5 @@
 import { durationText, parseDuration, timerPresets } from "../core/duration";
-import { bodyFontSize, type AppState } from "../core/types";
+import { bodyFontSize, type PrefsState } from "../core/types";
 import { h, lang, paper, t } from "./api";
 import { appear, chip, fitWindow, slipButton, slipHead, tape } from "./slip";
 
@@ -56,14 +56,14 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape") { event.preventDefault(); close(); }
 });
 
-function applyState(state: AppState): void {
+function applyState(state: PrefsState): void {
   document.documentElement.dataset.font = state.prefs.font;
   document.documentElement.style.setProperty("--body-size", `${bodyFontSize(state.prefs.font, "regular")}px`);
   recent = state.prefs.timerRecent ?? [];
   refresh();
 }
 
-api.on("state", (state) => applyState(state as AppState));
+api.on("state:prefs", (state) => applyState(state as PrefsState));
 api.on("timerSheet:open", (payload) => {
   const { text } = (payload ?? {}) as { text?: string };
   input.value = text ?? "";

@@ -25,6 +25,7 @@ swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/LocalEvent.swift \
     Sources/PaperCore/Memo.swift \
     Sources/PaperCore/MemoFolders.swift \
+    Sources/PaperCore/MemoTrash.swift \
     Sources/PaperCore/TodoSpaces.swift \
     Sources/PaperCore/Alarm.swift \
     Sources/PaperCore/Duration.swift \

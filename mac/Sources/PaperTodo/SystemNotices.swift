@@ -123,7 +123,7 @@ final class SystemNoticeController: NSObject, UNUserNotificationCenterDelegate {
         guard let center else { return }
         let request = UNNotificationRequest(identifier: id, content: content, trigger: nil)
         // The live test copy asks for quiet (provisional) delivery: no permission prompt to answer.
-        let arguments = ProcessInfo.processInfo.arguments
+        let arguments = TestHooks.arguments
         let options: UNAuthorizationOptions = arguments.contains("--live-test") ? [.alert, .sound, .provisional] : [.alert, .sound]
         let log = arguments.firstIndex(of: "--notice-log").flatMap { arguments.indices.contains($0 + 1) ? arguments[$0 + 1] : nil }
         func note(_ line: String) {

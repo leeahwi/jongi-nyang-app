@@ -1,7 +1,8 @@
 import type { Lang } from "./lang";
 import { dayMonth, monthName, spokenTime, weekdayName } from "./lang";
 import type { Memo } from "./memo";
-import { checklistLine, checklistProgress, sheetCount, slipSummary, type FolderSort } from "./memoDrawer";
+import { checklistProgress, sheetCount, type FolderSort } from "./memoDrawer";
+import { markdownLinks, markdownPlain, markdownRows, markdownTitle, type MarkdownRow } from "./memoMarkdown";
 
 /**
  * 메모 서랍's cards (1.29, the user's ③ 날짜 묶음 + 카드): the list in date groups (Apple Notes' — 고정 · 오늘 · 어제 ·
@@ -174,6 +175,26 @@ export function findLink(text: string): { url: string; label: string; host: stri
   return undefined;
 }
 
+/**
+ * 메모 찾기's 링크 chip (#114): a web address anywhere in the memo — a `[words](url)` link or a bare one — whatever kind
+ * its card shows (a checklist with a link in it has one too). The Mac's MemoCards.hasLink.
+ */
+export function hasLink(text: string): boolean {
+  if (!/http/i.test(text)) return false;
+  return (text.includes("](") && markdownLinks(text).some((link) => findLink(link.url) !== undefined)) || findLink(markdownPlain(text)) !== undefined;
+}
+
+/**
+ * The time a search result shows (#114): its day as a date, today the clock — never `어제` or a weekday, as the results
+ * are in folders, not days. `10월 21일` · `Oct 21` · `21 okt`; another year adds it. The Mac's MemoCards.foundTime.
+ */
+export function foundTime(at: Date, now: Date, lang: Lang = "ko"): string {
+  if (Number.isNaN(at.getTime())) return "";
+  const today = startOfDay(now);
+  if (at >= today && at < addDays(today, 1)) return spokenTime(at.getHours(), at.getMinutes(), lang);
+  return dayMonth(at.getMonth() + 1, at.getDate(), at.getFullYear() !== now.getFullYear() ? at.getFullYear() : undefined, lang);
+}
+
 /** D26: the first Korean phone number (9–11 digits from 0; `02` a two-digit area, else three): `010-1234-5678`. */
 export function findPhone(text: string): string | undefined {
   for (const match of text.matchAll(/(?<!\d)0\d{1,2}[ .-]?\d{3,4}[ .-]?\d{4}(?!\d)/g)) {
@@ -188,68 +209,54 @@ export function findPhone(text: string): string | undefined {
   return undefined;
 }
 
-/** D25, D26: what a memo is, the first found — checklist, then link, then phone; none for plain words. */
+/**
+ * D25, D26: what a memo is, the first found — checklist, then link, then phone; none for plain words. Read in its words
+ * without marks (#84): a `[words](url)` link is a link named by its words (before any bare address), and a number in a
+ * link's address is no phone.
+ */
 export function memoKind(text: string): MemoKind | undefined {
   const progress = checklistProgress(text);
   if (progress) return { kind: "checklist", ...progress };
-  const link = findLink(text);
+  for (const link of text.includes("](") ? markdownLinks(text) : []) {
+    const found = findLink(link.url);
+    if (found) return { kind: "link", url: found.url, label: link.label, host: found.host };
+  }
+  const plain = markdownPlain(text);
+  const link = findLink(plain);
   if (link) return { kind: "link", ...link };
-  const phone = findPhone(text);
+  const phone = findPhone(plain);
   return phone ? { kind: "phone", number: phone } : undefined;
 }
 
 const linkWords: Record<Lang, (host: string) => string> = { ko: (host) => `${host} 링크`, en: (host) => `${host} link`, nl: (host) => `${host}-link` };
 
-/** The card's title: the memo's title, or `youtube.com 링크` when the title line is just a URL (D25b, D25g). */
+/** The card's title: the memo's title without marks (#84), or `youtube.com 링크` when that is just a URL (D25b, D25g). */
 export function cardTitle(memo: Memo, lang: Lang = "ko"): string {
-  const line = memo.text.split("\n").find((entry) => entry.trim())?.trim();
-  if (line && /^https?:\/\/\S+$/i.test(line)) {
-    const link = findLink(line);
+  const title = markdownTitle(memo.text, lang);
+  if (/^https?:\/\/\S+$/i.test(title)) {
+    const link = findLink(title);
     if (link) return linkWords[lang](link.host);
   }
-  return slipSummary(memo, lang).title;
+  return title;
 }
 
-/** The card's one preview line: the first line with words after the title that isn't a checklist line (a checklist shows its chip). */
+/** The card's one preview line: the first row under the title that isn't a checklist item (a checklist shows its chip). */
 export function previewLine(memo: Memo): string | undefined {
-  const lines = memo.text.split("\n").filter((line) => line.trim());
-  return lines.slice(1).find((line) => !checklistLine(line))?.trim();
+  return markdownRows(memo.text, 1, false)[0]?.text;
 }
 
-/** A row of a card's preview: a line's words, or a checklist item (`checked` set). */
-export interface PreviewRow { checked?: boolean; text: string }
+/** A row of a card's preview: a line's words, or a checklist item (`checked` set); `code` a code block's line. */
+export type PreviewRow = MarkdownRow;
 
 /**
  * What a card shows under its title (D30, #14): a checklist memo its first `limit` items, ticked or not; any other memo
  * its first `limit` lines with words after the title, trimmed (the card wraps them into at most `limit` lines, … at the
  * end). Blank lines are skipped, so a short memo shows only what it has. Each row is cut at 300 characters (more never
- * fits in three lines); a checklist stops reading at its `limit`-th item. Same rule as the Mac app.
+ * fits in three lines); a checklist stops reading at its `limit`-th item. Same rule as the Mac app. #84: the rows are
+ * read without marks — a list item `• `, a numbered one its number, a code block its first line (memoMarkdown.ts).
  */
 export function previewRows(text: string, limit = 3): PreviewRow[] {
-  const items: PreviewRow[] = [];
-  const lines: PreviewRow[] = [];
-  if (limit <= 0) return items;
-  const cut = (words: string) => (words.length > 300 ? words.slice(0, 300) : words);
-  let titled = false;
-  for (let start = 0; start <= text.length;) {
-    let end = text.indexOf("\n", start);
-    if (end < 0) end = text.length;
-    const line = text.slice(start, end);
-    start = end + 1;
-    if (!line.trim()) continue;
-    // The title: the first line with words (a checklist's first item is its title, not one of the rows).
-    if (!titled) { titled = true; continue; }
-    const item = checklistLine(line);
-    if (item) {
-      const words = item.text.trim();
-      if (!words) continue;
-      items.push({ checked: item.checked, text: cut(words) });
-      if (items.length === limit) return items;
-    } else if (lines.length < limit) {
-      lines.push({ text: cut(line.trim()) });
-    }
-  }
-  return items.length ? items : lines;
+  return markdownRows(text, limit);
 }
 
 // ─── Tape and words ───────────────────────────────────────────────────────────
@@ -284,4 +291,39 @@ export function folderDeletedWords(name: string, moved: number, inbox: string, l
   if (lang === "en") return `${sheetCount(moved, lang)} moved to ‘${inbox}’`;
   if (lang === "nl") return `${sheetCount(moved, lang)} verplaatst naar ‘${inbox}’`;
   return `메모 ${sheetCount(moved, lang)}은 ‘${inbox}’ 폴더로 옮겼어요`;
+}
+
+// ─── 크게 보기 (#113) ──────────────────────────────────────────────────────────
+
+/**
+ * 크게 보기 (#113, C2 A): the paper while a memo is shown big — 640 at most, or 45 % of the screen's width when that is
+ * less, never narrower than the width the drawer was given, and never wider than the screen leaves beside the drawer's
+ * own chrome (`chrome`: the bookmarks, 34 px here; 48 pt on the Mac with its shadow). Whole pixels. The shared cases W1…
+ * in docs/plans/drawer-big-cases.json (the Mac's MemoCards.bigWidth).
+ */
+export function bigDrawerWidth(user: number, screen: number, chrome: number): number {
+  const wide = Math.max(user, Math.min(640, Math.floor(screen * 0.45)));
+  return Math.max(0, Math.min(wide, Math.floor(screen - chrome)));
+}
+
+const graphemes = typeof Intl !== "undefined" && "Segmenter" in Intl ? new Intl.Segmenter(undefined, { granularity: "grapheme" }) : undefined;
+/**
+ * The letters in a memo for 크게 보기's bar (#113): every character as it is seen (an emoji with its skin tone is one),
+ * line breaks left out. The shared cases C1….
+ */
+export function characterCount(text: string): number {
+  let count = 0;
+  if (graphemes) {
+    for (const { segment } of graphemes.segment(text)) if (segment !== "\n" && segment !== "\r\n" && segment !== "\r") count += 1;
+    return count;
+  }
+  for (const character of text) if (character !== "\n" && character !== "\r") count += 1;
+  return count;
+}
+
+/** "412자" · "412 characters" · "412 tekens" (one: "1 character" · "1 teken"). */
+export function characterWords(count: number, lang: Lang = "ko"): string {
+  if (lang === "en") return `${count} ${count === 1 ? "character" : "characters"}`;
+  if (lang === "nl") return `${count} ${count === 1 ? "teken" : "tekens"}`;
+  return `${count}자`;
 }

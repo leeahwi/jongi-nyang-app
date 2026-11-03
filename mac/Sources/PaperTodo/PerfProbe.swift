@@ -75,9 +75,9 @@ enum PerfProbe {
     }
 
     /// One more of something that wakes the app (written with `kill -USR2`).
-    static func count(_ name: String) {
+    static func count(_ name: @autoclosure () -> String) {
         guard isOn else { return }
-        counts[name, default: 0] += 1
+        counts[name(), default: 0] += 1
     }
 
     private static func writeCounts() {

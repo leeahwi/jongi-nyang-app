@@ -36,7 +36,8 @@ struct DayStripView: View {
         TimelineView(.everyMinute) { context in
             let now = self.now ?? context.date
             let events = calendar.showsStrip ? calendar.todayEvents(now: now) : []
-            let today = model.todayItems
+            // 2a (A3, S38): while one space shows, its to-dos only — now and next are picked from them and every event.
+            let today = model.lensedTodayItems
             let layout = DayRibbon.layout(events: events, reminders: DayRibbon.reminders(today, now: now),
                                           blocks: DayRibbon.blocks(today, now: now), now: now)
             if calendar.showsStrip && !layout.isEmpty {
@@ -216,6 +217,8 @@ struct DayStripView: View {
                     }
                     HStack(spacing: 7) {
                         if state.mode == .now, item.kind == .task, let id = item.taskID { checkbox(id) }
+                        // 2a (A3): a to-do's space, a small dot before its title (일반 and events: none).
+                        if let space = model.spaceOf(taskID: item.taskID) { SpaceDotView(space: space).help(space.name) }
                         Text(item.title.handwritten)
                             .font(model.notebookFont.font(points: 27))
                             .foregroundStyle(PaperTheme.ink)
@@ -305,7 +308,7 @@ struct DayStripView: View {
             guard ticking == nil, let uuid = UUID(uuidString: id) else { return }
             withAnimation(reduceMotion ? nil : .spring(duration: 0.25, bounce: 0.4)) { ticking = id }
             Task { @MainActor in
-                try? await Task.sleep(for: .milliseconds(reduceMotion ? 0 : 450))
+                try? await Task.sleep(for: .milliseconds(Motion.holdMilliseconds(Motion.dayStripHold, reduce: reduceMotion)))
                 model.toggle(uuid)
                 ticking = nil
             }
@@ -348,6 +351,9 @@ struct DayStripView: View {
                     if item.kind == .event {
                         Text(item.title).font(.system(size: 12.5)).lineLimit(1)
                     } else {
+                        if let space = model.spaceOf(taskID: item.taskID) {
+                            SpaceDotView(space: space).help(space.name).alignmentGuide(.firstTextBaseline) { d in d[.bottom] + 1 }
+                        }
                         Text(item.title.handwritten).font(model.notebookFont.font(points: 19)).lineLimit(1).padding(.trailing, 2)
                     }
                     if let id = item.taskID ?? item.event?.eventId, model.isAIMarked(id) {

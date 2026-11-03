@@ -1,6 +1,6 @@
 import { daysText, snoozeChoices, timeParts, type Alarm } from "../core/alarm";
 import { clock, dayWord, hourCycle, period, periodFirst, spokenTime, weekdayName, weekdayShort } from "../core/lang";
-import { bodyFontSize, type AppState } from "../core/types";
+import { bodyFontSize, type PrefsState } from "../core/types";
 import { startRinging } from "./alarmSound";
 import { h, lang, paper, t } from "./api";
 import { appear, chip, fitWindow, slipButton, tape } from "./slip";
@@ -54,7 +54,7 @@ function answer(channel: "ring:stop" | "ring:snooze", minutes?: number): void {
   api.send(channel, minutes);
 }
 
-/** "방금 울렸어요" · "1분째 울리는 중" (en "Just started" · "Ringing for 1 min", nl "Gaat net af" · "Gaat al 1 min"). */
+/** "방금 울렸어요" · "1분째 울리는 중" (en "Just started" · "Ringing for 1 min", nl "Gaat net af" · "Gaat al 1 min af"). */
 function drawRinging(): void {
   const minutes = Math.floor((Date.now() - startedAt) / 60_000);
   ringing.replaceChildren(h("i", { "aria-hidden": "true" }), minutes < 1 ? t("방금 울렸어요") : t("{n}분째 울리는 중", { n: minutes }));
@@ -123,10 +123,10 @@ api.on("ring:show", (payload) => show(payload as RingPayload));
 api.on("ring:hush", rest);
 window.addEventListener("pagehide", rest);
 
-function applyFont(state: AppState): void {
+function applyFont(state: PrefsState): void {
   document.documentElement.dataset.font = state.prefs.font;
   document.documentElement.style.setProperty("--body-size", `${bodyFontSize(state.prefs.font, "regular")}px`);
 }
-api.on("state", (state) => applyFont(state as AppState));
+api.on("state:prefs", (state) => applyFont(state as PrefsState));
 void api.getState().then(applyFont);
 api.send("ring:ready");

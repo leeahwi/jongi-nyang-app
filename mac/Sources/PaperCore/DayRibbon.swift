@@ -241,6 +241,20 @@ public enum TodayGroups {
 
     /// `first` (1.38 오늘 꼭 하나): today's one thing, at the top of 다음 when it's open (besides the three by time).
     public static func split(_ items: [TodoItem], series: [Series], now: Date, first: UUID? = nil, calendar: Calendar = .paper) -> Split {
+        let times = times(items, series: series, now: now, calendar: calendar)
+        let order = Dictionary(uniqueKeysWithValues: items.enumerated().map { ($1.id, $0) })
+        let pick = first.flatMap { id in items.first { $0.id == id && !$0.isCompleted }?.id }
+        let next = (pick.map { [$0] } ?? []) + times.keys.filter { $0 != pick }.sorted { (times[$0]!, order[$0]!) < (times[$1]!, order[$1]!) }.prefix(limit)
+        let chosen = Set(next)
+        let rest = items.map(\.id).filter { !chosen.contains($0) }
+        let openRest = items.filter { !$0.isCompleted && !chosen.contains($0.id) }.count
+        return Split(next: Array(next), rest: rest, times: times.filter { chosen.contains($0.key) },
+                     showsHeaders: !next.isEmpty && openRest > 0)
+    }
+
+    /// When the open rows are due today, for 다음 (and 2b's groups, S40): a range today that hasn't ended by its start,
+    /// a reminder later today, or a repeat's time later today. Rows without one aren't in it.
+    public static func times(_ items: [TodoItem], series: [Series], now: Date, calendar: Calendar = .paper) -> [UUID: Date] {
         let (_, dayEnd) = CalendarDay.window(now, calendar: calendar)
         let today = Archive.logicalDayStart(now, calendar: calendar)
         var times: [UUID: Date] = [:]
@@ -257,13 +271,6 @@ public enum TodayGroups {
                 times[item.id] = at
             }
         }
-        let order = Dictionary(uniqueKeysWithValues: items.enumerated().map { ($1.id, $0) })
-        let pick = first.flatMap { id in items.first { $0.id == id && !$0.isCompleted }?.id }
-        let next = (pick.map { [$0] } ?? []) + times.keys.filter { $0 != pick }.sorted { (times[$0]!, order[$0]!) < (times[$1]!, order[$1]!) }.prefix(limit)
-        let chosen = Set(next)
-        let rest = items.map(\.id).filter { !chosen.contains($0) }
-        let openRest = items.filter { !$0.isCompleted && !chosen.contains($0.id) }.count
-        return Split(next: Array(next), rest: rest, times: times.filter { chosen.contains($0.key) },
-                     showsHeaders: !next.isEmpty && openRest > 0)
+        return times
     }
 }

@@ -238,7 +238,8 @@ final class DesktopPetController {
     /// Picks what to do next. Resting between clips means no redraws most of the time.
     private func idle() {
         guard isVisible else { return }
-        let away = systemIdleSeconds()
+        // `--offscreen`: someone is always at the Mac, so the check measures a cat at work even while nobody is (#64).
+        let away = offscreen ? 0 : systemIdleSeconds()
         if asleep {
             if away < 5 { asleep = false; play(.stretch) } else { scheduleIdle() }
             return
@@ -337,11 +338,11 @@ final class DesktopPetController {
     func say(_ text: String, for seconds: TimeInterval = 6) {
         messageTask?.cancel()
         dropQuestion()
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { state.message = text }
+        withAnimation(Motion.animation(.bounce, reduce: reduceMotion)) { state.message = text }
         messageTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled else { return }
-            withAnimation(.easeIn(duration: 0.15)) { self?.state.message = nil }
+            withAnimation(Motion.exit(.quick, reduce: Motion.reduced)) { self?.state.message = nil }
         }
     }
 
@@ -382,7 +383,7 @@ final class DesktopPetController {
     private func ask(_ line: PetChatter.Line) {
         messageTask?.cancel()
         state.message = nil
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { state.question = line }
+        withAnimation(Motion.animation(.bounce, reduce: reduceMotion)) { state.question = line }
         play(reduceMotion ? .tilt : .hop)
         questionTask?.cancel()
         // Unanswered, it quietly goes away.
@@ -419,7 +420,7 @@ final class DesktopPetController {
         questionTask?.cancel()
         ownAnswer = nil
         guard state.question != nil else { return }
-        withAnimation(.easeIn(duration: 0.15)) { state.question = nil }
+        withAnimation(Motion.exit(.quick, reduce: reduceMotion)) { state.question = nil }
         updateInteractivity()
     }
 

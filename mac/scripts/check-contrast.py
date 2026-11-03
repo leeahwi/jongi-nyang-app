@@ -91,6 +91,9 @@ PAIRS = [
     ('stamp', 'paper2', 'text', 'AI stamp on a sunken row (1.42)'),
     ('stamp', 'card', 'text', 'AI stamp in a card (1.42)'),
     ('onSage', 'clayText', 'text', 'delete button (clay fill)'),
+    ('sageText', 'sage2', 'text', '백업 목록: the 매일 chip (#140)'),
+    ('lavenderText', 'memoTint', 'text', '백업 목록: the 업데이트 전 chip (#140)'),
+    ('honeyText', 'honey2', 'text', '백업 목록: the 직접 chip (#140)'),
     ('switchKnob', 'sage', 'note', 'switch knob on (shape, with a shadow)'),
     ('ink', 'raised', 'text', 'selected pane, segmented pick'),
     ('sage', 'raised', 'text', 'segmented pick'),
@@ -136,7 +139,8 @@ def ratio(a, b):
 NEED = {'text': 4.5, 'large': 3.0, 'note': 0, 'same': 1.0, 'gain': 0.01}
 # #14: a card's preview is the ink at this strength over its sheet (day 0.78, night 0.86 as the mock; kraft and grid a
 # little stronger so each paper reads better than the grey before). The Windows app's --d-peek is the same colour.
-PREVIEW_INK = {'day': 0.78, 'night': 0.86, 'kraft': 0.84, 'grid': 0.80}
+# #142: 한지 · 쑥색 · 벚꽃 · 먹색, each the first strength (by 0.02) that reads better than its grey.
+PREVIEW_INK = {'day': 0.78, 'night': 0.86, 'kraft': 0.84, 'grid': 0.80, 'hanji': 0.80, 'sage': 0.84, 'blossom': 0.82, 'ink': 0.86}
 
 # 하루 일정표 (1.40): an event block is its colour at 14 % over the paper by day (24 % at night, the colour at 85 %
 # brightness as PaperTheme.event draws it); its title is ink and its time line ink2 (text).
@@ -169,7 +173,7 @@ def event_tints(table):
     return out
 
 
-# 메모 서랍 (1.43): its four papers are fixed colours in MemoDrawerTheme.swift (`name: pair("#hex")` per palette, and
+# 메모 서랍 (1.43): its papers (four, and since #142 eight) are fixed colours in MemoDrawerTheme.swift (`name: pair("#hex")` per palette, and
 # the folder colours' table). Each pair must pass in every paper.
 DRAWER = os.path.join(ROOT, 'Sources/PaperTodo/MemoDrawerTheme.swift')
 DRAWER_PAIRS = [
@@ -208,11 +212,27 @@ DRAWER_PAIRS = [
     ('icon', 'chip', 'large', 'bar pills: icons (1.44)'),
     ('danger', 'chip', 'large', 'bar pills: 지우기 (1.44)'),
     ('faint', 'chip', 'text', 'footer key hint on its box (1.44)'),
+    # #135: the link field on its pill (ink 6 % over the sheet): its heading, its keys, 링크 빼기.
+    ('label', 'chip', 'text', 'link field heading (#135)'),
+    ('faint', 'chip', 'text', 'link field keys (#135)'),
+    ('secondary', 'chip', 'text', 'link field 링크 빼기 (#135)'),
+    # #117: the quick-write slip's hint: where it goes and its keys.
+    ('secondary', 'slip', 'text', 'quick-write hint: where it goes (#117)'),
+    # #82: 새 폴더 is an empty bookmark — the sheet's paper, a dashed edge in the open checkbox's colour, the + in the
+    # secondary ink (ink on the 6 % hover tint, the same colour as `chip`).
+    ('secondary', 'sheet', 'large', 'empty bookmark (새 폴더): its + (#82)'),
+    ('ink', 'chip', 'large', 'empty bookmark under the pointer: its + (#82)'),
+    ('box', 'sheet', 'large', 'empty bookmark: its dashed edge on its paper (#82)'),
+    # #83 · #111: the close bar's line at rest (#164: no longer drawn — the close tab is the handle's cream, see
+    # handle_rows); under 바탕 없음 on a sheet-paper pill.
+    ('closeBar', 'paper', 'large', 'close bar at rest: a short line (#83, #111)'),
+    ('closeBar', 'sheet', 'large', 'close bar on its pill, 바탕 없음 (#83)'),
 ]
 
 # The folder colours' edge as the open line (DrawerPalette.openLine): scaled toward black (toward white on a dark
 # sheet) in 5 % steps until 3:1 on the sheet. Same rule as the Windows app.
-SHEET_HEX = {'day': '#fffdf7', 'night': '#3d3a34', 'kraft': '#fbf6ea', 'grid': '#ffffff'}
+SHEET_HEX = {'day': '#fffdf7', 'night': '#3d3a34', 'kraft': '#fbf6ea', 'grid': '#ffffff',
+             'hanji': '#fffcf5', 'sage': '#fbfdf7', 'blossom': '#fffaf8', 'ink': '#283146'}
 
 
 def open_line(edge, sheet):
@@ -230,21 +250,25 @@ def open_line(edge, sheet):
 
 # 반투명 / 강하게 (1.44): the drawer paper at 82 % / 62 % over the system's popover material (which itself sits over
 # the desktop). The material is approximated by #ececec (light papers) / #2a2a2a (night). Sheets stay opaque.
-MATERIAL = {'day': '#ececec', 'night': '#2a2a2a', 'kraft': '#ececec', 'grid': '#ececec'}
-SEE_THROUGH = [('ink', 'text'), ('label', 'text'), ('faint', 'text'), ('secondary', 'text'), ('icon', 'large')]
+MATERIAL = {'day': '#ececec', 'night': '#2a2a2a', 'kraft': '#ececec', 'grid': '#ececec',
+            'hanji': '#ececec', 'sage': '#ececec', 'blossom': '#ececec', 'ink': '#2a2a2a'}
+# #142: the papers (MemoDrawerTheme.swift's Kind), the four of 1.43 and 한지 · 쑥색 · 벚꽃 · 먹색.
+PAPERS = ('day', 'night', 'kraft', 'grid', 'hanji', 'sage', 'blossom', 'ink')
+SEE_THROUGH = [('ink', 'text'), ('label', 'text'), ('faint', 'text'), ('secondary', 'text'), ('icon', 'large'),
+               ('closeBar', 'large')]  # #83: the close bar on the see-through paper
 
 
 def drawer_rows():
-    """(paper, fg, bg, kind, where, ratio) for every pair in the four papers, plus each folder colour's ink on its bookmark."""
+    """(paper, fg, bg, kind, where, ratio) for every pair in the eight papers, plus each folder colour's ink on its bookmark."""
     text = open(DRAWER, encoding='utf-8').read()
     rows = []
-    for paper in ('day', 'night', 'kraft', 'grid'):
+    for paper in PAPERS:
         block = re.search(r'static let %s = DrawerPalette\((.*?)scheme:' % paper, text, re.S).group(1)
         colours = {k: v.lower() for k, v in re.findall(r'(\w+): pair\("(#[0-9a-fA-F]{6})"\)', block)}
         tab = re.search(r'pinTab: Color\(drawerHex: "(#[0-9a-fA-F]{6})"\), pinTabEdge: Color\(drawerHex: "(#[0-9a-fA-F]{6})"\)', block)
         colours['pinTab'] = tab.group(1).lower()
         colours['pinTabEdge'] = tab.group(2).lower()
-        colours['chip'] = blend(colours['ink'], 0.07 if paper == 'night' else 0.06, colours['sheet'])
+        colours['chip'] = blend(colours['ink'], 0.07 if paper in ('night', 'ink') else 0.06, colours['sheet'])
         for fg, bg, kind, where in DRAWER_PAIRS:
             rows.append((paper, fg, bg, kind, where, ratio(colours[fg], colours[bg])))
         # #14 (option B): the preview is the ink one step lighter over the sheet, and reads better than the grey it replaced.
@@ -256,12 +280,14 @@ def drawer_rows():
             back = blend(colours['paper'], alpha, MATERIAL[paper])
             for fg, kind in SEE_THROUGH:
                 rows.append((paper, fg, f'paper {int(alpha * 100)}%', kind, f'{mode}: on the see-through paper (1.44)', ratio(colours[fg], back)))
-        table = re.search(r'\.%s: \[(.*?)\]' % paper, text, re.S).group(1)
+        table = re.search(r'^        \.%s: \[(.*?)\]' % paper, text, re.S | re.M).group(1)
         for name, a, b, ink, edge, tape in re.findall(r'\.(\w+): \("(#\w+)", "(#\w+)", "(#\w+)", "(#\w+)", "(#\w+)"\)', table):
             worst = min(ratio(ink, a), ratio(ink, b))
             rows.append((paper, f'{name} ink', f'{name} tab', 'text', 'drawer: bookmark name / first letter', worst))
             rows.append((paper, f'{name} edge', 'paper', 'note', 'bookmark edge, 1 pt (decorative, 1.44)', ratio(edge, colours['paper'])))
             rows.append((paper, f'{name} line', 'sheet', 'large', 'open memo line in the folder colour (1.44)', ratio(open_line(edge, SHEET_HEX[paper]), colours['sheet'])))
+            # #118: the picked card's 2 pt edge (the keyboard's place) is the same line colour, inside the card.
+            rows.append((paper, f'{name} picked', 'sheet', 'large', 'picked memo edge, 2 pt in the folder colour (#118)', ratio(open_line(edge, SHEET_HEX[paper]), colours['sheet'])))
         picked = re.search(r'pickedTab: \(Color\(drawerHex: "(#\w+)"\), Color\(drawerHex: "(#\w+)"\)', block)
         if picked:
             rows.append((paper, 'picked ink', 'picked tab', 'text', 'drawer: picked bookmark (kraft, grid)', ratio(picked.group(2), picked.group(1))))
@@ -288,7 +314,9 @@ def handle_rows():
     text = open(PANEL, encoding='utf-8').read()
     colours = dict(re.findall(r'static let (fill|edge|paw) = Color\(drawerHex: "(#[0-9a-fA-F]{6})"\)', text))
     return [('paw', 'fill', 'large', 'the handle\'s paw on its cream (1.45)', ratio(colours['paw'], colours['fill'])),
-            ('edge', 'fill', 'note', 'the handle\'s soft 1 pt edge (decorative, 1.45)', ratio(colours['edge'], colours['fill']))]
+            ('edge', 'fill', 'note', 'the handle\'s soft 1 pt edge (decorative, 1.45)', ratio(colours['edge'], colours['fill'])),
+            # #111 · #164: the close tab is the same cream with the way it closes (› or ‹) in the paw's colour.
+            ('paw', 'fill', 'text', 'the close tab\'s › on its cream (#111, #164)', ratio(colours['paw'], colours['fill']))]
 
 
 # 1.45 (#29): the Windows app draws the same tokens (windows/src/renderer/base.css, its own test/contrast.test.ts). When
@@ -298,6 +326,7 @@ SHARED = {
     'paper': 'paper', 'paper2': 'paper-2', 'card': 'card', 'ink': 'ink', 'ink2': 'ink-2', 'ink3': 'ink-3', 'faint': 'faint',
     'rule': 'rule', 'sage': 'sage', 'sage2': 'sage-2', 'clay': 'clay', 'clay2': 'clay-2', 'sageText': 'sage-text',
     'clayText': 'clay-text', 'onSage': 'on-sage', 'checkBorder': 'check-border', 'stamp': 'stamp',
+    'lavenderText': 'lavender-text', 'honeyText': 'honey-text', 'honey2': 'honey-2',
     'tabToday': 'tab-1', 'tabAhead': 'tab-2', 'tabTodayEdge': 'tab-1-edge', 'tabAheadEdge': 'tab-2-edge', 'tabInk': 'tab-ink',
     'tabMemo': 'tab-3', 'tintToday': 'tint-1', 'tintAhead': 'tint-2', 'eventBlue': 'event-blue', 'eventTint': 'event-blue-2',
     'memoPurple': 'memo-ink', 'memoTint': 'memo-2', 'toastAction': 'toast-action', 'toastKind': 'toast-strong',
@@ -388,7 +417,7 @@ def main():
         for fg, bg, kind, where, day, day_ok, night, night_ok in rows:
             mark = lambda ok, k: ' ' if k == 'note' else ('✓' if ok else '✗')
             print(f'{fg:<12} {bg:<10} {kind:<6} {day:6.2f}{mark(day_ok, kind)} {night:6.2f}{mark(night_ok, kind)}  {where}')
-        print('\n메모 서랍 (four papers):')
+        print('\n메모 서랍 (eight papers):')
         for paper, fg, bg, kind, where, value in drawer:
             mark = ' ' if kind == 'note' else ('✓' if value >= NEED[kind] else '✗')
             print(f'  {paper:<6} {fg:<14} {bg:<12} {kind:<6} {value:6.2f}{mark}  {where}')
@@ -405,7 +434,7 @@ def main():
         print(f'{len(failures)} pair(s) below AA')
         sys.exit(1)
     same = '' if differences is None else f'; the {len(SHARED)} shared tokens are the Windows app\'s'
-    print(f'Day and night: all {sum(1 for r in rows if r[2] != "note")} checked pairs pass AA; 메모 서랍: all {sum(1 for r in drawer if r[3] != "note")} in its four papers{same}.')
+    print(f'Day and night: all {sum(1 for r in rows if r[2] != "note")} checked pairs pass AA; 메모 서랍: all {sum(1 for r in drawer if r[3] != "note")} in its eight papers{same}.')
 
 
 if __name__ == '__main__':

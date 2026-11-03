@@ -37,9 +37,12 @@ struct DesktopPetView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            // Only moving clips need frames; resting poses draw once.
-            TimelineView(.animation(minimumInterval: 1.0 / 60, paused: state.activity.action.isResting || reduceMotion)) { context in
+            // Only moving clips need frames, each as often as it moves (PetMotion.frameInterval); resting poses and a blink
+            // draw once.
+            let every = PetMotion.frameInterval(of: state.activity.action)
+            TimelineView(.animation(minimumInterval: every ?? 1.0 / 60, paused: every == nil || reduceMotion)) { context in
                 let _ = PerfProbe.count("petFrame")
+                let _ = PerfProbe.count("petFrame." + state.activity.action.name)
                 let frame = PetMotion.frame(state.activity, homeX: state.homeX, at: reduceMotion ? state.activity.start : context.date)
                 pet(frame: frame, shift: PetBubble.shift(centerX: frame.x, width: bubbleWidth, stripWidth: geometry.size.width))
                     .position(x: frame.x, y: geometry.size.height - petHeight / 2 - 2)

@@ -3,9 +3,11 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { aiEntry, aiLogLine, parseAiLink, parseAiLog, type AiItem, type AiLogEntry } from "../src/core/ai";
+import { aiEntry, aiExtVersion, aiLogLine, parseAiLink, parseAiLog, type AiItem, type AiLogEntry } from "../src/core/ai";
 import { parseNotebook, serializeNotebook, type TodoItem } from "../src/core/notebook";
 import { serializeEvents, type LocalEvent } from "../src/core/events";
+import { serializeMemos } from "../src/core/memo";
+import { addFolder, memosIn, placeNew, serializeMemoFolders } from "../src/core/memoDrawer";
 import type { NoteNotice } from "../src/core/types";
 import { AiConnection } from "../src/main/aiConnect";
 import { Store } from "../src/main/store";
@@ -154,5 +156,67 @@ test("an event Claude moved goes back; the note hidden meanwhile gets the away n
   ai.undo(entry.id);
   assert.equal(store.events[0].start, 600);
   assert.equal(shown[shown.length - 1].text, "되돌렸어요");
+  ai.stop();
+});
+
+test("M23: a memo Claude put into a folder shows in that folder; 되돌리기 takes it out and its place shows nothing", () => {
+  const { folder, store, ai } = setup();
+  ai.start();
+  ai.setEnabled(true);
+  store.changeFolders((data) => addFolder(data, "회사", "mint", "C0FFEE01-0000-4000-8000-000000000001", new Date("2026-10-26T00:00:00Z")));
+  // What add_memo with a folder writes: the memo, its place, then the log line (memos.json only, as ever).
+  const memo = { id: crypto.randomUUID().toUpperCase(), text: "회의록\n- [ ] 정리하기", createdAt: "2026-10-27T01:00:00Z", updatedAt: "2026-10-27T01:00:00Z" };
+  fs.writeFileSync(path.join(folder, "memos.json"), serializeMemos([memo, ...store.memos]));
+  fs.writeFileSync(path.join(folder, "memo-folders.json"), serializeMemoFolders(placeNew(store.memoFolders, memo.id, { folder: "C0FFEE01-0000-4000-8000-000000000001", pinned: false }, new Date("2026-10-27T01:00:00Z"))));
+  const entry = { ...aiEntry({ client: "Claude", tool: "add_memo", kind: "add", target: "memos", title: "회의록", changes: [{ file: "memos.json", id: memo.id, before: null, after: memo as unknown as AiItem }] }), ext: aiExtVersion };
+  fs.appendFileSync(path.join(folder, "ai-log.jsonl"), `${aiLogLine(entry)}\n`);
+  logChanged(ai);
+  assert.deepEqual(memosIn(store.memoFolders, store.memos, "C0FFEE01-0000-4000-8000-000000000001").map((item) => item.id), [memo.id], "the drawer shows it in 회사");
+  ai.undo(entry.id);
+  assert.equal(store.memos.some((item) => item.id === memo.id), false);
+  assert.deepEqual(memosIn(store.memoFolders, store.memos, "C0FFEE01-0000-4000-8000-000000000001"), []);
+  ai.stop();
+});
+
+test("M41: ai-link.json carries the extension's version; an older Claude Desktop extension is said in AI 연결 until a new one writes", () => {
+  const { folder, ai } = setup();
+  ai.start();
+  ai.setEnabled(true);
+  assert.equal(parseAiLink(fs.readFileSync(path.join(folder, "ai-link.json"), "utf8"))!.ext, aiExtVersion);
+  assert.equal(ai.view().outdated, undefined, "nothing from Claude Desktop yet");
+  // A line from Claude Desktop's old extension (no version in it).
+  claudeAdds(folder, ["옛 확장이 넣은 일"]);
+  logChanged(ai);
+  assert.equal(ai.view().outdated, true);
+  // Claude Code runs the app's own copy: its lines don't count.
+  const code = { ...aiEntry({ client: "Claude Code", tool: "add_todos", kind: "add", target: "todos", title: "x", changes: [] }), ext: aiExtVersion };
+  fs.appendFileSync(path.join(folder, "ai-log.jsonl"), `${aiLogLine(code)}\n`);
+  logChanged(ai);
+  assert.equal(ai.view().outdated, true);
+  // The reinstalled extension writes its version: the line goes.
+  const fresh = { ...claudeAdds(folder, ["새 확장이 넣은 일"]).entry, ext: aiExtVersion };
+  fs.appendFileSync(path.join(folder, "ai-log.jsonl"), `${aiLogLine(fresh)}\n`);
+  logChanged(ai);
+  assert.equal(ai.view().outdated, undefined);
+  ai.stop();
+});
+
+test("#174: old lines go at launch (on or off), and 기록 지우기 empties the log", () => {
+  const { folder, ai } = setup();
+  const log = path.join(folder, "ai-log.jsonl");
+  const old = aiEntry({ client: "Claude", tool: "add_todos", kind: "add", target: "todos", title: "옛일", changes: [] }, new Date(Date.now() - 40 * 86_400_000));
+  fs.writeFileSync(log, `${aiLogLine(old)}\n`);
+  ai.start();
+  assert.equal(fs.readFileSync(log, "utf8"), "", "off, and still trimmed");
+  assert.equal(ai.view().hasLog, false);
+  ai.setEnabled(true);
+  claudeAdds(folder, ["장보기"]);
+  logChanged(ai);
+  assert.equal(ai.view().recent.length, 1);
+  assert.equal(ai.view().hasLog, true);
+  ai.clearLog();
+  assert.equal(fs.readFileSync(log, "utf8"), "");
+  assert.deepEqual([ai.view().recent.length, ai.view().marks.length, ai.view().hasLog], [0, 0, false]);
+  assert.equal(ai.undoLatest(), false, "nothing left to undo");
   ai.stop();
 });

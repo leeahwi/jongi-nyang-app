@@ -54,6 +54,14 @@ localizeDocument();
 export const reduceMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /**
+ * The motion words in milliseconds, for JS timers (base.css `--motion-*`; the Mac's `Motion`). `hold` is how long a
+ * finished row stays before it goes, `dayStripHold` the day strip's box before its task is done; both are
+ * `reducedHold` under Reduce Motion (`holdMs`), long enough to see what was pressed.
+ */
+export const motion = { quick: 120, change: 160, enter: 180, draw: 220, bounce: 300, strikeDelay: 80, hold: 650, dayStripHold: 450, reducedHold: 300 } as const;
+export const holdMs = (ms: number = motion.hold): number => (reduceMotion() ? motion.reducedHold : ms);
+
+/**
  * Soft 12px fades at the top and bottom of a scrolling box while there is more beyond (base.css
  * `.scroll-fade`): followed on scroll, on resize and when its content changes.
  */

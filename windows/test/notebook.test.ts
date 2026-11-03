@@ -91,3 +91,14 @@ test("retract: a task just added from the input line goes without a trace (no un
   assert.equal(notebook.canUndo, false);
   assert.equal(notebook.retract("missing"), false);
 });
+
+test("#168 reorder: the list in a given order as one undo step; the same order changes nothing", () => {
+  const notebook = new UndoableNotebook();
+  for (const title of ["가", "나", "다", "라"]) notebook.add(title);
+  const ids = notebook.items.map((item) => item.id);
+  assert.equal(notebook.reorder(ids), false);
+  assert.equal(notebook.reorder([ids[2], ids[0]]), true);
+  assert.deepEqual(notebook.items.map((item) => item.title), ["다", "가", "나", "라"]);
+  notebook.undo();
+  assert.deepEqual(notebook.items.map((item) => item.title), ["가", "나", "다", "라"]);
+});

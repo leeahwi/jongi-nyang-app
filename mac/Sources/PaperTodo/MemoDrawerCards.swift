@@ -56,9 +56,7 @@ struct MemoCard: View {
         .onHover { hovering = $0 }
         .onTapGesture { if !expanded { drawer.expand(memo.id) } }
         .draggableIf(!expanded, "memo:" + memo.id) { DragCard(title: drawer.cardTitle(memo), palette: sheet, font: font) }
-        .accessibilityElement(children: expanded ? .contain : .combine)
-        .accessibilityAddTraits(expanded ? [] : .isButton)
-        .accessibilityAction { drawer.expand(memo.id) }
+        .modifier(CardAccessibility(drawer: drawer, memo: memo, group: group, expanded: expanded, selected: selected, pinned: pinned))
     }
 
     @ViewBuilder private func closed(_ sheet: DrawerPalette) -> some View {
@@ -81,12 +79,80 @@ struct MemoCard: View {
             }
             .frame(height: MemoSlipStyle.titleRow)
             if !card.rows.isEmpty {
-                PreviewRows(rows: card.rows, limit: limit, palette: sheet)
+                PreviewRows(rows: card.rows, limit: limit, palette: sheet, text: drawer.text)
             }
             if let kind {
                 KindRow(drawer: drawer, kind: kind, time: time, palette: sheet)
                     .frame(height: MemoSlipStyle.kindRow)
             }
+        }
+    }
+}
+
+/// #119 (VoiceOver): a closed card is one element read as `제목, 오늘 오전 9:20, 고정, 체크 목록 2/4` with its preview as
+/// the value (not the chips one by one, nor a checklist's count twice); ↩ / VO-Space opens it, and the hover pill's and
+/// the kind chip's actions are its custom actions (복사 · 고정 · 폴더로 옮기기 · 지우기 · 링크 열기 · 번호 복사). An open
+/// memo keeps its parts (the words, the bar) as children.
+struct CardAccessibility: ViewModifier {
+    @ObservedObject var drawer: MemoDrawer
+    let memo: Memo
+    let group: MemoCards.Group
+    let expanded: Bool
+    let selected: Bool
+    let pinned: Bool
+
+    func body(content: Content) -> some View {
+        if expanded {
+            // The open memo: its title names the group around its words and its bar.
+            content.accessibilityElement(children: .contain).accessibilityLabel(drawer.card(memo).title)
+        } else {
+            let card = drawer.card(memo)
+            content
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(label(card))
+                .accessibilityValue(card.rows.prefix(3).map { $0.checked == nil ? $0.text : ($0.checked == true ? L("완료됨") : L("미완료")) + " " + $0.text }.joined(separator: ", "))
+                .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+                .accessibilityAction { drawer.expand(memo.id) }
+                .accessibilityAction(named: L("복사")) { drawer.copy(memo.id) }
+                .accessibilityAction(named: pinned ? L("고정 풀기") : String(localized: "고정", table: "Drawer")) { drawer.togglePin(memo.id) }
+                .accessibilityAction(named: L("폴더로 옮기기")) { drawer.openMoveList(memo.id) }
+                .accessibilityAction(named: L("지우기")) { drawer.delete(memo.id) }
+                .modifier(KindActions(drawer: drawer, kind: card.kind))
+        }
+    }
+
+    private func label(_ card: MemoDrawer.Card) -> String {
+        var parts = [card.title, MemoCards.dayTime(drawer.sortDate(memo), now: drawer.now(), language: .current)]
+        if pinned { parts.append(String(localized: "고정", table: "Drawer")) }
+        switch card.kind {
+        case .checklist(let done, let total): parts.append(L("체크 목록 \(done)/\(total)"))
+        case .link(_, let label): parts.append(label)
+        case .phone(let number): parts.append(number)
+        case nil: break
+        }
+        return parts.joined(separator: ", ")
+    }
+}
+
+/// A card's kind chip as an action of the card (VoiceOver can't reach the chip inside a card read as one).
+private struct KindActions: ViewModifier {
+    let drawer: MemoDrawer
+    let kind: MemoCards.Kind?
+
+    func body(content: Content) -> some View {
+        switch kind {
+        case .link(let url, _):
+            content.accessibilityAction(named: L("링크 열기")) {
+                if let target = URL(string: url) { NSWorkspace.shared.open(target) }
+            }
+        case .phone(let number):
+            content.accessibilityAction(named: L("번호 복사")) {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(number, forType: .string)
+                drawer.say(L("복사했어요"))
+            }
+        default:
+            content
         }
     }
 }
@@ -120,6 +186,8 @@ struct PreviewRows: View {
     let rows: [MemoCards.PreviewRow]
     let limit: Int
     let palette: DrawerPalette
+    /// The drawer's size step (#84): the preview follows it, always in the plain face.
+    var text = MemoText()
 
     var body: some View {
         if rows.first?.checked != nil {
@@ -129,37 +197,38 @@ struct PreviewRows: View {
                     HStack(spacing: 6) {
                         CheckBox(checked: done, palette: palette, size: 11)
                         Text(verbatim: row.text.keepingParticles)
-                            .font(.system(size: MemoSlipStyle.previewSize))
+                            .font(.system(size: text.previewSize))
                             .foregroundStyle(done ? palette.faint : palette.preview)
                             .strikethrough(done, color: palette.faint)
                             .lineLimit(1)
                             .truncationMode(.tail)
                     }
-                    .frame(height: MemoSlipStyle.previewLine)
+                    .frame(height: text.previewLine)
                 }
             }
             .accessibilityElement(children: .combine)
         } else {
+            let spacing = text.previewSpacing
             Text(words)
-                .font(.system(size: MemoSlipStyle.previewSize))
+                .font(.system(size: text.previewSize))
                 .foregroundStyle(palette.preview)
-                .lineSpacing(MemoSlipStyle.previewSpacing)
+                .lineSpacing(spacing)
                 .lineLimit(limit)
                 .truncationMode(.tail)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.vertical, MemoSlipStyle.previewSpacing / 2)
+                .padding(.vertical, spacing / 2)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    /// The rows joined by line breaks; a code line in the fixed-width face.
+    /// The rows joined by line breaks; a code block's line and an old code line in the fixed-width face.
     private var words: AttributedString {
         var all = AttributedString()
         for (index, row) in rows.prefix(limit).enumerated() {
             if index > 0 { all.append(AttributedString("\n")) }
-            let code = Checklist.isCode(row.text)
+            let code = row.code || Checklist.isCode(row.text)
             var part = AttributedString(code ? row.text : row.text.keepingParticles)
-            if code { part.font = .system(size: MemoSlipStyle.previewSize - 1, design: .monospaced) }
+            if code { part.font = .system(size: text.previewSize - 1, design: .monospaced) }
             all.append(part)
         }
         return all
@@ -312,9 +381,10 @@ private struct HoverPill: View {
     }
 }
 
-/// A small round button on the bar and the hover pill: 15 pt thin icons.
+/// A small round button on the bar and the hover pill: 15 pt thin icons (or a few letters: the bar's Aa, #112).
 struct BarButton: View {
     let symbol: String
+    var text: String?
     let palette: DrawerPalette
     let help: String
     var tint: Color?
@@ -324,8 +394,13 @@ struct BarButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .light))
+            Group {
+                if let text {
+                    Text(verbatim: text).font(.system(size: 12, weight: .semibold))
+                } else {
+                    Image(systemName: symbol).font(.system(size: 13, weight: .light))
+                }
+            }
                 .frame(width: 24, height: 24)
                 .background(palette.ink.opacity(hovering ? 0.08 : 0), in: Capsule())
                 .contentShape(Rectangle())
@@ -344,6 +419,8 @@ struct BarMenuButton: View {
     let symbol: String
     let palette: DrawerPalette
     let help: String
+    /// Reached with Tab (full keyboard access) and opened with Space · ↩ (#112: the open memo's ⋯).
+    var keyboard = false
     let items: @MainActor () -> [DrawerMenuItem]
     @State private var hovering = false
 
@@ -351,10 +428,12 @@ struct BarMenuButton: View {
         Image(systemName: symbol)
             .font(.system(size: 13, weight: .light))
             .foregroundStyle(palette.icon)
+            // #119: the menu button over it is what VoiceOver reads (the image said ‘더 보기’ a second time).
+            .accessibilityHidden(true)
             .frame(width: 24, height: 24)
             .background(palette.ink.opacity(hovering ? 0.08 : 0), in: Capsule())
             .onHover { hovering = $0 }
-            .overlay { DrawerMenuButtonArea(drawer: drawer, label: help, items: items) }
+            .overlay { DrawerMenuButtonArea(drawer: drawer, label: help, items: items, keyboard: keyboard) }
     }
 }
 
@@ -372,13 +451,20 @@ struct OpenMemo: View {
             } else {
                 CheckedText(drawer: drawer, memo: memo, palette: palette, font: font)
             }
+            if drawer.editing, drawer.linkEdit != nil {
+                LinkBar(drawer: drawer, palette: palette).padding(.top, 8)
+            }
+            if drawer.editing, drawer.formatBarOpen {
+                FormatBar(drawer: drawer, palette: palette).padding(.top, 8)
+            }
             MemoBar(drawer: drawer, memo: memo, palette: palette, big: false)
                 .padding(.top, 8)
         }
     }
 }
 
-/// The open memo's bar (SideNotes): [크게 보기 · 복사 · ⚙] · `5:38 고침` · [폴더로 옮기기 · 지우기].
+/// The open memo's bar (#112, SideNotes): [Aa] [⤢] [⋯] at the left, `5:38 고침` at the right. Aa opens the format bar
+/// (typing the memo if it wasn't); ⋯ is the memo's right-click menu — copy, pin, move, its paper, delete … are there.
 struct MemoBar: View {
     @ObservedObject var drawer: MemoDrawer
     let memo: Memo
@@ -388,22 +474,32 @@ struct MemoBar: View {
     var body: some View {
         HStack(spacing: 6) {
             BarPill(palette: palette) {
+                BarButton(symbol: "", text: "Aa", palette: palette, help: L("서식"), tint: drawer.editing && drawer.formatBarOpen ? palette.check : nil) {
+                    if drawer.editing {
+                        drawer.formatBarOpen.toggle()
+                    } else {
+                        drawer.edit(memo.id)
+                        drawer.formatBarOpen = true
+                    }
+                }
+            }
+            BarPill(palette: palette) {
                 BarButton(symbol: big ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right", palette: palette,
                           help: big ? L("작게 보기") : L("크게 보기")) {
                     if big { drawer.bigID = nil } else { drawer.showBig(memo.id) }
                 }
-                BarButton(symbol: "doc.on.doc", palette: palette, help: L("복사 (⇧⌘C)")) { drawer.copy(memo.id) }
-                BarMenuButton(drawer: drawer, symbol: "gearshape", palette: palette, help: L("이 메모")) { DrawerMenus.memoGear(drawer, memo.id) }
-            }
-            // Narrow drawers: `오후 5:38 고침`, else just the time, else nothing.
-            ViewThatFits(in: .horizontal) {
-                when(MemoCards.edited(memo.updatedAt, now: drawer.now(), language: .current))
-                when(MemoCards.dayTime(memo.updatedAt, now: drawer.now(), language: .current))
-                Color.clear.frame(height: 1)
             }
             BarPill(palette: palette) {
-                BarMenuButton(drawer: drawer, symbol: "tray.and.arrow.down", palette: palette, help: L("폴더로 옮기기")) { DrawerMenus.move(drawer, memo.id) }
-                BarButton(symbol: "trash", palette: palette, help: L("지우기 (⌘⌫)"), role: palette.danger) { drawer.delete(memo.id) }
+                BarMenuButton(drawer: drawer, symbol: "ellipsis", palette: palette, help: L("더 보기"), keyboard: true) { DrawerMenus.memo(drawer, memo.id) }
+            }
+            // Narrow drawers: `오후 5:38 고침`, else just the time, else nothing. 크게 보기 adds the letters (#113):
+            // `어제 21:40 고침 · 412자`.
+            ViewThatFits(in: .horizontal) {
+                let edited = MemoCards.edited(memo.updatedAt, now: drawer.now(), language: .current)
+                if big { when(edited + " · " + MemoCards.characters(MemoCards.characterCount(memo.text), language: .current)) }
+                when(edited)
+                when(MemoCards.dayTime(memo.updatedAt, now: drawer.now(), language: .current))
+                Color.clear.frame(height: 1)
             }
         }
         .frame(height: 30)
@@ -417,7 +513,160 @@ extension MemoBar {
             .foregroundStyle(palette.faint)
             .lineLimit(1)
             .fixedSize()
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+}
+
+/// 서식 막대 (Aa, #84 — SideNotes' way): what the keys do, as buttons on the open memo, on the selection or at the caret
+/// (a line's format on the caret's line; a second press takes it off); then the drawer's face, size and 기호 늘 보이기.
+struct FormatBar: View {
+    @ObservedObject var drawer: MemoDrawer
+    let palette: DrawerPalette
+
+    private var buttons: [(DrawerTextView.KeyTextView.Format, String, String)] { [
+        (.bold, "bold", L("굵게 (⌘B)")), (.italic, "italic", L("기울임 (⌘I)")), (.strike, "strikethrough", L("취소선 (⇧⌘X)")),
+        (.heading, "number", L("제목 (⌃⌘1–3)")), (.list, "list.bullet", L("목록")), (.olist, "list.number", L("번호 목록")),
+        (.check, "checklist", L("체크 목록 (⇧⌘L)")), (.quote, "text.quote", L("인용")), (.code, "chevron.left.forwardslash.chevron.right", L("코드 (⌥⌘C)")),
+        (.rule, "minus", L("가로줄")), (.link, "link", L("링크 (⌘K)")),
+    ] }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            FlowRow(spacing: 0) {
+                ForEach(buttons, id: \.1) { format, symbol, help in
+                    BarButton(symbol: symbol, palette: palette, help: help) { drawer.format(format) }
+                }
+            }
+            HStack(spacing: 6) {
+                Menu {
+                    Picker(L("글꼴"), selection: $drawer.bodyFace) { ForEach(MemoText.Face.allCases) { Text($0.title).tag($0) } }.pickerStyle(.inline)
+                    Picker(L("글자 크기"), selection: $drawer.textSize) { ForEach(MemoText.Size.allCases) { Text($0.title).tag($0) } }.pickerStyle(.inline)
+                } label: {
+                    Text(verbatim: "Aa  \(drawer.bodyFace.title) · \(drawer.textSize.title)")
+                        .font(.system(size: 11))
+                        .foregroundStyle(palette.icon)
+                        .lineLimit(1)
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help(L("글꼴과 글자 크기"))
+                Spacer(minLength: 4)
+                BarButton(symbol: drawer.showMarks ? "eye" : "eye.slash", palette: palette, help: L("기호 늘 보이기 (⇧⌘R)"),
+                          tint: drawer.showMarks ? palette.check : nil) { drawer.showMarks.toggle() }
+            }
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 3)
+        .background(palette.pill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(palette.pillEdge, lineWidth: 0.5) }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(L("서식"))
+    }
+}
+
+/// 링크 (#135, SideNotes' way): ⌘K on chosen words (or in a link) opens this small field under the memo — the address,
+/// Return to finish (the words become `[words](address)`, or the link's address changes), Esc to leave it; in a link,
+/// 링크 빼기 (or an empty address) takes the link out. The memo changes once, at Return (one undo).
+struct LinkBar: View {
+    @ObservedObject var drawer: MemoDrawer
+    let palette: DrawerPalette
+    @State private var url = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        let existing = drawer.linkEdit?.existing == true
+        VStack(alignment: .leading, spacing: 5) {
+            Text(existing ? L("링크 고치기") : L("링크 넣기"))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(palette.label)
+                .accessibilityAddTraits(.isHeader)
+            HStack(spacing: 6) {
+                Image(systemName: "link")
+                    .font(.system(size: 12))
+                    .foregroundStyle(palette.icon)
+                    .accessibilityHidden(true)
+                TextField(L("링크 주소"), text: $url, prompt: Text(verbatim: "https://").foregroundStyle(palette.placeholder))
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .foregroundStyle(palette.ink)
+                    .focused($focused)
+                    .onSubmit { drawer.finishLink(url) }
+                    .accessibilityLabel(L("링크 주소"))
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 28)
+            .background(palette.slip, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .overlay { RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(focused ? palette.check : palette.slipEdge, lineWidth: focused ? 1 : 0.5) }
+            HStack(spacing: 8) {
+                Text(existing ? L("↩ 고치기 · Esc 그만") : L("↩ 넣기 · Esc 그만"))
+                    .font(.system(size: 11))
+                    .foregroundStyle(palette.faint)
+                    // Never cut: a long language in a narrow drawer takes a second line.
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 4)
+                if existing {
+                    Button(L("링크 빼기")) { drawer.finishLink("") }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(palette.secondary)
+                        .fixedSize()
+                }
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 7)
+        .background(palette.pill, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(palette.pillEdge, lineWidth: 0.5) }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(existing ? L("링크 고치기") : L("링크 넣기"))
+        .onAppear {
+            url = drawer.linkEdit?.url ?? ""
+            focused = true
+        }
+        .onChange(of: drawer.linkEdit) { _, edit in
+            if let edit { url = edit.url; focused = true }
+        }
+    }
+}
+
+/// Buttons in rows: as many as fit, the rest on the next row (the Aa bar in a narrow drawer).
+struct FlowRow: Layout {
+    var spacing: CGFloat = 0
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = arrange(width: proposal.width ?? .infinity, subviews)
+        return CGSize(width: proposal.width ?? rows.map(\.width).max() ?? 0, height: rows.map(\.height).reduce(0, +))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in arrange(width: bounds.width, subviews) {
+            var x = bounds.minX
+            for index in row.items {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+                x += size.width + spacing
+            }
+            y += row.height
+        }
+    }
+
+    private func arrange(width: CGFloat, _ subviews: Subviews) -> [(items: [Int], width: CGFloat, height: CGFloat)] {
+        var rows: [(items: [Int], width: CGFloat, height: CGFloat)] = []
+        var current: [Int] = [], x: CGFloat = 0, height: CGFloat = 0
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            if !current.isEmpty, x + size.width > width {
+                rows.append((current, x - spacing, height))
+                current = []; x = 0; height = 0
+            }
+            current.append(index)
+            x += size.width + spacing
+            height = max(height, size.height)
+        }
+        if !current.isEmpty { rows.append((current, x - spacing, height)) }
+        return rows
     }
 }
 
@@ -436,53 +685,77 @@ private struct BarPill<Content: View>: View {
     }
 }
 
-/// An open memo with checklist lines: the title, each line (boxes to tick), a click on the words to type.
+/// An open memo with checklist lines: the title, each line (boxes to tick), a click on the words to type. #84: the other
+/// lines styled as the editor styles them (MemoStyler), in the drawer's face and size.
 struct CheckedText: View {
     @ObservedObject var drawer: MemoDrawer
     let memo: Memo
     let palette: DrawerPalette
     let font: NotebookFont
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        let lines = Checklist.split(memo.text)
-        let titleIndex = lines.firstIndex { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        let lines = MemoMarkdown.lines(memo.text)
+        let text = drawer.text
+        let styler = MemoStyler(text: text, ink: NSColor(palette.ink), soft: NSColor(palette.preview), accent: NSColor(palette.check))
+        let titleIndex = lines.firstIndex { !String(decoding: $0.units, as: UTF16.self).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        // 문단 간격 (#141): the room under each paragraph's last line (a list's lines stay together).
+        let ends = lines.indices.map { text.paragraph > 0 && TextSteps.endsParagraph(lines[$0].read.kind, next: $0 + 1 < lines.count ? lines[$0 + 1].read.kind : nil) }
         VStack(alignment: .leading, spacing: 0) {
-            ForEach(Array(lines.enumerated()), id: \.offset) { index, raw in
-                let line = raw.trimmingCharacters(in: .newlines)
-                if let item = Checklist.lines(raw).first {
-                    HStack(alignment: .firstTextBaseline, spacing: 7) {
-                        Button { drawer.model.toggleChecklist(memo.id, line: index) } label: {
-                            CheckBox(checked: item.checked, palette: palette)
+            ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
+                let raw = String(decoding: line.units, as: UTF16.self)
+                Group {
+                    if let item = Checklist.lines(raw).first {
+                        HStack(alignment: .firstTextBaseline, spacing: 7) {
+                            Button { drawer.tickInCard(memo.id, line: index, motion: !reduceMotion) } label: {
+                                CheckBox(checked: item.checked, palette: palette)
+                            }
+                            .buttonStyle(.plain)
+                            .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
+                            .accessibilityLabel(item.text)
+                            .accessibilityValue(item.checked ? L("완료됨") : L("미완료"))
+                            // #163: once the box is filled, the words fade to done (struck through, faint).
+                            ZStack(alignment: .leading) {
+                                Text(itemWords(line, styler))
+                                    .foregroundStyle(palette.ink)
+                                    .opacity(item.checked ? 0 : 1)
+                                Text(itemWords(line, styler))
+                                    .foregroundStyle(palette.faint)
+                                    .strikethrough(true, color: palette.faint)
+                                    .opacity(item.checked ? 1 : 0)
+                            }
+                                .font(Font(text.font()))
+                                .animation(item.checked ? Motion.animation(.change, reduce: reduceMotion)?.delay(Motion.enter.duration)
+                                           : Motion.exit(.quick, reduce: reduceMotion), value: item.checked)
+                                .modifier(OnTheLines(text: text))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                                .onTapGesture { edit(at: index) }
                         }
-                        .buttonStyle(.plain)
-                        .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
-                        .accessibilityLabel(item.text)
-                        .accessibilityValue(item.checked ? L("완료됨") : L("미완료"))
-                        Text(verbatim: item.text.keepingParticles)
-                            .font(.system(size: MemoSlipStyle.bodySize))
-                            .foregroundStyle(item.checked ? palette.faint : palette.ink)
-                            .strikethrough(item.checked, color: palette.faint)
-                            .modifier(OnTheLines())
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else if index == titleIndex {
+                        let words = (MemoMarkdown.linePlain(line.units, line.read) ?? raw).trimmingCharacters(in: .whitespaces)
+                        CardTitle(words: Text(verbatim: words.handwritten), font: font, color: palette.ink)
+                            .frame(maxWidth: .infinity, minHeight: MemoSlipStyle.titleRow, maxHeight: MemoSlipStyle.titleRow, alignment: .leading)
+                            .contentShape(Rectangle())
+                            .onTapGesture { edit(at: index) }
+                    } else if !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || line.read.kind == .code {
+                        MarkdownLine(line: line, raw: raw, styler: styler, palette: palette)
                             .contentShape(Rectangle())
                             .onTapGesture { edit(at: index) }
                     }
-                } else if index == titleIndex {
-                    CardTitle(words: Text(verbatim: line.trimmingCharacters(in: .whitespaces).handwritten), font: font, color: palette.ink)
-                        .frame(maxWidth: .infinity, minHeight: MemoSlipStyle.titleRow, maxHeight: MemoSlipStyle.titleRow, alignment: .leading)
-                        .contentShape(Rectangle())
-                        .onTapGesture { edit(at: index) }
-                } else if !line.trimmingCharacters(in: .whitespaces).isEmpty {
-                    Text(verbatim: Checklist.isCode(line) ? line : line.keepingParticles)
-                        .font(Checklist.isCode(line) ? .system(size: MemoSlipStyle.bodySize - 1, design: .monospaced) : .system(size: MemoSlipStyle.bodySize))
-                        .foregroundStyle(palette.ink)
-                        .modifier(OnTheLines())
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
-                        .onTapGesture { edit(at: index) }
                 }
+                .padding(.bottom, ends[index] && index != titleIndex ? text.paragraph : 0)
             }
         }
+    }
+
+    /// A checklist item's words after its box, its marks styled.
+    private func itemWords(_ line: MemoMarkdown.Line, _ styler: MemoStyler) -> AttributedString {
+        let styled = styler.swiftUI(line.units, line.read, base: Font(styler.text.font()), hide: !styler.text.showMarks)
+        let words = String(decoding: line.units[..<line.read.end], as: UTF16.self)
+        guard let start = Range(NSRange(location: min(line.read.words, (words as NSString).length), length: 0), in: words),
+              let from = AttributedString.Index(start.lowerBound, within: styled) else { return styled }
+        return AttributedString(styled[from...])
     }
 
     private func edit(at line: Int) {
@@ -491,38 +764,134 @@ struct CheckedText: View {
     }
 }
 
-/// An open memo's text: each line exactly `MemoSlipStyle.line` (26 pt) tall, its words centred in it — the same lines
+/// One line of an open memo that isn't a checklist item (#84): a heading larger and bold, a list item's words hanging
+/// after its mark, a quote beside its bar, a code block's line fixed-width on its tint, a rule's line; the marks faint.
+private struct MarkdownLine: View {
+    let line: MemoMarkdown.Line
+    let raw: String
+    let styler: MemoStyler
+    let palette: DrawerPalette
+    /// The marks left out (#84, 2026-10-30), unless 기호 늘 보이기.
+    private var hide: Bool { !styler.text.showMarks }
+
+    var body: some View {
+        let text = styler.text
+        let read = line.read
+        let base = Font(text.font())
+        switch read.kind {
+        case .code, .fence:
+            Text(verbatim: read.kind == .fence && hide ? " " : raw)
+                .font(Font(text.codeFont))
+                .foregroundStyle(read.kind == .fence ? Color(nsColor: styler.faint) : palette.ink)
+                .modifier(OnTheLines(text: text))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(nsColor: styler.tint))
+        case .heading:
+            let scale = MemoStyler.headingScale[max(0, min(2, read.level - 1))]
+            Text(styler.swiftUI(line.units, read, base: base, scale: scale, hide: hide))
+                .font(Font(text.font(scale: scale)).bold())
+                .foregroundStyle(palette.ink)
+                .modifier(OnTheLines(text: text, height: (text.line * scale).rounded()))
+                .frame(maxWidth: .infinity, alignment: .leading)
+        case .list, .olist:
+            let styled = styler.swiftUI(line.units, read, base: base)
+            let shown = hide ? styler.swiftUI(line.units, read, base: base, hide: true) : styled
+            // Hidden marks (#84): a list's `- ` drawn as •, a number as it is.
+            let bullet = hide && read.kind == .list
+            let head = bullet ? AttributedString(String(decoding: line.units[..<read.markFrom], as: UTF16.self) + "• ") : split(styled, at: read.words).head
+            HStack(alignment: .firstTextBaseline, spacing: 0) {
+                Text(head).font(base).foregroundStyle(bullet ? palette.preview : palette.ink)
+                Text(split(shown, at: bullet ? read.markFrom : read.words).tail).font(base).foregroundStyle(palette.ink)
+                    .modifier(OnTheLines(text: text))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        case .quote:
+            HStack(alignment: .top, spacing: MemoStyler.quoteIndent - 2) {
+                Rectangle().fill(Color(nsColor: styler.faint)).frame(width: 2).padding(.vertical, 2)
+                Text(styler.swiftUI(line.units, read, base: base, hide: hide)).font(base).foregroundStyle(palette.preview)
+                    .modifier(OnTheLines(text: text))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        case .rule:
+            Text(hide ? AttributedString(" ") : styler.swiftUI(line.units, read, base: base)).font(base)
+                .modifier(OnTheLines(text: text))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background { Rectangle().fill(Color(nsColor: styler.faint)).frame(height: 1) }
+        default:
+            let words = String(decoding: line.units[..<read.end], as: UTF16.self)
+            let code = !words.contains("`") && Checklist.isCode(words)
+            Text(code ? AttributedString(words) : styler.swiftUI(line.units, read, base: base, hide: hide))
+                .font(code ? Font(text.codeFont) : base)
+                .foregroundStyle(palette.ink)
+                .modifier(OnTheLines(text: text))
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// The styled line cut where its words start (a list item's mark, then its words).
+    private func split(_ styled: AttributedString, at offset: Int) -> (head: AttributedString, tail: AttributedString) {
+        let words = String(decoding: line.units[..<line.read.end], as: UTF16.self)
+        guard let cut = Range(NSRange(location: min(offset, (words as NSString).length), length: 0), in: words),
+              let index = AttributedString.Index(cut.lowerBound, within: styled) else { return (AttributedString(), styled) }
+        return (AttributedString(styled[..<index]), AttributedString(styled[index...]))
+    }
+}
+
+/// An open memo's text: each line exactly the setting's line (보통 26 pt) tall, its words centred in it — the same lines
 /// as while it's typed, so opening the editor doesn't move them.
 struct OnTheLines: ViewModifier {
+    var text = MemoText()
+    /// A heading's taller line.
+    var height: CGFloat?
     var lines: Int?
 
     func body(content: Content) -> some View {
+        let line = height ?? text.line
+        let spacing = max(0, line - MemoText.lineHeight(text.font()))
         content
-            .lineSpacing(MemoSlipStyle.lineSpacing)
+            .lineSpacing(spacing)
             .lineLimit(lines)
             .fixedSize(horizontal: false, vertical: true)
-            .padding(.vertical, MemoSlipStyle.lineSpacing / 2)
-            .frame(minHeight: MemoSlipStyle.line)
+            .padding(.vertical, spacing / 2)
+            .frame(minHeight: line)
     }
 }
 
 struct CheckBox: View {
     let checked: Bool
     let palette: DrawerPalette
-    /// 13 in an open memo; 11 on a card's preview (#14).
-    var size: CGFloat = 13
+    /// 15 in an open memo (#163; 13 before, the note's are 17–19); 11 on a card's preview (#14).
+    var size: CGFloat = MemoBox.size
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 3, style: .continuous)
-            .fill(checked ? palette.check : .clear)
-            .overlay {
-                if !checked { RoundedRectangle(cornerRadius: 3, style: .continuous).strokeBorder(palette.box, lineWidth: 1.2) }
-            }
-            .overlay {
-                if checked { Image(systemName: "checkmark").font(.system(size: size * 0.58, weight: .bold)).foregroundStyle(palette.checkOn) }
-            }
-            .frame(width: size, height: size)
-            .contentShape(Rectangle().inset(by: -4))
+        let corner = size * 3.5 / 15
+        ZStack {
+            RoundedRectangle(cornerRadius: corner, style: .continuous).strokeBorder(palette.box, lineWidth: 1.2)
+                .opacity(checked ? 0 : 1)
+            // #163: ticked, the box fills (0.18 s) and its mark draws in; unticked, back quicker. Reduce motion: at once.
+            RoundedRectangle(cornerRadius: corner, style: .continuous).fill(palette.check)
+                .scaleEffect(checked ? 1 : 0.82)
+                .opacity(checked ? 1 : 0)
+            CheckMark()
+                .trim(from: 0, to: checked ? 1 : 0)
+                .stroke(palette.checkOn, style: StrokeStyle(lineWidth: size < 13 ? 1.5 : 1.9, lineCap: .round, lineJoin: .round))
+        }
+        .frame(width: size, height: size)
+        .animation(checked ? Motion.animation(.enter, reduce: reduceMotion) : Motion.exit(.quick, reduce: reduceMotion), value: checked)
+        // As generous as the note's boxes: about 25 × 25 round its middle.
+        .contentShape(Rectangle().inset(by: -(MemoBox.target - size) / 2))
+    }
+}
+
+/// The box's mark as two strokes (the editor's MemoBox draws the same), drawn in from its short arm.
+struct CheckMark: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX + rect.width * 0.27, y: rect.minY + rect.height * 0.52))
+        path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.43, y: rect.minY + rect.height * 0.68))
+        path.addLine(to: CGPoint(x: rect.minX + rect.width * 0.74, y: rect.minY + rect.height * 0.34))
+        return path
     }
 }
 
@@ -547,11 +916,12 @@ struct SlipEditor: View {
 
     var body: some View {
         let id = memo.id
-        DrawerTextView(text: $text, palette: palette, bodyFont: .systemFont(ofSize: MemoSlipStyle.bodySize), titleFont: font.handNSFont(MemoDrawerView.hand(22)),
-                       titleStroke: font != .clean, lineHeight: MemoSlipStyle.line, titleLineHeight: MemoSlipStyle.titleRow,
+        let memoText = drawer.text
+        DrawerTextView(text: $text, palette: palette, bodyFont: memoText.font(), titleFont: font.handNSFont(MemoDrawerView.hand(22)),
+                       titleStroke: font != .clean, lineHeight: memoText.line, titleLineHeight: MemoSlipStyle.titleRow,
                        onEscape: { drawer.collapse() }, focus: SlipMotion.enabled ? 1 : 0, caretLine: drawer.editLine, minHeight: minHeight,
                        onEdit: { old, new in drawer.edit(id, text: new, from: old) }, onBlur: { drawer.sendTyped() }, accessibilityLabel: L("메모 내용"),
-                       extraMenu: { [weak drawer] in drawer.map { DrawerMenus.textSection($0, id) } ?? [] }, menuDrawer: drawer)
+                       extraMenu: { [weak drawer] in drawer.map { DrawerMenus.textSection($0, id) } ?? [] }, menuDrawer: drawer, markdown: memoText)
             .focusEffectDisabled()
             .onChange(of: memo.text) { _, newer in
                 guard newer != text else { return }
@@ -578,6 +948,8 @@ struct BigSlip: View {
                     .padding(.bottom, 8)
             }
             .scrollIndicators(.automatic)
+            if drawer.linkEdit != nil { LinkBar(drawer: drawer, palette: sheet).padding(.bottom, 6) }
+            if drawer.formatBarOpen { FormatBar(drawer: drawer, palette: sheet).padding(.bottom, 6) }
             MemoBar(drawer: drawer, memo: memo, palette: sheet, big: true)
         }
         .frame(maxHeight: .infinity, alignment: .top)
@@ -585,7 +957,9 @@ struct BigSlip: View {
     }
 }
 
-/// A search result: the matching line (the query on a tint), the memo's folder small at the right.
+/// A search result (#114): the list's card — its tape, the handwritten title, the date (MemoCards.foundTime) — with the
+/// found line in the preview's place (brought near its start, the query on a tint); a match in the title is marked there
+/// with the next line under it, and a result the chips alone picked shows its preview rows. Its folder is the group's.
 struct SearchSlip: View {
     @ObservedObject var drawer: MemoDrawer
     let hit: MemoFolders.Hit
@@ -595,47 +969,35 @@ struct SearchSlip: View {
     var body: some View {
         let memo = drawer.memo(hit.memoID)
         let selected = drawer.selectedID == hit.memoID
-        let folder = drawer.folders.folder(hit.folderID)
+        let color = drawer.folders.folder(hit.folderID)?.colorKey ?? .lavender
         let sheet = drawer.folders.paper(of: hit.memoID).map { DrawerPalette.of(DrawerPalette.Kind(rawValue: $0.rawValue)!) } ?? palette
+        let found = MemoFolders.snippet(hit.text, range: hit.range)
         Button { drawer.reveal(hit.memoID) } label: {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    CardTitle(words: Text(onTitle ? highlighted(sheet) : AttributedString(title.handwritten)), font: font, color: sheet.ink)
+                    CardTitle(words: Text(onTitle ? highlighted(found, sheet) : AttributedString(title.handwritten)), font: font, color: sheet.ink)
                     Spacer(minLength: 4)
-                    if let memo { TimeText(text: MemoCards.dayTime(memo.updatedAt, now: drawer.now(), language: .current), palette: sheet) }
-                    if let folder {
-                        let colors = palette.tab(folder.colorKey)
-                        Text(folder.displayName(.current))
-                            .font(.system(size: 10.5, weight: .medium))
-                            .foregroundStyle(colors.ink)
-                            .lineLimit(1)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1.5)
-                            .background(colors.a, in: Capsule())
-                            .fixedSize()
-                    }
+                    if let memo { TimeText(text: MemoCards.foundTime(memo.updatedAt, now: drawer.now(), language: .current), palette: sheet) }
                 }
                 .frame(height: MemoSlipStyle.titleRow)
-                if !onTitle {
-                    Text(highlighted(sheet))
-                        .font(.system(size: MemoSlipStyle.previewSize))
+                if hit.range != nil, !onTitle {
+                    Text(highlighted(found, sheet))
+                        .font(.system(size: drawer.text.previewSize))
                         .foregroundStyle(sheet.preview)
-                        .lineSpacing(MemoSlipStyle.previewSpacing)
+                        .lineSpacing(drawer.text.previewSpacing)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
-                        .padding(.vertical, MemoSlipStyle.previewSpacing / 2)
-                } else if let next = memo.flatMap({ MemoCards.preview($0.text) }) {
-                    Text(verbatim: next.keepingParticles)
-                        .font(.system(size: MemoSlipStyle.previewSize))
-                        .foregroundStyle(sheet.preview)
-                        .lineLimit(1)
-                        .frame(height: MemoSlipStyle.previewLine)
+                        .padding(.vertical, drawer.text.previewSpacing / 2)
+                } else if let memo, case let rows = drawer.card(memo).rows, !rows.isEmpty {
+                    PreviewRows(rows: rows, limit: 2, palette: sheet, text: drawer.text)
                 }
             }
-            .modifier(MemoSlipStyle(palette: sheet, drawer: palette, state: .init(selected: selected, folder: folder?.colorKey ?? .lavender,
+            .modifier(MemoSlipStyle(palette: sheet, drawer: palette, state: .init(selected: selected, folder: color,
+                                                                                  minHeight: MemoSlipStyle.denseHeight,
                                                                                   floating: drawer.shownBackdrop == .none)))
         }
         .buttonStyle(.plain)
+        .overlay(alignment: .top) { CardTape(id: hit.memoID, color: palette.tab(color).tape) }
     }
 
     private var title: String { drawer.memo(hit.memoID).map { drawer.cardTitle($0) } ?? "" }
@@ -646,17 +1008,17 @@ struct SearchSlip: View {
     }
 
     /// The query's letters on the check colour's tint.
-    private func highlighted(_ sheet: DrawerPalette) -> AttributedString {
-        var text = AttributedString(hit.text)
-        guard let range = hit.range else { return text }
-        let scalars = Array(hit.text.precomposedStringWithCanonicalMapping.unicodeScalars)
+    private func highlighted(_ found: (text: String, range: Range<Int>?), _ sheet: DrawerPalette) -> AttributedString {
+        var text = AttributedString(found.text)
+        guard let range = found.range else { return text }
+        let scalars = Array(found.text.precomposedStringWithCanonicalMapping.unicodeScalars)
         guard range.upperBound <= scalars.count else { return text }
         let before = String(String.UnicodeScalarView(scalars[..<range.lowerBound])).count
         let inside = String(String.UnicodeScalarView(scalars[range])).count
         let chars = text.characters
         guard before + inside <= chars.count else { return text }
         let start = chars.index(chars.startIndex, offsetBy: before), end = chars.index(start, offsetBy: inside)
-        text[start..<end].backgroundColor = sheet.check.opacity(sheet.kind == .night ? 0.35 : 0.22)
+        text[start..<end].backgroundColor = sheet.check.opacity(sheet.scheme == .dark ? 0.35 : 0.22)
         text[start..<end].foregroundColor = sheet.ink
         return text
     }

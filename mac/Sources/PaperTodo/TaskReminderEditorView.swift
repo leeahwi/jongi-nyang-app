@@ -215,7 +215,7 @@ struct TaskReminderEditorView: View {
                 } else {
                     RoundedRectangle(cornerRadius: 2).strokeBorder(PaperTheme.ink3, lineWidth: 1).frame(width: 8, height: 8)
                 }
-                Text(space?.name ?? SpaceWords.noSpace(.current)).lineLimit(1)
+                Text(space?.name ?? model.generalName).lineLimit(1)
                 Image(systemName: "chevron.up.chevron.down").font(.system(size: 8, weight: .semibold)).foregroundStyle(PaperTheme.ink3)
             }
             .font(.system(size: 12, weight: .medium))
@@ -224,8 +224,8 @@ struct TaskReminderEditorView: View {
             .frame(height: 24)
             .background(PaperTheme.paper2, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             .fixedSize()
-            .overlay { SpaceMenuArea(label: space?.name ?? SpaceWords.noSpace(.current), items: { SpaceMenus.move(model, item.id, offerNew: false) }, font: model.notebookFont) }
-            .accessibilityLabel(L("스페이스") + " " + (space?.name ?? SpaceWords.noSpace(.current)))
+            .overlay { SpaceMenuArea(label: space?.name ?? model.generalName, items: { SpaceMenus.move(model, item.id, offerNew: false) }, font: model.notebookFont) }
+            .accessibilityLabel(L("스페이스") + " " + (space?.name ?? model.generalName))
             Spacer(minLength: 0)
         }
     }
@@ -687,7 +687,7 @@ struct TaskReminderEditorView: View {
     }
 
     private var snapshotURL: URL? {
-        let arguments = ProcessInfo.processInfo.arguments
+        let arguments = TestHooks.arguments
         guard let index = arguments.firstIndex(of: "--editor-snapshot"), arguments.indices.contains(index + 1) else { return nil }
         return URL(fileURLWithPath: arguments[index + 1]).deletingPathExtension()
             .appendingPathExtension((mode == .repeating ? "repeat" : mode == .time ? "time" : showingCustomDate ? "custom" : "quick") + ".png")
@@ -773,7 +773,7 @@ private enum ReminderPreset: String, CaseIterable, Identifiable {
         case .oneHour:
             return L("1시간 뒤")
         case .tomorrowMorning:
-            return L("내일 오전 9시")
+            return Snooze.tomorrowMorning.title(.current) // #52: the 다시 알림 menu's name, ‘내일 아침 9시’
         }
     }
 

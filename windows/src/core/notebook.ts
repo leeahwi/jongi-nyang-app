@@ -416,6 +416,16 @@ export class UndoableNotebook {
     });
   }
 
+  /** #168: the list in `order` (ids in it first, as given; the rest after, as they were), as one undo step. */
+  reorder(order: readonly string[]): boolean {
+    const rank = new Map(order.map((id, index) => [id, index]));
+    const now = this.current.items;
+    const sorted = now.map((item, index) => ({ item, key: rank.get(item.id) ?? order.length + index, index }))
+      .sort((a, b) => a.key - b.key || a.index - b.index).map((entry) => entry.item);
+    if (sorted.every((item, index) => item === now[index])) return false;
+    return this.perform((notebook) => { notebook.items = sorted.map((item) => notebook.items.find((entry) => entry.id === item.id) ?? item); });
+  }
+
   clearCompleted(): number {
     const before = this.current.items.length;
     this.perform((notebook) => {

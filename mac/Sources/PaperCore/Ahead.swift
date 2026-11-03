@@ -153,6 +153,18 @@ public enum Ahead {
         return sections
     }
 
+    /// 2a (S37): the to-dos the page lays out while one space shows (`include`: in the lens), and how many open ones
+    /// ahead the lens hides (the end line's N). Events aren't to-dos: they always show.
+    public static func lensed(_ items: [TodoItem], now: Date, calendar: Calendar = .paper,
+                              include: (TodoItem) -> Bool) -> (items: [TodoItem], hidden: Int) {
+        var kept: [TodoItem] = []
+        var hidden = 0
+        for item in items {
+            if include(item) { kept.append(item) } else if isAhead(item, now: now, calendar: calendar) { hidden += 1 }
+        }
+        return (kept, hidden)
+    }
+
     /// The tab's badge: open tasks in every section.
     public static func count(_ sections: [Section]) -> Int { sections.map(\.count).reduce(0, +) }
 

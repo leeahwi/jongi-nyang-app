@@ -1,8 +1,8 @@
 import { dayKey } from "../core/archive";
-import { tomorrowKey } from "../core/carry";
+import { carriedDays, carriedText, tomorrowKey } from "../core/carry";
 import { eveningDue, morningItems, sweepItems, yesterdayKey } from "../core/sweep";
 import type { TodoItem } from "../core/notebook";
-import { t } from "../i18n";
+import { lang, t } from "../i18n";
 import type { ReminderPopup } from "./popup";
 import type { Store } from "./store";
 
@@ -59,7 +59,7 @@ export class EveningSweep {
     const prefs = this.store.prefs;
     const n = items.length;
     this.popup.show({
-      tasks: items.map((item) => ({ id: item.id, title: item.title })),
+      tasks: items.map((item) => ({ id: item.id, title: item.title, carried: carriedText(carriedDays(item, now), lang()) })),
       scheduled: false, preview, canComplete: false, style: prefs.reminderStyle, font: prefs.font,
       durationMs: 0, snoozeEnabled: false, reduceMotion: false,
       sweep: {

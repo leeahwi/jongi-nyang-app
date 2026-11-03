@@ -11,7 +11,7 @@ import { maxTimerMinutes, rememberTimer, timerPresets } from "../core/duration";
 import { focusRecord, type FocusRecord } from "../core/focus";
 import { newID } from "../core/notebook";
 import { lang, t } from "../i18n";
-import { offscreen } from "./env";
+import { offscreen, offscreenEnabled } from "./env";
 import type { Store, TimerMemory } from "./store";
 
 export interface TimerHooks {
@@ -456,6 +456,9 @@ export class FocusTimerWidget {
       ...this.size, show: false, frame: false, transparent: true, resizable: false, minimizable: false, maximizable: false,
       fullscreenable: false, focusable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false,
       backgroundColor: "#00000000", title: t("집중 타이머"),
+      // Off-screen runs (snapshots, tests): macOS pulls a window placed off every display back onto one unless it may be
+      // larger than the screen (only macOS reads this).
+      enableLargerThanScreen: offscreenEnabled,
       webPreferences: { preload: path.join(__dirname, "preload.js"), sandbox: true, contextIsolation: true, backgroundThrottling: false },
     });
     // Every desktop, but not over full-screen apps (videos, presentations).

@@ -1,0 +1,35 @@
+/* 노트 창 위의 고양이 귀 (#151): the drawer's two ears on the note's top edge, in the note's paper (--paper, day or
+   night), the drawer's pink inside, and a hairline along their sides in the shade of a window edge — they have no
+   shadow (it would fall on the note), so on a desktop of nearly the paper's colour the line keeps them from melting
+   away. The window is clear; only the ears take the mouse. */
+:root { --ear-in: rgba(242, 201, 198, 0.8); --ear-edge: rgba(60, 50, 30, 0.2); }
+:root[data-paper="night"] { --ear-in: #7d555a; --ear-edge: rgba(255, 255, 255, 0.16); }
+@media (prefers-contrast: more) { :root, :root[data-paper="night"] { --ear-edge: var(--ink-3); } }
+body.ears-window { margin: 0; background: transparent; overflow: hidden; }
+.note-ears { display: block; overflow: visible; pointer-events: none; }
+.note-ears .ear { fill: var(--paper); pointer-events: visiblePainted; cursor: default; }
+.note-ears .ear-edge { fill: none; stroke: var(--ear-edge); stroke-width: 0.6; pointer-events: none; }
+.note-ears .ear-in { fill: var(--ear-in); pointer-events: none; }
+/* A twitch: the tip flicks 4 px sideways (a skew about the ear's foot, which stays on the edge), a little past, settled
+   — 0.4 s. The left ear flicks outward (left), the right one the other way. None with reduced motion (ears.ts too). */
+.note-ears .one { transform-box: view-box; }
+.note-ears .one.twitch { animation: ear-flick-left 0.4s ease-out; }
+.note-ears .one.right.twitch { animation-name: ear-flick-right; }
+@keyframes ear-flick-left { 27% { transform: skewX(14deg); } 62% { transform: skewX(-4.7deg); } }
+@keyframes ear-flick-right { 27% { transform: skewX(-14deg); } 62% { transform: skewX(4.7deg); } }
+/* Snapshots: an ear held mid-twitch. */
+.note-ears .one.held { transform: skewX(14deg); }
+@media (prefers-reduced-motion: reduce) { .note-ears .one.twitch { animation: none; } }
+
+/* Snapshots (#preview): the note as it stands on a desktop with its ears — the note's picture with a window's edge and
+   shadow, the ears' box over its top edge at the right — and the ears alone on light and dark desktops. */
+body.ears-preview { margin: 0; background: linear-gradient(160deg, #dfe5ea, #cdd6de); }
+:root[data-paper="night"] body.ears-preview { background: linear-gradient(160deg, #3b4048, #2c3036); }
+.ears-preview .stage { position: relative; }
+.ears-preview .shot { position: absolute; display: block; box-shadow: 0 8px 26px rgba(30, 40, 50, 0.22), 0 0 0 0.5px rgba(0, 0, 0, 0.12); }
+:root[data-paper="night"] .ears-preview .shot { box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(255, 255, 255, 0.16); }
+.ears-preview .note-ears { position: absolute; }
+.ears-preview .strip { display: flex; }
+.ears-preview .strip > div { position: relative; width: 120px; height: 60px; }
+.ears-preview .strip .note-ears { left: 10px; top: 12px; }
+.ears-preview .strip .band { position: absolute; left: 10px; top: 31px; width: 100px; height: 14px; background: var(--paper); }

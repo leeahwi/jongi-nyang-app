@@ -9,7 +9,7 @@
 .index-tabs { display: flex; align-items: flex-end; gap: 4px; -webkit-app-region: no-drag; flex: none; }
 .index-tab {
   position: relative; height: 25px; padding: 0 12px; display: flex; align-items: center; gap: 5px; flex: none;
-  border-radius: 8px 8px 0 0; background: var(--tab-color); transition: height 0.12s ease-out, box-shadow 0.12s;
+  border-radius: 8px 8px 0 0; background: var(--tab-color); transition: height var(--motion-quick) var(--ease-out), box-shadow var(--motion-quick) var(--ease-out);
   border: 1px solid var(--tab-edge); border-bottom: none;
 }
 .index-tab:hover, .index-tab.hover { height: 26px; }
@@ -55,23 +55,17 @@
 :root[data-font="clean"] .title { font-size: 23px; font-weight: 600; line-height: 1.3; }
 :root[data-font="brush"] .title { font-size: 31px; }
 .prog { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 11px; font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* N17 (as on the Mac): the share is a registered type, so it can fill with 그리기 (0.22 s) — once drawn ("live"). */
+@property --done { syntax: "<percentage>"; inherits: false; initial-value: 0%; }
+@property --ring-done { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 .donut { width: 16px; height: 16px; border-radius: 50%; flex: none; background: conic-gradient(var(--sage) 0 var(--done, 0%), var(--rule) var(--done, 0%) 100%); display: grid; place-items: center; }
+.donut.live { transition: --done var(--motion-draw) var(--ease-out); }
 .donut::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--paper); }
 .donut.full::after { background: var(--sage); box-shadow: inset 0 0 0 2px var(--paper); }
 
-/* The cat peeking over the top edge of the sheet, paws on the edge; it nods when a task is checked
-   and sleeps from 11 p.m. to 5 a.m. */
-.peek { position: relative; width: 70px; height: 54px; margin: 0 0 -6px 6px; flex: none; align-self: flex-end; }
-.peek-window { position: absolute; inset: -12px 0 0; overflow: hidden; }
-.peek-window img { position: absolute; left: 0; top: 18px; width: 70px; height: 70px; transform-origin: 50% 90%; }
-.peek.nod .peek-window img { animation: nod 0.4s ease-out; }
+/* The focus card's cat nods (#151: the header's cat left; its ears stand on the window, ears.css). */
 @keyframes nod { 40% { transform: rotate(2deg) translateY(2px); } }
-.peek.sleeping .peek-window img { top: 12px; }
-/* 밤 종이: the cat a touch dimmer, so its own white paper doesn't glare. */
-:root[data-paper="night"] .peek-window img, :root[data-paper="night"] .peek-paws { opacity: 0.92; }
-/* …with a faint light outline (spec 3B), so it doesn't sink grey into the dark paper. */
-:root[data-paper="night"] .peek-window img { filter: drop-shadow(0 0 0.6px rgba(255, 255, 255, 0.5)) drop-shadow(0 0 1px rgba(255, 255, 255, 0.12)); }
-/* A short note (under 480 px high): a compact header — the title a size smaller, the cat smaller, less air —
+/* A short note (under 480 px high): a compact header — the title a size smaller, less air —
    so the list keeps room for more than one row. */
 @media (max-height: 480px) {
   .title-row { min-height: 58px; padding: 4px 16px 4px 22px; }
@@ -79,18 +73,7 @@
   .title { font-size: 27px; margin-top: 0; }
   :root[data-font="clean"] .title { font-size: 19px; }
   :root[data-font="brush"] .title { font-size: 25px; }
-  .peek { width: 56px; height: 44px; margin-bottom: -4px; }
-  .peek-window img { width: 56px; height: 56px; top: 14px; }
-  .peek.sleeping .peek-window img { top: 10px; }
-  .peek-paws { gap: 12px; bottom: -4px; }
-  .peek .paw { width: 10px; height: 9px; }
 }
-.peek-edge { position: absolute; left: 3px; right: 3px; bottom: 0; height: 1.2px; border-radius: 1px; background: color-mix(in srgb, var(--ink) 28%, transparent); }
-.peek-paws { position: absolute; left: 0; right: 0; bottom: -5px; display: flex; justify-content: center; gap: 16px; }
-.peek.sleeping .peek-paws { display: none; }
-.peek .paw { width: 12px; height: 11px; overflow: visible; }
-.peek .paw path { fill: rgb(247, 230, 196); stroke: rgba(107, 77, 48, 0.85); stroke-width: 0.85; }
-.peek .paw .toe { fill: none; stroke-width: 0.55; stroke-linecap: round; }
 .sheet { flex: 1; min-height: 0; overflow-y: auto; position: relative; scrollbar-width: none; }
 /* Soft 12px fades where the list goes on beyond the edge. */
 .sheet.fade-top { -webkit-mask-image: linear-gradient(to bottom, transparent, black 12px); }
@@ -105,12 +88,28 @@
 .lines::before { content: ""; position: absolute; left: var(--margin); top: 0; bottom: 0; width: 0.6px; background: color-mix(in srgb, var(--accent) 22%, transparent); pointer-events: none; }
 
 .row { height: var(--row); display: flex; align-items: center; position: relative; }
+/* #65: 오늘 with 2,000 rows — the rows out of view skip style, layout and paint (their height is fixed, so the list
+   is as tall). The clip margin keeps what a row draws past its edges (the drop line, focus rings) as it was. */
+.lines > .row { content-visibility: auto; contain-intrinsic-block-size: auto var(--row); overflow-clip-margin: 24px; }
 .row::after { content: ""; position: absolute; inset: 3px 7px 3px 14px; border-radius: 4px; background: color-mix(in srgb, var(--sage) 5.5%, transparent); opacity: 0; pointer-events: none; transition: opacity 0.1s; }
 .row:hover::after, .row.editing::after, .row.preview-hover::after { opacity: 1; }
 .row.dragging { opacity: 0.55; }
 .row.dragging.to-tab { opacity: 0.32; }
+/* #167: the copy of a dragged row that follows the pointer (moved by a transform only). */
+.drag-ghost { position: fixed; z-index: 55; margin: 0; pointer-events: none; background: var(--card); border: 1px solid var(--rule); border-radius: 8px; box-shadow: 0 8px 22px rgba(40, 30, 10, 0.18); opacity: 0.95; will-change: transform; }
+/* #181's row animations stay off the drag: the copy, its badge and the rows being dragged hold still. */
+.drag-ghost, .drag-ghost *, .row.dragging { animation: none !important; }
+.drag-ghost::after, .drag-ghost .grip, .drag-ghost .actions, .drag-ghost.no-band .sband { display: none !important; }
+/* #168: how many rows a drag takes ("3개"), on the copy's top right corner. */
+.drag-badge { position: absolute; top: -8px; right: 8px; height: 20px; padding: 0 7px; border-radius: 10px; display: inline-flex; align-items: center; background: var(--sage); color: var(--on-sage); font: 700 11px var(--ui); font-variant-numeric: tabular-nums; box-shadow: 0 1px 3px rgba(40, 30, 10, 0.2); }
 /* The keyboard's row: a soft sage tint and a sage bar on the margin line. */
 .row.selected::after { opacity: 1; background: color-mix(in srgb, var(--sage) 11%, transparent); }
+/* N3 · N4 (as on the Mac): a to-do just added rises 6 px as it fades in (등장); a finished one folds away (0.18 s, ease-in)
+   when its hold ends, taking no clicks. One row each; Reduce Motion: at once (base.css). */
+.row.appear { animation: row-in var(--motion-enter) var(--ease-out); }
+@keyframes row-in { from { opacity: 0; transform: translateY(var(--motion-rise)); } }
+.row.leaving { animation: row-out var(--motion-enter) var(--ease-in) forwards; overflow: hidden; pointer-events: none; }
+@keyframes row-out { to { height: 0; opacity: 0; } }
 .row.flash::after { opacity: 1; background: color-mix(in srgb, var(--sage) 16%, transparent); animation: flash 1.2s ease-out forwards; }
 @keyframes flash { 70% { opacity: 1; } 100% { opacity: 0; } }
 .row.up-next .grip { visibility: hidden; }
@@ -131,7 +130,7 @@
 .box .icon { opacity: 0; }
 .row.done .box .icon { opacity: 1; }
 /* Checking: the box fills sage with a short pop (0.85 → 1, 160 ms), then the strike draws left to right (220 ms). Unchecking is instant. */
-.row.pop .box { animation: pop 0.16s ease-out; }
+.row.pop .box { animation: pop var(--motion-change) var(--ease-out); }
 @keyframes pop { from { transform: rotate(-3deg) scale(0.85); } }
 
 .text { flex: 1; min-width: 0; padding-left: 17px; padding-right: 8px; position: relative; z-index: 1; }
@@ -142,7 +141,7 @@
 .strike { clip-path: inset(0 100% 0 0); }
 .strike path { fill: none; stroke: color-mix(in srgb, var(--ink) 62%, transparent); stroke-width: 1.25; stroke-linecap: round; }
 .row.done .strike { clip-path: inset(0 0 0 0); }
-.row.animate .strike { transition: clip-path 0.22s ease-out 0.08s; }
+.row.animate .strike { transition: clip-path var(--motion-draw) var(--ease-out) 0.08s; }
 .edit { width: 100%; font-family: var(--body-font); font-size: var(--body-size); color: var(--ink); background: transparent; border: 0; outline: none; padding: 0; line-height: 1.25; user-select: text; }
 
 .time { height: 24px; margin-left: 10px; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--sage-text); white-space: nowrap; z-index: 1; }
@@ -284,7 +283,7 @@
    their own ruled line, so a heading never sits on the line of the row above, and the paper goes on
    ruled below the last row. */
 .lines.grouped { display: flex; flex-direction: column; background-image: none; }
-.lines.grouped > .row, .lines.grouped > .all-done { flex: none; background-image: linear-gradient(var(--rule), var(--rule)); background-repeat: no-repeat; background-size: calc(100% - 38px) 1px; background-position: 18px 100%; }
+.lines.grouped > .row, .lines.grouped > .all-done, .lines.grouped > .lens-more { flex: none; background-image: linear-gradient(var(--rule), var(--rule)); background-repeat: no-repeat; background-size: calc(100% - 38px) 1px; background-position: 18px 100%; }
 .lines.grouped > .row.selected { background-image: linear-gradient(var(--sage), var(--sage)), linear-gradient(var(--rule), var(--rule)); background-size: 2px calc(100% - 10px), calc(100% - 38px) 1px; background-position: calc(var(--margin) - 1px) 5px, 18px 100%; }
 .lines-fill { flex: 1 0 0; min-height: 0; background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--row) - 1px), var(--rule) calc(var(--row) - 1px), var(--rule) var(--row)); background-size: calc(100% - 38px) 100%; background-position: 18px 0; background-repeat: no-repeat; }
 .group-head, .group-mark { flex: none; height: 22px; display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; padding: 0 20px 3px calc(var(--margin) + 17px); position: relative; z-index: 1; pointer-events: none; font: 600 10.5px/14px var(--ui); letter-spacing: 0.04em; color: var(--ink-3); font-variant-numeric: tabular-nums; }
@@ -410,6 +409,11 @@
 .tt-block.task { gap: 5px; padding: 0 7px 0 4px; background: var(--card); box-shadow: inset 0 0 0 1.5px var(--sage); cursor: grab; }
 .tt-block.task.late { box-shadow: inset 0 0 0 1.5px var(--clay); }
 .tt-block.task.tall { align-items: flex-start; padding: 3px 7px 3px 4px; }
+/* 2a (A4): a to-do in a space — its left edge, 3 px, in the space's band colour (the outline stays). */
+.tt-block.task.spaced { padding-left: 6px; box-shadow: inset 3px 0 0 var(--band), inset 0 0 0 1.5px var(--sage); }
+.tt-block.task.spaced.late { box-shadow: inset 3px 0 0 var(--band), inset 0 0 0 1.5px var(--clay); }
+/* 2a (A3): the strip's small round dot before a to-do's title in a space. */
+.sp-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--band); align-self: center; }
 .tt-block.task.done { opacity: 0.5; cursor: pointer; }
 .tt-block.task:not(.tall) .tb-time { margin-left: auto; padding-left: 4px; }
 .tb-check { flex: none; width: 16px; height: 16px; padding: 0; display: grid; place-items: center; }
@@ -492,7 +496,8 @@
 :root:lang(en) .ahead { --key-w: 56px; }
 .ahead { min-height: 100%; padding: 2px 16px 14px 18px; position: relative; }
 .ahead-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 14px 2px 2px 0; font: 600 10.5px/14px var(--ui); letter-spacing: 0.04em; color: var(--ink-3); font-variant-numeric: tabular-nums; }
-.ahead-head:first-child { margin-top: 6px; }
+/* #48: the first heading clear of the cat's shelf above it, so its count doesn't read as the cat's. */
+.ahead-head:first-child { margin-top: 14px; }
 .ahead-head .group-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ahead-head .group-count { flex: none; }
 /* A day (and 언젠가) reaches 8px past the list on both sides, so its drop highlight has room; its ruled line stays the list's width. */
@@ -529,6 +534,8 @@
 .ahead .row.selected { background-image: none; }
 .ahead .row.drop-before::before, .ahead .row.drop-after::before { left: 0; right: 0; }
 .due.ahead-day { color: var(--ink-3); font-weight: 600; }
+/* #48: the flag is the last column; whatever comes before it (a time, 달력에 넣음) keeps a little room. */
+.ahead .row .due { margin-left: 10px; }
 .due.ahead-day.late { color: var(--clay-text); }
 .ahead .due.later { font-weight: 500; color: var(--ink-3); }
 /* Where a dragged task would land: the day (or 언젠가) lights up in sage — behind it, in the 8px
@@ -574,7 +581,9 @@
 .fc-track { stroke: var(--rule); }
 .fc-progress { stroke: var(--clay); }
 .focus-card:is([data-stage="timeUp"], [data-stage="break"], [data-stage="breakOver"]) .fc-progress { stroke: var(--sage); }
-@media (prefers-reduced-motion: no-preference) { .fc-progress { transition: stroke-dashoffset 0.95s linear, stroke 0.2s; } }
+/* F2 (as on the Mac): the ring steps once a second with the clock, no transition — a 0.95 s linear one each second had it
+   repainting (stroke-dashoffset isn't composited) the whole 25 minutes. Only the colour change keeps its 0.2 s. */
+@media (prefers-reduced-motion: no-preference) { .fc-progress { transition: stroke 0.2s; } }
 .fc-in { position: relative; display: grid; justify-items: center; gap: 1px; }
 .fc-time { font: 650 calc(var(--size) * 0.205) / 1.1 var(--ui); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
 .fc-time.tclock { justify-items: center; }
@@ -584,8 +593,13 @@
 :root[data-font="clean"] .fc-task { font-size: 20px; font-weight: 600; line-height: 1.35; }
 :root[data-font="brush"] .fc-task { font-size: 30px; }
 .fc-task.one-line { -webkit-line-clamp: 1; }
+/* 2a (A6): the to-do's space over the title — a 6 px dot and its name, small, ink-2. */
+.fc-space { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; margin-top: 4px; font: 500 11px/1.3 var(--ui); color: var(--ink-2); white-space: nowrap; }
+.fc-space[hidden] { display: none; }
+.fc-space span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.fc-space-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--band); }
 .focus-card.tight .fc-next { display: none; }
-.fc-task.struck { background-size: 100% 1.5px; color: var(--ink-3); transition: background-size 0.22s ease-out, color 0.22s; }
+.fc-task.struck { background-size: 100% 1.5px; color: var(--ink-3); transition: background-size var(--motion-draw) var(--ease-out), color var(--motion-draw) var(--ease-out); }
 .fc-next { max-width: 100%; font-size: 12px; line-height: 1.4; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fc-btns { max-width: 100%; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 4px; }
 /* The slips' buttons (as on the Mac): ghost a soft paper-2 pill, primary sage with a light top edge. */
@@ -658,6 +672,8 @@
 .sband { position: absolute; left: 0; top: 22.5%; height: 55%; width: 12px; box-sizing: border-box; border-radius: 0 10px 10px 0 / 0 2px 2px 0; background: var(--band); border-right: 8px solid transparent; background-clip: padding-box; z-index: 2; }
 .sband[hidden] { display: none; }
 .row.done .sband { opacity: 0.45; }
+/* 2a (A2): on 앞으로 the row starts at its box — the band sits in the gap left of it. */
+.ahead .row .sband { left: -10px; }
 /* 모든 스페이스 ▾ at the end of the date line (its margins keep the line's height as it was). */
 .date-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .date-row .date-line { flex: 1; min-width: 0; }
@@ -669,12 +685,13 @@
 .space-pick-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .space-pick .icon { flex: none; color: var(--ink-3); }
 .space-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--band); flex: none; }
-/* 회사만 보는 중 · 다른 할 일 4개는 숨겼어요 · 모두 보기 */
-.lens-band { flex: none; margin: 4px 16px 6px 18px; min-height: 30px; padding: 4px 6px 4px 12px; display: flex; align-items: center; gap: 8px; border-radius: 9px;
-  background: color-mix(in srgb, var(--band) 9%, var(--paper)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--band) 40%, transparent); font: 500 11.5px/16px var(--ui); color: var(--ink-2); }
-.lens-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lens-all { flex: none; height: 22px; padding: 0 8px; border-radius: 6px; font: 600 11.5px var(--ui); color: var(--ink); white-space: nowrap; }
-.lens-all:hover { background: color-mix(in srgb, var(--band) 14%, transparent); }
+/* #87: 다른 스페이스에 4개 더 · 모두 보기 — one faint line at the end of the list, a row of the paper. */
+.lens-more { flex: none; height: var(--row); display: flex; align-items: center; gap: 5px; padding: 0 16px 0 calc(var(--margin) + 17px); font: 500 11px var(--ui); color: var(--ink-3); white-space: nowrap; }
+.lens-more-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* 2a (A17): on 앞으로 the words start where the to-dos' titles do (the day column, the box, the text's padding). */
+.ahead > .lens-more { padding: 0 0 0 calc(var(--key-w) + 10px + 30px); }
+.lens-all { flex: none; height: 22px; margin-left: -4px; padding: 0 4px; border-radius: 6px; font: 600 11px var(--ui); color: var(--ink-2); white-space: nowrap; }
+.lens-all:hover { background: var(--d-hover); color: var(--ink); }
 /* The paper menus over the note (the row menu, 모든 스페이스 ▾, the editor's 스페이스): the note's tokens. */
 .menu-layer { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
 .menu-layer > .menu { position: absolute; pointer-events: auto; }
@@ -694,3 +711,107 @@
 .editor .space-field-name { color: var(--ink-3); font-weight: 600; font-size: 11px; }
 .editor .space-field-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .editor .space-field .icon { flex: none; color: var(--ink-3); }
+/* 2b 스페이스별로 묶기 (docs/plans/spaces-phase2.md): one group per space. Each row draws its own rule (the groups break the
+   paper's even lines); the paper's lines carry on below the last group. */
+.lines.spaced { display: flex; flex-direction: column; background-image: none; }
+.lines.spaced > .all-done, .lines.spaced > .lens-more, .sgroup-rows > .row { flex: none; background-image: linear-gradient(var(--rule), var(--rule)); background-repeat: no-repeat; background-size: calc(100% - 38px) 1px; background-position: 18px 100%; }
+.sgroup-rows > .row.selected { background-image: linear-gradient(var(--sage), var(--sage)), linear-gradient(var(--rule), var(--rule)); background-size: 2px calc(100% - 10px), calc(100% - 38px) 1px; background-position: calc(var(--margin) - 1px) 5px, 18px 100%; }
+.sgroup { flex: none; position: relative; }
+.sgroup-head { display: flex; align-items: center; gap: 8px; position: relative; }
+.sgroup-pick { display: flex; align-items: center; gap: 8px; min-width: 0; border-radius: 6px; color: var(--ink); text-align: left; }
+.sgroup-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* F · 묶음 메모지: a small card (the card colour, a 1 px edge, 10 px corners) with the space's tape on top; no bands on its
+   rows (the tape says the space) and no margin line through it. */
+.lines.cards::before { display: none; }
+.lines.cards .sgroup { margin: 12px 12px 0; background: var(--card); border: 1px solid var(--rule); border-radius: 10px; }
+.lines.cards > .sgroup:first-child { margin-top: 14px; }
+.lines.cards .sgroup::before { content: ""; position: absolute; top: -6px; left: 50%; width: 46px; height: 11px; margin-left: -23px; border-radius: 2px; background: var(--band); opacity: 0.8; pointer-events: none; }
+.lines.cards .sgroup.general::before { background: color-mix(in srgb, var(--faint) 55%, transparent); }
+.lines.cards .sband { display: none; }
+.lines.cards .sgroup-rows > .row:last-child { background-image: none; }
+.lines.cards .sgroup-rows > .row.selected:last-child { background-image: linear-gradient(var(--sage), var(--sage)); background-size: 2px calc(100% - 10px); background-position: calc(var(--margin) - 1px) 5px; }
+.lines.cards .sgroup-head { height: 38px; padding: 0 12px 0 14px; }
+.lines.cards .sgroup-pick { flex: 1; height: 30px; font: 600 12.5px var(--ui); }
+.sgroup-ring { width: 14px; height: 14px; flex: none; border-radius: 50%; background: conic-gradient(var(--band) var(--ring-done, 0deg), var(--rule) 0); -webkit-mask: radial-gradient(circle, transparent 3.6px, black 4.1px); }
+.sgroup-ring { animation: ring-fill var(--motion-draw) var(--ease-out); }
+@keyframes ring-fill { from { --ring-done: var(--ring-from); } }
+.sgroup.general .sgroup-ring { background: conic-gradient(var(--ink-3) var(--ring-done, 0deg), var(--rule) 0); }
+.sgroup-left { margin-left: auto; flex: none; font: 400 11px var(--ui); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sgroup-done { height: 30px; display: flex; align-items: center; gap: 4px; padding: 0 0 0 calc(var(--margin) + 17px); width: 100%; font: 400 11px var(--ui); color: var(--ink-3); }
+.sgroup-done[hidden] { display: none; }
+.sgroup-done:hover { color: var(--ink); }
+.sgroup-done.open .icon { transform: rotate(180deg); }
+/* E · 책갈피 머리말: a 30 px head, the space's bookmark at the left end (its pale colour, a 4 px band, rounded on the right;
+   일반's dashed), 다음 13:43 on the right. The rows keep their bands. */
+.lines.bookmarks .sgroup-head { height: 30px; margin-top: 8px; padding: 0 16px 0 0; }
+.sgroup-tag { height: 22px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; border-radius: 0 8px 8px 0; background: color-mix(in srgb, var(--band) 17%, transparent); box-shadow: inset 4px 0 0 var(--band); font: 600 11.5px var(--ui); color: var(--ink); min-width: 0; }
+.sgroup.general .sgroup-tag { background: none; box-shadow: none; border: 1.2px dashed var(--faint); border-left: none; }
+.sgroup-count { flex: none; font-weight: 400; font-size: 10.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.sgroup-next { margin-left: auto; flex: none; font: 400 10.5px var(--ui); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* ⌄ folds a group to its head (a folded card is its head alone). */
+.sgroup-fold { flex: none; width: 24px; height: 24px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; color: var(--ink-3); }
+.sgroup-fold:hover { background: var(--d-hover); color: var(--ink); }
+.sgroup.folded .sgroup-fold .icon { transform: rotate(-90deg); }
+/* N12 (as on the Mac): ⌄ turns with 바뀜 (a keyframe: the head is made again on each change), and the rows a group just
+   showed fade in; folding is at once, and no height moves. Reduce Motion: at once (base.css). */
+.sgroup-fold.turning .icon, .sgroup-done.turning .icon { animation: chevron-turn var(--motion-change) var(--ease-out); }
+@keyframes chevron-turn { from { transform: rotate(var(--turn-from)); } }
+.sgroup-rows > .row.unfold-in { animation: unfold-in var(--motion-change) var(--ease-out); }
+@keyframes unfold-in { from { opacity: 0; } }
+.lines.bookmarks .sgroup-fold { margin-left: 2px; }
+/* A group's rows in time order still drag (to another group). */
+.sgroup-rows > .row.up-next .grip { visibility: visible; }
+/* J: the group under a dragged row lights up in its space's colour and says where it goes. */
+.sgroup-drop { display: none; margin-left: auto; min-width: 0; flex: 0 1 auto; font: 600 11px var(--ui); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sgroup.drop-target .sgroup-drop { display: inline; }
+.sgroup.drop-target .sgroup-left, .sgroup.drop-target .sgroup-next { display: none; }
+.lines.cards .sgroup.drop-target { border-color: var(--band); box-shadow: inset 0 0 0 0.5px var(--band); background: color-mix(in srgb, var(--band) 10%, var(--card)); }
+.lines.bookmarks .sgroup.drop-target { background: color-mix(in srgb, var(--band) 10%, transparent); }
+.sgroup.general.drop-target { --band: var(--ink-3); }
+/* I · 넓은 노트는 칸으로 (S45): one column per group when every column gets 220 px (the note goes up to 1,200 while
+   grouped); they share the width and don't scroll sideways, each column scrolls up and down. A 4 px band of the space's
+   colour on top, the name and count, the time on a small line under each title, + 회사에 넣기. */
+.sheet.board-mode { display: flex; flex-direction: column; overflow: hidden; }
+.sheet.board-mode > .lines.board { flex: 1 1 0; min-height: 0; }
+.lines.board { display: flex; flex-direction: row; align-items: stretch; gap: 10px; padding: 8px 14px 6px; overflow: hidden; min-height: 0; }
+.lines.board::before { display: none; }
+.lines.board > .sgroup { flex: 1 1 0; min-width: 220px; display: flex; flex-direction: column; min-height: 0; background: var(--card); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; box-shadow: inset 0 4px 0 var(--band); }
+.lines.board > .sgroup.general { box-shadow: inset 0 4px 0 color-mix(in srgb, var(--faint) 55%, transparent); }
+.lines.board .sgroup-head { flex: none; height: 34px; margin-top: 4px; padding: 0 12px; }
+.lines.board .sgroup-pick { flex: 0 1 auto; font: 600 12.5px var(--ui); }
+.lines.board .sgroup-count { margin-left: auto; font-size: 11px; color: var(--ink-3); }
+.lines.board .sgroup.drop-target .sgroup-count, .lines.board .sgroup.drop-target .sgroup-pick { display: none; }
+.lines.board .sgroup.drop-target .sgroup-drop { margin-left: 0; }
+.lines.board .sgroup.drop-target { border-color: var(--band); background: color-mix(in srgb, var(--band) 10%, var(--card)); }
+.lines.board .sgroup-rows { flex: 0 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: none; padding: 0 4px; }
+.lines.board .sgroup-rows::-webkit-scrollbar { display: none; }
+.lines.board .sband { display: none; }
+.lines.board .row { height: 36px; }
+.lines.board .row::after { inset: 2px 0; }
+.lines.board .row .grip { width: 16px; }
+.lines.board .row .check { width: 24px; }
+.lines.board .row .box { width: 17px; height: 17px; }
+.lines.board .row .text { padding-left: 6px; }
+.lines.board .row .end { width: 4px; }
+/* The time and deadline go under the title (the row's end keeps only its buttons on hover), so the title isn't cut short. */
+.subline { display: none; }
+.lines.board .row .subline:not([hidden]) { display: block; font: 500 11px/14px var(--ui); color: var(--sage-text); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lines.board .row.done .subline { color: var(--faded); }
+.lines.board .row .time, .lines.board .row .due, .lines.board .row .carry, .lines.board .row .sent-mark { display: none; }
+.lines.board .row:has(.subline:not([hidden])) { height: 50px; }
+.lines.board .sgroup-rows > .row { background-size: calc(100% - 24px) 1px; background-position: 12px 100%; }
+.lines.board .sgroup-rows > .row:last-child { background-image: none; }
+.lines.board .row.selected { background-image: linear-gradient(var(--sage), var(--sage)); background-size: 2px calc(100% - 10px); background-position: 1px 5px; }
+.lines.board .row.drop-before::before, .lines.board .row.drop-after::before { left: 16px; right: 8px; }
+.sgroup-add { flex: none; height: 30px; display: flex; align-items: center; padding: 0 12px; font: 400 11px var(--ui); color: var(--ink-3); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sgroup-add[hidden] { display: none; }
+.sgroup-add:hover { color: var(--ink); }
+/* H: the shortcut chips under the title (one line; it scrolls sideways when they don't fit). */
+.schips { flex: none; display: flex; gap: 6px; padding: 2px 18px 6px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.schips[hidden] { display: none; }
+.schips::-webkit-scrollbar { display: none; }
+.schip { flex: none; height: 22px; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border-radius: 11px; background: var(--card); border: 1px solid var(--rule); font: 500 11px var(--ui); color: var(--ink-2); white-space: nowrap; }
+.schip:hover { border-color: var(--rule-strong); color: var(--ink); }
+.schip-dot { width: 7px; height: 7px; border-radius: 2px; background: var(--band); flex: none; }
+.schip-dot.general { background: none; box-shadow: inset 0 0 0 1px var(--ink-3); }
+.schip-count { color: var(--ink-3); font-variant-numeric: tabular-nums; }

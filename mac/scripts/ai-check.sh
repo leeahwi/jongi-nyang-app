@@ -42,7 +42,13 @@ if [ "$build" = 1 ]; then
     cp -R Sources/PaperTodo/Assets "$app/Contents/Resources/"
     cp -R Resources/*.lproj "$app/Contents/Resources/"
     rm -f "$app"/Contents/Resources/*.lproj/InfoPlist.strings
-    cp "$mcp_dist/server/index.js" "$server"
+    # The extension's test build (#174): only it reads PAPERTODO_AI_HOME. The shipped server would look in the real
+    # settings folder, so there is no falling back to it.
+    if [ ! -f "$mcp_dist/server-test/index.js" ]; then
+        echo "Missing $mcp_dist/server-test/index.js — build the extension first: (cd ../windows && npm run mcp:build)" >&2
+        exit 1
+    fi
+    cp "$mcp_dist/server-test/index.js" "$server"
     cp "$mcp_dist/jongi-nyang.mcpb" "$app/Contents/Resources/mcp/jongi-nyang.mcpb"
     [ -d "$bin/PaperTodo_PaperTodo.bundle" ] && cp -R "$bin/PaperTodo_PaperTodo.bundle" "$app/Contents/Resources/" || true
     codesign --force --deep --sign - "$app" 2>/dev/null

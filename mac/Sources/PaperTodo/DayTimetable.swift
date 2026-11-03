@@ -302,6 +302,16 @@ struct DayTimetable<AllDay: View>: View {
                 case .task:
                     shape.fill(PaperTheme.card)
                         .overlay { shape.strokeBorder(!item.done && over ? PaperTheme.clay : PaperTheme.sage, lineWidth: 1.5) }
+                        .overlay {
+                            // 2a (A4): a to-do in a space, its left edge 3 pt in the space's colour (일반 as before).
+                            if let space = model.spaceOf(taskID: item.taskID) {
+                                ZStack(alignment: .leading) {
+                                    Color.clear
+                                    Rectangle().fill(PaperTheme.space(space.colorKey)).frame(width: 3)
+                                }
+                                .clipShape(shape)
+                            }
+                        }
                         .opacity(item.done ? 0.5 : 1)
                         .background(PaperTheme.paper, in: shape)
                 case .reminder:

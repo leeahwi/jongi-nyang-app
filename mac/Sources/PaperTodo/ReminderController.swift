@@ -243,9 +243,16 @@ struct SettingsPaneView: View {
         case .storage:
             StorageSettingsGroup(model: model)
             CompletedSettingsGroup(model: model)
+            if let book = model.backups {
+                AutoBackupGroup(book: book, model: model)
+                BackupListGroup(book: book, model: model)
+            }
             BackupSettingsGroup(model: model)
         case .drawer: MemoDrawerSettingsGroup(drawer: model.drawer)
-        case .spaces: SpacesSettingsPanel(model: model)
+        case .spaces:
+            SpacesSettingsPanel(model: model)
+            // 2b: only once there is a space to group by.
+            if !model.todoSpaces.isEmpty { SpaceGroupSettings(model: model) }
         case .ai:
             if let ai = model.ai { AISettingsPanel(ai: ai) }
         case .calendar, .history, .help: EmptyView()
@@ -269,39 +276,8 @@ struct SettingsPaneView: View {
                 livePreview
             }
 
-            SettingsGroup(title: L("글꼴")) {
-                ForEach(Array(NotebookFont.allCases.enumerated()), id: \.element) { index, font in
-                    if index > 0 { SettingsSeparator() }
-                    Button { model.notebookFont = font } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: model.notebookFont == font ? "checkmark.circle.fill" : "circle")
-                                .font(.system(size: 14))
-                                .foregroundStyle(model.notebookFont == font ? PaperTheme.sage : PaperTheme.faded)
-                            Text(font.title).font(.system(size: 13, weight: .medium))
-                                .lineLimit(1)
-                            Spacer(minLength: 8)
-                            Text(font.preview.handwritten)
-                                .font(font.bodyFont())
-                                .foregroundStyle(model.notebookFont == font ? PaperTheme.ink : PaperTheme.secondary)
-                                .lineLimit(1)
-                        }
-                        .settingsRow()
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(model.notebookFont == font ? .isSelected : [])
-                }
-            }
-
-            SettingsGroup(title: L("글자 크기"), footer: L("⌘ = 와 ⌘ − 로도 바꿀 수 있어요.")) {
-                HStack(spacing: 12) {
-                    Text("가").font(.system(size: 11)).foregroundStyle(PaperTheme.secondary)
-                    PaperSegmented(selection: $model.textSize,
-                                   options: NotebookTextSize.allCases.map { ($0, $0.title, nil) },
-                                   label: L("글자 크기"))
-                    Text("가").font(.system(size: 17)).foregroundStyle(PaperTheme.secondary)
-                }
-                .settingsRow()
-            }
+            // 노트 글꼴 (#141): the face as a popup and the size in seven steps, the drawer's rows alike.
+            NoteFontGroup(model: model)
 
             SettingsGroup(title: L("마감 표시"), footer: L("할 일의 알림 → 마감에서 오늘까지·이번 주 안·이번 달 안·날짜를 정해요. 지난 마감은 붉게 표시돼요.")) {
                 HStack(spacing: 12) {
@@ -334,46 +310,7 @@ struct SettingsPaneView: View {
                 .settingsRow()
             }
 
-            SettingsGroup(title: L("빠른 입력"), more: "quick", footer: [
-                model.quickEntryRegistered
-                    ? L("다른 앱을 쓰다가도 ⌃⌥N을 누르면 작은 입력 칸이 떠요. 적은 말에 맞춰 알림 · 마감 · 일정을 정해요.")
-                    : L("다른 앱이 ⌃⌥N을 쓰고 있어요. 그 앱의 단축키를 바꾼 뒤 다시 켜 주세요."),
-                model.quickMemoRegistered
-                    ? L("빠른 메모는 메모 서랍에서 마지막으로 본 폴더 맨 위에 들어가요.")
-                    : L("다른 앱이 ⌃⌥M을 쓰고 있어요. 그 앱의 단축키를 바꾼 뒤 다시 켜 주세요."),
-                model.noteHotKeyRegistered
-                    ? ""
-                    : L("다른 앱이 ⌃⌥J를 쓰고 있어요. 그 앱의 단축키를 바꾼 뒤 다시 켜 주세요."),
-                model.quickMemoClipboard ? L("빈 메모를 열면 방금 복사한 글이 골라진 채로 들어가요.") : "",
-            ].filter { !$0.isEmpty }.joined(separator: " ")) {
-                HStack {
-                    SettingsLabel(L("어디서든 빠른 입력 (⌃⌥N)"), systemImage: "keyboard")
-                    Spacer()
-                    Toggle("어디서든 빠른 입력", isOn: $model.quickEntryEnabled).toggleStyle(PaperToggleStyle()).labelsHidden()
-                }
-                .settingsRow()
-                SettingsSeparator()
-                HStack {
-                    SettingsLabel(L("어디서든 빠른 메모 (⌃⌥M)"), systemImage: "note.text")
-                    Spacer()
-                    Toggle("어디서든 빠른 메모", isOn: $model.quickMemoEnabled).toggleStyle(PaperToggleStyle()).labelsHidden()
-                }
-                .settingsRow()
-                SettingsSeparator()
-                HStack {
-                    SettingsLabel(L("어디서든 노트 보이기 · 숨기기 (⌃⌥J)"), systemImage: "macwindow")
-                    Spacer()
-                    Toggle(L("어디서든 노트 보이기 · 숨기기"), isOn: $model.noteHotKeyEnabled).toggleStyle(PaperToggleStyle()).labelsHidden()
-                }
-                .settingsRow()
-                SettingsSeparator()
-                HStack {
-                    SettingsLabel(L("빠른 메모를 열 때 복사한 글 넣기"), systemImage: "doc.on.clipboard")
-                    Spacer()
-                    Toggle(L("빠른 메모를 열 때 복사한 글 넣기"), isOn: $model.quickMemoClipboard).toggleStyle(PaperToggleStyle()).labelsHidden()
-                }
-                .settingsRow()
-            }
+            QuickEntrySettingsGroup(model: model)
         }
     }
 
@@ -603,6 +540,73 @@ struct SettingsPaneView: View {
 }
 
 /// A label style chosen at run time.
+/// 책상 → 꾸미기 → 빠른 입력: the keys from any app — ⌃⌥N 빠른 입력, ⌃⌥M 빠른 메모 (fixed, a switch each), the note's
+/// 보이기 · 숨기기 (its key can be changed, #85) — and 빠른 메모를 열 때 복사한 글 넣기.
+struct QuickEntrySettingsGroup: View {
+    @ObservedObject var model: AppModel
+    /// Snapshots: the note's recorder drawn listening, or with a refusal under it.
+    var previewNoteRecording = false
+    var previewNoteProblem: String?
+
+    var body: some View {
+        SettingsGroup(title: L("빠른 입력"), more: "quick", footer: [
+            model.quickEntryRegistered
+                ? L("다른 앱을 쓰다가도 ⌃⌥N을 누르면 작은 입력 칸이 떠요. 적은 말에 맞춰 알림 · 마감 · 일정을 정해요.")
+                : L("다른 앱이 ⌃⌥N을 쓰고 있어요. 그 앱의 단축키를 바꾼 뒤 다시 켜 주세요."),
+            model.quickMemoRegistered
+                ? L("빠른 메모는 메모 서랍에서 마지막으로 본 폴더 맨 위에 들어가요.")
+                : L("다른 앱이 ⌃⌥M을 쓰고 있어요. 그 앱의 단축키를 바꾼 뒤 다시 켜 주세요."),
+            // The note's key (#85): another app holding it is said as for the drawer's.
+            model.noteHotKeyRegistered || !model.noteHotKeyEnabled
+                ? ""
+                : L("다른 앱이 \(model.noteShortcut.text) 키를 쓰고 있어요. 다른 키를 골라 주세요."),
+            model.quickMemoClipboard ? L("빈 메모를 열면 방금 복사한 글이 골라진 채로 들어가요.") : "",
+        ].filter { !$0.isEmpty }.joined(separator: " ")) {
+            HStack {
+                SettingsLabel(L("어디서든 빠른 입력 (⌃⌥N)"), systemImage: "keyboard")
+                Spacer()
+                Toggle("어디서든 빠른 입력", isOn: $model.quickEntryEnabled).toggleStyle(PaperToggleStyle()).labelsHidden()
+            }
+            .settingsRow()
+            SettingsSeparator()
+            HStack {
+                SettingsLabel(L("어디서든 빠른 메모 (⌃⌥M)"), systemImage: "note.text")
+                Spacer()
+                Toggle("어디서든 빠른 메모", isOn: $model.quickMemoEnabled).toggleStyle(PaperToggleStyle()).labelsHidden()
+            }
+            .settingsRow()
+            SettingsSeparator()
+            // #85: the key can be changed, as the drawer's (ShortcutField.swift).
+            NoteShortcutRow(model: model, previewRecording: previewNoteRecording, previewProblem: previewNoteProblem)
+                .settingsRow()
+            SettingsSeparator()
+            HStack {
+                SettingsLabel(L("빠른 메모를 열 때 복사한 글 넣기"), systemImage: "doc.on.clipboard")
+                Spacer()
+                Toggle(L("빠른 메모를 열 때 복사한 글 넣기"), isOn: $model.quickMemoClipboard).toggleStyle(PaperToggleStyle()).labelsHidden()
+            }
+            .settingsRow()
+        }
+    }
+}
+
+/// 어디서든 노트 보이기 · 숨기기 (#85): the shared key row (ShortcutField.swift). ⌃⌥N · ⌃⌥M and the drawer's key can't be
+/// taken; while a key is recorded the app's keys from anywhere step aside.
+private struct NoteShortcutRow: View {
+    @ObservedObject var model: AppModel
+    var previewRecording = false
+    var previewProblem: String?
+
+    var body: some View {
+        ShortcutRow(title: L("어디서든 노트 보이기 · 숨기기"), systemImage: "macwindow", fieldLabel: L("노트 보이기 · 숨기기 단축키"),
+                    shortcut: model.noteShortcutShown, standard: .noteStandard,
+                    refusal: { ShortcutRules.refusal($0, for: .note, note: model.noteShortcut, drawer: model.drawer.shortcut) },
+                    choose: { model.chooseNoteShortcut($0) }, turn: { model.setNoteHotKey(on: $0) },
+                    pause: { model.onPauseGlobalKeys?($0) },
+                    previewRecording: previewRecording, previewProblem: previewProblem)
+    }
+}
+
 private struct AnyLabelStyle: LabelStyle {
     private let make: (Configuration) -> AnyView
     init<S: LabelStyle>(_ style: S) { make = { AnyView(style.makeBody(configuration: $0)) } }
@@ -726,11 +730,24 @@ private struct ReminderStyleTile: View {
 }
 
 /// Settings → 반복: every recurring task with its next day, edit/delete, and `+ 새 반복 할 일` as the card's last row (#22).
-private struct RepeatSettingsPanel: View {
+struct RepeatSettingsPanel: View {
     @ObservedObject var model: AppModel
     @State private var editing: String?
     @State private var title = ""
     @State private var draft = RepeatDraft()
+    /// 2a (A11): the rule's space while it's edited (nil: 일반), applied on 저장.
+    @State private var space: String?
+
+    /// `previewEditing` (snapshots): that rule's form open.
+    init(model: AppModel, previewEditing: Series? = nil) {
+        self.model = model
+        if let entry = previewEditing {
+            _editing = State(initialValue: entry.id)
+            _title = State(initialValue: entry.title)
+            _draft = State(initialValue: RepeatDraft(series: entry))
+            _space = State(initialValue: model.ruleSpace(entry.id)?.id)
+        }
+    }
     @State private var hovered: String?
     @State private var toast: PaperToast?
 
@@ -798,13 +815,15 @@ private struct RepeatSettingsPanel: View {
                 .overlay { RoundedRectangle(cornerRadius: 8).stroke(PaperTheme.rule, lineWidth: 0.8) }
                 .accessibilityLabel("반복할 일")
             RepeatFieldsView(draft: $draft)
+            if !model.todoSpaces.isEmpty { RuleSpaceField(model: model, space: $space) }
             HStack(spacing: 6) {
                 Spacer()
                 Button("취소") { editing = nil }
                     .buttonStyle(PaperActionButtonStyle())
                     .keyboardShortcut(.cancelAction)
                 Button {
-                    model.saveSeries(seriesID: entry?.id, title: title, rule: draft.rule, remindAt: draft.remindAt)
+                    model.saveSeries(seriesID: entry?.id, title: title, rule: draft.rule, remindAt: draft.remindAt,
+                                     space: model.todoSpaces.isEmpty ? nil : .some(space))
                     editing = nil
                 } label: {
                     Label(entry == nil ? L("추가") : L("저장"), systemImage: "repeat").labelStyle(.titleAndIcon)
@@ -820,6 +839,7 @@ private struct RepeatSettingsPanel: View {
     private func begin(_ entry: Series?) {
         title = entry?.title ?? ""
         draft = RepeatDraft(series: entry)
+        space = model.ruleSpace(entry?.id)?.id
         editing = entry?.id ?? "new"
     }
 
@@ -864,9 +884,8 @@ struct CompletedSettingsGroup: View {
                 HStack(spacing: 10) {
                     SettingsLabel(L("기록 폴더"), systemImage: "archivebox")
                     Spacer(minLength: 8)
-                    Button("열기") { model.openFolder(model.archiveFolderURL) }
-                        .buttonStyle(PaperActionButtonStyle())
-                        .help("Finder에서 완료 기록 폴더 열기")
+                    // #52: the same ‘↗ 폴더 열기’ in the same place as 저장 폴더's.
+                    OpenFolderButton(help: L("Finder에서 완료 기록 폴더 열기")) { model.openFolder(model.archiveFolderURL) }
                 }
                 FolderPath(url: model.archiveFolderURL)
                     .padding(.leading, FolderPath.indent)
@@ -877,12 +896,27 @@ struct CompletedSettingsGroup: View {
     }
 }
 
+/// ‘↗ 폴더 열기’ at the end of a folder's row (저장 폴더, 기록 폴더 — #52: one name, one place, as on Windows).
+struct OpenFolderButton: View {
+    let help: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Label(L("폴더 열기"), systemImage: "arrow.up.forward.app").labelStyle(.titleAndIcon)
+        }
+        .buttonStyle(PaperActionButtonStyle())
+        .fixedSize()
+        .help(help)
+    }
+}
+
 /// Settings → 꾸미기 → 저장 위치: the folder everything is kept in, and moving it to a shared one.
 struct StorageSettingsGroup: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
-        SettingsGroup(title: L("저장 위치"), more: "data", footer: L("할 일 · 메모 · 일정 · 기록이 모두 이 폴더에 있어요. iCloud Drive 같은 공유 폴더를 고르면 다른 기기와 같은 목록을 써요.")) {
+        SettingsGroup(title: L("저장 위치"), more: "data", footer: L("할 일 · 메모 · 일정 · 기록이 모두 이 폴더에 있어요. iCloud Drive 같은 공유 폴더를 고르면 다른 기기와 같은 목록을 써요. 다른 폴더를 고르면 지금 목록을 그 폴더로 옮기고 종이냥이 다시 시작돼요. 이미 종이냥 목록이 있는 폴더면 어느 쪽을 쓸지 물어요.")) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 10) {
                     SettingsLabel(L("저장 폴더"), systemImage: "folder")
@@ -890,6 +924,8 @@ struct StorageSettingsGroup: View {
                     Text(model.sharedFolder == nil ? L("이 Mac (기본)") : L("공유 폴더"))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(PaperTheme.secondary)
+                    // #52: at the end of the folder's row, as for 기록 폴더 (same name, same place).
+                    OpenFolderButton(help: L("Finder에서 저장 폴더 열기")) { model.openFolder(model.storageFolderURL) }
                 }
                 FolderPath(url: model.storageFolderURL)
                     .padding(.leading, FolderPath.indent)
@@ -898,11 +934,6 @@ struct StorageSettingsGroup: View {
             .settingsRow()
             SettingsSeparator()
             HStack(spacing: 8) {
-                Button { model.openFolder(model.storageFolderURL) } label: {
-                    Label("폴더 열기", systemImage: "arrow.up.forward.app").labelStyle(.titleAndIcon)
-                }
-                .buttonStyle(PaperActionButtonStyle())
-                .help("Finder에서 저장 폴더 열기")
                 Spacer()
                 if model.sharedFolder != nil {
                     Button("기본으로", action: model.resetStorageFolder).buttonStyle(PaperActionButtonStyle())
@@ -1317,17 +1348,18 @@ struct LanguageSettingsGroup: View {
     }
 }
 
-/// 꾸미기 → 종이 색: 자동 (follows macOS, live) · 낮 · 밤. Every open window changes at once.
+/// 꾸미기 → 낮 · 밤 (#142; ‘종이 색’ before — only the name changed, `paper.color` is the same setting): 자동 (follows
+/// macOS, live) · 낮 · 밤. Every open window changes at once, the drawer too.
 struct PaperColorGroup: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
-        SettingsGroup(title: L("종이"), footer: L("자동이면 Mac이 어두운 모드일 때 밤 종이가 돼요. 불 끈 방의 종이처럼 어둡고 조용한 색이에요.")) {
+        SettingsGroup(title: L("낮 · 밤"), footer: L("책상 · 노트 · 쪽지 · 서랍이 같이 바뀌어요. 자동이면 Mac이 어두운 모드일 때 밤이 돼요.")) {
             HStack(spacing: 12) {
                 // The icon follows the choice: half and half for 자동, a sun for 낮, a moon for 밤 (#21).
-                SettingsLabel(L("종이 색"), systemImage: model.paperColor == .day ? "sun.max" : model.paperColor == .night ? "moon" : "circle.lefthalf.filled")
+                SettingsLabel(L("낮 · 밤"), systemImage: model.paperColor == .day ? "sun.max" : model.paperColor == .night ? "moon" : "circle.lefthalf.filled")
                 Spacer(minLength: 8)
-                PaperSegmented(selection: $model.paperColor, options: PaperColor.allCases.map { ($0, $0.title, nil) }, label: L("종이 색"))
+                PaperSegmented(selection: $model.paperColor, options: PaperColor.allCases.map { ($0, $0.title, nil) }, label: L("낮 · 밤"))
                     // Dutch "Automatisch" needs room on both sides of it (1.45: it touched its segment's edges at 250).
                     .frame(width: AppLanguage.current == .ko ? 180 : AppLanguage.current == .en ? 250 : 290)
             }

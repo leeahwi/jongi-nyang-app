@@ -269,6 +269,10 @@ test("system notices: when they go, the toast and its links", () => {
   assert.deepEqual(readNotifyLink(["x.exe", "--flag", notifyLink({ kind: "snooze", ids, minutes: 10 })]), { kind: "snooze", ids, minutes: 10 });
   assert.deepEqual(readNotifyLink(["jongi-nyang:open/"]), { kind: "open" });
   assert.deepEqual(readNotifyLink(["jongi-nyang://alarm-stop"]), { kind: "alarmStop" });
+  // #172: an alarm's links carry the notification's nonce; read back only when it looks like one.
+  const nonce = "0123456789abcdef0123456789abcdef";
+  assert.deepEqual(readNotifyLink([notifyLink({ kind: "alarmSnooze", nonce })]), { kind: "alarmSnooze", nonce });
+  assert.deepEqual(readNotifyLink(["jongi-nyang:alarm-stop?n=<x>"]), { kind: "alarmStop" });
   assert.equal(readNotifyLink(["jongi-nyang:snooze?ids=A&minutes=9999"]), undefined);
   assert.equal(readNotifyLink(["jongi-nyang:done?ids=<script>"]), undefined);
   assert.equal(readNotifyLink(["https://example.com"]), undefined);
@@ -276,7 +280,8 @@ test("system notices: when they go, the toast and its links", () => {
   assert.match(xml, /<text>우유 &amp; 빵 &lt;사기&gt;<\/text>/);
   assert.match(xml, /<action content="끝내기" activationType="protocol" arguments="jongi-nyang:done\?ids=A"\/>/);
   assert.match(xml, /<action content="10분 뒤" activationType="protocol" arguments="jongi-nyang:snooze\?ids=A&amp;minutes=10"\/>/);
-  assert.match(toastXml({ kind: "alarm", title: "Alarm · 7:00 AM", lines: [] }, "en"), /scenario="alarm".*content="Stop".*content="Snooze"/);
+  assert.match(toastXml({ kind: "alarm", title: "Alarm · 7:00 AM", lines: [], nonce }, "en"), /scenario="alarm".*content="Stop".*content="Snooze"/);
+  assert.match(toastXml({ kind: "alarm", title: "Alarm", lines: [], nonce }, "en"), new RegExp(`arguments="jongi-nyang:alarm-stop\\?n=${nonce}"`));
 });
 
 test("dock to the edge, clipboard to the quick note, a click on the ribbon", () => {

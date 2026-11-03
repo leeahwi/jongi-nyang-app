@@ -15,11 +15,26 @@ done
 # Source paths end up in the binary (#file in assertions and logs); write them relative to the
 # package so the app doesn't carry this machine's home folder.
 prefix_map=(-Xswiftc -file-prefix-map -Xswiftc "$task_root=.")
-swift build -c release -Xswiftc -warnings-as-errors "${prefix_map[@]}"
-binary_directory="$(swift build -c release "${prefix_map[@]}" --show-bin-path)"
+# #174: the release build reads no test switches (--demo, --snapshot, --storage, the logs …; TestHooks.swift). Only this
+# script sets the flag; test and check scripts build without it.
+release_flag=(-Xswiftc -DPAPERTODO_RELEASE)
+# #182: SwiftPM's resource bundle accessor (`Bundle.module`) writes its absolute build folder into the binary, and the
+# prefix map doesn't reach it. The app reads Assets from Contents/Resources instead (AppResources.swift), so the app
+# build turns the resource bundle off (Package.swift) in its own build folder — debug builds, tests and snapshots keep
+# theirs in .build as before.
+export PAPERTODO_APP_BUNDLE=1
+app_build=(--scratch-path "$task_root/.build/app")
+swift build -c release -Xswiftc -warnings-as-errors "${app_build[@]}" "${release_flag[@]}" "${prefix_map[@]}"
+binary_directory="$(swift build -c release "${app_build[@]}" "${release_flag[@]}" "${prefix_map[@]}" --show-bin-path)"
 bundle="$task_root/dist/종이냥.app"
 mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
 cp "$binary_directory/PaperTodo" "$bundle/Contents/MacOS/PaperTodo"
+# Stop before packing if a build path (with this Mac's home folder name) is in the binary again. Counts only.
+home_paths="$(strings -a "$bundle/Contents/MacOS/PaperTodo" | grep -cF -e '/Users/' -e "$HOME" || true)"
+if [ "$home_paths" != "0" ]; then
+    echo "The binary holds $home_paths absolute home path(s) — see #182." >&2
+    exit 1
+fi
 cp Resources/Info.plist "$bundle/Contents/Info.plist"
 rm -rf "$bundle/Contents/Resources/Assets"
 cp -R Sources/PaperTodo/Assets "$bundle/Contents/Resources/"
@@ -31,6 +46,13 @@ rm -rf "$bundle/Contents/Resources/mcp"
 mkdir -p "$bundle/Contents/Resources/mcp/server"
 cp "$mcp_dist/server/index.js" "$bundle/Contents/Resources/mcp/server/index.js"
 cp "$mcp_dist/jongi-nyang.mcpb" "$bundle/Contents/Resources/mcp/jongi-nyang.mcpb"
+# #145: the third-party notices (the fonts, and the MIT · ISC · BSD packages inside 종이냥 for Claude) go along, as
+# the Windows installer's resources/NOTICE.txt does (#128).
+cp "$task_root/../NOTICE" "$bundle/Contents/Resources/NOTICE"
 swift scripts/make-icon.swift "$bundle/Contents/Resources" "$task_root/Sources/PaperTodo/Assets/PaperCat.png"
-codesign --force --deep --sign - "$bundle"
+# #175 (security review S-01): ad-hoc signed with the hardened runtime (no Developer ID yet: the user's call). Checked on
+# an off-screen test copy: the app starts, the bundled extension's files are sealed, Carbon hot keys register and
+# `claude mcp add` (zsh) still runs. No entitlements are needed.
+codesign --force --deep --options runtime --sign - "$bundle"
+codesign --verify --deep --strict "$bundle"
 printf 'Built: %s\n' "$bundle"

@@ -9,6 +9,11 @@ private func expect(_ condition: @autoclosure () throws -> Bool, _ message: Stri
     if try !condition() { throw TestFailure(description: message) }
 }
 
+private func expectEqual<T: Equatable>(_ actual: @autoclosure () throws -> T, _ expected: T, _ message: String) throws {
+    let value = try actual()
+    if value != expected { throw TestFailure(description: "\(message): expected \(expected), got \(value)") }
+}
+
 private func expectError(_ expected: NotebookFileError, _ action: () throws -> Void) throws {
     do {
         try action()
@@ -755,6 +760,94 @@ private enum CoreTests {
             try expect(Backup.summary(["memo-folders.json": theirs]).text == "비어 있는 백업이에요.", "no count of its own")
         }
 
+        try test("백업: copies in backups/ — names, and how many of each kind stay (same cases as backup.test.ts)") {
+            let calendar = Calendar.paper
+            func at(_ month: Int, _ day: Int, _ hour: Int, _ minute: Int, _ second: Int = 0) -> Date {
+                calendar.date(from: DateComponents(year: 2026, month: month, day: day, hour: hour, minute: minute, second: second))!
+            }
+            try expectEqual(Backup.savedName(.daily, at: at(10, 30, 9, 12, 5)), "매일-20261030-091205.jongi", "daily")
+            try expectEqual(Backup.savedName(.beforeFolderSwitch, at: at(10, 30, 9, 12, 5)), "폴더-바꾸기-전-20261030-091205.jongi", "folder")
+            try expectEqual(Backup.savedName(.beforeRestore, at: at(10, 30, 9, 12, 5)), "되돌리기-전-20261030-091205.jongi", "restore")
+            try expectEqual(Backup.savedName(.beforeUpdate, at: at(10, 30, 9, 12, 5)), "업데이트-전-20261030-091205.jongi", "update")
+            try expectEqual(Backup.savedName(.manual, at: at(10, 30, 9, 12, 5)), "직접-20261030-091205.jongi", "manual")
+            try expectEqual(Backup.saved("가져오기-전-20261008-143005.jongi"), Backup.Saved(name: "가져오기-전-20261008-143005.jongi", reason: .beforeImport, date: at(10, 8, 14, 30, 5)), "read back")
+            for other in ["종이냥-백업-2026-10-08.jongi", "매일-20261340-091205.jongi", "매일-20261030-0912.jongi", "매일-20261030-091205.json", "notes.txt"] {
+                try expect(Backup.saved(other) == nil, "not a copy: \(other)")
+            }
+            let names = (1...16).map { Backup.savedName(.daily, at: at(10, $0, 9, 0)) }
+                + (0..<12).map { Backup.savedName(.beforeImport, at: at(10, 30, 10, $0)) }
+                + (0..<3).map { Backup.savedName(.beforeFolderSwitch, at: at(10, 30, 11, $0)) }
+                + (1...20).map { Backup.savedName(.manual, at: at(9, $0, 9, 0)) }
+                + ["종이냥-백업-2026-10-08.jongi"]
+            try expectEqual(Backup.prune(names), ["가져오기-전-20261030-100000.jongi", "가져오기-전-20261030-100100.jongi",
+                                                  "매일-20261001-090000.jongi", "매일-20261002-090000.jongi"], "prune")
+        }
+
+        try test("백업 B4: a copy says why it was made and what it holds; older versions read past it (same cases as backup.test.ts)") {
+            let todos = ##"{"items":[{"createdAt":"2026-10-01T09:00:00Z","id":"00000000-0000-4000-8000-000000000001","isCompleted":false,"title":"보고서 쓰기"},{"createdAt":"2026-10-01T09:00:00Z","id":"00000000-0000-4000-8000-000000000002","isCompleted":false,"title":"장보기"}]}"##
+            let memos = ##"{"memos":[{"createdAt":"2026-10-01T09:00:00Z","id":"M1","text":"회의 메모","updatedAt":"2026-10-02T09:00:00Z"}]}"##
+            let line = { (id: String) in ##"{"completedAt":"2026-10-01T10:00:00Z","createdAt":"2026-10-01T09:00:00Z","id":""## + id + ##"","title":"끝"}"## }
+            let files = ["todos.json": todos, "memos.json": memos, "archive/2026-10.jsonl": line("a") + "\n" + line("b") + "\n"]
+            let at = Date(timeIntervalSince1970: 1_790_000_000)
+            let plain = try JSONSerialization.jsonObject(with: Data(Backup.make(files: files, exportedAt: at, from: "macOS 1.46.0").utf8)) as! [String: Any]
+            try expectEqual(plain.keys.sorted(), ["exportedAt", "files", "format", "from", "version"], "no reason: as before")
+            let told = try JSONSerialization.jsonObject(with: Data(Backup.make(files: files, exportedAt: at, from: "macOS 1.46.0", reason: .daily).utf8)) as! [String: Any]
+            try expect(told["version"] as? Int == 1 && told["reason"] as? String == "daily", "reason, version 1")
+            try expectEqual(told["counts"] as? [String: Int], ["todos": 2, "memos": 1, "events": 0, "archive": 2], "counts")
+            let back = try Backup.parse(Backup.make(files: files, exportedAt: at, from: "macOS 1.46.0", reason: .beforeRestore))
+            try expect(back.reason == .beforeRestore && back.counts == Backup.Counts(todos: 2, memos: 1, events: 0, archive: 2) && back.files == files, "read back")
+            // A file as another version might write it: the todos travel as one JSON string.
+            let quoted = String(String(decoding: try JSONSerialization.data(withJSONObject: [todos]), as: UTF8.self).dropFirst().dropLast())
+            func file(_ extra: String) -> String {
+                let head = #"{"format":"jongi-nyang-backup","version":1,"exportedAt":"2026-10-30T00:12:00Z","from":"Windows 1.31.0","#
+                return head + extra + #""files":{"todos.json":"# + quoted + "}}"
+            }
+            let known = try Backup.parse(file(##""reason":"manual","counts":{"todos":1,"memos":0,"events":0,"archive":0},"future":{"x":1},"##))
+            try expect(known.reason == .manual && known.counts == Backup.Counts(todos: 1) && known.files.keys.sorted() == ["todos.json"], "unknown keys are read past")
+            let someday = try Backup.parse(file(##""reason":"someday","counts":"lots","##))
+            try expect(someday.reason == nil && someday.counts == nil, "odd values left out")
+            try expectEqual(try Backup.parse(file(##""counts":{"todos":3},"##)).counts, Backup.Counts(todos: 3), "a missing count is 0")
+            try expect(try Backup.parse(file(##""counts":{"todos":-1},"##)).counts == nil, "a negative count")
+        }
+
+        try test("백업 목록: what a copy holds, when it was made, how big it is, when the daily one is due (same cases as backup.test.ts)") {
+            let many = Backup.Counts(todos: 24, memos: 12, events: 6, archive: 310)
+            try expectEqual(many.text(.ko), "할 일 24개 · 메모 12장 · 일정 6개 · 기록 310개", "ko")
+            try expectEqual(many.text(.en), "24 to-dos · 12 notes · 6 events · 310 in history", "en")
+            try expectEqual(many.text(.nl), "24 taken · 12 notities · 6 afspraken · 310 in geschiedenis", "nl")
+            let one = Backup.Counts(todos: 1, memos: 1, events: 1, archive: 1)
+            try expectEqual(one.text(.en), "1 to-do · 1 note · 1 event · 1 in history", "en one")
+            try expectEqual(one.text(.nl), "1 taak · 1 notitie · 1 afspraak · 1 in geschiedenis", "nl one")
+            try expectEqual(Backup.Counts(memos: 3).text(.ko), "메모 3장", "memos only")
+            try expectEqual(AppLanguage.allCases.map { Backup.Counts().text($0) }, ["비어 있어요", "Empty", "Leeg"], "empty")
+
+            let calendar = Calendar.paper
+            func at(_ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int) -> Date {
+                calendar.date(from: DateComponents(year: year, month: month, day: day, hour: hour, minute: minute))!
+            }
+            let now = at(2026, 10, 30, 10, 0)
+            let dates = [at(2026, 10, 30, 9, 12), at(2026, 10, 29, 21, 40), at(2026, 10, 28, 8, 55), at(2025, 12, 30, 8, 55)]
+            try expectEqual(dates.map { Backup.savedWhen($0, now: now) }, ["오늘 09:12", "어제 21:40", "10월 28일 08:55", "2025년 12월 30일 08:55"], "ko")
+            try expectEqual(dates.map { Backup.savedWhen($0, now: now, language: .en) }, ["Today 9:12 AM", "Yesterday 9:40 PM", "Oct 28, 8:55 AM", "Dec 30, 2025, 8:55 AM"], "en")
+            try expectEqual(dates.map { Backup.savedWhen($0, now: now, language: .nl) }, ["Vandaag 09:12", "Gisteren 21:40", "28 okt 08:55", "30 dec 2025 08:55"], "nl")
+            try expectEqual(dates.prefix(2).map { Backup.savedWhen($0, now: now, language: .en, midSentence: true) }, ["today 9:12 AM", "yesterday 9:40 PM"], "en mid")
+            try expectEqual(dates.prefix(2).map { Backup.savedWhen($0, now: now, language: .nl, midSentence: true) }, ["vandaag 09:12", "gisteren 21:40"], "nl mid")
+            try expectEqual(Backup.savedWhen(dates[0], now: now, midSentence: true), "오늘 09:12", "ko mid")
+
+            try expectEqual(Backup.sizeText(0), "1KB", "tiny")
+            try expectEqual(AppLanguage.allCases.map { Backup.sizeText(225_280, language: $0) }, ["220KB", "220 KB", "220 kB"], "KB")
+            try expectEqual(AppLanguage.allCases.map { Backup.sizeText(3_040_870, language: $0) }, ["2.9MB", "2.9 MB", "2,9 MB"], "MB")
+            try expectEqual(Backup.sizeText(150 * 1_048_576), "150MB", "big")
+
+            let last = at(2026, 10, 30, 9, 0)
+            try expect(!Backup.isDue(now: at(2026, 10, 31, 3, 59), lastDaily: last, changed: true), "before 4 a.m.: the same day")
+            try expect(Backup.isDue(now: at(2026, 10, 31, 4, 0), lastDaily: last, changed: true), "from 4 a.m.")
+            try expect(!Backup.isDue(now: at(2026, 10, 31, 4, 0), lastDaily: last, changed: false), "nothing changed")
+            try expect(Backup.isDue(now: at(2026, 10, 31, 4, 0), lastDaily: nil, changed: true), "the first")
+            try expect(!Backup.isDue(now: at(2026, 10, 31, 4, 0), lastDaily: nil, changed: false), "the first, nothing changed")
+            try expect(Backup.isDue(now: at(2026, 10, 30, 5, 0), lastDaily: at(2026, 10, 30, 2, 0), changed: true), "2 a.m. was the day before")
+        }
+
         try test("달력: month and week pages (same cases as calendar.test.ts)") {
             func at(_ day: Int, _ hour: Int, _ minute: Int = 0, month: Int = 10) -> Date {
                 seoul.date(from: DateComponents(year: 2026, month: month, day: day, hour: hour, minute: minute))!
@@ -815,6 +908,92 @@ private enum CoreTests {
             // 9
             let range = CalendarMonth.fetchRange(CalendarMonth.monthGrid(year: 2026, month: 10, calendar: seoul), calendar: seoul)
             try expect(range.start == at(27, 0, month: 9) && range.end == at(8, 0, month: 11), "9")
+        }
+
+        try test("저녁 정리 · 모두 끝냄 (#70): many tasks moved or finished in one pass, as one by one") {
+            var book = Notebook()
+            for n in 0..<300 { book.add("할 일 \(n)") }
+            book.restorePlace(id: book.items[7].id, dueDate: "2026-10-01", shelf: nil)
+            book.restorePlace(id: book.items[8].id, dueDate: nil, shelf: .later)
+            let ids = book.items.indices.filter { $0 % 3 == 0 }.map { book.items[$0].id }
+            let now = Date(timeIntervalSince1970: 1_790_000_000.7)
+            for place in [(dueDate: String?("2026-10-09"), shelf: ShelfPin?.none), (nil, .later)] {
+                var oneByOne = book, atOnce = book
+                for id in ids { oneByOne.restorePlace(id: id, dueDate: place.dueDate, shelf: place.shelf) }
+                atOnce.restorePlaces(Dictionary(uniqueKeysWithValues: ids.map { ($0, place) }))
+                try expect(oneByOne == atOnce, "places \(place)")
+            }
+            var oneByOne = book, atOnce = book
+            for id in ids { oneByOne.toggle(id: id, now: now) }
+            atOnce.toggle(ids: Set(ids), now: now)
+            try expect(oneByOne == atOnce && atOnce.items.filter(\.isCompleted).count == ids.count, "finished")
+            for id in ids { oneByOne.toggle(id: id, now: now) }
+            atOnce.toggle(ids: Set(ids), now: now)
+            try expect(oneByOne == atOnce && atOnce == book, "and back")
+        }
+
+        try test("달력 (#68): a page worked out at once shows each day as 1.45's day-by-day functions did") {
+            var seed: UInt64 = 68
+            func next(_ n: Int) -> Int {
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                return Int((seed >> 33) % UInt64(n))
+            }
+            func at(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+                seoul.date(from: DateComponents(year: 2026, month: 10, day: day, hour: hour, minute: minute))!
+            }
+            let now = at(14, 10)
+            let days = CalendarMonth.monthGrid(year: 2026, month: 10, calendar: seoul)
+            func someDay() -> String { CalendarMonth.adding(next(50) - 4, to: days[0], calendar: seoul) }
+            // Ranges on their day, on today (no date) or nowhere (언젠가), with deadlines and alerts on the same day or others.
+            let tasks = (0..<600).map { n -> TodoItem in
+                var item = TodoItem(title: ["회의", "보고서", "운동", "장보기"][next(4)] + " \(next(30))", isCompleted: next(6) == 0,
+                                    reminderAt: next(3) == 0 ? at(1 + next(30), next(24), [0, 30][next(2)]) : nil)
+                item.dueDate = next(2) == 0 ? someDay() : nil
+                item.shelf = [nil, .later, .today][next(3)]
+                if next(4) == 0 { item.timeStart = String(format: "%02d:%02d", 8 + next(10), [0, 30][next(2)]); item.timeEnd = next(2) == 0 ? "20:00" : nil }
+                if n % 50 == 0, let due = item.dueDate { item.reminderAt = CalendarMonth.date(due, calendar: seoul).addingTimeInterval(3600 * 9) }
+                return item
+            }
+            let events = (0..<150).map { n -> CalendarEvent in
+                let start = seoul.date(byAdding: .minute, value: next(60 * 24 * 45), to: CalendarMonth.date(days[0], calendar: seoul))!
+                let allDay = next(5) == 0
+                let begin = allDay ? seoul.startOfDay(for: start) : start
+                let end = allDay ? seoul.date(byAdding: .day, value: 1 + next(3), to: begin)! : start.addingTimeInterval(Double(next(4)) * 1800 + Double(next(2)) * 86_400)
+                return CalendarEvent(key: "c/\(n)", calendarId: "c", title: ["회의", "생일", "출장"][next(3)], allDay: allDay, start: begin, end: end, color: "#000000")
+            }
+            // 1.45's: each day on its own.
+            func before(_ day: String, ranges: Bool) -> [CalendarMonth.DayTask] {
+                var reminders: [(Date, CalendarMonth.DayTask)] = []
+                var deadlines: [CalendarMonth.DayTask] = []
+                for task in tasks where !task.isCompleted {
+                    if ranges, let range = task.timeRange, let start = TimeBlock.interval(of: task, now: now, calendar: seoul)?.start,
+                       TimeBlock.day(of: task, now: now, calendar: seoul) == day {
+                        reminders.append((start, .init(title: task.title, kind: .range, time: range.text(.ko), taskId: task.id)))
+                    } else if task.dueDate == day {
+                        deadlines.append(.init(title: task.title, kind: .deadline, time: nil, taskId: task.id))
+                    } else if let at = task.reminderAt, CalendarDraft.day(at, calendar: seoul) == day {
+                        let p = seoul.dateComponents([.hour, .minute], from: at)
+                        reminders.append((at, .init(title: task.title, kind: .reminder, time: AppLanguage.ko.clock(hour: p.hour!, minute: p.minute!), taskId: task.id)))
+                    }
+                }
+                return reminders.sorted { $0.0 < $1.0 }.map(\.1) + deadlines.sorted { $0.title < $1.title }
+            }
+            let page = CalendarMonth.Page(days: days, events: events, tasks: tasks, now: now, calendar: seoul)
+            var shown = 0
+            for day in days {
+                try expect(page.events(on: day) == CalendarMonth.eventsOn(day, events, calendar: seoul), "events \(day)")
+                try expect(page.tasks(on: day) == before(day, ranges: true), "to-dos \(day)")
+                try expect(CalendarMonth.dayTasks(day, tasks, now: now, calendar: seoul) == before(day, ranges: true), "dayTasks \(day)")
+                let cellBefore = CalendarMonth.eventsOn(day, events, calendar: seoul).map(CalendarMonth.CellItem.event)
+                    + before(day, ranges: false).filter { $0.kind == .deadline }.map(CalendarMonth.CellItem.task)
+                for limit in [1, 3, 99] {
+                    let cell = page.cell(day, limit: limit)
+                    try expect(cell.items == Array(cellBefore.prefix(limit)) && cell.more == max(0, cellBefore.count - limit), "cell \(day) \(limit)")
+                }
+                shown += page.tasks(on: day).count
+            }
+            try expect(shown > 100, "to-dos on the page: \(shown)")
+            try expect(page.tasks(on: "2027-05-01").isEmpty && page.events(on: "2027-05-01").isEmpty, "a day not on the page")
         }
 
         try test("quick entry understands dates and times written into a task") {
@@ -1012,7 +1191,7 @@ private enum CoreTests {
 
         try test("백업 in English and Dutch (same cases as i18n.test.ts)") {
             for (language, expected) in [(AppLanguage.en, ["This isn’t a Jongi-nyang backup file.", "This file comes from a newer version of Jongi-nyang. Please update Jongi-nyang.", "Couldn’t read ‘todos.json’ in the backup file."]),
-                                         (.nl, ["Dit is geen back-upbestand van Jongi-nyang.", "Dit bestand komt uit een nieuwere versie van Jongi-nyang. Werk Jongi-nyang bij.", "Kon ‘todos.json’ in het back-upbestand niet lezen."])] {
+                                         (.nl, ["Dit is geen back-upbestand van Jongi-nyang.", "Dit bestand komt uit een nieuwere versie van Jongi-nyang. Werk Jongi-nyang bij.", "Het lukte niet om ‘todos.json’ in het back-upbestand te lezen."])] {
                 try expect([Backup.Problem.notBackup, .newer, .unreadable("todos.json")].map { $0.message(language) } == expected, "\(language) messages")
             }
             var summary = Backup.Summary()

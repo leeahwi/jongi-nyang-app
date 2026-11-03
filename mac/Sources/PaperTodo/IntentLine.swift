@@ -93,7 +93,19 @@ extension AppModel {
             guard let id = addMemo(text: text) else { return nil }
             made = .memo(id)
         case .repeating(let guess):
-            guard let id = saveSeries(title: guess.title, rule: guess.rule, remindAt: guess.time, now: now) else { return nil }
+            // 2a (A12): the rule takes the line's space (a new one made first); the to-dos made from it follow (A10).
+            var ruleSpace: String??
+            switch space {
+            case .space(let id): ruleSpace = .some(id)
+            case .new(let name):
+                madeSpace = addTodoSpace(name: name)
+                ruleSpace = madeSpace.map { .some($0) }
+            case .noSpace, nil: ruleSpace = nil
+            }
+            guard let id = saveSeries(title: guess.title, rule: guess.rule, remindAt: guess.time, space: ruleSpace, now: now) else {
+                if let madeSpace { takeBackMadeSpace(madeSpace) }
+                return nil
+            }
             made = .series(id)
         }
         return IntentCommit(text: text, candidates: candidates, index: index,
@@ -288,6 +300,18 @@ struct IntentField: NSViewRepresentable {
     /// ↑ (-1) / ↓ (+1) — the search slip walks its results.
     var onArrow: (Int) -> Bool = { _ in false }
     var accessibilityLabel = ""
+    /// #162: more than 1 (`growing`: the 입력 줄, 빠른 입력): text with line breaks (pasted, or ⌥Return) grows the
+    /// field a line at a time up to this many, then it scrolls inside, and long lines wrap — as Windows' textarea.
+    /// 1 (the search slip): one line in the frame it's given.
+    var maxLines = 1
+
+    /// #162: one line sits in the middle of `height`, as `.frame(height:)` placed it; more lines grow the field
+    /// downward (up to `maxLines`), the first line staying where it was.
+    func growing(oneLine height: CGFloat, maxLines: Int = 4) -> some View {
+        var field = self
+        field.maxLines = maxLines
+        return field.padding(.vertical, (height - Self.lineHeight(font)) / 2)
+    }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -297,9 +321,17 @@ struct IntentField: NSViewRepresentable {
         field.isBezeled = false
         field.drawsBackground = false
         field.focusRingType = .none
-        field.lineBreakMode = .byTruncatingTail
-        field.cell?.isScrollable = true
-        field.cell?.wraps = false
+        if maxLines > 1 {
+            field.usesSingleLineMode = false
+            field.cell?.wraps = true
+            field.cell?.isScrollable = false
+            field.lineBreakMode = .byWordWrapping
+            field.cell?.truncatesLastVisibleLine = true
+        } else {
+            field.lineBreakMode = .byTruncatingTail
+            field.cell?.isScrollable = true
+            field.cell?.wraps = false
+        }
         field.delegate = context.coordinator
         field.setContentHuggingPriority(.defaultLow, for: .horizontal)
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -320,12 +352,66 @@ struct IntentField: NSViewRepresentable {
         }
     }
 
+    /// #162: as tall as its lines, up to `maxLines` (one line: the height the one-line field had).
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView field: KeyField, context: Context) -> CGSize? {
+        guard maxLines > 1 else { return nil }
+        let width = proposal.width ?? ceil((text as NSString).size(withAttributes: [.font: font]).width) + 4
+        return CGSize(width: width, height: Self.height(text, font: font, width: width.isFinite ? width : nil, maxLines: maxLines))
+    }
+
+    static func height(_ text: String, font: NSFont, width: CGFloat?, maxLines: Int) -> CGFloat {
+        let bottoms = lineBottoms(text, font: font, width: width)
+        return bottoms[min(bottoms.count, maxLines) - 1]
+    }
+
+    static func lines(_ text: String, font: NSFont, width: CGFloat?) -> Int { lineBottoms(text, font: font, width: width).count }
+
+    /// Where each line of `text` ends in a field `width` wide (nil: no wrapping), laid out by TextKit 2 as the field
+    /// editor lays it out; a last line break counts the empty line the caret goes to, as in a textarea.
+    static func lineBottoms(_ text: String, font: NSFont, width: CGFloat?) -> [CGFloat] {
+        if !text.contains(where: \.isNewline), width.map({ (text as NSString).size(withAttributes: [.font: font]).width + 4 <= $0 }) ?? true {
+            return [lineHeight(font)]
+        }
+        let bottoms = layOut(text, font: font, width: width)
+        return bottoms.isEmpty ? [lineHeight(font)] : bottoms
+    }
+
+    private static func layOut(_ text: String, font: NSFont, width: CGFloat?) -> [CGFloat] {
+        let content = NSTextContentStorage()
+        content.attributedString = NSAttributedString(string: text, attributes: [.font: font])
+        let manager = NSTextLayoutManager()
+        manager.usesFontLeading = false
+        content.addTextLayoutManager(manager)
+        let container = NSTextContainer(size: NSSize(width: width ?? 100_000, height: 0))
+        container.lineFragmentPadding = 2
+        manager.textContainer = container
+        var bottoms: [CGFloat] = []
+        manager.enumerateTextLayoutFragments(from: manager.documentRange.location, options: [.ensuresLayout, .ensuresExtraLineFragment]) { fragment in
+            for line in fragment.textLineFragments { bottoms.append(fragment.layoutFragmentFrame.minY + line.typographicBounds.maxY) }
+            return true
+        }
+        return bottoms
+    }
+
+    /// A line of `font` as the field editor lays it out (TextKit 2: without the font's leading).
+    static func lineHeight(_ font: NSFont) -> CGFloat {
+        if let height = lineHeights[font] { return height }
+        let height = layOut("x", font: font, width: nil).first ?? ceil(font.ascender - font.descender)
+        lineHeights[font] = height
+        return height
+    }
+
+    private static var lineHeights: [NSFont: CGFloat] = [:]
+
     private func update(_ field: KeyField, context: Context) {
         if field.stringValue != text { field.stringValue = text }
         if field.font != font { field.font = font }
         field.textColor = NSColor(PaperTheme.ink)
+        // The hint stays on one line, cut short with … when it doesn't fit (Windows: nowrap, ellipsis).
+        let hint = NSMutableParagraphStyle()
+        hint.lineBreakMode = .byTruncatingTail
         field.placeholderAttributedString = NSAttributedString(string: placeholder, attributes: [
-            .font: font, .foregroundColor: NSColor(PaperTheme.ink3),
+            .font: font, .foregroundColor: NSColor(PaperTheme.ink3), .paragraphStyle: hint,
         ])
         field.setAccessibilityLabel(accessibilityLabel)
         field.onFocus = { context.coordinator.parent.onFocus(true) }
@@ -345,6 +431,7 @@ struct IntentField: NSViewRepresentable {
         func controlTextDidChange(_ notification: Notification) {
             guard let field = notification.object as? NSTextField else { return }
             parent.text = field.stringValue
+            if let field = field as? KeyField, field.cell?.wraps == true { field.keepCaretInSight() }
         }
 
         func controlTextDidBeginEditing(_ notification: Notification) {
@@ -375,6 +462,45 @@ struct IntentField: NSViewRepresentable {
         var onFocus: () -> Void = {}
         var onUndo: () -> Bool = { false }
         var onCommandReturn: () -> Void = {}
+
+        override func setFrameSize(_ newSize: NSSize) {
+            super.setFrameSize(newSize)
+            if cell?.wraps == true { keepCaretInSight() }
+        }
+
+        /// #162: the caret's line inside the field — not in the few points of room the field editor has around it —
+        /// when the field grows or shrinks and after a key, so the lines scroll inside it.
+        func keepCaretInSight() {
+            guard let editor = currentEditor() as? NSTextView, let clip = editor.superview as? NSClipView, let window else { return }
+            guard let line = Self.caretLine(editor, window: window) else { return }
+            // The editor as tall as its lines first (TextKit 2 sizes it as it lays out), so it can scroll that far.
+            let content = max(line.maxY, editor.textLayoutManager?.usageBoundsForTextContainer.maxY ?? editor.frame.height)
+            if editor.frame.height < content - 0.5 { editor.sizeToFit() }
+            let shown = convert(bounds, to: editor)
+            var top = shown.minY
+            if line.minY < top { top = line.minY } else if line.maxY > top + shown.height { top = line.maxY - shown.height }
+            top = min(max(0, top), max(0, content - shown.height))
+            guard abs(top - shown.minY) > 0.25 else { return }
+            clip.scroll(to: NSPoint(x: clip.bounds.minX, y: clip.bounds.minY + top - shown.minY))
+        }
+
+        /// The caret's line in the field editor. Asked of TextKit 2 (laying out the lines past the field first: it lays
+        /// out only what shows); reaching for the editor's layout manager would turn it to TextKit 1.
+        static func caretLine(_ editor: NSTextView, window: NSWindow) -> NSRect? {
+            let caret = NSMaxRange(editor.selectedRange())
+            guard let manager = editor.textLayoutManager, let content = manager.textContentManager else {
+                let line = editor.convert(window.convertFromScreen(editor.firstRect(forCharacterRange: NSRange(location: caret, length: 0), actualRange: nil)), from: nil)
+                return line.height > 0 ? line : nil
+            }
+            guard let location = content.location(content.documentRange.location, offsetBy: caret) else { return nil }
+            manager.ensureLayout(for: manager.documentRange)
+            var line: NSRect?
+            manager.enumerateTextSegments(in: NSTextRange(location: location), type: .standard, options: [.rangeNotRequired]) { _, frame, _, _ in
+                line = frame
+                return false
+            }
+            return line.flatMap { $0.height > 0 ? $0.offsetBy(dx: editor.textContainerOrigin.x, dy: editor.textContainerOrigin.y) : nil }
+        }
 
         override func becomeFirstResponder() -> Bool {
             let became = super.becomeFirstResponder()
@@ -446,7 +572,7 @@ struct IntentChips: View {
 /// What the space chip says.
 struct SpaceChoiceChip: Equatable {
     var title: String
-    /// nil: a new space (`+`) or 스페이스 없음.
+    /// nil: a new space (`+`) or 일반.
     var color: TodoSpaces.Color?
     var new = false
     /// More than one choice and a `#` token: ⇧Tab goes through them.
@@ -459,12 +585,12 @@ struct SpaceChoiceChip: Equatable {
             let space = model.todoSpaces.space(id)
             return SpaceChoiceChip(title: space?.name ?? "", color: space?.colorKey, cycles: cycles)
         case .new(let name): return SpaceChoiceChip(title: SpaceWords.newSpace(name, language: .current), new: true, cycles: cycles)
-        case .noSpace: return SpaceChoiceChip(title: SpaceWords.noSpace(.current), cycles: cycles)
+        case .noSpace: return SpaceChoiceChip(title: model.generalName, cycles: cycles)
         }
     }
 }
 
-/// `● 회사` on a light tint of the space's colour; `+ 새 스페이스 ‘회사’`; `스페이스 없음`.
+/// `● 회사` on a light tint of the space's colour; `+ 새 스페이스 ‘회사’`; `일반`.
 struct SpaceChip: View {
     let chip: SpaceChoiceChip
 
@@ -618,7 +744,12 @@ struct IntentLineView: View {
             HStack(spacing: 8) {
                 IntentField(text: $text, placeholder: placeholder, font: model.notebookFont.handNSFont(compact ? 18 : 20),
                             focusRequest: (focusRequest ?? model.focusRequest) + localFocus,
-                            onFocus: { focused = $0; model.inputLineFocused = $0 },
+                            onFocus: {
+                                focused = $0
+                                model.inputLineFocused = $0
+                                // 2b (I): `+ 회사에 넣기` lasts while the line has the keyboard (or holds words).
+                                if !$0, usesLens, text.isEmpty, model.lineSpace != nil { model.lineSpace = nil }
+                            },
                             onTab: { step in
                                 // W7: ⇧Tab goes through the spaces while the line has a `#` token.
                                 if step < 0, SpaceLine.cycles(spaceReading) {
@@ -633,7 +764,7 @@ struct IntentLineView: View {
                             onEscape: escape,
                             onUndo: undo,
                             accessibilityLabel: L("입력 줄"))
-                    .frame(height: compact ? 22 : 26)
+                    .growing(oneLine: compact ? 22 : 26)
                     .accessibilityHint(L("할 일, 일정, 타이머, 알람이나 메모를 적어요. Tab으로 다른 뜻을 골라요."))
                 // No fade between the shortcut chip and the ↩ hint: a half-faded chip lingered while typing.
                 trailing(readable: !candidates.isEmpty)
@@ -686,7 +817,7 @@ struct IntentLineView: View {
         }
         let room = width - 20 - (width >= 260 ? 48 : 0)
         // 한 스페이스만 보기 (1.45): "회사 스페이스에 넣어요: 할 일, 일정", or "회사 스페이스에 넣어요" when that doesn't fit.
-        if usesLens, case .space = model.spaceShown, let name = model.spaceName(model.spaceShown) {
+        if usesLens, case .space = model.lineShown, let name = model.spaceName(model.lineShown) {
             let long = SpaceWords.writeIn(name, language: .current)
             let needed = (long as NSString).size(withAttributes: [.font: model.notebookFont.handNSFont(20)]).width
             return needed > room ? SpaceWords.writeInShort(name, language: .current) : long
@@ -734,6 +865,8 @@ struct IntentLineView: View {
         }
         guard !list.isEmpty else { return } // a slash line that can't be read (the hint says why), or only `#회사` (S5)
         guard let commit = model.commitIntent(text: trimmed, candidates: list, index: index, page: page, space: space) else { return }
+        // 2b (I): `+ 회사에 넣기` was for this one line.
+        if usesLens { model.lineSpace = nil }
         text = ""
         picked = 0
         spacePick = 0
@@ -749,6 +882,7 @@ struct IntentLineView: View {
     private func escape() -> Bool {
         if shownToast != nil { shownToast = nil; return true }
         if !text.isEmpty { text = ""; return true }
+        if usesLens, model.lineSpace != nil { model.lineSpace = nil; return true }
         return false
     }
 
@@ -784,7 +918,7 @@ enum SpaceLine {
     /// W7: ⇧Tab is the spaces' only with a `#` token and more than one choice.
     static func cycles(_ reading: SpaceToken.Reading) -> Bool { reading.token != nil && reading.choices.count > 1 }
 
-    /// The `⇧Tab` hint chip: only when more than one space matches (not just the space and 스페이스 없음).
+    /// The `⇧Tab` hint chip: only when more than one space matches (not just the space and 일반).
     static func hintsCycling(_ reading: SpaceToken.Reading) -> Bool { reading.token != nil && reading.choices.count > 2 }
 
     static func next(_ pick: Int, _ reading: SpaceToken.Reading) -> Int {
@@ -795,9 +929,9 @@ enum SpaceLine {
         reading.choices.isEmpty ? nil : reading.choices[pick % reading.choices.count]
     }
 
-    /// The chip's choice: only while the picked meaning is a to-do (M4).
+    /// The chip's choice: only while the picked meaning is a to-do (M4) or, since 2a (A12), a repeat (its rule's space).
     static func choice(_ reading: SpaceToken.Reading, pick: Int, candidates: [Intent.Candidate], index: Int) -> SpaceToken.Choice? {
-        guard candidates.indices.contains(index), candidates[index].kind == .todo else { return nil }
+        guard candidates.indices.contains(index), [.todo, .repeating].contains(candidates[index].kind) else { return nil }
         return pickedChoice(reading, pick: pick)
     }
 
@@ -810,15 +944,42 @@ enum SpaceLine {
 /// The toast over the bottom of a sheet's list (오늘 · 앞으로).
 struct ToastHost: View {
     @ObservedObject var model: AppModel
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        if let toast = model.toast {
-            ToastView(toast: toast, seconds: toast.seconds ?? 4) { if model.toast?.id == toast.id { model.toast = nil } }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
-                .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-                .id(toast.id)
+        ZStack {
+            if let toast = model.toast {
+                ToastView(toast: toast, seconds: toast.seconds ?? 4) { if model.toast?.id == toast.id { model.toast = nil } }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+                    .transition(.toast)
+                    .id(toast.id)
+            }
         }
+        .toastMotion(shown: model.toast != nil)
+    }
+}
+
+extension AnyTransition {
+    /// A toast rises 6 pt as it fades in and only fades as it goes (N10).
+    static var toast: AnyTransition {
+        .asymmetric(insertion: .offset(y: Motion.rise).combined(with: .opacity), removal: .opacity)
+    }
+    /// A to-do's row the same way (N3): rising 6 pt as it fades in, fading as the list closes up after it.
+    static var paperRow: AnyTransition { toast }
+}
+
+extension View {
+    /// N10: a toast comes in with 등장 (0.18 s ease-out) and goes with 살짝 (0.12 s ease-in); at once under Reduce
+    /// Motion and in snapshots. Keyed on whether one is up, so a new toast covering the last swaps at once.
+    /// Put it on a container that is always there, around the `if let` that shows the toast with `.transition(.toast)`.
+    func toastMotion(shown: Bool) -> some View { modifier(ToastMotion(shown: shown)) }
+}
+
+private struct ToastMotion: ViewModifier {
+    let shown: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content.animation(shown ? Motion.animation(.enter, reduce: reduceMotion) : Motion.exit(.quick, reduce: reduceMotion), value: shown)
     }
 }

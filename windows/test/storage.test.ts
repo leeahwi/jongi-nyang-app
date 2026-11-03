@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { parseNotebook, serializeNotebook, UndoableNotebook } from "../src/core/notebook";
 import { parseMemos, serializeMemos, type Memo } from "../src/core/memo";
-import { folderPlace, parseStorageFile, placeText, sameFolder, serializeStorageFile, storageLabel } from "../src/core/storage";
-import { copyData, hasList, mergeArchive, readDataFolder, writeDataFolder } from "../src/main/storageFolder";
+import { folderPlace, parseMoved, parseStorageFile, placeText, sameFolder, serializeMoved, serializeStorageFile, storageLabel } from "../src/core/storage";
+import { copyData, hasList, mergeArchive, readDataFolder, takeMoved, writeDataFolder, writeMoved } from "../src/main/storageFolder";
 import { Store } from "../src/main/store";
 import { parseEvents, serializeEvents, type LocalEvent } from "../src/core/events";
 import { parseAlarms, serializeAlarms, type Alarm } from "../src/core/alarm";
@@ -65,6 +66,21 @@ test("the chosen folder is kept beside the settings", () => {
   assert.equal(readDataFolder(settings), "E:\\공유");
   writeDataFolder(settings, undefined);
   assert.equal(readDataFolder(settings), undefined);
+});
+
+test("#195: a move leaves one note for the restarted app — the folder's name, never its path — and it's said once", () => {
+  const settings = temporary();
+  assert.equal(takeMoved(settings), undefined, "nothing moved: nothing to say");
+  writeMoved(settings, { folder: "종이냥", kept: "moved" });
+  assert.deepEqual(takeMoved(settings), { folder: "종이냥", kept: "moved" });
+  assert.equal(takeMoved(settings), undefined, "said once, then gone");
+  writeMoved(settings, { kept: "folder" });
+  assert.deepEqual(takeMoved(settings), { kept: "folder" }, "back to this PC: no folder name");
+  // A path written by mistake (or by hand) is shown as its last name only; anything else says nothing.
+  assert.deepEqual(parseMoved(JSON.stringify({ folder: "C:\\Users\\sample\\OneDrive\\종이냥", kept: "moved" })), { folder: "종이냥", kept: "moved" });
+  assert.equal(parseMoved(JSON.stringify({ folder: "종이냥", kept: "elsewhere" })), undefined);
+  assert.equal(parseMoved("not json"), undefined);
+  assert.equal(serializeMoved({ folder: "종이냥", kept: "folder" }), "{\"folder\":\"종이냥\",\"kept\":\"folder\"}\n");
 });
 
 test("settings stay in their own folder when the data lives elsewhere", () => {
@@ -187,15 +203,55 @@ test("memos: changes from another device and from here both survive, like on the
   assert.equal(store.memos.find((memo) => memo.id === ids.theirs)?.text, "edited there after");
 });
 
+/** Resolves when the store says `event`; fails after a generous `ms` (fs.watch lags while the machine is busy). */
+function heard(store: Store, event: string, ms = 20_000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const done = () => { clearTimeout(timer); resolve(); };
+    const timer = setTimeout(() => { store.off(event, done); reject(new Error(`no ‘${event}’ within ${ms} ms`)); }, ms);
+    store.once(event, done);
+  });
+}
+
 test("watching the folder reloads a changed file on its own", async () => {
   const directory = temporary();
   const store = new Store(directory);
   store.mutate((history) => history.add("하나"));
   store.watch();
   try {
+    // Written right away, perhaps before the system is listening (#154): the look after starting still finds it.
+    const watching = heard(store, "watching");
+    let reloaded = heard(store, "reloaded");
     writeElsewhere(directory, "둘");
-    const deadline = Date.now() + 15_000; // fs.watch can lag while the machine is busy
-    while (store.items.length < 2 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 100));
+    await reloaded;
+    assert.deepEqual(titles(store), ["하나", "둘"]);
+    // Once listening, the watcher itself hears the next change, long before the 30-second look.
+    await watching;
+    reloaded = heard(store, "reloaded");
+    writeElsewhere(directory, "셋");
+    await reloaded;
+    assert.deepEqual(titles(store), ["하나", "둘", "셋"]);
+  } finally {
+    store.unwatch();
+  }
+});
+
+test("a change the watcher never reports (made before it was listening) is still read back soon", async () => {
+  const directory = temporary();
+  const store = new Store(directory);
+  store.mutate((history) => history.add("하나"));
+  // A watcher that stays silent: what macOS does with a change made before its FSEvents stream starts.
+  const real = fs.watch;
+  const silent = Object.assign(new EventEmitter(), { close() {}, ref() { return silent; }, unref() { return silent; } });
+  fs.watch = (() => silent) as unknown as typeof fs.watch;
+  try {
+    store.watch();
+  } finally {
+    fs.watch = real;
+  }
+  try {
+    const reloaded = heard(store, "reloaded");
+    writeElsewhere(directory, "둘");
+    await reloaded; // from the look after starting, not the 30-second one
     assert.deepEqual(titles(store), ["하나", "둘"]);
   } finally {
     store.unwatch();

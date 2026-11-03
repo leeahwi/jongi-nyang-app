@@ -1,7 +1,9 @@
 import {
-  bodyFontSize, calendarAlertChoicesIn, fontTitles, styleDetails, styleTitles, textSizeTitles, textSizes,
-  type AppState, type NotebookFont, type Prefs, type ReminderStyle, type SystemNotify,
+  bodyFontSize, calendarAlertChoicesIn, fontTitles, styleDetails, styleTitles, textStepTitles,
+  type TodosState, type DrawerFont, type NotebookFont, type Prefs, type ReminderStyle, type SpaceGroupStyle, type SystemNotify,
 } from "../core/types";
+import { codeFonts, drawerMetrics, drawerPoints, lineSpacings, paragraphSpacings, type CodeFont, type LineSpacing, type ParagraphSpacing } from "../core/textSteps";
+import { d2codingFamily, monoFamily, paperSamples } from "../core/drawerPapers";
 import { archiveChoicesIn, logicalDayStart } from "../core/archive";
 import type { TimerCommand } from "../core/focusTimer";
 import { nativeName, shortDate, spokenTime, weekdayOrder, weekdayShort, type LanguageSetting } from "../core/lang";
@@ -18,14 +20,17 @@ import { paneTitle } from "./deskPanes";
 import { chatterFrequencyTitles } from "../core/chatter";
 import { timerSizes, timerSizeTitles } from "../core/timerWidget";
 import { sweepTimes } from "../core/sweep";
-import { defaultDrawerShortcut, drawerWidth, readShortcut, shortcutLabel, type DrawerBackdrop, type DrawerTheme } from "../core/memoDrawer";
-import { liveSpaces, newSpaceID, nextSpaceColor, spaceColor, spaceColors, spaceIndexOf, spaceObjectWords, type SpaceColor, type TodoSpace } from "../core/todoSpaces";
+import { defaultDrawerShortcut, drawerLook, drawerPaper, drawerThemeValue, drawerWidth, memoPapers, readShortcut, shortcutLabel, type DrawerBackdrop, type MemoPaper } from "../core/memoDrawer";
+import { defaultNoteShortcut, takenBy } from "../core/shortcuts";
+import { generalDefaults, generalName, liveSpaces, newSpaceID, nextSpaceColor, spaceColor, spaceColors, spaceIndexOf, seriesSpaceOf, spaceObjectWords, type SpaceColor, type TodoSpace } from "../core/todoSpaces";
 import { toaster } from "./slip";
 import { openMenu, type MenuHost } from "./drawerMenu";
 import { folderPlace, placeSeparator, placeText } from "../core/storage";
+import { countsText, savedWhen, sizeText, type BackupReason } from "../core/backup";
+import type { BackupEntry } from "../core/types";
 
 const api = paper();
-let state: AppState;
+let state: TodosState;
 type Tab = SettingsTab;
 const requestedTab = readPane(new URLSearchParams(location.search).get("tab"), true);
 let tab: Tab = requestedTab && isSettingsTab(requestedTab) ? requestedTab : "appearance";
@@ -41,13 +46,13 @@ const styles: ReminderStyle[] = ["compact", "paper", "character"];
 
 /** What each pane is for, under its name (the desk's pane header). */
 const subtitles: Record<Tab, string> = {
-  appearance: t("언어와 종이 색, 글꼴과 글자 크기를 정해요."),
+  appearance: t("언어와 낮 · 밤, 노트의 글꼴과 글자 크기를 정해요."),
   notifications: t("주기 알림과 알림 모양을 정하고, 미리보기로 확인해요."),
   repeat: t("반복하는 날마다 목록에 한 줄씩 놓여요."),
   pet: t("종이냥을 보이거나 숨기고, 돌아다닐지, 말을 걸지 정해요."),
   clock: t("알람을 맞추고, 뽀모도로 시간과 소리를 정하고 바로 시작해요."),
   events: t("일정을 적어 두면 오늘 할 일 위에 보이고, 시작 전에 알려 줘요."),
-  storage: t("할 일과 기록이 저장되는 곳, 다른 컴퓨터로 옮기는 백업이에요."),
+  storage: t("할 일과 기록이 저장되는 곳, 자동 백업과 다른 컴퓨터로 옮기는 백업이에요."),
   ai: t("Claude와 이야기하면서 할 일과 일정을 보고, 넣고, 고쳐요."),
   drawer: t("화면 끝에서 메모를 꺼내 보고, 바로 적고, 그 자리에서 고쳐요."),
   spaces: t("할 일을 회사 · 집처럼 나눠요. 오늘 한 장은 그대로예요."),
@@ -81,6 +86,12 @@ function folderPlaceLine(folder: string): HTMLElement {
   return element;
 }
 
+/** A key at the end of a row (#53), a cap per key (Ctrl + Shift + 0), as in the shortcut list. */
+function rowKeys(keys: string[]): HTMLElement {
+  return h("span", { class: "row-keys", role: "img", "aria-label": keys.join(" + ") },
+    ...keys.flatMap((key, index) => [index > 0 ? h("span", { class: "plus", "aria-hidden": "true" }, "+") : null, h("kbd", { class: "keycap", "aria-hidden": "true" }, key)]));
+}
+
 /** A row's line icon on a small sage square. */
 function glyph(name: string): HTMLElement {
   return h("span", { class: "glyph", "aria-hidden": "true" }, icon(name, 16, 1.7));
@@ -105,6 +116,121 @@ function segmented<T extends string | number>(options: { value: T; title: string
     control.append(choice);
   }
   return control;
+}
+
+/** A popup (as on the Mac's): a native select; `face` draws a font's name in that font, the picked one in the field too. */
+function popup<T extends string>(options: { value: T; title: string; face?: string }[], selected: T, onPick: (value: T) => void, label: string): HTMLSelectElement {
+  const select = h("select", { class: "popup", "aria-label": label }) as HTMLSelectElement;
+  for (const option of options) {
+    const element = h("option", { value: option.value }, option.title) as HTMLOptionElement;
+    if (option.face) element.style.fontFamily = option.face;
+    element.selected = option.value === selected;
+    select.append(element);
+  }
+  const face = options.find((option) => option.value === selected)?.face;
+  if (face) select.style.fontFamily = face;
+  // The handwriting runs small at the UI's size: its name a size up, as the Mac draws it.
+  if (face && /pen-font|brush-font/.test(face)) select.style.fontSize = "17px";
+  select.addEventListener("change", () => onPick(select.value as T));
+  return select;
+}
+
+/**
+ * A slider in steps (#141, as on the Mac): a sage fill up to a white knob, a tick under each step, a small 가 and a large
+ * 가 at the ends. ← → move it a step (the browser's own range keys); Narrator reads the step's name. `shown` is the
+ * value beside it, changed while it is dragged; the setting is saved when it is let go.
+ */
+function stepSlider(count: number, index: number, onPick: (index: number) => void, label: string, spoken: (index: number) => string, shown: HTMLElement, text: (index: number) => string): HTMLElement {
+  const input = h("input", { type: "range", class: "step-slider", min: "0", max: String(count - 1), step: "1", value: String(index), "aria-label": label }) as HTMLInputElement;
+  const ticks = Array.from({ length: count }, () => h("i", {}));
+  const paint = (at: number) => {
+    input.style.setProperty("--fill", `calc(8px + (100% - 16px) * ${at / (count - 1)})`);
+    input.setAttribute("aria-valuetext", spoken(at));
+    ticks.forEach((tick, tickAt) => tick.classList.toggle("on", tickAt <= at));
+    shown.textContent = text(at);
+  };
+  paint(index);
+  input.addEventListener("input", () => paint(Number(input.value)));
+  input.addEventListener("change", () => onPick(Number(input.value)));
+  return h("span", { class: "step-wrap" },
+    h("span", { class: "step-ga small", "aria-hidden": "true" }, t("가")),
+    h("span", { class: "step-track" }, input, h("span", { class: "step-ticks", "aria-hidden": "true" }, ...ticks)),
+    h("span", { class: "step-ga large", "aria-hidden": "true" }, t("가")));
+}
+
+/** The CSS font of a drawer face (drawer.css: --m-font); 고정폭 in the 코드 글꼴 (#143). */
+const drawerFace = (font: DrawerFont, code: CodeFont = "system"): string =>
+  (font === "pen" ? "var(--pen-font)" : font === "brush" ? "var(--brush-font)" : font === "mono" ? codeFamily(code) : "var(--ui)");
+const codeFamily = (code: CodeFont): string => (code === "d2coding" ? d2codingFamily : monoFamily);
+
+/**
+ * 메모 서랍 → 메모 글꼴's sample (#141): a memo sheet on the drawer's paper (its colours from core/drawerPapers.ts) —
+ * a handwritten title, a paragraph, a checklist with one item done and one with `code` — in the drawer's face, size,
+ * line and paragraph room. The words are made up.
+ */
+function drawerFontPreview(prefs: Prefs): HTMLElement {
+  const night = document.documentElement.dataset.paper === "night";
+  const sample = paperSamples[drawerLook(prefs.drawerTheme, night, prefs.drawerNightPaper)];
+  const metrics = drawerMetrics(prefs.drawerTextPt, prefs.drawerLineHeight, prefs.drawerParagraph);
+  const face = prefs.drawerFont;
+  const faceSize = face === "pen" ? Math.round((metrics.body * 23) / 15) : face === "brush" ? Math.round((metrics.body * 22) / 15) : face === "mono" ? metrics.body - 1 : metrics.body;
+  const hand = face === "pen" || face === "brush" ? face : prefs.font;
+  const box = (done: boolean) => h("span", { class: `dfp-box${done ? " on" : ""}` }, done ? icon("check", 9, 3) : null);
+  const element = h("div", { class: "dfp", role: "img", "aria-label": t("메모 글꼴 미리보기") },
+    h("div", { class: "dfp-sub" }, t("메모 서랍 · 회사")),
+    h("div", { class: "dfp-sheet" },
+      h("div", { class: `dfp-title${hand === "clean" ? " clean" : ""}` }, t("주간 회의")),
+      h("div", { class: "dfp-ln dfp-para" }, t("시안 두 개는 금요일까지 보내요.")),
+      h("div", { class: "dfp-ln done" }, box(true), h("span", {}, t("회의실 잡기"))),
+      h("div", { class: "dfp-ln" }, box(false), h("span", {}, t("자료 묶어서 올리기"), " ", h("code", {}, "v2-final")))));
+  const style: Record<string, string> = {
+    "--p-paper": sample.paper, "--p-edge": sample.edge, "--p-card": sample.card, "--p-card-edge": sample.cardEdge, "--p-ink": sample.ink,
+    "--p-sub": sample.sub, "--p-meta": sample.meta, "--p-box": sample.box, "--p-check": sample.check, "--p-on-check": sample.onCheck,
+    "--p-face": drawerFace(face, prefs.drawerCodeFont), "--p-mono": codeFamily(prefs.drawerCodeFont), "--p-size": `${faceSize}px`, "--p-mono-size": `${metrics.body - 1}px`, "--p-line": `${metrics.line}px`, "--p-para": `${metrics.paragraph}px`,
+    "--p-hand": hand === "brush" ? "var(--brush-font)" : hand === "pen" ? "var(--pen-font)" : "var(--ui)",
+  };
+  for (const [name, value] of Object.entries(style)) element.style.setProperty(name, value);
+  return element;
+}
+
+/** The papers' names (the drawer's ⋯ menu says them the same way). */
+const paperNames = (): Record<MemoPaper, string> => ({
+  day: t("낮 종이"), night: t("밤 종이"), kraft: t("크라프트지"), grid: t("모눈 노트"), hanji: t("한지"), sage: t("쑥색 종이"), blossom: t("벚꽃 종이"), ink: t("먹색 종이"),
+});
+/** After a tile is picked with the keyboard, the redrawn gallery gives the focus back to the picked tile. */
+let focusPaperTile = false;
+
+/**
+ * 서랍 종이 (#142, as on the Mac): a small drawer per paper — its paper, three bookmarks on the left, a sheet with a
+ * handwritten title and two lines, the folder colours' dots — drawn from core/drawerPapers.ts, with its name under it.
+ * The picked one has a sage edge and a check. A radio group: ← → ↑ ↓ pick the next one, as Narrator reads it.
+ */
+function paperGallery(picked: MemoPaper, pick: (paper: MemoPaper) => void): HTMLElement {
+  const names = paperNames();
+  const gallery = h("div", { class: "paper-gallery", role: "radiogroup", "aria-label": t("서랍 종이") });
+  for (const paper of memoPapers) {
+    const sample = paperSamples[paper];
+    const on = paper === picked;
+    const frame = h("span", { class: "pt-frame", "aria-hidden": "true" },
+      h("span", { class: "pt-tabs" }, ...sample.tabs.slice(0, 3).map((color) => h("i", { style: `background:${color}` }))),
+      h("span", { class: "pt-sheet" }, h("b", {}, t("주간 회의")), h("i", {}), h("i", { class: "short" })),
+      h("span", { class: "pt-dots" }, ...sample.tabs.map((color) => h("i", { style: `background:${color}` }))),
+      on ? h("span", { class: "pt-check" }, icon("check", 10, 3)) : null);
+    for (const [name, value] of Object.entries({ "--t-paper": sample.paper, "--t-edge": sample.edge, "--t-card": sample.card, "--t-card-edge": sample.cardEdge, "--t-ink": sample.ink })) frame.style.setProperty(name, value);
+    const tile = h("button", { class: "paper-tile", role: "radio", "aria-checked": String(on), "aria-label": names[paper], tabindex: on ? "0" : "-1", "data-paper": paper },
+      frame, h("span", { class: "pt-name" }, names[paper]));
+    tile.addEventListener("click", () => { if (!on) pick(paper); });
+    tile.addEventListener("keydown", (event) => {
+      const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+      if (!step) return;
+      event.preventDefault();
+      const next = memoPapers[(memoPapers.indexOf(paper) + step + memoPapers.length) % memoPapers.length];
+      focusPaperTile = true;
+      pick(next);
+    });
+    gallery.append(tile);
+  }
+  return gallery;
 }
 
 function toggle(checked: boolean, label: string, onChange: (value: boolean) => void): HTMLElement {
@@ -140,20 +266,14 @@ function appearance(): Node[] {
     ...samples.map((sample) => h("div", { class: `line${sample.done ? " done" : ""}` },
       h("span", { class: "box" }, sample.done ? icon("check", 10, 2.8) : null), h("span", { class: "text" }, sample.title))));
 
-  const fontRows = fonts.map((font) => {
-    const row = h("button", { class: "row choice", role: "radio", "aria-checked": String(prefs.font === font) },
-      h("span", { class: "radio" }), h("span", { class: "grow" }, fontTitles[lang()][font]), h("span", { class: "sample" }, t("오늘 할 일")));
-    row.style.setProperty("--sample-font", font === "pen" ? "var(--pen-font)" : font === "brush" ? "var(--brush-font)" : "var(--ui)");
-    row.style.setProperty("--sample-size", `${bodyFontSize(font, "regular")}px`);
-    row.addEventListener("click", () => set("font", font));
-    return row;
-  });
-
-  const sizeRow = h("div", { class: "row" },
-    h("span", { style: "font-size:11px;color:var(--secondary)" }, t("가")),
-    segmented(textSizes.map((size) => ({ value: size, title: textSizeTitles[lang()][size] })), prefs.textSize, (size) => set("textSize", size), t("글자 크기")),
-    h("span", { style: "font-size:17px;color:var(--secondary)" }, t("가")));
-  sizeRow.children[1].classList.add("wide");
+  // 노트 글꼴 (#141, as on the Mac): the face as a popup (each name in its face), the size in seven steps.
+  const fontRow = h("div", { class: "row note-font" }, glyph("font"), h("span", { class: "grow" }, t("글꼴")),
+    popup(fonts.map((font) => ({ value: font, title: fontTitles[lang()][font], face: font === "pen" ? "var(--pen-font)" : font === "brush" ? "var(--brush-font)" : "var(--ui)" })),
+      prefs.font, (font) => set("font", font), t("노트 글꼴")));
+  const stepName = h("span", { class: "step-value" });
+  const sizeRow = h("div", { class: "row note-size" }, glyph("textSize"), h("span", { class: "grow" }, t("글자 크기")),
+    stepSlider(textStepTitles[lang()].length, prefs.textStep, (step) => set("textStep", step), t("글자 크기"), (step) => textStepTitles[lang()][step], stepName, (step) => textStepTitles[lang()][step]),
+    stepName);
 
   const startRow = h("div", { class: "row" }, glyph("power"), h("span", { class: "grow" }, t("컴퓨터를 켤 때 같이 열기")),
     toggle(prefs.openAtLogin, t("Windows 시작 시 실행"), (value) => set("openAtLogin", value)));
@@ -165,37 +285,36 @@ function appearance(): Node[] {
     toggle(prefs.quickEntry, t("어디서든 빠른 입력"), (value) => set("quickEntry", value)));
   const memoRow = h("div", { class: "row" }, glyph("note"), h("span", { class: "grow" }, t("어디서든 빠른 메모 (Ctrl+Alt+M)")),
     toggle(prefs.quickMemo, t("어디서든 빠른 메모"), (value) => set("quickMemo", value)));
-  const noteRow = h("div", { class: "row" }, glyph("desk"), h("span", { class: "grow" }, t("어디서든 노트 보이기 · 숨기기 (Ctrl+Alt+J)")),
-    toggle(prefs.noteHotkey, t("어디서든 노트 보이기 · 숨기기"), (value) => set("noteHotkey", value)));
+  // #85: the note's key can be changed, as the drawer's (the same field, ‘기본값’ and switch).
+  const noteRow = noteKeyRow();
   // 빠른 메모를 열 때 복사한 글 넣기: the text copied since it last opened, ready (and selected) in the empty memo.
   const clipRow = h("div", { class: "row" }, glyph("share"),
     h("div", { class: "grow" }, h("div", {}, t("빠른 메모를 열 때 복사한 글 넣기")), h("div", { class: "sub" }, t("빈 메모를 열면 방금 복사한 글이 골라진 채로 들어가요."))),
     toggle(prefs.quickMemoClipboard, t("빠른 메모를 열 때 복사한 글 넣기"), (value) => set("quickMemoClipboard", value)));
   // Another app holding a shortcut is said in the foot, in the accent colour.
-  const shortcutProblems = [prefs.quickEntry ? state.shortcutProblem : undefined, prefs.quickMemo ? state.memoShortcutProblem : undefined, prefs.noteHotkey ? state.noteShortcutProblem : undefined].filter(Boolean) as string[];
+  const shortcutProblems = [prefs.quickEntry ? state.shortcutProblem : undefined, prefs.quickMemo ? state.memoShortcutProblem : undefined, noteRecordProblem ?? (prefs.noteHotkey ? state.noteShortcutProblem : undefined)].filter(Boolean) as string[];
   const quickFoot = shortcutProblems.length > 0
     ? shortcutProblems.join(" ")
-    : `${t("어떤 앱을 쓰다가도 Ctrl+Alt+N을 누르면 작은 종이가 떠요. 적은 말에 맞춰 알림 · 마감 · 일정을 정해요.")} ${t("Ctrl+Alt+M은 몇 줄을 바로 메모 서랍에 넣는 빠른 메모예요.")} ${t("Ctrl+Alt+J는 노트를 불러오거나 넣어 둬요.")}`;
+    : `${t("어떤 앱을 쓰다가도 Ctrl+Alt+N을 누르면 작은 종이가 떠요. 적은 말에 맞춰 알림 · 마감 · 일정을 정해요.")} ${t("Ctrl+Alt+M은 몇 줄을 바로 메모 서랍에 넣는 빠른 메모예요.")}`;
 
   // 언어: 자동 (the system's) or one of the three, each named in its own language; changing it restarts the app.
   const languages: { value: LanguageSetting; title: string }[] = [{ value: "auto", title: t("자동") }, ...(["ko", "en", "nl"] as const).map((value) => ({ value, title: nativeName[value] }))];
   const languageRow = h("div", { class: "row language" }, glyph("globe"), h("span", { class: "grow" }, t("앱 언어")),
     segmented(languages, prefs.language, (value) => set("language", value), t("언어")));
-  // 종이 색: 자동 follows Windows' light or dark mode; 낮 and 밤 keep one.
+  // 낮 · 밤 (#142; ‘종이 색’ before — the same setting, `paper`): 자동 follows Windows' light or dark mode; 낮 and 밤 keep one.
   const papers: { value: PaperSetting; title: string }[] = [{ value: "auto", title: t("자동") }, { value: "day", title: t("낮") }, { value: "night", title: t("밤") }];
   // The icon follows the choice: half and half for 자동, a sun for 낮, a moon for 밤 (as on the Mac).
-  const paperRow = h("div", { class: "row paper" }, glyph(prefs.paper === "day" ? "sun" : prefs.paper === "night" ? "moon" : "contrast"), h("span", { class: "grow" }, t("종이 색")),
-    segmented(papers, prefs.paper, (value) => set("paper", value), t("종이 색")));
+  const paperRow = h("div", { class: "row paper" }, glyph(prefs.paper === "day" ? "sun" : prefs.paper === "night" ? "moon" : "contrast"), h("span", { class: "grow" }, t("낮 · 밤")),
+    segmented(papers, prefs.paper, (value) => set("paper", value), t("낮 · 밤")));
   // The due-style samples: a row's badge for a deadline three days off, as each style writes it (core label()).
   const [ddaySample, dateSample] = { ko: ["D-3", "~금"], en: ["3 days left", "by Fri"], nl: ["nog 3 dagen", "tot vr"] }[lang()]; // i18n-ok
 
   return [
     group(t("언어"), [languageRow]),
-    group(t("종이"), [paperRow], t("자동은 Windows의 밝게 · 어둡게 모드를 따라가요. 밤 종이는 불 끈 방의 종이 색이에요.")),
+    group(t("낮 · 밤"), [paperRow], t("책상 · 노트 · 쪽지 · 서랍이 같이 바뀌어요. 자동이면 Windows가 어둡게 모드일 때 밤이 돼요.")),
     // The sample sheet, named like every other group (#21).
     h("div", { class: "group" }, h("div", { class: "label" }, t("미리보기")), preview),
-    group(t("글꼴"), fontRows),
-    group(t("글자 크기"), [sizeRow], t("Ctrl + = 와 Ctrl + − 로도 바꿀 수 있어요.")),
+    group(t("노트 글꼴"), [fontRow, sizeRow], t("Ctrl + = 와 Ctrl + − 로 한 칸씩 바꿔요. 줄 간격은 노트 줄(44px)에 맞춰져 있어요.")),
     group(t("마감 표시"), [h("div", { class: "row" }, glyph("flag"), h("span", { class: "grow" }, t("마감을 이렇게 보여 주기")),
       segmented([{ value: "dday", title: ddaySample }, { value: "date", title: dateSample }], prefs.dueStyle, (style) => set("dueStyle", style), t("마감 표시 방식")))],
       t("할 일의 알림 → 마감에서 오늘까지·이번 주 안·이번 달 안·날짜를 정해요. 지난 마감은 붉게 표시돼요.")),
@@ -217,7 +336,8 @@ function completedGroup(): HTMLElement {
   const archiveRow = h("div", { class: "row" }, glyph("calendar"), h("span", { class: "grow" }, t("완료한 일 기록으로 옮기기")), archiveSelect);
   // The desk's own 완료 기록 icon (1.30).
   const historyButton = h("button", { class: "row choice" }, glyph("leaf"), h("span", { class: "grow" }, t("완료 기록 보기")), h("span", { style: "color:var(--faded)" }, "Ctrl+H ›"));
-  const openArchive = h("button", { class: "action small", title: t("탐색기에서 완료 기록 폴더 열기") }, t("열기"));
+  // #52: ‘↗ 폴더 열기’ at the end of the folder's row, as in 저장 위치.
+  const openArchive = h("button", { class: "action small", title: t("탐색기에서 완료 기록 폴더 열기") }, icon("arrow", 13), t("폴더 열기"));
   openArchive.addEventListener("click", () => api.act({ type: "openArchiveFolder" }));
   const archiveFolderRow = h("div", { class: "row storage" }, glyph("folder"),
     h("div", { class: "grow" }, h("div", {}, t("기록 폴더")), folderPlaceLine(state.storage.archivePath)), openArchive);
@@ -239,12 +359,13 @@ function storagePane(): Node[] {
   const reset = h("button", { class: "action small", title: t("이 PC의 기본 위치로 돌아가요") }, t("기본으로"));
   reset.disabled = !storage.custom;
   reset.addEventListener("click", () => api.act({ type: "resetStorage" }));
-  const whereRow = h("div", { class: "row storage" }, glyph("folder"),
-    h("div", { class: "grow" }, h("div", { class: "where" }, h("span", {}, t("저장 폴더")), h("span", { class: "kind" }, storage.custom ? t("공유 폴더") : t("이 PC (기본)"))),
-      folderPlaceLine(storage.path)));
+  // #52: ‘↗ 폴더 열기’ at the end of the folder's row, as for 기록 폴더 (same name, same place).
   const openFolder = h("button", { class: "action small", title: t("탐색기에서 저장 폴더 열기") }, icon("arrow", 13), t("폴더 열기"));
   openFolder.addEventListener("click", () => api.act({ type: "openDataFolder" }));
-  const actionsRow = h("div", { class: "row storage-actions" }, openFolder, h("span", { class: "grow" }), reset, choose);
+  const whereRow = h("div", { class: "row storage" }, glyph("folder"),
+    h("div", { class: "grow" }, h("div", { class: "where" }, h("span", {}, t("저장 폴더")), h("span", { class: "kind" }, storage.custom ? t("공유 폴더") : t("이 PC (기본)"))),
+      folderPlaceLine(storage.path)), openFolder);
+  const actionsRow = h("div", { class: "row storage-actions" }, h("span", { class: "grow" }), reset, choose);
 
   // 백업 · 옮기기: everything in the storage folder to one .jongi file, and back.
   const exportButton = h("button", { class: "action small", title: t("할 일 · 메모 · 반복 · 일정 · 완료 기록을 .jongi 파일 하나로") }, icon("arrowUp", 13), t("내보내기…"));
@@ -254,11 +375,101 @@ function storagePane(): Node[] {
   const backupRow = h("div", { class: "row storage-actions" }, glyph("share"), h("span", { class: "grow" }, t("백업 파일")), exportButton, importButton);
 
   return [
-    group(t("저장 위치"), [whereRow, actionsRow], t("할 일 · 메모 · 일정 · 기록이 모두 이 폴더에 있어요. OneDrive 같은 공유 폴더를 고르면 다른 기기와 같은 목록을 써요."), false, "data"),
+    group(t("저장 위치"), [whereRow, actionsRow], t("할 일 · 메모 · 일정 · 기록이 모두 이 폴더에 있어요. OneDrive 같은 공유 폴더를 고르면 다른 기기와 같은 목록을 써요. 다른 폴더를 고르면 지금 목록을 그 폴더로 옮기고 종이냥이 다시 시작돼요. 이미 종이냥 목록이 있는 폴더면 어느 쪽을 쓸지 물어요."), false, "data"),
     completedGroup(),
+    autoBackupGroup(),
+    backupListGroup(),
     group(t("백업 · 옮기기"), [backupRow],
       t("내보낸 백업 파일(.jongi)을 다른 컴퓨터의 종이냥에서 가져오면 모두 그대로 옮겨져요. Mac ↔ Windows도 돼요."), false, "backup"),
   ];
+}
+
+// ─── 자동 백업 · 백업 목록 (#139 · #140, the same as the Mac's) ─────────────────
+
+/**
+ * 자동 백업: whether the daily copy is on (and when the last copy was made), 지금 백업하기, and the backup folder — on this PC
+ * unless another was chosen; never inside the storage folder.
+ */
+function autoBackupGroup(): HTMLElement {
+  const { backups } = state;
+  const newest = backups.entries[0];
+  const title = backups.auto ? t("자동 백업이 켜져 있어요") : t("자동 백업이 꺼져 있어요");
+  let sub = !backups.auto ? t("덮어쓰기 전에는 그래도 백업해 둬요.")
+    : newest ? t("마지막 백업 {when} · 하루 한 번, 덮어쓰기 전에도", { when: savedWhen(new Date(newest.at), new Date(), lang(), true) })
+    : t("아직 백업이 없어요 · 하루 한 번, 덮어쓰기 전에도");
+  let warn = false;
+  if (backups.failed) { sub = t("마지막 백업을 하지 못했어요. 백업 폴더를 확인해 주세요."); warn = true; }
+  else if (backups.missing) { sub = t("고른 백업 폴더를 찾지 못해 기본 폴더에 백업해요."); warn = true; }
+  const mark = h("span", { class: `backup-mark${backups.auto ? " on" : ""}`, "aria-hidden": "true" }, backups.auto ? icon("check", 13, 2.4) : null);
+  const now = h("button", { class: "action small" }, t("지금 백업하기"));
+  now.addEventListener("click", () => api.act({ type: "backupNow" }));
+  const statusRow = h("div", { class: "row backup-status" }, mark,
+    h("div", { class: "grow" }, h("div", { class: "backup-title" }, title), h("div", { class: `sub${warn ? " warn" : ""}` }, sub)),
+    now, toggle(backups.auto, t("자동 백업"), (on) => api.act({ type: "setBackupAuto", on })));
+  const open = h("button", { class: "action small", title: t("탐색기에서 백업 폴더 열기") }, icon("arrow", 13), t("폴더 열기"));
+  open.addEventListener("click", () => api.act({ type: "openBackupFolder" }));
+  const folderRow = h("div", { class: "row storage" }, glyph("archive"),
+    h("div", { class: "grow" }, h("div", { class: "where" }, h("span", {}, t("백업 폴더")), h("span", { class: "kind" }, backups.custom ? t("고른 폴더") : t("이 PC (기본)"))),
+      folderPlaceLine(backups.folder)), open);
+  const reset = h("button", { class: "action small", title: t("이 PC의 기본 위치로 돌아가요") }, t("기본으로"));
+  reset.disabled = !backups.custom && !backups.missing;
+  reset.addEventListener("click", () => api.act({ type: "resetBackupFolder" }));
+  const choose = h("button", { class: "action small" }, icon("folder", 13), t("다른 폴더…"));
+  choose.addEventListener("click", () => api.act({ type: "chooseBackupFolder" }));
+  const actionsRow = h("div", { class: "row storage-actions" }, h("span", { class: "grow" }), reset, choose);
+  const where = backups.custom ? t("백업은 고른 폴더에만 있어요. 클라우드 폴더라면 백업도 그곳으로 올라가요.")
+    : t("백업은 이 PC에만 있어요. 저장 폴더가 공유 폴더여도 백업은 기기마다 따로 남겨요.");
+  const total = backups.entries.length ? ` ${t("모두 {count}개 · {size}.", { count: backups.entries.length, size: sizeText(backups.total, lang()) })}` : "";
+  return group(t("자동 백업"), [statusRow, folderRow, actionsRow], where + total, false, "backup");
+}
+
+/** The kind of a copy, on its chip: 매일 (sage), the ‘before’ ones (clay), 업데이트 전 (lavender), 직접 (honey). */
+function reasonChip(reason: BackupReason): HTMLElement {
+  const words: Record<BackupReason, string> = {
+    daily: t("매일"), beforeImport: t("가져오기 전"), beforeFolderSwitch: t("폴더 바꾸기 전"), beforeRestore: t("되돌리기 전"),
+    beforeUpdate: t("업데이트 전"), manual: t("직접", undefined, "backup"), export: t("내보내기"),
+  };
+  const tone = reason === "daily" ? "sage" : reason === "beforeUpdate" ? "lavender" : reason === "manual" || reason === "export" ? "honey" : "clay";
+  return h("span", { class: `backup-chip ${tone}` }, words[reason]);
+}
+
+/** 백업 목록: five newest unless opened up; the rest are still in the folder (and the more row says how many). */
+let backupsOpened = false;
+
+function backupRow(entry: BackupEntry): HTMLElement {
+  const when = savedWhen(new Date(entry.at), new Date(), lang());
+  const restore = h("button", { class: "action small" }, t("되돌리기…"));
+  restore.addEventListener("click", () => api.act({ type: "restoreBackup", name: entry.name }));
+  const row = h("div", { class: "row backup-row" },
+    h("div", { class: "backup-left" }, h("div", { class: "backup-when" }, when), reasonChip(entry.reason)),
+    h("div", { class: "backup-counts grow" }, entry.counts ? countsText(entry.counts, lang()).split(" · ").map((part) => part.replace(/ /g, "\u00a0")).join(" · ") : ""),
+    h("span", { class: "backup-size" }, sizeText(entry.size, lang())),
+    restore);
+  row.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+    openMenu(rowMenuHost, [
+      { kind: "item", label: t("탐색기에서 보기"), icon: "folder", run: () => void api.act({ type: "showBackup", name: entry.name }) },
+      { kind: "sep" },
+      { kind: "item", label: t("지우기"), icon: "trash", danger: true, run: () => void api.act({ type: "deleteBackup", name: entry.name }) },
+    ], when, { x: event.clientX, y: event.clientY });
+  });
+  return row;
+}
+
+function backupListGroup(): HTMLElement {
+  const { entries } = state.backups;
+  const foot = t("되돌리기 전에 지금 것을 한 번 더 백업해 둬요.");
+  if (entries.length === 0) {
+    return group(t("백업 목록"), [h("div", { class: "row backup-empty" }, h("span", { class: "sub" }, t("아직 백업이 없어요. 하루 한 번 여기에 쌓여요.")))], foot);
+  }
+  const rows: HTMLElement[] = (backupsOpened ? entries : entries.slice(0, 5)).map(backupRow);
+  if (entries.length > 5) {
+    const more = h("button", { class: "row choice backup-more" },
+      h("span", { class: "grow" }, backupsOpened ? t("처음 5개만 보기") : t("{count}개 더 보기", { count: entries.length - 5 })));
+    more.addEventListener("click", () => { backupsOpened = !backupsOpened; render(); });
+    rows.push(more);
+  }
+  return group(t("백업 목록"), rows, foot);
 }
 
 /**
@@ -274,7 +485,8 @@ function aiPane(): Node[] {
   const desktop = h("button", { class: "action small primary" }, t("Claude 데스크톱에 연결"));
   desktop.addEventListener("click", () => api.act({ type: "aiConnectDesktop" }));
   const desktopRow = h("div", { class: "row ai-connect" }, glyph("desk"),
-    h("div", { class: "grow" }, h("div", {}, t("Claude 데스크톱")), h("div", { class: "sub" }, t("누르면 Claude가 ‘종이냥 for Claude’를 설치할지 물어봐요."))), desktop);
+    h("div", { class: "grow" }, h("div", {}, t("Claude 데스크톱")), h("div", { class: "sub", ...(ai.outdated ? { role: "status" } : {}) },
+      ai.outdated ? t("Claude 데스크톱의 확장이 이 앱보다 옛 판이에요. 다시 연결하면 새로 설치해요.") : t("누르면 Claude가 ‘종이냥 for Claude’를 설치할지 물어봐요."))), desktop);
   const copy = h("button", { class: "action small" }, ai.copied ? icon("check", 13) : icon("keyboard", 13), ai.copied ? t("복사했어요") : t("Claude Code 명령 복사"));
   copy.addEventListener("click", () => api.act({ type: "aiCopyCommand" }));
   const codeRow = h("div", { class: "row ai-connect" }, glyph("keyboard"),
@@ -282,6 +494,12 @@ function aiPane(): Node[] {
 
   const rows: Node[] = [];
   if (ai.recent.length === 0) rows.push(h("div", { class: "row ai-empty" }, t("아직 없어요")));
+  // #174: the log keeps 30 days; 기록 지우기 empties it now (after a slip).
+  const clear = h("button", { class: "action small", style: "white-space:nowrap;flex:none" }, icon("trash", 13), t("기록 지우기"));
+  if (!ai.hasLog) clear.setAttribute("disabled", "");
+  clear.addEventListener("click", () => api.act({ type: "aiClearLog" }));
+  const clearRow = h("div", { class: "row ai-clear", style: "padding-top:8px;padding-bottom:8px" }, glyph("trash"),
+    h("div", { class: "grow" }, h("div", { class: "sub", style: "margin-top:0;line-height:1.45" }, t("Claude가 한 일의 기록은 이 기기에 30일 동안 남아요."))), clear);
   for (const day of ["today", "yesterday"] as const) {
     const entries = ai.recent.filter((entry) => entry.day === day);
     if (entries.length === 0) continue;
@@ -302,7 +520,7 @@ function aiPane(): Node[] {
   return [
     group(t("AI 연결"), [enabledRow], t("켜면 Claude가 할 일 · 일정 · 메모를 보고 새로 넣어요. 고칠 땐 먼저 물어보고, 지우지는 못해요. 읽은 내용은 대화와 함께 Claude로 가요."), false, "ai"),
     group(t("연결하기"), [desktopRow, codeRow], t("따로 켜 두는 프로그램은 없어요. 연결하면 위 스위치도 켜져요.")),
-    group(t("최근 AI 작업"), rows, t("되돌리기는 그 뒤로 바뀌지 않은 항목만 되돌려요. Claude가 넣거나 고친 줄에는 그날 동안 작은 도장이 찍혀요.")),
+    group(t("최근 AI 작업"), [...rows, clearRow], t("되돌리기는 그 뒤로 바뀌지 않은 항목만 되돌려요. Claude가 넣거나 고친 줄에는 그날 동안 작은 도장이 찍혀요.")),
   ];
 }
 
@@ -392,15 +610,45 @@ function seriesForm(entry: Series | undefined): HTMLElement {
   refreshSave();
   const close = () => { openForm = undefined; render(); };
   cancel.addEventListener("click", close);
+  // 2a (A11): the rule's space — its new to-dos go there; applied with 저장 (its open to-dos move with it).
+  const was = seriesSpaceOf(state.todoSpaces, entry?.id);
+  let picked: string | undefined = was;
+  const space = liveSpaces(state.todoSpaces).length ? seriesSpaceField(() => picked, (id) => { picked = id; }) : undefined;
   save.addEventListener("click", () => {
     const value = fields.value();
     if (!value || !title.value.trim()) return;
-    void api.act({ type: "saveSeries", seriesID: entry?.id, title: title.value.trim(), rule: value.rule, remindAt: value.remindAt });
+    const spaceChange = space && picked !== was ? { space: picked ?? null } : {};
+    void api.act({ type: "saveSeries", seriesID: entry?.id, title: title.value.trim(), rule: value.rule, remindAt: value.remindAt, ...spaceChange });
     close();
   });
   title.addEventListener("keydown", (event) => { if (event.key === "Escape") close(); });
   setTimeout(() => title.focus(), 0);
-  return h("div", { class: "series-form" }, title, fields.element, h("div", { class: "form-actions" }, h("span", { class: "spacer" }), cancel, save));
+  return h("div", { class: "series-form" }, title, fields.element, ...(space ? [space] : []), h("div", { class: "form-actions" }, h("span", { class: "spacer" }), cancel, save));
+}
+
+/** The rule editor's 스페이스 field: `● 회사 ⌄`, a menu of the spaces and 일반 (as the to-do editor's field). */
+function seriesSpaceField(current: () => string | undefined, pick: (id: string | undefined) => void): HTMLElement {
+  const field = h("button", { class: "space-field", type: "button", "aria-haspopup": "menu" });
+  const dot = (band: string) => { const element = h("span", { class: "space-dot" }); element.style.setProperty("--band", band); return element; };
+  const draw = () => {
+    const space = liveSpaces(state.todoSpaces).find((entry) => entry.id === current());
+    const name = space?.name ?? generalName(state.todoSpaces, lang());
+    field.replaceChildren(h("span", { class: "space-field-name" }, t("스페이스", undefined, "field")), dot(space ? `var(--band-${spaceColor(space.color)})` : "var(--rule-strong)"),
+      h("span", { class: "space-field-value" }, name), icon("chevron", 11, 2));
+    field.setAttribute("aria-label", t("스페이스: {name}", { name }));
+  };
+  draw();
+  field.addEventListener("click", () => {
+    const menuDot = (band: string) => { const element = h("span", { class: "dot" }); element.style.setProperty("--band", band); return element; };
+    openMenu(rowMenuHost, [
+      ...liveSpaces(state.todoSpaces).map((space) => ({
+        kind: "item" as const, label: space.name, extra: [menuDot(`var(--band-${spaceColor(space.color)})`)], checked: current() === space.id, run: () => { pick(space.id); draw(); },
+      })),
+      { kind: "sep" as const },
+      { kind: "item" as const, label: generalName(state.todoSpaces, lang()), extra: [menuDot("var(--rule-strong)")], checked: current() === undefined, run: () => { pick(undefined); draw(); } },
+    ], t("스페이스"), field.getBoundingClientRect());
+  });
+  return field;
 }
 
 // #22: the list panes (반복 · 시계 · 스페이스) add and delete the same way, as on the Mac (DeskListRows.swift): `+ 새 …` is
@@ -748,7 +996,13 @@ window.addEventListener("keydown", (event) => {
   event.preventDefault();
   event.stopPropagation();
   if (event.key === "Escape" && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) { recording = false; recordProblem = undefined; render(); return; }
-  const reading = readShortcut(event);
+  const reading = readShortcut(event, []);
+  // Ctrl+Alt+M · Ctrl+Alt+N and the note's key (#85: it may have moved) can't be taken.
+  if ("accelerator" in reading && takenBy(reading.accelerator, "drawer", { note: state.prefs.noteShortcut, drawer: state.prefs.drawerShortcut })) {
+    recordProblem = t("{key} 키는 종이냥이 이미 써요(빠른 메모 · 노트 · 빠른 입력). 다른 키를 눌러 주세요.", { key: shortcutLabel(reading.accelerator) });
+    render();
+    return;
+  }
   if ("accelerator" in reading) {
     recording = false;
     recordProblem = undefined;
@@ -757,10 +1011,62 @@ window.addEventListener("keydown", (event) => {
     return;
   }
   if (reading.problem === "waiting") return;
-  recordProblem = reading.problem === "reserved" ? t("Ctrl+Alt+M · Ctrl+Alt+J · Ctrl+Alt+N은 종이냥이 이미 써요. 다른 키를 눌러 주세요.")
-    : reading.problem === "modifier" ? t("Ctrl, Alt 또는 Win 키와 함께 눌러 주세요.") : t("이 키는 쓸 수 없어요. 다른 키를 눌러 주세요.");
+  recordProblem = reading.problem === "modifier" ? t("Ctrl, Alt 또는 Win 키와 함께 눌러 주세요.") : t("이 키는 쓸 수 없어요. 다른 키를 눌러 주세요.");
   render();
 }, true);
+
+/** The note's key (#85): waiting for a key, and what was wrong with the last one pressed (said in 빠른 입력's foot). */
+let recordingNote = false;
+let noteRecordProblem: string | undefined;
+
+window.addEventListener("keydown", (event) => {
+  if (!recordingNote) return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (event.key === "Escape" && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) { recordingNote = false; noteRecordProblem = undefined; render(); return; }
+  const reading = readShortcut(event, []);
+  if ("accelerator" in reading) {
+    // Ctrl+Alt+N · Ctrl+Alt+M and the drawer's key, chosen or default, can't be taken.
+    if (takenBy(reading.accelerator, "note", { note: state.prefs.noteShortcut, drawer: state.prefs.drawerShortcut })) {
+      noteRecordProblem = t("{key} 키는 종이냥이 이미 써요(빠른 입력 · 빠른 메모 · 메모 서랍). 다른 키를 눌러 주세요.", { key: shortcutLabel(reading.accelerator) });
+      render();
+      return;
+    }
+    recordingNote = false;
+    noteRecordProblem = undefined;
+    void set("noteShortcut", reading.accelerator);
+    if (!state.prefs.noteHotkey) void set("noteHotkey", true);
+    render();
+    return;
+  }
+  if (reading.problem === "waiting") return;
+  noteRecordProblem = reading.problem === "modifier" ? t("Ctrl, Alt 또는 Win 키와 함께 눌러 주세요.") : t("이 키는 쓸 수 없어요. 다른 키를 눌러 주세요.");
+  render();
+}, true);
+
+/**
+ * 어디서든 노트 보이기 · 숨기기 (#85), as the drawer's key row: the key (click, then press the new one), a small
+ * ‘기본값’ link once it isn't Ctrl+Alt+J, and the switch, which keeps the key (on brings it back).
+ */
+function noteKeyRow(): HTMLElement {
+  const { prefs } = state;
+  const current = prefs.noteHotkey ? prefs.noteShortcut : "";
+  const field = h("button", { class: `keyfield${recordingNote ? " recording" : ""}`, "aria-label": t("노트 보이기 · 숨기기 단축키"), title: t("누르고 원하는 키를 누르면 바뀌어요") },
+    recordingNote ? t("키를 눌러 주세요…") : current ? shortcutLabel(current) : t("꺼짐"));
+  field.addEventListener("click", () => { recordingNote = !recordingNote; noteRecordProblem = undefined; render(); });
+  const reset = current && current !== defaultNoteShortcut && !recordingNote
+    ? h("button", { class: "textlink", title: t("{key}로 되돌려요", { key: shortcutLabel(defaultNoteShortcut) }) }, t("기본값"))
+    : null;
+  reset?.addEventListener("click", () => { recordingNote = false; noteRecordProblem = undefined; void set("noteShortcut", defaultNoteShortcut); });
+  const onOff = toggle(prefs.noteHotkey, t("어디서든 노트 보이기 · 숨기기"), (value) => {
+    recordingNote = false;
+    noteRecordProblem = undefined;
+    // On: the key it had, unless the drawer took it meanwhile (then Ctrl+Alt+J).
+    if (value && takenBy(prefs.noteShortcut, "note", { note: prefs.noteShortcut, drawer: prefs.drawerShortcut })) void set("noteShortcut", defaultNoteShortcut);
+    void set("noteHotkey", value);
+  });
+  return h("div", { class: "row drawer-key note-key" }, glyph("desk"), h("span", { class: "grow" }, t("어디서든 노트 보이기 · 숨기기")), reset, field, onOff);
+}
 
 /**
  * 메모 서랍: the shortcut (the key, a small ‘기본값’ link once it differs, a switch), the handle, 다른 창 위에 띄우기, the
@@ -781,7 +1087,8 @@ function drawerPane(): Node[] {
   const onOff = toggle(Boolean(current), t("어디서든 열고 닫기"), (value) => {
     recording = false;
     recordProblem = undefined;
-    if (value) { void set("drawerShortcut", prefs.drawerShortcutLast || defaultDrawerShortcut); return; }
+    const last = prefs.drawerShortcutLast && !takenBy(prefs.drawerShortcutLast, "drawer", { note: prefs.noteShortcut, drawer: "" }) ? prefs.drawerShortcutLast : defaultDrawerShortcut;
+    if (value) { void set("drawerShortcut", last); return; }
     void set("drawerShortcutLast", current);
     void set("drawerShortcut", "");
   });
@@ -803,25 +1110,57 @@ function drawerPane(): Node[] {
   width.addEventListener("input", () => { widthValue.textContent = width.value; });
   width.addEventListener("change", () => set("drawerWidth", Number(width.value)));
   const widthRow = h("div", { class: "row drawer-width" }, glyph("width"), h("span", { class: "grow" }, t("폭")), width, widthValue);
-  const themes: { value: DrawerTheme; title: string }[] = [
-    { value: "auto", title: t("자동") }, { value: "day", title: t("낮 종이") }, { value: "night", title: t("밤 종이") }, { value: "kraft", title: t("크라프트지") }, { value: "grid", title: t("모눈 노트") },
-  ];
-  const themeRow = h("div", { class: "row drawer-theme" }, glyph("palette"), h("span", { class: "grow" }, t("종이")),
-    segmented(themes, prefs.drawerTheme, (value) => set("drawerTheme", value), t("서랍 종이")));
+  // 서랍 종이 (#142): the paper for the day as small drawer pictures, and 밤에는 밤 종이로 under them.
+  const picked = drawerPaper(prefs.drawerTheme, prefs.drawerNightPaper);
+  const nightRow = h("div", { class: "row drawer-night" }, glyph("moon"),
+    h("div", { class: "grow" }, h("div", {}, t("밤에는 밤 종이로")), h("div", { class: "sub" }, t("낮 · 밤이 밤일 때 고른 종이 대신 밤 종이(먹색 종이를 골랐으면 그대로)"))),
+    toggle(picked.nightPaper, t("밤에는 밤 종이로"), (value) => set("drawerNightPaper", value)));
   // 바탕 (1.29): 불투명 · 반투명 · 강하게 · 바탕 없음; where 반투명 · 강하게 can't be drawn, the footnote says why.
   const backdrops: { value: DrawerBackdrop; title: string }[] = [
     { value: "solid", title: t("불투명") }, { value: "frost", title: t("반투명") }, { value: "strong", title: t("강하게") }, { value: "none", title: t("바탕 없음") },
   ];
   const backdropRow = h("div", { class: "row drawer-backdrop" }, glyph("backdrop"), h("span", { class: "grow" }, t("바탕")),
-    segmented(backdrops, prefs.drawerBackdrop, (value) => set("drawerBackdrop", value), t("서랍 바탕")));
+    popup(backdrops, prefs.drawerBackdrop, (value) => set("drawerBackdrop", value), t("서랍 바탕")));
+  // 메모 글꼴 (#141, as on the Mac): a sample memo, then the face (a popup), the size in nine steps (12–20), 줄 간격, 문단 간격.
+  const fonts: { value: DrawerFont; title: string; face: string }[] = [
+    ...(["clean", "pen", "brush"] as const).map((value) => ({ value, title: fontTitles[lang()][value], face: drawerFace(value) })),
+    { value: "mono", title: t("고정폭"), face: drawerFace("mono") },
+  ];
+  const fontRow = h("div", { class: "row drawer-font" }, glyph("font"), h("span", { class: "grow" }, t("글꼴")),
+    popup(fonts, prefs.drawerFont, (value) => set("drawerFont", value), t("메모 글꼴")));
+  // 코드 글꼴 (#143): `코드`, code blocks and the 고정폭 face.
+  const codeTitles: Record<CodeFont, string> = { system: t("고정폭(시스템)"), d2coding: "D2Coding" };
+  const codeRow = h("div", { class: "row drawer-code" }, glyph("code"), h("span", { class: "grow" }, t("코드 글꼴")),
+    popup(codeFonts.map((value) => ({ value, title: codeTitles[value], face: codeFamily(value) })), prefs.drawerCodeFont, (value) => set("drawerCodeFont", value), t("코드 글꼴")));
+  const points = h("span", { class: "step-value points" });
+  const sizeRow = h("div", { class: "row drawer-size" }, glyph("textSize"), h("span", { class: "grow" }, t("글자 크기")),
+    stepSlider(drawerPoints.length, drawerPoints.indexOf(prefs.drawerTextPt), (index) => set("drawerTextPt", drawerPoints[index]), t("메모 글자 크기"),
+      (index) => t("{size}포인트", { size: drawerPoints[index] }), points, (index) => String(drawerPoints[index])),
+    points);
+  const lineTitles: Record<LineSpacing, string> = { tight: t("촘촘하게"), regular: t("보통"), loose: t("넉넉하게") };
+  const lineRow = h("div", { class: "row drawer-line" }, glyph("lineHeight"), h("span", { class: "grow" }, t("줄 간격")),
+    popup(lineSpacings.map((value) => ({ value, title: lineTitles[value] })), prefs.drawerLineHeight, (value) => set("drawerLineHeight", value), t("줄 간격")));
+  const paragraphTitles: Record<ParagraphSpacing, string> = { regular: t("보통"), wide: t("넓게"), wider: t("아주 넓게") };
+  const paragraphRow = h("div", { class: "row drawer-paragraph" }, glyph("paragraph"), h("span", { class: "grow" }, t("문단 간격")),
+    popup(paragraphSpacings.map((value) => ({ value, title: paragraphTitles[value] })), prefs.drawerParagraph, (value) => set("drawerParagraph", value), t("문단 간격")));
+  const marksRow = h("div", { class: "row" }, glyph("font"), h("span", { class: "grow" }, t("기호 늘 보이기")),
+    toggle(prefs.drawerShowMarks, t("기호 늘 보이기"), (value) => set("drawerShowMarks", value)));
+  const doneRow = h("div", { class: "row" }, glyph("checkBox"), h("span", { class: "grow" }, t("끝낸 항목 아래로 보내기")),
+    toggle(prefs.drawerDoneToBottom, t("끝낸 항목 아래로 보내기"), (value) => set("drawerDoneToBottom", value)));
 
   return [
     group(t("단축키"), [keyRow], keyFoot, Boolean(problem)),
-    group(t("여는 방법"), [handleRow, pinRow], t("노트 위의 발 버튼, Ctrl+3, ⋯ → 메모 서랍, 고양이 우클릭, 알림 영역 메뉴로도 열려요. 다른 앱을 눌러도 닫히지 않고, 같은 단축키 · Esc · ×로 닫혀요."), false, "drawer"),
-    group(t("모양"), [sideRow, widthRow, themeRow, backdropRow], [
-      t("자동 종이는 노트의 낮 · 밤을 따라요. 바탕은 서랍 종이를 비쳐 보이게 하거나(반투명 · 강하게) 걷어 내요(바탕 없음). 메모지는 늘 불투명해요."),
+    group(t("여는 방법"), [handleRow, pinRow], t("노트 위의 발 버튼, Ctrl+3, ⋯ → 메모 서랍, 고양이 우클릭, 알림 영역 메뉴로도 열려요. 다른 앱을 눌러도 닫히지 않고, 같은 단축키 · Esc를 누르거나 안쪽 가장자리 가운데의 작은 바를 누르면 닫혀요."), false, "drawer"),
+    group(t("서랍 종이"), [paperGallery(picked.paper, (paper) => set("drawerTheme", drawerThemeValue(paper, picked.nightPaper))), nightRow],
+      t("종이는 이 PC에만 저장돼요. 공유 폴더의 다른 기기는 저마다 고른 종이로 보여요.")),
+    group(t("모양"), [sideRow, widthRow, backdropRow, marksRow, doneRow], [
+      t("바탕은 서랍 종이를 비쳐 보이게 하거나(반투명 · 강하게) 걷어 내요(바탕 없음). 메모지는 늘 불투명해요."),
+      t("굵게 · 목록 같은 서식 기호는 커서가 있는 줄에서만 보여요. Ctrl+Shift+R로 늘 보이게 할 수 있어요."),
       state.drawerBackdropNote,
     ].filter(Boolean).join(" ")),
+    h("div", { class: "group" }, h("div", { class: "label" }, t("미리보기")), drawerFontPreview(prefs)),
+    group(t("메모 글꼴"), [fontRow, codeRow, sizeRow, lineRow, paragraphRow],
+      `${t("글꼴과 글자 크기는 서랍의 모든 메모에 같이 써요. 카드 미리보기는 크기만 따라요.")} ${t("코드 글꼴은 ‘코드’ 표시와 코드 묶음, 고정폭 글꼴에 써요. D2Coding은 한글이 영문 두 칸 폭이라 코드 줄의 칸이 맞아요.")}`),
   ];
 }
 
@@ -841,7 +1180,7 @@ let spaceRedraw = false;
 const toastHost = h("div", { class: "toast-host settings-toast" });
 const toast = toaster(toastHost);
 
-/** S12: a space deleted (its to-dos to 스페이스 없음) with 되돌리기 bringing it back with them. */
+/** S12: a space deleted (its to-dos to 일반) with 되돌리기 bringing it back with them. */
 function deleteSpaceNow(space: TodoSpace): void {
   const todos = [...spaceIndexOf(state.todoSpaces.spaces, state.spaceOf)].filter(([, entry]) => entry.id === space.id).map(([id]) => id);
   void api.act({ type: "spaceDelete", id: space.id });
@@ -899,6 +1238,34 @@ function spaceRow(space: TodoSpace, open: number): HTMLElement[] {
   return [row, colors];
 }
 
+/**
+ * 일반 (#89): the first row, fixed — no grip, no colour (its to-dos have no band on 오늘), its name typed over
+ * (blank or a default name: back to 일반 · General · Algemeen), its open to-dos; no 지우기, not dragged. Shown once
+ * there is a space: before that every to-do is in it, and the name is shown nowhere.
+ */
+function generalRow(open: number): HTMLElement {
+  const shown = generalName(state.todoSpaces, lang());
+  const name = h("input", {
+    class: "space-name", type: "text", value: shown, maxlength: "40", spellcheck: "false", placeholder: generalDefaults[lang()],
+    "aria-label": t("스페이스 없는 할 일의 이름"), title: t("어느 스페이스에도 넣지 않은 할 일이에요. 이름을 바꿀 수 있어요."), "data-keep": "space-general",
+  });
+  name.addEventListener("focus", () => { spaceBusy = true; });
+  name.addEventListener("keydown", (event) => {
+    if (event.isComposing) return;
+    if (event.key === "Enter") { event.preventDefault(); name.blur(); }
+    if (event.key === "Escape") { event.preventDefault(); name.value = shown; name.blur(); }
+  });
+  name.addEventListener("blur", () => {
+    const typed = name.value.trim();
+    if (typed !== shown) void api.act({ type: "generalRename", name: typed });
+    if (!typed) name.value = generalDefaults[lang()];
+    settleSpaces();
+  });
+  const count = h("span", { class: "space-count" }, open ? t("남은 할 일 {n}개", { n: open }) : "");
+  return h("div", { class: "row space-row general" },
+    h("span", { class: "space-grip", "aria-hidden": "true" }), h("span", { class: "space-swatch still", "aria-hidden": "true" }), name, count, h("span", { class: "space-delete", "aria-hidden": "true" }));
+}
+
 /** Dragging a row by its grip: the rows reorder under the pointer, and the order is kept on letting go. */
 function dragSpace(event: PointerEvent, row: HTMLElement): void {
   event.preventDefault();
@@ -909,14 +1276,14 @@ function dragSpace(event: PointerEvent, row: HTMLElement): void {
   row.classList.add("dragging");
   row.setPointerCapture(event.pointerId);
   const move = (moveEvent: PointerEvent) => {
-    const rows = [...list.querySelectorAll<HTMLElement>(".space-row")].filter((entry) => entry !== row);
+    const rows = [...list.querySelectorAll<HTMLElement>(".space-row[data-id]")].filter((entry) => entry !== row);
     const after = rows.find((entry) => { const box = entry.getBoundingClientRect(); return moveEvent.clientY < box.top + box.height / 2; });
     if (after) list.insertBefore(row, after); else rows.at(-1)?.after(row);
   };
   const up = () => {
     row.removeEventListener("pointermove", move);
     row.classList.remove("dragging");
-    const ids = [...list.querySelectorAll<HTMLElement>(".space-row")].map((entry) => entry.dataset.id!);
+    const ids = [...list.querySelectorAll<HTMLElement>(".space-row[data-id]")].map((entry) => entry.dataset.id!);
     if (ids.join() !== liveSpaces(state.todoSpaces).map((entry) => entry.id).join()) void api.act({ type: "spaceOrder", ids });
     settleSpaces();
   };
@@ -930,11 +1297,15 @@ function spacesPane(): Node[] {
   const spaces = liveSpaces(state.todoSpaces);
   const index = spaceIndexOf(state.todoSpaces.spaces, state.spaceOf);
   const open = new Map<string, number>();
+  let openGeneral = 0;
   for (const item of state.items) {
-    const space = !item.isCompleted ? index.get(item.id) : undefined;
+    if (item.isCompleted) continue;
+    const space = index.get(item.id);
     if (space) open.set(space.id, (open.get(space.id) ?? 0) + 1);
+    else openGeneral += 1;
   }
-  const rows = spaces.flatMap((space) => spaceRow(space, open.get(space.id) ?? 0));
+  // 일반 first and fixed (#89); the spaces' rows are the only ones dragged.
+  const rows = [...(spaces.length ? [generalRow(openGeneral)] : []), ...spaces.flatMap((space) => spaceRow(space, open.get(space.id) ?? 0))];
   let lastRow: HTMLElement;
   if (spaceDraft !== undefined) {
     const color = nextSpaceColor(state.todoSpaces);
@@ -962,10 +1333,21 @@ function spacesPane(): Node[] {
     lastRow = addRow(t("새 스페이스"), () => { spaceDraft = ""; render(); });
   }
   return [
+    // #53: the pane's header says what spaces are for; the footnote only what comes after (as on the Mac).
     group(t("스페이스"), [...rows, lastRow],
-      t("할 일을 회사 · 집처럼 나눠요. 오늘 한 장에는 그대로 모두 보이고, 머리말에서 한 스페이스만 볼 수 있어요. 입력 줄에 {tag}을 붙이면 그 스페이스로 들어가요.", { tag: `#${t("이름").toLowerCase()}` }), false, "spaces"),
-    group(t("한 스페이스만 보기"), [h("div", { class: "row" }, glyph("keyboard"), h("div", { class: "grow" }, h("div", {}, t("노트에서 Ctrl+Shift+1–9")), h("div", { class: "sub" }, t("스페이스 순서대로 골라요. Ctrl+Shift+0은 모두 보기예요."))))],
-      t("다음 날 아침 4시에 모든 스페이스로 돌아와요. 알림과 오늘 탭의 숫자는 숨긴 할 일도 그대로 셈해요.")),
+      t("머리말에서 한 스페이스만 볼 수 있어요. 입력 줄에 {tag}을 붙이면 그 스페이스로 들어가요.", { tag: `#${t("이름").toLowerCase()}` }), false, "spaces"),
+    // 2b: 스페이스별로 묶기 and its look (메모지 · 책갈피), only once there is a space to group by.
+    ...(spaces.length ? [group(t("스페이스별로 묶기"), [
+      h("div", { class: "row" }, glyph("spaces"), h("span", { class: "grow" }, t("스페이스별로 묶기")), rowKeys(["Ctrl", "Shift", "G"]),
+        toggle(state.prefs.spaceGroups, t("스페이스별로 묶기"), (value) => set("spaceGroups", value))),
+      h("div", { class: "row" }, glyph("sliders"), h("span", { class: "grow" }, t("모양")),
+        segmented<SpaceGroupStyle>([{ value: "card", title: t("메모지") }, { value: "bookmark", title: t("책갈피") }], state.prefs.spaceGroupStyle, (value) => set("spaceGroupStyle", value), t("묶음 모양"))),
+    ], t("오늘 탭의 할 일을 스페이스마다 모아 보여요. 이 PC에만 적용돼요."))] : []),
+    // The keys as every other row: its name, the key caps on the right.
+    group(t("단축키"), [
+      h("div", { class: "row" }, glyph("keyboard"), h("div", { class: "grow" }, h("div", {}, t("한 스페이스만 보기")), h("div", { class: "sub" }, t("노트에서 스페이스 순서대로 골라요."))), rowKeys(["Ctrl", "Shift", "1–9"])),
+      h("div", { class: "row" }, glyph("spaces"), h("span", { class: "grow" }, t("모두 보기")), rowKeys(["Ctrl", "Shift", "0"])),
+    ], t("다음 날 아침 4시에 모든 스페이스로 돌아와요. 알림과 오늘 탭의 숫자는 숨긴 할 일도 그대로 셈해요.")),
   ];
 }
 
@@ -977,7 +1359,7 @@ function render(): void {
   const { prefs } = state;
   document.documentElement.dataset.font = prefs.font;
   document.documentElement.dataset.pane = tab;
-  document.documentElement.style.setProperty("--body-size", `${bodyFontSize(prefs.font, prefs.textSize)}px`);
+  document.documentElement.style.setProperty("--body-size", `${bodyFontSize(prefs.font, prefs.textStep)}px`);
   const scrollTop = app.querySelector(".content")?.scrollTop ?? 0;
   const pages: Record<Tab, () => Node[]> = { appearance, notifications, repeat: repeats, pet, clock, events: calendarSettings, storage: storagePane, drawer: drawerPane, spaces: spacesPane, ai: aiPane };
   const content = h("div", { class: "content" }, ...pages[tab]());
@@ -998,6 +1380,10 @@ function render(): void {
   content.scrollTop = scrollTop;
   // A soft edge under the pane's header (and above the bottom) while there is more to scroll.
   edgeFade(content);
+  if (focusPaperTile && tab === "drawer") {
+    focusPaperTile = false;
+    app.querySelector<HTMLElement>(`.paper-tile[aria-checked="true"]`)?.focus();
+  }
   if (keep) {
     const again = app.querySelector<HTMLInputElement>(`[data-keep="${keep}"]`);
     again?.focus();
@@ -1012,6 +1398,8 @@ function showTab(next: Tab): void {
   openForm = undefined;
   recording = false;
   recordProblem = undefined;
+  recordingNote = false;
+  noteRecordProblem = undefined;
   spaceDraft = undefined;
   colorsOpen = undefined;
   spaceBusy = false;
@@ -1020,7 +1408,7 @@ function showTab(next: Tab): void {
 }
 
 api.on("state", (next) => {
-  state = next as AppState;
+  state = next as TodosState;
   // Don't wipe a half-filled form or an alarm being edited; redraw once it closes. (A space's name being typed, too.)
   if (openForm || editingAlarm) return;
   if (spaceBusy && tab === "spaces") { spaceRedraw = true; return; }

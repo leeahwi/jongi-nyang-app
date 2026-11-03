@@ -56,31 +56,48 @@ struct SearchView: View {
     /// Snapshots: a query already typed.
     var previewQuery: String?
     @State private var query = ""
+    /// What the results are for (#69): `query` once its keys pause (`pause`); at once when it's emptied or shortened,
+    /// and on ↩ and ↑↓.
+    @State private var searched = ""
+    @State private var waiting: Task<Void, Never>?
+    @State private var results = SearchResults()
     @State private var picked = 0
     @State private var focus = 0
     /// The results' own height (the list is as tall as them, at most 360 pt).
     @State private var listHeight: CGFloat = 120
 
     static let width: CGFloat = 460
+    /// The wait after the last key before searching (as 메모 서랍's search).
+    static var pause: Duration = .milliseconds(80)
 
-    private var groups: [(group: Search.Group, hits: [Search.Hit])] {
-        let now = Date()
-        let today = Calendar.paper.startOfDay(for: Archive.logicalDayStart(now))
-        let events = model.calendar.events.filter { event in
-            Search.match(query, in: event.title) != nil || (event.location.map { Search.match(query, in: $0) != nil } ?? false)
-        }.map { event -> Search.EventEntry in
-            // The next day it happens from today, else its first day.
-            let next = event.occurrences(from: today, to: Calendar.paper.date(byAdding: .day, value: 400, to: today)!, language: .current).first
-            return Search.EventEntry(id: event.id, title: event.title, date: next.map { Archive.dayKey($0.start) } ?? event.date, location: event.location)
+    private func groups(for query: String) -> [(group: Search.Group, hits: [Search.Hit])] {
+        results.groups(query, model: model, history: history)
+    }
+
+    /// The results for what's in the field now (↩ and ↑↓ don't wait for the pause).
+    private func hitsNow() -> [Search.Hit] {
+        searchNow()
+        return groups(for: query).flatMap(\.hits)
+    }
+
+    private func searchNow() {
+        waiting?.cancel()
+        waiting = nil
+        if searched != query { searched = query }
+    }
+
+    private func typed(from old: String, to new: String) {
+        guard Self.pause > .zero, !new.isEmpty, new.count >= old.count else { return searchNow() }
+        waiting?.cancel()
+        waiting = Task { @MainActor in
+            try? await Task.sleep(for: Self.pause)
+            guard !Task.isCancelled else { return }
+            searchNow()
         }
-        var folders: [String: String] = [:]
-        for memo in model.memos { if let name = model.memoFolderName(memo.id) { folders[memo.id] = name } }
-        return Search.find(query, items: model.items, memos: model.memos, history: history, events: events, now: now, language: .current,
-                           memoFolders: folders)
     }
 
     var body: some View {
-        let groups = self.groups
+        let groups = groups(for: searched)
         let hits = groups.flatMap(\.hits)
         PaperSlip(kind: .confirm, width: Self.width) {
             VStack(alignment: .leading, spacing: 0) {
@@ -89,9 +106,10 @@ struct SearchView: View {
                     Image(systemName: "magnifyingglass").font(.system(size: 13, weight: .medium)).foregroundStyle(PaperTheme.ink3)
                     IntentField(text: $query, placeholder: L("할 일 · 메모 · 기록 · 일정에서 찾기"), font: .systemFont(ofSize: 15, weight: .regular),
                                 focusRequest: focus,
-                                onSubmit: { _, _ in open(hits) },
+                                onSubmit: { _, _ in open(hitsNow()) },
                                 onEscape: { onClose(); return true },
                                 onArrow: { step in
+                                    let hits = hitsNow()
                                     guard !hits.isEmpty else { return false }
                                     picked = min(max(0, picked + step), hits.count - 1)
                                     return true
@@ -115,16 +133,24 @@ struct SearchView: View {
                 } trailing: { EmptyView() }
             }
         }
-        .onChange(of: query) { picked = 0 }
+        .onChange(of: query) { old, new in
+            picked = 0
+            typed(from: old, to: new)
+        }
         .onAppear {
-            if let previewQuery { query = previewQuery }
+            if let previewQuery {
+                query = previewQuery
+                searched = previewQuery
+            }
+            results.prepare(model: model, history: history)
             focus += 1
         }
+        .onDisappear { waiting?.cancel() }
     }
 
     @ViewBuilder
     private func results(_ groups: [(group: Search.Group, hits: [Search.Hit])], picked: Int) -> some View {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = searched.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
             Text(L("초성으로도 찾을 수 있어요 (예: ㅂㄱㅅ → 보고서)"))
                 .font(.system(size: 12))
@@ -145,7 +171,8 @@ struct SearchView: View {
             let offsets = groups.indices.map { index in groups[..<index].reduce(0) { $0 + $1.hits.count } }
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
-                    VStack(alignment: .leading, spacing: 0) {
+                    // #69: only the rows in view are laid out (up to 110 rows each key).
+                    LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(Array(groups.enumerated()), id: \.offset) { index, group in
                             GroupHeader(title: group.group.title(.current), count: group.hits.count, leading: 18)
                                 .padding(.top, index == 0 ? 4 : 10)
@@ -190,6 +217,79 @@ struct SearchView: View {
             model.onShowNote?()
             model.calendar.sheet = CalendarSheetRequest(mode: .edit(event, day: hit.day), draft: .forEvent(event))
         }
+    }
+}
+
+/// The slip's results (#69), kept per query while the to-dos, memos, folders, events, record and day stay the same —
+/// a key, ↑↓ or a change elsewhere in the model no longer searches everything again. What one search read (each
+/// title's keys, each memo's lines, the record's order, each event's next day) is kept for the next.
+@MainActor
+final class SearchResults {
+    typealias Groups = [(group: Search.Group, hits: [Search.Hit])]
+    private struct Key: Equatable {
+        var items: [TodoItem]
+        var memos: [Memo]
+        var folders: MemoFolders
+        var events: [LocalEvent]
+        var history: [ArchiveEntry]
+        /// Today by the 4 a.m. rule, and by the clock (a date's year).
+        var day: String
+        var date: String
+        var language: AppLanguage
+        var calendar: Calendar
+    }
+    private var key: Key?
+    private var found: [String: Groups] = [:]
+    private let index = Search.Index()
+    /// Each event's next day from today (else its first), while it and the day are the same.
+    private var nextDays: [String: (event: LocalEvent, today: Date, day: String)] = [:]
+
+    func groups(_ query: String, model: AppModel, history: [ArchiveEntry], now: Date = Date()) -> Groups {
+        guard !query.isEmpty else { return [] }
+        let calendar = Calendar.paper
+        let key = Key(items: model.items, memos: model.memos, folders: model.memoFolders, events: model.calendar.events, history: history,
+                      day: Archive.dayKey(now, calendar: calendar), date: CalendarDraft.day(now, calendar: calendar), language: .current,
+                      calendar: calendar)
+        if key != self.key {
+            self.key = key
+            found = [:]
+        }
+        if let known = found[query] { return known }
+        let words = Search.Query(query)
+        let today = calendar.startOfDay(for: Archive.logicalDayStart(now, calendar: calendar))
+        let events = key.events.filter { event in
+            Search.match(words, in: event.title) != nil || (event.location.map { Search.match(words, in: $0) != nil } ?? false)
+        }.map { event in
+            Search.EventEntry(id: event.id, title: event.title, date: nextDay(event, today: today, calendar: calendar), location: event.location)
+        }
+        var folders: [String: String] = [:]
+        for memo in key.memos { if let name = model.memoFolderName(memo.id) { folders[memo.id] = name } }
+        let groups = Search.find(query, items: key.items, memos: key.memos, history: history, events: events, now: now, calendar: calendar,
+                                 language: key.language, memoFolders: folders, index: index)
+        if found.count > 64 { found = [:] }
+        found[query] = groups
+        return groups
+    }
+
+    /// The to-dos' and the record's titles read off the main thread while the slip opens, so the first key's search
+    /// finds them ready.
+    func prepare(model: AppModel, history: [ArchiveEntry]) {
+        let items = model.items
+        Task.detached(priority: .userInitiated) { [weak self] in
+            let read = Search.Index.read(items: items, history: history)
+            await self?.take(read)
+        }
+    }
+
+    private func take(_ read: Search.Index.Read) { index.take(read) }
+
+    /// The next day it happens from today, else its first day.
+    private func nextDay(_ event: LocalEvent, today: Date, calendar: Calendar) -> String {
+        if let known = nextDays[event.id], known.event == event, known.today == today { return known.day }
+        let next = event.occurrences(from: today, to: calendar.date(byAdding: .day, value: 400, to: today)!, calendar: calendar, language: .current).first
+        let day = next.map { Archive.dayKey($0.start, calendar: calendar) } ?? event.date
+        nextDays[event.id] = (event, today, day)
+        return day
     }
 }
 

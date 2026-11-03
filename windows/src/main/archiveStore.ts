@@ -4,6 +4,7 @@ import { dueForArchive, monthKey, parseArchiveLines, toEntry, type ArchiveEntry 
 import type { Store } from "./store";
 import type { TodoItem } from "../core/notebook";
 import { t } from "../i18n";
+import { appendSafely, readTextIfSafe, writeFileAtomically } from "./safeFiles";
 
 /**
  * The record of finished tasks: `archive/2026-09.jsonl`, one line per task. Lines are only
@@ -45,12 +46,12 @@ export class ArchiveStore {
     try {
       for (const name of fs.readdirSync(this.directory).filter((file) => file.endsWith(".jsonl"))) {
         const file = path.join(this.directory, name);
-        const text = fs.readFileSync(file, "utf8");
+        // #173: a link or an oversized month is left as it is (readTextIfSafe), and the new text never goes through one.
+        const text = readTextIfSafe(file);
+        if (text === undefined) continue;
         const kept = parseArchiveLines(text).filter((entry) => !ids.has(entry.id));
         if (kept.length === parseArchiveLines(text).length) continue;
-        const temporary = `${file}.tmp`;
-        fs.writeFileSync(temporary, kept.map((entry) => JSON.stringify(entry)).join("\n") + (kept.length ? "\n" : ""), "utf8");
-        fs.renameSync(temporary, file);
+        writeFileAtomically(file, kept.map((entry) => JSON.stringify(entry)).join("\n") + (kept.length ? "\n" : ""));
       }
     } catch {
       // The record stays as it is; the tasks still come back to the list.
@@ -83,7 +84,7 @@ export class ArchiveStore {
     try {
       fs.mkdirSync(this.directory, { recursive: true });
       for (const [month, list] of byMonth) {
-        fs.appendFileSync(path.join(this.directory, `${month}.jsonl`), list.map((entry) => JSON.stringify(entry)).join("\n") + "\n", "utf8");
+        appendSafely(path.join(this.directory, `${month}.jsonl`), list.map((entry) => JSON.stringify(entry)).join("\n") + "\n");
         for (const entry of list) { saved.add(entry.id); this.entries?.push(entry); }
       }
     } catch {
@@ -98,7 +99,8 @@ export class ArchiveStore {
     const entries: ArchiveEntry[] = [];
     try {
       for (const name of fs.readdirSync(this.directory).filter((file) => file.endsWith(".jsonl")).sort()) {
-        entries.push(...parseArchiveLines(fs.readFileSync(path.join(this.directory, name), "utf8")));
+        // #173: a link, or a month past the size limit, is not read (it reads as no lines).
+        entries.push(...parseArchiveLines(readTextIfSafe(path.join(this.directory, name)) ?? ""));
       }
     } catch {
       // No record yet.

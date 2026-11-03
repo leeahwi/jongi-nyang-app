@@ -2,9 +2,10 @@ import AppKit
 import PaperCore
 import SwiftUI
 
-/// 할 일 스페이스 (1.45, spec §7): 오늘 with no spaces (as 1.44), a mixed sheet with bands, 회사만 보는 중 (the band over
-/// the list), the input line's `#회사` and new-space chips, the `모든 스페이스 ▾` popup, the row's 스페이스로 옮기기, the
-/// desk's 스페이스 pane (and its toast), the editor's space field. Sample spaces are plain words (회사 · 집 · 공부).
+/// 할 일 스페이스 (1.45, spec §7): 오늘 with no spaces (as 1.44), a mixed sheet with bands, 회사만 보는 중 (the faint
+/// line at the end of the list, #87), the input line's `#회사`, `#일반` and new-space chips, the `모든 스페이스 ▾` popup,
+/// the row's 스페이스로 옮기기, the desk's 스페이스 pane with 일반 as its fixed first row (#89; renamed too), its toast, the
+/// editor's space field. Sample spaces are plain words (회사 · 집 · 공부).
 extension DesignSnapshots {
     static func renderSpaces(folder: URL, preferences: UserDefaults, output: URL) throws {
         let only = ProcessInfo.processInfo.environment["PAPERTODO_ONLY"] ?? ""
@@ -23,6 +24,7 @@ extension DesignSnapshots {
         _ = notebook.add(L("내일의 나에게 메모 남기기"))
         try NotebookFile(url: storage).save(notebook)
         let model = AppModel(storageURL: storage, isolated: true, preferences: preferences)
+        keptModels.append(model)
         model.paperColor = night ? .night : .day
         model.notebookFont = .pen
         let size = NSSize(width: 420, height: 600)
@@ -38,8 +40,13 @@ extension DesignSnapshots {
             }
         }
 
-        // S19: no spaces — the sheet as 1.44 drew it.
+        // S19: no spaces — the sheet as 1.44 drew it, and the desk's pane with only + 새 스페이스.
         try note("today-none")
+        do {
+            let controller = ReminderController(model: model, preferences: preferences, onOpen: {})
+            try render(DeskView(state: DeskState(pane: .spaces), model: model, archive: ArchiveStore(model: model), reminders: controller, previewTitlebar: true),
+                       size: DeskMetrics.size, to: output.appendingPathComponent("spaces-desk-empty.png"))
+        }
         try line("none", t("빨래 #세탁", "laundry #chores", "was #klusjes"))
 
         let work = model.addTodoSpace(name: t("회사", "Work", "Werk"), color: .pink)!
@@ -64,7 +71,8 @@ extension DesignSnapshots {
                              ("prefix", t("견적서 #ㅎㅅ", "quote #wo", "offerte #we")),
                              ("new", t("빨래 #세탁", "laundry #chores", "was #klusjes")),
                              ("event", t("내일 3시 회의 #회사", "meeting tomorrow 3pm #work", "morgen om 3 uur overleg #werk")),
-                             ("only-token", t("#회사", "#work", "#werk"))] {
+                             ("only-token", t("#회사", "#work", "#werk")),
+                             ("general", t("빨래 #일반", "laundry #general", "was #algemeen"))] {
             try line(name, text)
         }
         model.showSpace(.space(work))
@@ -108,6 +116,16 @@ extension DesignSnapshots {
         }
         try desk("desk")
         try desk("desk-narrow", size: DeskMetrics.minimum)
+        // #89: 일반 renamed — the desk's first row, the popup and the line's end while it shows alone.
+        model.renameGeneral(to: t("기타", "Other", "Overig"))
+        try desk("desk-general-renamed")
+        model.showSpace(.noSpace)
+        try menuShot("popup-general", SpaceMenus.header(model), at: CGPoint(x: 170, y: 100))
+        model.showSpace(.all)
+        model.renameGeneral(to: "")
+        // + 새 스페이스: the row being named right there (1.45.1, no slip).
+        try render(SpacesSettingsPanel(model: model, previewDraft: t("운동", "Exercise", "Sport")).padding(28).frame(width: 640).background(PaperBackground()),
+                   size: nil, to: output.appendingPathComponent("spaces-desk-new.png"))
         var toast = PaperToast(symbol: "trash", text: SpaceWords.deleted(t("공부", "Study", "Studie"), language: .current))
         toast.action = L("되돌리기")
         toast.perform = {}
@@ -129,5 +147,310 @@ extension DesignSnapshots {
         let plain = model.items.first { $0.title == L("내일의 나에게 메모 남기기") }!
         try render(TaskReminderEditorView(item: plain, model: model, onSave: { _ in }, onRemove: {}, onCancel: {}),
                    size: nil, to: output.appendingPathComponent("spaces-editor-none.png"))
+
+        try renderSpaces2a(model: model, work: work, home: home, output: output)
+        try renderSpaces2b(folder: folder, preferences: preferences, output: output)
+    }
+
+    /// 2b 스페이스별로 묶기 (spaces-phase2.md): F 메모지 and E 책갈피 on a mixed sheet, folded groups and a finished row open,
+    /// the shortcut chips, a drag over another group, the wide note's columns, the header's menu and the desk's switch.
+    /// The day is fixed at 12:40. Made-up to-dos only. `PAPERTODO_ONLY=spaces2b`.
+    static func renderSpaces2b(folder: URL, preferences: UserDefaults, output: URL) throws {
+        let storage = folder.appendingPathComponent("spaces2b/todos.json")
+        try FileManager.default.createDirectory(at: storage.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try NotebookFile(url: storage).save(Notebook())
+        let model = AppModel(storageURL: storage, isolated: true, preferences: preferences)
+        keptModels.append(model)
+        model.paperColor = night ? .night : .day
+        model.notebookFont = .pen
+        let now = Date()
+        func at(_ hour: Int, _ minute: Int = 0) -> Date { Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: now)! }
+        let stripNow = at(12, 40)
+        let work = model.addTodoSpace(name: t("회사", "Work", "Werk"), color: .pink)!
+        let home = model.addTodoSpace(name: t("집", "Home", "Thuis"), color: .mint)!
+        let study = model.addTodoSpace(name: t("공부", "Study", "Studie"), color: .sky)!
+        func add(_ title: String, in space: String?, done: Bool = false) -> UUID {
+            model.add(title, literal: true)
+            let id = model.items.last!.id
+            if let space { model.moveTodo(id, toSpace: space, toast: false) }
+            if done { model.toggle(id) }
+            return id
+        }
+        let coffee = add(L("창문 열고, 커피 한 잔"), in: nil, done: true)
+        let plan = add(L("오늘 꼭 해야 할 일 정리하기"), in: work)
+        model.setTimeRange(plan, to: TimeRange(start: 13 * 60 + 40, end: 14 * 60 + 10))
+        _ = add(t("주간 보고서 초안", "Draft the weekly report", "Weekrapport opzetten"), in: work)
+        _ = add(t("회의록 올리기", "Post the meeting notes", "Notulen delen"), in: work, done: true)
+        let laundry = add(t("세탁기 돌리기", "Run the washing machine", "Wasmachine aanzetten"), in: home)
+        model.setTimeRange(laundry, to: TimeRange(start: 19 * 60, end: 19 * 60 + 30))
+        _ = add(L("잠깐, 바깥 공기 쐬기"), in: home)
+        let book = add(L("미뤄 둔 책 10쪽 읽기"), in: study)
+        _ = add(L("내일의 나에게 메모 남기기"), in: nil)
+        _ = coffee
+        model.toast = nil
+        model.selectedTaskID = nil
+        model.groupBySpace = true
+
+        func shot(_ name: String, size: NSSize = NSSize(width: 420, height: 720), drag: (UUID, String)? = nil) throws {
+            try render(PaperView(model: model, previewNow: stripNow, previewGroupDrag: drag), size: size,
+                       to: output.appendingPathComponent("spaces2b-\(name).png"))
+        }
+        // F 메모지 (the default), then with 일반's finished row open; E 책갈피.
+        try shot("card")
+        try shot("card-narrow", size: NSSize(width: 350, height: 560))
+        model.openDoneGroups = [SpaceGroups.general]
+        try shot("card-done-open")
+        model.openDoneGroups = []
+        model.groupStyle = .bookmark
+        try shot("bookmark")
+        try shot("bookmark-narrow", size: NSSize(width: 350, height: 560))
+        model.groupStyle = .card
+        // Folded: 집 and 공부 only their heads.
+        model.foldedGroups = [home, study]
+        try shot("card-folded")
+        model.groupStyle = .bookmark
+        try shot("bookmark-folded")
+        model.groupStyle = .card
+        model.foldedGroups = []
+        // A drag of 공부's book over 집: the group lights up in its colour and says where it goes.
+        try shot("drag", drag: (book, home))
+        model.groupStyle = .bookmark
+        try shot("bookmark-drag", drag: (book, home))
+        model.groupStyle = .card
+        // Only 회사: its group alone.
+        model.showSpace(.space(work))
+        try shot("lens")
+        model.showSpace(.all)
+        // I (S45): the note at 1,200 (its widest while grouped) — four columns; a drag over 집; 집's `+ 집에 넣기`, the line
+        // writing into 집. At 720 four columns don't get 220 each: 메모지 as usual. Then three columns (only 회사 · 집 ·
+        // 공부 with to-dos) at 1,200.
+        let wide = NSSize(width: 1_200, height: 640)
+        try shot("board", size: wide)
+        try shot("board-drag", size: wide, drag: (book, home))
+        model.lineSpace = .space(home)
+        try render(PaperView(model: model, previewLine: t("빨래 개기", "Fold the laundry", "Was opvouwen"), previewNow: stripNow),
+                   size: wide, to: output.appendingPathComponent("spaces2b-board-add.png"))
+        model.lineSpace = nil
+        try shot("board-720-cards", size: NSSize(width: 720, height: 640))
+        model.hideCompleted = true
+        if let memo = model.items.first(where: { $0.title == L("내일의 나에게 메모 남기기") }) { model.moveTodo(memo.id, toSpace: study, toast: false) }
+        model.toast = nil
+        try shot("board-three", size: wide)
+        model.hideCompleted = false
+
+        // #168: three to-dos picked (⌘-click), in 메모지, 책갈피 and the plain list; one dragged over 집 with the ‘3개’
+        // badge; the toast after.
+        try renderMultiPick(model: model, home: home, now: stripNow, output: output)
+
+        // The header's menu with 스페이스별로 묶기 ✓, and the desk's pane with the switch and the look.
+        let screen = night ? Color(white: 0.12) : PaperTheme.desk
+        let menu = ZStack(alignment: .topLeading) {
+            PaperView(model: model, previewNow: stripNow).frame(width: 420, height: 640)
+            DrawerMenuPreview(items: SpaceMenus.header(model), font: model.notebookFont, width: 250).offset(x: 160, y: 100)
+        }
+        .frame(width: 440, height: 640, alignment: .topLeading)
+        .background(screen)
+        try render(menu, size: NSSize(width: 440, height: 640), to: output.appendingPathComponent("spaces2b-menu.png"))
+        let controller = ReminderController(model: model, preferences: preferences, onOpen: {})
+        try render(DeskView(state: DeskState(pane: .spaces), model: model, archive: ArchiveStore(model: model), reminders: controller, previewTitlebar: true),
+                   size: DeskMetrics.size, to: output.appendingPathComponent("spaces2b-desk.png"))
+        model.groupBySpace = false
+    }
+
+    /// #168: several to-dos picked and moved at once — `PAPERTODO_ONLY=multi`.
+    static func renderMultiPick(model: AppModel, home: String, now: Date, output: URL) throws {
+        func id(_ title: String) -> UUID? { model.items.first { $0.title == title }?.id }
+        let picks = [id(t("주간 보고서 초안", "Draft the weekly report", "Weekrapport opzetten")), id(L("미뤄 둔 책 10쪽 읽기")),
+                     id(L("잠깐, 바깥 공기 쐬기"))].compactMap { $0 }
+        guard picks.count == 3 else { print("multi: the sample rows are missing"); return }
+        model.apply(ListSelection(anchor: picks[0], focus: picks[2], ids: Set(picks)))
+        let size = NSSize(width: 420, height: 720)
+        func shot(_ name: String, drag: (UUID, String)? = nil) throws {
+            try render(PaperView(model: model, previewNow: now, previewGroupDrag: drag), size: size, to: output.appendingPathComponent("multi-\(name).png"))
+        }
+        model.groupStyle = .card
+        try shot("pick")
+        model.groupStyle = .bookmark
+        try shot("pick-bookmark")
+        model.groupStyle = .card
+        model.groupBySpace = false
+        try shot("pick-plain")
+        model.groupBySpace = true
+        // The drag: the picture of the first picked row (its grip's), lifted over 집 with the badge.
+        let url = output.appendingPathComponent("multi-drag.png")
+        if wanted(url) {
+            // The picture is taken from the note as it is at the press (the row not faded yet), then put over the note as
+            // it is while dragging (the row faded, 집 lit).
+            func host(_ drag: (UUID, String)?) -> (NSHostingView<PaperView>, NSWindow) {
+                let hosting = NSHostingView(rootView: PaperView(model: model, previewNow: now, previewGroupDrag: drag))
+                let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
+                window.isReleasedWhenClosed = false
+                window.appearance = NSAppearance(named: night ? .darkAqua : .aqua)
+                window.contentView = hosting
+                hosting.frame = NSRect(origin: .zero, size: size)
+                hosting.layoutSubtreeIfNeeded()
+                RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+                hosting.layoutSubtreeIfNeeded()
+                return (hosting, window)
+            }
+            let (pressed, pressWindow) = host(nil)
+            let (hosting, window) = host((picks[0], home))
+            var grips: [PaperTaskDragHandle.GripView] = []
+            func visit(_ view: NSView) { if let grip = view as? PaperTaskDragHandle.GripView { grips.append(grip) }; view.subviews.forEach(visit) }
+            visit(pressed)
+            // 회사's second row (주간 보고서 초안, the first picked; the first, timed, has its grip too): the grips top to bottom.
+            let ordered = grips.sorted { $0.convert($0.bounds, to: nil).maxY > $1.convert($1.bounds, to: nil).maxY }
+            let lifted = ordered.count > 1 ? DragGhost.lift(ordered[1], in: pressWindow, badge: SpaceWords.badge(picks.count, language: .current)) : nil
+            if let lifted { lifted.removeFromSuperview(); hosting.addSubview(lifted) }
+            pressWindow.contentView = nil
+            pressWindow.close()
+            if let ghost = lifted {
+                ghost.place(dx: 6, dy: -150)
+                // The note drawn without the picture, then the picture (with its badge) drawn on top where it is, with
+                // the shadow it has on screen (a bitmap of the view doesn't draw a layer's shadow).
+                ghost.isHidden = true
+                hosting.layoutSubtreeIfNeeded()
+                let badge = ghost.subviews.compactMap { $0 as? DragBadge }.first
+                if let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds),
+                   let picture = (ghost.subviews.first as? NSImageView)?.image,
+                   let badge, let badgeBitmap = badge.bitmapImageRepForCachingDisplay(in: badge.bounds) {
+                    hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
+                    badge.cacheDisplay(in: badge.bounds, to: badgeBitmap)
+                    let frame = ghost.frame
+                    let at = NSRect(x: frame.minX, y: hosting.bounds.height - frame.maxY, width: frame.width, height: frame.height)
+                    NSGraphicsContext.saveGraphicsState()
+                    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+                    let shadow = NSShadow()
+                    shadow.shadowColor = NSColor.black.withAlphaComponent(0.22)
+                    shadow.shadowBlurRadius = 10
+                    shadow.shadowOffset = NSSize(width: 0, height: -5)
+                    shadow.set()
+                    NSColor(PaperTheme.card).setFill()
+                    NSBezierPath(roundedRect: at, xRadius: 6, yRadius: 6).fill()
+                    NSShadow().set()
+                    picture.draw(in: at, from: .zero, operation: .sourceOver, fraction: 0.95, respectFlipped: true, hints: nil)
+                    NSColor(PaperTheme.rule).setStroke()
+                    NSBezierPath(roundedRect: at.insetBy(dx: 0.5, dy: 0.5), xRadius: 6, yRadius: 6).stroke()
+                    // The badge where it sits on the picture (the picture's own coordinates are y up, as the bitmap's).
+                    badgeBitmap.draw(in: badge.frame.offsetBy(dx: at.minX, dy: at.minY), from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+                    NSGraphicsContext.restoreGraphicsState()
+                    try bitmap.representation(using: .png, properties: [:])?.write(to: url)
+                }
+                ghost.removeFromSuperview()
+            } else {
+                print("multi: no grip for the drag picture")
+            }
+            window.contentView = nil
+            window.close()
+        }
+        // The toast after a drop of the three on 집: it counts only the rows that change space, as `moveTodos` does
+        // (잠깐, 바깥 공기 쐬기 is in 집 already).
+        let moving = picks.filter { model.spaceIndex[$0]?.id != home }.count
+        var toast = PaperToast(symbol: "square.stack", text: SpaceWords.moved(moving, to: t("집", "Home", "Thuis"), language: .current))
+        toast.action = L("되돌리기")
+        toast.perform = {}
+        model.toast = toast
+        try shot("toast")
+        model.toast = nil
+        model.apply(ListSelection())
+    }
+
+    /// 2a (spaces-phase2.md A1–A12): the bands and the lens on 앞으로, the day strip (dots), the day's timetable (left
+    /// edges), the 오늘 창 (bands, the lens line), the focus card's space, the rule editor's 스페이스 field and a repeat's
+    /// chip in the line. The day is fixed at 13:20 so it looks the same whenever it's drawn. `PAPERTODO_ONLY=spaces2a`.
+    static func renderSpaces2a(model: AppModel, work: String, home: String, output: URL) throws {
+        let now = Date()
+        func at(_ hour: Int, _ minute: Int = 0) -> Date { Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: now)! }
+        let stripNow = at(13, 20)
+        let day = CalendarDraft.day(CalendarDay.window(stripNow).start)
+        func event(_ id: String, _ title: String, _ color: LocalEvent.Color, _ from: Date, _ to: Date) -> LocalEvent {
+            LocalEvent(id: id, title: title, date: day, start: CalendarDraft.minutes(from), end: CalendarDraft.minutes(to), color: color)
+        }
+        model.calendar.showForSnapshot([
+            event("m", t("팀 회의", "Team meeting", "Teamoverleg"), .sage, at(11), at(12)),
+            event("d", t("치과", "Dentist", "Tandarts"), .blue, at(17), at(18)),
+        ])
+        func add(_ title: String, in space: String?) -> UUID {
+            model.add(title, literal: true)
+            let id = model.items.last!.id
+            if let space { model.moveTodo(id, toSpace: space, toast: false) }
+            return id
+        }
+        func ranged(_ title: String, _ start: Int, _ end: Int, in space: String?) -> UUID {
+            let id = add(title, in: space)
+            model.setTimeRange(id, to: TimeRange(start: start, end: end))
+            return id
+        }
+        let plan = ranged(t("기획안 검토", "Review the plan", "Plan nalopen"), 13 * 60, 14 * 60, in: work)
+        _ = ranged(t("빨래 개기", "Fold the laundry", "Was opvouwen"), 14 * 60 + 30, 15 * 60, in: home)
+        _ = ranged(t("자료 정리", "Sort the notes", "Notities ordenen"), 15 * 60 + 30, 16 * 60, in: work)
+        let pill = add(t("약 먹기", "Take my medicine", "Medicijnen innemen"), in: nil)
+        model.setTaskReminder(pill, at: at(15))
+        // 앞으로: tomorrow, next week, later, someday — in 회사, 집 and 일반.
+        let calendar = Calendar.paper
+        let today = Archive.logicalDayStart(stripNow)
+        func due(_ title: String, days: Int, in space: String?) {
+            let id = add(title, in: space)
+            model.move(id, to: .day(Deadline.key(calendar.date(byAdding: .day, value: days, to: today)!)))
+        }
+        due(t("견적서 보내기", "Send the quote", "Offerte sturen"), days: 1, in: work)
+        due(t("장보기", "Groceries", "Boodschappen"), days: 1, in: home)
+        due(t("운동 등록", "Sign up for the gym", "Inschrijven sportschool"), days: 6, in: home)
+        due(t("분기 보고", "Quarterly report", "Kwartaalrapport"), days: 9, in: work)
+        due(t("세금 신고", "File the taxes", "Belastingaangifte"), days: 24, in: nil)
+        let someday = add(t("책장 정리", "Tidy the bookshelf", "Boekenkast opruimen"), in: home)
+        model.move(someday, to: .someday)
+        model.toast = nil
+
+        func shot(_ name: String, _ view: some View, size: NSSize? = nil) throws {
+            try render(view, size: size, to: output.appendingPathComponent("spaces2a-\(name).png"))
+        }
+        let strip = { (width: CGFloat) in
+            DayStripView(model: model, calendar: model.calendar, noteHeight: 640, now: stripNow).frame(width: width).background(PaperTheme.paper)
+        }
+        let window = { TodayWindowView(model: model, timer: FocusTimerState(), alarms: model.alarms, calendar: model.calendar, now: stripNow) }
+        func each(_ lens: SpaceLens.Shown, _ suffix: String) throws {
+            model.showSpace(lens)
+            model.page = .ahead
+            try shot("ahead\(suffix)", PaperView(model: model, previewNow: stripNow), size: NSSize(width: 420, height: 640))
+            try shot("ahead\(suffix)-narrow", PaperView(model: model, previewNow: stripNow), size: NSSize(width: 350, height: 480))
+            model.page = .todos
+            try shot("note\(suffix)", PaperView(model: model, previewNow: stripNow), size: NSSize(width: 420, height: 640))
+            try shot("strip\(suffix)", strip(420))
+            try shot("strip\(suffix)-narrow", strip(350))
+            model.calendar.setDayOpen(true, now: stripNow)
+            try shot("timetable\(suffix)", strip(420))
+            model.calendar.setDayOpen(false, now: stripNow)
+            try slip(window(), to: output.appendingPathComponent("spaces2a-today-window\(suffix).png"))
+        }
+        try each(.all, "")
+        try each(.space(work), "-lens")
+        try each(.space(home), "-lens-home")
+        try each(.noSpace, "-lens-general")
+        model.showSpace(.all)
+
+        // The focus card: `● 회사` over the title.
+        let session = FocusSession.focus(taskId: plan.uuidString, title: model.items.first { $0.id == plan }!.title, minutes: 25,
+                                         now: Date().addingTimeInterval(-(12 * 60 + 30)))
+        model.timerState.session = session
+        model.timerState.timer = session.timer
+        try shot("focus", PaperView(model: model), size: NSSize(width: 420, height: 560))
+        try shot("focus-small", PaperView(model: model), size: NSSize(width: 350, height: 400))
+        model.timerState.session = nil
+        model.timerState.timer = nil
+
+        // A repeat's rule in 집 (its first to-do there too, A10), the rule editor's 스페이스 field, and a repeat's chip.
+        let rule = model.saveSeries(title: t("물 마시기", "Drink water", "Water drinken"), rule: RepeatRule(kind: .daily), remindAt: nil, space: .some(home))
+        if let entry = model.series.first(where: { $0.id == rule }) {
+            try shot("rule-editor", RepeatSettingsPanel(model: model, previewEditing: entry).padding(28).frame(width: 640).background(PaperBackground()))
+        }
+        // Only 집: the rule's first to-do is there.
+        model.showSpace(.space(home))
+        try shot("today-repeat", PaperView(model: model, previewNow: stripNow), size: NSSize(width: 420, height: 640))
+        model.showSpace(.all)
+        for _ in 0..<2 {
+            try shot("line-repeat", IntentLineView(model: model, page: .todos, previewText: t("매일 스트레칭 #집", "every day stretch #home", "elke dag rekken #thuis"), previewFocused: true)
+                        .padding(12).frame(width: 420).background(PaperTheme.paper))
+        }
     }
 }

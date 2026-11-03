@@ -19,10 +19,13 @@ final class AppModel: ObservableObject {
         didSet { preferences.set(notebookFont.rawValue, forKey: "notebookFont") }
     }
     @Published var textSize: NotebookTextSize {
-        didSet { preferences.set(textSize.rawValue, forKey: "textSize") }
+        // #141: as its step (`textStep`), and as the nearest of 1.45's four sizes for an older version.
+        didSet { textSize.save(in: preferences) }
     }
     /// Recurring tasks, kept in repeats.json next to todos.json (same format as the Windows app).
     @Published private(set) var series: [Series] = []
+    /// repeats.json couldn't be read at launch: the rules' spaces aren't pruned against an empty list (S36).
+    var repeatsUnreadable = false
     var onRepeatSettings: (() -> Void)?
     // MARK: Desktop pet & focus timer preferences
     /// The first-launch guide over the note; ⋯ → 사용 안내 shows it again.
@@ -83,8 +86,28 @@ final class AppModel: ObservableObject {
     }
     /// 시스템 알림으로도 보내기: 놓친 것만 · 항상 · 끄기.
     @Published var systemNotices: SystemNoticeMode { didSet { preferences.set(systemNotices.rawValue, forKey: "systemNotices") } }
-    /// ⌃⌥J from any app shows or hides the note.
+    /// The note's key from any app shows or hides it (⌃⌥J unless changed, #85). Off keeps the key, so on brings it back.
     @Published var noteHotKeyEnabled: Bool { didSet { preferences.set(noteHotKeyEnabled, forKey: "noteHotKey.enabled") } }
+    @Published var noteShortcut: GlobalShortcut {
+        didSet {
+            preferences.set(try? JSONEncoder().encode(noteShortcut), forKey: "noteHotKey.shortcut")
+            NoteKey.text = noteShortcut.text
+        }
+    }
+    /// The note's key as the menu and the shortcut list show it: nil while it's off.
+    var noteShortcutShown: GlobalShortcut? { noteHotKeyEnabled ? noteShortcut : nil }
+    /// The switch: on brings back the key it had, unless the drawer has taken it meanwhile (then ⌃⌥J).
+    func setNoteHotKey(on: Bool) {
+        if on, ShortcutRules.taken(noteShortcut, by: .note, note: noteShortcut, drawer: drawer.shortcut) != nil { noteShortcut = .noteStandard }
+        noteHotKeyEnabled = on
+    }
+    /// A new key from the recorder: taken, and the switch on.
+    func chooseNoteShortcut(_ key: GlobalShortcut) {
+        noteShortcut = key
+        noteHotKeyEnabled = true
+    }
+    /// Set by the app: the note's recorder sets the app's keys from anywhere aside while a key is pressed.
+    var onPauseGlobalKeys: ((Bool) -> Void)?
     @Published var noteHotKeyRegistered = true
     /// Dock에 남은 개수: today's open to-dos on the Dock icon.
     @Published var dockBadge: Bool { didSet { preferences.set(dockBadge, forKey: "dock.badge") } }
@@ -190,8 +213,20 @@ final class AppModel: ObservableObject {
     @Published var memoFolders = MemoFolders.fresh(language: .current)
     /// memo-folders.json as this Mac last read or wrote it.
     var knownFoldersData: Data?
+    /// 지운 메모 (#120): deleted memos kept 30 days, in memo-trash.json next to memos.json (MemoDrawerTrash.swift).
+    @Published var memoTrash = MemoTrash()
+    /// memo-trash.json as this Mac last read or wrote it.
+    var knownTrashData: Data?
     /// 할 일 스페이스 (1.45): which space each to-do is in, in todo-spaces.json next to todos.json (TodoSpacesModel.swift).
-    @Published var todoSpaces = TodoSpaces() { didSet { if todoSpaces != oldValue { spaceIndex = Self.spaceIndex(todoSpaces); spacesRevision &+= 1 } } }
+    @Published var todoSpaces = TodoSpaces() {
+        didSet {
+            guard todoSpaces != oldValue else { return }
+            spaceIndex = Self.spaceIndex(todoSpaces)
+            spacesRevision &+= 1
+            // The last space gone (or the first made) while grouping is on: the note's widest changes too.
+            if todoSpaces.isEmpty != oldValue.isEmpty { onNoteWidthCap?() }
+        }
+    }
     /// todo-spaces.json as this Mac last read or wrote it.
     var knownSpacesData: Data?
     /// Catch-ups in a row that found the file unreadable (moved aside on the third, W21).
@@ -207,6 +242,45 @@ final class AppModel: ObservableObject {
             preferences.set(spaceLens.flatMap { try? JSONEncoder().encode($0) }, forKey: "spaces.lens")
         }
     }
+    /// 2b 스페이스별로 묶기 (SpaceGroupsView.swift): this Mac's — on or off, 메모지 (F) or 책갈피 (E), the folded groups and the
+    /// groups whose finished rows are open (F), by space id (`none`: 일반).
+    @Published var groupBySpace = false {
+        didSet {
+            guard groupBySpace != oldValue else { return }
+            preferences.set(groupBySpace, forKey: "spaces.group")
+            onNoteWidthCap?()
+        }
+    }
+    /// Set by the app: the note's widest follows grouping (1,200 while grouped, else 720 — S45).
+    var onNoteWidthCap: (() -> Void)?
+    @Published var groupStyle = SpaceGroupStyle.card {
+        didSet { if groupStyle != oldValue { preferences.set(groupStyle.rawValue, forKey: "spaces.groupStyle") } }
+    }
+    @Published var foldedGroups: Set<String> = [] {
+        didSet { if foldedGroups != oldValue { preferences.set(foldedGroups.sorted(), forKey: "spaces.folded") } }
+    }
+    @Published var openDoneGroups: Set<String> = [] {
+        didSet { if openDoneGroups != oldValue { preferences.set(openDoneGroups.sorted(), forKey: "spaces.doneOpen") } }
+    }
+    /// N12: the group just opened (⌄, a chip or `끝낸 N`): its rows coming into view fade in (바뀜), for a moment.
+    /// Not published: it changes with `foldedGroups` / `openDoneGroups`, which redraw.
+    private(set) var unfoldingGroup: String?
+    private var unfoldingEnds: Task<Void, Never>?
+    func markUnfolding(_ key: String) {
+        unfoldingGroup = key
+        unfoldingEnds?.cancel()
+        unfoldingEnds = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            self?.unfoldingGroup = nil
+        }
+    }
+    /// A shortcut chip clicked: the list scrolls to that group (and lets this go).
+    @Published var groupToReveal: String?
+    /// I: the note is wide enough for the groups' columns (set by the list as it's laid out; ↑↓ walk column by column).
+    var spaceBoardShown = false
+    /// I: `+ 회사에 넣기` — the input line puts what's written in that group (until it's written or left empty).
+    @Published var lineSpace: SpaceLens.Shown?
     /// memo-folders.json is written off the main thread, one write after another (MemoDrawerModel.swift).
     let folderWriter = MemoFoldersWriter()
     /// The drawer: its settings (this Mac's), what it shows, its window (set by the app).
@@ -329,6 +403,7 @@ final class AppModel: ObservableObject {
         saveMemosSoon()
     }
 
+    /// A memo deleted: out of memos.json; a memo with words is kept 30 days in 지운 메모 (#120) with where it was.
     func deleteMemo(_ id: String) {
         guard let index = memos.firstIndex(where: { $0.id == id }) else { return }
         let memo = memos.remove(at: index)
@@ -337,15 +412,27 @@ final class AppModel: ObservableObject {
         if !memo.isBlank { lastDeletedMemo = memo }
         if openMemoID == id { openMemoID = nil }
         saveMemosNow()
+        if !memo.isBlank { keepInTrash(memo) }
     }
 
+    /// The toast's 되돌리기: the memo last deleted, back where it was (from 지운 메모, #120).
     func restoreDeletedMemo() {
         guard let memo = lastDeletedMemo else { return }
+        lastDeletedMemo = nil
+        if restoreFromTrash(memo.id) != nil { return }
+        // Not in the trash any more (emptied meanwhile): as before 1.46, the memo itself.
+        putBack(memo)
+    }
+
+    /// A memo back in memos.json (its id, words and times as they were).
+    func putBack(_ memo: Memo) {
+        if lastDeletedMemo?.id == memo.id { lastDeletedMemo = nil }
         memoDeletions.remove(memo.id)
         memoEdits.insert(memo.id)
-        memos.insert(memo, at: 0)
-        memos.sort { $0.updatedAt > $1.updatedAt }
-        lastDeletedMemo = nil
+        if !memos.contains(where: { $0.id == memo.id }) {
+            memos.insert(memo, at: 0)
+            memos.sort { $0.updatedAt > $1.updatedAt }
+        }
         saveMemosNow()
     }
 
@@ -431,6 +518,8 @@ final class AppModel: ObservableObject {
     /// The days with a completion (the record and the list), for the cat's streak cheer (#42); set by the app.
     var completedDays: () -> Set<String> = { [] }
     var onCollapse: (() -> Void)?
+    /// A to-do on the note was just finished: the note's left ear twitches (NoteEars.swift).
+    var onTaskFinished: (() -> Void)?
     var onReminderSettings: (() -> Void)?
     var onTaskReminderEditing: (() -> Void)?
     @Published var hideCompleted: Bool {
@@ -483,7 +572,7 @@ final class AppModel: ObservableObject {
         calendar = EventBook(preferences: preferences, folder: storageURL.deletingLastPathComponent())
         alarms = AlarmBook(preferences: preferences, folder: storageURL.deletingLastPathComponent())
         notebookFont = NotebookFont(rawValue: preferences.string(forKey: "notebookFont") ?? "") ?? .pen
-        textSize = NotebookTextSize(rawValue: preferences.string(forKey: "textSize") ?? "") ?? .regular
+        textSize = NotebookTextSize.saved(in: preferences)
         let store = preferences
         let flag = { (key: String, fallback: Bool) in store.object(forKey: key) == nil ? fallback : store.bool(forKey: key) }
         petVisible = flag("pet.visible", !isolated)
@@ -506,6 +595,9 @@ final class AppModel: ObservableObject {
         dailyPick = store.data(forKey: "dailyPick.current").flatMap { try? JSONDecoder().decode(DailyPick.self, from: $0) }
         systemNotices = SystemNoticeMode(rawValue: store.string(forKey: "systemNotices") ?? "") ?? .missed
         noteHotKeyEnabled = flag("noteHotKey.enabled", true)
+        // Saved since 1.45.1; before, ⌃⌥J (and the switch above keeps working as it was).
+        noteShortcut = ShortcutRules.savedNote(store.data(forKey: "noteHotKey.shortcut"), drawer: nil)
+        NoteKey.text = ShortcutRules.savedNote(store.data(forKey: "noteHotKey.shortcut"), drawer: nil).text
         dockBadge = flag("dock.badge", false)
         quickMemoClipboard = flag("quickMemo.clipboard", false)
         pomodoroSettings = store.data(forKey: "pet.pomodoro").flatMap { try? JSONDecoder().decode(PomodoroSettings.self, from: $0) } ?? PomodoroSettings()
@@ -519,27 +611,39 @@ final class AppModel: ObservableObject {
         loadRepeats()
         let memosFile = file.url.deletingLastPathComponent().appendingPathComponent("memos.json")
         do {
-            memos = try MemoFile.load(memosFile).sorted { $0.updatedAt > $1.updatedAt }
-            knownMemosData = try? Data(contentsOf: memosFile)
+            // #173: through SafeFile (a link or a file past 32MB is never read; it is kept aside as unreadable).
+            memos = try (SafeFile.entry(memosFile) == nil ? [] : MemoFile.decode(SafeFile.sharedData(memosFile))).sorted { $0.updatedAt > $1.updatedAt }
+            knownMemosData = try? SafeFile.sharedData(memosFile)
         } catch {
             keepUnreadable(memosFile, what: .memos)
         }
         loadMemoFolders()
+        loadMemoTrash()
         loadTodoSpaces()
         spaceLens = preferences.data(forKey: "spaces.lens").flatMap { try? JSONDecoder().decode(SpaceLens.self, from: $0) }
-        do {
-            history = UndoableNotebook(notebook: try file.load())
-        } catch NotebookFileError.missing {
-            // The first launch starts with a blank sheet.
-        } catch {
-            let backup = storageURL.deletingPathExtension()
-                .appendingPathExtension("unreadable-\(Int(Date().timeIntervalSince1970)).json")
+        groupBySpace = preferences.bool(forKey: "spaces.group")
+        groupStyle = SpaceGroupStyle(rawValue: preferences.string(forKey: "spaces.groupStyle") ?? "") ?? .card
+        foldedGroups = Set(preferences.stringArray(forKey: "spaces.folded") ?? [])
+        openDoneGroups = Set(preferences.stringArray(forKey: "spaces.doneOpen") ?? [])
+        if SafeFile.isRefused(storageURL) {
+            // #173 (review L-04 · L-05): todos.json is a link or past 32MB — not read, and never saved over.
+            canSave = false
+            storageError = L("목록 파일이 링크이거나 32MB보다 커서 읽지 않았어요. 그 파일은 덮어쓰지 않고 그대로 둬요.")
+        } else {
             do {
-                try FileManager.default.copyItem(at: storageURL, to: backup)
-                storageError = L("목록 파일을 읽지 못해서 빈 목록으로 시작했어요.") + " " + Self.keptAside(backup)
+                history = UndoableNotebook(notebook: try file.load())
+            } catch NotebookFileError.missing {
+                // The first launch starts with a blank sheet.
             } catch {
-                canSave = false
-                storageError = L("목록 파일을 읽지 못했어요. 원래 파일을 지키려고 그 위에 저장하지 않아요. 여기 적은 건 ‘텍스트로 내보내기’로 따로 남겨 두세요.")
+                let backup = storageURL.deletingPathExtension()
+                    .appendingPathExtension("unreadable-\(Int(Date().timeIntervalSince1970)).json")
+                do {
+                    try FileManager.default.copyItem(at: storageURL, to: backup)
+                    storageError = L("목록 파일을 읽지 못해서 빈 목록으로 시작했어요.") + " " + Self.keptAside(backup)
+                } catch {
+                    canSave = false
+                    storageError = L("목록 파일을 읽지 못했어요. 원래 파일을 지키려고 그 위에 저장하지 않아요. 여기 적은 건 ‘텍스트로 내보내기’로 따로 남겨 두세요.")
+                }
             }
         }
         // 어제부터: older files have no stamps yet — today, from now on.
@@ -581,17 +685,35 @@ final class AppModel: ObservableObject {
         let shown = today.filter(isShown)
         let lens = key.lens
         let items = lens == .all ? shown : shown.filter { lens.includes(spaceIndex[$0.id]?.id) }
+        // The rows' animation (PaperView) keys on a count bumped here, once per change, instead of on 2,000 ids
+        // mapped and compared on every redraw; a change of lens, spaces or day is drawn at once (as on Windows).
+        if let before = visible, !before.items.elementsEqual(items, by: { $0.id == $1.id }) {
+            visibleRowsChanged += 1
+            visibleRowsMotion = before.key.lens != key.lens || before.key.spaces != key.spaces || before.key.day != key.day ? nil
+                : items.count < before.items.count ? .leave : .enter
+        }
         visible = (key, items)
         return items
+    }
+    /// What the sheet's rows last did: came in or went (등장 0.18, going ease-in), or nil when the lens, the spaces
+    /// or the day changed (drawn at once). Read with `visibleRowsVersion`.
+    enum RowsMotion { case enter, leave }
+    private(set) var visibleRowsMotion: RowsMotion?
+    private var visibleRowsChanged = 0
+    /// Bumped when the rows shown change (works `visibleItems` out first).
+    var visibleRowsVersion: Int {
+        _ = visibleItems
+        return visibleRowsChanged
     }
     /// What `visibleItems` depends on besides the list.
     private struct VisibleKey: Equatable {
         var revision: Int, day: String, hideCompleted: Bool, finishing: Set<UUID>, lens: SpaceLens.Shown, spaces: Int
     }
     private var visible: (key: VisibleKey, items: [TodoItem])?
-    /// Today's rows as the sheet shows them: 다음 first, then the rest.
+    /// Today's rows as the sheet shows them: 다음 first, then the rest (2b: group by group, without the folded rows).
     var todayDisplayOrder: [TodoItem] {
         let visible = visibleItems
+        if showsSpaceGroups { return groupedDisplayOrder(visible) }
         let split = TodayGroups.split(visible, series: series, now: Date(), first: todayPickID)
         let byID = Dictionary(uniqueKeysWithValues: visible.map { ($0.id, $0) })
         return (split.next + split.rest).compactMap { byID[$0] }
@@ -632,7 +754,15 @@ final class AppModel: ObservableObject {
             lingering.isCompleted = false
             return lingering
         }
-        return Ahead.sections(items: shown, events: aheadEvents(now: now), now: now, language: .current)
+        return Ahead.sections(items: aheadLensed(shown, now: now).items, events: aheadEvents(now: now), now: now, language: .current)
+    }
+
+    /// 2a (A2, S37): while one space shows, 앞으로 lays out its to-dos only (events all); `hidden` is the end line's N.
+    func aheadLensed(_ list: [TodoItem]? = nil, now: Date = Date()) -> (items: [TodoItem], hidden: Int) {
+        let lens = spaceShown
+        let all = list ?? items
+        guard lens != .all else { return (all, 0) }
+        return Ahead.lensed(all, now: now) { lens.includes(spaceIndex[$0.id]?.id) }
     }
 
     /// Event occurrences from today to a little past next week (Ahead keeps tomorrow … next week).
@@ -764,7 +894,10 @@ final class AppModel: ObservableObject {
     /// Creates or updates a recurring task. From a row, the task itself becomes today's copy
     /// when the rule applies today (and gets today's alert if that time is still ahead).
     @discardableResult
-    func saveSeries(taskID: UUID? = nil, seriesID: String? = nil, title: String? = nil, rule: RepeatRule, remindAt: String?, now: Date = Date()) -> String? {
+    /// `space` (2a, A9 · A11 · A12): the rule's space (nil inside: 일반) — from the line or the rule editor; left out, a
+    /// rule saved from a to-do takes that to-do's space and one saved otherwise keeps its own.
+    func saveSeries(taskID: UUID? = nil, seriesID: String? = nil, title: String? = nil, rule: RepeatRule, remindAt: String?,
+                    space: String?? = nil, now: Date = Date()) -> String? {
         guard Repeat.isValid(rule) else { return nil }
         let task = taskID.flatMap { id in items.first { $0.id == id } }
         let existingID = seriesID ?? task?.seriesID
@@ -791,6 +924,9 @@ final class AppModel: ObservableObject {
                 series[index].lastPlaced = Archive.dayKey(now)
             }
         }
+        // Before today's copy is made, so it's made in the rule's space (A10).
+        let fromTask: String?? = task.map { spaceIndex[$0.id]?.id }
+        if case .some(let ruleSpace) = space ?? fromTask { setRuleSpace(seriesID, to: ruleSpace) }
         saveRepeats()
         placeRecurring(now: now)
         if task == nil {
@@ -833,6 +969,7 @@ final class AppModel: ObservableObject {
         let plan = Repeat.planToday(series, items: items, now: now)
         guard !plan.placed.isEmpty else { return }
         mutate { $0.placeRecurring(create: plan.create, roll: plan.roll) }
+        placeMadeCopies(plan.create)
         let key = Archive.dayKey(now)
         for index in series.indices where plan.placed.contains(series[index].id) { series[index].lastPlaced = key }
         saveRepeats()
@@ -847,8 +984,9 @@ final class AppModel: ObservableObject {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         do {
-            series = try decoder.decode(RepeatsFile.self, from: Data(contentsOf: repeatsURL)).series.filter { Repeat.isValid($0.rule) }
+            series = try decoder.decode(RepeatsFile.self, from: SafeFile.sharedData(repeatsURL)).series.filter { Repeat.isValid($0.rule) }
         } catch {
+            repeatsUnreadable = true
             keepUnreadable(repeatsURL, what: .repeats)
         }
     }
@@ -883,6 +1021,8 @@ final class AppModel: ObservableObject {
 
     /// The folder the list lives in, when it's a shared one (iCloud Drive, Dropbox …); nil = this Mac.
     var sharedFolder: URL?
+    /// 자동 백업 and the backup list (#139, #140); set at launch, a temporary folder for previews and snapshots.
+    var backups: BackupBook?
 
     /// Where everything is kept: todos.json, memos.json, repeats.json and the archive/ folder.
     var storageFolderURL: URL { file.url.deletingLastPathComponent() }
@@ -904,17 +1044,18 @@ final class AppModel: ObservableObject {
     /// while a title is being edited here (the next check catches up); memos written here and the
     /// open memo keep this Mac's text.
     func reloadFromDisk() {
-        if !hasUnsavedChanges, editingTaskReminderID == nil, let notebook = try? file.load(), notebook != history.notebook {
+        if !hasUnsavedChanges, editingTaskReminderID == nil, !SafeFile.isRefused(file.url), let notebook = try? file.load(), notebook != history.notebook {
             takeFromDisk(notebook)
         }
         catchUpMemos()
         catchUpMemoFolders()
+        catchUpMemoTrash()
         catchUpTodoSpaces()
         calendar.reloadIfChanged()
         alarms.reloadIfChanged()
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        if let data = try? Data(contentsOf: repeatsURL), let loaded = try? decoder.decode(RepeatsFile.self, from: data).series.filter({ Repeat.isValid($0.rule) }),
+        if let data = try? SafeFile.sharedData(repeatsURL), let loaded = try? decoder.decode(RepeatsFile.self, from: data).series.filter({ Repeat.isValid($0.rule) }),
            loaded != series {
             series = loaded
         }
@@ -924,7 +1065,7 @@ final class AppModel: ObservableObject {
     /// seconds): take its list first, so the change about to be made lands on top of it instead
     /// of writing over it. Everything here is saved right away, so a file that differs is newer.
     private func catchUpWithDisk() {
-        guard sharedFolder != nil || aiWatching, !hasUnsavedChanges, let notebook = try? file.load(), notebook != history.notebook else { return }
+        guard sharedFolder != nil || aiWatching, !hasUnsavedChanges, !SafeFile.isRefused(file.url), let notebook = try? file.load(), notebook != history.notebook else { return }
         takeFromDisk(notebook)
     }
 
@@ -982,7 +1123,7 @@ final class AppModel: ObservableObject {
     /// open memo once something was typed in it) and leaving deleted ones out, so a save never
     /// drops a memo or an edit made elsewhere.
     private func catchUpMemos() {
-        guard let data = try? Data(contentsOf: memosURL), data != knownMemosData else { return }
+        guard let data = try? SafeFile.sharedData(memosURL), data != knownMemosData else { return }
         let base = knownMemosData.flatMap { try? MemoFile.decode($0) } ?? []
         knownMemosData = data
         guard let theirs = try? MemoFile.decode(data) else {
@@ -1049,7 +1190,16 @@ final class AppModel: ObservableObject {
     // MARK: Keyboard
 
     /// The row picked with the keyboard (or a click on its empty area) on 오늘 / 앞으로.
-    @Published var selectedTaskID: UUID?
+    @Published var selectedTaskID: UUID? {
+        // #168: picking a row any other way (↑↓, a plain click, Esc, a page) leaves only that row picked.
+        didSet { if !applyingSelection { selectionAnchor = selectedTaskID; if !multiSelected.isEmpty { multiSelected = [] } } }
+    }
+    /// #168: the rows picked besides the keyboard's (all of them, that one too) when there are several; empty otherwise.
+    @Published var multiSelected: Set<UUID> = []
+    /// #168: where a ⇧-click or ⇧↑↓ range starts.
+    var selectionAnchor: UUID?
+    /// Set while a ⌘- or ⇧-pick is written (so it isn't taken for a plain pick).
+    var applyingSelection = false
     /// Asks a row to start editing its title (Return on the selected row).
     @Published var editRequestID: UUID?
 
@@ -1064,6 +1214,10 @@ final class AppModel: ObservableObject {
     enum ListKey { case up, down, toggle, edit, delete, moveUp, moveDown, clear, upFromInput, downFromInput
         /// 1.38: ⌥→ · ⌥← · ⌥↓ on the selected row, F to focus on it.
         case later, earlier, someday, focus
+        /// 2b (S44): ⌥⌘↑ · ⌥⌘↓ the selected row to the group above or below.
+        case groupUp, groupDown
+        /// #168: ⇧↑ · ⇧↓ grow or shrink the picked range.
+        case extendUp, extendDown
     }
 
     /// ↑↓ select, Space completes, Return edits, ⌫ deletes, ⌘↑↓ moves, Esc clears. Returns
@@ -1137,6 +1291,11 @@ final class AppModel: ObservableObject {
         case .moveUp, .moveDown:
             guard page == .todos, let id = selectedTaskID, index != nil else { return false }
             move(id, by: key == .moveUp ? -1 : 1)
+        case .extendUp, .extendDown:
+            extendSelection(key == .extendUp ? -1 : 1)
+        case .groupUp, .groupDown:
+            guard page == .todos, showsSpaceGroups, let id = selectedTaskID, index != nil else { return false }
+            moveToNeighborGroup(id, step: key == .groupUp ? -1 : 1)
         case .clear:
             guard selectedTaskID != nil else { return false }
             selectedTaskID = nil
@@ -1154,7 +1313,8 @@ final class AppModel: ObservableObject {
         mutate { $0.toggle(id: id) }
         if finishing {
             finishingTasks[id] = Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .milliseconds(650))
+                // 0.65 s, 0.3 under Reduce Motion: long enough to see what was checked.
+                try? await Task.sleep(for: .milliseconds(Motion.holdMilliseconds()))
                 guard !Task.isCancelled else { return }
                 self?.finishingIDs.remove(id)
                 self?.finishingTasks[id] = nil
@@ -1234,9 +1394,9 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// ⋯ → 키보드 단축키: the shortcut list slip (#86), with the note's and the drawer's keys as chosen.
     func showShortcuts() {
-        SlipAlert.run(symbol: "keyboard", title: L("종이냥 단축키"), message: L("⌘N     입력 줄로 가기\n⌘1 · ⌘2     오늘 · 앞으로\n⌘3     메모 서랍\n⌘F     검색\n⌘M     포스트잇으로 접기\n⌘D     책상\nReturn     넣기 · 고치기 끝\nEsc     고치기 취소\n⌘Z     되돌리기\n⇧⌘Z     다시 하기\n⇧⌘C     목록 복사\n⌘E     텍스트로 내보내기\n⌥→ · ⌥←     고른 할 일 하루 뒤로 · 앞으로\n⌥↓     고른 할 일 언젠가로\nF     고른 할 일에 집중\n⌃⌥N     빠른 입력 (어디서든)\n⌃⌥M     빠른 메모 (어디서든)\n⌃⌥J     노트 보이기 · 숨기기 (어디서든)\n\n집중하는 동안: Space 일시정지 · ⌘↩ 다 했어요 · ⌘= 5분 더 · Esc 그만두기\n할 일을 누르면 바로 고칠 수 있어요. 줄 왼쪽 손잡이를 끌거나 우클릭 메뉴로 순서를 바꿔요.\n목록은 이 Mac에 저절로 저장돼요."),
-                      choices: [.init(title: L("확인"), role: .primary, isDefault: true, isCancel: true)], cat: nil, width: .medium)
+        ShortcutList.show(note: noteShortcutShown, drawer: drawer.shortcut)
     }
 
     func showStorageError(_ message: String) {

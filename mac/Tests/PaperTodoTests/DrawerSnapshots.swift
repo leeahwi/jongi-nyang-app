@@ -73,11 +73,22 @@ extension DesignSnapshots {
         folders.setPinned("deploy", true, now: stamp)
         folders.setPinned("weekend", true, now: stamp)
         try folders.save(to: data.appendingPathComponent(MemoFolders.fileName))
+        // #120: three deleted memos in 지운 메모 (2, 5 and 12 days ago; fictional).
+        var trash = MemoTrash()
+        trash.add(memo("gone-trip", t("지난 여행 짐 목록\n- [x] 여권\n- [x] 충전기", "Last trip’s packing list\n- [x] Passport\n- [x] Charger",
+                                      "Paklijst vorige reis\n- [x] Paspoort\n- [x] Oplader"), at(daysAgo: 20, 9, 0)),
+                  folder: "home", pinned: false, paper: nil, now: at(daysAgo: 2, 11, 0))
+        trash.add(memo("gone-meeting", t("옛 회의 시간\n화요일 3시로 옮김", "Old meeting time\nMoved to Tuesday at 3", "Oude vergadertijd\nVerzet naar dinsdag 3 uur"),
+                       at(daysAgo: 20, 9, 0)), folder: "work", pinned: false, paper: nil, now: at(daysAgo: 5, 11, 0))
+        trash.add(memo("gone-book", t("읽다 만 책에서 적어 둔 문장", "A line from the book I didn’t finish", "Een zin uit het boek dat ik niet uitlas"),
+                       at(daysAgo: 20, 9, 0)), folder: MemoFolders.inbox, pinned: false, paper: nil, now: at(daysAgo: 12, 11, 0))
+        try Data(trash.encoded().utf8).write(to: data.appendingPathComponent(MemoTrash.fileName))
 
         let suite = "PaperTodo.Drawer.\(UUID())"
         let preferences = UserDefaults(suiteName: suite)!
         defer { preferences.removePersistentDomain(forName: suite) }
         let model = AppModel(storageURL: storage, isolated: true, preferences: preferences)
+        keptModels.append(model)
         model.paperColor = night ? .night : .day
         let drawer = model.drawer
         drawer.now = { base }
@@ -115,40 +126,94 @@ extension DesignSnapshots {
             drawer.backdrop = .opaque
             drawer.previewDesktop = false
             drawer.previewHover = nil
+            drawer.previewEdgeHover = false
             drawer.show(.folder("work"))
             drawer.selectedID = nil
             drawer.toast = nil
             drawer.folderSheet = nil
+            drawer.closeTrash()
         }
 
-        // The list (③ 날짜 묶음 + 카드) in the four papers: groups, chips, the pinned group; then the checklist open.
-        for theme in [MemoDrawer.Theme.day, .night, .kraft, .grid] {
+        // The list (③ 날짜 묶음 + 카드) in every paper (#142: 한지 · 쑥색 · 벚꽃 · 먹색 too), each as it is (밤에는 밤 종이로
+        // off): groups, chips, the pinned group; then the checklist open.
+        drawer.nightPaper = false
+        for theme in MemoDrawer.Theme.allCases {
             drawer.theme = theme
             reset()
             try shot("list-\(theme.rawValue)", size())
             drawer.expand("deploy")
             try shot(theme.rawValue, size())
         }
-        // 자동 follows the note: day paper by day, night paper under a night note.
-        drawer.theme = .auto
+        // #115: 제목만 in every paper (the busy folder: about twelve to a screen).
+        for theme in MemoDrawer.Theme.allCases {
+            drawer.theme = theme
+            reset()
+            drawer.setView(.titles, for: .folder("many"))
+            drawer.show(.folder("many"))
+            try shot("titles-\(theme.rawValue)", size())
+            drawer.setView(.cards, for: .folder("many"))
+        }
+        // 밤에는 밤 종이로 (1.45's 자동): day paper by day, night paper under a night note.
+        drawer.theme = .day
+        drawer.nightPaper = true
         reset()
         drawer.expand("deploy")
         try shot("auto-\(night ? "night" : "day")", size())
         drawer.theme = night ? .night : .day
         let paper = night ? "night" : "day"
+        // #114 · #120 on the new papers (#142): the found line, 체크 남음 and 지운 메모 in 한지 and 먹색, as they are.
+        drawer.nightPaper = false
+        for theme in [MemoDrawer.Theme.hanji, .ink] {
+            drawer.theme = theme
+            reset()
+            drawer.startSearch()
+            drawer.query = "QA"
+            try shot("search-line-\(theme.rawValue)-\(paper)", size())
+            drawer.endSearch()
+            drawer.startSearch()
+            drawer.toggleFilter(.open)
+            try shot("search-open-\(theme.rawValue)-\(paper)", size())
+            drawer.endSearch()
+            reset()
+            drawer.openTrash()
+            try shot("trash-\(theme.rawValue)-\(paper)", size())
+        }
+        drawer.nightPaper = true
+        drawer.theme = night ? .night : .day
         // Picked by keyboard; under the pointer (the hover pill); typing in a memo (its raw text and the bar).
         reset()
         drawer.selectedID = "phone"
         try shot("selected-\(paper)", size())
+        // #118: ⇧⌘M — the picked memo's 폴더로 옮기기 under the folder's name.
+        try menuShot("move-list-\(paper)", DrawerMenus.moveList(drawer, "phone"), at: CGPoint(x: 62, y: 78))
+        // #117: the quick-write slip typed into — where it goes and its keys under the words.
+        reset()
+        drawer.quickText = t("내일 아침에 우체국 들르기", "Stop by the post office tomorrow morning", "Morgen langs het postkantoor")
+        try shot("quick-typing-\(paper)", size())
+        drawer.width = 260
+        try shot("quick-typing-narrow-\(paper)", size(260))
+        drawer.quickText = ""
         reset()
         drawer.previewHover = "mcpb"
         try shot("hover-\(paper)", size())
         reset()
         drawer.expand("weekly")
         try shot("editing-\(paper)", size())
+        // #133: a checklist typed — its boxes drawn in the editor, done items faint and struck through.
         reset()
+        drawer.edit("deploy")
+        try shot("editing-check-\(paper)", size())
+        // #163: a box ticking, frozen part way (filled, its mark half drawn in; its words not faded yet).
+        MemoLayoutManager.previewLook = (index: 2, look: 0.6)
+        reset()
+        drawer.edit("deploy")
+        try shot("editing-check-mid-\(paper)", size())
+        MemoLayoutManager.previewLook = nil
+        reset()
+        // #113: 크게 보기 widens the drawer (a 1440-wide screen: 640) and counts the letters.
+        drawer.screenWidth = 1440
         drawer.bigID = "long"
-        try shot("big-\(paper)", size())
+        try shot("big-\(paper)", size(drawer.shownWidth))
         // Per-memo paper: a night memo in a day drawer (a day memo in a night one).
         reset()
         drawer.setPaper("weekly", night ? .day : .night)
@@ -171,21 +236,47 @@ extension DesignSnapshots {
         drawer.setSort(.title, for: .folder("work"))
         try shot("sort-title-\(paper)", size())
         drawer.setSort(.edited, for: .folder("work"))
+        // #115: 제목만 with a memo open where it was (its card), and the 260 drawer's titles cut with …; the folder ▾ menu
+        // with 보기 · 정렬 on top.
+        reset()
+        drawer.setView(.titles, for: .folder("work"))
+        drawer.show(.folder("work"))
+        drawer.expand("deploy")
+        try shot("titles-open-\(paper)", size())
+        reset()
+        drawer.width = 260
+        try shot("titles-260-\(paper)", size(260))
+        reset()
+        try menuShot("menu-folders-titles-\(paper)", DrawerMenus.folderList(drawer), at: CGPoint(x: 70, y: 72))
+        drawer.setView(.cards, for: .folder("work"))
         reset()
         drawer.startSearch()
         drawer.query = t("ㅎㅇ", "meet", "overleg")
         try shot("search-\(paper)", size())
         drawer.query = t("ㅋㅋㅋ", "zebra", "zebra")
         try shot("search-none-\(paper)", size())
+        // #114: the found line deep in a long one (brought near its start); 체크 남음 alone; this folder only.
+        drawer.query = "QA"
+        try shot("search-line-\(paper)", size())
         drawer.endSearch()
-        // The menus (mock/v2): the folder list, ⚙, a memo's (with 폴더로 옮기기), the open memo's ⚙, a bookmark's, 고정's.
+        drawer.startSearch()
+        drawer.toggleFilter(.open)
+        try shot("search-open-\(paper)", size())
+        drawer.endSearch()
+        drawer.startSearch()
+        drawer.setSearchHere(true)
+        drawer.toggleFilter(.link)
+        try shot("search-here-\(paper)", size())
+        drawer.endSearch()
+        // The menus (mock/v2): the folder list, ⚙, a memo's (with 폴더로 옮기기), the open memo's ⋯, a bookmark's, 고정's.
         reset()
         try menuShot("menu-folders-\(paper)", DrawerMenus.folderList(drawer), at: CGPoint(x: 70, y: 72))
         try menuShot("menu-gear-\(paper)", DrawerMenus.drawer(drawer), at: CGPoint(x: 40, y: 330))
         let memoItems = DrawerMenus.memo(drawer, "deploy")
         try menuShot("menu-memo-\(paper)", memoItems, at: CGPoint(x: 90, y: 150), sub: DrawerMenus.move(drawer, "deploy"), subAt: 240)
         drawer.expand("deploy")
-        try menuShot("menu-memo-gear-\(paper)", DrawerMenus.memoGear(drawer, "deploy"), at: CGPoint(x: 80, y: 380))
+        // #112: the open memo's ⋯ is the memo's own menu.
+        try menuShot("menu-memo-more-\(paper)", DrawerMenus.memo(drawer, "deploy"), at: CGPoint(x: 80, y: 120))
         reset()
         try menuShot("menu-bookmark-\(paper)", DrawerMenus.folder(drawer, "work"), at: CGPoint(x: 30, y: 200), sub: DrawerMenus.sort(drawer, .folder("work")), subAt: 150)
         try menuShot("menu-pinned-\(paper)", DrawerMenus.pinned(drawer), at: CGPoint(x: 30, y: 420))
@@ -209,6 +300,16 @@ extension DesignSnapshots {
         try shot("folder-edit-\(paper)", size())
         drawer.newFolder()
         try shot("folder-new-\(paper)", size())
+        // #120: 지운 메모 — its slip, and the question before 모두 비우기; at the narrowest width too.
+        reset()
+        drawer.openTrash()
+        try shot("trash-\(paper)", size())
+        drawer.trashConfirm = true
+        try shot("trash-ask-\(paper)", size())
+        reset()
+        drawer.width = 260
+        drawer.openTrash()
+        try shot("trash-260-\(paper)", size(260))
         // Narrow, wide, the left side.
         for width: CGFloat in [260, 480] {
             reset()
@@ -220,10 +321,155 @@ extension DesignSnapshots {
         drawer.side = .left
         drawer.expand("deploy")
         try shot("left-\(paper)", size())
+        // #82 · #83: the empty bookmark (+) and the close bar on the inner edge as if under the pointer, both sides.
+        reset()
+        drawer.previewEdgeHover = true
+        try shot("edge-hover-\(paper)", size())
+        drawer.side = .left
+        try shot("edge-hover-left-\(paper)", size())
+        // #164: a short screen — the close tab keeps its place above the footer, the bookmarks scroll above it.
+        reset()
+        try shot("short-\(paper)", size(height: 560))
         // The undo toast after deleting a folder.
         reset()
         drawer.say(MemoFolders.movedToInbox(count: 5, inbox: drawer.folders.folder(MemoFolders.inbox)?.displayName(.current) ?? "", language: .current), action: L("되돌리기"))
         try shot("toast-\(paper)", size(height: 600))
+        reset()
+
+        // 메모 마크다운 · 글꼴 · 크기 (#84): a memo with every mark (fictional words) in 공부 — open in the editor at the four
+        // sizes, in the four papers, at the largest size in the narrowest drawer, as it reads with its boxes, its card,
+        // and the three other faces.
+        let markdown = t("""
+            # 여행 준비
+            **금요일**까지 _천천히_ 챙기기. ~~지난 목록~~은 버려요.
+            ## 짐
+            - 여권과 `충전기`
+              - 작은 가방
+            1. 숙소 확인
+            2) 기차표 출력
+            > 비 오면 우산 챙기기
+            - [ ] 환전하기
+            - [x] 보험 들기
+            ---
+            ### 링크
+            [지도 보기](https://example.com/map) · https://example.com/info
+            ***꼭 기억하기***
+            ```
+            ls ~/여행
+            ```
+            """, """
+            # Trip prep
+            Pack *slowly* by **Friday**. ~~Last year’s list~~ goes.
+            ## Bags
+            - Passport and `charger`
+              - Small bag
+            1. Check the room
+            2) Print the train tickets
+            > Take an umbrella if it rains
+            - [ ] Change money
+            - [x] Get insurance
+            ---
+            ### Links
+            [See the map](https://example.com/map) · https://example.com/info
+            ***Don’t forget***
+            ```
+            ls ~/trip
+            ```
+            """, """
+            # Reis voorbereiden
+            Voor **vrijdag** _rustig_ inpakken. ~~De oude lijst~~ mag weg.
+            ## Tassen
+            - Paspoort en `oplader`
+              - Kleine tas
+            1. Kamer controleren
+            2) Treinkaartjes printen
+            > Paraplu mee als het regent
+            - [ ] Geld wisselen
+            - [x] Verzekering afsluiten
+            ---
+            ### Links
+            [Kaart bekijken](https://example.com/map) · https://example.com/info
+            ***Niet vergeten***
+            ```
+            ls ~/reis
+            ```
+            """)
+        // A second one without boxes: its card's preview rows read without marks (a list `• `, a number, a quote's words).
+        _ = model.addMemo(text: t("## 장 볼 것\n- **우유** 두 통\n- 달걀 _열 개_\n3. 빵집 들르기\n> 저녁 전에",
+                                  "## Shopping\n- **Milk**, two\n- Eggs, _a dozen_\n3. Stop at the bakery\n> Before dinner",
+                                  "## Boodschappen\n- **Melk**, twee pakken\n- Eieren, _tien_\n3. Langs de bakker\n> Voor het eten"), folder: "study")
+        let markdownID = model.addMemo(text: markdown, folder: "study") ?? ""
+        func markdownShot(_ name: String, width: CGFloat = 300, editing: Bool = true, link: MemoDrawer.LinkEdit? = nil, height: CGFloat = 820) throws {
+            reset()
+            drawer.width = width
+            drawer.show(.folder("study"))
+            drawer.expand(markdownID)
+            drawer.editing = editing
+            drawer.linkEdit = link
+            try shot("md-\(name)", size(width, height: height))
+            drawer.linkEdit = nil
+        }
+        for step in [MemoText.Size.small, .regular, .large, .extraLarge] {
+            drawer.textSize = step
+            try markdownShot("\(step.name)-\(paper)")
+        }
+        drawer.textSize = .regular
+        drawer.nightPaper = false
+        for theme in [MemoDrawer.Theme.kraft, .grid] {
+            drawer.theme = theme
+            try markdownShot("\(theme.rawValue)-\(paper)")
+        }
+        drawer.nightPaper = true
+        drawer.theme = night ? .night : .day
+        drawer.textSize = .extraLarge
+        try markdownShot("narrow-extraLarge-\(paper)", width: 260)
+        try markdownShot("narrow-extraLarge-read-\(paper)", width: 260, editing: false)
+        // #141: the new largest step in the narrowest drawer; 줄 간격 넉넉하게 · 문단 간격 아주 넓게, typed and as it reads.
+        drawer.textSize = .pt20
+        try markdownShot("narrow-20-\(paper)", width: 260)
+        drawer.textSize = .regular
+        drawer.lineSpacing = .loose
+        drawer.paragraphSpacing = .wider
+        try markdownShot("spacing-\(paper)")
+        try markdownShot("spacing-read-\(paper)", editing: false)
+        drawer.lineSpacing = .regular
+        drawer.paragraphSpacing = .regular
+        try markdownShot("read-\(paper)", editing: false)
+        // 2026-10-30: the Aa bar out; every mark shown (기호 늘 보이기); the bar at the narrowest width.
+        drawer.formatBarOpen = true
+        try markdownShot("format-bar-\(paper)")
+        try markdownShot("format-bar-narrow-\(paper)", width: 260)
+        drawer.formatBarOpen = false
+        // #135: the link field — on chosen words (an address typed), and in a link (its address, 링크 빼기).
+        try markdownShot("link-new-\(paper)", link: .init(from: 0, to: 0, url: "example.com/map", existing: false), height: 1000)
+        try markdownShot("link-edit-\(paper)", link: .init(from: 0, to: 0, url: "https://example.com/map", existing: true), height: 1000)
+        try markdownShot("link-edit-narrow-\(paper)", width: 260, link: .init(from: 0, to: 0, url: "https://example.com/map", existing: true), height: 1080)
+        drawer.showMarks = true
+        try markdownShot("marks-\(paper)")
+        drawer.showMarks = false
+        for face in [MemoText.Face.pen, .brush, .mono] {
+            drawer.bodyFace = face
+            try markdownShot("font-\(face.rawValue)-\(paper)")
+        }
+        // 코드 글꼴 D2Coding (#143): the code block and `code` with Korean in them, and the 고정폭 face.
+        drawer.bodyFace = .clean
+        drawer.codeFace = .d2coding
+        try markdownShot("code-d2coding-\(paper)")
+        drawer.bodyFace = .mono
+        try markdownShot("font-mono-d2coding-\(paper)")
+        drawer.codeFace = .system
+        drawer.bodyFace = .clean
+        for step in [MemoText.Size.regular, .extraLarge] {
+            drawer.textSize = step
+            reset()
+            drawer.show(.folder("study"))
+            try shot("md-card-\(step.name)-\(paper)", size())
+            reset()
+            drawer.width = 260
+            drawer.show(.folder("study"))
+            try shot("md-card-narrow-\(step.name)-\(paper)", size(260))
+        }
+        drawer.textSize = .regular
         reset()
 
         // The handle at the edge (1.45: one pale cream on every paper, day and night; today's number only in its
@@ -244,8 +490,21 @@ extension DesignSnapshots {
         func settings(_ view: some View) -> some View {
             view.environment(\.settingsTint, DeskPane.drawer.tint).frame(width: 640).padding(28).background(PaperTheme.paper)
         }
-        drawer.theme = .auto
+        drawer.theme = .day
+        drawer.nightPaper = true
         try render(settings(MemoDrawerSettingsGroup(drawer: drawer)), size: nil, to: output.appendingPathComponent("drawer-settings.png"))
+        // #141 · #142: another paper (the switch off), the pen face at 18 pt with wide paragraphs — the sample and the rows.
+        drawer.theme = .hanji
+        drawer.nightPaper = false
+        drawer.bodyFace = .pen
+        drawer.textSize = .pt18
+        drawer.paragraphSpacing = .wide
+        try render(settings(MemoDrawerSettingsGroup(drawer: drawer)), size: nil, to: output.appendingPathComponent("drawer-settings-hanji.png"))
+        drawer.theme = .day
+        drawer.nightPaper = true
+        drawer.bodyFace = .clean
+        drawer.textSize = .regular
+        drawer.paragraphSpacing = .regular
         try render(settings(MemoDrawerSettingsGroup(drawer: drawer, previewRecording: true,
                                                    previewProblem: L("\(DrawerShortcut(keyCode: 46, modifiers: 4096 | 2048, key: "M").text) 키는 종이냥이 이미 써요(빠른 메모 · 노트 · 빠른 입력). 다른 키를 눌러 주세요."))),
                    size: nil, to: output.appendingPathComponent("drawer-settings-recording.png"))

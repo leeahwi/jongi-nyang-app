@@ -1,6 +1,7 @@
 import { bubblePointer, bubbleShift, clampFloorX, clipMs, isResting, petFrame, petSize, walkCycleFrames, type PetFrame, type PetImage, type PetPayload } from "../core/pet";
 import { wrapBubble } from "../core/bubbleText";
 import { lang, paper, reduceMotion, t } from "./api";
+import { sampled } from "./sampled";
 
 const api = paper();
 const pet = document.getElementById("pet")!;
@@ -41,12 +42,17 @@ let suppressClick = false;
 let interactive: boolean | undefined;
 /** What the bubble shows now, so a state that changes nothing there leaves it (and its animation) alone. */
 let bubbleKey = "";
+/** The bubble's width for what it shows now (unknown until measured). */
+let bubbleWidth: number | undefined;
+// A font that loads later can change it.
+document.fonts.addEventListener("loadingdone", () => { bubbleWidth = undefined; });
 
 /** A line, or 종이냥 한마디 asking something with answer buttons. */
 function showBubble(next: PetPayload): void {
   const key = next.question ? `q\n${next.question.text}\n${next.question.answers.join("\n")}` : `m\n${next.message ?? ""}`;
   if (key === bubbleKey) return;
   bubbleKey = key;
+  bubbleWidth = undefined;
   const question = next.question;
   bubble.classList.toggle("asking", Boolean(question));
   if (!question) {
@@ -109,13 +115,15 @@ function draw(now: number): void {
   const frame = petFrame(action, activityStart, dragX ?? state.homeX, reduceMotion() ? activityStart : now);
   pet.style.left = `${frame.x - petWidth / 2}px`;
   if (!bubble.hidden) {
-    // Near the screen's edges the bubble slides inward; its pointer still finds the cat.
-    const width = bubble.offsetWidth;
+    // Near the screen's edges the bubble slides inward; its pointer still finds the cat. Its width is read once per
+    // text (#67: reading it forced a layout on every frame of a clip).
+    const width = bubbleWidth ??= bubble.offsetWidth;
     const shift = bubbleShift(frame.x, width, window.innerWidth);
     bubble.style.setProperty("--shift", `${shift}px`);
     bubble.style.setProperty("--pointer", `${bubblePointer(shift, width)}px`);
   }
   zs.hidden = !frame.sleepy;
+  sampled(zs, frame.sleepy ? "zs" : undefined);
   const url = frame.walkFrame !== undefined ? walkURL(frame.walkFrame) : imageURL(frame.image);
   if (art.getAttribute("src") !== url) art.setAttribute("src", url);
   const { pose } = frame;
@@ -126,6 +134,7 @@ function draw(now: number): void {
   const breathing = frame.walkFrame !== undefined || !isResting(action) ? "" : frame.sleepy ? "asleep" : "awake";
   art.classList.toggle("awake", breathing === "awake");
   art.classList.toggle("asleep", breathing === "asleep");
+  sampled(art, breathing || undefined);
   shadow.style.width = `${size * 0.58 * (1 - 0.02 * pose.lift)}px`;
   shadow.style.background = `rgba(0, 0, 0, ${Math.max(0, 0.1 - 0.006 * pose.lift)})`;
   drawEffects(frame);

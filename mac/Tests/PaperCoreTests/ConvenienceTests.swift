@@ -433,6 +433,144 @@ private enum ConvenienceTests {
             try expect(compared == 20_000, "compared")
         }
 
+        try test("검색 (#69): the kept index and the groups' stops give 1.45's results, in its order") {
+            var seed: UInt64 = 69
+            func next(_ n: Int) -> Int {
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                return Int((seed >> 33) % UInt64(n))
+            }
+            let words = ["보고서", "회의", "장보기", "Café", "review", "ideeën", "치과 예약", "운동", "  보 고  ", "메일", "ㅂㄱ", "x"]
+            func title() -> String { (0..<(1 + next(3))).map { _ in words[next(words.count)] }.joined(separator: " ") + " \(next(50))" }
+            func day(_ offset: Int) -> String { Deadline.key(seoul.date(byAdding: .day, value: offset, to: now)!, calendar: seoul) }
+            // Many of each, so every group is cut at its limit; equal times, so the sorts' ties count.
+            let items = (0..<400).map { _ -> TodoItem in
+                var item = task(title(), done: next(5) == 0, due: next(3) == 0 ? day(next(40) - 10) : nil, shelf: [nil, .later, .today][next(3)],
+                                reminder: next(6) == 0 ? at(1 + next(20), 9 + next(10)) : nil)
+                if next(8) == 0 { item.timeRange = TimeRange(start: 600, end: 690) }
+                return item
+            }
+            let memos = (0..<120).map { n in
+                Memo(id: "m\(n)", text: (0..<(1 + next(5))).map { _ in title() }.joined(separator: ["\n", "\r\n", "\n\n"][next(3)]),
+                     updatedAt: at(1 + next(7), 9))
+            }
+            let folders = Dictionary(uniqueKeysWithValues: memos.filter { _ in next(3) == 0 }.map { ($0.id, ["회사", "집", "보고"][next(3)]) })
+            let history = (0..<900).map { n in
+                ArchiveEntry(id: "h\(n)", title: title(), createdAt: at(1, 9), completedAt: next(20) == 0 ? nil : at(1 + next(5), 9 + next(3), month: 9))
+            }
+            let events = (0..<60).map { n in
+                Search.EventEntry(id: "e\(n)", title: title(), date: day(next(60) - 30), location: next(4) == 0 ? title() : nil)
+            }
+            func text(_ groups: [(group: Search.Group, hits: [Search.Hit])]) -> [String] {
+                groups.flatMap { group in group.hits.map { "\(group.group) \($0)" } }
+            }
+            let index = Search.Index()
+            for query in ["보", "보고서", "ㅂㄱㅅ", "ㅎ", "회의 1", "cafe", "IDEEEN", "x", "없는말", " 보  고 ", "1", ""] {
+                let wanted = text(referenceFind(query, items: items, memos: memos, history: history, events: events, memoFolders: folders))
+                for round in 0..<2 {
+                    let plain = Search.find(query, items: items, memos: memos, history: history, events: events, now: now, calendar: seoul,
+                                            memoFolders: folders)
+                    let kept = Search.find(query, items: items, memos: memos, history: history, events: events, now: now, calendar: seoul,
+                                           memoFolders: folders, index: index)
+                    try expect(text(plain) == wanted, "‘\(query)’ without the index (\(round))")
+                    try expect(text(kept) == wanted, "‘\(query)’ with the index (\(round))")
+                }
+            }
+            // The to-dos changed under a kept index: read again.
+            var changed = items
+            changed[3].title = "보고서 새로"
+            let wanted = text(referenceFind("보고서", items: changed, memos: memos, history: history, events: events, memoFolders: folders))
+            try expect(text(Search.find("보고서", items: changed, memos: memos, history: history, events: events, now: now, calendar: seoul,
+                                        memoFolders: folders, index: index)) == wanted, "changed to-dos")
+            // Read ahead (on another thread in the app), then taken: the same.
+            let ahead = Search.Index()
+            ahead.take(Search.Index.read(items: items, history: history))
+            try expect(text(Search.find("보", items: items, memos: memos, history: history, events: events, now: now, calendar: seoul,
+                                        memoFolders: folders, index: ahead))
+                       == text(referenceFind("보", items: items, memos: memos, history: history, events: events, memoFolders: folders)), "read ahead")
+        }
+
         print("\(count) convenience checks passed.")
     }
 }
+
+/// 1.45's Search.find, kept as it was (#69): the slip's search now stops at each group's limit and reads through a kept
+/// index, and must find the same.
+private func referenceFind(_ query: String, items: [TodoItem], memos: [Memo], history: [ArchiveEntry], events: [Search.EventEntry],
+                           memoFolders: [String: String]) -> [(group: Search.Group, hits: [Search.Hit])] {
+    let calendar = seoul, language = AppLanguage.ko, limit = Search.limit
+    let query = Search.Query(query)
+    guard !query.isEmpty else { return [] }
+    let todayKey = Archive.dayKey(now, calendar: calendar)
+    let thisYear = calendar.component(.year, from: Archive.logicalDayStart(now, calendar: calendar))
+    func dayText(_ date: Date) -> String {
+        let p = calendar.dateComponents([.year, .month, .day], from: date)
+        return language.dayMonth(month: p.month!, day: p.day!, year: p.year == thisYear ? nil : p.year)
+    }
+    func taskDetail(_ item: TodoItem) -> String {
+        // 1.39: the time range after the day ("10월 12일 · 14:00–15:30"), in place of the reminder's clock.
+        if let range = item.timeRange {
+            let day = item.dueDate.map { Deadline.label($0, style: .date, now: now, calendar: calendar, language: language) }
+            return (day.map { $0 + " · " } ?? "") + range.text(language)
+        }
+        if let due = item.dueDate { return Deadline.label(due, style: .date, now: now, calendar: calendar, language: language) }
+        if let at = item.reminderAt {
+            let p = calendar.dateComponents([.hour, .minute], from: at)
+            let clock = language.clock(hour: p.hour!, minute: p.minute!)
+            return Archive.dayKey(at, calendar: calendar) == todayKey ? clock : language.shortDate(at, calendar: calendar) + " " + clock
+        }
+        return ""
+    }
+    func taskHit(_ item: TodoItem, _ group: Search.Group) -> Search.Hit? {
+        Search.match(query, in: item.title).map {
+            Search.Hit(group: group, id: item.id.uuidString, text: item.title, range: $0, detail: taskDetail(item), done: item.isCompleted, day: item.dueDate)
+        }
+    }
+
+    var groups: [(group: Search.Group, hits: [Search.Hit])] = []
+    func add(_ group: Search.Group, _ hits: [Search.Hit]) {
+        if !hits.isEmpty { groups.append((group, Array(hits.prefix(group == .history ? max(limit, Search.historyLimit) : limit)))) }
+    }
+
+    let onToday = items.filter { Shelf.page(of: $0, now: now, calendar: calendar) == .today }
+    add(.today, (onToday.filter { !$0.isCompleted } + onToday.filter(\.isCompleted)).compactMap { taskHit($0, .today) })
+
+    let ahead = items.enumerated().filter { Shelf.page(of: $0.element, now: now, calendar: calendar) != .today }
+    let dated = ahead.filter { $0.element.dueDate != nil }.sorted { ($0.element.dueDate!, $0.offset) < ($1.element.dueDate!, $1.offset) }
+    let someday = ahead.filter { $0.element.dueDate == nil }
+    add(.ahead, (dated + someday).compactMap { taskHit($0.element, .ahead) })
+
+    add(.memos, memos.sorted { $0.updatedAt > $1.updatedAt }.compactMap { memo in
+        let folder = memoFolders[memo.id]
+        let detail = folder.map { $0 + " · " + dayText(memo.updatedAt) } ?? dayText(memo.updatedAt)
+        // The title line if it matches, else the first line that does.
+        for line in memo.text.split(whereSeparator: \.isNewline) {
+            let text = line.trimmingCharacters(in: .whitespaces)
+            if let range = Search.match(query, in: text) {
+                return Search.Hit(group: .memos, id: memo.id, text: text, range: range, detail: detail, done: false, day: nil)
+            }
+        }
+        if let folder, Search.match(query, in: folder) != nil {
+            return Search.Hit(group: .memos, id: memo.id, text: memo.title(language), range: 0..<0, detail: detail, done: false, day: nil)
+        }
+        return nil
+    })
+
+    add(.history, history.sorted { ($0.completedAt ?? .distantPast) > ($1.completedAt ?? .distantPast) }.compactMap { entry in
+        Search.match(query, in: entry.title).map {
+            Search.Hit(group: .history, id: entry.id, text: entry.title, range: $0, detail: entry.completedAt.map(dayText) ?? "",
+                done: true, day: entry.completedAt.map { Archive.dayKey($0, calendar: calendar) })
+        }
+    })
+
+    let coming = events.filter { $0.date >= todayKey }.sorted { $0.date < $1.date }
+    let past = events.filter { $0.date < todayKey }.sorted { $0.date > $1.date }
+    add(.events, (coming + past).compactMap { event in
+        let range = Search.match(query, in: event.title) ?? event.location.flatMap { Search.match(query, in: $0) }.map { _ in 0..<0 }
+        return range.map { range in
+            let detail = Deadline.date(from: event.date, calendar: calendar).map { language.shortDate($0, calendar: calendar) } ?? event.date
+            return Search.Hit(group: .events, id: event.id, text: event.title, range: range, detail: detail, done: false, day: event.date)
+        }
+    })
+    return groups
+}
+

@@ -6,22 +6,31 @@ import { UndoableNotebook, isoDate, newID, parseNotebook, serializeNotebook, typ
 import { alertOn, isValidRule, occursOn, parseSeries, planToday, serializeSeries, type RepeatRule, type Series } from "../core/repeat";
 import { isBlank, mergeMemos, newMemo, parseMemos, serializeMemos, type Memo } from "../core/memo";
 import {
-  clampDrawerWidth, duplicateFolder, emptyMemoFolders, lastFolderOf, memosIn, placementOf, readMemoPaper, setMemoPaper, visibleFolders, memoFoldersFileName, mergeMemoFolders, parseMemoFolders, placeNew, pruneMemoFolders, readDrawerShortcut,
-  readDrawerBackdrop, readDrawerTheme, readSort, serializeMemoFolders, toggleChecklist, type MemoFolders, type MemoPlacement,
+  clampDrawerWidth, duplicateFolder, emptyMemoFolders, inboxID, lastFolderOf, memosIn, placementOf, readMemoPaper, setMemoPaper, visibleFolders, memoFoldersFileName, mergeMemoFolders, parseMemoFolders, placeNew, pruneMemoFolders, readDrawerShortcut,
+  readDrawerBackdrop, readDrawerFont, readDrawerTextSize, readDrawerTheme, readSort, readView, serializeMemoFolders, type MemoFolders, type MemoPlacement, drawerPaper, drawerThemeValue,
 } from "../core/memoDrawer";
 import { mergeText } from "../core/textMerge";
-import { emptyTodoSpaces, mergeTodoSpaces, packSpaceOf, parseTodoSpaces, pruneTodoSpaces, readLens, serializeTodoSpaces, todoSpacesFileName, type TodoSpaces } from "../core/todoSpaces";
+import { drawerLegacyName, drawerPoint, noteLegacyName, noteStep, readCodeFont, readLineSpacing, readParagraphSpacing } from "../core/textSteps";
+import { toggleDone } from "../core/memoEdits";
+import { emptyAll, emptyTrash, memoTrashFileName, mergeTrash, parseMemoTrash, pruneTrash, serializeMemoTrash, trashMemo, untrash, type MemoTrash } from "../core/memoTrash";
+import {
+  emptyTodoSpaces, mergeTodoSpaces, packSpaceOf, parseTodoSpaces, placeSeriesCopies, pruneTodoSpaces, readLens, serializeTodoSpaces, setSeriesSpace, spaceOf, todoSpacesFileName,
+  type TodoSpaces,
+} from "../core/todoSpaces";
 import { pageOf } from "../core/shelf";
 import { todaySinceUpdates } from "../core/carry";
 import { sharedFiles, type SharedFile } from "../core/storage";
-import { defaultPrefs, type AiView, type AppState, type FocusView, type Prefs, type TimerView } from "../core/types";
+import { defaultPrefs, type AiView, type AppState, type BackupsView, type FocusView, type Prefs, type TimerView } from "../core/types";
 import type { CalendarView } from "../core/calendar";
 import { readPaper } from "../core/desk";
+import { readNoteShortcut } from "../core/shortcuts";
 import { parseEvents, serializeEvents, type LocalEvent } from "../core/events";
 import { parseAlarms, serializeAlarms, type Alarm } from "../core/alarm";
 import { lang, t } from "../i18n";
 import { exportRange } from "../core/timeRange";
 import { takeLock } from "./aiLock";
+import { RefusedFile, readTextSafely, writeFileAtomically } from "./safeFiles";
+import { megabytes } from "../core/fileLimits";
 
 export interface WindowMemory {
   bounds?: { x: number; y: number; width: number; height: number };
@@ -107,9 +116,14 @@ export class Store extends EventEmitter {
   /** The deleted memo's place, put back with 되돌리기. */
   private lastDeletedPlacement?: MemoPlacement;
   private readonly memoFoldersPath: string;
+  /** 지운 메모 (memo-trash.json, #120): deleted memos kept 30 days; merged with another device's copy entry by entry. */
+  memoTrash: MemoTrash = emptyTrash();
+  private readonly memoTrashPath: string;
   /** 할 일 스페이스 (todo-spaces.json): the spaces and each to-do's; merged with another device's like the folders. */
   todoSpaces: TodoSpaces = emptyTodoSpaces();
   private readonly todoSpacesPath: string;
+  /** repeats.json couldn't be read at launch: the rules' spaces aren't cleaned up against an empty list (S36). */
+  private repeatsUnread = false;
   private memoTimer?: NodeJS.Timeout;
   private memoChangeTimer?: NodeJS.Timeout;
   history = new UndoableNotebook();
@@ -124,7 +138,7 @@ export class Store extends EventEmitter {
   shortcutProblem?: string;
   /** Where Ctrl+Alt+M (빠른 메모) stands. */
   memoShortcutProblem?: string;
-  /** The same for Ctrl+Alt+J (노트 보이기 · 숨기기). */
+  /** The same for the note's key (노트 보이기 · 숨기기, Ctrl+Alt+J unless changed). */
   noteShortcutProblem?: string;
   /** The same for 메모 서랍's shortcut (Ctrl+Shift+D unless changed). */
   drawerShortcutProblem?: string;
@@ -138,6 +152,8 @@ export class Store extends EventEmitter {
   calendarView: () => CalendarView = () => ({ today: [], hasEvents: this.events.length > 0, withEvents: [] });
   /** AI 연결 as the windows draw it (set by main/aiConnect.ts). */
   aiView: () => AiView = () => ({ enabled: this.prefs.aiEnabled, marks: [], recent: [], command: "", copied: false });
+  /** 자동 백업 · 백업 목록 (set by main from autoBackup.ts). */
+  backupsView: () => BackupsView = () => ({ auto: true, folder: "", custom: false, missing: false, failed: false, shared: false, entries: [], total: 0 });
   /** The text this app last read or wrote for each shared file; undefined while the file is absent. */
   private readonly known = new Map<SharedFile, string | undefined>();
   private readonly stamps = new Map<SharedFile, string | undefined>();
@@ -148,8 +164,12 @@ export class Store extends EventEmitter {
   private typedOpenMemo?: string;
   private watcher?: fs.FSWatcher;
   private poll?: NodeJS.Timeout;
+  /** The one look `watch` takes once the watcher has surely started. */
+  private settle?: NodeJS.Timeout;
   private readonly syncTimers = new Map<SharedFile, NodeJS.Timeout>();
   private readonly failedReads = new Map<SharedFile, number>();
+  /** #173: shared files left alone (a link, or past the size limit): not read, never written over; the message shown. */
+  private readonly refused = new Map<SharedFile, string>();
   /**
    * AI 연결 on: ai-write.lock in the settings folder, held from catching up to writing so the extension
    * (mcp/) and this app never write todos.json, events.json or memos.json from the same stale copy.
@@ -170,6 +190,7 @@ export class Store extends EventEmitter {
     this.eventsPath = path.join(directory, "events.json");
     this.alarmsPath = path.join(directory, "alarms.json");
     this.memoFoldersPath = path.join(directory, memoFoldersFileName);
+    this.memoTrashPath = path.join(directory, memoTrashFileName);
     this.todoSpacesPath = path.join(directory, todoSpacesFileName);
     const memos = this.readDisk("memos.json");
     this.noteKnown("memos.json", memos);
@@ -178,6 +199,7 @@ export class Store extends EventEmitter {
     }
     this.loadSettings();
     this.loadMemoFolders();
+    this.loadMemoTrash();
     this.loadRepeats();
     this.loadEvents();
     this.loadAlarms();
@@ -219,6 +241,7 @@ export class Store extends EventEmitter {
       drawerShortcutProblem: this.drawerShortcutProblem,
       drawerBackdropNote: this.drawerBackdropNote,
       memoFolders: { ...this.memoFolders, folders: this.memoFolders.folders.map((folder) => ({ ...folder })), placement: { ...this.memoFolders.placement } },
+      memoTrash: { ...this.memoTrash, entries: this.memoTrash.entries.map((entry) => ({ ...entry, memo: { ...entry.memo } })) },
       todoSpaces: { ...this.todoSpaces, spaces: this.todoSpaces.spaces.map((space) => ({ ...space })), items: {} },
       spaceOf: this.packedSpaces(),
       storage: { ...this.storage },
@@ -228,6 +251,7 @@ export class Store extends EventEmitter {
       timer: this.timerView(),
       focus: this.focusView(),
       ai: this.aiView(),
+      backups: this.backupsView(),
     };
   }
 
@@ -312,8 +336,9 @@ export class Store extends EventEmitter {
 
   private saveTodoSpaces(): void {
     if (!this.mayWrite(todoSpacesFileName)) return;
-    // S17, S22: entries of to-dos gone more than 30 days, and old tombstones, go.
-    this.todoSpaces = pruneTodoSpaces(this.todoSpaces, new Set(this.history.items.map((item) => item.id)));
+    // S17, S22, S36: entries of to-dos gone more than 30 days, old tombstones, and rules gone that long, go.
+    this.todoSpaces = pruneTodoSpaces(this.todoSpaces, new Set(this.history.items.map((item) => item.id)), new Date(),
+      this.repeatsUnread ? undefined : new Set(this.series.map((entry) => entry.id)));
     const contents = serializeTodoSpaces(this.todoSpaces);
     if (contents === this.known.get(todoSpacesFileName)) return;
     try {
@@ -370,7 +395,96 @@ export class Store extends EventEmitter {
       this.lastDeletedPlacement = this.memoFolders.placement[id];
     }
     this.saveMemos();
+    // 지운 메모 (#120): a memo with words is kept 30 days with where it was (T1).
+    if (!isBlank(memo)) {
+      const place = placementOf(this.memoFolders, id);
+      const paper = this.memoFolders.placement[id]?.paper;
+      this.changeTrash((trash) => trashMemo(trash, memo, { ...place, ...(paper !== undefined ? { paper } : {}) }));
+    }
     this.changed();
+  }
+
+  // ─── 지운 메모 (memo-trash.json, #120) ──────────────────────────────────────────
+
+  /** A change to the trash: caught up with the disk first, what's 30 days old or alive again dropped (T4, T6), saved at once. */
+  changeTrash(change: (trash: MemoTrash) => MemoTrash): void {
+    this.locked(() => {
+      this.catchUp(["memos.json", memoTrashFileName]);
+      this.memoTrash = change(this.memoTrash);
+      this.saveMemoTrash();
+      this.changed();
+    });
+  }
+
+  /**
+   * 되돌리기 from 지운 메모 (T2): the memo back in memos.json and in its folder (메모 when that folder is gone), pinned and
+   * papered as it was. Returns the folder it went to, undefined when it isn't in the trash.
+   */
+  restoreFromTrash(id: string): string | undefined {
+    this.catchUp(["memos.json", memoTrashFileName]);
+    const back = this.memoTrash.entries.find((entry) => entry.memo.id === id);
+    if (!back) return undefined;
+    this.changeTrash((trash) => untrash(trash, id).trash);
+    this.memoDeletions.delete(id);
+    this.memoEdits.add(id);
+    if (this.lastDeletedMemo?.id === id) { this.lastDeletedMemo = undefined; this.lastDeletedPlacement = undefined; }
+    if (!this.memos.some((memo) => memo.id === id)) this.memos = [back.memo, ...this.memos].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    this.saveMemos();
+    const folder = this.memoFolders.folders.some((entry) => entry.id === back.folder && !entry.deleted) ? back.folder : inboxID;
+    this.changeFolders((data) => {
+      const placed = { ...data, placement: { ...data.placement, [id]: { folder, pinned: back.pinned, at: isoDate(new Date()), ...(back.paper !== undefined ? { paper: back.paper } : {}) } }, updatedAt: isoDate(new Date()) };
+      return placed;
+    });
+    this.changed();
+    return folder;
+  }
+
+  /** 지금 모두 비우기 (T3). */
+  emptyTrash(): void {
+    this.changeTrash((trash) => emptyAll(trash));
+  }
+
+  private loadMemoTrash(): void {
+    const text = this.readDisk(memoTrashFileName);
+    this.noteKnown(memoTrashFileName, text);
+    if (text === undefined) { this.memoTrash = emptyTrash(); return; }
+    try {
+      this.memoTrash = parseMemoTrash(text);
+    } catch {
+      this.memoTrash = emptyTrash();
+      this.keepTrashAside();
+      return;
+    }
+    // Entries 30 days old (and those alive in memos.json) go at once.
+    if (pruneTrash(this.memoTrash, new Set(this.memos.map((memo) => memo.id))) !== this.memoTrash) this.saveMemoTrash();
+  }
+
+  /** An unreadable memo-trash.json is moved aside as memo-trash.unreadable-<UTC stamp>.json, said once; the trash starts empty. */
+  private keepTrashAside(): void {
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/T/, "-").replace(/\..*$/, "").replace(/Z$/, "");
+    const aside = path.join(this.dataDirectory, `memo-trash.unreadable-${stamp}.json`);
+    const what = t("지운 메모 파일을 읽지 못해서 지운 메모 없이 시작했어요. 메모는 모두 그대로예요.");
+    try {
+      fs.renameSync(this.memoTrashPath, aside);
+      this.noteKnown(memoTrashFileName, undefined);
+      this.storageError = `${what} ${keptAside(aside)}`;
+    } catch {
+      this.storageError = `${what} ${t("저장 폴더가 열리는지 확인해 주세요.")}`;
+    }
+  }
+
+  private saveMemoTrash(): void {
+    if (!this.mayWrite(memoTrashFileName)) return;
+    this.memoTrash = pruneTrash(this.memoTrash, new Set(this.memos.map((memo) => memo.id)));
+    const contents = serializeMemoTrash(this.memoTrash);
+    if (contents === (this.known.get(memoTrashFileName) ?? serializeMemoTrash(emptyTrash()))) return;
+    try {
+      this.writeAtomically(this.memoTrashPath, contents);
+      this.noteKnown(memoTrashFileName, contents);
+      this.clearError(t("지운 메모를 저장하지 못했어요."));
+    } catch {
+      this.reportError(saveProblem(t("지운 메모를 저장하지 못했어요.")));
+    }
   }
 
   /**
@@ -465,7 +579,8 @@ export class Store extends EventEmitter {
     this.catchUp(["memos.json"]);
     const index = this.memos.findIndex((memo) => memo.id === id);
     if (index < 0) return;
-    const text = toggleChecklist(this.memos[index].text, line);
+    // 끝낸 항목 아래로 보내기 (#84): a finished item to the bottom of its checklist, one change of the words.
+    const text = toggleDone(this.memos[index].text, line, this.prefs.drawerDoneToBottom);
     if (text === this.memos[index].text) return;
     const memo = { ...this.memos[index], text, updatedAt: new Date().toISOString().replace(/\.\d{3}Z$/, "Z") };
     this.memoEdits.add(id);
@@ -555,6 +670,8 @@ export class Store extends EventEmitter {
   restoreMemo(): void {
     this.catchUp(["memos.json"]);
     if (!this.lastDeletedMemo) return;
+    // From 지운 메모 (#120), back where it was; not there any more (emptied meanwhile): as before 1.31.
+    if (this.restoreFromTrash(this.lastDeletedMemo.id) !== undefined) return;
     this.memoDeletions.delete(this.lastDeletedMemo.id);
     this.memoEdits.add(this.lastDeletedMemo.id);
     const restored = this.lastDeletedMemo;
@@ -579,6 +696,7 @@ export class Store extends EventEmitter {
       this.reload("memos.json");
       if (this.differs("memos.json")) return; // not readable yet; tried again soon
     }
+    if (this.refused.has("memos.json")) return; // #173: a link or an oversized file stays as it is
     const contents = serializeMemos(this.memos.filter((memo) => !isBlank(memo)));
     if (contents === this.known.get("memos.json")) return this.forgetMemoEdits();
     try {
@@ -603,7 +721,7 @@ export class Store extends EventEmitter {
    * Creates or updates a recurring task. From a row, the task itself becomes today's copy
    * when the rule applies today (and gets today's alert if that time is still ahead).
    */
-  saveSeries(change: { taskID?: string; seriesID?: string; title?: string; rule: RepeatRule; remindAt?: string }, now = new Date()): string | undefined {
+  saveSeries(change: { taskID?: string; seriesID?: string; title?: string; rule: RepeatRule; remindAt?: string; space?: string | null }, now = new Date()): string | undefined {
     if (!isValidRule(change.rule)) return undefined;
     this.catchUp(["repeats.json", "todos.json"]);
     const task = change.taskID ? this.items.find((item) => item.id === change.taskID) : undefined;
@@ -629,6 +747,14 @@ export class Store extends EventEmitter {
       if (occursToday) entry.lastPlaced = dayKey(now);
     }
     this.saveRepeats();
+    // 2a (A9, A11, A12): the rule's space — the one asked for (the rule's editor, the input line; its open to-dos move
+    // with it), or from a to-do's editor that to-do's own — before today's copy is made, so the copy gets it (A10).
+    const ruleID = entry.id;
+    const space = change.space !== undefined ? change.space : task ? spaceOf(this.todoSpaces, task.id) ?? null : undefined;
+    if (space !== undefined) {
+      const copies = change.space !== undefined ? this.items.filter((item) => item.seriesID === ruleID && !item.isCompleted).map((item) => item.id) : [];
+      this.changeSpaces((data) => setSeriesSpace(data, ruleID, space, copies, now));
+    }
     this.placeRecurring(now);
     if (!task) {
       const series = entry;
@@ -683,6 +809,9 @@ export class Store extends EventEmitter {
     const key = dayKey(now);
     for (const entry of this.series) if (plan.placed.includes(entry.id)) entry.lastPlaced = key;
     this.saveRepeats();
+    // 2a (A10, S35): each new copy in its rule's space (copies carried over from yesterday keep theirs).
+    const made = plan.create.flatMap((item) => (item.seriesID ? [{ todo: item.id, series: item.seriesID }] : []));
+    if (made.length && this.todoSpaces.series) this.changeSpaces((data) => placeSeriesCopies(data, made, now));
   }
 
   private loadRepeats(): void {
@@ -692,6 +821,7 @@ export class Store extends EventEmitter {
     try {
       this.series = parseSeries(text);
     } catch {
+      this.repeatsUnread = true;
       this.keepUnreadable(this.repeatsPath, "repeats");
     }
   }
@@ -835,6 +965,7 @@ export class Store extends EventEmitter {
       try { this.memos = parseMemos(memos).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); } catch { this.keepUnreadable(this.memosPath, "memos"); }
     }
     this.loadMemoFolders();
+    this.loadMemoTrash();
     this.loadRepeats();
     this.loadEvents();
     this.loadAlarms();
@@ -859,7 +990,7 @@ export class Store extends EventEmitter {
       alarms: t("알람 파일을 읽지 못해서 알람 없이 시작했어요."),
     }[what];
     try {
-      fs.copyFileSync(file, backup);
+      fs.copyFileSync(file, backup, fs.constants.COPYFILE_EXCL);
       this.storageError = `${starting ? emptied : unread} ${keptAside(backup)}`;
     } catch {
       this.storageError = `${unread} ${t("저장 폴더가 열리는지 확인해 주세요.")}`;
@@ -881,7 +1012,12 @@ export class Store extends EventEmitter {
 
   setPref<K extends keyof Prefs>(key: K, value: Prefs[K]): void {
     if (this.prefs[key] === value) return;
-    this.prefs = { ...this.prefs, [key]: value };
+    // #141: a step is written with the nearest of 1.30's four sizes beside it, for an older version.
+    const legacy: Partial<Prefs> = key === "textStep" ? { textSize: noteLegacyName(value as number) }
+      : key === "drawerTextPt" ? { drawerTextSize: drawerLegacyName(value as number) }
+      // #142: the switch rewrites drawerTheme too (낮 종이 with it on is written `auto`, as 1.30 reads it).
+      : key === "drawerNightPaper" ? { drawerTheme: drawerThemeValue(drawerPaper(this.prefs.drawerTheme, this.prefs.drawerNightPaper).paper, value as boolean) } : {};
+    this.prefs = { ...this.prefs, [key]: value, ...legacy };
     this.saveSettingsSoon();
     this.emit("prefs", key);
     this.changed();
@@ -943,7 +1079,7 @@ export class Store extends EventEmitter {
     } catch {
       const backup = this.notebookPath.replace(/\.json$/, `.unreadable-${Math.floor(Date.now() / 1000)}.json`);
       try {
-        fs.copyFileSync(this.notebookPath, backup);
+        fs.copyFileSync(this.notebookPath, backup, fs.constants.COPYFILE_EXCL);
         this.storageError = `${t("목록 파일을 읽지 못해서 빈 목록으로 시작했어요.")} ${keptAside(backup)}`;
       } catch {
         this.canSave = false;
@@ -968,30 +1104,54 @@ export class Store extends EventEmitter {
 
   private pathOf(file: SharedFile): string {
     return file === "todos.json" ? this.notebookPath : file === "memos.json" ? this.memosPath : file === "events.json" ? this.eventsPath : file === "alarms.json" ? this.alarmsPath
-      : file === memoFoldersFileName ? this.memoFoldersPath : file === todoSpacesFileName ? this.todoSpacesPath : this.repeatsPath;
+      : file === memoFoldersFileName ? this.memoFoldersPath : file === todoSpacesFileName ? this.todoSpacesPath : file === memoTrashFileName ? this.memoTrashPath : this.repeatsPath;
   }
 
   private readDisk(file: SharedFile): string | undefined {
     try {
-      return fs.readFileSync(this.pathOf(file), "utf8");
-    } catch {
+      const text = readTextSafely(this.pathOf(file));
+      this.accept(file);
+      return text;
+    } catch (error) {
+      if (error instanceof RefusedFile) this.refuse(file, error);
+      else this.accept(file); // gone (or unreadable another way): no longer a refused one
       return undefined;
     }
   }
 
-  /** Writes to a temporary file and renames it, so a crash (or a sync client) never sees half a file. */
-  private writeAtomically(file: string, contents: string): void {
-    const temporary = `${file}.tmp`;
-    fs.writeFileSync(temporary, contents, "utf8");
-    fs.renameSync(temporary, file);
+  /**
+   * #173 (security review L-04 · L-05): a shared file that is a link, or bigger than the limit (core/fileLimits.ts), is
+   * not read and never written over — what is here stays as it is, and the note says why until the file is normal again.
+   */
+  private refuse(file: SharedFile, error: RefusedFile): void {
+    const message = error.why === "link"
+      ? t("{file} 파일이 링크라서 읽지 않았어요. 그 자리는 덮어쓰지 않고 그대로 둬요.", { file })
+      : t("{file} 파일이 {limit}보다 커서 읽지 않았어요. 그 파일은 덮어쓰지 않고 그대로 둬요.", { file, limit: megabytes(error.limit) });
+    this.refused.set(file, message);
+    this.reportError(message);
   }
 
-  /** A write is allowed only once this app has caught up with the file on disk. */
+  private accept(file: SharedFile): void {
+    const message = this.refused.get(file);
+    if (message === undefined) return;
+    this.refused.delete(file);
+    if (this.storageError === message) {
+      this.storageError = [...this.refused.values()][0];
+      this.changed();
+    }
+  }
+
+  /** Writes to a random temporary file (made new) and renames it, so a crash (or a sync client) never sees half a file. */
+  private writeAtomically(file: string, contents: string): void {
+    writeFileAtomically(file, contents);
+  }
+
+  /** A write is allowed only once this app has caught up with the file on disk (and never over a refused one, #173). */
   private mayWrite(file: SharedFile): boolean {
-    if (!this.differs(file)) return true;
+    if (!this.differs(file)) return !this.refused.has(file);
     // Newer data came in: memory now matches the disk, and the stale contents must not be written.
     const replaced = this.reload(file);
-    return !replaced && !this.differs(file);
+    return !replaced && !this.differs(file) && !this.refused.has(file);
   }
 
   /** Reads back any shared file that changed on disk since this app last read or wrote it. */
@@ -1056,6 +1216,7 @@ export class Store extends EventEmitter {
         this.canSave = true;
       } else if (file === "repeats.json") {
         this.series = parseSeries(text);
+        this.repeatsUnread = false;
       } else if (file === "events.json") {
         this.events = parseEvents(text);
         this.eventsVersion += 1;
@@ -1067,6 +1228,9 @@ export class Store extends EventEmitter {
       } else if (file === memoFoldersFileName) {
         // Another device's folders: merged entry by entry (D13, D14), so nothing changed here is lost.
         this.memoFolders = mergeMemoFolders(this.memoFolders, parseMemoFolders(text, lang()));
+      } else if (file === memoTrashFileName) {
+        // Another device's 지운 메모 (#120): joined by memo id (T5), emptied stays emptied.
+        this.memoTrash = mergeTrash(this.memoTrash, parseMemoTrash(text));
       } else {
         const mine = new Set(this.memoEdits);
         if (this.typedOpenMemo) mine.add(this.typedOpenMemo);
@@ -1096,6 +1260,13 @@ export class Store extends EventEmitter {
         this.changed();
         return false;
       }
+      if (file === memoTrashFileName) {
+        // Kept aside; this device's 지운 메모 are written in its place.
+        this.keepTrashAside();
+        this.saveMemoTrash();
+        this.changed();
+        return false;
+      }
       this.keepUnreadable(this.pathOf(file), file === "todos.json" ? "list" : file === "memos.json" ? "memos" : file === "events.json" ? "events" : file === "alarms.json" ? "alarms" : "repeats", false);
       this.noteKnown(file, text);
       this.changed();
@@ -1122,6 +1293,10 @@ export class Store extends EventEmitter {
    * Watches the data folder for the five shared files (the folder rather than the files, since
    * every save replaces the file). Cloud folders don't always report changes, so it also looks
    * every 30 seconds.
+   *
+   * `fs.watch` returns before the system is listening (on macOS libuv starts the FSEvents stream on
+   * another thread, more slowly the busier the machine is), and a change made in that gap is never
+   * reported. So it looks once more when the watcher has surely started, then says `watching` (#154).
    */
   watch(): void {
     if (this.watcher || this.poll) return;
@@ -1138,13 +1313,24 @@ export class Store extends EventEmitter {
     let looks = 0;
     this.poll = setInterval(() => this.catchUp(sharedFiles, ++looks % 5 === 0), 30_000);
     this.poll.unref?.();
+    this.settle = setTimeout(() => {
+      this.settle = undefined;
+      this.catchUp(sharedFiles);
+      this.emit("watching");
+    }, Store.watchSettleMs);
+    this.settle.unref?.();
   }
+
+  /** How long `watch` gives the system to start listening before it looks again (a few hundred ms at most, seen under load). */
+  static watchSettleMs = 2_000;
 
   unwatch(): void {
     this.watcher?.close();
     this.watcher = undefined;
     clearInterval(this.poll);
     this.poll = undefined;
+    clearTimeout(this.settle);
+    this.settle = undefined;
     for (const timer of this.syncTimers.values()) clearTimeout(timer);
     this.syncTimers.clear();
   }
@@ -1158,10 +1344,23 @@ export class Store extends EventEmitter {
         ...defaultPrefs, ...known, paper: readPaper(known.paper),
         // 메모 서랍's device settings, kept within what the drawer can take.
         drawerShortcut: readDrawerShortcut(known.drawerShortcut), drawerShortcutLast: readDrawerShortcut(known.drawerShortcutLast) || defaultPrefs.drawerShortcutLast, drawerWidth: clampDrawerWidth(known.drawerWidth), drawerTheme: readDrawerTheme(known.drawerTheme),
+        drawerNightPaper: drawerPaper(readDrawerTheme(known.drawerTheme), typeof known.drawerNightPaper === "boolean" ? known.drawerNightPaper : undefined).nightPaper,
+        // The note's key (#85): before 1.30.1 there was none saved (Ctrl+Alt+J); the switch, noteHotkey, is read as it was.
+        noteShortcut: readNoteShortcut(known.noteShortcut, readDrawerShortcut(known.drawerShortcut)),
         drawerSide: known.drawerSide === "left" ? "left" : "right",
-        drawerBackdrop: readDrawerBackdrop(known.drawerBackdrop), drawerPinnedSort: readSort(known.drawerPinnedSort),
+        drawerBackdrop: readDrawerBackdrop(known.drawerBackdrop), drawerPinnedSort: readSort(known.drawerPinnedSort), drawerPinnedView: readView(known.drawerPinnedView),
+        drawerFont: readDrawerFont(known.drawerFont), drawerTextSize: readDrawerTextSize(known.drawerTextSize),
+        // #141: the steps (from 1.30's four names when this version hasn't written them yet), 줄 간격 · 문단 간격.
+        textStep: noteStep(known.textStep, known.textSize), drawerTextPt: drawerPoint(known.drawerTextPt, known.drawerTextSize),
+        drawerLineHeight: readLineSpacing(known.drawerLineHeight), drawerParagraph: readParagraphSpacing(known.drawerParagraph),
+        drawerCodeFont: readCodeFont(known.drawerCodeFont),
         drawerRecentMoves: Array.isArray(known.drawerRecentMoves) ? known.drawerRecentMoves.filter((id): id is string => typeof id === "string").slice(0, 2) : [],
         spaceLens: readLens(known.spaceLens) ?? null,
+        // 2b: the groups' switch, look and remembered folds, as read (anything odd: the defaults).
+        spaceGroups: known.spaceGroups === true,
+        spaceGroupStyle: known.spaceGroupStyle === "bookmark" ? "bookmark" : "card",
+        spaceGroupsFolded: Array.isArray(known.spaceGroupsFolded) ? known.spaceGroupsFolded.filter((id): id is string => typeof id === "string") : [],
+        spaceGroupsDoneOpen: Array.isArray(known.spaceGroupsDoneOpen) ? known.spaceGroupsDoneOpen.filter((id): id is string => typeof id === "string") : [],
         drawerHandleY: typeof known.drawerHandleY === "number" && known.drawerHandleY >= 0 && known.drawerHandleY <= 1 ? known.drawerHandleY : defaultPrefs.drawerHandleY,
       };
       this.memory = saved.memory ?? {};
@@ -1177,10 +1376,8 @@ export class Store extends EventEmitter {
 
   private writeSettings(): void {
     this.settingsTimer = undefined;
-    const temporary = `${this.settingsPath}.tmp`;
     try {
-      fs.writeFileSync(temporary, JSON.stringify({ prefs: this.prefs, memory: this.memory }, null, 2), "utf8");
-      fs.renameSync(temporary, this.settingsPath);
+      writeFileAtomically(this.settingsPath, JSON.stringify({ prefs: this.prefs, memory: this.memory }, null, 2));
     } catch {
       // Settings are a convenience; the list itself reports save failures.
     }

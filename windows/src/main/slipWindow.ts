@@ -15,6 +15,9 @@ export function slipWindowOptions(size: { width: number; height: number }, title
   return {
     ...size, show: false, frame: false, transparent: true, resizable: false, movable: false, minimizable: false, maximizable: false,
     fullscreenable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false, backgroundColor: "#00000000", title,
+    // Off-screen runs (snapshots, tests): macOS pulls a window placed off every display back onto one unless it may be
+    // larger than the screen (only macOS reads this).
+    enableLargerThanScreen: offscreenEnabled,
     ...extra,
     webPreferences: { preload: path.join(__dirname, "preload.js"), sandbox: true, contextIsolation: true, backgroundThrottling: false, ...extra.webPreferences },
   };

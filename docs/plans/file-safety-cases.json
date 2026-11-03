@@ -1,0 +1,31 @@
+{
+  "about": "파일 안전 공유 사례 (#173, 보안 검토 L-04 · L-05 · I-08). limits: 두 앱 · 종이냥 for Claude가 같은 숫자를 써요(Windows core/fileLimits.ts, Mac PaperCore FileLimits). backupBytes는 .jongi 하나(가져오기 · 되돌리기 · 백업 목록의 개수 읽기), dataFileBytes는 저장 폴더의 데이터 파일 하나(todos.json · memos.json · memo-trash.json · archive/<달>.jsonl …). 넘으면 읽지 않고, 그 위에 쓰지도 않고, 알려요. links: 저장 폴더 · 백업 폴더의 심볼릭 링크는 lstat으로 보고 건너뛰어요(읽지 않고, 그 위에 쓰지 않아요, 링크가 가리키는 파일은 그대로). size: bytes는 'limit'(상한과 같음, 읽어요) 또는 'limit+1'(넘음, 거절). temporary: 임시 파일은 대상 옆에 무작위 이름으로 새로 만들고(O_EXCL / wx) 이름을 바꿔 넣어요. messages: 너무 큰 .jongi를 거절할 때의 말. Windows test/fileSafety.test.ts와 Mac Tests/PaperTodoTests/BackupTests.swift가 이 파일을 읽어요.",
+  "limits": { "backupBytes": 67108864, "dataFileBytes": 33554432 },
+  "links": [
+    {"id": "L1", "about": "저장 폴더의 todos.json이 링크: 백업 · 내보내기에 들어가지 않아요", "file": "todos.json", "where": "read", "expect": "skipped"},
+    {"id": "L2", "about": "지운 메모(memo-trash.json)가 링크: 백업에 들어가지 않아요", "file": "memo-trash.json", "where": "read", "expect": "skipped"},
+    {"id": "L3", "about": "완료 기록의 달 파일이 링크: 백업에 들어가지 않아요", "file": "archive/2026-10.jsonl", "where": "read", "expect": "skipped"},
+    {"id": "L4", "about": "바꾸기로 가져올 때 대상 memos.json이 링크: 그 위에 쓰지 않고, 링크가 가리키는 파일도 그대로예요", "file": "memos.json", "where": "import", "expect": "untouched"},
+    {"id": "L5", "about": "링크가 아닌 다른 파일은 평소처럼 읽고 써요", "file": "events.json", "where": "read", "expect": "read"}
+  ],
+  "size": [
+    {"id": "Z1", "about": "데이터 파일이 상한과 같으면 거절하지 않아요", "kind": "dataFile", "bytes": "limit", "expect": "allowed"},
+    {"id": "Z2", "about": "데이터 파일이 상한보다 1바이트 크면 거절해요(백업에 들어가지 않아요)", "kind": "dataFile", "bytes": "limit+1", "expect": "refused"},
+    {"id": "Z3", "about": "지운 메모 파일도 같은 상한", "kind": "dataFile", "file": "memo-trash.json", "bytes": "limit+1", "expect": "refused"},
+    {"id": "Z4", "about": ".jongi가 상한과 같으면 거절하지 않아요", "kind": "backup", "bytes": "limit", "expect": "allowed"},
+    {"id": "Z5", "about": ".jongi가 상한보다 1바이트 크면 열지 않고(가져오기 · 되돌리기) 지금 목록은 그대로예요", "kind": "backup", "bytes": "limit+1", "expect": "refused"}
+  ],
+  "temporary": [
+    {"id": "T1", "about": "같은 파일의 임시 이름은 매번 달라요", "file": "todos.json", "expect": "unique"},
+    {"id": "T2", "about": "임시 파일은 대상과 같은 폴더에, 대상 이름으로 시작해요", "file": "todos.json", "expect": "beside"},
+    {"id": "T3", "about": "예전의 고정 임시 이름(todos.json.tmp)에 누가 링크를 심어 둬도, 저장은 그 링크를 따라가지 않아요(링크가 가리키는 파일은 그대로)", "file": "todos.json", "planted": "todos.json.tmp", "expect": "untouched"},
+    {"id": "T4", "about": "저장한 뒤 임시 파일이 남지 않아요", "file": "todos.json", "expect": "none-left"}
+  ],
+  "messages": {
+    "tooLarge": {
+      "ko": "파일이 너무 커서 열지 않았어요. 백업 파일은 64MB까지 열 수 있어요.",
+      "en": "This file is too big to open. Backup files can be up to 64 MB.",
+      "nl": "Dit bestand is te groot om te openen. Back-upbestanden mogen tot 64 MB zijn."
+    }
+  }
+}

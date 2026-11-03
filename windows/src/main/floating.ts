@@ -2,7 +2,7 @@ import { BrowserWindow, Menu, ipcMain, screen, type MenuItemConstructorOptions }
 import path from "node:path";
 import { iconOrigin, type Point } from "../core/placement";
 import { t } from "../i18n";
-import { offscreen } from "./env";
+import { offscreen, offscreenEnabled } from "./env";
 import type { Store } from "./store";
 
 const size = { width: 110, height: 130 };
@@ -96,6 +96,9 @@ export class FloatingNote {
       ...size, show: false, frame: false, transparent: true, resizable: false, maximizable: false,
       minimizable: false, fullscreenable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false,
       backgroundColor: "#00000000",
+      // Off-screen runs (snapshots, tests): macOS pulls a window placed off every display back onto one unless it may be
+      // larger than the screen (only macOS reads this).
+      enableLargerThanScreen: offscreenEnabled,
       webPreferences: { preload: path.join(__dirname, "preload.js"), sandbox: true, contextIsolation: true },
     });
     window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });

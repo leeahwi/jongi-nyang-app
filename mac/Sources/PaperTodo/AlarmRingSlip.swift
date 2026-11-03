@@ -102,7 +102,7 @@ struct AlarmRingView: View {
         .minimumScaleFactor(0.6)
     }
 
-    /// "방금 울렸어요" · "1분째 울리는 중" (en "Just started" · "Ringing for 1 min"; nl "Gaat net af" · "Gaat al 1 min").
+    /// "방금 울렸어요" · "1분째 울리는 중" (en "Just started" · "Ringing for 1 min"; nl "Gaat net af" · "Gaat al 1 min af").
     static func ringingText(since start: Date, now: Date) -> String {
         let minutes = max(0, Int(now.timeIntervalSince(start) / 60))
         return minutes == 0 ? L("방금 울렸어요") : L("\(minutes)분째 울리는 중")

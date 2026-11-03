@@ -1,4 +1,5 @@
 import { shortcutLabel } from "../core/memoDrawer";
+import { defaultNoteShortcut } from "../core/shortcuts";
 import { logicalDayStart } from "../core/archive";
 import { dayFor, deadlineChoiceTitles, key as dueKey, fromKey, label as dueLabel, sentence as dueSentence, urgency, type DeadlineChoice } from "../core/deadline";
 import { clock, dayWord, longDate, minutesAway, weekdayShort } from "../core/lang";
@@ -6,14 +7,15 @@ import type { TodoItem } from "../core/notebook";
 import { describe } from "../core/repeat";
 import { afterRemoval, fromInput, reorder, step } from "../core/keyboard";
 import { dropTabs, pageOf, tabAt, tabDrop, type NoteTab } from "../core/shelf";
-import { aheadCount, aheadEyebrow, aheadSectionTitle, aheadSections, aheadSummary, aheadWeek, movedText, type AheadSection, type AheadTarget } from "../core/ahead";
+import { aheadCount, aheadEyebrow, aheadLens, aheadSectionTitle, aheadSections, aheadSummary, aheadWeek, movedText, type AheadSection, type AheadTarget } from "../core/ahead";
 import { compactTime, rowLabel, scheduledTime } from "../core/timeText";
-import { bodyFontSize, textSizes, type AppState, type IntentPage, type IntentToast, type NoteNotice } from "../core/types";
+import { bodyFontSize, type TodosState, type IntentPage, type IntentToast, type NoteNotice } from "../core/types";
+import { noteScales } from "../core/textSteps";
 import { expand } from "../core/events";
 import { dayRibbon, todayGroups as splitToday } from "../core/ribbon";
 import { DayStripView } from "./dayStrip";
 import { markWord } from "../core/dayStrip";
-import { h, icon, lang, paper, reduceMotion, scrollFade, t } from "./api";
+import { h, holdMs, icon, lang, motion, paper, reduceMotion, scrollFade, t } from "./api";
 import { paperCalendar } from "./calendar";
 import { openEventSheet, type EventSheet } from "./eventSheet";
 import type { CalendarSheetRequest } from "../core/calendar";
@@ -30,15 +32,20 @@ import { dayKey } from "../core/archive";
 import { clockKey, logicalMinutes, rangeDay, rangeOf, rangeText, rangeTimes, rangeWhenText, reminderFor, validRange } from "../core/timeRange";
 import { durationText } from "../core/duration";
 import { timeList, timeOf } from "./timePick";
-import { activeLens, findSpace, inLens, lensForDigit, lensNone, liveSpaces, spaceColor, spaceIndexOf, type TodoSpace } from "../core/todoSpaces";
+import { activeLens, findSpace, generalName, groupedCount, inLens, lensForDigit, lensTasks, lensNone, liveSpaces, spaceColor, spaceIndexOf, type TodoSpace } from "../core/todoSpaces";
 import { closeMenus, menuOpen, openMenu, type MenuEntry, type MenuHost } from "./drawerMenu";
+import { badgeWords, extendSelection, oneSelected, rangeSelection, toggleSelection, type ListSelection } from "../core/selection";
+import { addToWords, boardFits, doneWords, dropHereWords, groupItems, groupOpen, groupSpace, leftWords, neighborGroup, nextWords, spaceGroups, type SpaceGroup } from "../core/spaceGroups";
+import { snoozeTitle } from "../core/snooze";
 
 /** 오늘 · 앞으로 (1.28: the memo tab became the 메모 서랍). */
 type Page = Exclude<NoteTab, "memos">;
 const pages: Page[] = ["today", "ahead"];
 
 const api = paper();
-let state: AppState;
+let state: TodosState;
+/** 2b (I): a column's `+ 회사에 넣기` — the line writes into that group (`none`: 일반) until it's written or left empty. */
+let lineSpace: string | undefined;
 const finishing = new Set<string>();
 const todayRows = new Map<string, Row>();
 const aheadRows = new Map<string, Row>();
@@ -53,7 +60,7 @@ const tabLabel: Record<Page, string> = { today: t("오늘"), ahead: t("앞으로
 /** 메모 서랍: opened (on a memo, or at its quick-write slip). */
 const openDrawer = (extra: { memo?: string; write?: boolean } = {}) => void api.act({ type: "drawer", command: "open", ...extra });
 
-// ─── Frame: washi index tabs and the tools, then the header with the peeking cat ─
+// ─── Frame: washi index tabs and the tools, then the header (#151: the cat's ears stand on the window, ears.ts) ─
 
 const pinButton = h("button", { class: "quiet pin", title: t("항상 위에 두기"), "aria-label": t("항상 위에 두기") }, icon("pin", 16));
 const tabs = h("div", { class: "index-tabs", role: "tablist" });
@@ -79,18 +86,17 @@ const title = h("div", { class: "title" });
 const donut = h("span", { class: "donut", "aria-hidden": "true" });
 const progressText = h("span", { class: "prog-text" });
 const progress = h("div", { class: "prog" }, donut, progressText);
-const paw = '<svg class="paw" viewBox="0 0 14 13"><path d="M3.2 12C.6 10 0 5.6 1.3 3.5 2.5.4 5.2-.1 7.1.9c3-.8 5.3 1 5.8 3.4.9 2.6.6 5.9-1.4 7.6-2.8 1-5.4 1-8.3.1z"/><path class="toe" d="M5.2 7.6v3M8.7 7.6v3"/></svg>';
-const cat = h("div", { class: "peek", title: t("노트 위의 작은 친구, 종이냥"), role: "img", "aria-label": t("종이냥 캐릭터") });
-cat.innerHTML = `<div class="peek-window"><img src="../../assets/cat.png" alt="" draggable="false"></div><div class="peek-edge"></div><div class="peek-paws">${paw}${paw}</div>`;
-const catImage = cat.querySelector("img")!;
 // The progress sits beside the title when there's room, else under it (as on the Mac).
 // 할 일 스페이스 (1.30): 모든 스페이스 ▾ at the end of the date line, over the title (hidden until there is a space), so
 // the header keeps its height and the title its room.
 const spaceButton = h("button", { class: "space-pick", "aria-haspopup": "menu", "aria-expanded": "false", hidden: "" },
   h("span", { class: "space-dot" }), h("span", { class: "space-pick-label" }), icon("chevron", 11, 2));
 spaceButton.addEventListener("click", () => openSpacePicker());
-const titleRow = h("div", { class: "title-row" }, h("div", { class: "title-text" }, h("div", { class: "date-row" }, dateLine, spaceButton), h("div", { class: "title-line" }, title, progress)), cat);
+const titleRow = h("div", { class: "title-row" }, h("div", { class: "title-text" }, h("div", { class: "date-row" }, dateLine, spaceButton), h("div", { class: "title-line" }, title, progress)));
 
+/** 2b (H): the shortcut chips under the title while grouped — `● 회사 2 · ● 집 2 · 일반 1` (open to-dos); one line that scrolls sideways. */
+const chipsRow = h("div", { class: "schips", role: "toolbar", "aria-label": t("스페이스 바로 가기"), hidden: "" });
+chipsRow.addEventListener("wheel", (event) => { if (event.deltaY && !event.deltaX) { chipsRow.scrollLeft += event.deltaY; event.preventDefault(); } }, { passive: false });
 const sheet = h("div", { class: "sheet" });
 /** The paper menus (the row menu, 모든 스페이스 ▾, the editor's 스페이스): drawn over everything, inside the note. */
 const menuLayer = h("div", { class: "menu-layer" });
@@ -98,7 +104,7 @@ const menuHost: MenuHost = { container: menuLayer };
 const toastHost = h("div", { class: "toast-host" });
 const dock = h("div", { class: "dock" }, toastHost);
 const footer = h("div", { class: "footer" });
-document.getElementById("app")!.append(tabsRow, titleRow, sheet, dock, footer);
+document.getElementById("app")!.append(tabsRow, titleRow, chipsRow, sheet, dock, footer);
 document.body.append(menuLayer);
 
 // ─── 집중 ─────────────────────────────────────────────────────────────────────
@@ -106,6 +112,7 @@ document.body.append(menuLayer);
 /** The focus card: while a session is on, the note is this one card (see focusCard.ts). */
 const focusCard = new FocusCard({
   todayItems: () => (state ? todayItems() : []),
+  spaceOf: (id) => (state ? spacesOf().get(id) : undefined),
   next: () => {
     if (!state) return undefined;
     const next = dayRibbon(todayOccurrences(), state.items, new Date(), lang())?.next;
@@ -178,7 +185,8 @@ function renderHeader(): void {
   const ahead = aheadNow(now);
   const counts: Record<Page, number> = {
     today: todayItems().filter((item) => !item.isCompleted).length,
-    ahead: aheadCount(ahead),
+    // 2a (A2): every to-do ahead, as 오늘's count is (the lens hides some from the page, not from the count).
+    ahead: aheadLensed(now).all,
   };
   // The three tabs are made once; a redraw only changes what they say.
   if (tabs.childElementCount === 0) {
@@ -217,18 +225,12 @@ function renderHeader(): void {
     const share = Math.round((done / today.length) * 100);
     donut.style.setProperty("--done", `${share}%`);
     donut.classList.toggle("full", done === today.length);
+    liveAfterFirstDraw(donut);
     progressText.textContent = t("{completed} / {total} 끝냈어요", { completed: done, total: today.length });
     progress.setAttribute("role", "img");
     progress.setAttribute("aria-label", t("{total}개 중 {completed}개 끝냈어요, {remaining}개 남았어요", { total: today.length, completed: done, remaining: today.length - done }));
   }
   renderSpaceButton();
-  // The cat sleeps from 11 p.m. to 5 a.m.
-  const hour = now.getHours();
-  // (Snapshots draw the sleeping cat at any hour: `window.catSleeps`.)
-  const sleeping = (window as { catSleeps?: boolean }).catSleeps ?? (hour >= 23 || hour < 5);
-  const art = sleeping ? "../../assets/pet/256/sleep.png" : "../../assets/cat.png";
-  if (!catImage.src.endsWith(art.replace("../..", ""))) catImage.src = art;
-  cat.classList.toggle("sleeping", sleeping);
 }
 
 /**
@@ -256,7 +258,9 @@ window.addEventListener("resize", () => {
   if (!state) return;
   fitTabs();
   // The 하루 띠 follows the note's size (one row when narrow, three when tall; the open day's height): once a frame at most.
-  if (page === "today" && strip.element.isConnected && !resizePending) {
+  // 2b (I): the board comes and goes at 720 px.
+  const boardChanged = page === "today" && groupsOn() && boardFits(sheet.clientWidth, todaySpaceGroups().length) !== lines.classList.contains("board");
+  if (page === "today" && (strip.element.isConnected || boardChanged) && !resizePending) {
     resizePending = true;
     requestAnimationFrame(() => { resizePending = false; render(); });
   }
@@ -268,19 +272,47 @@ document.fonts.addEventListener("loadingdone", () => { if (state) fitTabs(true);
 
 // The minute moves the 하루 띠, "어제부터" and the D-days — on the minute, so the strip's "40분 남음" turns with the clock;
 // a note out of sight catches up when it shows again. Nothing is drawn between minutes.
-let missedMinute = false;
 function onTheMinute(): void {
   setTimeout(() => {
-    if (state) { if (document.hidden) missedMinute = true; else render(); }
+    if (state) drawWhenSeen();
     onTheMinute();
   }, 60_000 - (Date.now() % 60_000) + 40);
 }
 onTheMinute();
-document.addEventListener("visibilitychange", () => { if (!document.hidden && missedMinute && state) { missedMinute = false; render(); } });
+
+// #65: a hidden note (in the tray, folded to the post-it, minimized) keeps the latest state and draws once when it
+// shows again — with 2,000 to-dos a draw is tens of ms, and every change in any window sends a state.
+let unseen = false;
+/** The catch-up draw: rows finished meanwhile show as done, without playing the check. */
+let quietDraw = false;
+function drawWhenSeen(): void {
+  if (document.hidden) unseen = true; else render();
+}
+/** Draws what came while hidden (when it shows, or before a command that needs the rows as they are now). */
+function catchUp(): void {
+  if (!unseen || !state) return;
+  quietDraw = true;
+  try { render(); } finally { quietDraw = false; }
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) catchUp(); });
 
 // ─── Which tasks go where ───────────────────────────────────────────────────
 
-const todayItems = () => state.items.filter((item) => pageOf(item, new Date()) === "today");
+/** 오늘's to-dos, worked out once per state and minute (a draw asks four or five times). */
+let todayKept: { state: TodosState; minute: number; list: TodoItem[] } | undefined;
+const todayItems = (): TodoItem[] => {
+  const now = new Date();
+  const minute = Math.floor(now.getTime() / 60_000);
+  if (todayKept?.state === state && todayKept.minute === minute) return todayKept.list;
+  todayKept = { state, minute, list: state.items.filter((item) => pageOf(item, now) === "today") };
+  return todayKept.list;
+};
+/** Each to-do by id, and the ids put in the calendar, once per state (rows look them up). */
+let lookupKept: { state: TodosState; items: Map<string, TodoItem>; withEvents: Set<string> } | undefined;
+function lookup(): { items: Map<string, TodoItem>; withEvents: Set<string> } {
+  if (lookupKept?.state !== state) lookupKept = { state, items: new Map(state.items.map((item) => [item.id, item])), withEvents: new Set(state.calendar?.withEvents ?? []) };
+  return lookupKept;
+}
 
 function visibleToday(): TodoItem[] {
   const lens = lensNow();
@@ -291,7 +323,7 @@ function visibleToday(): TodoItem[] {
 // ─── 할 일 스페이스 (1.30) ────────────────────────────────────────────────────
 
 /** Each to-do's live space, worked out once per state (2,000 rows look it up on every draw). */
-let spacesKept: { state: AppState; data: string; spaces: string; index: Map<string, TodoSpace> } | undefined;
+let spacesKept: { state: TodosState; data: string; spaces: string; index: Map<string, TodoSpace> } | undefined;
 /** Counts each new reading of the spaces (a row with a space draws again when its name or colour may have changed). */
 let spacesVersion = 0;
 function spacesOf(): Map<string, TodoSpace> {
@@ -316,6 +348,15 @@ const setLens = (space: string | undefined) => {
 /** "Ctrl+Shift+1" for the nth space (W8). */
 const lensKey = (index: number) => (index < 9 ? `Ctrl+Shift+${index + 1}` : undefined);
 
+/** 일반 — the to-dos in no space — as it's called now: renamed, or 일반 · General · Algemeen (#89). */
+const generalNow = () => generalName(state.todoSpaces, lang());
+/** While one space shows: the open to-dos on 오늘 it hides (#87: the line at the end of the list, the button's label). */
+const hiddenOpen = (lens: string | undefined): number => {
+  if (lens === undefined) return 0;
+  const spaces = spacesOf();
+  return todayItems().filter((item) => !item.isCompleted && !inLens(lens, spaces.get(item.id)?.id)).length;
+};
+
 let spaceButtonDrawn = "";
 function renderSpaceButton(): void {
   const show = page === "today" && hasSpaces();
@@ -324,11 +365,13 @@ function renderSpaceButton(): void {
   const lens = lensNow();
   const space = lens && lens !== lensNone ? findSpace(state.todoSpaces, lens) : undefined;
   const colors = liveSpaces(state.todoSpaces).slice(0, 3).map((entry) => bandStyle(entry));
+  const name = space ? space.name : lens === lensNone ? generalNow() : undefined;
+  const hidden = hiddenOpen(lens);
   // Drawn again only when what it shows changed (a redraw of 2,000 rows touches nothing here).
-  const drawnKey = `${lens ?? ""}|${space?.name ?? ""}|${space?.color ?? ""}|${colors.join()}`;
+  const drawnKey = `${lens ?? ""}|${name ?? ""}|${space?.color ?? ""}|${colors.join()}|${hidden}`;
   if (drawnKey === spaceButtonDrawn) return;
   spaceButtonDrawn = drawnKey;
-  const label = space ? t("{name}만", { name: space.name }) : lens === lensNone ? t("스페이스 없음") : t("모든 스페이스");
+  const label = name !== undefined ? t("{name}만", { name }) : t("모든 스페이스");
   spaceButton.querySelector(".space-pick-label")!.textContent = label;
   spaceButton.classList.toggle("on", lens !== undefined);
   spaceButton.style.setProperty("--band", space ? bandStyle(space) : "var(--ink-3)");
@@ -337,11 +380,14 @@ function renderSpaceButton(): void {
   dot.style.setProperty("--band", space ? bandStyle(space) : "var(--faint)");
   if (!space && lens !== lensNone) dot.style.setProperty("background", colors.length > 1 ? `conic-gradient(${colors.map((color, index) => `${color} ${(index * 100) / colors.length}% ${((index + 1) * 100) / colors.length}%`).join(", ")})` : colors[0] ?? "");
   else dot.style.removeProperty("background");
-  spaceButton.setAttribute("aria-label", t("스페이스: {name}", { name: label }));
+  // #87: a screen reader hears what the list hides too — "회사만 보는 중, 다른 스페이스에 4개 더".
+  const spoken = name === undefined ? label
+    : hidden ? t("{name}만 보는 중, 다른 스페이스에 {n}개 더", { name, n: groupedCount(hidden, lang()) }) : t("{name}만 보는 중", { name });
+  spaceButton.setAttribute("aria-label", t("스페이스: {name}", { name: spoken }));
   spaceButton.title = t("한 스페이스만 보기 (Ctrl+Shift+1–9, 모두 보기 Ctrl+Shift+0)");
 }
 
-/** 모든 스페이스 ▾: 모든 스페이스 (N), the spaces with their open to-dos and keys, 스페이스 없음 (N), 스페이스 관리…. */
+/** 모든 스페이스 ▾: 모든 스페이스 (N), the spaces with their open to-dos and keys, 일반 (N), 스페이스 관리…. */
 function openSpacePicker(keyboard = false): void {
   if (menuOpen() && spaceButton.getAttribute("aria-expanded") === "true") { closeMenus(); return; }
   const lens = lensNow();
@@ -358,24 +404,27 @@ function openSpacePicker(keyboard = false): void {
     ...liveSpaces(state.todoSpaces).map((space, index): MenuEntry => ({
       kind: "item", label: space.name, extra: [dot(bandStyle(space))], count: count(space.id), key: lensKey(index), checked: lens === space.id, run: () => setLens(space.id),
     })),
-    { kind: "item", label: t("스페이스 없음"), extra: [dot("var(--rule-strong)")], count: count(undefined), checked: lens === lensNone, run: () => setLens(lensNone) },
+    { kind: "item", label: generalNow(), extra: [dot("var(--rule-strong)")], count: count(undefined), checked: lens === lensNone, run: () => setLens(lensNone) },
     { kind: "sep" },
+    // 2b: 스페이스별로 묶기 (Ctrl+Shift+G), this device's.
+    { kind: "item", label: t("스페이스별로 묶기"), key: "Ctrl+Shift+G", checked: state.prefs.spaceGroups, run: toggleSpaceGroups },
     { kind: "item", label: t("스페이스 관리…"), icon: "gear", run: () => void api.act({ type: "openSpaces" }) },
   ];
   spaceButton.setAttribute("aria-expanded", "true");
   openMenu({ ...menuHost, closed: () => spaceButton.setAttribute("aria-expanded", "false") }, entries, t("모든 스페이스"), spaceButton.getBoundingClientRect(), keyboard);
 }
 
-/** 스페이스로 옮기기 ▸: the spaces (✓ where it is), 스페이스 없음, 새 스페이스…. */
-function moveEntries(id: string): MenuEntry[] {
+/** 스페이스로 옮기기 ▸: the spaces (✓ where it is), 일반, 새 스페이스…. */
+function moveEntries(id: string, rows: string[] = [id]): MenuEntry[] {
+  // #168: the row's menu moves every picked row when it's one of them (`rows`); the editor's field, its one to-do.
   const current = spacesOf().get(id)?.id;
   const dot = (band: string) => { const element = h("span", { class: "dot" }); element.style.setProperty("--band", band); return element; };
   return [
     ...liveSpaces(state.todoSpaces).map((space): MenuEntry => ({
-      kind: "item", label: space.name, extra: [dot(bandStyle(space))], checked: current === space.id, run: () => void api.act({ type: "todoSpace", ids: [id], space: space.id }),
+      kind: "item", label: space.name, extra: [dot(bandStyle(space))], checked: current === space.id, run: () => void api.act({ type: "todoSpace", ids: rows, space: space.id }),
     })),
     { kind: "sep" },
-    { kind: "item", label: t("스페이스 없음"), extra: [dot("var(--rule-strong)")], checked: current === undefined, run: () => { if (current) void api.act({ type: "todoSpace", ids: [id], space: null }); } },
+    { kind: "item", label: generalNow(), extra: [dot("var(--rule-strong)")], checked: current === undefined, run: () => { if (rows.some((row) => spacesOf().get(row))) void api.act({ type: "todoSpace", ids: rows, space: null }); } },
     { kind: "item", label: t("새 스페이스…"), icon: "plus", run: () => newSpaceSlip(id) },
   ];
 }
@@ -407,35 +456,33 @@ interface PaperEntry { kind: "item" | "sub" | "sep" | "spaces"; label?: string; 
 function paperMenu(entries: PaperEntry[]): MenuEntry[] {
   return entries.map((entry): MenuEntry => {
     if (entry.kind === "sep") return { kind: "sep" };
-    if (entry.kind === "spaces") return { kind: "sub", label: entry.label!, icon: entry.icon, entries: () => moveEntries(entry.todo!) };
+    if (entry.kind === "spaces") return { kind: "sub", label: entry.label!, icon: entry.icon, entries: () => moveEntries(entry.todo!, pickedRows(entry.todo!)) };
     if (entry.kind === "sub") return { kind: "sub", label: entry.label!, icon: entry.icon, entries: () => paperMenu(entry.entries ?? []) };
     return { kind: "item", label: entry.label!, icon: entry.icon ?? null, key: entry.key, danger: entry.danger, checked: entry.checked, disabled: entry.disabled, run: () => void api.act({ type: "rowMenuPick", pick: entry.pick! }) };
   });
 }
 api.on("note:row-menu", (payload) => {
   const { id, entries, x, y, keyboard } = payload as { id: string; entries: PaperEntry[]; x?: number; y?: number; keyboard?: boolean };
+  catchUp();
   const row = rowFor(id)?.element;
   const item = state?.items.find((entry) => entry.id === id);
   const at = x !== undefined && y !== undefined ? { x, y } : row ? row.getBoundingClientRect() : titleRow.getBoundingClientRect();
   openMenu(menuHost, paperMenu(entries), item?.title ?? "", "width" in at ? new DOMRect(at.left + 48, at.top + at.height - 6, 0, 0) : at, keyboard);
 });
 
-/** 회사만 보는 중 · 다른 할 일 4개는 숨겼어요 · 모두 보기 — over 오늘's list while one space is shown. */
-const lensText = h("span", { class: "lens-text" });
-const lensAll = h("button", { class: "lens-all" }, t("모두 보기"));
+/**
+ * #87: at the end of 오늘's list while one space shows, one small faint line — 다른 스페이스에 4개 더 · 모두 보기 (the
+ * open to-dos the lens hides; no line for none). It replaced the band over the list, which said again, larger, what
+ * the header's 회사만 ▾ says.
+ */
+const lensMoreText = h("span", { class: "lens-more-text" });
+const lensAll = h("button", { class: "lens-all", title: `${t("모두 보기")} (Ctrl+Shift+0)` }, t("모두 보기"));
 lensAll.addEventListener("click", () => setLens(undefined));
-const lensBand = h("div", { class: "lens-band", role: "status" }, lensText, lensAll);
-function renderLensBand(): boolean {
-  const lens = lensNow();
-  if (lens === undefined) return false;
-  const space = lens === lensNone ? undefined : findSpace(state.todoSpaces, lens);
-  const spaces = spacesOf();
-  const hidden = todayItems().filter((item) => !item.isCompleted && !inLens(lens, spaces.get(item.id)?.id)).length;
-  const showing = space ? t("{name}만 보는 중", { name: space.name }) : t("스페이스 없는 할 일만 보는 중");
-  const text = hidden ? `${showing} · ${t("다른 할 일 {n}개는 숨겼어요", { n: hidden })}` : showing;
-  if (lensText.textContent !== text) lensText.textContent = text;
-  lensText.title = text;
-  lensBand.style.setProperty("--band", space ? bandStyle(space) : "var(--ink-3)");
+const lensMore = h("div", { class: "lens-more" }, lensMoreText, h("span", { class: "lens-more-dot", "aria-hidden": "true" }, "·"), lensAll);
+function renderLensMore(hidden = hiddenOpen(lensNow())): boolean {
+  if (!hidden) return false;
+  const text = t("다른 스페이스에 {n}개 더", { n: groupedCount(hidden, lang()) });
+  if (lensMoreText.textContent !== text) lensMoreText.textContent = text;
   return true;
 }
 
@@ -461,19 +508,22 @@ const line = new InputLine({
   placeholder: () => {
     if (askingPick) return { long: t("오늘 꼭 하나만 고른다면?"), short: t("오늘 꼭 하나만?") };
     // 한 스페이스만 보기: what is written goes into that space (S7).
-    const lens = state && page === "today" ? lensNow() : undefined;
+    const lens = state && page === "today" ? lineSpace ?? lensNow() : undefined;
     const space = lens && lens !== lensNone ? findSpace(state.todoSpaces, lens) : undefined;
     if (space) return { long: t("{name} 스페이스에 넣어요: 할 일, 일정", { name: space.name }), short: t("{name} 스페이스에 넣어요", { name: space.name }) };
     return { long: t("무엇이든 적어요: 할 일, 일정, ‘타이머 40’"), short: t("무엇이든 적어요") };
   },
   mode: () => "intent",
-  spaces: () => (state ? { data: state.todoSpaces, lens: page === "today" ? lensNow() : undefined } : undefined),
+  // 2b (I): a column's `+ 회사에 넣기` writes the next line into that group, before the lens.
+  spaces: () => (state ? { data: state.todoSpaces, lens: page === "today" ? lineSpace ?? lensNow() : undefined } : undefined),
   prefer: () => state?.prefs.intentPrefer ?? {},
   // #55 D-4: the key that brings you to this line (the guide teaches 입력 줄 Ctrl+N), not the quick entry's
   // Ctrl+Alt+N — that one is on the quick entry slip's own head. Same as the Mac (⌘N).
   shortcut: () => "Ctrl+N",
   commit: async (candidate, candidates, text, space) => {
     const result = await commitReading(flow, candidate, candidates, text, "note", space);
+    // 2b (I): `+ 회사에 넣기` was for this one line.
+    if (result.made && lineSpace !== undefined) { lineSpace = undefined; line.refresh(); }
     // 오늘 꼭 하나: the first to-do written after the question gets the day's star.
     if (askingPick && result.made?.kind === "todo" && result.made.id) {
       askingPick = false;
@@ -485,6 +535,12 @@ const line = new InputLine({
   },
   onArrowUp: (event) => enterList(event, -1),
   onEscape: (event) => { if (line.value) { event.preventDefault(); line.clear(); } else line.field.blur(); },
+});
+// 2b (I): `+ 회사에 넣기` lasts while the line has the keyboard (or holds words).
+line.field.addEventListener("blur", () => {
+  if (lineSpace === undefined || line.value) return;
+  lineSpace = undefined;
+  line.refresh();
 });
 line.field.addEventListener("keydown", (event) => {
   // Ctrl+Z right after putting a line in takes it back (the field's own undo otherwise).
@@ -547,18 +603,44 @@ function renderToday(): void {
   };
   // The strip first: its 지금 · 다음 marks the rows below (#31).
   const shown = strip.render();
+  // 2b: one group per space instead of 다음 · 그 밖에 (the 하루 띠 already shows what's next).
+  if (groupsOn()) {
+    // I (S45): a wide note shows the groups side by side when each gets 220 (the strip above them; they don't fold there).
+    const groups = todaySpaceGroups();
+    const board = boardFits(sheet.clientWidth || window.innerWidth, groups.length) && today.length > 0;
+    lines.classList.toggle("board", board);
+    sheet.classList.toggle("board-mode", board);
+    const elements = groups.map((group) => drawGroup(group, row));
+    shownToday = new Set(groups.flatMap((group) => shownRows(group).map((item) => item.id)));
+    for (const key of [...groupViews.keys()]) if (!groups.some((group) => group.key === key)) groupViews.delete(key);
+    lines.classList.remove("grouped");
+    lines.classList.add("spaced");
+    lines.classList.toggle("cards", !board && state.prefs.spaceGroupStyle !== "bookmark");
+    lines.classList.toggle("bookmarks", !board && state.prefs.spaceGroupStyle === "bookmark");
+    const more = renderLensMore();
+    reconcile(lines, board ? elements : [...elements, ...(allFinished ? [allDone] : []), ...(today.length === 0 ? [emptyToday] : []), ...(more ? [lensMore] : []), linesFill]);
+    reconcile(sheet, [...(shown ? [strip.element] : []), lines]);
+    sheet.classList.toggle("with-strip", shown);
+    if (board) chipsRow.hidden = true; else renderChips(groups);
+    if (revealing) requestAnimationFrame(revealNow);
+    renderTodayFooter(today.length - remaining);
+    return;
+  }
+  chipsRow.hidden = true;
+  lines.classList.remove("spaced", "cards", "bookmarks", "board");
+  sheet.classList.remove("board-mode");
   const nextRows = next.map((item) => row(item, true));
   const restRows = rest.map((item) => row(item, false));
   shownToday = new Set([...next, ...rest].map((item) => item.id));
   nextHead.querySelector(".group-count")!.textContent = String(next.length);
   restHead.querySelector(".group-count")!.textContent = String(rest.length);
   lines.classList.toggle("grouped", grouped);
+  const more = renderLensMore();
   reconcile(lines, [
     ...(grouped ? [nextHead] : []), ...nextRows, ...(grouped ? [restHead] : []), ...restRows,
-    ...(allFinished ? [allDone] : []), ...(today.length === 0 ? [emptyToday] : []), ...(grouped ? [linesFill] : []),
+    ...(allFinished ? [allDone] : []), ...(today.length === 0 ? [emptyToday] : []), ...(more ? [lensMore] : []), ...(grouped ? [linesFill] : []),
   ]);
-  const lensed = renderLensBand();
-  reconcile(sheet, [...(lensed ? [lensBand] : []), ...(shown ? [strip.element] : []), lines]);
+  reconcile(sheet, [...(shown ? [strip.element] : []), lines]);
   sheet.classList.toggle("with-strip", shown);
   renderTodayFooter(today.length - remaining);
 }
@@ -566,9 +648,197 @@ function renderToday(): void {
 /** The rows 오늘 showed last time it was drawn. */
 let shownToday = new Set<string>();
 
+// ─── 2b: 스페이스별로 묶기 (docs/plans/spaces-phase2.md, core/spaceGroups.ts) ─────
+
+/** 오늘 in groups: turned on here, with a space to group by (none: as before, nothing added). */
+const groupsOn = () => Boolean(state?.prefs.spaceGroups) && hasSpaces();
+/** Now — or the moment snapshots set for the 하루 띠 (`window.ribbonNow`), so a group's 다음 matches it. */
+const groupsNow = (): Date => { const forced = (window as { ribbonNow?: string }).ribbonNow; return forced ? new Date(forced) : new Date(); };
+/** The groups of the rows shown now (S39–S42). */
+function todaySpaceGroups(now = groupsNow()): SpaceGroup[] {
+  const spaces = spacesOf();
+  return spaceGroups(visibleToday(), state.todoSpaces, (id) => spaces.get(id)?.id, lensNow(now), now);
+}
+const isFolded = (key: string) => state.prefs.spaceGroupsFolded.includes(key);
+/** The rows a group shows: none while folded; F keeps the finished ones under 끝낸 N until opened. */
+function shownRows(group: SpaceGroup): TodoItem[] {
+  // I: a column shows every row, its finished ones at the foot (columns don't fold).
+  if (lines.classList.contains("board")) return groupItems(group);
+  if (isFolded(group.key)) return [];
+  if (state.prefs.spaceGroupStyle !== "bookmark" && !state.prefs.spaceGroupsDoneOpen.includes(group.key)) return [...group.timed, ...group.rest];
+  return groupItems(group);
+}
+/** A device list of group keys with `key` in or out. */
+function toggleGroupKey(pref: "spaceGroupsFolded" | "spaceGroupsDoneOpen", key: string): void {
+  const list = state.prefs[pref];
+  void api.act({ type: "setPref", key: pref, value: list.includes(key) ? list.filter((entry) => entry !== key) : [...list, key] });
+}
+/** ‘스페이스별로 묶기’ on or off (the header's menu, ⋯ → 보기, Ctrl+Shift+G, 설정 → 스페이스). */
+function toggleSpaceGroups(): void {
+  if (!hasSpaces()) return;
+  void api.act({ type: "setPref", key: "spaceGroups", value: !state.prefs.spaceGroups });
+}
+/** The rows shown in `id`'s group that keep a place of their own (the timed ones go by their time). */
+function reorderableInGroup(id: string): string[] {
+  const group = todaySpaceGroups().find((entry) => groupItems(entry).some((item) => item.id === id));
+  return group ? shownRows(group).filter((item) => !group.times.has(item.id)).map((item) => item.id) : [];
+}
+/** A group's head clicked: that space alone (as Ctrl+Shift+1–9); clicked again while it's alone, everything. */
+function showGroupAlone(key: string): void {
+  setLens(lensNow() === key ? undefined : key);
+}
+
+/** One group's lasting elements (kept so a redraw moves no row that stays put). */
+interface GroupView { element: HTMLElement; head: HTMLElement; rows: HTMLElement; fold: HTMLButtonElement; add: HTMLButtonElement; ring: HTMLElement; drawn: string; folded?: boolean; doneOpen?: boolean }
+const groupViews = new Map<string, GroupView>();
+
+function makeGroupView(key: string): GroupView {
+  const head = h("div", { class: "sgroup-head", role: "heading", "aria-level": "3" });
+  const rows = h("div", { class: "sgroup-rows", role: "list" });
+  const fold = h("button", { class: "sgroup-done", hidden: "" });
+  fold.addEventListener("click", () => toggleGroupKey("spaceGroupsDoneOpen", key));
+  // I: a column's foot — the input line, writing into this group.
+  const add = h("button", { class: "sgroup-add" });
+  add.addEventListener("click", () => {
+    lineSpace = key;
+    line.refresh();
+    line.focus();
+  });
+  const element = h("div", { class: "sgroup", "data-group": key }, head, rows, fold, add);
+  // F's ring stays the same element across redraws of the head, so it can fill (N17).
+  const ring = h("span", { class: "sgroup-ring", "aria-hidden": "true" });
+  return { element, head, rows, fold, add, ring, drawn: "" };
+}
+
+/** H: the shortcut chips (chipsRow, under the title). */
+let chipsDrawn = "";
+/** A chip clicked: its group opened (when folded), then scrolled to once drawn. */
+let revealing: string | undefined;
+function renderChips(groups: readonly SpaceGroup[]): void {
+  chipsRow.hidden = groups.length < 2;
+  const drawn = JSON.stringify(groups.map((group) => [group.key, groupOpen(group), group.space ? findSpace(state.todoSpaces, group.space)?.name : generalNow(), group.space && findSpace(state.todoSpaces, group.space)?.color]));
+  if (drawn === chipsDrawn) return;
+  chipsDrawn = drawn;
+  chipsRow.replaceChildren(...groups.map((group) => {
+    const space = group.space ? findSpace(state.todoSpaces, group.space) : undefined;
+    const name = space?.name ?? generalNow();
+    const dot = h("span", { class: `schip-dot${space ? "" : " general"}`, "aria-hidden": "true" });
+    if (space) dot.style.setProperty("--band", bandStyle(space));
+    const chip = h("button", { class: "schip", "aria-label": `${name}, ${leftWords(groupOpen(group), lang())}` }, dot, h("span", { class: "schip-name" }, name), h("span", { class: "schip-count" }, groupedCount(groupOpen(group), lang())));
+    chip.addEventListener("click", () => {
+      revealing = group.key;
+      if (isFolded(group.key)) toggleGroupKey("spaceGroupsFolded", group.key); else revealNow();
+    });
+    return chip;
+  }));
+}
+function revealNow(): void {
+  if (!revealing) return;
+  const element = groupViews.get(revealing)?.element;
+  revealing = undefined;
+  element?.scrollIntoView({ block: "start", inline: "start", behavior: reduceMotion() ? "auto" : "smooth" });
+}
+
+/** A group drawn: F's card (tape, ring, name, N개 남음, 끝낸 N) or E's bookmark (name and count, 다음 13:43). */
+function drawGroup(group: SpaceGroup, row: (item: TodoItem, up: boolean) => HTMLElement): HTMLElement {
+  let view = groupViews.get(group.key);
+  if (!view) groupViews.set(group.key, (view = makeGroupView(group.key)));
+  const space = group.space ? findSpace(state.todoSpaces, group.space) : undefined;
+  const name = space?.name ?? generalNow();
+  const card = state.prefs.spaceGroupStyle !== "bookmark";
+  const folded = isFolded(group.key);
+  const open = groupOpen(group);
+  const doneOpen = state.prefs.spaceGroupsDoneOpen.includes(group.key);
+  const next = group.next === undefined ? "" : nextWords(clock(new Date(group.next).getHours(), new Date(group.next).getMinutes(), lang()), lang());
+  const board = lines.classList.contains("board");
+  // N12: what turned since the last draw — ⌄ turns (바뀜) and the rows that come into view fade in; folding is at once.
+  const turned = view.folded !== undefined && view.folded !== folded;
+  const doneTurned = view.doneOpen !== undefined && view.doneOpen !== doneOpen;
+  const opening = !reduceMotion() && ((turned && !folded) || (doneTurned && doneOpen));
+  view.folded = folded;
+  view.doneOpen = doneOpen;
+  const drawn = JSON.stringify([card, board, name, space?.color, open, group.done.length, next, folded, doneOpen, lensNow() === group.key]);
+  if (view.drawn !== drawn) {
+    view.drawn = drawn;
+    view.element.classList.toggle("general", !space);
+    view.element.classList.toggle("folded", folded);
+    view.element.style.setProperty("--band", space ? bandStyle(space) : "var(--faint)");
+    const pick = h("button", { class: "sgroup-pick", title: t("{name}만 보기", { name }) });
+    pick.setAttribute("aria-label", `${name}, ${leftWords(open, lang())}`);
+    pick.addEventListener("click", () => showGroupAlone(group.key));
+    // ⌄: folded to the head and its count, or open (this device remembers, per space).
+    const unfoldWord = t("펼치기", undefined, "group");
+    const foldWord = folded ? unfoldWord : t("접기", undefined, "group");
+    const foldButton = h("button", { class: "sgroup-fold", title: foldWord, "aria-expanded": String(!folded), "aria-label": `${name} ${foldWord}` }, icon("chevron", 12, 2.2));
+    foldButton.addEventListener("click", () => toggleGroupKey("spaceGroupsFolded", group.key));
+    // J: the words on this group while a row from another is dragged over it.
+    const hint = h("span", { class: "sgroup-drop" }, dropHereWords(name, lang()));
+    view.add.textContent = addToWords(name, lang());
+    view.add.title = addToWords(name, lang());
+    if (board) {
+      // I: a column's head — the name and the open count (no ⌄: columns don't fold).
+      pick.append(h("span", { class: "sgroup-name" }, name));
+      view.head.replaceChildren(pick, h("span", { class: "sgroup-count" }, groupedCount(open, lang())), hint);
+    } else if (card) {
+      const total = group.done.length + open;
+      const ring = view.ring;
+      const share = `${total ? Math.round((group.done.length / total) * 360) : 0}deg`;
+      // The head is made again, so the ring comes back into the page: a keyframe fills it from where it was (a
+      // transition wouldn't run on an element just put back), and `--ring-from` catches up once it's done.
+      ring.style.setProperty("--ring-from", ring.style.getPropertyValue("--ring-done") || share);
+      ring.style.setProperty("--ring-done", share);
+      window.clearTimeout(Number(ring.dataset.settle));
+      ring.dataset.settle = String(window.setTimeout(() => ring.style.setProperty("--ring-from", share), motion.draw + 40));
+      pick.append(ring, h("span", { class: "sgroup-name" }, name), h("span", { class: "sgroup-left" }, leftWords(open, lang())), hint);
+      view.head.replaceChildren(pick, foldButton);
+    } else {
+      pick.append(h("span", { class: "sgroup-tag" }, h("span", { class: "sgroup-name" }, name), h("span", { class: "sgroup-count" }, groupedCount(open, lang()))));
+      view.head.replaceChildren(pick, h("span", { class: "sgroup-next" }, next), hint, foldButton);
+    }
+    view.fold.replaceChildren(doneWords(group.done.length, lang()), icon("chevron", 10, 2.2));
+    view.fold.classList.toggle("open", doneOpen);
+    view.fold.setAttribute("aria-expanded", String(doneOpen));
+    // The head and the chevron are made again on a change, so a keyframe turns ⌄ from where it was.
+    if (turned) turnChevron(foldButton, folded ? "0deg" : "-90deg");
+    if (doneTurned) turnChevron(view.fold, doneOpen ? "0deg" : "180deg");
+  }
+  view.fold.hidden = board || !(card && !folded && group.done.length > 0);
+  view.add.hidden = !board;
+  const before = opening ? new Set(view.rows.children) : undefined;
+  reconcile(view.rows, shownRows(group).map((item) => row(item, group.times.has(item.id))));
+  if (before) {
+    // Only the rows the group just showed (one class each, on this draw only; no height moves).
+    for (const element of view.rows.children) {
+      if (before.has(element)) continue;
+      element.classList.add("unfold-in");
+      setTimeout(() => element.classList.remove("unfold-in"), motion.change + 60);
+    }
+  }
+  return view.element;
+}
+
+/** N12: a group's ⌄ (made again with its head) turns from `from` to where it now points, with 바뀜. */
+function turnChevron(button: HTMLElement, from: string): void {
+  if (reduceMotion()) return;
+  button.style.setProperty("--turn-from", from);
+  button.classList.add("turning");
+  setTimeout(() => button.classList.remove("turning"), motion.change + 60);
+}
+
+/**
+ * N17: the donut fills with 그리기 (0.22 s) as tasks get done — from the draw after its first, so it doesn't fill up
+ * from empty when the note opens (the Mac's doesn't either).
+ */
+function liveAfterFirstDraw(element: HTMLElement): void {
+  if (element.classList.contains("live") || element.dataset.live) return;
+  element.dataset.live = "soon";
+  requestAnimationFrame(() => requestAnimationFrame(() => element.classList.add("live")));
+}
+
 function newRow(item: TodoItem, next: boolean): HTMLElement {
   const row = new Row(item, false, next);
   todayRows.set(item.id, row);
+  madeRows.push({ id: item.id, element: row.element });
   return row.element;
 }
 
@@ -593,6 +863,9 @@ const strip = new DayStripView({
   changed: () => fadeEdges(),
   room: () => sheet.clientHeight || window.innerHeight - 170,
   redraw: () => { if (state) render(); },
+  // 2a (A3, A4): the lens is the strip's and the timetable's too.
+  tasks: () => lensTasks(state.items, spacesOf(), lensNow()),
+  spaceOf: (id) => spacesOf().get(id),
 });
 window.addEventListener("ribbon-now", () => { if (state) render(); });
 
@@ -644,17 +917,23 @@ function renderTodayFooter(completed: number): void {
  * The sections for now (see ahead.ts). A task just checked stays a moment as it was (its row
  * plays the check and goes), the way 완료 숨기기 lets one finish on 오늘.
  */
-let aheadKept: { state: AppState; minute: number; finishing: string; sections: AheadSection[] } | undefined;
-function aheadNow(now = new Date()): AheadSection[] {
+let aheadKept: { state: TodosState; minute: number; finishing: string; lens?: string; sections: AheadSection[]; all: number; hidden: number } | undefined;
+/** 2a (A2, S37): the page under the lens — its to-dos only; events stay. `all`: the tab's count (every to-do), `hidden`: the end line's N. */
+function aheadLensed(now = new Date()): { sections: AheadSection[]; all: number; hidden: number } {
   // The header and the page both ask during one redraw: worked out once per state and minute.
   const minute = Math.floor(now.getTime() / 60_000);
   const holding = [...finishing].join(",");
-  if (aheadKept && aheadKept.state === state && aheadKept.minute === minute && aheadKept.finishing === holding) return aheadKept.sections;
+  const lens = lensNow(now);
+  if (aheadKept && aheadKept.state === state && aheadKept.minute === minute && aheadKept.finishing === holding && aheadKept.lens === lens) return aheadKept;
   const items = finishing.size ? state.items.map((item) => (finishing.has(item.id) && item.isCompleted ? { ...item, isCompleted: false } : item)) : state.items;
-  const sections = aheadSections(items, state.events ?? [], now, lang());
-  aheadKept = { state, minute, finishing: holding, sections };
-  return sections;
+  const spaces = spacesOf();
+  const lensed = aheadLens(items, (id) => spaces.get(id)?.id, lens, now);
+  const sections = aheadSections(lensed.items, state.events ?? [], now, lang());
+  const all = lens === undefined ? aheadCount(sections) : aheadCount(sections) + lensed.hidden;
+  aheadKept = { state, minute, finishing: holding, lens, sections, all, hidden: lensed.hidden };
+  return aheadKept;
 }
+const aheadNow = (now = new Date()): AheadSection[] => aheadLensed(now).sections;
 
 const aheadList = h("div", { class: "ahead", role: "list" });
 // Two sentences, two lines (one long line would leave a word on its own).
@@ -675,9 +954,9 @@ function sectionHead(section: AheadSection): HTMLElement {
 
 /** A task's row on this page, reused while it stays, with what its right end says. */
 function aheadRow(item: TodoItem, meta: RowMeta): HTMLElement {
-  const real = state.items.find((entry) => entry.id === item.id) ?? item;
+  const real = lookup().items.get(item.id) ?? item;
   let row = aheadRows.get(item.id);
-  if (row) { row.meta = meta; row.update(real); } else { row = new Row(real, true, false, meta); aheadRows.set(item.id, row); }
+  if (row) { row.meta = meta; row.update(real); } else { row = new Row(real, true, false, meta); aheadRows.set(item.id, row); madeRows.push({ id: item.id, element: row.element }); }
   return row.element;
 }
 
@@ -761,6 +1040,8 @@ function renderAhead(): void {
   for (const id of [...blocks.keys()]) if (!usedBlocks.has(id)) blocks.delete(id);
   for (const [id, line] of [...eventLines]) if (!usedLines.has(line)) eventLines.delete(id);
   if (sections.length === 0) children.push(emptyAhead);
+  // 2a (A1, A2): one space showing — the open to-dos ahead it hides, on the last line (as 오늘's, #87).
+  if (renderLensMore(aheadLensed(now).hidden)) children.push(lensMore);
   reconcile(aheadList, children);
   // What a drag (or a snapshot of one) left marked.
   for (const element of aheadList.querySelectorAll(".drop-target, .drop-before, .drop-after, .dragging")) element.classList.remove("drop-target", "drop-before", "drop-after", "dragging");
@@ -798,6 +1079,8 @@ function showAllDays(): void {
     days.push(key);
   }
   emptyAhead.remove();
+  // 2a (A17): the end line steps aside while the empty days show as places to drop on.
+  lensMore.remove();
   const later = () => aheadList.querySelector(".head-laterOn, .amonth, .head-someday, .someday") ?? null;
   for (const kind of ["thisWeek", "nextWeek"] as const) {
     const keys = days.filter((key) => (kind === "thisWeek" ? key <= weekEnd : key > weekEnd));
@@ -828,6 +1111,7 @@ function showEmptySomeday(): void {
   entry.element.classList.add("empty");
   entry.items.replaceChildren(h("span", { class: "zone-hint" }, t("여기에 놓으면 날짜 없이 언젠가로 가요")));
   emptyAhead.remove();
+  lensMore.remove();
   aheadList.append(sectionHead({ kind: "someday", title: t("언젠가"), count: 0 }), entry.element);
 }
 
@@ -891,6 +1175,8 @@ class Row {
   /** AI 연결: "Claude" stamped after the title, the day Claude added or changed it. */
   private readonly stamp: HTMLSpanElement;
   private readonly band: HTMLSpanElement;
+  /** 2b (I): in a narrow board column, the time and deadline on a small line under the title. */
+  private readonly subline: HTMLSpanElement;
   private item: TodoItem;
 
   /** `onShelf`: a row of 앞으로 (with `meta`), else of 오늘. */
@@ -911,7 +1197,8 @@ class Row {
     // 오늘 꼭 하나: the day's one thing, starred.
     this.star = h("span", { class: "star", title: t("오늘 꼭 하나"), role: "img", "aria-label": t("오늘 꼭 하나") }, icon("star", 12, 1.6));
     this.stamp = h("span", { class: "ai-stamp", title: t("Claude가 오늘 넣거나 고쳤어요"), role: "img", "aria-label": t("Claude가 오늘 넣거나 고쳤어요") }, "Claude");
-    this.textCell = h("div", { class: "text" }, this.star, this.label, this.stamp);
+    this.subline = h("span", { class: "subline", hidden: "", "aria-hidden": "true" });
+    this.textCell = h("div", { class: "text" }, this.star, this.label, this.stamp, this.subline);
     this.due = h("button", { class: "due" });
     this.time = h("button", { class: "time" });
     // Put in the calendar (a copy: changing the task later doesn't change the event).
@@ -937,7 +1224,9 @@ class Row {
     pick.addEventListener("click", () => pickTask(this.item.id));
     // 할 일 스페이스: the space's band at the left edge (오늘 only), its name in the tooltip.
     this.band = h("span", { class: "sband", hidden: "" });
-    this.element = h("div", { class: "row", role: "listitem", "data-id": item.id }, this.band, grip, check, this.textCell, this.mark, this.carry, this.due, this.time, this.sent, actions, pick, h("span", { class: "end" }));
+    // 앞으로 (#48): the deadline's flag is the row's last column, so the flags line up; a time comes before it.
+    const ends = onShelf ? [this.sent, this.time, this.due] : [this.due, this.time, this.sent];
+    this.element = h("div", { class: "row", role: "listitem", "data-id": item.id }, this.band, grip, check, this.textCell, this.mark, this.carry, ...ends, actions, pick, h("span", { class: "end" }));
 
     check.addEventListener("click", () => {
       commitEditing();
@@ -945,7 +1234,8 @@ class Row {
       if (!this.item.isCompleted && (state.prefs.hideCompleted || this.onShelf)) holdWhileFinishing(this.item.id);
       void api.act({ type: "toggle", id: this.item.id });
     });
-    this.label.addEventListener("click", () => this.beginEdit());
+    // #168: with Ctrl or Shift the title picks the row (more rows), as the row's empty space does; else it edits.
+    this.label.addEventListener("click", (event) => { if (event.ctrlKey || event.metaKey || event.shiftKey) clickRow(this.item.id, event); else this.beginEdit(); });
     this.due.addEventListener("click", () => openEditor(this.item.id, "deadline"));
     this.time.addEventListener("click", () => openEditor(this.item.id, rangeOf(this.item) ? "time" : undefined));
     this.bell.addEventListener("click", () => openEditor(this.item.id));
@@ -960,7 +1250,7 @@ class Row {
     // A click on the row's empty space selects it for the keyboard (↑↓ · Space · Enter · Delete).
     this.element.addEventListener("click", (event) => {
       if ((event.target as HTMLElement).closest("button, input, .label, .grip")) return;
-      select(this.item.id, false);
+      clickRow(this.item.id, event);
     });
     this.element.addEventListener("contextmenu", (event) => {
       event.preventDefault();
@@ -971,21 +1261,21 @@ class Row {
   }
 
   update(item: TodoItem): void {
-    const completedNow = item.isCompleted && !this.item.isCompleted;
+    const completedNow = !quietDraw && item.isCompleted && !this.item.isCompleted;
     this.item = item;
     // Every state push redraws the page: a row whose task and surroundings didn't change is left alone.
     if (!completedNow && this.drawnKey === this.key(item)) return;
     this.render(item, completedNow);
   }
 
-  /** Everything the row's look depends on (the minute too: "어제부터", D-3 and 내일 09:00 move with the clock). */
+  /** Everything the row's look depends on (the clock too: "어제부터", D-3 and 내일 09:00 move with the day). */
   private drawnKey = "";
   private key(item: TodoItem): string {
     const series = item.seriesID ? state.series.find((entry) => entry.id === item.seriesID) : undefined;
     // The space by id; its name and colour by the spaces' own version (one string per state, not one per row).
-    const space = this.onShelf ? undefined : spacesOf().get(item.id)?.id;
+    const space = spacesOf().get(item.id)?.id;
     return JSON.stringify([item, this.next, this.onShelf, this.meta, state.prefs.dueStyle, editingID === item.id, series?.rule, series?.remindAt, space, space && spacesVersion,
-      isStarred(item), Boolean(state.calendar?.withEvents?.includes(item.id)), aiMarked(item.id), this.stripMark(item), Math.floor(Date.now() / 60_000)]);
+      isStarred(item), lookup().withEvents.has(item.id), aiMarked(item.id), this.stripMark(item), rowClock(item)]);
   }
 
   /** Shown in the 하루 띠's 지금 · 다음 block too (오늘's open rows only). */
@@ -1048,7 +1338,7 @@ class Row {
       this.due.title = `${dueSentence(item.dueDate, now, lang())} · ${t("눌러서 고치기")}`;
     }
 
-    this.sent.hidden = item.isCompleted || !state.calendar?.withEvents?.includes(item.id);
+    this.sent.hidden = item.isCompleted || !lookup().withEvents.has(item.id);
 
     const series = item.seriesID ? state.series.find((entry) => entry.id === item.seriesID) : undefined;
     const hasReminder = Boolean(item.reminderAt);
@@ -1068,7 +1358,7 @@ class Row {
     this.carry.textContent = carried ?? "";
     this.carry.title = carried ? t("{text} 오늘 할 일에 있어요", { text: carried }) : "";
     this.star.hidden = !isStarred(item);
-    const space = this.onShelf ? undefined : spacesOf().get(item.id);
+    const space = spacesOf().get(item.id);
     this.band.hidden = !space;
     if (space) {
       this.band.style.setProperty("--band", bandStyle(space));
@@ -1115,6 +1405,10 @@ class Row {
       this.time.replaceChildren(...parts);
       this.time.title = `${labels.join(" · ")} · ${t("눌러서 고치기")}`;
     }
+    // 2b (I): the same time and deadline, for a column's line under the title (shown only on the board).
+    const below = [this.time.hidden ? "" : this.time.textContent ?? "", this.due.hidden ? "" : this.due.textContent ?? ""].filter(Boolean);
+    this.subline.textContent = below.join(" · ");
+    this.subline.hidden = below.length === 0;
   }
 
   beginEdit(): void {
@@ -1150,6 +1444,19 @@ class Row {
   }
 }
 
+/**
+ * #66: what the clock changes on a row — the day (the calendar's and the 4 a.m. one: D-3, 어제부터, 내일 09:00), and for
+ * a reminder whether its time has passed (알림 대기). The minute's redraw draws only the rows these changed for, not
+ * all 1,900 every minute.
+ */
+let clockKept: { minute: number; day: string } | undefined;
+function rowClock(item: TodoItem): string {
+  const now = Date.now();
+  const minute = Math.floor(now / 60_000);
+  if (clockKept?.minute !== minute) { const date = new Date(now); clockKept = { minute, day: `${date.toDateString()}|${dayKey(date)}` }; }
+  return item.reminderAt ? `${clockKept.day}|${Date.parse(item.reminderAt) < now}` : clockKept.day;
+}
+
 /** AI 연결: Claude added or changed this to-do today (and nobody changed it since). */
 function aiMarked(id: string): boolean {
   return Boolean(state.ai?.marks.includes(id.toUpperCase()));
@@ -1165,16 +1472,49 @@ function commitEditing(): void {
 
 function holdWhileFinishing(id: string): void {
   finishing.add(id);
-  setTimeout(() => { finishing.delete(id); render(); }, 650);
+  setTimeout(() => {
+    // N4 (as on the Mac): the row folds away (등장's 0.18 s, ease-in) before the list closes up; it stays in `finishing`
+    // meanwhile, so a redraw keeps it, and it takes no clicks. One row, and only one that is on the page now.
+    const leaving = leavingRow(id);
+    if (!leaving) { finishing.delete(id); drawWhenSeen(); return; }
+    leaving.classList.add("leaving");
+    setTimeout(() => { leaving.classList.remove("leaving"); finishing.delete(id); drawWhenSeen(); }, motion.enter);
+  }, holdMs()); // 0.65 s, 0.3 under Reduce Motion
 }
 
-/** The cat nods when a task is checked (still under reduced motion). */
+/** The row of a just-finished to-do that goes once its hold ends (still done, still drawn), or none. */
+function leavingRow(id: string): HTMLElement | undefined {
+  if (reduceMotion() || document.hidden || !state) return undefined;
+  if (!lookup().items.get(id)?.isCompleted) return undefined;
+  if (page === "today" && !state.prefs.hideCompleted) return undefined;
+  const element = rowFor(id)?.element;
+  // A row being dragged (#167 · #168) goes at the drop, not folding under the pointer.
+  return element?.isConnected && !element.classList.contains("dragging") ? element : undefined;
+}
+
+/**
+ * N3: a to-do just added comes in with 등장 (rising 6 px as it fades in) — only its row, and only rows made in this
+ * draw for ids the last drawn state didn't have (not the first draw, not a catch-up, not a day's worth at once).
+ */
+let drawnItems: readonly TodoItem[] | undefined;
+const madeRows: { id: string; element: HTMLElement }[] = [];
+function playAdded(): void {
+  const made = madeRows.splice(0);
+  const before = drawnItems;
+  drawnItems = state.items;
+  if (!before || quietDraw || made.length === 0 || made.length > 3 || reduceMotion()) return;
+  for (const { id, element } of made) {
+    if (before.some((item) => item.id === id) || !element.isConnected) continue;
+    element.classList.add("appear");
+    // Off after it ran, so a row moved later (reconcile) doesn't play it again.
+    setTimeout(() => element.classList.remove("appear"), motion.enter + 60);
+  }
+}
+
+/** A task checked: the left ear on top of the note twitches (#151; not with reduced motion — the ears' page checks too). */
 function nod(): void {
   if (reduceMotion()) return;
-  cat.classList.remove("nod");
-  void cat.offsetWidth;
-  cat.classList.add("nod");
-  setTimeout(() => cat.classList.remove("nod"), 420);
+  api.send("ears:twitch");
 }
 
 // ─── Drag to reorder (today) ────────────────────────────────────────────────
@@ -1185,49 +1525,74 @@ function startDrag(event: PointerEvent, id: string, grip: HTMLElement): void {
   commitEditing();
   grip.setPointerCapture(event.pointerId);
   const source = todayRows.get(id)!.element;
-  source.classList.add("dragging");
+  // #168: a picked row takes every picked row with it (faded too while they go).
+  const moving = pickedRows(id);
+  const faded = moving.flatMap((entry) => { const row = todayRows.get(entry); return row ? [row.element as HTMLElement] : []; });
+  for (const element of faded) element.classList.add("dragging");
   let drop: { targetID: string; after: boolean } | undefined;
   /** Over the 앞으로 tab: dropping there moves the task to that page. */
   let tabTarget: NoteTab | undefined;
   // Looked up each time: a redraw during the drag replaces the tabs.
   const tabElements = () => [...tabs.querySelectorAll<HTMLElement>(".index-tab")];
+  /** 2b (J): another group under the pointer (grouped by space). */
+  let groupTarget: string | undefined;
+  // #167: what the drag moves among is worked out once, at the press (it was the whole sheet's groups on every move);
+  // inside its group 다음 keeps the time's order, so rows move among the rest only.
+  const grouped = groupsOn();
+  const visible = grouped ? [] : todayGroups().rest.map((item) => item.id);
+  // Only what changed is marked or cleared (every row of the sheet was cleared on every move; a group's class changed
+  // twice a move, and the browser worked out the styles of all its rows again).
+  let marked = new Map<HTMLElement, string>();
+  const show = (next: Map<HTMLElement, string>) => {
+    for (const [element, name] of marked) if (next.get(element) !== name) element.classList.remove(name);
+    for (const [element, name] of next) if (marked.get(element) !== name) element.classList.add(name);
+    marked = next;
+  };
   const clear = () => {
-    for (const row of todayRows.values()) row.element.classList.remove("drop-before", "drop-after");
-    for (const tab of tabElements()) tab.classList.remove("drop-target");
+    show(new Map());
     source.classList.remove("to-tab");
   };
-  const move = (moveEvent: PointerEvent) => {
-    // Inside its group: 다음 keeps the time's order, so rows move among the rest only.
-    const visible = todayGroups().rest;
-    clear();
-    drop = undefined;
+  const ghost = dragGhost(source, moving.length > 1 ? badgeWords(moving.length, lang()) : undefined);
+  const startX = event.clientX, startY = event.clientY;
+  let pointer = { x: event.clientX, y: event.clientY };
+  const place = () => {
+    // Read first (the tabs, the row under the pointer), then mark: no layout forced between the two.
     const rects = tabElements().map((element, index) => {
       const rect = element.getBoundingClientRect();
       return { tab: pages[index] as NoteTab, left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
     });
-    const over = tabAt(rects, moveEvent.clientX, moveEvent.clientY);
+    const over = tabAt(rects, pointer.x, pointer.y);
+    let next: { targetID: string; after: boolean } | undefined;
+    let nextGroup: string | undefined;
+    if (!over) {
+      if (grouped) ({ group: nextGroup, drop: next } = groupDragOver(id, pointer.x, pointer.y));
+      else next = plainDrop(id, visible, pointer.y) ?? undefined;
+    }
+    drop = next;
+    groupTarget = nextGroup;
     tabTarget = over && dropTabs.includes(over) ? over : undefined;
-    if (tabTarget) {
-      tabElements()[pages.indexOf(tabTarget as Page)]?.classList.add("drop-target");
-      source.classList.add("to-tab");
-    }
-    if (over) return;
-    for (const [index, item] of visible.entries()) {
-      const rect = todayRows.get(item.id)?.element.getBoundingClientRect();
-      if (!rect) continue;
-      if (moveEvent.clientY < rect.bottom || index === visible.length - 1) {
-        const after = moveEvent.clientY >= rect.top + rect.height / 2;
-        if (item.id !== id) {
-          drop = { targetID: item.id, after };
-          todayRows.get(item.id)?.element.classList.add(after ? "drop-after" : "drop-before");
-        }
-        break;
-      }
-    }
+    const marks = new Map<HTMLElement, string>();
+    const tab = tabTarget ? tabElements()[pages.indexOf(tabTarget as Page)] : undefined;
+    if (tab) marks.set(tab, "drop-target");
+    const group = groupTarget ? groupViews.get(groupTarget)?.element : undefined;
+    if (group) marks.set(group, "drop-target");
+    const row = drop && drop.targetID !== id ? todayRows.get(drop.targetID)?.element : undefined;
+    if (row && drop) marks.set(row, drop.after ? "drop-after" : "drop-before");
+    show(marks);
+    source.classList.toggle("to-tab", Boolean(tabTarget));
   };
+  const move = (moveEvent: PointerEvent) => {
+    pointer = { x: moveEvent.clientX, y: moveEvent.clientY };
+    ghost.follow(pointer.x - startX, pointer.y - startY);
+    place();
+  };
+  // Near the list's top or bottom edge (or a column's), it scrolls while the pointer waits there; then the place again.
+  const scroller = edgeScroller(() => pointer, () => listUnder(pointer.x, pointer.y), place);
   const end = () => {
     grip.removeEventListener("pointermove", move);
-    source.classList.remove("dragging");
+    scroller.stop();
+    ghost.remove();
+    for (const element of faded) element.classList.remove("dragging");
     clear();
     if (tabTarget) {
       // Said where it went: its day (a deadline still ahead) or 언젠가.
@@ -1235,11 +1600,145 @@ function startDrag(event: PointerEvent, id: string, grip: HTMLElement): void {
       const result = item ? tabDrop(item, tabTarget, new Date()) : undefined;
       void api.act({ type: "dropOnTab", id, tab: tabTarget });
       if (result) movedToast(result.kind === "deadline" ? { kind: "day", day: result.dueDate } : { kind: "someday" });
-    } else if (drop) void api.act({ type: "move", id, targetID: drop.targetID, after: drop.after });
+    } else if (groupTarget) {
+      // J (S43): into another group — its head, or between its rows; the toast's 되돌리기 puts back the space and the place.
+      void api.act({ type: "groupDrop", id, ...(moving.length > 1 ? { ids: moving } : {}), space: groupSpace(groupTarget), ...(drop ? { targetID: drop.targetID, after: drop.after } : {}) });
+    } else if (drop && moving.length > 1) void api.act({ type: "moveMany", ids: moving, targetID: drop.targetID, after: drop.after });
+    else if (drop) void api.act({ type: "move", id, targetID: drop.targetID, after: drop.after });
   };
   grip.addEventListener("pointermove", move);
   grip.addEventListener("pointerup", end, { once: true });
-  grip.addEventListener("pointercancel", () => { drop = undefined; tabTarget = undefined; end(); }, { once: true });
+  grip.addEventListener("pointercancel", () => { drop = undefined; tabTarget = undefined; groupTarget = undefined; end(); }, { once: true });
+}
+
+// Snapshots: a row drawn as if dragged over another group (`detail`: { id, group }; none: as before).
+// #168: with `lift` (px down), the dragged row's copy too, over the target — and its badge when several rows are picked.
+let snapshotGhost: { remove(): void } | undefined;
+window.addEventListener("snapshot-group-drag", (event) => {
+  const { id, group, lift } = ((event as CustomEvent).detail ?? {}) as { id?: string; group?: string; lift?: number };
+  for (const view of groupViews.values()) view.element.classList.remove("drop-target");
+  for (const row of todayRows.values()) row.element.classList.remove("dragging");
+  snapshotGhost?.remove();
+  snapshotGhost = undefined;
+  if (id && lift !== undefined) {
+    const moving = pickedRows(id);
+    const row = todayRows.get(id)?.element;
+    if (row) {
+      const ghost = dragGhost(row, moving.length > 1 ? badgeWords(moving.length, lang()) : undefined);
+      ghost.follow(6, lift);
+      snapshotGhost = ghost;
+    }
+    for (const entry of moving) todayRows.get(entry)?.element.classList.add("dragging");
+  } else if (id) todayRows.get(id)?.element.classList.add("dragging");
+  if (group) groupViews.get(group)?.element.classList.add("drop-target");
+});
+
+/**
+ * J: the group under a row dragged by its grip, grouped by space — another group (`group`, lit by the caller in its
+ * colour with where it goes); over a row, the place before or after it (`drop`). The row's own group: places only.
+ * #167: the groups' boxes (a handful), then the row by halving its group's rows (they stand in order), not every row's
+ * box from the top.
+ */
+function groupDragOver(id: string, x: number, y: number): { group?: string; drop?: { targetID: string; after: boolean } } {
+  const sourceRow = todayRows.get(id)?.element;
+  for (const [key, view] of groupViews) {
+    if (!view.element.isConnected) continue;
+    const box = view.element.getBoundingClientRect();
+    if (x < box.left || x > box.right || y < box.top || y > box.bottom) continue;
+    const own = Boolean(sourceRow && view.rows.contains(sourceRow));
+    const rows = view.rows.children as HTMLCollectionOf<HTMLElement>;
+    let low = 0, high = rows.length - 1;
+    let drop: { targetID: string; after: boolean } | undefined;
+    while (low <= high) {
+      const middle = (low + high) >> 1;
+      const rect = rows[middle].getBoundingClientRect();
+      if (y < rect.top) high = middle - 1;
+      else if (y >= rect.bottom) low = middle + 1;
+      else {
+        const target = rows[middle].dataset.id;
+        if (target && target !== id) drop = { targetID: target, after: y >= rect.top + rect.height / 2 };
+        break;
+      }
+    }
+    return { ...(own ? {} : { group: key }), ...(drop ? { drop } : {}) };
+  }
+  return {};
+}
+
+/**
+ * The plain list: among `visible` (the rows that keep a place of their own, in order), the first row whose bottom is
+ * below the pointer — the last one past them all — before or after it. Found by halving (#167: every row's box from the
+ * top was read on every move). Null over the dragged row itself (no move).
+ */
+function plainDrop(id: string, visible: readonly string[], y: number): { targetID: string; after: boolean } | null {
+  let low = 0, high = visible.length - 1, found = visible.length - 1;
+  while (low <= high) {
+    const middle = (low + high) >> 1;
+    const rect = todayRows.get(visible[middle])?.element.getBoundingClientRect();
+    if (!rect) return null;
+    if (y < rect.bottom) { found = middle; high = middle - 1; } else low = middle + 1;
+  }
+  const target = visible[found];
+  const rect = target ? todayRows.get(target)?.element.getBoundingClientRect() : undefined;
+  if (!target || target === id || !rect) return null;
+  return { targetID: target, after: y >= rect.top + rect.height / 2 };
+}
+
+/** #167: the list a dragged row scrolls — the board's column under the pointer, else the sheet. */
+function listUnder(x: number, y: number): HTMLElement {
+  const column = lines.classList.contains("board") ? document.elementFromPoint(x, y)?.closest<HTMLElement>(".sgroup")?.querySelector<HTMLElement>(".sgroup-rows") : undefined;
+  return column ?? sheet;
+}
+
+/**
+ * #167: while a row is dragged, the list under it scrolls when the pointer is within 40 px of its top or bottom edge
+ * (or past it) — faster the nearer the edge, up to 24 px a frame — and sideways near its left or right edge when it
+ * scrolls that way. `moved` runs after each step (the drop place under the still pointer has changed).
+ */
+function edgeScroller(pointer: () => { x: number; y: number }, list: () => HTMLElement, moved: () => void): { stop(): void } {
+  const edge = 40, fastest = 24;
+  const step = (distance: number) => Math.round(4 + (fastest - 4) * (1 - Math.max(0, Math.min(distance, edge)) / edge));
+  let frame = 0;
+  const tick = () => {
+    const { x, y } = pointer();
+    const box = list();
+    const rect = box.getBoundingClientRect();
+    let dy = 0, dx = 0;
+    if (box.scrollHeight > box.clientHeight + 1) dy = y < rect.top + edge ? -step(y - rect.top) : y > rect.bottom - edge ? step(rect.bottom - y) : 0;
+    if (box.scrollWidth > box.clientWidth + 1 && y >= rect.top && y <= rect.bottom) dx = x < rect.left + edge ? -step(x - rect.left) : x > rect.right - edge ? step(rect.right - x) : 0;
+    if (dy || dx) {
+      const before = box.scrollTop + box.scrollLeft;
+      box.scrollBy({ top: dy, left: dx, behavior: "instant" });
+      if (box.scrollTop + box.scrollLeft !== before) moved();
+    }
+    frame = requestAnimationFrame(tick);
+  };
+  frame = requestAnimationFrame(tick);
+  return { stop: () => cancelAnimationFrame(frame) };
+}
+
+/**
+ * #167: a copy of the dragged row that follows the pointer (lifted a little, with a shadow), moved by a transform only;
+ * the row itself stays where it was, faded, until the drop.
+ */
+function dragGhost(row: HTMLElement, badge?: string): { follow(dx: number, dy: number): void; remove(): void } {
+  const rect = row.getBoundingClientRect();
+  const ghost = row.cloneNode(true) as HTMLElement;
+  // Nor the row animations (#181): a copy of a row still rising in, folding away or popping its box stays still.
+  ghost.classList.remove("dragging", "selected", "drop-before", "drop-after", "appear", "leaving", "unfold-in", "pop", "animate", "flash");
+  ghost.classList.add("drag-ghost");
+  // As the row looks where it is: no band on a card's or a column's rows.
+  if (lines.classList.contains("cards") || lines.classList.contains("board")) ghost.classList.add("no-band");
+  ghost.removeAttribute("data-id");
+  ghost.setAttribute("aria-hidden", "true");
+  Object.assign(ghost.style, { left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px` });
+  // #168: how many rows go ("3개"), on the copy's top right corner.
+  if (badge) ghost.append(h("span", { class: "drag-badge" }, badge));
+  document.body.append(ghost);
+  return {
+    follow: (dx, dy) => { ghost.style.transform = `translate(${dx}px, ${dy}px) rotate(-1deg)`; },
+    remove: () => ghost.remove(),
+  };
 }
 
 // ─── Drag on 앞으로 ──────────────────────────────────────────────────────────
@@ -1364,7 +1863,8 @@ function quickChoices(now = new Date()): { label: string; date: Date }[] {
     { label: minutesAway(10, lang()), date: new Date(now.getTime() + 10 * 60_000) },
     { label: minutesAway(30, lang()), date: new Date(now.getTime() + 30 * 60_000) },
     { label: t("1시간 뒤"), date: new Date(now.getTime() + 60 * 60_000) },
-    { label: t("내일 오전 9시"), date: new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0) },
+    // The same name as the reminder slip's 다시 알림 menu (#52): ‘내일 아침 9시’.
+    { label: snoozeTitle("morning", lang()), date:new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 9, 0) },
   ];
 }
 
@@ -1505,8 +2005,8 @@ function openEditor(id: string, startOn?: EditorMode): void {
     const space = spacesOf().get(id);
     const dot = h("span", { class: "space-dot" });
     dot.style.setProperty("--band", space ? bandStyle(space) : "var(--rule-strong)");
-    spaceField.replaceChildren(h("span", { class: "space-field-name" }, t("스페이스")), dot, h("span", { class: "space-field-value" }, space?.name ?? t("스페이스 없음")), icon("chevron", 11, 2));
-    spaceField.setAttribute("aria-label", t("스페이스: {name}", { name: space?.name ?? t("스페이스 없음") }));
+    spaceField.replaceChildren(h("span", { class: "space-field-name" }, t("스페이스", undefined, "field")), dot, h("span", { class: "space-field-value" }, space?.name ?? generalNow()), icon("chevron", 11, 2));
+    spaceField.setAttribute("aria-label", t("스페이스: {name}", { name: space?.name ?? generalNow() }));
   };
   drawSpaceField();
   spaceField?.addEventListener("click", () => openMenu(menuHost, moveEntries(id).filter((entry) => !(entry.kind === "item" && entry.icon === "plus")), t("스페이스"), spaceField.getBoundingClientRect()));
@@ -1654,9 +2154,10 @@ function openEditor(id: string, startOn?: EditorMode): void {
 
 function render(): void {
   if (!state) return; // a command can arrive before the first state (it just picks the page)
+  unseen = false;
   const root = document.documentElement;
   root.dataset.font = state.prefs.font;
-  root.style.setProperty("--body-size", `${bodyFontSize(state.prefs.font, state.prefs.textSize)}px`);
+  root.style.setProperty("--body-size", `${bodyFontSize(state.prefs.font, state.prefs.textStep)}px`);
   pinButton.classList.toggle("on", state.prefs.alwaysOnTop);
   pinButton.title = state.prefs.alwaysOnTop ? t("항상 위에 두기 해제") : t("항상 위에 두기");
   drawerButton.title = state.prefs.drawerShortcut ? `${t("메모 서랍")} (${shortcutLabel(state.prefs.drawerShortcut)})` : t("메모 서랍");
@@ -1666,11 +2167,16 @@ function render(): void {
   // (A new page refreshes the line itself first, in setPage: one layout, not two.)
   const lineKey = `${lensNow() ?? ""}|${JSON.stringify(liveSpaces(state.todoSpaces).map((space) => [space.id, space.name, space.color]))}`;
   if (lineKey !== lineKeyDrawn) { lineKeyDrawn = lineKey; line.refresh(); }
+  // 2b: the chips and the board are 오늘's (renderToday shows them while grouped).
+  if (page !== "today") { chipsRow.hidden = true; sheet.classList.remove("board-mode"); }
+  // `+ 회사에 넣기` belongs to the board: it goes with it.
+  if (lineSpace !== undefined && (page !== "today" || !groupsOn())) { lineSpace = undefined; line.refresh(); }
   if (page === "today") renderToday();
   else renderAhead();
   focusCard.update(state);
   paintSelection();
   eventSheet?.refresh();
+  playAdded();
   // Measured in the next frame, when the page is laid out anyway (measuring now would force a second layout).
   if (!fadePending) { fadePending = true; requestAnimationFrame(() => { fadePending = false; fadeEdges(); }); }
   // `npm run perf` reads when the first list was drawn.
@@ -1689,17 +2195,18 @@ new ResizeObserver(fadeEdges).observe(sheet);
 
 // ─── First-launch guide ─────────────────────────────────────────────────────
 
-/** Five paper cards the cat walks you through; shown once, and again from ⋯ → 사용 안내. */
-const guideCards: { pose: string; title: string; body: string; keys: [string, string][]; login?: boolean }[] = [
+/** Five paper cards the cat walks you through; shown once, and again from ⋯ → 사용 안내. The last names the note's key as chosen (#85). */
+const guideCards = (noteKey = shortcutLabel(state?.prefs.noteShortcut ?? defaultNoteShortcut)): { pose: string; title: string; body: string; keys: [string, string][]; login?: boolean }[] => [
   { pose: "happy", title: t("종이냥에 오신 걸 환영해요"), body: t("할 일과 일정을 종이 한 장에 적는\n노트예요. 적고, 체크하고, 끝!"), keys: [[t("입력 줄"), "Ctrl+N"], [t("완료"), t("네모 칸 누르기")], [t("어디서든 빠른 입력"), "Ctrl+Alt+N"]] },
   { pose: "curious", title: t("날짜에 맞춰 알아서 옮겨 가요"), body: t("마감이 있는 일은 ‘앞으로’에서 날짜별로 기다리다\n그날이 되면 오늘로 올라와요.\n날짜 없는 일은 맨 아래 ‘언젠가’, 생각은 ‘메모 서랍’에."), keys: [[t("오늘 · 앞으로"), "Ctrl+1–2"], [t("메모 서랍"), "Ctrl+Shift+D"], [t("내일 하기"), "Alt+→"]] },
   { pose: "stretch", title: t("아래 입력 줄에 무엇이든"), body: t("‘내일 3시 회의’, ‘30분 뒤 빨래’, ‘매일 물 마시기’처럼\n적으면 칩으로 알아들은 뜻을 보여 줘요.\nTab으로 다른 뜻, Enter로 넣기."), keys: [[t("다른 뜻"), "Tab"], [t("되돌리기"), "Ctrl+Z"], [t("검색"), "Ctrl+F"]] },
   { pose: "tea", title: t("종이냥과 집중"), body: t("할 일에서 F를 누르면 바로 집중을 시작해요.\n화면 아래의 종이냥은 저녁이 되면\n남은 일을 내일로 넘길지 물어봐요."), keys: [[t("이거 집중"), "F"], [t("설정"), "Ctrl+,"]] },
-  { pose: "cheer", title: t("준비 끝!"), body: t("필요 없을 땐 작은 포스트잇으로 접어 둬요.\n어디서든 Ctrl+Alt+J로 다시 불러요.\n아래 스위치를 끄면 컴퓨터를 켤 때 열리지 않아요."), keys: [[t("작게 접기"), "Ctrl+M"], [t("노트 보이기 · 숨기기"), "Ctrl+Alt+J"]], login: true },
+  { pose: "cheer", title: t("준비 끝!"), body: t("필요 없을 땐 작은 포스트잇으로 접어 둬요.\n어디서든 {key} 키로 다시 불러요.\n아래 스위치를 끄면 컴퓨터를 켤 때 열리지 않아요.", { key: noteKey }), keys: [[t("작게 접기"), "Ctrl+M"], [t("노트 보이기 · 숨기기"), noteKey]], login: true },
 ];
 let guide: { close(): void } | undefined;
 
 function openGuide(): void {
+  const cards = guideCards();
   guide?.close();
   editor?.close();
   eventSheet?.close();
@@ -1721,8 +2228,8 @@ function openGuide(): void {
     art, heading, text, keys, loginRow, dots, h("div", { class: "guide-actions" }, skip, h("span", { class: "spacer" }), back, next));
   const root = h("div", { class: "guide" }, h("div", { class: "guide-scrim" }), card);
   const show = () => {
-    const current = guideCards[step];
-    const last = step === guideCards.length - 1;
+    const current = cards[step];
+    const last = step === cards.length - 1;
     art.src = `../../assets/pet/256/${current.pose}.png`;
     heading.textContent = current.title;
     text.textContent = current.body;
@@ -1730,8 +2237,8 @@ function openGuide(): void {
     loginRow.hidden = !current.login;
     if (current.login && loginChoice === undefined) loginChoice = state.prefs.guideSeen ? state.prefs.openAtLogin : true;
     loginSwitch.setAttribute("aria-checked", String(Boolean(loginChoice)));
-    dots.replaceChildren(...guideCards.map((_, index) => h("span", { class: index === step ? "on" : "" })));
-    dots.setAttribute("aria-label", t("{total}장 중 {n}장", { total: guideCards.length, n: step + 1 }));
+    dots.replaceChildren(...cards.map((_, index) => h("span", { class: index === step ? "on" : "" })));
+    dots.setAttribute("aria-label", t("{total}장 중 {n}장", { total: cards.length, n: step + 1 }));
     skip.hidden = last;
     back.hidden = step === 0;
     // Enter presses it (onKey below): its keycap inside, like every slip's primary (the Mac's guide too).
@@ -1741,7 +2248,7 @@ function openGuide(): void {
     card.classList.add("turn");
     next.focus();
   };
-  const go = (delta: number) => { step = Math.min(Math.max(step + delta, 0), guideCards.length - 1); show(); };
+  const go = (delta: number) => { step = Math.min(Math.max(step + delta, 0), cards.length - 1); show(); };
   const close = () => {
     root.remove();
     window.removeEventListener("keydown", onKey, true);
@@ -1752,7 +2259,7 @@ function openGuide(): void {
   };
   const onKey = (event: KeyboardEvent) => {
     if (event.key === "Escape") close();
-    else if (event.key === "ArrowRight" || event.key === "Enter") step === guideCards.length - 1 ? close() : go(1);
+    else if (event.key === "ArrowRight" || event.key === "Enter") step === cards.length - 1 ? close() : go(1);
     else if (event.key === "ArrowLeft") go(-1);
     else return;
     event.preventDefault();
@@ -1760,7 +2267,7 @@ function openGuide(): void {
   };
   skip.addEventListener("click", close);
   back.addEventListener("click", () => go(-1));
-  next.addEventListener("click", () => (step === guideCards.length - 1 ? close() : go(1)));
+  next.addEventListener("click", () => (step === cards.length - 1 ? close() : go(1)));
   window.addEventListener("keydown", onKey, true);
   document.body.append(root);
   show();
@@ -1798,10 +2305,41 @@ function showSearch(query = ""): SearchSlip | undefined {
 // ─── Keyboard ─────────────────────────────────────────────────────────────────
 
 let selectedID: string | undefined;
+/**
+ * #168: the note already had one picked row — `selectedID`, the keyboard's row (↑↓ · Space · Enter · Delete · Ctrl+↑↓ ·
+ * Alt+→ act on it, a click picks it, Esc lets it go). This adds to that same pick rather than a second one: Ctrl-click
+ * and Shift-click pick more, Shift+↑↓ grows the range, and `multi` holds them all while there are several. Picking a
+ * row the plain way (select) leaves only that one.
+ */
+let multi = new Set<string>();
+let anchorID: string | undefined;
+function currentSelection(): ListSelection {
+  const anchor = anchorID ?? selectedID;
+  return { ...(anchor ? { anchor } : {}), ...(selectedID ? { focus: selectedID } : {}), ids: multi.size ? new Set(multi) : new Set(selectedID ? [selectedID] : []) };
+}
+function applySelection(selection: ListSelection, scroll = false): void {
+  anchorID = selection.anchor;
+  multi = selection.ids.size > 1 ? new Set(selection.ids) : new Set();
+  selectedID = selection.ids.size ? selection.focus : undefined;
+  if (document.activeElement instanceof HTMLButtonElement) document.activeElement.blur();
+  paintSelection();
+  if (selectedID && scroll) rowFor(selectedID)?.element.scrollIntoView({ block: "nearest", behavior: reduceMotion() ? "auto" : "smooth" });
+}
+/** A click on a row: Ctrl adds or takes it away, Shift picks the range from the anchor, else that row alone. */
+function clickRow(id: string, event: MouseEvent): void {
+  const order = selectable();
+  const selection = currentSelection();
+  applySelection(event.ctrlKey || event.metaKey ? toggleSelection(selection, id, order) : event.shiftKey ? rangeSelection(selection, id, order) : oneSelected(id));
+}
+/** What a row's action moves: every picked row when it's one of them, else the row alone — in the list's order. */
+function pickedRows(id: string): string[] {
+  return multi.has(id) ? selectable().filter((entry) => multi.has(entry)) : [id];
+}
 
 /** The rows of the open page, top to bottom, as the keyboard walks them. */
 function selectable(): string[] {
   if (!state) return [];
+  if (page === "today" && groupsOn()) return todaySpaceGroups().flatMap(shownRows).map((item) => item.id);
   if (page === "today") { const { next, rest } = todayGroups(); return [...next, ...rest].map((item) => item.id); }
   if (page === "ahead") return [...aheadList.querySelectorAll<HTMLElement>(".row")].map((element) => element.dataset.id!).filter((id) => aheadRows.has(id));
   return [];
@@ -1810,6 +2348,8 @@ function selectable(): string[] {
 
 function select(id: string | undefined, scroll = true): void {
   selectedID = id;
+  multi = new Set();
+  anchorID = id;
   // A row's button keeps focus after a click; Space and Enter now belong to the selection.
   if (document.activeElement instanceof HTMLButtonElement) document.activeElement.blur();
   paintSelection();
@@ -1820,7 +2360,9 @@ function select(id: string | undefined, scroll = true): void {
 function paintSelection(): void {
   const rows = page === "today" ? todayRows : page === "ahead" ? aheadRows : undefined;
   if (selectedID && !rows?.has(selectedID)) selectedID = undefined;
-  for (const map of [todayRows, aheadRows]) for (const [id, row] of map) row.element.classList.toggle("selected", map === rows && id === selectedID);
+  for (const id of multi) if (!rows?.has(id)) multi.delete(id);
+  if (multi.size < 2) multi = new Set();
+  for (const map of [todayRows, aheadRows]) for (const [id, row] of map) row.element.classList.toggle("selected", map === rows && (id === selectedID || multi.has(id)));
 }
 
 /** ↑ in the empty line under 오늘, or ↓ in the empty line above a shelf, steps into the rows. */
@@ -1851,12 +2393,13 @@ function listKey(event: KeyboardEvent): boolean {
     if (command) {
       if (!selectedID) return false;
       // 앞으로: within its day (or 언젠가); 오늘: within the lower group.
-      const rest = page === "ahead" ? zoneSiblings(selectedID) : page === "today" ? todayGroups().rest.map((item) => item.id) : [];
+      const rest = page === "ahead" ? zoneSiblings(selectedID) : page === "today" ? (groupsOn() ? reorderableInGroup(selectedID) : todayGroups().rest.map((item) => item.id)) : [];
       const target = rest.includes(selectedID) ? reorder(rest, selectedID, direction) : undefined;
       if (target) void api.act({ type: "move", id: selectedID, targetID: target.targetID, after: target.after });
       return handled();
     }
-    if (event.shiftKey) return false;
+    // #168: Shift+↑↓ picks more rows (or fewer), from the anchor.
+    if (event.shiftKey) { applySelection(extendSelection(currentSelection(), direction, ids), true); return handled(); }
     const next = step(ids, selectedID, direction, "end");
     if (next && "input" in next) { select(undefined); focusInput(); } else if (next) select(next.id);
     return handled();
@@ -1940,6 +2483,21 @@ window.addEventListener("keydown", (event) => {
     if (lens !== null) setLens(lens);
     return;
   }
+  // 2b (S44): Ctrl+Alt+↑ · ↓ moves the selected to-do to the group above or below (nothing at the ends).
+  if (event.ctrlKey && event.altKey && !event.shiftKey && !event.metaKey && (event.key === "ArrowUp" || event.key === "ArrowDown") && page === "today" && state && groupsOn() && selectedID
+    && !(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)) {
+    event.preventDefault();
+    const key = neighborGroup(selectedID, event.key === "ArrowUp" ? -1 : 1, todaySpaceGroups());
+    // #168 (S48): every picked row goes (to the group above or below the keyboard's row).
+    if (key) void api.act({ type: "todoSpace", ids: pickedRows(selectedID), space: groupSpace(key) });
+    return;
+  }
+  // 2b: Ctrl+Shift+G groups 오늘 by space (or not), by the key's place.
+  if (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && event.code === "KeyG" && state && hasSpaces()) {
+    event.preventDefault();
+    toggleSpaceGroups();
+    return;
+  }
   if (picking && event.key === "Enter" && selectedID && !(event.target instanceof HTMLInputElement)) { event.preventDefault(); pickTask(selectedID); return; }
   if (listKey(event)) return;
   const typing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
@@ -1960,8 +2518,9 @@ window.addEventListener("keydown", (event) => {
   if (key === "e") return act(() => api.act({ type: "exportList" }));
   if (key === "c" && event.shiftKey) return act(() => api.act({ type: "copyList" }));
   if (key === "=" || key === "+" || key === "-") {
-    const index = textSizes.indexOf(state.prefs.textSize) + (key === "-" ? -1 : 1);
-    if (index >= 0 && index < textSizes.length) act(() => api.act({ type: "setPref", key: "textSize", value: textSizes[index] }));
+    // #141: one of the seven steps at a time.
+    const step = state.prefs.textStep + (key === "-" ? -1 : 1);
+    if (step >= 0 && step < noteScales.length) act(() => api.act({ type: "setPref", key: "textStep", value: step }));
     return;
   }
   if (typing) return; // text fields keep their own undo
@@ -1971,9 +2530,10 @@ window.addEventListener("keydown", (event) => {
 
 // ─── Wiring ───────────────────────────────────────────────────────────────────
 
-api.on("state", (next) => { state = next as AppState; render(); });
+api.on("state", (next) => { state = next as TodosState; drawWhenSeen(); });
 api.on("note:focus-new", focusNew);
 api.on("note:event-sheet", (payload) => {
+  catchUp();
   if (state) showEventSheet(payload as CalendarSheetRequest);
   else void api.getState().then((initial) => { state = initial; render(); showEventSheet(payload as CalendarSheetRequest); });
 });
@@ -1990,6 +2550,7 @@ api.on("note:toast", (payload) => {
 });
 api.on("note:row-command", (payload) => {
   const { id, command } = payload as { id: string; command: string };
+  catchUp();
   if (command === "edit") rowFor(id)?.beginEdit();
   if (command === "reminder") openEditor(id);
   if (command === "repeat") openEditor(id, "repeat");
@@ -2029,7 +2590,16 @@ api.on("note:notice", (payload) => {
 /** 되돌리기 after 스페이스로 옮기기: each to-do back in the space it was in (`entry`: [id, space | null][]). */
 function undoSpaceMove(entry: string): void {
   let moves: [string, string | null][] = [];
-  try { moves = JSON.parse(entry) as [string, string | null][]; } catch { return; }
+  // 2b (J): a drop between another group's rows also puts the row back in its place in the list (`back`); #168: several
+  // rows, each back after the row it followed (`previous`, the list's order before).
+  let back: { id: string; targetID: string; after: boolean } | undefined;
+  let previous: string[] | undefined;
+  try {
+    const read = JSON.parse(entry) as [string, string | null][] | { moves: [string, string | null][]; back?: typeof back; previous?: string[] };
+    if (Array.isArray(read)) moves = read; else ({ moves, back, previous } = read);
+  } catch { return; }
+  if (back) void api.act({ type: "move", id: back.id, targetID: back.targetID, after: back.after });
+  if (previous) void api.act({ type: "restoreOrder", ids: moves.map(([id]) => id), previous });
   const bySpace = new Map<string | null, string[]>();
   for (const [id, space] of moves) bySpace.set(space, [...(bySpace.get(space) ?? []), id]);
   for (const [space, ids] of bySpace) void api.act({ type: "todoSpace", ids, space });

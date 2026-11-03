@@ -11,7 +11,7 @@ extension AppModel {
 
     /// At launch: the file, or the inbox alone (D1); an unreadable one is moved aside with one notice (D15).
     func loadMemoFolders(now: Date = Date()) {
-        guard let data = try? Data(contentsOf: memoFoldersURL) else {
+        guard let data = try? SafeFile.sharedData(memoFoldersURL) else {
             memoFolders = .fresh(language: .current)
             knownFoldersData = nil
             return
@@ -44,7 +44,7 @@ extension AppModel {
     /// A write of this Mac's still under way is waited for first, so the file read is never this Mac's older one.
     func catchUpMemoFolders() {
         finishMemoFolderWrites()
-        guard let data = try? Data(contentsOf: memoFoldersURL), data != knownFoldersData else { return }
+        guard let data = try? SafeFile.sharedData(memoFoldersURL), data != knownFoldersData else { return }
         knownFoldersData = data
         guard let theirs = try? MemoFolders.decode(data, language: .current) else {
             moveFoldersAside(now: Date(), starting: false)
@@ -135,7 +135,8 @@ extension AppModel {
     /// D7, D8: the box on that line flips; the memo is saved like any edit.
     func toggleChecklist(_ id: String, line: Int) {
         guard let memo = memos.first(where: { $0.id == id }) else { return }
-        let text = Checklist.toggle(memo.text, line: line)
+        // 끝낸 항목 아래로 보내기 (#84): a finished item to the bottom of its checklist, one change of the words.
+        let text = MemoEdits.toggleDone(memo.text, line: line, moveDone: drawer.doneToBottom)
         guard text != memo.text else { return }
         updateMemo(id, text: text, from: memo.text)
         saveMemosNow()
@@ -149,6 +150,12 @@ extension AppModel {
 
     func setMemoFolderSort(_ id: String, _ sort: MemoFolders.Sort) {
         changeMemoFolders { folders, now in folders.setSort(id, sort, now: now) }
+    }
+
+    /// 보기 (#115): 카드 · 제목만, in memo-folders.json.
+    func setMemoFolderView(_ id: String, _ view: MemoFolders.View) {
+        guard let folder = memoFolders.folder(id), folder.view != (view == .cards ? nil : view.rawValue) else { return }
+        changeMemoFolders { folders, now in folders.setView(id, view, now: now) }
     }
 
     /// 고정 모두 풀기: the memos let go (for 되돌리기).
@@ -217,31 +224,15 @@ final class MemoFoldersWriter: @unchecked Sendable {
 
 // MARK: - The drawer's settings and what it shows
 
-/// A shortcut the drawer claims from any app: a key code and Carbon modifiers, with the key's letter for showing.
-struct DrawerShortcut: Equatable, Codable {
-    var keyCode: Int
-    var modifiers: Int
-    var key: String
+/// The drawer's key is a `GlobalShortcut` (PaperCore, saved as before); ⇧⌘D unless changed (Windows Ctrl+Shift+D).
+typealias DrawerShortcut = GlobalShortcut
 
-    /// ⇧⌘D (Windows Ctrl+Shift+D).
-    static let standard = DrawerShortcut(keyCode: kVK_ANSI_D, modifiers: cmdKey | shiftKey, key: "D")
-    /// ⌃⌥M (빠른 메모), ⌃⌥J (노트), ⌃⌥N (빠른 입력): the app's own, not to be taken.
-    static let reserved = [(kVK_ANSI_M, controlKey | optionKey), (kVK_ANSI_J, controlKey | optionKey), (kVK_ANSI_N, controlKey | optionKey)]
+extension GlobalShortcut {
+    /// ⇧⌘D, the drawer's.
+    static var standard: GlobalShortcut { .drawerStandard }
 
-    /// In the Mac's order: ⌃⌥⇧⌘ then the key.
-    var text: String {
-        var out = ""
-        if modifiers & controlKey != 0 { out += "⌃" }
-        if modifiers & optionKey != 0 { out += "⌥" }
-        if modifiers & shiftKey != 0 { out += "⇧" }
-        if modifiers & cmdKey != 0 { out += "⌘" }
-        return out + key
-    }
-
-    var isReserved: Bool { Self.reserved.contains { $0.0 == keyCode && $0.1 == modifiers } }
-
-    /// What a key press in the recorder makes: nil without ⌘, ⌃ or ⌥ (a plain letter can't be global).
-    static func from(_ event: NSEvent) -> DrawerShortcut? {
+    /// What a key press in a recorder makes: nil without ⌘, ⌃ or ⌥ (a plain letter can't be global).
+    static func from(_ event: NSEvent) -> GlobalShortcut? {
         let flags = event.modifierFlags.intersection([.command, .control, .option, .shift])
         guard !flags.intersection([.command, .control, .option]).isEmpty else { return nil }
         var modifiers = 0
@@ -256,10 +247,10 @@ struct DrawerShortcut: Equatable, Codable {
         guard code != kVK_Escape else { return nil }
         let key = names[code] ?? (event.charactersIgnoringModifiers ?? "").uppercased()
         guard !key.isEmpty, key.unicodeScalars.allSatisfy({ $0.value >= 32 }) else { return nil }
-        return DrawerShortcut(keyCode: code, modifiers: modifiers, key: key)
+        return GlobalShortcut(keyCode: code, modifiers: modifiers, key: key)
     }
 
-    /// For the menu item: the key equivalent and its modifier mask.
+    /// For a menu item: the key equivalent and its modifier mask.
     var menuKey: (String, NSEvent.ModifierFlags)? {
         guard key.count == 1 else { return nil }
         var mask: NSEvent.ModifierFlags = []
@@ -278,16 +269,21 @@ struct DrawerShortcut: Equatable, Codable {
 final class MemoDrawer: ObservableObject {
     enum Side: String, CaseIterable { case right, left }
 
+    /// 서랍 종이 (#142): the paper picked for the day — the four of 1.45, then 한지 · 쑥색 · 벚꽃 · 먹색. Whether it gives
+    /// way to 밤 종이 at night is `nightPaper` (1.45's ‘자동’ is 낮 종이 with it on).
     enum Theme: String, CaseIterable, Identifiable {
-        case auto, day, night, kraft, grid
+        case day, night, kraft, grid, hanji, sage, blossom, ink
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .auto: L("자동")
             case .day: L("낮 종이")
             case .night: L("밤 종이")
             case .kraft: L("크라프트지")
             case .grid: L("모눈 노트")
+            case .hanji: L("한지")
+            case .sage: L("쑥색 종이")
+            case .blossom: L("벚꽃 종이")
+            case .ink: L("먹색 종이")
             }
         }
     }
@@ -303,7 +299,14 @@ final class MemoDrawer: ObservableObject {
     @Published var side: Side { didSet { preferences.set(side.rawValue, forKey: "drawer.side") } }
     @Published var width: CGFloat { didSet { preferences.set(Double(width), forKey: "drawer.width") } }
     @Published var handleOn: Bool { didSet { preferences.set(handleOn, forKey: "drawer.handle") } }
-    @Published var theme: Theme { didSet { preferences.set(theme.rawValue, forKey: "drawer.theme") } }
+    @Published var theme: Theme { didSet { saveTheme() } }
+    /// 밤에는 밤 종이로 (#142): at night a light paper gives way to 밤 종이 (a dark one stays).
+    @Published var nightPaper: Bool { didSet { saveTheme() } }
+    /// `drawer.theme` keeps 1.45's values (`auto` for 낮 종이 with the switch on), `drawer.nightPaper` the switch.
+    private func saveTheme() {
+        preferences.set(TextSteps.drawerThemeValue(paper: theme.rawValue, nightPaper: nightPaper), forKey: "drawer.theme")
+        preferences.set(nightPaper, forKey: "drawer.nightPaper")
+    }
     /// 위에 고정: floating above other windows (default on).
     @Published var pinned: Bool { didSet { preferences.set(pinned, forKey: "drawer.pinned") } }
     /// nil: 끄기.
@@ -321,7 +324,8 @@ final class MemoDrawer: ObservableObject {
             guard newValue != (shortcut != nil) else { return }
             if newValue {
                 let kept = preferences.data(forKey: "drawer.shortcutBeforeOff").flatMap { try? JSONDecoder().decode(DrawerShortcut.self, from: $0) }
-                shortcut = kept.flatMap { $0.isReserved ? nil : $0 } ?? .standard
+                // Unless 빠른 입력 · 빠른 메모 or the note holds it now (#85).
+                shortcut = kept.flatMap { ShortcutRules.taken($0, by: .drawer, note: model.noteShortcut, drawer: nil) == nil ? $0 : nil } ?? .standard
             } else {
                 shortcut = nil
             }
@@ -357,6 +361,61 @@ final class MemoDrawer: ObservableObject {
         }
     }
     @Published var backdrop: Backdrop { didSet { preferences.set(backdrop.rawValue, forKey: "drawer.backdrop") } }
+    /// 메모 글꼴 · 크기 (#84): one face and one size step for every memo in the drawer, this Mac's.
+    @Published var bodyFace: MemoText.Face { didSet { preferences.set(bodyFace.rawValue, forKey: "drawer.font") } }
+    /// #141: 12–20 pt as `drawer.textPt`, and the nearest of 1.45's four as `drawer.textSize` for an older version.
+    @Published var textSize: MemoText.Size {
+        didSet {
+            preferences.set(textSize.rawValue, forKey: "drawer.textPt")
+            preferences.set(TextSteps.drawerLegacyName(textSize.rawValue), forKey: "drawer.textSize")
+        }
+    }
+    /// 줄 간격 · 문단 간격 (#141), this Mac's.
+    @Published var lineSpacing: MemoText.LineSpacing { didSet { preferences.set(lineSpacing.rawValue, forKey: "drawer.lineHeight") } }
+    @Published var paragraphSpacing: MemoText.ParagraphSpacing { didSet { preferences.set(paragraphSpacing.rawValue, forKey: "drawer.paragraph") } }
+    /// 코드 글꼴 (#143), this Mac's: the system's fixed-width face (the default) or D2Coding.
+    @Published var codeFace: MemoText.CodeFace { didSet { preferences.set(codeFace.rawValue, forKey: "drawer.codeFont") } }
+    /// 기호 늘 보이기 (⇧⌘R) and 끝낸 항목 아래로 보내기 (#84, 2026-10-30), this Mac's.
+    @Published var showMarks: Bool { didSet { preferences.set(showMarks, forKey: "drawer.showMarks") } }
+    @Published var doneToBottom: Bool { didSet { preferences.set(doneToBottom, forKey: "drawer.doneToBottom") } }
+    var text: MemoText { MemoText(face: bodyFace, size: textSize, codeFace: codeFace, showMarks: showMarks, lineSpacingChoice: lineSpacing, paragraphChoice: paragraphSpacing) }
+    /// The open memo's text view (the Aa bar's buttons act on it) and whether the bar is out.
+    weak var editorView: DrawerTextView.KeyTextView?
+    @Published var formatBarOpen = false
+    func format(_ format: DrawerTextView.KeyTextView.Format) { editorView?.format(format) }
+
+    /// #135 (SideNotes' way): the link field under the open memo — the chosen words (or the link the caret is in) and
+    /// the address it starts with. Nothing in the memo changes until Return (one undo); Esc puts it away.
+    struct LinkEdit: Equatable {
+        var from: Int
+        var to: Int
+        var url: String
+        /// In a link already: Return changes its address, an empty one (or 링크 빼기) takes the link out.
+        var existing: Bool
+    }
+    @Published var linkEdit: LinkEdit?
+
+    /// The link field's Return (or 링크 빼기, an empty address): the words made a link, its address changed, or the link
+    /// taken out; the keyboard back in the memo.
+    func finishLink(_ url: String) {
+        guard let edit = linkEdit else { return }
+        linkEdit = nil
+        guard let view = editorView else { return }
+        let length = (view.string as NSString).length
+        if edit.to <= length {
+            view.apply(MemoEdits.setLink(view.string, from: edit.from, to: edit.to, url: url))
+        }
+        view.window?.makeFirstResponder(view)
+    }
+
+    /// Esc in the link field: nothing changes, the keyboard back in the memo where it was.
+    func cancelLink() {
+        guard linkEdit != nil else { return }
+        linkEdit = nil
+        if let view = editorView { view.window?.makeFirstResponder(view) }
+    }
+    /// The titles' handwriting: the body's when it is a handwriting face (title and words alike), else the notebook's.
+    var titleFont: NotebookFont { bodyFace.notebook ?? model.notebookFont }
     /// System Settings › Accessibility › Display › Reduce transparency: 반투명 and 강하게 draw as 불투명.
     @Published var reduceTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
     /// What's drawn: 반투명/강하게 fall back to 불투명 under Reduce transparency (바탕 없음 still works).
@@ -367,6 +426,13 @@ final class MemoDrawer: ObservableObject {
     @Published var pinnedSort: MemoFolders.Sort {
         didSet {
             preferences.set(pinnedSort.rawValue, forKey: "drawer.pinnedSort")
+            listChanged()
+        }
+    }
+    /// 고정's 보기 (#115; 고정 isn't a folder, so it lives here, on this Mac, as its 정렬 does).
+    @Published var pinnedView: MemoFolders.View {
+        didSet {
+            preferences.set(pinnedView.rawValue, forKey: "drawer.pinnedView")
             listChanged()
         }
     }
@@ -397,10 +463,23 @@ final class MemoDrawer: ObservableObject {
     /// Where the caret goes when an open slip turns to typing (the line clicked).
     var editLine: Int?
     @Published var selectedID: String?
-    /// 크게 보기: one memo the drawer's whole height.
+    /// 크게 보기: one memo the drawer's whole height, the drawer wider while it shows (#113).
     @Published var bigID: String?
+    /// The width of the screen the drawer is out on (set as it opens): 크게 보기 takes up to 45 % of it.
+    var screenWidth: CGFloat = 1440
+    /// The paper's width now: the user's, or while a memo is shown big up to 640 (#113, MemoCards.bigWidth); the
+    /// setting itself never changes.
+    var shownWidth: CGFloat {
+        guard bigID != nil else { return width }
+        return CGFloat(MemoCards.bigWidth(user: Double(width), screen: Double(screenWidth),
+                                          chrome: Double(MemoDrawerView.shadowRoom + MemoDrawerView.tabsWidth)))
+    }
     @Published var searching = false
     @Published var query = "" { didSet { if query != oldValue { searchSoon() } } }
+    /// 메모 찾기's chips (#114): only the folder (or 고정) shown, and the kinds of memo kept to. Both start over with each
+    /// search.
+    @Published var searchHere = false { didSet { foundCache = nil } }
+    @Published var searchFilters: MemoFolders.SearchFilters = [] { didSet { foundCache = nil } }
     /// What the results are for: `query` once its keys pause (80 ms), at once when it's emptied.
     @Published private(set) var searchedQuery = ""
     private var searchTask: Task<Void, Never>?
@@ -411,6 +490,9 @@ final class MemoDrawer: ObservableObject {
     @Published var quickText = ""
     /// The folder sheet (new, or name and colour of one).
     @Published var folderSheet: FolderSheet?
+    /// 지운 메모's slip (#120) and its question before 모두 비우기 (MemoDrawerTrash.swift).
+    @Published var trashOpen = false
+    @Published var trashConfirm = false
     @Published var toast: DrawerToast?
     /// Bumped to move the keyboard: the quick-write slip, the search field.
     @Published var focusQuick = 0
@@ -435,6 +517,10 @@ final class MemoDrawer: ObservableObject {
     var previewDesktop = false
     /// Set by the snapshot renderer: this card drawn as if under the pointer (its hover pill).
     var previewHover: String?
+    /// Set by the snapshot renderer: the empty bookmark (+) and the close bar drawn as if under the pointer.
+    var previewEdgeHover = false
+    /// The close bar has the keyboard (#83): ↩ there closes the drawer instead of opening the picked memo.
+    var closeBarFocused = false
     /// Set by the snapshot renderer: a fixed "now" for slip times.
     var now: (() -> Date) = { Date() }
 
@@ -447,9 +533,15 @@ final class MemoDrawer: ObservableObject {
         var moving: String?
     }
 
-    /// The paper drawn now (자동 follows the app's day or night).
+    /// The paper drawn now (밤에는 밤 종이로 follows the app's day or night).
     var palette: DrawerPalette {
-        theme.palette(NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .dark : .light)
+        palette(NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .dark : .light)
+    }
+
+    /// The paper drawn under `scheme`: the picked one, or 밤 종이 at night when the switch says so.
+    func palette(_ scheme: ColorScheme) -> DrawerPalette {
+        let shown = TextSteps.drawerShownPaper(paper: theme.rawValue, nightPaper: nightPaper, night: scheme == .dark)
+        return DrawerPalette.of(DrawerPalette.Kind(rawValue: shown) ?? .day)
     }
 
     struct DrawerToast: Equatable {
@@ -467,10 +559,21 @@ final class MemoDrawer: ObservableObject {
         let saved = store.double(forKey: "drawer.width")
         width = saved > 0 ? min(max(CGFloat(saved), Self.widths.lowerBound), Self.widths.upperBound) : Self.defaultWidth
         handleOn = store.object(forKey: "drawer.handle") == nil ? true : store.bool(forKey: "drawer.handle")
-        theme = Theme(rawValue: store.string(forKey: "drawer.theme") ?? "") ?? .auto
+        // #142: 1.45's ‘자동’ is 낮 종이 with 밤에는 밤 종이로 on; a paper picked by name had it off.
+        let picked = TextSteps.drawerPaper(theme: store.string(forKey: "drawer.theme"), nightPaper: store.object(forKey: "drawer.nightPaper") as? Bool)
+        theme = Theme(rawValue: picked.paper) ?? .day
+        nightPaper = picked.nightPaper
         pinned = store.object(forKey: "drawer.pinned") == nil ? true : store.bool(forKey: "drawer.pinned")
         backdrop = Backdrop(rawValue: store.string(forKey: "drawer.backdrop") ?? "") ?? .opaque
+        bodyFace = MemoText.Face(rawValue: store.string(forKey: "drawer.font") ?? "") ?? .clean
+        textSize = MemoText.Size(rawValue: TextSteps.drawerPoint(saved: store.object(forKey: "drawer.textPt") as? Int, legacy: store.string(forKey: "drawer.textSize"))) ?? .regular
+        lineSpacing = MemoText.LineSpacing(rawValue: store.string(forKey: "drawer.lineHeight") ?? "") ?? .regular
+        paragraphSpacing = MemoText.ParagraphSpacing(rawValue: store.string(forKey: "drawer.paragraph") ?? "") ?? .regular
+        codeFace = MemoText.CodeFace(rawValue: store.string(forKey: "drawer.codeFont") ?? "") ?? .system
+        showMarks = store.bool(forKey: "drawer.showMarks")
+        doneToBottom = store.object(forKey: "drawer.doneToBottom") == nil ? true : store.bool(forKey: "drawer.doneToBottom")
         pinnedSort = MemoFolders.Sort(rawValue: store.string(forKey: "drawer.pinnedSort") ?? "") ?? .edited
+        pinnedView = MemoFolders.View(rawValue: store.string(forKey: "drawer.pinnedView") ?? "") ?? .cards
         if let data = store.data(forKey: "drawer.shortcut") {
             shortcut = data.isEmpty ? nil : (try? JSONDecoder().decode(DrawerShortcut.self, from: data)) ?? .standard
         } else {
@@ -481,6 +584,8 @@ final class MemoDrawer: ObservableObject {
             self.memos = memos
         }.store(in: &subscriptions)
         model.$notebookFont.dropFirst().sink { [weak self] _ in self?.objectWillChange.send() }.store(in: &subscriptions)
+        // 지운 메모 (#120): its slip and the menus' row follow the trash while the drawer is out.
+        model.$memoTrash.dropFirst().sink { [weak self] _ in if self?.isOpen == true { self?.objectWillChange.send() } }.store(in: &subscriptions)
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
@@ -521,6 +626,8 @@ final class MemoDrawer: ObservableObject {
         if editing { editing = false }
         if bigID != nil { bigID = nil }
         if folderSheet != nil { folderSheet = nil }
+        if trashOpen { trashOpen = false }
+        if trashConfirm { trashConfirm = false }
     }
 
     /// For snapshots and the first draw: the model's data now.
@@ -557,15 +664,17 @@ final class MemoDrawer: ObservableObject {
         var shown: [Memo]
         /// More than 20 memos shown: the cards a little closer (12 pt apart, at least 56 tall).
         var dense: Bool
+        /// 제목만 (#115): one line a memo.
+        var titles = false
     }
     private var listCache: List?
     private var folderCounts: [String: Int]?
-    private var hitsCache: (query: String, hits: [MemoFolders.Hit])?
+    private var foundCache: (query: String, groups: [MemoFolders.HitGroup], hits: [MemoFolders.Hit])?
 
     private func listChanged() {
         listCache = nil
         folderCounts = nil
-        hitsCache = nil
+        foundCache = nil
     }
 
     var list: List {
@@ -581,7 +690,8 @@ final class MemoDrawer: ObservableObject {
         }
         let sections = MemoCards.sections(entries, sort: sort, pinnedGroup: tab != .pinned, now: now())
         let byID = Dictionary(memos.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let made = List(day: day, sections: sections, byID: byID, shown: sections.flatMap(\.ids).compactMap { byID[$0] }, dense: inTab.count > 20)
+        let made = List(day: day, sections: sections, byID: byID, shown: sections.flatMap(\.ids).compactMap { byID[$0] }, dense: inTab.count > 20,
+                        titles: view == .titles)
         listCache = made
         return made
     }
@@ -607,6 +717,23 @@ final class MemoDrawer: ObservableObject {
         switch tab {
         case .pinned: pinnedSort
         case .folder(let id): folders.sort(of: id)
+        }
+    }
+
+    /// 보기 of what's shown (#115): the folder's, or 고정's (this Mac's).
+    var view: MemoFolders.View { view(of: tab) }
+
+    func view(of tab: MemoFolders.Tab) -> MemoFolders.View {
+        switch tab {
+        case .pinned: pinnedView
+        case .folder(let id): folders.view(of: id)
+        }
+    }
+
+    func setView(_ view: MemoFolders.View, for tab: MemoFolders.Tab) {
+        switch tab {
+        case .pinned: pinnedView = view
+        case .folder(let id): model.setMemoFolderView(id, view)
         }
     }
 
@@ -655,6 +782,7 @@ final class MemoDrawer: ObservableObject {
         let ids = Set(memos.map(\.id))
         cards = cards.filter { ids.contains($0.key) }
         titles = titles.filter { ids.contains($0.key) }
+        links = links.filter { ids.contains($0.key) }
     }
 
     /// The time a card is grouped and timed by: 만든 순 its creation, else its last edit (frozen while a memo is open).
@@ -672,13 +800,33 @@ final class MemoDrawer: ObservableObject {
         }.map(\.element)
     }
 
-    /// The results for `searchedQuery`, worked out once per query and change (the list and the footer both read them).
-    var hits: [MemoFolders.Hit] {
-        if let known = hitsCache, known.query == searchedQuery { return known.hits }
-        let made = folders.search(searchedQuery, memos: arranged(memos), language: .current, index: searchIndex)
-        hitsCache = (searchedQuery, made)
+    /// The results for `searchedQuery` and the chips (#114), by folder, worked out once per query and change (the list,
+    /// the keys and the footer all read them).
+    var found: [MemoFolders.HitGroup] { foundNow().groups }
+
+    /// The results one after another, as the list shows them (↑ ↓ go through them in this order).
+    var hits: [MemoFolders.Hit] { foundNow().hits }
+
+    private func foundNow() -> (query: String, groups: [MemoFolders.HitGroup], hits: [MemoFolders.Hit]) {
+        if let known = foundCache, known.query == searchedQuery { return known }
+        let groups = folders.find(searchedQuery, memos: arranged(memos), scope: searchHere ? tab : nil, filters: searchFilters,
+                                  language: .current, index: searchIndex, isOpen: { [unowned self] memo in
+                                      if case .checklist(let done, let total)? = card(memo).kind { return done < total }
+                                      return false
+                                  }, hasLink: { [unowned self] memo in hasLink(memo) })
+        let made = (searchedQuery, groups, groups.flatMap(\.hits))
+        foundCache = made
         return made
     }
+
+    /// 링크 (#114): a web address in the memo, read once per text.
+    private func hasLink(_ memo: Memo) -> Bool {
+        if let known = links[memo.id], known.text == memo.text { return known.link }
+        let link = MemoCards.hasLink(memo.text)
+        links[memo.id] = (memo.text, link)
+        return link
+    }
+    private var links: [String: (text: String, link: Bool)] = [:]
 
     private func searchSoon() {
         searchTask?.cancel()
@@ -802,6 +950,31 @@ final class MemoDrawer: ObservableObject {
         query = ""
         searchNow()
         selectedID = nil
+        if searchHere { searchHere = false }
+        if !searchFilters.isEmpty { searchFilters = [] }
+    }
+
+    /// The folder shown (or 고정) by name: the search's `{이름}만` chip (#114).
+    var hereName: String {
+        switch tab {
+        case .pinned: L("고정")
+        case .folder: currentFolder?.displayName(.current) ?? ""
+        }
+    }
+
+    /// A filter chip (#114) pressed: on or off; the results follow at once.
+    func toggleFilter(_ filter: MemoFolders.SearchFilters) {
+        searchNow()
+        if searchFilters.contains(filter) { searchFilters.remove(filter) } else { searchFilters.insert(filter) }
+        selectedID = nil
+    }
+
+    /// 모든 폴더 · {지금 폴더}만 (#114).
+    func setSearchHere(_ here: Bool) {
+        searchNow()
+        guard searchHere != here else { return }
+        searchHere = here
+        selectedID = nil
     }
 
     /// A search result: its folder, opened at it.
@@ -835,6 +1008,7 @@ final class MemoDrawer: ObservableObject {
     /// One open slip at a time.
     func expand(_ id: String) {
         guard expandedID != id else { return }
+        linkEdit = nil
         commitOpenSlip()
         expandedID = id
         selectedID = id
@@ -857,6 +1031,7 @@ final class MemoDrawer: ObservableObject {
     }
 
     func collapse() {
+        linkEdit = nil
         commitOpenSlip()
         expandedID = nil
         editing = false
@@ -866,6 +1041,9 @@ final class MemoDrawer: ObservableObject {
     /// Esc: the big view, the open slip, the folder sheet, the search — one at a time; false when nothing was open
     /// (the drawer closes).
     func escape() -> Bool {
+        if linkEdit != nil { cancelLink(); return true }
+        if trashConfirm { trashConfirm = false; return true }
+        if trashOpen { trashOpen = false; return true }
         if folderSheet != nil { folderSheet = nil; return true }
         if bigID != nil { bigID = nil; return true }
         if expandedID != nil { collapse(); return true }
@@ -1011,8 +1189,35 @@ final class MemoDrawer: ObservableObject {
         model.showDesk(.help)
     }
 
+    /// #163: a box ticked in an open memo as it reads — the words change at once, in place (the box draws its tick);
+    /// with 끝낸 항목 아래로 the line goes down once that is drawn (0.36 s; unticked 0.14 s). `motion` off (Reduce motion):
+    /// one change at once, as before.
+    func tickInCard(_ id: String, line: Int, motion: Bool) {
+        guard motion, doneToBottom, let before = memo(id)?.text else { return model.toggleChecklist(id, line: line) }
+        let inPlace = MemoEdits.toggleDone(before, line: line, moveDone: false)
+        guard inPlace != before else { return }
+        let on = Checklist.lines(Checklist.split(before)[line]).first?.checked == false
+        model.updateMemo(id, text: inPlace, from: before)
+        model.saveMemosNow()
+        // After the tick is drawn (등장 + 바뀜, or 살짝 back), as in the editor.
+        let drawn = on ? Motion.enter.duration + Motion.change.duration : Motion.quick.duration
+        DispatchQueue.main.asyncAfter(deadline: .now() + drawn + 0.02) { [weak self] in
+            guard let self, self.memo(id)?.text == inPlace else { return }
+            self.model.updateMemo(id, text: MemoEdits.toggleDone(before, line: line, moveDone: true), from: inPlace)
+            self.model.saveMemosNow()
+        }
+    }
+
     /// The folder list (the name's ▾, ⌘L): set by the header's hotspot.
     var openFolderList: () -> Void = {}
+    /// A menu under the folder's name in the header (set by the same hotspot).
+    var popUnderName: ([DrawerMenuItem]) -> Void = { _ in }
+
+    /// ⇧⌘M (#118): the picked memo's 폴더로 옮기기, under the folder's name.
+    func openMoveList(_ id: String) {
+        guard memo(id) != nil else { return }
+        popUnderName(DrawerMenus.moveList(self, id))
+    }
 
     // MARK: Folders
 
@@ -1057,6 +1262,9 @@ final class MemoDrawer: ObservableObject {
     // MARK: Toast
 
     func say(_ text: String, action: String? = nil, perform: (() -> Void)? = nil) {
+        // #119: VoiceOver says the toast too (it isn't focused, and goes in a few seconds).
+        NSAccessibility.post(element: NSApp as Any, notification: .announcementRequested,
+                             userInfo: [.announcement: action.map { text + ", " + $0 } ?? text, .priority: NSAccessibilityPriorityLevel.high.rawValue])
         toastTask?.cancel()
         toast = DrawerToast(text: text, action: action)
         toastAction = perform

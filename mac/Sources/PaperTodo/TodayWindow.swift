@@ -285,7 +285,7 @@ struct TodayWindowView: View {
     var onCalendar: () -> Void = {}
     @State private var toast: PaperToast?
     @State private var timerHover = false
-    /// 1.38: an empty card's suggestion, put into the line below (“타이머 25”, “알람 7시”).
+    /// 1.38: an empty card's suggestion, put into the line below (‘타이머 25’, ‘알람 7시’).
     @State private var lineFill: String?
 
     static let width: CGFloat = 320
@@ -302,12 +302,16 @@ struct TodayWindowView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         // The toast floats just above the line it came from, centred on it.
                         .overlay(alignment: .bottom) {
-                            if let shown = toast ?? previewToast {
-                                ToastView(toast: shown) { if toast?.id == shown.id { toast = nil } }
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .padding(.horizontal, -2)
-                                    .id(shown.id)
+                            ZStack {
+                                if let shown = toast ?? previewToast {
+                                    ToastView(toast: shown) { if toast?.id == shown.id { toast = nil } }
+                                        .fixedSize(horizontal: false, vertical: true)
+                                        .padding(.horizontal, -2)
+                                        .transition(.toast)
+                                        .id(shown.id)
+                                }
                             }
+                            .toastMotion(shown: toast ?? previewToast != nil)
                         }
                         .zIndex(1)
                     IntentLineView(model: model, page: .todos, toast: $toast, compact: true, focusRequest: focus, prefill: $lineFill)
@@ -380,7 +384,7 @@ struct TodayWindowView: View {
                     if running != nil && (timerHover || previewTimerHover) { timerButtons(paused: running?.isPaused ?? false) }
                 }
                 .onHover { timerHover = $0 }
-                // 1.38: an empty timer card puts “타이머 25” into the line.
+                // 1.38: an empty timer card puts ‘타이머 25’ into the line.
                 .onTapGesture { if running == nil { lineFill = TodayGlance.timerWords(language) } }
             // 다음 알람
             GlanceCard(caption: L("다음 알람"),
@@ -389,7 +393,7 @@ struct TodayWindowView: View {
                        hot: alarm.map { $0.fire.timeIntervalSince(now) <= TimeInterval(TodayGlance.window * 60) } ?? false,
                        accessibility: alarm.map { L("다음 알람") + ": " + Alarm.timeText($0.alarm, language: language) + ", " + Alarm.untilText($0.fire, now: now, language: language) }
                            ?? L("다음 알람") + ": " + L("없음"))
-                // 1.38: an alarm opens 시계; none puts “알람 7시” into the line.
+                // 1.38: an alarm opens 시계; none puts ‘알람 7시’ into the line.
                 .onTapGesture { if alarm == nil { lineFill = TodayGlance.alarmWords(language) } else { model.showAlarmSettings() } }
         }
         .fixedSize(horizontal: false, vertical: true)
@@ -422,14 +426,16 @@ struct TodayWindowView: View {
 
     @ViewBuilder
     private func tasks(now: Date) -> some View {
-        let open = model.glanceTodayItems
+        // 2a (A5): the note's lens — one space's to-dos (the menu bar's words and the counts stay everyone's).
+        let shown = model.spaceShown
+        let open = shown == .all ? model.glanceTodayItems : model.glanceTodayItems.filter { shown.includes(model.spaceOf($0.id)?.id) }
         let split = TodayGroups.split(open, series: model.series, now: now)
         let byID = Dictionary(uniqueKeysWithValues: open.map { ($0.id, $0) })
         let next = split.next.compactMap { byID[$0] }
         let rest = split.rest.compactMap { byID[$0] }.prefix(Self.moreLimit)
         let more = open.filter { !$0.isCompleted }.count - next.filter { !$0.isCompleted }.count - rest.filter { !$0.isCompleted }.count
         VStack(alignment: .leading, spacing: 0) {
-            if open.isEmpty {
+            if open.isEmpty && (shown == .all || model.hiddenOpenCount == 0) {
                 // 1.38: the small cat, like every other empty sheet.
                 HStack(spacing: 8) {
                     Image(nsImage: PetArt.image(model.todayItems.isEmpty ? .happy : .cheer) ?? PaperTheme.mascot)
@@ -446,7 +452,7 @@ struct TodayWindowView: View {
                 ForEach(next) { GlanceTaskRow(item: $0, model: model, time: split.times[$0.id]) }
             }
             if !rest.isEmpty {
-                if !next.isEmpty { GlanceHeader(title: L("오늘 할 일")).padding(.top, 4) }
+                if !next.isEmpty { GlanceHeader(title: L("그 밖에")).padding(.top, 4) } // #52: as the note and Windows
                 ForEach(Array(rest)) { GlanceTaskRow(item: $0, model: model, time: nil) }
             }
             if more > 0 {
@@ -460,6 +466,7 @@ struct TodayWindowView: View {
                 .buttonStyle(.plain)
                 .padding(.leading, 2)
             }
+            if shown != .all { GlanceLensLine(model: model, shown: shown) }
         }
     }
 
@@ -555,6 +562,71 @@ private struct GlanceCard: View {
     }
 }
 
+/// 2a (A5): under the 오늘 창's to-dos while one space shows — `● 회사만`, and with hidden open to-dos
+/// ` · 다른 스페이스에 N개 더 · 모두 보기` (모두 보기 lets the lens go everywhere).
+private struct GlanceLensLine: View {
+    @ObservedObject var model: AppModel
+    let shown: SpaceLens.Shown
+
+    var body: some View {
+        let hidden = model.hiddenOpenCount
+        let name = model.spaceName(shown) ?? ""
+        // One line when it fits; else the name on its own line and the rest under it (Dutch is long), never cut.
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 5) {
+                lens(name)
+                if hidden > 0 {
+                    dot
+                    more(hidden)
+                }
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                lens(name)
+                if hidden > 0 { more(hidden).padding(.leading, 12) }
+            }
+        }
+        .font(.system(size: 11))
+        .lineLimit(1)
+        .padding(.leading, 4)
+        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(SpaceWords.lensLabel(name, hidden: hidden, language: .current))
+    }
+
+    private var dot: some View { Text("·").foregroundStyle(PaperTheme.ink3).accessibilityHidden(true) }
+
+    /// `● 회사만` (일반: an empty dot).
+    private func lens(_ name: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Group {
+                if let space = model.todoSpaces.space(shown.lensID) {
+                    SpaceDotView(space: space, size: 7)
+                } else {
+                    Circle().strokeBorder(PaperTheme.ink3, lineWidth: 1).frame(width: 7, height: 7)
+                }
+            }
+            .alignmentGuide(.firstTextBaseline) { d in d[.bottom] }
+            Text(SpaceWords.only(name, language: .current)).fontWeight(.semibold).foregroundStyle(PaperTheme.ink2)
+        }
+        .fixedSize()
+    }
+
+    /// `다른 스페이스에 N개 더 · 모두 보기`.
+    private func more(_ hidden: Int) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 5) {
+            Text(SpaceWords.more(hidden, language: .current)).foregroundStyle(PaperTheme.ink3)
+            dot
+            Button { model.showSpace(.all) } label: {
+                Text(L("모두 보기")).fontWeight(.semibold).foregroundStyle(PaperTheme.ink2).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(L("모두 보기") + " (⌥⌘0)")
+        }
+        .fixedSize()
+    }
+}
+
 private struct GlanceHeader: View {
     let title: String
 
@@ -577,7 +649,7 @@ private struct GlanceTaskRow: View {
     let time: Date?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var strike: CGFloat = 0
-    @State private var pop = false
+    @State private var pops = 0
     @State private var hovering = false
 
     var body: some View {
@@ -594,7 +666,7 @@ private struct GlanceTaskRow: View {
                     }
                 }
                 .frame(width: 17, height: 17)
-                .scaleEffect(pop ? 0.85 : 1)
+                .checkPop(pops)
                 .frame(width: 22, height: 30)
                 .contentShape(Rectangle())
             }
@@ -635,15 +707,19 @@ private struct GlanceTaskRow: View {
         .padding(.trailing, 4)
         .frame(minHeight: 30)
         .background(PaperTheme.sage.opacity(hovering ? 0.055 : 0), in: RoundedRectangle(cornerRadius: 4))
+        .overlay(alignment: .leading) {
+            // 2a (A5): the space's band at the row's left end, in the window's margin clear of the box.
+            if let space = model.spaceOf(item.id) { SpaceBand(space: space, height: 30, faded: item.isCompleted).offset(x: -8) }
+        }
         .overlay(alignment: .bottom) { Rectangle().fill(PaperTheme.rule).frame(height: 0.6).padding(.leading, 26) }
         .onHover { hovering = $0 }
         .onAppear { strike = item.isCompleted ? 1 : 0 }
         .onChange(of: item.isCompleted) { _, done in
-            guard done, !reduceMotion else { strike = done ? 1 : 0; return }
+            // 체크 한 번, as in the note (the hold before the row goes is the model's: 0.65 s, 0.3 under Reduce Motion).
+            guard done, Motion.animation(.change, reduce: reduceMotion) != nil else { strike = done ? 1 : 0; return }
             strike = 0
-            withAnimation(.easeOut(duration: 0.22)) { strike = 1 }
-            pop = true
-            withAnimation(.easeOut(duration: 0.16)) { pop = false }
+            withAnimation(Motion.strike(reduce: reduceMotion)) { strike = 1 }
+            pops += 1
         }
     }
 }

@@ -40,8 +40,10 @@ final class SweepController {
 
     func show(_ moment: Sweep.Moment, items: [TodoItem]) {
         let panel = panel ?? makePanel()
-        panel.show(SweepView(model: model, moment: moment, items: items, onClose: { [weak self] in self?.close() }))
-        if let pet = petAnchor() {
+        let pet = petAnchor()
+        // Over the cat that is out, the slip has no cat of its own (#51, as on Windows).
+        panel.show(SweepView(model: model, moment: moment, items: items, onPet: pet != nil, onClose: { [weak self] in self?.close() }))
+        if let pet {
             onPetGreet()
             panel.placeSlip(topCenter: NSPoint(x: pet.midX, y: pet.maxY + panel.frame.height - 10))
         } else if let note = noteFrame() {
@@ -68,6 +70,8 @@ struct SweepView: View {
     @ObservedObject var model: AppModel
     let moment: Sweep.Moment
     let items: [TodoItem]
+    /// Standing over the desktop cat: no second cat beside the question.
+    var onPet = false
     var onClose: () -> Void = {}
     @State private var excluded: Set<UUID> = []
 
@@ -80,10 +84,12 @@ struct SweepView: View {
                 SlipHeader(kind: .todo, symbol: moment == .evening ? "moon" : "sun.max",
                            title: moment == .evening ? L("저녁 정리") : L("아침 정리"), onClose: onClose)
                 HStack(alignment: .center, spacing: 12) {
-                    Image(nsImage: PetArt.image(moment == .evening ? .tea : .happy) ?? PaperTheme.mascot)
-                        .resizable().scaledToFit()
-                        .frame(width: 52, height: 52)
-                        .accessibilityHidden(true)
+                    if !onPet {
+                        Image(nsImage: PetArt.image(moment == .evening ? .tea : .happy) ?? PaperTheme.mascot)
+                            .resizable().scaledToFit()
+                            .frame(width: 52, height: 52)
+                            .accessibilityHidden(true)
+                    }
                     Text(Sweep.question(moment, count: items.count, language: .current))
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(PaperTheme.ink)
@@ -95,7 +101,8 @@ struct SweepView: View {
                 GroupHeader(title: L("넘길 할 일"), count: chosen.count, leading: 16)
                     .padding(.top, 8)
                 ScrollView(.vertical) {
-                    VStack(spacing: 0) {
+                    // #70: only the rows in view are made (1,000 took 1–1.7 s to open).
+                    LazyVStack(spacing: 0) {
                         ForEach(items) { item in row(item) }
                     }
                 }
@@ -109,9 +116,10 @@ struct SweepView: View {
                         Button(L("그대로 두기"), action: onClose).buttonStyle(SlipButtonStyle(role: .ghost))
                     }
                 } trailing: {
+                    // #51: one filled button (the default), the others alike — the same rule as Windows.
                     if moment == .evening {
                         Button(L("언젠가로")) { apply(someday: true) }
-                            .buttonStyle(SlipButtonStyle(role: .quiet)).disabled(chosen.isEmpty)
+                            .buttonStyle(SlipButtonStyle(role: .ghost)).disabled(chosen.isEmpty)
                         Button(L("내일로")) { apply(someday: false) }
                             .buttonStyle(SlipButtonStyle(role: .primary)).disabled(chosen.isEmpty)
                             .help(L("할 일을 내일로 옮겨요"))
@@ -119,7 +127,7 @@ struct SweepView: View {
                         Button(L("언젠가로")) { apply(someday: true) }
                             .buttonStyle(SlipButtonStyle(role: .ghost)).disabled(chosen.isEmpty)
                         Button(L("내일로")) { apply(someday: false) }
-                            .buttonStyle(SlipButtonStyle(role: .quiet)).disabled(chosen.isEmpty)
+                            .buttonStyle(SlipButtonStyle(role: .ghost)).disabled(chosen.isEmpty)
                         Button(L("오늘 할게요"), action: onClose).buttonStyle(SlipButtonStyle(role: .primary))
                     }
                 }

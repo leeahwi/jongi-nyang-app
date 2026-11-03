@@ -1,0 +1,58 @@
+{
+  "about": "글꼴 · 종이 설정 (#141 · #142, settings-plan.md F1 · F2 · P3): the cases both apps read — Mac TextSteps.swift (scripts/test-settings.sh), Windows textSteps.ts (test/textSteps.test.ts).",
+  "noteScales": [0.87, 0.93, 1, 1.07, 1.13, 1.2, 1.26],
+  "noteSteps": [
+    { "case": "F1 1.45's 작게", "legacy": "small", "step": 0 },
+    { "case": "F1 1.45's 보통", "legacy": "regular", "step": 2 },
+    { "case": "F1 1.45's 크게", "legacy": "large", "step": 4 },
+    { "case": "F1 1.45's 아주 크게", "legacy": "extraLarge", "step": 6 },
+    { "case": "F1 nothing saved", "step": 2 },
+    { "case": "F1 an unknown name", "legacy": "huge", "step": 2 },
+    { "case": "F1 the step wins over the old name", "saved": 3, "legacy": "small", "step": 3 },
+    { "case": "F1 a step out of range", "saved": 9, "legacy": "large", "step": 4 }
+  ],
+  "noteLegacyNames": ["small", "small", "regular", "large", "large", "extraLarge", "extraLarge"],
+  "drawerPoints": [
+    { "case": "F1 1.45's 작게", "legacy": "small", "points": 13 },
+    { "case": "F1 1.45's 보통", "legacy": "regular", "points": 14 },
+    { "case": "F1 1.45's 크게", "legacy": "large", "points": 16 },
+    { "case": "F1 1.45's 아주 크게", "legacy": "extraLarge", "points": 18 },
+    { "case": "F1 nothing saved", "points": 14 },
+    { "case": "F1 the points win", "saved": 20, "legacy": "small", "points": 20 },
+    { "case": "F1 points out of range", "saved": 11, "legacy": "large", "points": 16 }
+  ],
+  "drawerLegacyNames": { "12": "small", "13": "small", "14": "regular", "15": "regular", "16": "large", "17": "large", "18": "extraLarge", "19": "extraLarge", "20": "extraLarge" },
+  "drawerMetrics": [
+    { "case": "F1 보통, as in 1.45", "points": 14, "line": "regular", "paragraph": "regular", "expect": { "body": 14, "line": 26, "paragraph": 0, "preview": 13, "previewLine": 20 } },
+    { "case": "F1 1.45's 작게", "points": 13, "expect": { "body": 13, "line": 24, "paragraph": 0, "preview": 12, "previewLine": 18 } },
+    { "case": "F1 1.45's 크게", "points": 16, "expect": { "body": 16, "line": 30, "paragraph": 0, "preview": 14, "previewLine": 22 } },
+    { "case": "F1 1.45's 아주 크게", "points": 18, "expect": { "body": 18, "line": 33, "paragraph": 0, "preview": 15, "previewLine": 23 } },
+    { "case": "F1 the smallest", "points": 12, "expect": { "body": 12, "line": 22, "paragraph": 0, "preview": 11, "previewLine": 17 } },
+    { "case": "F1 the largest", "points": 20, "expect": { "body": 20, "line": 37, "paragraph": 0, "preview": 16, "previewLine": 25 } },
+    { "case": "F2 촘촘하게", "points": 14, "line": "tight", "expect": { "body": 14, "line": 22, "paragraph": 0, "preview": 13, "previewLine": 20 } },
+    { "case": "F2 넉넉하게", "points": 14, "line": "loose", "expect": { "body": 14, "line": 29, "paragraph": 0, "preview": 13, "previewLine": 20 } },
+    { "case": "F2 넓게", "points": 14, "paragraph": "wide", "expect": { "body": 14, "line": 26, "paragraph": 9, "preview": 13, "previewLine": 20 } },
+    { "case": "F2 아주 넓게, 넉넉하게 at 20", "points": 20, "line": "loose", "paragraph": "wider", "expect": { "body": 20, "line": 42, "paragraph": 29, "preview": 16, "previewLine": 25 } }
+  ],
+  "paragraphs": [
+    { "case": "F2 plain lines are one paragraph", "text": "제목\n첫 줄\n둘째 줄", "ends": [false, false, false] },
+    { "case": "F2 a blank line ends one", "text": "제목\n첫 줄\n\n둘째 문단", "ends": [false, true, false, false] },
+    { "case": "F2 a list stays together, its end is one", "text": "제목\n- [ ] 우유\n- [x] 달걀\n1. 빵\n끝", "ends": [true, false, false, true, false] },
+    { "case": "F2 a heading is its own", "text": "제목\n## 짐\n여권", "ends": [true, true, false] },
+    { "case": "F2 a code block stays together", "text": "제목\n```\nls\n# 주석\n```\n뒤", "ends": [true, false, false, false, true, false] },
+    { "case": "F2 a quote, a rule", "text": "제목\n> 하나\n> 둘\n---\n끝", "ends": [true, false, true, true, false] },
+    { "case": "F2 nothing after the last line", "text": "- 하나", "ends": [false] }
+  ],
+  "drawerPapers": [
+    { "case": "P3 1.45's 자동: 낮 종이, switch on", "theme": "auto", "paper": "day", "nightPaper": true, "writes": "auto", "shown": ["day", "night"] },
+    { "case": "P3 nothing saved: as 자동", "paper": "day", "nightPaper": true, "writes": "auto", "shown": ["day", "night"] },
+    { "case": "P3 1.45's 낮 종이 stayed light at night: switch off", "theme": "day", "paper": "day", "nightPaper": false, "writes": "day", "shown": ["day", "day"] },
+    { "case": "P3 낮 종이 written by an older version wins over the switch", "theme": "day", "saved": true, "paper": "day", "nightPaper": false, "writes": "day", "shown": ["day", "day"] },
+    { "case": "P3 1.45's 크라프트지: switch off", "theme": "kraft", "paper": "kraft", "nightPaper": false, "writes": "kraft", "shown": ["kraft", "kraft"] },
+    { "case": "P3 크라프트지 with the switch on turns at night", "theme": "kraft", "saved": true, "paper": "kraft", "nightPaper": true, "writes": "kraft", "shown": ["kraft", "night"] },
+    { "case": "P3 1.45's 밤 종이", "theme": "night", "paper": "night", "nightPaper": false, "writes": "night", "shown": ["night", "night"] },
+    { "case": "P4 먹색 stays itself at night", "theme": "ink", "saved": true, "paper": "ink", "nightPaper": true, "writes": "ink", "shown": ["ink", "ink"] },
+    { "case": "P4 한지 with the switch off", "theme": "hanji", "saved": false, "paper": "hanji", "nightPaper": false, "writes": "hanji", "shown": ["hanji", "hanji"] },
+    { "case": "P4 벚꽃 with the switch on", "theme": "blossom", "saved": true, "paper": "blossom", "nightPaper": true, "writes": "blossom", "shown": ["blossom", "night"] }
+  ]
+}

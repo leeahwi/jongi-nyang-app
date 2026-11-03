@@ -68,7 +68,7 @@ test("glance cards: next event, timer, next alarm — the urgent one hot", () =>
   const cards = glanceCards([event("치과", at(15, 30), at(16, 30)), event("회의", at(10), at(11))], undefined, alarms, new Set(), now, "ko");
   assert.deepEqual(cards.map((card) => [card.label, card.big, card.small, card.hot, card.empty]), [
     ["다음 일정", "15:30", "40분 뒤 · 치과", true, false],
-    ["타이머", "—", "“타이머 25”", false, true],
+    ["타이머", "—", "‘타이머 25’", false, true],
     ["다음 알람", "07:00", "내일 · 평일", false, false],
   ]);
   const en = glanceCards([event("Meeting", at(10, 0, 9), at(11, 0, 9))], running, alarms, new Set(), now, "en");
@@ -85,10 +85,10 @@ test("glance cards: next event, timer, next alarm — the urgent one hot", () =>
   ]);
   // An alarm within the hour is hot; an event later today says how long until it.
   const soon = glanceCards([event("저녁", at(18, 20), at(19))], undefined, [alarm("15:30", [])], new Set(), now, "ko");
-  assert.deepEqual(soon.map((card) => [card.big, card.small, card.hot]), [["18:20", "3시간 30분 뒤 · 저녁", false], ["—", "“타이머 25”", false], ["15:30", "오늘 · 한 번", true]]);
-  assert.deepEqual(glanceCards([], undefined, [], new Set(), now, "en").map((card) => card.small), ["None today", "“timer 25”", "“alarm 7am”"]);
+  assert.deepEqual(soon.map((card) => [card.big, card.small, card.hot]), [["18:20", "3시간 30분 뒤 · 저녁", false], ["—", "‘타이머 25’", false], ["15:30", "오늘 · 한 번", true]]);
+  assert.deepEqual(glanceCards([], undefined, [], new Set(), now, "en").map((card) => card.small), ["None today", "‘timer 25’", "‘alarm 7am’"]);
   // The empty cards say what the Mac's say: none today, or what to type (stage 4 parity).
-  assert.deepEqual(glanceCards([], undefined, [], new Set(), now, "ko").map((card) => card.small), ["오늘은 없어요", "“타이머 25”", "“알람 7시”"]);
+  assert.deepEqual(glanceCards([], undefined, [], new Set(), now, "ko").map((card) => card.small), ["오늘은 없어요", "‘타이머 25’", "‘알람 7시’"]);
   // A countdown says when it ends (to the minute), or that it's paused; a pomodoro its phase.
   assert.equal(glanceCards([], running, [], new Set(), now, "ko")[1].small, "15:03에 끝나요");
   assert.equal(glanceCards([], { ...running, paused: true }, [], new Set(), now, "ko")[1].small, "멈춤");

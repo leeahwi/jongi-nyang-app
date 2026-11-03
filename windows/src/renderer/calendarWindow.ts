@@ -4,10 +4,11 @@ import {
 } from "../core/calendar";
 import { draftFromEvent, expand, parseOccurrenceKey } from "../core/events";
 import { fromKey, key as dayKey } from "../core/deadline";
-import type { AppState } from "../core/types";
+import type { TodosState } from "../core/types";
 import { weekdayLetter, weekdayOrder, weekdayShort } from "../core/lang";
 import { h, icon, lang, paper, t } from "./api";
 import { openEventSheet, type EventSheet } from "./eventSheet";
+import { paneSight } from "./paneSight";
 
 /**
  * 달력: a month of six weeks, or a week of seven rows, with the events (events.json, spread over the
@@ -26,7 +27,7 @@ let room = { cell: 3, week: 4, dots: 0 };
 /** Below this width a month cell's titles would be two or three letters: its items become coloured dots. */
 const DOT_CELL = 56;
 
-let state: AppState | undefined;
+let state: TodosState | undefined;
 let view: "month" | "week" = "month";
 /** Opened on a day (an alert's title: ?day=2026-10-08), else today. */
 const requestedDay = new URLSearchParams(location.search).get("day");
@@ -337,23 +338,30 @@ window.addEventListener("keydown", (event) => {
 
 // ─── Wiring ───────────────────────────────────────────────────────────────────
 
-function apply(next: AppState): void {
+function apply(next: TodosState): void {
   const first = !state;
   state = next;
   document.documentElement.dataset.font = next.prefs.font;
   if (first) {
     view = next.prefs.calendarView === "week" ? "week" : "month";
     shown = monthOf(selected);
+    redraw();
+    // `npm run perf` reads when the first month was drawn.
+    performance.mark("paper:first-render");
   }
-  // Every change may bring events (one written here or in the note, a shared folder read again).
+  // Out of sight (the desk hidden, another pane in front): drawn once when it shows again (#79).
+  else sight.draw(redraw);
+}
+
+/** Every change may bring events (one written here or in the note, a shared folder read again). */
+function redraw(): void {
   spreadEvents();
   render();
   sheet?.refresh();
-  // `npm run perf` reads when the first month was drawn.
-  if (first) performance.mark("paper:first-render");
 }
+const sight = paneSight("calendar", redraw);
 
-api.on("state", (next) => apply(next as AppState));
+api.on("state", (next) => apply(next as TodosState));
 // An alert's title (or 달력에서 열기), with the desk already open: that day.
 api.on("desk:pane", (payload) => {
   const { pane, day } = (payload ?? {}) as { pane?: unknown; day?: unknown };
@@ -362,6 +370,7 @@ api.on("desk:pane", (payload) => {
   choose(day);
 });
 api.on("calendar:event-sheet", (payload) => {
+  sight.flush();
   const request = payload as CalendarSheetRequest;
   const key = request.key;
   showSheet(request, () => (key ? [...app.querySelectorAll<HTMLElement>(".panel .ev")].find((row) => row.dataset.key === key) : undefined) ?? app.querySelector<HTMLElement>(".panel") ?? undefined);

@@ -5,8 +5,10 @@ import { emptyMemoFolders, mergeMemoFolders, parseMemoFolders, serializeMemoFold
 import { isoDate, parseNotebook } from "./notebook";
 import { parseSeries } from "./repeat";
 import { emptyTodoSpaces, mergeTodoSpaces, parseTodoSpaces, serializeTodoSpaces } from "./todoSpaces";
+import { emptyTrash, mergeTrash, parseMemoTrash, serializeMemoTrash } from "./memoTrash";
 import { clock, dayMonth, langIndex, plural, type Lang } from "./lang";
 import { focusFileName } from "./focus";
+import { logicalDayStart } from "./archive";
 
 /**
  * 백업 · 옮기기: everything in the storage folder in one file, to move it to another computer (Mac
@@ -26,10 +28,11 @@ export const backupExtension = "jongi";
 /** The storage folder's files, by their path inside it ("todos.json", "archive/2026-10.jsonl"). */
 export type BackupFiles = Record<string, string>;
 
-export interface Backup { exportedAt?: string; from?: string; files: BackupFiles }
+/** `reason` and `counts` (B4, optional, version still 1): why a copy was made and what it holds, so a list can show both. */
+export interface Backup { exportedAt?: string; from?: string; reason?: BackupReason; counts?: BackupCounts; files: BackupFiles }
 
 /** The data files (메모 서랍's folders since 1.28, 할 일 스페이스 since 1.30); the record is archive/<month>.jsonl beside them, and the focus record focus.jsonl. */
-export const dataFiles = ["todos.json", "memos.json", "repeats.json", "events.json", "alarms.json", "memo-folders.json", "todo-spaces.json"] as const;
+export const dataFiles = ["todos.json", "memos.json", "repeats.json", "events.json", "alarms.json", "memo-folders.json", "todo-spaces.json", "memo-trash.json"] as const;
 export type DataFile = typeof dataFiles[number];
 /** A month of the record ("2026-10", "undated"): nothing that could reach outside the archive folder. */
 export const isArchiveName = (name: string) => /^archive\/[0-9A-Za-z_-]+\.jsonl$/.test(name);
@@ -43,18 +46,23 @@ export const notBackup = "종이냥 백업 파일이 아니에요.";
 export const tooNew = "더 새 버전의 종이냥에서 만든 파일이에요. 종이냥을 업데이트해 주세요.";
 export const unreadable = (name: string) => `백업 파일 안의 ‘${name}’을 읽지 못했어요.`;
 
-/** The three refusals in a language (the same as the macOS Backup.Problem messages). */
-export const backupMessages: Record<Lang, { notBackup: string; tooNew: string; unreadable: (name: string) => string }> = {
-  ko: { notBackup, tooNew, unreadable },
+/** #173 (review L-05): a .jongi past fileLimits.backupBytes is not opened. */
+export const tooLarge = "파일이 너무 커서 열지 않았어요. 백업 파일은 64MB까지 열 수 있어요.";
+
+/** The four refusals in a language (the same as the macOS Backup.Problem messages). */
+export const backupMessages: Record<Lang, { notBackup: string; tooNew: string; unreadable: (name: string) => string; tooLarge: string }> = {
+  ko: { notBackup, tooNew, unreadable, tooLarge },
   en: {
     notBackup: "This isn’t a Jongi-nyang backup file.",
     tooNew: "This file comes from a newer version of Jongi-nyang. Please update Jongi-nyang.",
     unreadable: (name) => `Couldn’t read ‘${name}’ in the backup file.`,
+    tooLarge: "This file is too big to open. Backup files can be up to 64 MB.",
   },
   nl: {
     notBackup: "Dit is geen back-upbestand van Jongi-nyang.",
     tooNew: "Dit bestand komt uit een nieuwere versie van Jongi-nyang. Werk Jongi-nyang bij.",
-    unreadable: (name) => `Kon ‘${name}’ in het back-upbestand niet lezen.`,
+    unreadable: (name) => `Het lukte niet om ‘${name}’ in het back-upbestand te lezen.`,
+    tooLarge: "Dit bestand is te groot om te openen. Back-upbestanden mogen tot 64 MB zijn.",
   },
 };
 
@@ -65,17 +73,72 @@ export function backupFileName(now: Date, lang: Lang = "ko"): string {
   return `${name}-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.${backupExtension}`;
 }
 
-/** The automatic copy before an import: "가져오기-전-20261008-143005.jongi". */
-export function preImportName(now: Date): string {
-  const pad = (value: number) => String(value).padStart(2, "0");
-  return `가져오기-전-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.${backupExtension}`;
+// ─── Automatic copies (backups/ on this device) ───────────────────────────────
+
+/** Why a copy was made. The values are the .jongi file's optional `reason` (B4); the same as Backup.Reason on the Mac. */
+export const backupReasons = ["daily", "beforeImport", "beforeFolderSwitch", "beforeRestore", "beforeUpdate", "manual", "export"] as const;
+export type BackupReason = typeof backupReasons[number];
+
+/** The start of a copy's name in backups/ — Korean in every language (old copies are found by it); none for 내보내기. */
+export const savedPrefix: Record<Exclude<BackupReason, "export">, string> = {
+  daily: "매일", beforeImport: "가져오기-전", beforeFolderSwitch: "폴더-바꾸기-전", beforeRestore: "되돌리기-전", beforeUpdate: "업데이트-전", manual: "직접", // i18n-ok: file names
+};
+
+/** How many of a kind stay: 14 daily ones, 10 of each ‘before’ kind; undefined = until deleted (직접). */
+export function keeps(reason: BackupReason): number | undefined {
+  if (reason === "daily") return 14;
+  return reason.startsWith("before") ? 10 : undefined;
 }
 
-/** The backup file's text: only the files given (those the folder has), keys in order. */
-export function makeBackup(files: BackupFiles, from: string, exportedAt: Date): string {
+/** "매일-20261030-091200.jongi", "폴더-바꾸기-전-20261030-091200.jongi" (local time). */
+export function savedName(reason: BackupReason, now: Date): string {
+  const pad = (value: number) => String(value).padStart(2, "0");
+  const prefix = reason === "export" ? savedPrefix.manual : savedPrefix[reason];
+  return `${prefix}-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}.${backupExtension}`;
+}
+
+/** The automatic copy before an import: "가져오기-전-20261008-143005.jongi". */
+export const preImportName = (now: Date) => savedName("beforeImport", now);
+
+/** A copy in backups/, read from its name. */
+export interface SavedCopy { name: string; reason: BackupReason; date: Date }
+
+/** The kind and time in a copy's name; undefined for any other file. */
+export function parseSavedName(name: string): SavedCopy | undefined {
+  for (const [reason, prefix] of Object.entries(savedPrefix) as [BackupReason, string][]) {
+    const match = new RegExp(`^${prefix}-(\\d{4})(\\d{2})(\\d{2})-(\\d{2})(\\d{2})(\\d{2})\\.${backupExtension}$`).exec(name);
+    if (!match) continue;
+    const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
+    const date = new Date(year, month - 1, day, hour, minute, second);
+    if (date.getMonth() !== month - 1 || date.getDate() !== day) continue;
+    return { name, reason, date };
+  }
+  return undefined;
+}
+
+/** The copies to remove: past the newest 14 daily ones and the newest 10 of each ‘before’ kind. 직접 and other files stay. */
+export function pruneSaved(names: string[]): string[] {
+  const copies = names.map(parseSavedName).filter((copy): copy is SavedCopy => copy !== undefined);
+  const remove: string[] = [];
+  for (const reason of backupReasons) {
+    const kept = keeps(reason);
+    if (kept === undefined) continue;
+    const kind = copies.filter((copy) => copy.reason === reason)
+      .sort((a, b) => b.date.getTime() - a.date.getTime() || (a.name < b.name ? 1 : a.name > b.name ? -1 : 0));
+    remove.push(...kind.slice(kept).map((copy) => copy.name));
+  }
+  return remove.sort();
+}
+
+/**
+ * The backup file's text: only the files given (those the folder has), keys in order. With a reason (B4), also
+ * `"reason"` and `"counts"` (to-dos, memos, events, record lines); older versions read past both.
+ */
+export function makeBackup(files: BackupFiles, from: string, exportedAt: Date, reason?: BackupReason): string {
   const sorted: BackupFiles = {};
   for (const name of Object.keys(files).sort()) sorted[name] = files[name];
-  return JSON.stringify({ format: backupFormat, version: backupVersion, exportedAt: isoDate(exportedAt), from, files: sorted }, null, 2) + "\n";
+  const told = reason ? { reason, counts: backupCounts(files) } : {};
+  return JSON.stringify({ format: backupFormat, version: backupVersion, exportedAt: isoDate(exportedAt), from, ...told, files: sorted }, null, 2) + "\n";
 }
 
 type Json = Record<string, unknown>;
@@ -93,6 +156,7 @@ export function readable(name: string, text: string): boolean {
     else if (name === "alarms.json") parseAlarms(text);
     else if (name === "memo-folders.json") parseMemoFolders(text);
     else if (name === "todo-spaces.json") parseTodoSpaces(text);
+    else if (name === "memo-trash.json") parseMemoTrash(text);
     else return false;
     return true;
   } catch {
@@ -124,9 +188,24 @@ export function parseBackup(text: string, lang: Lang = "ko"): { backup: Backup }
     backup: {
       ...(typeof value.exportedAt === "string" ? { exportedAt: value.exportedAt } : {}),
       ...(typeof value.from === "string" ? { from: value.from } : {}),
+      ...((backupReasons as readonly unknown[]).includes(value.reason) ? { reason: value.reason as BackupReason } : {}),
+      ...(readCounts(value.counts) ? { counts: readCounts(value.counts) } : {}),
       files,
     },
   };
+}
+
+/** `counts` as written by makeBackup: an object of non-negative whole numbers (a missing one is 0); anything else none. */
+function readCounts(value: unknown): BackupCounts | undefined {
+  if (!isObject(value)) return undefined;
+  const counts: BackupCounts = { todos: 0, memos: 0, events: 0, archive: 0 };
+  for (const key of ["todos", "memos", "events", "archive"] as const) {
+    const number = value[key];
+    if (number === undefined) continue;
+    if (typeof number !== "number" || !Number.isInteger(number) || number < 0) return undefined;
+    counts[key] = number;
+  }
+  return counts;
 }
 
 const order = (name: string) => { const index = (dataFiles as readonly string[]).indexOf(name); return index < 0 ? dataFiles.length : index; };
@@ -187,9 +266,72 @@ export function exportedText(exportedAt: string | undefined, lang: Lang = "ko"):
   return `${day}${lang === "en" ? ", " : " "}${clock(date.getHours(), date.getMinutes(), lang)}`;
 }
 
+// ─── The backup list (책상 → 저장과 백업, the same as the Mac's) ─────────────────
+
+/** What a copy holds, shortly: to-dos, memos, events and the record's lines (B4 `counts`). */
+export interface BackupCounts { todos: number; memos: number; events: number; archive: number }
+
+export function backupCounts(files: BackupFiles): BackupCounts {
+  const all = summary(files);
+  return { todos: all.todos, memos: all.memos, events: all.events, archive: all.archive };
+}
+
+const countNouns: Record<"en" | "nl", [string, string][]> = {
+  en: [["to-do", "to-dos"], ["note", "notes"], ["event", "events"], ["in history", "in history"]],
+  nl: [["taak", "taken"], ["notitie", "notities"], ["afspraak", "afspraken"], ["in geschiedenis", "in geschiedenis"]],
+};
+
+/**
+ * A list row's contents: "할 일 24개 · 메모 12장 · 일정 6개 · 기록 310개" (zeros left out; none: "비어 있어요") —
+ * en "24 to-dos · 12 notes · 6 events · 310 in history" ("Empty"), nl "24 taken · 12 notities · 6 afspraken · 310 in geschiedenis" ("Leeg").
+ */
+export function countsText(counts: BackupCounts, lang: Lang = "ko"): string {
+  const values = [counts.todos, counts.memos, counts.events, counts.archive];
+  const parts = values.map((value, index) => [value, lang === "ko"
+    ? [`할 일 ${value}개`, `메모 ${value}장`, `일정 ${value}개`, `기록 ${value}개`][index]
+    : plural(value, ...countNouns[lang][index])] as const);
+  const shown = parts.filter(([value]) => value > 0).map(([, text]) => text);
+  return shown.length > 0 ? shown.join(" · ") : ["비어 있어요", "Empty", "Leeg"][langIndex(lang)];
+}
+
+/**
+ * The daily copy is due when something changed since the last copy and the newest daily one is from an earlier day —
+ * the app's day, which ends at 4 a.m. (as the record's). Nothing changed: none, so the same copy doesn't pile up.
+ */
+export function isDue(now: Date, lastDaily: Date | undefined, changed: boolean): boolean {
+  return changed && (lastDaily === undefined || logicalDayStart(lastDaily).getTime() < logicalDayStart(now).getTime());
+}
+
+/**
+ * When a copy was made, by calendar day: "오늘 09:12" · "어제 21:40" · "10월 28일 08:55" · "2025년 12월 30일 08:55" —
+ * en "Today 9:12 AM" · "Oct 28, 8:55 AM" · "Dec 30, 2025, 8:55 AM", nl "Vandaag 09:12" · "28 okt 08:55" · "30 dec 2025 08:55".
+ * `midSentence`: en "today …" · "yesterday …", nl "vandaag …" · "gisteren …".
+ */
+export function savedWhen(date: Date, now: Date, lang: Lang = "ko", midSentence = false): string {
+  const midnight = (value: Date) => new Date(value.getFullYear(), value.getMonth(), value.getDate()).getTime();
+  const days = Math.round((midnight(now) - midnight(date)) / 86_400_000);
+  const time = clock(date.getHours(), date.getMinutes(), lang);
+  if (days === 0 || days === 1) {
+    const word = [["오늘", "Today", "Vandaag"], ["어제", "Yesterday", "Gisteren"]][days][langIndex(lang)];
+    return `${midSentence && lang !== "ko" ? word.toLowerCase() : word} ${time}`;
+  }
+  const day = dayMonth(date.getMonth() + 1, date.getDate(), date.getFullYear() === now.getFullYear() ? undefined : date.getFullYear(), lang);
+  return `${day}${lang === "en" ? ", " : " "}${time}`;
+}
+
+/** A copy's size: "220KB" · "2.9MB" (KB = 1024 bytes, rounded up below 1000 KB) — en "220 KB" · "2.9 MB", nl "220 kB" · "2,9 MB". */
+export function sizeText(bytes: number, lang: Lang = "ko"): string {
+  const kilobytes = Math.max(1, Math.ceil(bytes / 1024));
+  const gap = lang === "ko" ? "" : " ";
+  if (kilobytes < 1000) return `${kilobytes}${gap}${lang === "nl" ? "kB" : "KB"}`;
+  const megabytes = bytes / 1_048_576;
+  const shown = megabytes >= 100 ? String(Math.round(megabytes)) : (Math.round(megabytes * 10) / 10).toFixed(1);
+  return `${lang === "nl" ? shown.replace(".", ",") : shown}${gap}MB`;
+}
+
 // ─── 합치기 · 바꾸기 ──────────────────────────────────────────────────────────
 
-type ListFile = Exclude<DataFile, "memo-folders.json" | "todo-spaces.json">;
+type ListFile = Exclude<DataFile, "memo-folders.json" | "todo-spaces.json" | "memo-trash.json">;
 const arrayKey: Record<ListFile, string> = { "todos.json": "items", "memos.json": "memos", "repeats.json": "series", "events.json": "events", "alarms.json": "alarms" };
 
 /** Entries of both by id: every one here as it is, then the imported ones this side lacks (in their order). */
@@ -245,6 +387,13 @@ export function mergeFiles(current: BackupFiles, imported: BackupFiles): BackupF
         const merged = serializeMemoFolders(mergeMemoFolders(parseMemoFolders(mine), parseMemoFolders(text)));
         result[name] = merged === serializeMemoFolders(parseMemoFolders(mine)) ? mine : merged;
       } catch { result[name] = text; }
+    } else if (name === "memo-trash.json") {
+      // 지운 메모 (#120): joined as two devices' copies are (T5); this side's unreadable: the backup's.
+      try {
+        const kept = parseMemoTrash(mine);
+        const merged = serializeMemoTrash(mergeTrash(kept, parseMemoTrash(text)));
+        result[name] = merged === serializeMemoTrash(kept) ? mine : merged;
+      } catch { result[name] = text; }
     } else if (name === "todo-spaces.json") {
       // 할 일 스페이스: entry by entry (S18), the backup's winning only where newer; this side's unreadable: the backup's.
       try {
@@ -269,6 +418,7 @@ export const emptyFile: Record<DataFile, string> = {
   "alarms.json": JSON.stringify({ alarms: [] }, null, 2) + "\n",
   "memo-folders.json": serializeMemoFolders(emptyMemoFolders("ko")),
   "todo-spaces.json": serializeTodoSpaces(emptyTodoSpaces()),
+  "memo-trash.json": serializeMemoTrash(emptyTrash()),
 };
 
 /**

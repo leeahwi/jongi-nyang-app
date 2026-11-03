@@ -47,22 +47,21 @@ struct CalendarWindowView: View {
 
     private var today: String { CalendarDraft.day(Date()) }
 
-    private var days: [String] {
-        switch mode {
-        case .month:
-            let p = CalendarMonth.parts(page)
-            return CalendarMonth.monthGrid(year: p.year, month: p.month, language: language)
-        case .week:
-            return CalendarMonth.weekDays(page, language: language)
-        }
-    }
+    /// Kept with the page (the body reads them for every row).
+    private var days: [String] { pages.days(mode: mode, page: page, language: language) }
 
-    private var events: [CalendarEvent] {
-        let range = CalendarMonth.fetchRange(days)
-        return calendar.occurrences(from: range.start, to: range.end)
+    /// The page's events and to-dos by day (#68), made again only when what they come from changes.
+    @State private var pages = CalendarPageCache()
+
+    private func makePage() -> CalendarMonth.Page {
+        pages.page(days: days, selected: selected, events: calendar.events, tasks: model.items, now: now, language: language)
     }
 
     var body: some View {
+        content(makePage())
+    }
+
+    private func content(_ data: CalendarMonth.Page) -> some View {
         VStack(spacing: 0) {
             topBar
                 .padding(.horizontal, 20)
@@ -70,13 +69,13 @@ struct CalendarWindowView: View {
                 .padding(.bottom, 12)
             HStack(spacing: 0) {
                 Group {
-                    if mode == .month { monthView } else { weekView }
+                    if mode == .month { monthView(data) } else { weekView(data) }
                 }
                 .padding(.leading, 16)
                 .padding(.trailing, 12)
                 .padding(.bottom, 16)
                 Rectangle().fill(PaperTheme.rule).frame(width: 1)
-                dayPanel
+                dayPanel(data)
                     .frame(width: panelWidth)
             }
         }
@@ -153,7 +152,7 @@ struct CalendarWindowView: View {
 
     // MARK: Month
 
-    private var monthView: some View {
+    private func monthView(_ data: CalendarMonth.Page) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) {
                 ForEach(language.weekdayOrder, id: \.self) { weekday in
@@ -173,7 +172,13 @@ struct CalendarWindowView: View {
                         HStack(spacing: 0) {
                             ForEach(days[(row * 7)..<(row * 7 + 7)], id: \.self) { day in
                                 // The day number (≈30 pt with its padding), then ≈16 pt per line ("+N" counts as one).
-                                monthCell(day, lines: max(1, Int((height - 30) / 16)), dots: dots).frame(maxWidth: .infinity).frame(height: height)
+                                let lines = max(1, Int((height - 30) / 16))
+                                Keyed(key: MonthCellKey(day: day, inMonth: inMonth(day), selected: day == selected, today: today, lines: lines,
+                                                        dots: dots, all: data.cell(day, limit: 99))) {
+                                    monthCell(day, data: data, lines: lines, dots: dots)
+                                }
+                                .equatable()
+                                .frame(maxWidth: .infinity).frame(height: height)
                             }
                         }
                     }
@@ -184,17 +189,35 @@ struct CalendarWindowView: View {
         .overlay { RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(PaperTheme.rule, lineWidth: 1) }
     }
 
+    private func inMonth(_ day: String) -> Bool { CalendarMonth.parts(day).month == CalendarMonth.parts(page).month }
+
+    /// What a month cell is drawn from (#68): the cells are drawn again only when it changes, not on every change of
+    /// the model (`all`: the day's lines, as `cell(limit: 99)` — every shorter cell is cut from it).
+    private struct MonthCellKey: Equatable, Sendable {
+        var day: String
+        var inMonth: Bool
+        var selected: Bool
+        var today: String
+        var lines: Int
+        var dots: Bool
+        var all: (items: [CalendarMonth.CellItem], more: Int)
+        static func == (a: Self, b: Self) -> Bool {
+            a.day == b.day && a.inMonth == b.inMonth && a.selected == b.selected && a.today == b.today && a.lines == b.lines
+                && a.dots == b.dots && a.all.items == b.all.items && a.all.more == b.all.more
+        }
+    }
+
     /// `lines`: as many as the cell's height fits (3 at the usual size).
-    private func monthCell(_ day: String, lines: Int, dots: Bool) -> some View {
-        let inMonth = CalendarMonth.parts(day).month == CalendarMonth.parts(page).month
-        var cell = CalendarMonth.cellItems(day, events: events, tasks: model.items, limit: lines)
+    private func monthCell(_ day: String, data: CalendarMonth.Page, lines: Int, dots: Bool) -> some View {
+        let inMonth = inMonth(day)
+        var cell = data.cell(day, limit: lines)
         // More than fits: one line fewer, so "+N" has its own.
-        if cell.more > 0 && lines > 1 { cell = CalendarMonth.cellItems(day, events: events, tasks: model.items, limit: lines - 1) }
+        if cell.more > 0 && lines > 1 { cell = data.cell(day, limit: lines - 1) }
         return VStack(alignment: .leading, spacing: 2) {
             dayNumber(day, size: 12)
             if dots {
                 // Too narrow for words: a dot per item, then "+N".
-                let all = CalendarMonth.cellItems(day, events: events, tasks: model.items, limit: 99).items
+                let all = data.cell(day, limit: 99).items
                 HStack(spacing: 2.5) {
                     ForEach(Array(all.prefix(4).enumerated()), id: \.offset) { _, item in
                         if case .task(let task) = item, task.kind == .deadline {
@@ -296,13 +319,17 @@ struct CalendarWindowView: View {
 
     // MARK: Week
 
-    private var weekView: some View {
+    private func weekView(_ data: CalendarMonth.Page) -> some View {
         GeometryReader { geometry in
             let lines = max(1, Int((geometry.size.height / 7 - 12) / 16))
             VStack(spacing: 0) {
                 ForEach(days, id: \.self) { day in
-                    weekRow(day, limit: lines)
-                        .frame(maxHeight: .infinity)
+                    Keyed(key: WeekRowKey(day: day, events: data.events(on: day), tasks: data.tasks(on: day), limit: lines,
+                                          selected: day == selected, today: today)) {
+                        weekRow(day, data: data, limit: lines)
+                    }
+                    .equatable()
+                    .frame(maxHeight: .infinity)
                     if day != days.last { Rectangle().fill(PaperTheme.rule.opacity(0.55)).frame(height: 0.5) }
                 }
             }
@@ -311,10 +338,20 @@ struct CalendarWindowView: View {
         .overlay { RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(PaperTheme.rule, lineWidth: 1) }
     }
 
+    /// What a week row is drawn from (#68), as for the month's cells.
+    private struct WeekRowKey: Equatable, Sendable {
+        var day: String
+        var events: [CalendarEvent]
+        var tasks: [CalendarMonth.DayTask]
+        var limit: Int
+        var selected: Bool
+        var today: String
+    }
+
     /// `limit`: lines the row's height fits (3 at the usual size).
-    private func weekRow(_ day: String, limit fitting: Int) -> some View {
-        let dayEvents = CalendarMonth.eventsOn(day, events)
-        let tasks = CalendarMonth.dayTasks(day, model.items, now: now, language: language)
+    private func weekRow(_ day: String, data: CalendarMonth.Page, limit fitting: Int) -> some View {
+        let dayEvents = data.events(on: day)
+        let tasks = data.tasks(on: day)
         let lines = dayEvents.count + tasks.count
         // More than fits: one line fewer, so "+N개 더" has its own and the row keeps its height.
         let limit = lines > fitting && fitting > 1 ? fitting - 1 : fitting
@@ -392,9 +429,9 @@ struct CalendarWindowView: View {
 
     // MARK: The day
 
-    private var dayPanel: some View {
-        let dayEvents = CalendarMonth.eventsOn(selected, events)
-        let tasks = CalendarMonth.dayTasks(selected, model.items, now: now, language: language)
+    private func dayPanel(_ data: CalendarMonth.Page) -> some View {
+        let dayEvents = data.events(on: selected)
+        let tasks = data.tasks(on: selected)
         return VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 6) {
                 Text(CalendarMonth.dayTitle(selected, language: language)).font(.system(size: 15, weight: .semibold))
@@ -520,5 +557,62 @@ struct CalendarWindowView: View {
 
     private func newEvent(on day: String) {
         sheet = CalendarSheetRequest(mode: .new, draft: CalendarMonth.draftForDay(day, now: Date(), color: calendar.lastColor))
+    }
+}
+
+/// A view drawn again only when its key changes (with `.equatable()`): the content is what the key describes.
+struct Keyed<Key: Equatable & Sendable, Content: View>: View, Equatable {
+    nonisolated let key: Key
+    @ViewBuilder let content: () -> Content
+    var body: some View { content() }
+    nonisolated static func == (a: Self, b: Self) -> Bool { a.key == b.key }
+}
+
+/// The calendar window's page (#68): its events expanded once and its to-dos read once, kept until the days, the
+/// chosen day, the events, the to-dos, the day or the language change. A change it doesn't show (a pick in the note)
+/// costs a comparison: arrays that weren't touched compare by their storage.
+@MainActor
+final class CalendarPageCache {
+    private struct Key: Equatable {
+        var days: [String]
+        var selected: String
+        var events: [LocalEvent]
+        var tasks: [TodoItem]
+        var today: String
+        var language: AppLanguage
+        var calendar: Calendar
+    }
+    private var key: Key?
+    private var page: CalendarMonth.Page?
+    private var daysKey: (mode: CalendarWindowView.Mode, page: String, language: AppLanguage, calendar: Calendar)?
+    private var shownDays: [String] = []
+
+    /// The month's six weeks, or the week, around `page`.
+    func days(mode: CalendarWindowView.Mode, page: String, language: AppLanguage) -> [String] {
+        let calendar = Calendar.paper
+        if let known = daysKey, known.mode == mode, known.page == page, known.language == language, known.calendar == calendar { return shownDays }
+        switch mode {
+        case .month:
+            let p = CalendarMonth.parts(page)
+            shownDays = CalendarMonth.monthGrid(year: p.year, month: p.month, calendar: calendar, language: language)
+        case .week:
+            shownDays = CalendarMonth.weekDays(page, calendar: calendar, language: language)
+        }
+        daysKey = (mode, page, language, calendar)
+        return shownDays
+    }
+
+    func page(days: [String], selected: String, events: [LocalEvent], tasks: [TodoItem], now: Date, language: AppLanguage) -> CalendarMonth.Page {
+        let calendar = Calendar.paper
+        let key = Key(days: days, selected: selected, events: events, tasks: tasks, today: Archive.dayKey(now, calendar: calendar),
+                      language: language, calendar: calendar)
+        if let page, key == self.key { return page }
+        let range = CalendarMonth.fetchRange(days, calendar: calendar)
+        // As EventBook.occurrences.
+        let occurrences = LocalEvent.expand(events, from: range.start, to: range.end, calendar: calendar, language: .current)
+        let made = CalendarMonth.Page(days: days + [selected], events: occurrences, tasks: tasks, now: now, calendar: calendar, language: language)
+        self.key = key
+        page = made
+        return made
     }
 }

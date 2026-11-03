@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  advanceSeen, aiCatLine, aiChangeKind, aiLogLine, aiMarks, aiShortTitle, aiToastText, aiAwayText, aiUndoText, awayCount, parseAiLink, parseAiLog,
+  advanceSeen, aiCatLine, aiChangeKind, aiExtOutdated, aiExtVersion, aiLogLine, aiMarks, aiShortTitle, aiToastText, aiAwayText, aiUndoText, awayCount, parseAiLink, parseAiLog,
   recentAi, sameSaved, serializeAiLink, trimAiLog, undoEntry, undoneIds, unseenAi, type AiChange, type AiItem, type AiLogEntry,
 } from "../src/core/ai";
 
@@ -17,8 +17,8 @@ const added = (after: AiItem): AiChange => ({ file: "todos.json", id: after.id, 
 const changed = (before: AiItem, after: AiItem): AiChange => ({ file: "todos.json", id: after.id, before, after });
 
 test("ai-link.json: read leniently, written with fixed keys", () => {
-  const text = serializeAiLink({ v: 1, enabled: true, dataFolder: "C:\\Users\\noa\\AppData\\Roaming\\PaperTodo", lang: "nl", app: "windows 1.27.0", updatedAt: "2026-10-27T05:00:00Z" });
-  assert.equal(text, '{\n  "v": 1,\n  "enabled": true,\n  "dataFolder": "C:\\\\Users\\\\noa\\\\AppData\\\\Roaming\\\\PaperTodo",\n  "lang": "nl",\n  "app": "windows 1.27.0",\n  "updatedAt": "2026-10-27T05:00:00Z"\n}\n');
+  const text = serializeAiLink({ v: 1, enabled: true, dataFolder: "C:\\Users\\sample\\AppData\\Roaming\\PaperTodo", lang: "nl", app: "windows 1.27.0", updatedAt: "2026-10-27T05:00:00Z" });
+  assert.equal(text, '{\n  "v": 1,\n  "enabled": true,\n  "dataFolder": "C:\\\\Users\\\\sample\\\\AppData\\\\Roaming\\\\PaperTodo",\n  "lang": "nl",\n  "app": "windows 1.27.0",\n  "updatedAt": "2026-10-27T05:00:00Z"\n}\n');
   assert.equal(parseAiLink(text)?.lang, "nl");
   assert.equal(parseAiLink('{"enabled":"yes"}')?.enabled, false);
   assert.equal(parseAiLink("{ broken"), undefined);
@@ -33,6 +33,24 @@ test("ai-log.jsonl: lines read back, a torn line and unknown kinds left out", ()
   assert.equal(read.length, 1);
   assert.deepEqual(read[0], one);
   assert.match(aiLogLine(one), /^\{"v":1,"id":"E[^"]+","at":"2026-10-27T01:00:00Z","client":"Claude","tool":"add_todos","kind":"add","target":"todos","count":1,"title":"보고서 쓰기","changes":\[/);
+});
+
+test("M41: the extension's version in ai-link.json and on each log line; Claude Desktop's extension older than the app's", () => {
+  const link = serializeAiLink({ v: 1, enabled: true, dataFolder: "/x", lang: "ko", app: "windows 1.31.0", updatedAt: "", ext: aiExtVersion });
+  assert.match(link, /"updatedAt": "",\n  "ext": 2\n\}\n$/);
+  assert.equal(parseAiLink(link)?.ext, aiExtVersion);
+  assert.equal(parseAiLink('{"enabled":true,"ext":"2"}')?.ext, undefined, "only a whole number");
+  assert.equal(parseAiLink('{"app":"mac 1.46.0","ext":2,"enabled":true}')?.ext, 2, "the Mac's sorted keys");
+  const one = { ...entry({ changes: [added(item({ id: "A" }))] }), ext: aiExtVersion };
+  assert.match(aiLogLine(one), /"title":"보고서 쓰기","ext":2,"changes":\[/);
+  assert.deepEqual(parseAiLog(aiLogLine(one))[0], one);
+  const old = entry({ changes: [added(item({ id: "B" }))] });
+  assert.equal(aiExtOutdated([]), false);
+  assert.equal(aiExtOutdated([old]), true, "no version: the one before versions (1)");
+  assert.equal(aiExtOutdated([old, one]), false, "the newest line counts");
+  assert.equal(aiExtOutdated([one, { ...old, client: "Claude Code" }]), false, "Claude Code runs the app's own copy");
+  assert.equal(aiExtOutdated([one, { ...old, client: "app", kind: "undo" }]), false, "the app's undo lines don't count");
+  assert.equal(aiExtVersion, 2);
 });
 
 test("toasts, as on the Mac (AIText.toast)", () => {
@@ -132,4 +150,12 @@ test("the cat now and then, in its own words", () => {
   assert.equal(aiCatLine(two, undefined, now, () => 0.9, "ko"), undefined);
   assert.equal(aiCatLine(two, now.getTime() - 3_600_000, now, () => 0.1, "ko"), undefined);
   assert.equal(aiCatLine(entry({ kind: "change", changes: [] }), undefined, now, () => 0.1, "ko"), "Claude랑 계획 세웠어요? 저도 볼게요.");
+});
+
+test("#174: the app keeps 30 days of the log whatever its size", () => {
+  const old = aiLogLine(entry({ id: "old", at: "2026-08-01T00:00:00Z", changes: [] }));
+  const recent = aiLogLine(entry({ id: "new", at: "2026-10-26T00:00:00Z", changes: [] }));
+  assert.equal(trimAiLog(`${old}\n${recent}\n`, local(27, 10), 0), `${recent}\n`, "small, but older than 30 days");
+  assert.equal(trimAiLog(`${old}\n`, local(27, 10), 0), "");
+  assert.equal(trimAiLog(`${recent}\n`, local(27, 10), 0), undefined);
 });

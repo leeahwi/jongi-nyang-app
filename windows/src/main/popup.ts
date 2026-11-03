@@ -2,7 +2,7 @@ import { BrowserWindow, ipcMain, screen } from "electron";
 import path from "node:path";
 import { bubbleAbove, type Rect } from "../core/pet";
 import type { PopupPayload, PopupTask } from "../core/types";
-import { offscreen } from "./env";
+import { offscreen, offscreenEnabled } from "./env";
 
 const edgePadding = 22;
 const bottomPadding = 34;
@@ -47,16 +47,20 @@ export class ReminderPopup {
   private static registerIPC(): void {
     const owner = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) =>
       [...ReminderPopup.instances].find((popup) => popup.window && !popup.window.isDestroyed() && popup.window.webContents === event.sender);
-    ipcMain.handle("popup:place", (event, size: { width: number; height: number }) => owner(event)?.place(size));
+    // #172: each value checked before it is used (an id is a short string, a size and minutes are plain numbers).
+    const isId = (value: unknown): value is string => typeof value === "string" && value.length > 0 && value.length <= 200;
+    const isSize = (value: unknown): value is { width: number; height: number } => typeof value === "object" && value !== null
+      && [(value as { width?: unknown }).width, (value as { height?: unknown }).height].every((side) => typeof side === "number" && Number.isFinite(side) && side >= 0 && side <= 10_000);
+    ipcMain.handle("popup:place", (event, size: unknown) => (isSize(size) ? owner(event)?.place(size) : undefined));
     ipcMain.handle("popup:pointer", (event) => owner(event)?.pointer());
-    ipcMain.on("popup:interactive", (event, interactive: boolean) => {
-      owner(event)?.window?.setIgnoreMouseEvents(!interactive, { forward: true });
+    ipcMain.on("popup:interactive", (event, interactive: unknown) => {
+      owner(event)?.window?.setIgnoreMouseEvents(interactive !== true, { forward: true });
     });
-    ipcMain.on("popup:complete", (event, id: string) => owner(event)?.handlers?.onComplete(id));
+    ipcMain.on("popup:complete", (event, id: unknown) => { if (isId(id)) owner(event)?.handlers?.onComplete(id); });
     ipcMain.on("popup:complete-all", (event, ids: unknown) => {
       const handlers = owner(event)?.handlers;
       if (!Array.isArray(ids)) return;
-      const list = ids.filter((id): id is string => typeof id === "string");
+      const list = ids.filter(isId).slice(0, 1_000);
       if (handlers?.onCompleteAll) handlers.onCompleteAll(list); else for (const id of list) handlers?.onComplete(id);
     });
     // The ⌄ menu's later moments, 내일로, and an event's 5분 전에 다시: the bubble goes, then the handler runs.
@@ -74,14 +78,15 @@ export class ReminderPopup {
     ipcMain.on("popup:event-again", (event) => closing(event, (handlers) => handlers.onEventAgain?.()));
     ipcMain.on("popup:sweep", (event, choice: unknown, ids: unknown) => {
       if (choice !== "tomorrow" && choice !== "someday" && choice !== "keep") return;
-      const list = Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string") : [];
+      const list = Array.isArray(ids) ? ids.filter(isId).slice(0, 1_000) : [];
       closing(event, (handlers) => handlers.onSweep?.(choice, list));
     });
-    ipcMain.on("popup:snooze", (event, minutes: number) => {
+    ipcMain.on("popup:snooze", (event, minutes: unknown) => {
+      if (!Number.isInteger(minutes) || (minutes as number) < 1 || (minutes as number) > 24 * 60) return;
       const popup = owner(event);
       const handlers = popup?.handlers;
       popup?.hide();
-      handlers?.onSnooze(minutes);
+      handlers?.onSnooze(minutes as number);
     });
     ipcMain.on("popup:open", (event) => {
       const popup = owner(event);
@@ -89,7 +94,8 @@ export class ReminderPopup {
       popup?.hide();
       handlers?.onOpen();
     });
-    ipcMain.on("popup:open-event", (event, id: string) => {
+    ipcMain.on("popup:open-event", (event, id: unknown) => {
+      if (!isId(id)) return;
       const popup = owner(event);
       const handlers = popup?.handlers;
       popup?.hide();
@@ -113,9 +119,12 @@ export class ReminderPopup {
     // With the pet out, no second cat walks in: a small bubble pops up above it and it hops.
     this.anchor = ReminderPopup.petAnchor?.();
     if (this.anchor) ReminderPopup.onPetAlert?.();
-    const style = this.anchor ? "compact" : payload.style;
+    // 저녁 정리 (#51, as on the Mac): no cat walks in beside the slip — it sits in the slip by the question, or
+    // the desktop cat is right under it.
+    const style = this.anchor || payload.sweep ? "compact" : payload.style;
+    const sweep = payload.sweep ? { ...payload.sweep, cat: !this.anchor } : undefined;
     const window = this.ensureWindow();
-    const send = () => window.webContents.send("popup:show", { ...payload, style, travel: 0 });
+    const send = () => window.webContents.send("popup:show", { ...payload, style, sweep, travel: 0 });
     if (window.webContents.isLoading()) window.webContents.once("did-finish-load", send); else send();
   }
 
@@ -183,6 +192,9 @@ export class ReminderPopup {
       movable: false, minimizable: false, maximizable: false, fullscreenable: false,
       focusable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false,
       backgroundColor: "#00000000",
+      // Off-screen runs (snapshots, tests): macOS pulls a window placed off every display back onto one unless it may be
+      // larger than the screen (only macOS reads this).
+      enableLargerThanScreen: offscreenEnabled,
       webPreferences: { preload: path.join(__dirname, "preload.js"), sandbox: true, contextIsolation: true, backgroundThrottling: false },
     });
     window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });

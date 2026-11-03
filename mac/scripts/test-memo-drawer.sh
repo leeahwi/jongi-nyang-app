@@ -24,7 +24,9 @@ swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/Memo.swift \
     Sources/PaperCore/MemoFolders.swift \
     Sources/PaperCore/MemoFolderSearch.swift \
+    Sources/PaperCore/MemoTrash.swift \
     Sources/PaperCore/MemoCards.swift \
+    Sources/PaperCore/MemoMarkdown.swift \
     Sources/PaperCore/TextMerge.swift \
     Sources/PaperCore/Intent.swift \
     Sources/PaperCore/DayRibbon.swift \

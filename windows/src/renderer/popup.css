@@ -24,7 +24,7 @@ html, body { background: transparent; }
 .check span { width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid var(--check-border); display: grid; place-items: center; color: var(--on-sage); transition: background 0.16s, border-color 0.16s; }
 .check span .icon { opacity: 0; }
 .check:hover span { border-color: var(--ink-2); }
-.task.done .check span { background: var(--sage); border-color: var(--sage); animation: pop 0.16s ease-out; }
+.task.done .check span { background: var(--sage); border-color: var(--sage); animation: pop var(--motion-change) var(--ease-out); }
 .task.done .check span .icon { opacity: 1; }
 @keyframes pop { from { transform: scale(0.85); } }
 .check:disabled { opacity: 0.45; }
@@ -35,8 +35,15 @@ html, body { background: transparent; }
 .more { padding-top: 8px; font: 500 12px var(--ui); color: var(--ink-3); text-align: left; align-self: flex-start; }
 .more:hover { color: var(--ink); }
 
-/* 저녁 정리: the question, then the tasks (ticked ones go along), at most five rows before it scrolls. */
-.sweep-msg { font: 500 13px var(--ui); color: var(--ink); line-height: 1.45; margin-bottom: 6px; }
+/* 저녁 정리: the question beside the cat, ‘넘길 할 일 3’, then the tasks (ticked ones go along), at most five rows before
+   it scrolls; how long each has stayed on 오늘 at its end. As the Mac's slip (#51). */
+.sweep-msg { font: 600 13.5px var(--ui); color: var(--ink); line-height: 1.45; margin-bottom: 4px; }
+.sweep-ask { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.sweep-ask .sweep-msg { flex: 1; min-width: 0; margin-bottom: 0; }
+.sweep-cat { width: 52px; height: 52px; flex: none; object-fit: contain; pointer-events: none; }
+.sweep-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 6px; font: 600 10.5px/14px var(--ui); letter-spacing: 0.04em; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.sweep-head .group-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sweep-head .group-count { flex: none; }
 .sweep-rows { max-height: 180px; overflow-y: auto; }
 .check.carry-pick span { border-radius: 50%; }
 .task.picked .check.carry-pick span { background: var(--band-lavender); border-color: var(--band-lavender); }

@@ -17,8 +17,7 @@ enum PetArt {
         if pose == .idle { return PaperTheme.mascot }
         if let image = cache[pose] { return image }
         if missing.contains(pose) { return nil }
-        let url = Bundle.main.url(forResource: pose.rawValue, withExtension: "png", subdirectory: "Assets/Pet")
-            ?? Bundle.module.url(forResource: pose.rawValue, withExtension: "png", subdirectory: "Assets/Pet")
+        let url = AppResources.url(pose.rawValue, extension: "png", in: "Assets/Pet")
         guard let url, let source = NSImage(contentsOf: url) else {
             missing.insert(pose)
             return nil
@@ -60,8 +59,7 @@ enum PetArt {
     static let walkCycle: [NSImage]? = {
         let completeFrames = (1...8).compactMap { index -> NSImage? in
             let name = String(format: "walk-cycle-%02d", index)
-            let url = Bundle.main.url(forResource: name, withExtension: "png", subdirectory: "Assets/Pet")
-                ?? Bundle.module.url(forResource: name, withExtension: "png", subdirectory: "Assets/Pet")
+            let url = AppResources.url(name, extension: "png", in: "Assets/Pet")
             guard let url, let source = NSImage(contentsOf: url) else { return nil }
             return PaperTheme.downsampled(source, maxPixels: 384)
         }

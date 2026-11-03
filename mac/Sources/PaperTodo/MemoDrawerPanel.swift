@@ -6,7 +6,8 @@ import SwiftUI
 
 /// 메모 서랍's windows: the drawer (made the first time it opens, hidden — never closed — after) and the paw handle at
 /// the screen's edge. The drawer takes typing without bringing the note forward (a non-activating panel), floats above
-/// other windows while pinned, and never closes on a click elsewhere: only the shortcut, Esc or its ×.
+/// other windows while pinned, and never closes on a click elsewhere: only the shortcut, Esc or the small bar on its
+/// inner edge (#83).
 @MainActor
 final class MemoDrawerController {
     private let model: AppModel
@@ -53,6 +54,10 @@ final class MemoDrawerController {
             .sink { [weak self] in self?.backdrop?.needsLayout = true }
             .store(in: &subscriptions)
         drawer.$shortcut.removeDuplicates().dropFirst().sink { [weak self] _ in DispatchQueue.main.async { self?.registerShortcut() } }.store(in: &subscriptions)
+        // 크게 보기 (#113): wider while a memo is shown big, back to the user's width after (at once under Reduce motion).
+        drawer.$bigID.map { $0 != nil }.removeDuplicates().dropFirst().sink { [weak self] _ in
+            DispatchQueue.main.async { self?.widen() }
+        }.store(in: &subscriptions)
         // The handle's number (its tooltip): memos changed today, worked out once the memos stop changing for half a
         // second (a typed memo changes them on every key).
         model.$memos
@@ -113,6 +118,7 @@ final class MemoDrawerController {
         let panel = self.panel ?? makePanel()
         let mouse = NSEvent.mouseLocation
         screen = NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main
+        drawer.screenWidth = visible.width
         drawer.willOpen()
         let wasOpen = isOpen
         isOpen = true
@@ -155,6 +161,7 @@ final class MemoDrawerController {
         guard isOpen, let panel else { return }
         PerfProbe.begin("drawerclose")
         isOpen = false
+        drawer.closeBarFocused = false
         drawer.didClose()
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
             finishClose()
@@ -203,7 +210,7 @@ final class MemoDrawerController {
 
     private var visible: NSRect { (screen ?? NSScreen.main)?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900) }
 
-    private var panelWidth: CGFloat { MemoDrawerView.shadowRoom + MemoDrawerView.tabsWidth + drawer.width }
+    private var panelWidth: CGFloat { MemoDrawerView.shadowRoom + MemoDrawerView.tabsWidth + drawer.shownWidth }
 
     /// The usable height of the screen, against its edge.
     private func frame() -> NSRect {
@@ -221,8 +228,27 @@ final class MemoDrawerController {
         panel.setFrame(frame(), display: true, animate: animated)
     }
 
-    /// The inner edge dragged to the pointer: 260–480 pt.
+    /// 크게 보기 came or went (#113): the drawer widens toward the screen or goes back to the user's width, sliding 0.18 s
+    /// along its inner edge (the paper follows the window) — at once under Reduce motion. Only while it is out.
+    private func widen() {
+        guard isOpen, let panel else { return }
+        drawer.screenWidth = visible.width
+        let target = frame()
+        guard target != panel.frame else { return }
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion || offscreen {
+            panel.setFrame(target, display: true)
+            return
+        }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Self.slide
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            panel.animator().setFrame(target, display: true)
+        }
+    }
+
+    /// The inner edge dragged to the pointer: 260–480 pt. Not while a memo is shown big (its width is the big one).
     private func drag(toX mouse: CGFloat) {
+        guard drawer.bigID == nil else { return }
         let area = visible
         let raw = drawer.side == .right ? area.maxX - mouse : mouse - area.minX
         let width = min(max(raw.rounded(), MemoDrawer.widths.lowerBound), MemoDrawer.widths.upperBound)
@@ -234,7 +260,8 @@ final class MemoDrawerController {
     // MARK: Keys
 
     /// The drawer's keys (the plan's keyboard map), before the menus see them: ⌘N, ⌘F, ⌘1–9, ⌘0, ⇧⌘C, ⌘⌫, ↑ ↓ ↩ Esc —
-    /// and ⌘Z, which here undoes the typing, never a to-do in the note.
+    /// and ⌘Z, which here undoes the typing, never a to-do in the note. #118: ⌘/ the drawer's keys on a slip, ⇧⌘M the
+    /// picked (or open) memo's 폴더로 옮기기, ⌘↩ its 크게 보기 (and back).
     private func key(_ event: NSEvent) -> Bool {
         guard let panel else { return false }
         let flags = event.modifierFlags.intersection([.command, .shift, .option, .control])
@@ -262,11 +289,24 @@ final class MemoDrawerController {
             case kVK_ANSI_Z:
                 responder?.undoManager?.undo()
                 return true
+            case kVK_ANSI_Slash:
+                // After this key's turn: the slip waits for its answer (a modal), which mustn't hold up the drawer's keys.
+                DispatchQueue.main.async { ShortcutList.showDrawer() }
+                return true
+            case kVK_Return, kVK_ANSI_KeypadEnter:
+                // The quick-write slip's own ⌘↩ (it writes the memo); elsewhere 크게 보기 of the open or picked memo.
+                if (responder as? DrawerTextView.KeyTextView)?.submitsOnReturn == true { return false }
+                guard let id = drawer.bigID ?? drawer.selectedID ?? drawer.expandedID else { return !typing }
+                if drawer.bigID == id { drawer.bigID = nil } else { drawer.showBig(id) }
+                return true
             default: return false
             }
         }
         if flags == [.command, .shift] {
             switch code {
+            case kVK_ANSI_M:
+                if let id = drawer.selectedID ?? drawer.expandedID { drawer.openMoveList(id) }
+                return true
             case kVK_ANSI_C:
                 if let id = drawer.selectedID ?? drawer.expandedID { drawer.copy(id) }
                 return true
@@ -290,7 +330,10 @@ final class MemoDrawerController {
         switch code {
         case kVK_UpArrow: drawer.moveSelection(-1); return true
         case kVK_DownArrow: drawer.moveSelection(1); return true
-        case kVK_Return, kVK_ANSI_KeypadEnter: drawer.openSelected(); return true
+        case kVK_Return, kVK_ANSI_KeypadEnter:
+            // The close bar has the keyboard: ↩ presses it, like Space.
+            if drawer.closeBarFocused { close() } else { drawer.openSelected() }
+            return true
         default: return false
         }
     }
@@ -512,7 +555,9 @@ final class DrawerBackdropView: NSView {
         let right = drawer.side == .right
         let top = MemoDrawerView.catRoom - DrawerCat.earHeight
         let x = right ? MemoDrawerView.shadowRoom + MemoDrawerView.tabsWidth : 0
-        let frame = NSRect(x: x, y: top, width: drawer.width, height: max(0, bounds.height - top))
+        // The paper's width as the window has it now (크게 보기 widens it, #113, sliding).
+        let width = max(0, bounds.width - MemoDrawerView.shadowRoom - MemoDrawerView.tabsWidth)
+        let frame = NSRect(x: x, y: top, width: width, height: max(0, bounds.height - top))
         if blur.frame != frame { blur.frame = frame }
         blur.appearance = NSAppearance(named: drawer.palette.scheme == .dark ? .darkAqua : .aqua)
         // The system's own blur (its radius isn't ours to set): 강하게 differs by letting more of it through (62 %).

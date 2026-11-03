@@ -660,6 +660,8 @@ private struct ReminderPopupView: View {
     @ObservedObject var state: ReminderPopupState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoveredTask: UUID?
+    /// 체크 한 번's pop, per row (a row checked here or by 모두 끝내기).
+    @State private var pops: [UUID: Int] = [:]
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -808,14 +810,15 @@ private struct ReminderPopupView: View {
                     if state.snoozeMoves {
                         // 1.38: 내일로 — what's shown moves to tomorrow (its reminder cleared).
                         // Its own table: a short "Tomorrow" / "Morgen" fits beside 모두 끝냄 (the tidy-up's says "To tomorrow").
+                        // #51: a plain button beside the one filled default (모두 끝내기), as on Windows.
                         Button(String(localized: "내일로", table: "Reminder")) { state.onSnooze(.tomorrow) }
-                            .buttonStyle(SlipButtonStyle(role: .quiet))
+                            .buttonStyle(SlipButtonStyle(role: .ghost))
                             .fixedSize()
                             .disabled(open.isEmpty)
                             .help(L("할 일을 내일로 옮겨요"))
                     }
                     Button(open.count >= 2 ? L("모두 끝내기") : L("끝내기")) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        withAnimation(Motion.animation(.change, reduce: reduceMotion)) {
                             if open.count >= 2 { state.onCompleteAll(open.map(\.id)) } else { for task in open { state.onComplete(task.id) } }
                         }
                     }
@@ -911,7 +914,7 @@ private struct ReminderPopupView: View {
                     .frame(width: 22)
                     .accessibilityHidden(true)
             } else {
-                Button { withAnimation(.easeOut(duration: 0.16)) { state.onComplete(task.id) } } label: {
+                Button { withAnimation(Motion.animation(.change, reduce: reduceMotion)) { state.onComplete(task.id) } } label: {
                     ZStack {
                         RoundedRectangle(cornerRadius: 5).fill(done ? PaperTheme.sage : PaperTheme.card.opacity(0.6))
                         RoundedRectangle(cornerRadius: 5).strokeBorder(done ? PaperTheme.sage : PaperTheme.checkBorder, lineWidth: 1.5)
@@ -922,11 +925,16 @@ private struct ReminderPopupView: View {
                         }
                     }
                     .frame(width: 17, height: 17)
+                    .checkPop(pops[task.id] ?? 0)
                     .frame(width: 22, height: 30)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .onHover { hoveredTask = $0 ? task.id : (hoveredTask == task.id ? nil : hoveredTask) }
+                .onChange(of: done) { _, now in
+                    // R2: the box pops as in the note (the title's line stays the text's own: it can wrap to three lines).
+                    if now && Motion.animation(.change, reduce: reduceMotion) != nil { pops[task.id, default: 0] += 1 }
+                }
                 .disabled(!state.canComplete || done)
                 .opacity(state.canComplete ? 1 : 0.4)
                 .help(state.preview ? L("미리보기: 목록은 바뀌지 않아요") : L("완료 표시"))
@@ -960,7 +968,7 @@ private struct ReminderPopupView: View {
         .overlay(alignment: .bottom) {
             if !last { Rectangle().fill(PaperTheme.rule).frame(height: 1) }
         }
-        .animation(.easeOut(duration: 0.2), value: done)
+        .animation(Motion.animation(.change, reduce: reduceMotion), value: done)
     }
 
     private var mascot: some View {

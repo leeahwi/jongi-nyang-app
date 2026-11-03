@@ -1,5 +1,6 @@
 import { BrowserWindow, clipboard, globalShortcut, ipcMain, screen } from "electron";
 import { clipboardPrefill } from "../core/memo";
+import { visibleFolders } from "../core/memoDrawer";
 import path from "node:path";
 import { followSlip, slipWindowOptions } from "./slipWindow";
 import { t } from "../i18n";
@@ -13,7 +14,8 @@ const size = { width: 420 + 48, height: 300 };
 
 /**
  * 빠른 메모: Ctrl+Alt+M anywhere (or the tray, the pet, the note's ⋯) opens a small paper card with
- * a few lines to write in. Ctrl+Enter puts the text in the 메모 서랍 (its last folder) and closes; Esc or clicking
+ * a few lines to write in. Ctrl+Enter puts the text in the 메모 서랍 (the folder on its chip, #117: the drawer's last
+ * folder unless another is picked) and closes; Ctrl+Alt+Enter puts it in and keeps the card open; Esc or clicking
  * elsewhere closes and keeps the text for next time (prefs `quickMemoDraft`, so it survives a
  * restart). `live` is false in tests and snapshots, so no real shortcut is taken there.
  */
@@ -34,14 +36,16 @@ export class QuickMemo {
       if (typeof text === "string") this.keepDraft(text);
       this.hide();
     });
-    ipcMain.on("quickMemo:save", (event, text: unknown) => {
+    ipcMain.on("quickMemo:save", (event, text: unknown, folder: unknown, keep: unknown) => {
       if (!fromCard(event) || typeof text !== "string") return;
       if (text.trim()) {
-        const id = store.addMemoText(text.replace(/\s+$/, ""));
+        // The chip's folder, when it is still there; else the drawer's last one.
+        const target = typeof folder === "string" && visibleFolders(store.memoFolders).some((entry) => entry.id === folder) ? { folder, pinned: false } : undefined;
+        const id = store.addMemoText(text.replace(/\s+$/, ""), target);
         this.keepDraft("");
         if (id) this.saved(id);
       }
-      this.hide();
+      if (keep !== true) this.hide();
     });
     store.on("prefs", (key: string) => {
       if (key === "quickMemo") this.updateShortcut();

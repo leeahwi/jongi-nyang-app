@@ -1,4 +1,4 @@
-import { h, icon, paper, reduceMotion, t } from "./api";
+import { h, icon, motion, paper, reduceMotion, t } from "./api";
 
 /**
  * Building blocks of the 쪽지 family (see slip.css): the tape, the header, keycaps, buttons, chips,
@@ -95,15 +95,34 @@ export interface ToastOptions {
  * hover), Esc dismisses it. Returns whether one is up, and hides it.
  */
 export function toaster(host: HTMLElement): { show(options: ToastOptions): void; hide(): void; get visible(): boolean } {
+  // #119: the host is the live region, there before any toast (a region added with its words is often not read).
+  host.setAttribute("role", "status");
+  host.setAttribute("aria-live", "polite");
   let current: { element: HTMLElement; timer?: number; left: number; started: number; options: ToastOptions } | undefined;
-  const hide = () => {
+  // N10: the one going away fades out (살짝, ease-in) and takes no clicks meanwhile; a new toast removes it at once.
+  let leaving: { element: HTMLElement; timer: number } | undefined;
+  const dropLeaving = () => {
+    if (!leaving) return;
+    window.clearTimeout(leaving.timer);
+    leaving.element.remove();
+    leaving = undefined;
+  };
+  const close = (fade: boolean) => {
     if (!current) return;
     const { element, timer, options } = current;
     window.clearTimeout(timer);
     current = undefined;
-    element.remove();
+    dropLeaving();
+    if (fade && !reduceMotion() && element.isConnected) {
+      element.classList.remove("appear");
+      element.classList.add("leaving");
+      leaving = { element, timer: window.setTimeout(dropLeaving, motion.quick) };
+    } else {
+      element.remove();
+    }
     options.onHide?.();
   };
+  const hide = () => close(true);
   const arm = () => {
     if (!current) return;
     current.started = performance.now();
@@ -120,12 +139,13 @@ export function toaster(host: HTMLElement): { show(options: ToastOptions): void;
   }, true);
   return {
     show(options: ToastOptions): void {
-      hide();
+      close(false);
+      dropLeaving();
       const text = h("span", { class: `toast-text${options.twoLines ? " two-lines" : ""}` }, options.text);
       text.title = options.text;
       const action = options.action ? h("button", { class: "toast-act" }, options.action.label) : null;
       action?.addEventListener("click", () => { const run = options.action!.run; hide(); run(); });
-      const element = h("div", { class: "toast", role: "status", "aria-live": "polite" }, icon(options.icon ?? "check", 14), text, action);
+      const element = h("div", { class: "toast" }, icon(options.icon ?? "check", 14), text, action);
       element.addEventListener("mouseenter", pause);
       element.addEventListener("mouseleave", arm);
       host.append(element);

@@ -72,7 +72,21 @@ struct FocusCardView: View {
             Spacer(minLength: 4)
             VStack(spacing: state.restOpen || height < 470 ? 6 : 10) {
                 ring(session, stage: stage, at: now)
+                // 2a (A6): the to-do's space over its title, small — `● 회사` (일반: no line).
+                if let space = model.spaceOf(taskID: session.taskId) {
+                    HStack(spacing: 5) {
+                        SpaceDotView(space: space)
+                        Text(space.name).lineLimit(1)
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(PaperTheme.ink2)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, -4)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(L("스페이스") + " " + space.name)
+                }
                 title(session.title, points: height < 470 ? 26 : 30)
+                    .overlay { titleStrike }
                     .padding(.horizontal, 24)
                     .accessibilityAddTraits(.isHeader)
                 if let next = nextLine(at: now) {
@@ -106,15 +120,29 @@ struct FocusCardView: View {
         }
     }
 
-    /// The task in handwriting (two lines at most, held close together; see HandTitle).
+    /// The task in handwriting (two lines at most, held close together; see HandTitle). Faded once 다 했어요 is pressed.
     @ViewBuilder
     private func title(_ text: String, points: CGFloat) -> some View {
+        let color = state.finishing ? PaperTheme.ink3 : PaperTheme.ink
         switch model.notebookFont {
-        case .pen: HandTitle(text: text.handwritten, font: HandwritingFont.native(face: .pen, size: points))
-        case .brush: HandTitle(text: text.handwritten, font: HandwritingFont.native(face: .brush, size: (points * 0.93).rounded()))
+        case .pen: HandTitle(text: text.handwritten, font: HandwritingFont.native(face: .pen, size: points), color: color)
+        case .brush: HandTitle(text: text.handwritten, font: HandwritingFont.native(face: .brush, size: (points * 0.93).rounded()), color: color)
         case .clean:
-            Text(text).font(model.notebookFont.font(points: points)).lineLimit(2).multilineTextAlignment(.center)
+            Text(text).font(model.notebookFont.font(points: points)).lineLimit(2).multilineTextAlignment(.center).foregroundStyle(color)
         }
+    }
+
+    /// F4: 다 했어요 draws a pencil line through the title, left to right (그리기), as on Windows (`.fc-task.struck`).
+    private var titleStrike: some View {
+        GeometryReader { geometry in
+            Rectangle()
+                .fill(PaperTheme.ink.opacity(0.62))
+                .frame(width: state.finishing ? geometry.size.width : 0, height: 1.5)
+                .offset(y: (geometry.size.height * 0.58 - 0.75).rounded())
+        }
+        .animation(Motion.animation(.draw, reduce: reduceMotion), value: state.finishing)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     // MARK: Top row
@@ -343,15 +371,12 @@ private struct FocusRestRow: View {
     let item: TodoItem
     @ObservedObject var model: AppModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var pop = false
+    @State private var pops = 0
 
     var body: some View {
         HStack(spacing: 10) {
             Button {
-                if !item.isCompleted && !reduceMotion {
-                    pop = true
-                    withAnimation(.easeOut(duration: 0.16)) { pop = false }
-                }
+                if !item.isCompleted && Motion.animation(.change, reduce: reduceMotion) != nil { pops += 1 }
                 model.toggle(item.id)
             } label: {
                 ZStack {
@@ -362,7 +387,7 @@ private struct FocusRestRow: View {
                     }
                 }
                 .frame(width: 16, height: 16)
-                .scaleEffect(pop ? 0.85 : 1)
+                .checkPop(pops)
                 .frame(width: 24, height: 30)
                 .contentShape(Rectangle())
             }
@@ -422,6 +447,7 @@ struct FocusSwitch<Content: View>: View {
 struct HandTitle: NSViewRepresentable {
     let text: String
     let font: NSFont
+    var color = PaperTheme.ink
 
     func makeNSView(context: Context) -> NSTextField {
         let field = NSTextField(wrappingLabelWithString: "")
@@ -451,7 +477,7 @@ struct HandTitle: NSViewRepresentable {
 
     private func update(_ field: NSTextField) {
         field.attributedStringValue = NSAttributedString(string: text, attributes: [
-            .font: font, .foregroundColor: NSColor(PaperTheme.ink), .paragraphStyle: paragraph,
+            .font: font, .foregroundColor: NSColor(color), .paragraphStyle: paragraph,
             .baselineOffset: -(font.ascender + font.descender - font.pointSize) / 4,
         ])
         field.setAccessibilityRole(.staticText)

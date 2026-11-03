@@ -70,11 +70,15 @@ extension View {
     /// The toast after a delete, under the list card (the 스페이스 pane's since 1.45).
     func deskPaneToast(_ toast: Binding<PaperToast?>, preview: PaperToast? = nil) -> some View {
         overlay(alignment: .bottom) {
-            if let shown = toast.wrappedValue ?? preview {
-                ToastView(toast: shown) { if toast.wrappedValue?.id == shown.id { toast.wrappedValue = nil } }
-                    .offset(y: 56)
-                    .id(shown.id)
+            ZStack {
+                if let shown = toast.wrappedValue ?? preview {
+                    ToastView(toast: shown) { if toast.wrappedValue?.id == shown.id { toast.wrappedValue = nil } }
+                        .transition(.toast)
+                        .id(shown.id)
+                }
             }
+            .offset(y: 56)
+            .toastMotion(shown: toast.wrappedValue ?? preview != nil)
         }
         .padding(.bottom, toast.wrappedValue ?? preview == nil ? 0 : 56)
     }

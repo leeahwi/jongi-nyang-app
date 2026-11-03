@@ -11,6 +11,8 @@
 :root {
   --d-hand: var(--title-font);
   --d-mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, Menlo, monospace;
+  /* 메모 글꼴 · 크기 (#84): the words' face and size, set by drawer.ts from the drawer's setting (보통 below). */
+  --m-size: 14px; --m-face-size: 14px; --m-line: 26px; --m-para: 0px; --m-preview: 13px; --m-preview-line: 20px; --m-font: var(--ui);
   --d-tabs: 34px;
   --d-top: 24px;
 }
@@ -25,6 +27,7 @@
   --d-qk: #fffdf7; --d-qk-edge: #d0c2a3; --d-radius: 10px;
   --d-chip: #f3efe6; --d-pill: #f5f2ea; --d-pill-edge: rgba(70, 60, 40, 0.14); --d-pin: #7f6418; --d-danger: #a4472f;
   --d-pintab: #f6dc7c; --d-pintab-edge: #dcc062; --d-pintab-ink: #66531a; /* 고정's bookmark (1.30): the note's 오늘 tab */
+  --d-closebar: #7b766a; /* the close bar at rest (#83): --d-meta into the paper, still 3:1 — the Mac's closeBar */
   --d-shadow-deep: rgba(60, 50, 30, 0.24); --d-slip-bottom: #e0d7c4; --d-ear: #e6dbc3; --d-ear-in: rgba(242, 201, 198, 0.8);
   --c-lavender-a: #dcd8f3; --c-lavender-b: #d3cef0; --c-lavender-ink: #3f3a73; --c-lavender-tape: #d3cef0; --c-lavender-edge: #9d92d8; --c-lavender-line: #8e84c8;
   --c-pink-a: #f2d3d6; --c-pink-b: #eccacd; --c-pink-ink: #6f3239; --c-pink-tape: #ecc6ca; --c-pink-edge: #d79aa2; --c-pink-line: #b87b82;
@@ -46,6 +49,7 @@
   --d-qk: #3d3a34; --d-qk-edge: #5a554b; --d-radius: 10px;
   --d-chip: #4a4740; --d-pill: #46433c; --d-pill-edge: rgba(255, 255, 255, 0.12); --d-pin: #d9c47a; --d-danger: #eaa58a;
   --d-pintab: #c4a245; --d-pintab-edge: #d6b65a; --d-pintab-ink: #1f1d18; /* 고정's bookmark (1.30): the note's 오늘 tab, dark ink */
+  --d-closebar: #8e897d; /* the close bar at rest (#83) */
   --d-shadow-deep: rgba(0, 0, 0, 0.62); --d-slip-bottom: #1d1c19; --d-ear: #1c1a17; --d-ear-in: #7d555a;
   --c-lavender-a: #5e5888; --c-lavender-b: #575181; --c-lavender-ink: #f1edff; --c-lavender-tape: #7d75ad; --c-lavender-edge: #8f87c4; --c-lavender-line: #8f87c4;
   --c-pink-a: #74545a; --c-pink-b: #6c4e54; --c-pink-ink: #ffe4e8; --c-pink-tape: #8a666c; --c-pink-edge: #a8797f; --c-pink-line: #ad7f85;
@@ -67,6 +71,7 @@
   --d-qk: #fbf6ea; --d-qk-edge: #a98d63; --d-radius: 4px;
   --d-chip: #f1e9d8; --d-pill: #f3ecde; --d-pill-edge: rgba(90, 60, 20, 0.16); --d-pin: #5f4712; --d-danger: #8f3a22;
   --d-pintab: #f1d37a; --d-pintab-edge: #ab9049; --d-pintab-ink: #5c4512; /* 고정's bookmark (1.30): this paper's yellow */
+  --d-closebar: #6a583f; /* the close bar at rest (#83) */
   --d-shadow-deep: rgba(60, 50, 30, 0.24); --d-slip-bottom: #c9b08a; --d-ear: #cdb187; --d-ear-in: rgba(227, 160, 142, 0.7);
   --c-lavender-a: #f4ecdc; --c-lavender-b: #f4ecdc; --c-lavender-ink: #5c4228; --c-lavender-tape: #9cc2a6; --c-lavender-edge: #a3927d; --c-lavender-line: #98856f;
   --c-pink-a: #e9a38f; --c-pink-b: #e9a38f; --c-pink-ink: #4f2418; --c-pink-tape: #e9a38f; --c-pink-edge: #c27a66; --c-pink-line: #bd7763;
@@ -88,6 +93,7 @@
   --d-qk: #ffffff; --d-qk-edge: #bccadb; --d-radius: 10px;
   --d-chip: #eff2f6; --d-pill: #f1f4f7; --d-pill-edge: rgba(40, 70, 110, 0.14); --d-pin: #806516; --d-danger: #a4472f;
   --d-pintab: #f6e7b0; --d-pintab-edge: #cebe87; --d-pintab-ink: #614f17; /* 고정's bookmark (1.30): this paper's yellow */
+  --d-closebar: #74808b; /* the close bar at rest (#83) */
   --d-shadow-deep: rgba(30, 50, 80, 0.24); --d-slip-bottom: #d8e0e8; --d-ear: #dde6f0; --d-ear-in: #f6d6d2;
   --c-lavender-a: #e4ebf8; --c-lavender-b: #e4ebf8; --c-lavender-ink: #2f4a7a; --c-lavender-tape: #f6d6d2; --c-lavender-edge: #b3c0d6; --c-lavender-line: #7c8eaf;
   --c-pink-a: #f6d6d2; --c-pink-b: #f6d6d2; --c-pink-ink: #6e2f28; --c-pink-tape: #f6d6d2; --c-pink-edge: #e0aaa3; --c-pink-line: #b98079;
@@ -99,6 +105,93 @@
   --c-gray-a: #e2e5e9; --c-gray-b: #e2e5e9; --c-gray-ink: #3b434c; --c-gray-tape: #e2e5e9; --c-gray-edge: #b8bcc2; --c-gray-line: #888e95;
 }
 
+/* ─── 한지 (#142, the Mac's DrawerPalette.hanji) ─── */
+:root[data-look="hanji"], .it[data-sheet="hanji"], .big[data-sheet="hanji"] {
+  --d-paper: #e9e1d0; --d-edge: #cdc2ab; --d-line: transparent; --d-ink: #2b2925; --d-title: #2b2925;
+  --d-sub: #42603c; --d-icon: #55504a; --d-card: #fffcf5; --d-card-edge: #d6ccb6; --d-shadow: rgba(60, 50, 30, 0.12); --d-meta: #5f5b52; --d-preview: #5a564d; --d-peek: #55534f; --d-grp: #5a564d;
+  --d-check: #5f7a5a; --d-on-check: #fffdf8; --d-box: #8a8374; --d-done: #5f5b52; --d-select: #6f63b8; --d-open: #8d82cf;
+  --d-bar: #5f7a5a; --d-bar-track: #efe9dc; --d-foot-rule: #cdc2ab; --d-foot: #5f5b52; --d-foot-paw: #c4797e;
+  --d-hover: rgba(70, 60, 40, 0.07); --d-mark: rgba(233, 207, 122, 0.55); --d-menu: #fffcf5; --d-menu-edge: #d6ccb6;
+  --d-qk: #fffcf5; --d-qk-edge: #d6ccb6; --d-radius: 10px;
+  --d-chip: #f2efe9; --d-pill: #f5f3ec; --d-pill-edge: rgba(70, 60, 40, 0.14); --d-pin: #7f6418; --d-danger: #a4472f;
+  --d-pintab: #f6dc7c; --d-pintab-edge: #dcc062; --d-pintab-ink: #6b5520;
+  --d-closebar: #847f74;
+  --d-shadow-deep: rgba(60, 50, 30, 0.24); --d-slip-bottom: #e3dbc9; --d-ear: #e9e1d0; --d-ear-in: rgba(242, 201, 198, 0.8);
+  --c-lavender-a: #dcd8f3; --c-lavender-b: #d3cef0; --c-lavender-ink: #3f3a73; --c-lavender-tape: #d3cef0; --c-lavender-edge: #9d92d8; --c-lavender-line: #8d83c2;
+  --c-pink-a: #f2d3d6; --c-pink-b: #eccacd; --c-pink-ink: #6f3239; --c-pink-tape: #ecc6ca; --c-pink-edge: #d3979f; --c-pink-line: #b38087;
+  --c-mint-a: #cfe6d6; --c-mint-b: #c4dfcc; --c-mint-ink: #2d5638; --c-mint-tape: #c4dfcc; --c-mint-edge: #80b090; --c-mint-line: #6d967a;
+  --c-yellow-a: #f3e3a0; --c-yellow-b: #efdc90; --c-yellow-ink: #66531a; --c-yellow-tape: #efdc90; --c-yellow-edge: #bfae71; --c-yellow-line: #998b5a;
+  --c-sky-a: #d6e5f4; --c-sky-b: #cbdcef; --c-sky-ink: #2c4c70; --c-sky-tape: #cbdcef; --c-sky-edge: #8fb0da; --c-sky-line: #728dae;
+  --c-peach-a: #f6dccb; --c-peach-b: #f1d1bc; --c-peach-ink: #6f4026; --c-peach-tape: #f1d1bc; --c-peach-edge: #c8a793; --c-peach-line: #a08676;
+  --c-sand-a: #ebe2cf; --c-sand-b: #e3d8c1; --c-sand-ink: #574629; --c-sand-tape: #e3d8c1; --c-sand-edge: #aea48e; --c-sand-line: #948b79;
+  --c-gray-a: #e2e0da; --c-gray-b: #d9d6cf; --c-gray-ink: #47453f; --c-gray-tape: #d9d6cf; --c-gray-edge: #a8a6a0; --c-gray-line: #8f8d88;
+}
+
+/* ─── 쑥색 종이 (#142, the Mac's DrawerPalette.sage) ─── */
+:root[data-look="sage"], .it[data-sheet="sage"], .big[data-sheet="sage"] {
+  --d-paper: #d9e2cf; --d-edge: #b2c1a4; --d-line: transparent; --d-ink: #223020; --d-title: #223020;
+  --d-sub: #355530; --d-icon: #47553f; --d-card: #fbfdf7; --d-card-edge: #c0ceb3; --d-shadow: rgba(40, 55, 30, 0.12); --d-meta: #4b5847; --d-preview: #465243; --d-peek: #455142; --d-grp: #465243;
+  --d-check: #4f7a4a; --d-on-check: #fbfdf7; --d-box: #7d8a74; --d-done: #4b5847; --d-select: #3f6a3a; --d-open: #6f8a64;
+  --d-bar: #4f7a4a; --d-bar-track: #e4ebdc; --d-foot-rule: #b2c1a4; --d-foot: #4b5847; --d-foot-paw: #b86f76;
+  --d-hover: rgba(40, 60, 30, 0.07); --d-mark: rgba(233, 207, 122, 0.55); --d-menu: #fbfdf7; --d-menu-edge: #c0ceb3;
+  --d-qk: #fbfdf7; --d-qk-edge: #c0ceb3; --d-radius: 10px;
+  --d-chip: #eef1ea; --d-pill: #f1f4ed; --d-pill-edge: rgba(40, 60, 30, 0.14); --d-pin: #76600f; --d-danger: #a4472f;
+  --d-pintab: #f6dc7c; --d-pintab-edge: #dcc062; --d-pintab-ink: #6b5520;
+  --d-closebar: #768170;
+  --d-shadow-deep: rgba(40, 55, 30, 0.24); --d-slip-bottom: #cad4bf; --d-ear: #d9e2cf; --d-ear-in: rgba(242, 201, 198, 0.8);
+  --c-lavender-a: #dcd8f3; --c-lavender-b: #d3cef0; --c-lavender-ink: #3f3a73; --c-lavender-tape: #d3cef0; --c-lavender-edge: #9d92d8; --c-lavender-line: #8d83c2;
+  --c-pink-a: #f2d3d6; --c-pink-b: #eccacd; --c-pink-ink: #6f3239; --c-pink-tape: #ecc6ca; --c-pink-edge: #d3979f; --c-pink-line: #b38087;
+  --c-mint-a: #cfe6d6; --c-mint-b: #c4dfcc; --c-mint-ink: #2d5638; --c-mint-tape: #c4dfcc; --c-mint-edge: #80b090; --c-mint-line: #6d967a;
+  --c-yellow-a: #f3e3a0; --c-yellow-b: #efdc90; --c-yellow-ink: #66531a; --c-yellow-tape: #efdc90; --c-yellow-edge: #bfae71; --c-yellow-line: #998b5a;
+  --c-sky-a: #d6e5f4; --c-sky-b: #cbdcef; --c-sky-ink: #2c4c70; --c-sky-tape: #cbdcef; --c-sky-edge: #8fb0da; --c-sky-line: #728dae;
+  --c-peach-a: #f6dccb; --c-peach-b: #f1d1bc; --c-peach-ink: #6f4026; --c-peach-tape: #f1d1bc; --c-peach-edge: #c8a793; --c-peach-line: #a08676;
+  --c-sand-a: #ebe2cf; --c-sand-b: #e3d8c1; --c-sand-ink: #574629; --c-sand-tape: #e3d8c1; --c-sand-edge: #aea48e; --c-sand-line: #948b79;
+  --c-gray-a: #e2e0da; --c-gray-b: #d9d6cf; --c-gray-ink: #47453f; --c-gray-tape: #d9d6cf; --c-gray-edge: #a8a6a0; --c-gray-line: #8f8d88;
+}
+
+/* ─── 벚꽃 종이 (#142, the Mac's DrawerPalette.blossom) ─── */
+:root[data-look="blossom"], .it[data-sheet="blossom"], .big[data-sheet="blossom"] {
+  --d-paper: #efd9d5; --d-edge: #d4b7b1; --d-line: transparent; --d-ink: #33262a; --d-title: #33262a;
+  --d-sub: #7a3a42; --d-icon: #5e4a4f; --d-card: #fffaf8; --d-card-edge: #e0c6c1; --d-shadow: rgba(70, 40, 40, 0.12); --d-meta: #67525a; --d-preview: #61494e; --d-peek: #584c4f; --d-grp: #61494e;
+  --d-check: #5f7a5a; --d-on-check: #fffdf8; --d-box: #8f7c80; --d-done: #67525a; --d-select: #8a4552; --d-open: #a46f7a;
+  --d-bar: #5f7a5a; --d-bar-track: #f3e5e2; --d-foot-rule: #d4b7b1; --d-foot: #67525a; --d-foot-paw: #b9636c;
+  --d-hover: rgba(80, 40, 45, 0.07); --d-mark: rgba(233, 207, 122, 0.55); --d-menu: #fffaf8; --d-menu-edge: #e0c6c1;
+  --d-qk: #fffaf8; --d-qk-edge: #e0c6c1; --d-radius: 10px;
+  --d-chip: #f3edec; --d-pill: #f6f0ef; --d-pill-edge: rgba(80, 40, 45, 0.14); --d-pin: #77600f; --d-danger: #a4472f;
+  --d-pintab: #f6dc7c; --d-pintab-edge: #dcc062; --d-pintab-ink: #6b5520;
+  --d-closebar: #8c767b;
+  --d-shadow-deep: rgba(70, 40, 40, 0.24); --d-slip-bottom: #e5ccc7; --d-ear: #efd9d5; --d-ear-in: rgba(232, 163, 170, 0.7);
+  --c-lavender-a: #dcd8f3; --c-lavender-b: #d3cef0; --c-lavender-ink: #3f3a73; --c-lavender-tape: #d3cef0; --c-lavender-edge: #9d92d8; --c-lavender-line: #8d83c2;
+  --c-pink-a: #f2d3d6; --c-pink-b: #eccacd; --c-pink-ink: #6f3239; --c-pink-tape: #ecc6ca; --c-pink-edge: #cf949c; --c-pink-line: #b07e85;
+  --c-mint-a: #cfe6d6; --c-mint-b: #c4dfcc; --c-mint-ink: #2d5638; --c-mint-tape: #c4dfcc; --c-mint-edge: #86b896; --c-mint-line: #6b9378;
+  --c-yellow-a: #f3e3a0; --c-yellow-b: #efdc90; --c-yellow-ink: #66531a; --c-yellow-tape: #efdc90; --c-yellow-edge: #bfae71; --c-yellow-line: #998b5a;
+  --c-sky-a: #d6e5f4; --c-sky-b: #cbdcef; --c-sky-ink: #2c4c70; --c-sky-tape: #cbdcef; --c-sky-edge: #8fb0da; --c-sky-line: #728dae;
+  --c-peach-a: #f6dccb; --c-peach-b: #f1d1bc; --c-peach-ink: #6f4026; --c-peach-tape: #f1d1bc; --c-peach-edge: #c8a793; --c-peach-line: #a08676;
+  --c-sand-a: #ebe2cf; --c-sand-b: #e3d8c1; --c-sand-ink: #574629; --c-sand-tape: #e3d8c1; --c-sand-edge: #aea48e; --c-sand-line: #948b79;
+  --c-gray-a: #e2e0da; --c-gray-b: #d9d6cf; --c-gray-ink: #47453f; --c-gray-tape: #d9d6cf; --c-gray-edge: #a8a6a0; --c-gray-line: #8f8d88;
+}
+
+/* ─── 먹색 종이 (#142, the Mac's DrawerPalette.ink) ─── */
+:root[data-look="ink"], .it[data-sheet="ink"], .big[data-sheet="ink"] {
+  --d-paper: #1a2030; --d-edge: #3d4760; --d-line: rgba(255, 255, 255, 0.04); --d-ink: #eef1f7; --d-title: #eef1f7;
+  --d-sub: #a9c7e8; --d-icon: #c4ccdb; --d-card: #283146; --d-card-edge: #46516b; --d-shadow: rgba(0, 0, 0, 0.45); --d-meta: #b9c1d1; --d-preview: #cdd4e2; --d-peek: #d2d6de; --d-grp: #cdd4e2;
+  --d-check: #a9c7e8; --d-on-check: #1a2030; --d-box: #9aa4b8; --d-done: #b9c1d1; --d-select: #b0c4ec; --d-open: #9d95d6;
+  --d-bar: #a9c7e8; --d-bar-track: #3c4660; --d-foot-rule: #3d4760; --d-foot: #b9c1d1; --d-foot-paw: #d39a9e;
+  --d-hover: rgba(255, 255, 255, 0.06); --d-mark: rgba(190, 168, 90, 0.5); --d-menu: #283146; --d-menu-edge: #46516b;
+  --d-qk: #283146; --d-qk-edge: #46516b; --d-radius: 10px;
+  --d-chip: #363e52; --d-pill: #343d51; --d-pill-edge: rgba(255, 255, 255, 0.12); --d-pin: #d9c47a; --d-danger: #eaa58a;
+  --d-pintab: #c4a245; --d-pintab-edge: #d6b65a; --d-pintab-ink: #1f1d18;
+  --d-closebar: #757c8c;
+  --d-shadow-deep: rgba(0, 0, 0, 0.62); --d-slip-bottom: #141926; --d-ear: #1a2030; --d-ear-in: #7d555a;
+  --c-lavender-a: #5e5888; --c-lavender-b: #575181; --c-lavender-ink: #f1edff; --c-lavender-tape: #7d75ad; --c-lavender-edge: #8f87c4; --c-lavender-line: #8f87c4;
+  --c-pink-a: #74545a; --c-pink-b: #6c4e54; --c-pink-ink: #ffe4e8; --c-pink-tape: #8a666c; --c-pink-edge: #a8797f; --c-pink-line: #a8797f;
+  --c-mint-a: #4b6a55; --c-mint-b: #46634f; --c-mint-ink: #e2f5e7; --c-mint-tape: #5f8269; --c-mint-edge: #719a7e; --c-mint-line: #719a7e;
+  --c-yellow-a: #716641; --c-yellow-b: #6a603c; --c-yellow-ink: #fff1bf; --c-yellow-tape: #85794f; --c-yellow-edge: #9d9168; --c-yellow-line: #9d9168;
+  --c-sky-a: #4a5d78; --c-sky-b: #455770; --c-sky-ink: #e3eeff; --c-sky-tape: #5d7090; --c-sky-edge: #7189ad; --c-sky-line: #7189ad;
+  --c-peach-a: #765b49; --c-peach-b: #6e5544; --c-peach-ink: #ffe8d8; --c-peach-tape: #8b6d58; --c-peach-edge: #a08675; --c-peach-line: #a08675;
+  --c-sand-a: #6a644f; --c-sand-b: #635d4a; --c-sand-ink: #f5ecd4; --c-sand-tape: #7b745d; --c-sand-edge: #958c6e; --c-sand-line: #958c6e;
+  --c-gray-a: #5d5a55; --c-gray-b: #57544f; --c-gray-ink: #f0ede6; --c-gray-tape: #6e6b65; --c-gray-edge: #8a8782; --c-gray-line: #8a8782;
+}
 .c-lavender { --a: var(--c-lavender-a); --b: var(--c-lavender-b); --k: var(--c-lavender-ink); --tp: var(--c-lavender-tape); --e: var(--c-lavender-edge); --ln: var(--c-lavender-line); }
 .c-pink { --a: var(--c-pink-a); --b: var(--c-pink-b); --k: var(--c-pink-ink); --tp: var(--c-pink-tape); --e: var(--c-pink-edge); --ln: var(--c-pink-line); }
 .c-mint { --a: var(--c-mint-a); --b: var(--c-mint-b); --k: var(--c-mint-ink); --tp: var(--c-mint-tape); --e: var(--c-mint-edge); --ln: var(--c-mint-line); }
@@ -136,10 +229,9 @@ body.drawer-window { background: transparent; overflow: hidden; color: var(--d-i
 .side-right .dr { left: var(--d-tabs); right: 0; border-right: none; border-radius: 14px 0 0 14px; }
 .side-left .dr { left: 0; right: var(--d-tabs); border-left: none; border-radius: 0 14px 14px 0; }
 :root[data-look="grid"] .dr { background-image: linear-gradient(var(--d-line) 1px, transparent 1px), linear-gradient(90deg, var(--d-line) 1px, transparent 1px); background-size: 14px 14px; }
-:root[data-look="night"] .dr { box-shadow: 0 0 24px -6px rgba(0, 0, 0, 0.6); }
+:root[data-look="night"] .dr, :root[data-look="ink"] .dr { box-shadow: 0 0 24px -6px rgba(0, 0, 0, 0.6); }
 /* 낮 · 밤: ruled lines across the paper (under everything on it). */
-.dr::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: repeating-linear-gradient(transparent 0 21px, var(--d-line) 21px 22px); }
-:root[data-look="grid"] .dr::before { display: none; }
+/* #111: no ruled lines on the drawer's paper any more (the memo sheets lost theirs in 1.30); 모눈 keeps its squares. */
 .dr > * { position: relative; }
 .dr > .ears, .dr > .grip, .dr > .big, .dr > .menu, .dr > .toast-host, .dr > .tip { position: absolute; }
 
@@ -148,7 +240,31 @@ body.drawer-window { background: transparent; overflow: hidden; color: var(--d-i
 .side-right .grip { left: 0; }
 .side-left .grip { right: 0; }
 
-/* ─── The header: 메모 서랍, the folder's name ▾ (the folder list), 검색 · 위에 고정 · 닫기 ─── */
+/* 서랍 닫기 (#83, like SideNotes; #164): a tab out of the paper's inner edge, on the desktop's side, as the handle comes
+   out of the screen's edge when the drawer is shut — the handle's cream, edge and shadow (the same colours as .handle),
+   rounded on the outer side, with the way it closes (› on a right drawer, ‹ on a left one). In the middle of the edge,
+   or under the bookmarks when they reach that far (drawer.ts placeCloseTab); it follows the edge as the drawer widens
+   (#113). A click closes the drawer, a drag still changes the width. Under the pointer or Tab it comes out 4px more;
+   with Tab its edge is drawn in the paw's ink (its focus mark: no ring round it). The paper carries no line any more. */
+.closebar {
+  --handle-fill: #f6e7b0; --handle-edge: #e2cf86; --handle-paw: #5e4a12;
+  position: absolute; top: calc(var(--d-top) + (100% - var(--d-top)) / 2); width: 24px; height: 50px; margin-top: -25px; padding: 0; border: 0; background: transparent;
+  display: flex; align-items: center; z-index: 3;
+}
+.side-right .closebar { right: calc(100% - var(--d-tabs)); justify-content: flex-end; }
+.side-left .closebar { left: calc(100% - var(--d-tabs)); justify-content: flex-start; }
+.closebar .bar {
+  display: grid; place-items: center; width: 18px; height: 46px; background: var(--handle-fill); color: var(--handle-paw);
+  box-shadow: inset 0 0 0 1px var(--handle-edge), 0 1px 4px rgba(60, 48, 24, 0.22); transition: width var(--motion-quick) var(--ease-out);
+}
+.side-right .closebar .bar { border-radius: 10px 0 0 10px; }
+.side-left .closebar .bar { border-radius: 0 10px 10px 0; }
+.side-left .closebar .bar .icon { transform: scaleX(-1); }
+.closebar:hover .bar, .closebar:focus-visible .bar, .edge-hover .closebar .bar { width: 22px; }
+.closebar:focus-visible .bar { box-shadow: inset 0 0 0 1.5px var(--handle-paw), 0 1px 4px rgba(60, 48, 24, 0.22); }
+.closebar:focus-visible { outline: none; }
+
+/* ─── The header: 메모 서랍, the folder's name ▾ (the folder list), 검색 · 위에 고정 (#83: closing is the bar on the edge) ─── */
 .hd { padding: 10px 9px 6px 14px; flex: none; }
 .sub { font-size: 11px; font-weight: 600; color: var(--d-sub); letter-spacing: 0.02em; padding-left: 2px; }
 .ttl { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 38px; }
@@ -181,7 +297,11 @@ body.drawer-window { background: transparent; overflow: hidden; color: var(--d-i
 }
 :root[data-font="clean"] .qk textarea { font-size: 13.5px; line-height: 21px; }
 .qk textarea::placeholder { color: var(--d-meta); opacity: 1; }
-.qk-hint { display: flex; justify-content: flex-end; gap: 10px; font-size: 10.5px; color: var(--d-meta); margin-top: 3px; white-space: nowrap; overflow: hidden; }
+.qk-hint { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 10px; font-size: 10.5px; color: var(--d-meta); margin-top: 5px; padding-top: 5px; border-top: 0.5px solid var(--d-pill-edge); }
+.qk-to { font-weight: 600; color: var(--d-preview); white-space: nowrap; }
+/* A narrow drawer in a long language: the keys go under where it goes (never cut). */
+.qk-keys { display: flex; flex-wrap: wrap; gap: 0 10px; margin-left: auto; }
+.qk-keys > span { white-space: nowrap; }
 .qk-hint[hidden] { display: none; }
 
 /* ─── The memos: date groups of cards ─── */
@@ -217,10 +337,22 @@ body.drawer-window { background: transparent; overflow: hidden; color: var(--d-i
    2,000 cards cost the list's redraw a fifth more than one line did. The clip margin keeps the tape above the edge. */
 .list > .it:not(.open) { content-visibility: auto; contain-intrinsic-size: auto 96px; overflow-clip-margin: 8px; }
 .list.dense .it { --pad-top: 10px; --pad-bottom: 9px; --min: 56px; }
+/* 제목만 (#115): one line 36px tall — the folder's colour as a 3px band at the left, the title, `1/3`, the short time;
+   about twelve to a screen, 6px apart. No tape and no perforation; the open memo is its card, where it was. */
+.list.titles { --gap: 6px; }
+.list.titles > .it.open { margin: 4px 0 6px; }
+.it.ti { --min: 36px; display: flex; align-items: center; padding: 0 12px 0 14px; border-radius: 5px; contain-intrinsic-size: auto 36px; box-shadow: 0 1px 3px var(--d-shadow), 0 0 0 0.8px var(--d-card-edge); }
+.it.ti::before { inset: 0 auto 0 0; width: 3px; height: auto; border-radius: 5px 0 0 5px; background: var(--ln); }
+.it.ti > .tp { display: none; }
+.it.ti .row { flex: 1; align-items: center; min-height: 0; }
+.it.ti .row .hw { font-size: 19px; line-height: 24px; }
+:root[data-font="clean"] .it.ti .row .hw { font-size: 14px; }
+.it.ti.selected:not(.open) { box-shadow: 0 2px 8px var(--d-shadow-deep), 0 0 0 1.5px color-mix(in srgb, var(--ln) 80%, var(--d-card-edge)); }
 /* The perforation along the top edge: small half holes of the drawer's paper. */
 .it::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; pointer-events: none; background: radial-gradient(circle at 3.5px 0, var(--drawer-paper) 1.3px, transparent 1.6px) 0 0 / 7px 3px repeat-x; }
 .it.open { box-shadow: 0 1px 0 var(--d-slip-bottom), 0 6px 18px var(--d-shadow-deep), 0 0 0 1px var(--d-card-edge); }
-.it.selected:not(.open) { box-shadow: 0 1px 0 var(--d-slip-bottom), 0 6px 18px var(--d-shadow-deep), 0 0 0 1.5px color-mix(in srgb, var(--ln) 55%, var(--d-card-edge)); }
+/* #118: the keyboard's pick is a 2 px edge in the folder's line colour inside the card (3:1 on it, drawerContrast.test.ts), as on the Mac. */
+.it.selected:not(.open) { box-shadow: 0 1px 0 var(--d-slip-bottom), 0 6px 18px var(--d-shadow-deep), inset 0 0 0 2px var(--ln); }
 /* The keyboard's place is the picked card's depth and edge (above): no ring round it, and none round the text being typed. */
 .it:focus-visible, .it .editor:focus-visible, .hw-field:focus-visible { outline: none; }
 .it.dragging { opacity: 0.45; }
@@ -237,17 +369,17 @@ body.drawer-window { background: transparent; overflow: hidden; color: var(--d-i
 .it .paw .icon, .acts .ib.on .icon, .hov .ib.on .icon { fill: currentColor; }
 /* The preview (#14): up to three lines of the memo's words (dense two), wrapped, … at the end of the last; the ink one
    step lighter. A checklist shows its first items instead, one a line, with small boxes. */
-.p { margin: 0; font-size: 13px; line-height: 20px; color: var(--d-peek); white-space: pre-line; overflow-wrap: anywhere; overflow: hidden;
+.p { margin: 0; font-size: var(--m-preview); line-height: var(--m-preview-line); color: var(--d-peek); white-space: pre-line; overflow-wrap: anywhere; overflow: hidden;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
 .list.dense .p, .p.hit { -webkit-line-clamp: 2; }
 .pk { display: flex; flex-direction: column; }
-.pr { display: flex; align-items: center; gap: 6px; min-width: 0; height: 20px; font-size: 13px; color: var(--d-peek); }
+.pr { display: flex; align-items: center; gap: 6px; min-width: 0; height: var(--m-preview-line); font-size: var(--m-preview); color: var(--d-peek); }
 .pr > span:last-child { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pr.done > span:last-child { color: var(--d-done); text-decoration: line-through; }
 .pr .bx { width: 11px; height: 11px; margin-top: 0; border-radius: 2.5px; }
 .pr .bx.on::after { content: ""; width: 5px; height: 2.5px; border: solid var(--d-on-check); border-width: 0 0 1.5px 1.5px; transform: translateY(-0.5px) rotate(-45deg); }
 .list.dense .pr:nth-child(n + 3) { display: none; }
-.code { font-family: var(--d-mono); font-size: 12px; letter-spacing: 0; }
+.code { font-family: var(--d-mono); font-size: calc(var(--m-preview) - 1px); letter-spacing: 0; }
 /* The kind row: a chip on the left (a link's address, a phone number, a checklist's count and bar), the time on the right. */
 .kind { display: flex; align-items: center; gap: 6px; min-height: 24px; min-width: 0; }
 .kind .m { margin-left: auto; }
@@ -271,32 +403,46 @@ body.dragging-memo .it > .hov { display: none !important; }
 /* An open memo: every line, checklist boxes that work, and its bar under it. */
 .body { margin-top: 0; }
 /* An open memo (#14): 14px on 26px lines, as while it's typed. */
-.ln { font-size: 14px; line-height: 26px; margin: 0; overflow-wrap: anywhere; white-space: pre-wrap; color: var(--d-ink); cursor: text; min-height: 26px; }
-.ln.code { font-size: 13px; }
+/* An open memo (#14): the drawer's face on its lines (보통 14px on 26px), as while it's typed. */
+.ln { font-family: var(--m-font); font-size: var(--m-face-size); line-height: var(--m-line); margin: 0; word-break: keep-all; overflow-wrap: anywhere; white-space: pre-wrap; color: var(--d-ink); cursor: text; min-height: var(--m-line); }
+.ln.code { font-family: var(--d-mono); font-size: calc(var(--m-size) - 1px); }
 .ck { display: flex; gap: 7px; align-items: flex-start; }
-.bx { width: 12px; height: 12px; border-radius: 3px; margin-top: 7px; flex: none; border: 1.2px solid var(--d-box); display: grid; place-items: center; color: var(--d-on-check); cursor: default; }
+.bx { width: 12px; height: 12px; border-radius: 3px; margin-top: calc((var(--m-line) - 12px) / 2); flex: none; border: 1.2px solid var(--d-box); display: grid; place-items: center; color: var(--d-on-check); cursor: default; }
 .bx .icon { opacity: 0; }
 .bx.on { background: var(--d-check); border-color: var(--d-check); }
 .bx.on .icon { opacity: 1; }
 button.bx:hover { border-color: var(--d-ink); }
 .ck.done .ckt { color: var(--d-done); text-decoration: line-through; }
 .ckt { min-width: 0; }
-.editor { display: block; width: 100%; resize: none; border: 0; outline: none; background-color: transparent; color: var(--d-ink); font: 14px/26px var(--ui); padding: 0; margin: 0; min-height: 52px; overflow: hidden; user-select: text; }
+/* The open memo's words (#84: CodeMirror, memoEditor.ts): the drawer's face on its lines, no box, no ring; CodeMirror's own
+   look (a monospace face, padding, a dotted focus ring) taken off. */
+.editor { display: block; width: 100%; background-color: transparent; color: var(--d-ink); font-family: var(--m-font); font-size: var(--m-face-size); line-height: var(--m-line); min-height: 52px; user-select: text; }
+.dr .editor.cm-focused { outline: none; }
+/* In a card: exactly its lines' height (memoEditor.ts fitHeight) and contained, so a key lays out the editor alone. */
+.it.open .editor { contain: strict; }
+.dr .editor .cm-scroller { font-family: inherit; line-height: inherit; overflow: visible; }
+.dr .editor .cm-content { padding: 0; min-height: 52px; caret-color: var(--d-ink); word-break: keep-all; overflow-wrap: anywhere; }
+.dr .editor .cm-line { padding: 0; }
+.dr .editor .cm-placeholder { color: var(--d-meta); }
 /* The open memo's bar: [크게 보기 · 복사 · ⚙] · `오후 5:38 고침` · [폴더로 옮기기 · 지우기]. */
 .acts { display: flex; align-items: center; gap: 6px; margin-top: 8px; min-width: 0; }
 .pill { display: flex; align-items: center; gap: 1px; padding: 2px 4px; border-radius: 999px; background: var(--d-pill); box-shadow: inset 0 0 0 0.5px var(--d-pill-edge); flex: none; }
 .pill .ib { width: 25px; height: 22px; border-radius: 999px; }
 .pill .ib.danger { color: var(--d-danger); }
-.acts .when { flex: 1; min-width: 0; text-align: center; font-size: 11px; color: var(--d-meta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* #112: the bar's Aa (the format bar) in letters, as on the Mac. */
+.pill .ib.aa { font: 600 12px/1 var(--ui); letter-spacing: 0; }
+.pill .ib.aa[aria-pressed="true"] { color: var(--d-check); }
+.acts .when { flex: 1; min-width: 0; text-align: right; padding-right: 2px; font-size: 11px; color: var(--d-meta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Too narrow for the time between the pills (260 wide, a long date): it goes under them. */
-.acts.stack { flex-wrap: wrap; justify-content: space-between; row-gap: 2px; }
+.acts.stack { flex-wrap: wrap; row-gap: 2px; }
 .acts.stack .when { order: 3; flex-basis: 100%; }
 
 /* 크게 보기: the open memo over the whole list. */
 .big { left: 10px; right: 10px; top: var(--big-top, 120px); bottom: 50px; z-index: 4; display: flex; flex-direction: column; padding: 16px 16px 14px; color: var(--d-ink);
   background-color: var(--d-card); box-shadow: 0 1px 0 var(--d-slip-bottom), 0 10px 30px -10px var(--d-shadow-deep), 0 0 0 1px var(--d-card-edge); }
 .big .row { display: flex; align-items: center; gap: 8px; }
-.big .editor { flex: 1; overflow-y: auto; }
+.big .editor { flex: 1; min-height: 0; }
+.big .editor .cm-scroller { overflow: auto; }
 .big .editor:focus-visible { outline: none; }
 
 /* ─── Menus: menu.css (shared with the note's row menu and 모든 스페이스 ▾, 1.30), drawn with the --d-* tokens above. ─── */
@@ -312,6 +458,11 @@ button.bx:hover { border-color: var(--d-ink); }
 .swrow i.s-auto { background: linear-gradient(135deg, #efe7d6 50%, #1e1c19 50%); }
 .swrow i.s-follow { background: linear-gradient(135deg, var(--d-card) 50%, var(--d-paper) 50%); }
 .swrow i.s-day { background: #fffdf7; } .swrow i.s-day.s-drawer { background: #e6dbc3; }
+/* #142: 한지 · 쑥색 · 벚꽃 · 먹색 (their sheet, and their drawer paper under .s-drawer). */
+.swrow i.s-hanji, .sq-paper.s-hanji { background: #fffcf5; } .swrow i.s-hanji.s-drawer { background: #e9e1d0; }
+.swrow i.s-sage, .sq-paper.s-sage { background: #fbfdf7; box-shadow: inset 0 0 0 3px #d9e2cf; } .swrow i.s-sage.s-drawer { background: #d9e2cf; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.22); }
+.swrow i.s-blossom, .sq-paper.s-blossom { background: #fffaf8; box-shadow: inset 0 0 0 3px #efd9d5; } .swrow i.s-blossom.s-drawer { background: #efd9d5; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.22); }
+.swrow i.s-ink, .sq-paper.s-ink { background: #283146; } .swrow i.s-ink.s-drawer { background: #1a2030; }
 .swrow i.s-night { background: #3d3a34; } .swrow i.s-night.s-drawer { background: #1c1a17; }
 .swrow i.s-kraft { background: #fbf6ea; box-shadow: inset 0 0 0 3px #cdb187; } .swrow i.s-kraft.s-drawer { background: #cdb187; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.22); }
 .swrow i.s-grid { background: #fff linear-gradient(#d8e2ee 1px, transparent 1px) 0 0 / 6px 6px, #fff linear-gradient(90deg, #d8e2ee 1px, transparent 1px) 0 0 / 6px 6px; background-color: #fff; }
@@ -334,6 +485,24 @@ button.bx:hover { border-color: var(--d-ink); }
 .menu .btn:hover { background: var(--d-hover); }
 .menu .btn.go { background: var(--d-check); color: var(--d-on-check); }
 .menu .btn.go:disabled { opacity: 0.45; }
+/* 지운 메모 (#120): its slip under the folder name — the head, a row a memo (title · folder · how long ago · 되돌리기), the foot. */
+.menu .thead { display: flex; align-items: baseline; gap: 6px; margin: 6px 8px 4px; font-size: 12.5px; color: var(--d-ink); flex: none; }
+.menu .thead span { font-size: 11px; color: var(--d-meta); }
+.menu .trows { display: flex; flex-direction: column; max-height: 300px; overflow-y: auto; margin: 0 2px; flex: none; }
+.menu .trow { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "title back" "meta back"; align-items: center; column-gap: 8px; padding: 5px 6px; border-top: 0.5px solid var(--d-menu-edge); }
+.menu .trow:first-child { border-top: none; }
+.menu .trow .hw { grid-area: title; font-family: var(--d-hand); font-size: 18px; line-height: 22px; color: var(--d-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+:root[data-font="clean"] .menu .trow .hw { font-size: 13px; font-weight: 600; }
+.menu .trow .m { grid-area: meta; overflow: hidden; text-overflow: ellipsis; }
+.menu .trow .btn.back { grid-area: back; color: var(--d-check); padding: 0 8px; }
+.menu .tnone { margin: 6px 8px; font-size: 12px; color: var(--d-meta); }
+.menu .tfoot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 8px; margin: 6px 6px 4px; padding-top: 6px; border-top: 0.5px solid var(--d-menu-edge); font-size: 11px; color: var(--d-meta); flex: none; }
+.menu .tfoot.ask { flex-direction: column; align-items: stretch; gap: 2px; }
+.menu .tfoot.ask b { font-size: 12.5px; color: var(--d-ink); }
+.menu .tfoot.ask .row-btns { padding: 6px 0 0; }
+.menu .btn.danger { color: var(--d-danger); padding: 0 8px; }
+.menu .btn.danger:disabled { opacity: 0.45; }
+.menu .btn.go.danger { background: var(--d-danger); color: var(--d-on-check); }
 
 /* A bookmark's small label, beside it over the paper: `장보기 · 세 장 · Ctrl+3`. */
 .tip { z-index: 7; pointer-events: none; padding: 4px 9px; border-radius: 8px; background: var(--d-menu); border: 0.5px solid var(--d-menu-edge); box-shadow: 0 6px 16px -6px rgba(40, 30, 10, 0.35); font-size: 11.5px; color: var(--d-ink); white-space: nowrap; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; }
@@ -348,11 +517,16 @@ button.bx:hover { border-color: var(--d-ink); }
 :root[data-font="clean"] .empty .hw { font-size: 14px; }
 .empty p { margin: 6px 0 0; font-size: 11.5px; line-height: 1.5; text-wrap: balance; }
 
-/* Search results: the folder's name small, the matched words marked. */
-.it .where { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--d-meta); min-height: 22px; white-space: nowrap; overflow: hidden; max-width: 100%; }
-.it .where .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--a); box-shadow: inset 0 0 0 1px var(--e); flex: none; }
-.it .where .m { margin-left: auto; }
+/* Search results (#114): in groups by folder (its colour square, name and count), the matched words marked. */
+.grp.found .sq { width: 9px; height: 9px; border-radius: 2px; background: var(--a); box-shadow: inset 0 0 0 1px var(--e); flex: none; }
 mark { background: var(--d-mark); color: inherit; border-radius: 2px; padding: 0 1px; }
+/* The chips under the field (#114): where to look, then what to keep to; the picked ones on the card's paper with a green edge. */
+.chips { display: flex; flex-direction: column; gap: 5px; padding: 6px 0 2px 2px; }
+.chips[hidden] { display: none; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; }
+.chip { height: 22px; padding: 0 9px; border-radius: 999px; font: 11.5px/22px var(--ui); color: var(--d-preview); background: var(--d-pill); box-shadow: inset 0 0 0 0.5px var(--d-pill-edge); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.chip:hover { background: var(--d-hover); }
+.chip.on { color: var(--d-ink); font-weight: 600; background: var(--d-card); box-shadow: inset 0 0 0 1.2px var(--d-check); }
 
 /* ─── The footer: ⚙ · the folder and its count · the shortcut ─── */
 .ft { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 12px 10px 12px; border-top: 0.5px solid var(--d-foot-rule); font-size: 11px; color: var(--d-foot); min-width: 0; }
@@ -390,6 +564,9 @@ mark { background: var(--d-mark); color: inherit; border-radius: 2px; padding: 0
 .side-right .bk { border-radius: 9px 0 0 9px; border-right: none; margin-right: 1px; }
 .side-left .bk { border-radius: 0 9px 9px 0; border-left: none; margin-left: 1px; }
 .bk:hover { width: 28px; }
+/* #116: two letters where first letters collide — Hangul stacked, as the picked name is; Latin side by side, smaller. */
+.bk[data-two] { font-size: 13px; letter-spacing: -0.5px; }
+.bk[data-two="stack"] { writing-mode: vertical-rl; text-orientation: upright; line-height: 1; }
 .bk.on { width: 30px; height: auto; min-height: 64px; max-height: 150px; padding: 9px 0; font-size: 18px; line-height: 30px; writing-mode: vertical-rl; text-orientation: mixed; white-space: nowrap; text-overflow: ellipsis; }
 .side-right .bk.on { margin-right: 0; }
 :root[data-font="clean"] .bk.on { font-size: 13px; font-weight: 600; }
@@ -398,12 +575,16 @@ mark { background: var(--d-mark); color: inherit; border-radius: 2px; padding: 0
 .bk.paw { --a: var(--d-pintab); --k: var(--d-pintab-ink); --e: var(--d-pintab-edge); }
 .bk.paw .icon { flex: none; fill: currentColor; }
 .bk.paw.on { writing-mode: horizontal-tb; padding: 0; height: 64px; }
-.bk.add { background: transparent; border: 1px dashed color-mix(in srgb, var(--d-icon) 60%, transparent); color: var(--d-icon); height: 26px; }
-.side-right .bk.add { border-right: none; }
-.side-left .bk.add { border-left: none; }
-.bk.add:hover { background: var(--d-hover); color: var(--d-ink); }
+/* 새 폴더 (#82): an empty bookmark — the un-picked bookmarks' shape, a little shorter (24 × 32), in the sheet's paper with
+   a dashed edge in the open checkbox's colour and a 13 px + in the secondary ink (3:1 or more on every paper); under the
+   pointer it comes out like the others, a touch darker, the + in ink. */
+.bk.add { --a: var(--d-card); --k: var(--d-preview); --e: var(--d-box); border-style: dashed; height: 32px; }
+.side-right .bk.add { border-right-style: none; }
+.side-left .bk.add { border-left-style: none; }
+.bk.add:hover, .edge-hover .bk.add { --a: color-mix(in srgb, var(--d-ink) 6%, var(--d-card)); --k: var(--d-ink); --e: var(--d-icon); }
+.edge-hover .bk.add { width: 28px; }
 .bk.drop { filter: brightness(0.94) saturate(1.2); width: 30px; }
-:root[data-look="night"] .bk.drop { filter: brightness(1.25); }
+:root[data-look="night"] .bk.drop, :root[data-look="ink"] .bk.drop { filter: brightness(1.25); }
 .bk.lifted { opacity: 0.5; }
 .bk:focus-visible { outline: 2px solid var(--d-select); outline-offset: -2px; }
 
@@ -419,12 +600,12 @@ mark { background: var(--d-mark); color: inherit; border-radius: 2px; padding: 0
 /* 바탕 없음: no paper — the header on a floating pill, the slip, the cards, the group headers on small pills and
    the footer's pieces float on the desktop. The bookmarks stay; the mouse goes through everywhere else. */
 :root[data-backdrop="none"] .dr { background: transparent; border-color: transparent; box-shadow: none; }
-:root[data-backdrop="none"] .dr::before, :root[data-backdrop="none"] .ears, :root[data-backdrop="none"] .it::before { display: none; }
+:root[data-backdrop="none"] .ears, :root[data-backdrop="none"] .it::before { display: none; }
 :root[data-backdrop="none"] .hd { margin: 6px 10px 6px; padding: 6px 6px 4px 12px; border-radius: 14px; background: var(--d-card); box-shadow: 0 0 0 1px var(--d-card-edge), 0 2px 8px rgba(0, 0, 0, 0.18); }
 :root[data-backdrop="none"] .qk { box-shadow: 0 0 0 1px var(--d-qk-edge), 0 4px 14px rgba(0, 0, 0, 0.22); }
 :root[data-backdrop="none"] .it { box-shadow: 0 1px 0 var(--d-slip-bottom), 0 4px 14px rgba(0, 0, 0, 0.22), 0 0 0 1px var(--d-card-edge); }
 :root[data-backdrop="none"] .it.open { box-shadow: 0 1px 0 var(--d-slip-bottom), 0 6px 18px rgba(0, 0, 0, 0.34), 0 0 0 1px var(--d-card-edge); }
-:root[data-backdrop="none"] .it.selected:not(.open) { box-shadow: 0 1px 0 var(--d-slip-bottom), 0 6px 18px rgba(0, 0, 0, 0.34), 0 0 0 1.5px color-mix(in srgb, var(--ln) 55%, var(--d-card-edge)); }
+:root[data-backdrop="none"] .it.selected:not(.open) { box-shadow: 0 1px 0 var(--d-slip-bottom), 0 6px 18px rgba(0, 0, 0, 0.34), inset 0 0 0 2px var(--ln); }
 :root[data-backdrop="none"] .grp { align-self: flex-start; padding: 2px 9px; border-radius: 999px; background: var(--d-card); box-shadow: 0 0 0 1px var(--d-card-edge), 0 2px 6px rgba(0, 0, 0, 0.16); color: var(--d-preview); }
 :root[data-backdrop="none"] .grp::after { display: none; }
 :root[data-backdrop="none"] .ft { border-top: none; background: transparent; }
@@ -451,11 +632,12 @@ body.handle-window { background: transparent; overflow: hidden; }
 .handle:focus-visible { outline: 2px solid var(--handle-paw); outline-offset: -3px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .stage, .handle { transition: none; }
+  .stage, .handle, .closebar .bar { transition: none; }
 }
 @media (forced-colors: active) {
   .dr, .it, .bk, .qk, .menu, .handle, .grp, .pill, .kchip { border: 1px solid CanvasText; }
   .it.selected { outline: 2px solid Highlight; }
+  .closebar .bar { forced-color-adjust: none; background: ButtonFace; color: ButtonText; box-shadow: inset 0 0 0 1px ButtonText; }
   .it:focus-visible { outline: 2px solid Highlight; }
 }
 
@@ -469,4 +651,88 @@ body.handle-window { background: transparent; overflow: hidden; }
 :root[data-font="clean"] .hw-field { font: 600 15px/28px var(--ui); }
 .big .hw-field { font-size: 24px; height: 30px; }
 :root[data-font="clean"] .big .hw-field { font-size: 16px; }
+/* #134: the title line is a one-line CodeMirror (memoTitleEditor): the <input>'s face and height, no scroll bar, its
+   marks hidden or faint (.md-mark) as the words' are. */
+.dr .hw-field.cm-focused { outline: none; }
+.dr .hw-field .cm-scroller { font-family: inherit; line-height: inherit; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.dr .hw-field .cm-scroller::-webkit-scrollbar { display: none; }
+.dr .hw-field .cm-content { padding: 0; min-height: 0; caret-color: var(--d-ink); white-space: pre; }
+.dr .hw-field .cm-line { padding: 0; }
+.dr .hw-field .cm-placeholder { color: var(--d-meta); }
 .editor::placeholder { color: var(--d-meta); }
+
+/* ─── 메모 마크다운 (#84, docs/plans/memo-markdown.md): styled as written, the marks kept and faint (40 % of the ink).
+   The same classes in the editor (CodeMirror's lines and marks, memoEditor.ts) and in an open memo as it reads. ─── */
+:root[data-memo-font="pen"] { --m-font: var(--pen-font); }
+:root[data-memo-font="brush"] { --m-font: var(--brush-font); }
+:root[data-memo-font="mono"] { --m-font: var(--d-mono); }
+/* 코드 글꼴 D2Coding (#143): code, `code` and the 고정폭 face; Cascadia Mono · Consolas behind it. */
+:root[data-code-font="d2coding"] { --d-mono: "D2Coding", "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, Menlo, monospace; }
+.md-mark { opacity: 0.4; }
+/* A checklist line in the editor (#133): the card's box in place of `- [ ] `, a done item's words faint and struck. */
+.editor .md-box { display: inline-grid; vertical-align: middle; margin: -2px 7px 0 0; text-indent: 0; }
+.editor .md-box:hover { border-color: var(--d-ink); }
+/* #163: the boxes are 15 px (the note's are 17); a click within about 25 × 25 round one ticks it (nearBox in
+   memoEditor.ts and drawer.ts), as the note's do. */
+.md-box, .ck > .bx { width: 15px; height: 15px; border-radius: 3.5px; }
+.ck > .bx { margin-top: calc((var(--m-line) - 15px) / 2); }
+/* The tick drawn: the box fills (0.18 s), its mark draws in, then the words fade to done; unticked, back quicker. */
+.bx .icon path { stroke-dasharray: 24; }
+.bx.pop { animation: box-fill var(--motion-enter) ease-out; }
+.bx.pop .icon { animation: box-mark-show var(--motion-enter) steps(1, end); }
+.bx.pop .icon path { animation: box-mark var(--motion-change) ease-out 0.06s backwards; }
+.bx.unpop { animation: box-empty var(--motion-quick) ease-in; }
+.md-done-pop, .ck.done.pop .ckt { animation: done-fade var(--motion-change) ease-out var(--motion-enter) backwards; }
+@keyframes box-fill { from { background-color: transparent; border-color: var(--d-box); transform: scale(0.82); } 60% { transform: scale(1.06); } }
+@keyframes box-mark-show { from { opacity: 1; } }
+@keyframes box-mark { from { stroke-dashoffset: 24; } to { stroke-dashoffset: 0; } }
+@keyframes box-empty { from { background-color: var(--d-check); border-color: var(--d-check); } }
+@keyframes done-fade { from { color: var(--d-ink); text-decoration-color: transparent; } }
+@media (prefers-reduced-motion: reduce) {
+  .bx.pop, .bx.pop .icon, .bx.pop .icon path, .bx.unpop, .md-done-pop, .ck.done.pop .ckt { animation: none; }
+}
+.editor .md-done { color: var(--d-done); text-decoration: line-through; }
+.md-bold { font-weight: 700; }
+.md-italic { font-style: italic; }
+.md-strike { text-decoration: line-through; }
+.md-code { font-family: var(--d-mono); font-size: calc(var(--m-size) - 1px); background: color-mix(in srgb, var(--d-ink) 7%, transparent); border-radius: 3px; }
+.md-link { text-decoration: underline; text-decoration-color: var(--d-check); text-underline-offset: 2px; }
+.md-h1, .md-h2, .md-h3 { font-weight: 700; }
+/* 문단 간격 (#141): the room under a paragraph's last line, as reading and as typing. */
+.dr .ln.md-para, .dr .editor .cm-line.md-para { padding-bottom: var(--m-para); }
+.md-h1 { font-size: calc(var(--m-face-size) * 1.45); line-height: calc(var(--m-line) * 1.45); }
+.md-h2 { font-size: calc(var(--m-face-size) * 1.25); line-height: calc(var(--m-line) * 1.25); }
+.md-h3 { font-size: calc(var(--m-face-size) * 1.1); line-height: calc(var(--m-line) * 1.1); }
+.md-codeline, .md-oldcode { font-family: var(--d-mono); font-size: calc(var(--m-size) - 1px); }
+.md-codeline { background: color-mix(in srgb, var(--d-ink) 7%, transparent); }
+.dr .md-quote, .dr .editor .cm-line.md-quote { color: var(--d-peek); box-shadow: inset 2px 0 color-mix(in srgb, var(--d-ink) 40%, transparent); padding-left: 9px; }
+.md-rule { background: linear-gradient(transparent calc(50% - 0.5px), color-mix(in srgb, var(--d-ink) 40%, transparent) calc(50% - 0.5px) calc(50% + 0.5px), transparent calc(50% + 0.5px)); }
+.ln.md-item { display: flex; }
+.ln.md-item > span:last-child { min-width: 0; }
+.md-bullet { white-space: pre; flex: none; }
+/* Hidden marks (#84, 2026-10-30): off the caret's line, and in an open memo as it reads, unless 기호 늘 보이기. */
+:root:not([data-show-marks]) .ln .md-mark:not(.md-num), :root:not([data-show-marks]) .it .row .hw .md-mark { display: none; }
+.md-dot { color: var(--d-peek); }
+
+/* 서식 막대 (Aa, #84): under the memo being typed, the formats in a row (wrapping when narrow), the face and the marks at its end. */
+.fmt { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 2px 6px; margin-top: 8px; padding: 3px 4px; border-radius: 10px; background: var(--d-pill); box-shadow: inset 0 0 0 0.5px var(--d-pill-edge); }
+.fbs { display: flex; flex-wrap: wrap; gap: 1px; min-width: 0; }
+.fbs.end { margin-left: auto; }
+.fb { min-width: 24px; height: 24px; padding: 0 5px; border-radius: 7px; color: var(--d-icon); font: 13px/24px var(--ui); display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; }
+.fb:hover { background: var(--d-hover); color: var(--d-ink); }
+.fb[aria-pressed="true"] { color: var(--d-sub); background: var(--d-hover); }
+.fb.mono { font-family: var(--d-mono); font-size: 11px; }
+.fb.face { font-size: 11px; color: var(--d-meta); }
+.big .fmt { margin: 0 0 6px; }
+/* 링크 칸 (#135): the address under the memo, Enter to finish, Esc to leave it; 링크 빼기 in a link. */
+.lnk { margin-top: 8px; padding: 7px 8px; border-radius: 10px; background: var(--d-pill); box-shadow: inset 0 0 0 0.5px var(--d-pill-edge); display: flex; flex-direction: column; gap: 5px; }
+.big .lnk { margin: 0 0 6px; }
+.lk-head { font: 500 11px/14px var(--ui); color: var(--d-meta); }
+.lk-row { display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: 7px; background: var(--d-card); box-shadow: inset 0 0 0 0.5px var(--d-card-edge); color: var(--d-icon); cursor: text; }
+.lk-row:focus-within { box-shadow: inset 0 0 0 1px var(--d-check); }
+.lk-url { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--d-ink); font: 13px var(--ui); padding: 0; user-select: text; }
+.lk-url::placeholder { color: var(--d-meta); }
+.lk-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 2px 8px; min-width: 0; }
+.lk-keys { font: 11px/15px var(--ui); color: var(--d-meta); white-space: nowrap; }
+.lk-out { flex: none; margin-left: auto; font: 500 11.5px var(--ui); color: var(--d-preview); padding: 2px 6px; border-radius: 6px; }
+.lk-out:hover { background: var(--d-hover); color: var(--d-ink); }

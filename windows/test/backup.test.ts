@@ -3,13 +3,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { makeBackup, mergeFiles, notBackup, parseBackup, replaceFiles, summary, summaryText, tooNew, unreadable, type BackupFiles } from "../src/core/backup";
+import { countsText, isDue, makeBackup, mergeFiles, notBackup, parseBackup, parseSavedName, pruneSaved, replaceFiles, savedName, savedWhen, sizeText, summary, summaryText, tooNew, unreadable, type BackupFiles } from "../src/core/backup";
 import { serializeAlarms, type Alarm } from "../src/core/alarm";
 import { serializeEvents, type LocalEvent } from "../src/core/events";
 import { serializeMemos } from "../src/core/memo";
 import { serializeNotebook, type TodoItem } from "../src/core/notebook";
 import { serializeSeries } from "../src/core/repeat";
-import { importInto, leftoverFiles, readDataFiles, removeLeftovers, saveBeforeImport, writeDataFiles } from "../src/main/storageFolder";
+import { importInto, leftoverFiles, moveData, readDataFiles, removeLeftovers, saveBeforeImport, writeDataFiles } from "../src/main/storageFolder";
 import { Store } from "../src/main/store";
 
 // 백업 · 옮기기 (spec §2): the same cases as the macOS app, then whole folders exported and imported.
@@ -149,7 +149,7 @@ test("내보내기 → 바꾸기 into an empty folder gives the very same files"
   assert.ok("backup" in parsed);
   const target = temporary();
   const settings = temporary();
-  const { saved } = importInto(target, settings, parsed.backup.files, "replace", "Windows 1.16.0", exportedAt);
+  const { saved } = importInto(target, path.join(settings, "backups"), parsed.backup.files, "replace", "Windows 1.16.0", exportedAt);
   for (const name of Object.keys(files)) assert.equal(fs.readFileSync(path.join(target, ...name.split("/")), "utf8"), files[name], name);
   assert.deepEqual(readDataFiles(target), files);
   assert.deepEqual(fs.readdirSync(target).sort(), ["alarms.json", "archive", "events.json", "memos.json", "repeats.json", "todos.json"]);
@@ -179,7 +179,7 @@ test("합치기 into a folder with its own list: the counts add up, and nothing 
   fs.mkdirSync(path.join(target, "archive"));
   fs.writeFileSync(path.join(target, "archive", "2026-10.jsonl"), `${line(uuid(902), "운동")}\n${line(uuid(950), "독서")}\n`);
   const backup = readDataFiles(source);
-  const { files } = importInto(target, settings, backup, "merge", "Windows 1.16.0", exportedAt);
+  const { files } = importInto(target, path.join(settings, "backups"), backup, "merge", "Windows 1.16.0", exportedAt);
   assert.deepEqual(summary(files), { todos: 4, memos: 1, repeats: 1, events: 2, alarms: 1, archive: 4, focus: 0 });
   assert.equal(summaryText(summary(files)), "할 일 4 · 메모 1 · 반복 1 · 일정 2 · 알람 1 · 완료 기록 4");
   // The same id on both sides: this PC's copy stays.
@@ -187,7 +187,7 @@ test("합치기 into a folder with its own list: the counts add up, and nothing 
   assert.deepEqual(store.events.map((entry) => entry.title), ["팀 회의 (이 PC)", "출장"]);
   assert.deepEqual(store.items.map((item) => item.title), ["이 PC의 할 일", "보고서 쓰기", "장보기", "물 마시기"]);
   assert.equal(store.history.canUndo, false);
-  const again = importInto(target, settings, backup, "merge", "Windows 1.16.0", new Date(exportedAt.getTime() + 1000));
+  const again = importInto(target, path.join(settings, "backups"), backup, "merge", "Windows 1.16.0", new Date(exportedAt.getTime() + 1000));
   assert.deepEqual(summary(again.files), summary(files));
   assert.equal(fs.readdirSync(path.join(settings, "backups")).length, 2);
 });
@@ -195,12 +195,17 @@ test("합치기 into a folder with its own list: the counts add up, and nothing 
 test("a write that fails half-way leaves the folder as it was", () => {
   const folder = filledFolder();
   const before = readDataFiles(folder);
-  // Something in the way of one of the new files.
-  fs.mkdirSync(path.join(folder, "archive", "2026-11.jsonl.import-tmp"));
+  // One of the new files can't be written (#173: temporary names are random now, so the archive folder is made read-only
+  // instead of planting something at a known name).
+  fs.chmodSync(path.join(folder, "archive"), 0o555);
   const next = { ...replaceFiles(before, { "todos.json": todos(task(7, "새 할 일")), "archive/2026-11.jsonl": line("n", "n") + "\n" }) };
-  assert.throws(() => writeDataFiles(folder, before, next));
+  try {
+    assert.throws(() => writeDataFiles(folder, before, next));
+  } finally {
+    fs.chmodSync(path.join(folder, "archive"), 0o755);
+  }
   assert.deepEqual(readDataFiles(folder), before);
-  assert.deepEqual(fs.readdirSync(folder).filter((name) => name.endsWith(".import-tmp")), []);
+  assert.deepEqual([...fs.readdirSync(folder), ...fs.readdirSync(path.join(folder, "archive"))].filter((name) => name.endsWith(".import-tmp")), []);
 });
 
 test("the copies before an import: the ten newest are kept", () => {
@@ -212,10 +217,149 @@ test("the copies before an import: the ten newest are kept", () => {
   assert.equal(kept[9], "가져오기-전-20261008-143012.jongi");
 });
 
+test("#137: overwriting a folder's list with this one backs that list up first (the same place and format as before an import)", () => {
+  const source = temporary();
+  fs.writeFileSync(path.join(source, "todos.json"), todos(task(1, "이 PC의 할 일")));
+  fs.writeFileSync(path.join(source, "memos.json"), memos([1, "이 PC 메모"]));
+  const target = temporary();
+  fs.writeFileSync(path.join(target, "todos.json"), todos(task(2, "폴더의 할 일"), task(3, "회의 자료 정리")));
+  fs.mkdirSync(path.join(target, "archive"));
+  fs.writeFileSync(path.join(target, "archive", "2026-10.jsonl"), line("a", "끝낸 일") + "\n");
+  const backups = path.join(temporary(), "backups");
+  const now = new Date(2026, 9, 30, 9, 12, 0);
+  moveData(source, target, true, backups, "Windows 1.31.0", now);
+  assert.deepEqual(fs.readdirSync(backups), ["폴더-바꾸기-전-20261030-091200.jongi"]);
+  const saved = parseBackup(fs.readFileSync(path.join(backups, "폴더-바꾸기-전-20261030-091200.jongi"), "utf8"));
+  assert.ok("backup" in saved);
+  assert.deepEqual(titlesOf(saved.backup.files["todos.json"], "items"), ["폴더의 할 일", "회의 자료 정리"]);
+  assert.equal(saved.backup.files["archive/2026-10.jsonl"], line("a", "끝낸 일") + "\n");
+  // …and then this list is in the folder; the folder's record stays.
+  assert.deepEqual(titlesOf(fs.readFileSync(path.join(target, "todos.json"), "utf8"), "items"), ["이 PC의 할 일"]);
+  assert.ok(fs.existsSync(path.join(target, "archive", "2026-10.jsonl")));
+});
+
+test("#137: no backup when nothing is overwritten (an empty folder, or the folder's list kept)", () => {
+  const source = temporary();
+  fs.writeFileSync(path.join(source, "todos.json"), todos(task(1, "이 PC의 할 일")));
+  const backups = path.join(temporary(), "backups");
+  moveData(source, temporary(), true, backups, "Windows 1.31.0", new Date(2026, 9, 30, 9, 12, 0));
+  const kept = temporary();
+  fs.writeFileSync(path.join(kept, "todos.json"), todos(task(2, "폴더의 할 일")));
+  moveData(source, kept, false, backups, "Windows 1.31.0", new Date(2026, 9, 30, 9, 13, 0));
+  assert.equal(fs.existsSync(backups), false);
+  assert.deepEqual(titlesOf(fs.readFileSync(path.join(kept, "todos.json"), "utf8"), "items"), ["폴더의 할 일"]);
+});
+
+test("#137: a backup that can't be written stops the move", () => {
+  const source = temporary();
+  fs.writeFileSync(path.join(source, "todos.json"), todos(task(1, "이 PC의 할 일")));
+  const target = temporary();
+  fs.writeFileSync(path.join(target, "todos.json"), todos(task(2, "폴더의 할 일")));
+  const blocked = path.join(temporary(), "backups");
+  fs.writeFileSync(blocked, "a file where the folder should be");
+  assert.throws(() => moveData(source, target, true, blocked, "Windows 1.31.0", new Date(2026, 9, 30, 9, 12, 0)));
+  assert.deepEqual(titlesOf(fs.readFileSync(path.join(target, "todos.json"), "utf8"), "items"), ["폴더의 할 일"]);
+});
+
+test("copies in backups/: names, and how many of each kind stay (the same cases as the Mac's)", () => {
+  const at = new Date(2026, 9, 30, 9, 12, 5);
+  assert.equal(savedName("daily", at), "매일-20261030-091205.jongi");
+  assert.equal(savedName("beforeFolderSwitch", at), "폴더-바꾸기-전-20261030-091205.jongi");
+  assert.equal(savedName("beforeRestore", at), "되돌리기-전-20261030-091205.jongi");
+  assert.equal(savedName("beforeUpdate", at), "업데이트-전-20261030-091205.jongi");
+  assert.equal(savedName("manual", at), "직접-20261030-091205.jongi");
+  assert.deepEqual(parseSavedName("가져오기-전-20261008-143005.jongi"), { name: "가져오기-전-20261008-143005.jongi", reason: "beforeImport", date: new Date(2026, 9, 8, 14, 30, 5) });
+  for (const other of ["종이냥-백업-2026-10-08.jongi", "매일-20261340-091205.jongi", "매일-20261030-0912.jongi", "매일-20261030-091205.json", "notes.txt"]) assert.equal(parseSavedName(other), undefined, other);
+  const names = [
+    ...Array.from({ length: 16 }, (_, day) => savedName("daily", new Date(2026, 9, day + 1, 9, 0, 0))),
+    ...Array.from({ length: 12 }, (_, minute) => savedName("beforeImport", new Date(2026, 9, 30, 10, minute, 0))),
+    ...Array.from({ length: 3 }, (_, minute) => savedName("beforeFolderSwitch", new Date(2026, 9, 30, 11, minute, 0))),
+    ...Array.from({ length: 20 }, (_, day) => savedName("manual", new Date(2026, 8, day + 1, 9, 0, 0))),
+    "종이냥-백업-2026-10-08.jongi",
+  ];
+  assert.deepEqual(pruneSaved(names), [
+    "가져오기-전-20261030-100000.jongi", "가져오기-전-20261030-100100.jongi", "매일-20261001-090000.jongi", "매일-20261002-090000.jongi",
+  ]);
+});
+
 test("what Google left on this device is removed at launch; nothing else", () => {
   const settings = temporary();
   for (const name of [...leftoverFiles, "google.json.tmp", "settings.json", "storage.json"]) fs.writeFileSync(path.join(settings, name), "{}");
   assert.deepEqual(removeLeftovers(settings).sort(), ["calendar-cache.json", "google.json", "google.json.tmp", "tasks-sync.json"]);
   assert.deepEqual(fs.readdirSync(settings).sort(), ["settings.json", "storage.json"]);
   assert.deepEqual(removeLeftovers(settings), []);
+});
+
+// ─── #139 · #140: B4 `reason` · `counts`, the list's words, the daily rule (the same cases as the Mac's CoreTests) ───
+
+test("B4: a copy says why it was made and what it holds; without a reason the file is as before", () => {
+  const files = { "todos.json": todos(task(1, "보고서 쓰기"), task(2, "장보기")), "memos.json": memos([1, "회의 메모"]), "archive/2026-10.jsonl": `${line("a", "a")}\n${line("b", "b")}\n` };
+  const plain = JSON.parse(makeBackup(files, "Windows 1.31.0", exportedAt)) as Record<string, unknown>;
+  assert.deepEqual(Object.keys(plain), ["format", "version", "exportedAt", "from", "files"]);
+  const told = JSON.parse(makeBackup(files, "Windows 1.31.0", exportedAt, "daily")) as Record<string, unknown>;
+  assert.equal(told.version, 1);
+  assert.equal(told.reason, "daily");
+  assert.deepEqual(told.counts, { todos: 2, memos: 1, events: 0, archive: 2 });
+  const back = parseBackup(makeBackup(files, "Windows 1.31.0", exportedAt, "beforeRestore"));
+  assert.ok("backup" in back);
+  assert.equal(back.backup.reason, "beforeRestore");
+  assert.deepEqual(back.backup.counts, { todos: 2, memos: 1, events: 0, archive: 2 });
+  assert.deepEqual(back.backup.files, files);
+});
+
+test("B4: older versions read past the new keys (and anything else unknown); odd values are left out", () => {
+  const file = (extra: string) => `{"format":"jongi-nyang-backup","version":1,"exportedAt":"2026-10-30T00:12:00Z","from":"macOS 1.46.0",${extra}"files":{"todos.json":${JSON.stringify(todos(task(1, "보고서 쓰기")))}}}`;
+  const known = parseBackup(file(`"reason":"manual","counts":{"todos":1,"memos":0,"events":0,"archive":0},"future":{"x":1},`));
+  assert.ok("backup" in known);
+  assert.equal(known.backup.reason, "manual");
+  assert.deepEqual(known.backup.counts, { todos: 1, memos: 0, events: 0, archive: 0 });
+  assert.deepEqual(Object.keys(known.backup.files), ["todos.json"]);
+  const someday = parseBackup(file(`"reason":"someday","counts":"lots",`));
+  assert.ok("backup" in someday);
+  assert.equal(someday.backup.reason, undefined);
+  assert.equal(someday.backup.counts, undefined);
+  const partial = parseBackup(file(`"counts":{"todos":3},`));
+  assert.ok("backup" in partial);
+  assert.deepEqual(partial.backup.counts, { todos: 3, memos: 0, events: 0, archive: 0 });
+  const negative = parseBackup(file(`"counts":{"todos":-1},`));
+  assert.ok("backup" in negative);
+  assert.equal(negative.backup.counts, undefined);
+});
+
+test("the list's words: what a copy holds, when it was made, how big it is (ko · en · nl)", () => {
+  const many = { todos: 24, memos: 12, events: 6, archive: 310 };
+  assert.equal(countsText(many), "할 일 24개 · 메모 12장 · 일정 6개 · 기록 310개");
+  assert.equal(countsText(many, "en"), "24 to-dos · 12 notes · 6 events · 310 in history");
+  assert.equal(countsText(many, "nl"), "24 taken · 12 notities · 6 afspraken · 310 in geschiedenis");
+  const one = { todos: 1, memos: 1, events: 1, archive: 1 };
+  assert.equal(countsText(one, "en"), "1 to-do · 1 note · 1 event · 1 in history");
+  assert.equal(countsText(one, "nl"), "1 taak · 1 notitie · 1 afspraak · 1 in geschiedenis");
+  assert.equal(countsText({ todos: 0, memos: 3, events: 0, archive: 0 }), "메모 3장");
+  assert.equal(countsText({ todos: 0, memos: 0, events: 0, archive: 0 }), "비어 있어요");
+  assert.equal(countsText({ todos: 0, memos: 0, events: 0, archive: 0 }, "en"), "Empty");
+  assert.equal(countsText({ todos: 0, memos: 0, events: 0, archive: 0 }, "nl"), "Leeg");
+
+  const now = new Date(2026, 9, 30, 10, 0);
+  const today = new Date(2026, 9, 30, 9, 12), yesterday = new Date(2026, 9, 29, 21, 40), earlier = new Date(2026, 9, 28, 8, 55), lastYear = new Date(2025, 11, 30, 8, 55);
+  assert.deepEqual([today, yesterday, earlier, lastYear].map((date) => savedWhen(date, now)), ["오늘 09:12", "어제 21:40", "10월 28일 08:55", "2025년 12월 30일 08:55"]);
+  assert.deepEqual([today, yesterday, earlier, lastYear].map((date) => savedWhen(date, now, "en")), ["Today 9:12 AM", "Yesterday 9:40 PM", "Oct 28, 8:55 AM", "Dec 30, 2025, 8:55 AM"]);
+  assert.deepEqual([today, yesterday, earlier, lastYear].map((date) => savedWhen(date, now, "nl")), ["Vandaag 09:12", "Gisteren 21:40", "28 okt 08:55", "30 dec 2025 08:55"]);
+  assert.deepEqual([today, yesterday].map((date) => savedWhen(date, now, "en", true)), ["today 9:12 AM", "yesterday 9:40 PM"]);
+  assert.deepEqual([today, yesterday].map((date) => savedWhen(date, now, "nl", true)), ["vandaag 09:12", "gisteren 21:40"]);
+  assert.equal(savedWhen(today, now, "ko", true), "오늘 09:12");
+
+  assert.equal(sizeText(0), "1KB");
+  assert.deepEqual(["ko", "en", "nl"].map((lang) => sizeText(225280, lang as "ko")), ["220KB", "220 KB", "220 kB"]);
+  assert.deepEqual(["ko", "en", "nl"].map((lang) => sizeText(3040870, lang as "ko")), ["2.9MB", "2.9 MB", "2,9 MB"]);
+  assert.equal(sizeText(150 * 1048576), "150MB");
+});
+
+test("the daily copy: once a day from 4 a.m., only when something changed (TZ=Asia/Seoul)", () => {
+  const last = new Date(2026, 9, 30, 9, 0);
+  assert.equal(isDue(new Date(2026, 9, 31, 3, 59), last, true), false);
+  assert.equal(isDue(new Date(2026, 9, 31, 4, 0), last, true), true);
+  assert.equal(isDue(new Date(2026, 9, 31, 4, 0), last, false), false);
+  assert.equal(isDue(new Date(2026, 9, 31, 4, 0), undefined, true), true);
+  assert.equal(isDue(new Date(2026, 9, 31, 4, 0), undefined, false), false);
+  assert.equal(isDue(new Date(2026, 9, 30, 5, 0), new Date(2026, 9, 30, 2, 0), true), true);
 });

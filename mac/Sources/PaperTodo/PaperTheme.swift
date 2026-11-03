@@ -80,6 +80,10 @@ enum PaperTheme {
     static let memoTint = token("#ebe6f6", night: "#3a3548")
     /// AI 연결's stamp on a row Claude added or changed today (1.42): blue-grey stamp ink.
     static let stamp = token("#4d5b86", night: "#a9b6dc")
+    /// 백업 목록's kind chips (#140): 업데이트 전 lavender words on memoTint, 직접 honey words on honey2 (매일 sage, the ‘before’ ones clay).
+    static let lavenderText = token("#62559a", night: "#c6bcf0")
+    static let honeyText = token("#755e12", night: "#e4c86e")
+    static let honey2 = token("#f5ebc6", night: "#463d22")
     /// The toast: an ink pill with paper text (so at night a light pill with dark text); its
     /// action and the kind word in it.
     static let toastBack = token("#2f2e2a", night: "#ece6d6")
@@ -154,9 +158,88 @@ enum PaperTheme {
     }
 
     @MainActor static func asset(_ name: String) -> NSImage {
-        let url = Bundle.main.url(forResource: name, withExtension: "png", subdirectory: "Assets")
-            ?? Bundle.module.url(forResource: name, withExtension: "png", subdirectory: "Assets")!
+        let url = AppResources.url(name, extension: "png", in: "Assets")!
         return NSImage(contentsOf: url)!
+    }
+}
+
+/// The motion words both apps share (docs/plans/motion-audit.md §2; Windows `--motion-*` in base.css and
+/// `motion` in api.ts). Every new movement uses one of these, runs once and ends: nothing repeats.
+/// 살짝 0.12 (hover, a tab rising, a drop target, fading out) · 바뀜 0.16 (switches, ⌄, a check's pop,
+/// folding) · 등장 0.18 (slips, toasts, new rows; rising 6–8 pt with a fade) · 그리기 0.22 (the pencil line,
+/// the donut) · 톡 0.3 (the cat's bubble and the first guide only).
+enum Motion {
+    case quick, change, enter, draw, bounce
+
+    var duration: Double {
+        switch self {
+        case .quick: 0.12
+        case .change: 0.16
+        case .enter: 0.18
+        case .draw: 0.22
+        case .bounce: 0.3
+        }
+    }
+
+    /// How far a new thing rises as it fades in (등장).
+    static let rise: CGFloat = 6
+    /// The pencil line starts this long after the box pops (체크 한 번, as on Windows).
+    static let strikeDelay = 0.08
+    /// A finished row stays this long where it was before it goes (완료 숨기기, 앞으로, 오늘 창).
+    static let hold = 0.65
+    /// The day strip's box, after it is pressed, before the task is done.
+    static let dayStripHold = 0.45
+    /// Both holds under Reduce Motion: long enough to see what was pressed.
+    static let reducedHold = 0.3
+
+    /// Reduce Motion, for code outside a view (views read `accessibilityReduceMotion`).
+    @MainActor static var reduced: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+
+    /// The animation for a change (ease-out, the bounce a spring), or nil — no animation — under Reduce
+    /// Motion and in snapshots (`SlipMotion.enabled == false`).
+    @MainActor static func animation(_ motion: Motion, reduce: Bool) -> Animation? {
+        guard !reduce, SlipMotion.enabled else { return nil }
+        if motion == .bounce { return .spring(response: 0.3, dampingFraction: 0.7) }
+        return .easeOut(duration: motion.duration)
+    }
+
+    /// The same, for something leaving (closing, fading out): ease-in.
+    @MainActor static func exit(_ motion: Motion, reduce: Bool) -> Animation? {
+        guard !reduce, SlipMotion.enabled else { return nil }
+        return .easeIn(duration: motion.duration)
+    }
+
+    /// 체크 한 번 (N2 · T2 · R2 · F4, and #163's memo checkbox): the box pops from 0.85 with 바뀜, the pencil line is
+    /// drawn left to right with 그리기 starting 0.08 s later, then (where the row goes) it holds `hold` and leaves.
+    @MainActor static func strike(reduce: Bool) -> Animation? {
+        animation(.draw, reduce: reduce)?.delay(strikeDelay)
+    }
+
+    /// A finished row's hold, in milliseconds (0.3 s under Reduce Motion).
+    @MainActor static func holdMilliseconds(_ seconds: Double = hold, reduce: Bool? = nil) -> Int {
+        Int((((reduce ?? reduced) ? reducedHold : seconds) * 1000).rounded())
+    }
+}
+
+extension View {
+    /// 체크 한 번's pop: the box shrinks to 0.85 and comes back with 바뀜 each time `trigger` goes up. Bump it only
+    /// when a box is checked and `Motion.animation(.change, reduce:)` isn't nil (not under Reduce Motion, not in
+    /// snapshots). Keyframes, because setting a flag and animating it back in the same update draws nothing.
+    func checkPop(_ trigger: Int) -> some View { modifier(CheckPop(trigger: trigger)) }
+}
+
+private struct CheckPop: ViewModifier {
+    let trigger: Int
+
+    func body(content: Content) -> some View {
+        content.keyframeAnimator(initialValue: CGFloat(1), trigger: trigger) { view, scale in
+            view.scaleEffect(scale)
+        } keyframes: { _ in
+            KeyframeTrack {
+                MoveKeyframe(0.85)
+                LinearKeyframe(1, duration: 0.16, timingCurve: .easeOut) // 바뀜
+            }
+        }
     }
 }
 
@@ -311,7 +394,7 @@ struct PaperSwitch: View {
 
     var body: some View {
         let width: CGFloat = small ? 30 : 36, height: CGFloat = small ? 18 : 21
-        Button { withAnimation(reduceMotion ? nil : .easeOut(duration: 0.14)) { action() } } label: {
+        Button { withAnimation(Motion.animation(.change, reduce: reduceMotion)) { action() } } label: {
             // A circular-cornered rectangle, not Capsule: Capsule's stroke left hairlines at both ends.
             let track = RoundedRectangle(cornerRadius: height / 2, style: .circular)
             track
@@ -335,6 +418,8 @@ struct PaperMenuPicker<Value: Hashable>: View {
     @Binding var selection: Value
     let options: [(value: Value, title: String)]
     let label: String
+    /// A font popup (#141): the picked name drawn in its own face.
+    var face: ((Value) -> Font)?
     @Environment(\.isEnabled) private var enabled
 
     var body: some View {
@@ -348,6 +433,7 @@ struct PaperMenuPicker<Value: Hashable>: View {
         } label: {
             HStack(spacing: 6) {
                 Text(options.first { $0.value == selection }?.title ?? "")
+                    .font(face?(selection))
                     .lineLimit(1)
                 Image(systemName: "chevron.up.chevron.down").font(.system(size: 8.5, weight: .bold))
             }

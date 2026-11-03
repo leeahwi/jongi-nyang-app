@@ -71,6 +71,13 @@ select { height: 28px; border-radius: 7px; border: 1px solid var(--rule); backgr
 .quiet.danger:hover { color: var(--clay-text); }
 .series-form { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; background: color-mix(in srgb, var(--sage) 4%, transparent); }
 .series-form + .row, .row + .series-form { border-top: 1px solid var(--rule); }
+/* 2a (A11): the rule's space, as the to-do editor's field (note.css). */
+.series-form .space-field { align-self: flex-start; max-width: 100%; height: 26px; padding: 0 9px 0 8px; display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; border: 1px solid var(--rule); background: color-mix(in srgb, var(--card) 55%, transparent); font: 12px var(--ui); color: var(--ink); white-space: nowrap; cursor: pointer; }
+.series-form .space-field:hover { background: var(--card); }
+.series-form .space-field-name { color: var(--ink-3); font-weight: 600; font-size: 11px; }
+.series-form .space-field-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.series-form .space-field .icon { flex: none; color: var(--ink-3); }
+.series-form .space-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--band); flex: none; }
 .title-input { height: 36px; border-radius: 8px; border: 1px solid var(--rule); background: var(--card); padding: 0 10px; font-family: var(--body-font); font-size: 20px; color: var(--ink); user-select: text; }
 .form-actions { display: flex; gap: 6px; }
 .form-actions .spacer { flex: 1; }
@@ -103,6 +110,29 @@ select { height: 28px; border-radius: 7px; border: 1px solid var(--rule); backgr
 .row.storage-actions { gap: 6px; padding-top: 8px; padding-bottom: 8px; }
 .row .action.small { height: 30px; padding: 0 12px; font-size: 12px; font-weight: 600; gap: 5px; }
 .row .action.small .icon { color: inherit; }
+
+/* 자동 백업 · 백업 목록 (#139 · #140, as the Mac's): a sage check (on) or an empty ring (off) before the status, then each
+   copy as when · its kind's chip · what it holds (wrapping, never cut) · size · 되돌리기…. */
+.row.backup-status { gap: 10px; padding-top: 10px; padding-bottom: 10px; }
+.backup-mark { flex: none; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: inset 0 0 0 1.5px var(--faint); }
+.backup-mark.on { background: var(--sage); color: var(--on-sage); box-shadow: none; }
+.backup-mark .icon { color: inherit; }
+.backup-title { font-weight: 600; }
+.row.backup-status .sub { margin-top: 2px; font-size: 12px; line-height: 1.4; color: var(--secondary); }
+.row.backup-status .sub.warn { color: var(--clay-text); }
+.row.backup-row { gap: 12px; padding-top: 9px; padding-bottom: 9px; }
+.backup-left { flex: none; min-width: 140px; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.backup-when { font-size: 13px; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.backup-chip { font-size: 11px; font-weight: 600; line-height: 18px; padding: 0 7px; border-radius: 9px; white-space: nowrap; }
+.backup-chip.sage { color: var(--sage-text); background: var(--sage-2); }
+.backup-chip.clay { color: var(--clay-text); background: var(--clay-2); }
+.backup-chip.lavender { color: var(--lavender-text); background: var(--memo-2); }
+.backup-chip.honey { color: var(--honey-text); background: var(--honey-2); }
+.backup-counts { min-width: 0; font-size: 12px; line-height: 1.4; color: var(--secondary); }
+.backup-size { flex: none; font-size: 12px; color: var(--faded); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.row.backup-more { color: var(--sage-text); font-size: 12.5px; font-weight: 600; }
+.row.backup-empty { padding-top: 12px; padding-bottom: 12px; }
+.row.backup-empty .sub { font-size: 12px; line-height: 1.5; }
 
 /* 캘린더 */
 .row .sub.warn { color: var(--clay-text); }
@@ -169,6 +199,10 @@ input.step-value:focus { background: var(--card); outline: 2px solid color-mix(i
 .keyfield { min-width: 118px; height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--rule-strong); background: var(--card); font: 600 12.5px var(--ui); color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .keyfield:hover { border-color: var(--check-border); }
 .keyfield.recording { border-color: var(--sage); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sage) 22%, transparent); color: var(--sage-text); }
+/* 스페이스 › 단축키 (#53): a fixed key at the end of its row, a cap per key as in the shortcut list. */
+.row-keys { display: inline-flex; align-items: center; gap: 3px; flex: none; }
+.row-keys .keycap { min-width: 22px; height: 20px; padding: 0 6px; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.row-keys .plus { font: 500 11px var(--ui); color: var(--ink-3); }
 .row.drawer-key { gap: 8px; }
 .row.drawer-key .switch { margin-left: 4px; }
 /* A small text button in the sage text colour: ‘기본값’ beside a changed key, ‘자세히’ at the end of a footnote (#21, #27). */
@@ -181,12 +215,35 @@ input.step-value:focus { background: var(--card); outline: 2px solid color-mix(i
 /* The pane header's own button (메모 서랍's 서랍 열기). */
 .pane-head .ph-action { flex: none; height: 32px; padding: 0 12px; font-size: 12px; font-weight: 600; gap: 5px; }
 .pane-head .ph-action .icon { color: inherit; }
-.row.drawer-theme .segmented button { padding: 0 8px; }
+/* 서랍 종이 (#142, as on the Mac): a small drawer per paper, five to a line (three when the desk is narrow); the picked one
+   with a sage edge and a check. The tile's own colours are the paper's (core/drawerPapers.ts), day or night. */
+.paper-gallery { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px 10px; padding: 12px; }
+@media (max-width: 560px) { .paper-gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.paper-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; padding: 0; border: 0; background: none; color: var(--ink); }
+.paper-tile:focus-visible { outline: none; }
+.paper-tile:focus-visible .pt-frame { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--sage); }
+.pt-frame { position: relative; display: block; width: 100%; aspect-ratio: 1.45; border-radius: 9px; overflow: hidden; background: var(--t-paper); box-shadow: inset 0 0 0 1px var(--t-edge); }
+.paper-tile[aria-checked="true"] .pt-frame { box-shadow: inset 0 0 0 2.5px var(--sage); }
+.pt-tabs { position: absolute; left: 6%; top: 14%; display: flex; flex-direction: column; gap: 3px; width: 7%; }
+.pt-tabs i { display: block; height: 11px; border-radius: 2px; }
+.pt-sheet { position: absolute; left: 17%; right: 8%; top: 12%; height: 48%; padding: 4px 6px; background: var(--t-card); box-shadow: inset 0 0 0 1px var(--t-card-edge); display: flex; flex-direction: column; gap: 3px; overflow: hidden; }
+.pt-sheet b { font: 400 11px/1.1 var(--pen-font); color: var(--t-ink); white-space: nowrap; overflow: hidden; }
+.pt-sheet i { display: block; height: 2px; width: 82%; border-radius: 1px; background: color-mix(in srgb, var(--t-ink) 40%, transparent); }
+.pt-sheet i.short { width: 52%; }
+.pt-dots { position: absolute; left: 17%; bottom: 10%; display: flex; gap: 3px; }
+.pt-dots i { width: 6px; height: 6px; border-radius: 50%; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.18); }
+.pt-check { position: absolute; right: 5px; bottom: 5px; width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; background: var(--sage); color: var(--on-sage); box-shadow: 0 0 0 1.5px var(--card); }
+.pt-name { max-width: 100%; font-size: 11.5px; color: var(--ink-2); text-align: center; line-height: 1.25; }
+.paper-tile[aria-checked="true"] .pt-name { color: var(--ink); font-weight: 600; }
 
 /* 스페이스 (1.30): a row per space — the grip, its colour, its name typed over in place, its open to-dos, 지우기. */
 .row.space-row { gap: 8px; }
 .space-grip { width: 16px; height: 28px; margin-left: -6px; flex: none; display: flex; align-items: center; justify-content: center; color: var(--faint); cursor: grab; transform: rotate(90deg); }
 .space-row.new .space-grip { cursor: default; }
+/* 일반 (#89): fixed — the grip's, colour's and trash's places kept empty, so the names and counts line up. */
+.space-row.general .space-grip { cursor: default; }
+.space-row.general .space-swatch { background: none; box-shadow: none; }
+.space-row.general .space-delete { visibility: hidden; }
 .space-row.dragging { background: color-mix(in srgb, var(--sage) 8%, var(--card)); cursor: grabbing; }
 .space-swatch { width: 18px; height: 18px; flex: none; border-radius: 50%; background: var(--band); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--card) 40%, transparent); }
 .space-swatch:not(.still):hover, .space-swatch[aria-expanded="true"] { box-shadow: 0 0 0 2px var(--card), 0 0 0 3.5px var(--band); }
@@ -216,3 +273,36 @@ input.step-value:focus { background: var(--card); outline: 2px solid color-mix(i
 }
 body > .menu { position: fixed; }
 :root[data-paper="night"] .menu { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 30px -10px rgba(0, 0, 0, 0.7); }
+
+/* 글꼴 설정 (#141, as on the Mac): a popup field, a slider in steps (a sage fill to a white knob, a tick a step, 가 … 가),
+   the step's name or the size beside it; 메모 글꼴's sample memo on the drawer's paper. */
+select.popup { max-width: 220px; height: 28px; padding: 0 6px 0 9px; border-radius: 7px; background: var(--paper-2); font-size: 12.5px; font-weight: 500; }
+.step-wrap { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.step-ga { color: var(--ink-2); line-height: 1; }
+.step-ga.small { font-size: 11px; }
+.step-ga.large { font-size: 17px; }
+.step-track { position: relative; width: 150px; height: 24px; flex: none; }
+.step-slider { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 24px; margin: 0; background: transparent; }
+.step-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: linear-gradient(to right, var(--sage) var(--fill), var(--rule) var(--fill)); box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--check-border) 50%, transparent); }
+.step-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: var(--raised); border: 1px solid var(--check-border); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.14); }
+.step-slider:focus-visible { outline: none; }
+.step-slider:focus-visible::-webkit-slider-thumb { border: 2px solid var(--sage); }
+.step-ticks { position: absolute; left: 8px; right: 8px; top: 19px; display: flex; justify-content: space-between; pointer-events: none; }
+.step-ticks i { width: 1px; height: 4px; background: var(--check-border); }
+.step-ticks i.on { background: var(--sage); }
+.step-value { min-width: 58px; text-align: right; font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+:root:lang(en) .step-value { min-width: 104px; }
+:root:lang(nl) .step-value { min-width: 82px; }
+.step-value.points, :root:lang(en) .step-value.points, :root:lang(nl) .step-value.points { min-width: 24px; font-variant-numeric: tabular-nums; }
+.dfp { padding: 14px; border-radius: 12px; background: var(--p-paper); box-shadow: inset 0 0 0 1px var(--p-edge); }
+.dfp-sub { font-size: 10.5px; font-weight: 600; color: var(--p-sub); margin-bottom: 8px; }
+.dfp-sheet { padding: 16px 16px 14px; background: var(--p-card); box-shadow: inset 0 0 0 1px var(--p-card-edge), 0 3px 8px -3px rgba(60, 50, 30, 0.18); }
+.dfp-title { height: 28px; display: flex; align-items: center; font-family: var(--p-hand); font-size: 22px; color: var(--p-ink); -webkit-text-stroke: 0.35px currentColor; }
+.dfp-title.clean { font-size: 15px; font-weight: 600; -webkit-text-stroke: 0; }
+.dfp-ln { display: flex; align-items: center; gap: 7px; min-height: var(--p-line); line-height: var(--p-line); font-family: var(--p-face); font-size: var(--p-size); color: var(--p-ink); white-space: nowrap; }
+.dfp-ln.dfp-para { padding-bottom: var(--p-para); }
+.dfp-ln.done { color: var(--p-meta); }
+.dfp-ln.done > span:last-child { text-decoration: line-through; }
+.dfp-ln code { font-family: var(--p-mono); font-size: var(--p-mono-size); padding: 0 3px; border-radius: 3px; background: color-mix(in srgb, var(--p-ink) 7%, transparent); }
+.dfp-box { width: 12px; height: 12px; flex: none; border-radius: 3px; border: 1.2px solid var(--p-box); display: grid; place-items: center; color: var(--p-on-check); }
+.dfp-box.on { background: var(--p-check); border-color: var(--p-check); }

@@ -8,6 +8,7 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 
 | Phase | Milestone | Mac | Windows |
 | --- | --- | --- | --- |
+| Widen | [Group by space · automatic backups](#group-by-space--automatic-backups) | 1.45.1 – 1.46.0 | 1.30.1 – 1.31.0 |
 | Widen | [To-do spaces · a clearer notes drawer](#to-do-spaces--a-clearer-notes-drawer) | 1.45.0 | 1.30.0 |
 | Polish | [An easier notes drawer](#an-easier-notes-drawer) | 1.44.0 | 1.29.0 |
 | Widen | [Notes drawer](#notes-drawer) | 1.43.0 – 1.43.1 | 1.28.0 – 1.28.1 |
@@ -37,6 +38,18 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 | Mac | [From a first notepad to the cat](#from-a-first-notepad-to-the-cat) | 1.0 – 1.10 | — |
 
 ---
+
+## Group by space · automatic backups
+
+**Mac 1.46.0 · Windows 1.31.0** (including the unreleased Mac 1.45.1 · Windows 1.30.1) — shared cases: both apps read the same nine case files in `docs/plans/` (spaces, note Markdown, settings, file safety, the notes drawer)
+
+![A wide notepad with today's to-dos grouped into four columns: work, home, study and general](docs/screenshots/mac/spaces2b-board.png)
+
+- Once to-dos had spaces, it sometimes helped to see each space together on the one Today sheet. So `All spaces ▾` gained "Group by space", as note cards or as bookmarks; widen the notepad and each space gets its own column (up to 1,200). Turn grouping off and Today is the single sheet it was.
+- Drag a to-do onto another group to move it to that space, or pick several and move them at once. The colour band and showing one space now also reach the Ahead tab, the day ribbon, the timetable, the Today window, the focus card and repeating to-dos.
+- The storage folder is backed up automatically once a day and before anything overwrites it. Backups stay in each device's own `backups` folder, not the shared folder, and Desk → Storage & backup lets you pick one to restore.
+- The notes drawer gained Markdown, search results grouped by folder, and a titles-only view per folder. Deleted notes stay in `memo-trash.json` for 30 days and can be restored. There is also a link field, larger checkboxes, four new papers (hanji, sage, blossom, ink) and the D2Coding code font.
+- Each release now comes with a `SHA256SUMS` file, so you can check that what you downloaded is what was uploaded.
 
 ## To-do spaces · a clearer notes drawer
 

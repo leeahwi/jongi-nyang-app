@@ -163,6 +163,22 @@ export function aheadSections(items: readonly TodoItem[], events: readonly Local
   return sections;
 }
 
+/**
+ * 2a (A2, S37): the lens on the page — the to-dos it keeps (events aren't filtered) and how many open ones ahead it
+ * hides (the end-of-list line's N). Without a lens: everything, none hidden.
+ */
+export function aheadLens(items: readonly TodoItem[], spaceOf: (id: string) => string | undefined, lens: string | undefined, now: Date): { items: TodoItem[]; hidden: number } {
+  if (lens === undefined) return { items: [...items], hidden: 0 };
+  const shows = (item: TodoItem) => { const space = spaceOf(item.id); return lens === "none" ? space === undefined : space === lens; };
+  let hidden = 0;
+  const kept = items.filter((item) => {
+    if (shows(item)) return true;
+    if (!item.isCompleted && pageOf(item, now) !== "today") hidden += 1;
+    return false;
+  });
+  return { items: kept, hidden };
+}
+
 /** Open tasks on the page (the tab's count). */
 export const aheadCount = (sections: readonly AheadSection[]): number => sections.reduce((sum, section) => sum + section.count, 0);
 

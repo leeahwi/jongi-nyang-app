@@ -5,8 +5,9 @@
 #
 #   scripts/perf-idle.sh [out-folder] [--no-build] [seconds]      PERF_DATA_ARGS for another data size;
 #
-# 1. the cat off, 2. the cat on (it wanders and blinks as in the app; 한마디 on), 3. 완료 기록 opened once (⌘Y) and
-# the desk closed (⌘W), then 8 checks 1.5 s apart: the CPU over them. No reminder pops up (each counts as shown).
+# 1. the cat off, 2. the cat on (it wanders and blinks as in the app; 한마디 on; awake even when nobody is at the Mac,
+# frames counted per clip: petFrame.walk …), 3. 완료 기록 opened once (⌘Y) and the desk closed (⌘W), then 8 checks
+# 1.5 s apart: the CPU over them. No reminder pops up (each counts as shown).
 # The installed app and its data are never touched; everything the test copy wrote is removed at the end.
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
@@ -100,6 +101,9 @@ run off; measure "note open, the cat off (${seconds} s)" "$seconds"
 run on; measure "note open, the cat on (${seconds} s)" "$seconds"
 "$probe" key "$pid" 16 cmd; sleep 4
 "$probe" key "$pid" 13 cmd; sleep 3
+# ⌘W goes to the key window: with the test copy behind another app, that isn't always the desk (2026-10-31: it stayed
+# open, and each check below redrew 완료 기록 — historyBody=8). Said here, so the line below isn't read as a closed desk.
+if "$probe" windows "$pid" | grep -q "완료 기록"; then echo "(the desk stayed open: ⌘W went to another window)"; fi
 measure "완료 기록 opened once, the desk closed (${seconds} s)" "$seconds"
 "$probe" key "$pid" 45 cmd; sleep 0.5; "$probe" key "$pid" 126; sleep 2
 kill -USR2 "$pid"; sleep 0.2

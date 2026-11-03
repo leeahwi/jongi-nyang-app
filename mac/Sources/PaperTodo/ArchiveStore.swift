@@ -101,7 +101,8 @@ final class ArchiveStore: ObservableObject {
         guard !ids.isEmpty else { return }
         let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
         for url in files where url.pathExtension == "jsonl" {
-            guard let text = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            // #173: a linked or oversized month is left as it is.
+            guard let text = try? SafeFile.text(url) else { continue }
             let entries = Archive.parseLines(text)
             guard entries.contains(where: { ids.contains($0.id) }) else { continue }
             let kept = entries.filter { !ids.contains($0.id) }
@@ -177,6 +178,8 @@ final class ArchiveStore: ObservableObject {
             for (month, list) in byMonth {
                 let url = directory.appendingPathComponent("\(month).jsonl")
                 let data = Data((list.map(Archive.encodeLine).joined(separator: "\n") + "\n").utf8)
+                // #173: never appended through a link, nor onto a month past 32MB (the tasks stay on the list).
+                try SafeFile.check(url)
                 if let handle = try? FileHandle(forWritingTo: url) {
                     defer { try? handle.close() }
                     try handle.seekToEnd()
@@ -198,7 +201,7 @@ final class ArchiveStore: ObservableObject {
         let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
         let entries = files.filter { $0.pathExtension == "jsonl" }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
-            .flatMap { Archive.parseLines((try? String(contentsOf: $0, encoding: .utf8)) ?? "") }
+            .flatMap { Archive.parseLines((try? SafeFile.text($0)) ?? "") } // #173: a link or a month past 32MB reads as none
         cache = entries
         return entries
     }

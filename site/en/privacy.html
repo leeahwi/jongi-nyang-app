@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — Jongi-nyang</title>
+<meta name="description" content="What Jongi-nyang keeps, where, and when anything can leave your computer. No account, no server, no usage statistics.">
+<meta name="theme-color" content="#fbf9f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#2a2924" media="(prefers-color-scheme: dark)">
+<link rel="icon" type="image/png" href="../assets/favicon.png">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="alternate" hreflang="ko" href="https://leeahwi.github.io/jongi-nyang-app/privacy.html">
+<link rel="alternate" hreflang="en" href="https://leeahwi.github.io/jongi-nyang-app/en/privacy.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Privacy — Jongi-nyang">
+<meta property="og:description" content="No account, no server, no statistics: files on your own computer.">
+<meta property="og:image" content="https://leeahwi.github.io/jongi-nyang-app/assets/og-en.png">
+<meta property="og:url" content="https://leeahwi.github.io/jongi-nyang-app/en/privacy.html">
+<script>(function(d){d.className=d.className.replace("no-js","js");try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t)}catch(e){}})(document.documentElement)</script>
+<link rel="preload" href="../assets/fonts/Caveat-500-site.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../assets/fonts/fonts.css">
+<link rel="stylesheet" href="../assets/style.css">
+<style>:root { --hand: "Caveat", "HanJang Pen", cursive; }</style>
+<script src="../assets/site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./" aria-label="Jongi-nyang home"><img src="../assets/cat.webp" alt="" width="30" height="30">Jongi-nyang</a>
+    <nav class="nav" aria-label="Main">
+      <a href="./#tour">Tour</a>
+      <a href="./#features">Features</a>
+      <a href="./#spaces">Spaces</a>
+      <a href="./#drawer">Notes drawer</a>
+      <a href="./#built">How it's built</a>
+      <a href="./#faq">FAQ</a>
+      <a href="https://github.com/leeahwi/jongi-nyang-app">GitHub</a>
+    </nav>
+    <div class="tools">
+      <div class="theme" role="group" aria-label="Appearance">
+        <button type="button" data-theme-set="auto" aria-pressed="true" title="Match the system"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg><span class="sr">Match the system</span></button>
+        <button type="button" data-theme-set="light" aria-pressed="false" title="Day paper"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="2.8"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg><span class="sr">Day paper</span></button>
+        <button type="button" data-theme-set="dark" aria-pressed="false" title="Night paper"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M13.5 9.6A5.6 5.6 0 0 1 6.4 2.5a5.6 5.6 0 1 0 7.1 7.1z"/></svg><span class="sr">Night paper</span></button>
+      </div>
+      <a class="lang" href="../privacy.html" hreflang="ko" lang="ko">한국어</a>
+      <a class="btn primary small" href="./#download">Download</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+  <section class="hero page-hero" aria-labelledby="page-title">
+    <div class="wrap">
+      <p class="eyebrow">Privacy</p>
+      <h1 id="page-title">Your lists stay<br><span class="hand">on your computer.</span></h1>
+      <p class="lede">Jongi-nyang has no account and no server, so it collects nothing. Here is everything it keeps, where, and when anything can leave your computer.</p>
+      <p class="alt">As of Mac 1.45 and Windows 1.30 · 30 October 2026</p>
+    </div>
+  </section>
+
+  <section aria-label="Privacy">
+    <div class="wrap doc">
+      <ul class="points">
+        <li><strong>Nothing collected</strong><span>No sign-up, usage statistics, crash reports or ads. The app never goes online by itself.</span></li>
+        <li><strong>Plain files</strong><span>Your to-dos, notes and events are files in a folder on your computer. You choose the folder.</span></li>
+        <li><strong>AI only when you turn it on</strong><span>It's off at first. Once on, what Claude reads goes to Claude with the conversation.</span></li>
+        <li><strong>A quiet site too</strong><span>No cookies, no analytics, and the fonts and images come from this site.</span></li>
+      </ul>
+
+      <h2 id="stored">Where things are kept</h2>
+      <p>All of it stays on your computer. Not even the person who made Jongi-nyang can see it.</p>
+      <dl class="where">
+        <div>
+          <dt>To-dos, notes, events, alarms, repeats, spaces, history and focus records</dt>
+          <dd>
+            <p>JSON files in the storage folder. At first that's the app's folder; you can pick another one in Desk → Storage &amp; backup.</p>
+            <p>Mac <code>~/Library/Application Support/com.noa.PaperTodo/</code></p>
+            <p>Windows <code>%APPDATA%\PaperTodo\</code></p>
+          </dd>
+        </div>
+        <div>
+          <dt>Settings</dt>
+          <dd>
+            <p>Font, reminders, the folder you picked and other settings are kept per device and never go to the shared folder.</p>
+            <p>Mac <code>~/Library/Preferences/com.noa.PaperTodo.plist</code></p>
+            <p>Windows <code>%APPDATA%\PaperTodo\settings.json</code>, <code>storage.json</code></p>
+          </dd>
+        </div>
+        <div>
+          <dt>AI connection settings and record</dt>
+          <dd><p><code>ai-link.json</code> and <code>ai-log.jsonl</code>. They stay in this device's app folder (the default folder above), even with a shared folder.</p></dd>
+        </div>
+        <div>
+          <dt>Automatic backups</dt>
+          <dd><p>Once a day, and before anything overwrites the storage folder (an import or a restore, say), the app saves a backup file (.jongi) to <code>backups</code> in its folder. It keeps 14 daily backups and 10 of each kind made before overwriting. They stay on this device even when you use a shared folder.</p></dd>
+        </div>
+        <div>
+          <dt>Window state on Windows</dt>
+          <dd><p>Electron, which the Windows app is built on, keeps window state such as the last tab you opened, and its caches, in <code>%APPDATA%\종이냥\</code>.</p></dd>
+        </div>
+      </dl>
+
+      <h2 id="not-sent">What never leaves</h2>
+      <ul>
+        <li>Neither app has any code that connects to the internet: no usage statistics, crash reports, ads or update checks.</li>
+        <li>Your browser opens only when you click a link, such as a link in a note or the Claude Desktop download page.</li>
+        <li>Reminders and alarms ring on this computer only.</li>
+      </ul>
+
+      <h2 id="ai">If you turn on the AI connection</h2>
+      <p>Jongi-nyang for Claude lets you look at and add to your lists while talking with Claude Desktop or Claude Code. It's off at first; turn it on in Desk → AI connection.</p>
+      <ul>
+        <li>While it's on, Claude runs Jongi-nyang for Claude on this computer when a conversation needs it. It reads the to-dos, events, alarms, notes, focus records and history in your storage folder, and adds to-dos, events and notes. For to-dos and one-off events it shows the before and after and changes them only once you say yes. It never deletes anything.</li>
+        <li><strong>What Claude reads goes to Claude as part of the conversation.</strong> That conversation is handled under your Claude account settings and Anthropic's privacy policy.</li>
+        <li>Jongi-nyang for Claude never goes online by itself. It reads and writes only the files in Jongi-nyang's storage folder and app folder.</li>
+        <li>Each thing Claude adds or changes is written to <code>ai-log.jsonl</code> as one line with the before and after. Undo and Recent AI work use it. It stays on this device; past 1 MB only the last 30 days are kept.</li>
+        <li>Turn the switch off and Claude can't read or write any of Jongi-nyang's files.</li>
+      </ul>
+
+      <h2 id="shared">Shared folders and backup files</h2>
+      <ul>
+        <li>If you pick a shared folder such as iCloud Drive, OneDrive or Dropbox as the storage folder, that service moves the files between devices, under its own terms and privacy policy.</li>
+        <li>Jongi-nyang doesn't sign in to that service or talk to it. It only reads and writes the files in the folder.</li>
+        <li>A backup file (.jongi) is saved where you choose. It holds all your to-dos, notes, events and history, so anyone you send it to can read all of it.</li>
+      </ul>
+
+      <h2 id="site">This site</h2>
+      <ul>
+        <li>No cookies and no analytics.</li>
+        <li>Fonts, images and videos all come from this site. Opening a page sends no request anywhere else.</li>
+        <li>If you pick day or night paper, only that choice is kept in this browser (localStorage). Match the system clears it.</li>
+        <li>The site is served by GitHub Pages, and the download and document links lead to GitHub. GitHub handles those visits under its own policy.</li>
+      </ul>
+
+      <h2 id="delete">Removing everything</h2>
+      <p>The folders and settings above are all Jongi-nyang leaves behind. Follow these steps and nothing is left. Removing only the app keeps your lists.</p>
+      <h3>Mac</h3>
+      <ol>
+        <li>If you used the AI connection, disconnect it in Claude first. Remove ‘Jongi-nyang for Claude’ in Claude Desktop’s Settings → Extensions, and if you connected Claude Code, run <code>claude mcp remove -s user jongi-nyang</code>.</li>
+        <li>Turn off ‘Open Jongi-nyang at login’ in Desk → Appearance → Startup. If the app is already gone, remove it in System Settings → General → Login Items.</li>
+        <li>Quit Jongi-nyang and move it from the Applications folder to the Trash.</li>
+        <li>Delete the <code>~/Library/Application Support/com.noa.PaperTodo/</code> folder. Your lists, the AI connection record and the automatic copies are all in it.</li>
+        <li>Delete the settings: run <code>defaults delete com.noa.PaperTodo</code> in Terminal, which removes <code>~/Library/Preferences/com.noa.PaperTodo.plist</code>.</li>
+      </ol>
+      <h3>Windows</h3>
+      <ol>
+        <li>If you used the AI connection, disconnect it in Claude first. Remove ‘Jongi-nyang for Claude’ in Claude Desktop’s Settings → Extensions, and if you pasted the connect command into Claude Code, run <code>claude mcp remove jongi-nyang</code> in that same folder.</li>
+        <li>Turn off ‘Open Jongi-nyang when Windows starts’ in Desk → Appearance → Startup. If the app is already gone, turn it off in Task Manager → Startup apps.</li>
+        <li>Quit Jongi-nyang from the notification area, then uninstall it in Settings → Apps → Installed apps. For the ZIP version, delete the folder you unzipped. Uninstalling keeps your lists.</li>
+        <li>Delete the <code>%APPDATA%\PaperTodo\</code> folder. Your lists, settings, the AI connection record and the automatic copies are all in it.</li>
+        <li>Delete the <code>%APPDATA%\종이냥\</code> folder (window state and caches).</li>
+      </ol>
+      <h3>Both apps</h3>
+      <ul>
+        <li>If you used a shared folder, delete <code>todos.json</code>, <code>memos.json</code>, <code>repeats.json</code>, <code>memo-folders.json</code>, <code>todo-spaces.json</code>, <code>events.json</code>, <code>alarms.json</code>, <code>focus.jsonl</code> and the <code>archive</code> folder there. The lists disappear on every device using that folder too.</li>
+        <li>Delete any backup files (.jongi) you exported, wherever you saved them.</li>
+      </ul>
+
+      <h2 id="contact">Questions</h2>
+      <p>Open a <a href="https://github.com/leeahwi/jongi-nyang-app/issues">GitHub issue</a>. Anyone can read it, so please leave out personal details.</p>
+
+      <h2 id="changes">When this page changes</h2>
+      <p>If what the app handles changes, this page is updated along with the date at the top. Every edit stays in the GitHub repository's history.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot">
+      <div class="about">
+        <a class="brand" href="./"><img src="../assets/cat.webp" alt="" width="30" height="30" loading="lazy">Jongi-nyang</a>
+        <p>A to-do app you take out like a sheet of paper, with a paper cat. For macOS and Windows.</p>
+      </div>
+      <div>
+        <h4>App</h4>
+        <ul>
+          <li><a href="./#tour">Tour</a></li>
+          <li><a href="./#features">Features</a></li>
+          <li><a href="./#spaces">Spaces</a></li>
+          <li><a href="./#drawer">Notes drawer</a></li>
+          <li><a href="./#download">Download</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/CHANGELOG.en.md">Changelog</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Read</h4>
+        <ul>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/README.en.md">Overview</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/one-pager-en.md">One-pager</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/troubleshooting.en.md">Troubleshooting log</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Elsewhere</h4>
+        <ul>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app">GitHub repository</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/releases">Releases</a></li>
+          <li><a href="../privacy.html" hreflang="ko" lang="ko">한국어</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="legal">
+      <span>© 2026 leeAhwi · Source code under the <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/LICENSE">Apache License 2.0</a> · <a href="privacy.html" aria-current="page">Privacy</a></span>
+      <span>Mac 1.46.0 · Windows 1.31.0</span>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

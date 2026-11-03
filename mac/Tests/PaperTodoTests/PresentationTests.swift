@@ -373,6 +373,16 @@ private enum PresentationTests {
             }
         }
 
+        try await test("코드 글꼴 D2Coding (#143) loads from the bundle, a Hangul syllable two Latin columns wide") {
+            let font = MemoText(codeFace: .d2coding).codeFont
+            try expect(font.fontName == "D2Coding", "D2Coding must load, got \(font.fontName)")
+            let latin = ("a" as NSString).size(withAttributes: [.font: font]).width
+            let hangul = ("가" as NSString).size(withAttributes: [.font: font]).width
+            try expect(abs(hangul - 2 * latin) < 0.5, "A syllable must be two columns (\(hangul) vs \(latin))")
+            try expect(MemoText(codeFace: .system).codeFont.fontName != "D2Coding", "The system face stays the default")
+            try expect(MemoText(face: .mono, codeFace: .d2coding).font().fontName == "D2Coding", "고정폭 body follows the code font")
+        }
+
         try await test("making a row recur links it, places today's copy once and deleting keeps the task") {
             let fixture = try Fixture(items: [("스트레칭", false)])
             defer { fixture.cleanup() }
@@ -1042,34 +1052,271 @@ private enum PresentationTests {
 
         try await test("메모 서랍 (1.45): a key restyles only its own lines, and the memo looks as if it were restyled whole") {
             _ = NSApplication.shared
-            let parent = DrawerTextView(text: .constant(""), palette: DrawerPalette.of(.day), bodyFont: .systemFont(ofSize: MemoSlipStyle.bodySize),
-                                        titleFont: .systemFont(ofSize: 20, weight: .semibold), lineHeight: MemoSlipStyle.line, titleLineHeight: MemoSlipStyle.titleRow)
-            @MainActor func made(_ text: String) -> (DrawerTextView.KeyTextView, DrawerTextView.Coordinator) {
-                let view = DrawerTextView.KeyTextView()
-                view.isRichText = false
-                let coordinator = DrawerTextView.Coordinator(parent)
-                view.delegate = coordinator
-                view.string = text
-                coordinator.restyle(view, full: true)
-                return (view, coordinator)
+            // #84: the same for the markdown editor, marks hidden off the caret's line (the caret moving restyles only the
+            // lines it left and reached) and with 기호 늘 보이기.
+            let memoText = MemoText()
+            for markdown in [nil, memoText, MemoText(showMarks: true)] as [MemoText?] {
+                let parent = DrawerTextView(text: .constant(""), palette: DrawerPalette.of(.day), bodyFont: memoText.font(),
+                                            titleFont: .systemFont(ofSize: 20, weight: .semibold), lineHeight: memoText.line,
+                                            titleLineHeight: MemoSlipStyle.titleRow, markdown: markdown)
+                @MainActor func made(_ text: String, caret: NSRange? = nil) -> (DrawerTextView.KeyTextView, DrawerTextView.Coordinator) {
+                    let view: DrawerTextView.KeyTextView
+                    if markdown != nil {
+                        let storage = NSTextStorage(), layout = MemoLayoutManager(), container = NSTextContainer()
+                        storage.addLayoutManager(layout)
+                        layout.addTextContainer(container)
+                        view = DrawerTextView.KeyTextView(frame: .zero, textContainer: container)
+                    } else {
+                        view = DrawerTextView.KeyTextView()
+                    }
+                    view.isRichText = false
+                    let coordinator = DrawerTextView.Coordinator(parent)
+                    view.string = text
+                    if let caret { view.setSelectedRange(caret) }
+                    view.delegate = coordinator
+                    coordinator.restyle(view, full: true)
+                    return (view, coordinator)
+                }
+                let (view, coordinator) = made("\n  \n장보기 목록\n- [ ] 우유\n    indented code\ngit log --oneline -5\n보통 줄", caret: NSRange(location: 0, length: 0))
+                let pieces = ["가", "a", " ", "\n", "    ", "git status x", "$ ls", "`x`", "\n\n", "제목 ", "- [ ] ", "\t"]
+                    + (markdown == nil ? [] : ["**", "# ", "```", "\n```\n", "> ", "- ", "1. ", "~~", "[a](b)", "---", "_x_ "])
+                var seed: UInt64 = 11
+                func next(_ n: Int) -> Int {
+                    seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                    return Int((seed >> 33) % UInt64(max(1, n)))
+                }
+                for step in 0..<600 {
+                    let length = (view.string as NSString).length
+                    let at = next(length + 1)
+                    let cut = next(4) == 0 ? min(next(6), length - at) : 0
+                    let typed = next(5) == 0 ? "" : pieces[next(pieces.count)]
+                    view.insertText(typed, replacementRange: NSRange(location: at, length: cut))
+                    // Now and then the caret moves on its own (a click, an arrow).
+                    if markdown != nil, next(4) == 0 { view.setSelectedRange(NSRange(location: next((view.string as NSString).length + 1), length: 0)) }
+                    let (whole, _) = made(view.string, caret: view.selectedRange())
+                    try expect(view.textStorage!.isEqual(to: whole.textStorage!),
+                               "\(markdown.map { $0.showMarks ? "marks shown" : "markdown" } ?? "plain") step \(step): ‘\(typed)’ at \(at) (cut \(cut)) in \(view.string.debugDescription)")
+                }
+                try expect(coordinator.lineRestyles > 300, "most keys restyled only their lines (\(coordinator.lineRestyles) of 600)")
             }
-            let (view, coordinator) = made("\n  \n장보기 목록\n- [ ] 우유\n    indented code\ngit log --oneline -5\n보통 줄")
-            let pieces = ["가", "a", " ", "\n", "    ", "git status x", "$ ls", "`x`", "\n\n", "제목 ", "- [ ] ", "\t"]
-            var seed: UInt64 = 11
-            func next(_ n: Int) -> Int {
-                seed = seed &* 6364136223846793005 &+ 1442695040888963407
-                return Int((seed >> 33) % UInt64(max(1, n)))
+        }
+
+        try await test("입력 줄 (#162): pasted lines grow the line up to 4, then it scrolls with the caret in sight; the keys still work") {
+            _ = NSApplication.shared
+            HandwritingFont.register()
+            let fixture = try Fixture(items: [])
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            model.calendar.showForSnapshot([])
+            model.alarms.showForSnapshot([])
+            // Never shown: a window that is never ordered in, so nothing reaches the screen.
+            let hosting = NSHostingView(rootView: IntentLineView(model: model, page: .todos).frame(width: 420).fixedSize(horizontal: false, vertical: true))
+            let window = NSWindow(contentRect: NSRect(x: -40_000, y: -40_000, width: 420, height: 400), styleMask: [.borderless], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            defer { window.close() }
+            window.contentView = hosting
+            @MainActor func settle() {
+                for _ in 0..<10 { hosting.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.03)) }
             }
-            for step in 0..<600 {
-                let length = (view.string as NSString).length
-                let at = next(length + 1)
-                let cut = next(4) == 0 ? min(next(6), length - at) : 0
-                let typed = next(5) == 0 ? "" : pieces[next(pieces.count)]
-                view.insertText(typed, replacementRange: NSRange(location: at, length: cut))
-                let (whole, _) = made(view.string)
-                try expect(view.textStorage!.isEqual(to: whole.textStorage!), "step \(step): ‘\(typed)’ at \(at) (cut \(cut)) in \(view.string.debugDescription)")
+            settle()
+            @MainActor func keyField(_ view: NSView) -> IntentField.KeyField? {
+                if let field = view as? IntentField.KeyField { return field }
+                return view.subviews.lazy.compactMap { keyField($0) }.first
             }
-            try expect(coordinator.lineRestyles > 300, "most keys restyled only their lines (\(coordinator.lineRestyles) of 600)")
+            guard let field = keyField(hosting) else { throw TestFailure(description: "no field in the line") }
+            let font = model.notebookFont.handNSFont(20)
+            let line = IntentField.lineHeight(font)
+            try expect(line > 15 && line < 40, "a line of the hand at 20 pt (\(line))")
+            try expectEqual(field.frame.height, line, "empty: one line, as tall as before")
+            try expect(window.makeFirstResponder(field), "the field takes the keyboard")
+            guard let editor = field.currentEditor() as? NSTextView else { throw TestFailure(description: "no field editor") }
+            // A paste from a private pasteboard (never the user's clipboard).
+            let board = NSPasteboard(name: NSPasteboard.Name("PaperTodo.PresentationTests.\(UUID().uuidString)"))
+            defer { board.releaseGlobally() }
+            @MainActor func paste(_ text: String) {
+                board.clearContents()
+                board.setString(text, forType: .string)
+                _ = editor.readSelection(from: board, type: .string)
+                settle()
+            }
+            /// The caret's line lies inside the field itself (not only in the field editor's room around it). Asked
+            /// through the text input API, as the field does: the editor's layout manager would turn it to TextKit 1.
+            @MainActor func caretShown() -> Bool {
+                guard let caret = IntentField.KeyField.caretLine(editor, window: window) else { return false }
+                let line = field.convert(caret, from: editor)
+                return line.height > 0 && line.minY >= field.bounds.minY - 1 && line.maxY <= field.bounds.maxY + 1
+            }
+            /// The field editor is still TextKit 2, as AppKit gives it (TextKit 1 lays lines out with the font's leading).
+            @MainActor func textKit2() -> Bool { editor.textLayoutManager != nil }
+            let chipsHeight = NSHostingView(rootView: IntentChips(candidates: model.intentCandidates("장보기 목록\n우유"), picked: 0)
+                .frame(width: 400)).fittingSize.height
+            /// What the field and its editor draw sits under the chips (8 pt padding, the chips) and inside the card.
+            @MainActor func underChips() -> Bool {
+                var frame = hosting.convert(field.bounds, from: field)
+                if let clip = editor.superview, editor.window != nil { frame = frame.union(hosting.convert(clip.bounds, from: clip)) }
+                let top = hosting.isFlipped ? frame.minY : hosting.bounds.height - frame.maxY
+                let bottom = hosting.isFlipped ? frame.maxY : hosting.bounds.height - frame.minY
+                return top >= 8 + chipsHeight && bottom <= hosting.bounds.height - 1.5
+            }
+            paste("장보기 목록")
+            try expectEqual(field.frame.height, line, "one line: as tall as before")
+            editor.selectAll(nil)
+            paste("장보기 목록\n\n우유 · 달걀 · 빵")
+            try expectEqual(field.stringValue, "장보기 목록\n\n우유 · 달걀 · 빵", "the lines are kept as pasted")
+            try expect(textKit2(), "the field editor is TextKit 2")
+            try expect(abs(field.frame.height - 3 * line) < 0.5, "3 lines: two lines taller (\(field.frame.height))")
+            try expect(underChips(), "3 lines: under the chips, inside the card")
+            try expect(caretShown(), "3 lines: the caret is in sight")
+            try expect(editor.visibleRect.minY < 0.5, "3 lines: nothing to scroll")
+            editor.selectAll(nil)
+            paste("장보기 목록\n우유\n달걀\n빵\n사과\n휴지")
+            try expect(abs(field.frame.height - 4 * line) < 0.5, "6 lines: 4 lines high, no more (\(field.frame.height))")
+            try expect(underChips(), "6 lines: under the chips, inside the card")
+            try expect(caretShown(), "6 lines: the caret at the end is in sight")
+            try expect(editor.visibleRect.minY > line, "6 lines: scrolled down inside the field (\(editor.visibleRect.minY))")
+            // Scrolled, only the field editor draws the words: the field's own drawing (unscrolled, its last line ending
+            // in …) stays out from under it.
+            do {
+                let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int(field.bounds.width), pixelsHigh: Int(field.bounds.height),
+                                              bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,
+                                              bytesPerRow: 0, bitsPerPixel: 0)!
+                NSGraphicsContext.saveGraphicsState()
+                NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: bitmap)
+                field.cell?.drawInterior(withFrame: field.bounds, in: field)
+                NSGraphicsContext.restoreGraphicsState()
+                var ink = 0
+                for y in 0..<bitmap.pixelsHigh {
+                    for x in 0..<bitmap.pixelsWide where (bitmap.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.4 { ink += 1 }
+                }
+                try expect(field.currentEditor() === editor, "still typing")
+                try expectEqual(ink, 0, "6 lines: the field draws no words under its editor")
+            }
+            // Typing on: the caret stays in sight.
+            editor.insertText("\n물", replacementRange: editor.selectedRange())
+            settle()
+            try expect(caretShown(), "typing a 7th line: the caret is in sight")
+            try expect(textKit2(), "the field editor stays TextKit 2")
+            try expect(abs(field.frame.height - 4 * line) < 0.5, "7 lines: still 4 lines high")
+            // ↑ moves the caret up a line (the line gives it away), Tab picks another reading.
+            let end = editor.selectedRange().location
+            try expect(!(field.delegate as! IntentField.Coordinator).control(field, textView: editor, doCommandBy: #selector(NSResponder.moveUp(_:))),
+                       "↑ is the field's own")
+            editor.moveUp(nil)
+            try expect(editor.selectedRange().location < end, "↑ moved the caret up a line")
+            // Esc empties the line, and it is one line again.
+            try expect((field.delegate as! IntentField.Coordinator).control(field, textView: editor, doCommandBy: #selector(NSResponder.cancelOperation(_:))),
+                       "Esc is taken")
+            settle()
+            try expectEqual(field.stringValue, "", "Esc empties the line")
+            try expectEqual(field.frame.height, line, "Esc: one line again")
+            // Return puts it in (a memo, or a to-do of its first line); ⌘Z brings the lines back.
+            paste("장보기 목록\n우유\n달걀\n빵\n사과\n휴지")
+            let memos = model.memos.count, items = model.items.count
+            try expect((field.delegate as! IntentField.Coordinator).control(field, textView: editor, doCommandBy: #selector(NSResponder.insertNewline(_:))),
+                       "Return is taken")
+            settle()
+            try expect(model.memos.count + model.items.count == memos + items + 1, "Return made one thing")
+            try expectEqual(field.stringValue, "", "Return empties the line")
+            try expectEqual(field.frame.height, line, "Return: one line again")
+            let commandZ = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0, windowNumber: window.windowNumber,
+                                            context: nil, characters: "z", charactersIgnoringModifiers: "z", isARepeat: false, keyCode: 6)!
+            try expect(field.performKeyEquivalent(with: commandZ), "⌘Z is taken while the toast is up")
+            settle()
+            try expect(model.memos.count + model.items.count == memos + items, "⌘Z took it back")
+            try expectEqual(field.stringValue, "장보기 목록\n우유\n달걀\n빵\n사과\n휴지", "⌘Z: the lines come back")
+            try expect(abs(field.frame.height - 4 * line) < 0.5, "⌘Z: 4 lines high again")
+            // ⇧Return (literal): a to-do of the text as it is, as before.
+            NSApp.postEvent(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .shift, timestamp: 0, windowNumber: window.windowNumber,
+                                             context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36)!, atStart: true)
+            guard let shiftReturn = NSApp.nextEvent(matching: .keyDown, until: .distantPast, inMode: .default, dequeue: true) else {
+                throw TestFailure(description: "no ⇧Return event")
+            }
+            try expect(NSApp.currentEvent?.modifierFlags.contains(.shift) == true, "⇧Return is the current event")
+            editor.keyDown(with: shiftReturn)
+            settle()
+            try expect(model.items.count == items + 1 && model.memos.count == memos, "⇧Return made a to-do")
+            try expectEqual(field.stringValue, "", "⇧Return empties the line")
+            // ⌘Return is the field's key equivalent (as an event), still caught before the window's menu.
+            try expect(field.performKeyEquivalent(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0,
+                                                                          windowNumber: window.windowNumber, context: nil, characters: "\r",
+                                                                          charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36)!),
+                       "⌘Return is taken")
+            // The 오늘 창's compact line and 빠른 입력 grow the same way; the search slip stays one line.
+            try expectEqual(IntentField.lines("장보기 목록\n\n우유 · 달걀 · 빵", font: font, width: 300), 3, "3 lines counted")
+            try expectEqual(IntentField.lines("장보기 목록\n", font: font, width: 300), 2, "a last line break counts the caret's line")
+            try expectEqual(IntentField.lines("장보기 목록", font: font, width: 300), 1, "one line")
+            try expect(IntentField.lines(String(repeating: "우유 달걀 빵 ", count: 12), font: font, width: 300) > 1, "a long line wraps, as on Windows")
+            let quick = NSHostingView(rootView: QuickEntryView(model: model, text: "장보기 목록\n우유\n달걀\n빵\n사과\n휴지").fixedSize())
+            let quickEmpty = NSHostingView(rootView: QuickEntryView(model: model).fixedSize())
+            let quickLine = IntentField.lineHeight(model.notebookFont.handNSFont(28))
+            try expect(quick.fittingSize.height - quickEmpty.fittingSize.height >= 3 * quickLine - 0.5, "빠른 입력: 4 lines high (\(quick.fittingSize.height) vs \(quickEmpty.fittingSize.height))")
+            model.toast = nil
+        }
+
+        try await test("입력 줄 (#162): the first line is drawn where one line is, and the lines don't move when the keyboard comes") {
+            _ = NSApplication.shared
+            HandwritingFont.register()
+            let font = NotebookFont.pen.handNSFont(20)
+            /// The field drawn (never shown on screen) on white, and the rows (in the field's points, from its top) that
+            /// have ink: drawn by the field, or by its field editor when the keyboard is in it.
+            @MainActor func drawn(_ text: String, editing: Bool) throws -> (picture: NSBitmapImageRep, ink: Set<Int>) {
+                let hosting = NSHostingView(rootView: IntentField(text: .constant(text), placeholder: "", font: font).growing(oneLine: 26)
+                    .frame(width: 300).fixedSize(horizontal: false, vertical: true).background(Color.white))
+                let window = NSWindow(contentRect: NSRect(x: -40_000, y: -40_000, width: 300, height: 200), styleMask: [.borderless], backing: .buffered, defer: false)
+                window.isReleasedWhenClosed = false
+                defer { window.close() }
+                window.contentView = hosting
+                hosting.frame.size = hosting.fittingSize
+                hosting.layoutSubtreeIfNeeded()
+                func find(_ view: NSView) -> IntentField.KeyField? { (view as? IntentField.KeyField) ?? view.subviews.lazy.compactMap(find).first }
+                guard let field = find(hosting) else { throw TestFailure(description: "no field") }
+                var source: NSView = field
+                if editing {
+                    guard window.makeFirstResponder(field), let editor = field.currentEditor() as? NSTextView else { throw TestFailure(description: "no editor") }
+                    editor.selectedRange = NSRange(location: 0, length: 0)
+                    source = editor
+                }
+                RunLoop.main.run(until: Date().addingTimeInterval(0.05))
+                hosting.layoutSubtreeIfNeeded()
+                let picture = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds)!
+                hosting.cacheDisplay(in: hosting.bounds, to: picture)
+                let bitmap = source.bitmapImageRepForCachingDisplay(in: source.bounds)!
+                source.cacheDisplay(in: source.bounds, to: bitmap)
+                let scale = CGFloat(bitmap.pixelsHigh) / bitmap.size.height
+                let top = field.convert(source.bounds, from: source).minY
+                var ink = Set<Int>()
+                for y in 0..<bitmap.pixelsHigh {
+                    for x in 0..<bitmap.pixelsWide where (bitmap.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.4 {
+                        ink.insert(Int((top + CGFloat(y) / scale).rounded(.down)))
+                        break
+                    }
+                }
+                return (picture, ink)
+            }
+            /// Pixels that differ in the top `rows` points of both.
+            func differing(_ a: NSBitmapImageRep, _ b: NSBitmapImageRep, rows: CGFloat) -> Int {
+                let scale = CGFloat(a.pixelsHigh) / a.size.height
+                var count = 0
+                for y in 0..<Int(rows * scale) {
+                    for x in 0..<min(a.pixelsWide, b.pixelsWide) {
+                        guard let p = a.colorAt(x: x, y: y), let q = b.colorAt(x: x, y: y) else { continue }
+                        if abs(p.brightnessComponent - q.brightnessComponent) > 0.15 { count += 1 }
+                    }
+                }
+                return count
+            }
+            let one = try drawn("장보기 목록", editing: false)
+            let three = try drawn("장보기 목록\n우유 · 달걀\n빵", editing: false)
+            try expect(abs(three.picture.size.height - (26 + 2 * IntentField.lineHeight(font))) < 0.5, "3 lines drawn 2 lines taller (\(three.picture.size.height))")
+            try expectEqual(one.picture.size.height, 26, "one line: 26 pt, as the one-line field's frame")
+            // The one-line field sat in the middle of its 26 pt: 3 pt above a 20 pt line.
+            try expectEqual(differing(one.picture, three.picture, rows: (26 + IntentField.lineHeight(font)) / 2), 0, "the first line of three is drawn as one line")
+            // The field editor lays the lines out as the field draws them: the same rows have ink either way.
+            let typing = try drawn("장보기 목록\n우유 · 달걀\n빵", editing: true)
+            try expect(three.ink.count > 30 && three.ink.symmetricDifference(typing.ink).count <= 2,
+                       "with the keyboard in it the lines stay put (\(three.ink.sorted()) vs \(typing.ink.sorted()))")
+            let typingOne = try drawn("장보기 목록", editing: true)
+            try expect(one.ink.symmetricDifference(typingOne.ink).count <= 1, "one line: the same rows with the keyboard (\(one.ink.sorted()) vs \(typingOne.ink.sorted()))")
         }
 
         print("\n\(count) checks passed.")

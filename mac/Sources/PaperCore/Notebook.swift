@@ -133,6 +133,26 @@ public struct Notebook: Codable, Equatable, Sendable {
         return true
     }
 
+    /// `restorePlace` for many tasks in one pass over the list (#70: 저녁 정리 moved hundreds one search at a time).
+    public mutating func restorePlaces(_ places: [TodoItem.ID: (dueDate: String?, shelf: ShelfPin?)]) {
+        guard !places.isEmpty else { return }
+        for index in items.indices {
+            guard let place = places[items[index].id] else { continue }
+            items[index].dueDate = place.dueDate
+            items[index].shelf = place.shelf
+        }
+    }
+
+    /// `toggle` for many tasks in one pass over the list (#70: 모두 끝냄).
+    public mutating func toggle(ids: Set<TodoItem.ID>, now: Date = Date()) {
+        guard !ids.isEmpty else { return }
+        let at = Date(timeIntervalSince1970: now.timeIntervalSince1970.rounded(.down))
+        for index in items.indices where ids.contains(items[index].id) {
+            items[index].isCompleted.toggle()
+            items[index].completedAt = items[index].isCompleted ? at : nil
+        }
+    }
+
     /// Links a task to a series. When the series has today's copy (`placeToday`), the task
     /// leaves the "나중에" shelf and takes today's alert if one is given.
     @discardableResult
@@ -278,6 +298,18 @@ public struct Notebook: Codable, Equatable, Sendable {
         let item = items.remove(at: sourceIndex)
         let adjustedIndex = targetIndex > sourceIndex ? targetIndex - 1 : targetIndex
         items.insert(item, at: max(0, min(adjustedIndex, items.count)))
+        return true
+    }
+
+    /// #168: the list in `order` (ids in it first, as given; the rest after, as they were). Nothing when it's the same.
+    @discardableResult
+    public mutating func reorder(_ order: [UUID]) -> Bool {
+        let rank = Dictionary(order.enumerated().map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+        let sorted = items.enumerated().sorted { a, b in
+            (rank[a.element.id] ?? order.count + a.offset, a.offset) < (rank[b.element.id] ?? order.count + b.offset, b.offset)
+        }.map(\.element)
+        guard sorted.map(\.id) != items.map(\.id) else { return false }
+        items = sorted
         return true
     }
 
@@ -535,6 +567,12 @@ public struct UndoableNotebook: Equatable, Sendable {
     @discardableResult
     public mutating func move(id: TodoItem.ID, to targetIndex: Int) -> Bool {
         perform { $0.move(id: id, to: targetIndex) }
+    }
+
+    /// #168: the list in `order`, as one undo step.
+    @discardableResult
+    public mutating func reorder(_ order: [UUID]) -> Bool {
+        perform { $0.reorder(order) }
     }
 
     @discardableResult

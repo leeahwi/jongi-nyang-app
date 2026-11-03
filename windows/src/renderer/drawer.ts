@@ -1,17 +1,23 @@
 import type { Memo } from "../core/memo";
 import {
-  bookmarkTip, cardTitle, dayTime, editedLabel, folderDeletedWords, footerWords, groupMemos, memoCardTime, memoKind, previewRows, tapePlace, type PreviewRow, type CardGroup, type GroupKind,
+  bookmarkTip, cardTitle, characterCount, characterWords, editedLabel, foundTime, folderDeletedWords, footerWords, groupMemos, memoCardTime, memoKind, previewRows, tapePlace, type PreviewRow, type CardGroup, type GroupKind,
 } from "../core/memoCards";
 import {
-  checklistLine, checklistProgress, drawerFooter, drawerSearch, folderColors, folderName, hasCheckedLines, inboxID, isCodeLine, memosIn, paperOf, pinnedView,
-  placementOf, removeCheckedLines, resolveView, sheetCount, shortcutLabel, shownColor, sortOf, viewForDigit, visibleFolders,
-  type DrawerBackdrop, type DrawerHit, type FolderSort, type MemoFolder, type MemoFolders, type MemoPaper,
+  bookmarkLetters, checklistLine, checklistProgress, drawerFooter, folderColors, folderName, hasCheckedLines, inboxID, isCodeLine, memosIn, paperOf, pinnedView,
+  placementOf, removeCheckedLines, resolveView, sheetCount, shortcutLabel, shownColor, slipTime, sortOf, viewForDigit, viewOf, visibleFolders, folderViews,
+  drawerPaper, drawerThemeValue, memoPapers, type DrawerBackdrop, type DrawerHit, type FolderSort, type FolderView, type MemoFolder, type MemoFolders, type MemoPaper,
 } from "../core/memoDrawer";
-import type { AppState } from "../core/types";
-import { h, icon, lang, paper, scrollFade, t } from "./api";
+import { fontTitles, type MemosState } from "../core/types";
+import { drawerMetrics, drawerPoints, endsParagraph } from "../core/textSteps";
+import { h, icon, lang, paper, scrollFade, t, motion, reduceMotion } from "./api";
 import { toaster } from "./slip";
 import { drawerCat } from "./drawerCat";
 import { closeMenus, menuContains, menuOpen, openMenu, type MenuEntry } from "./drawerMenu";
+import { isFenceLine, markdownLines, readLine } from "../core/memoMarkdown";
+import { toggleDone } from "../core/memoEdits";
+import { drawerFind, hitSnippet, searchFilters, searchFooterWords, type SearchFilter } from "../core/drawerFind";
+import { emptyQuestion, restoredWords, trashAgo, trashMenuLabel, type TrashEntry } from "../core/memoTrash";
+import { markdownNodes, memoBodyEditor, memoTitleEditor, nearBox, showTitleCaret, type BodyEditor, type LinkRequest, type MemoFormat, type TitleEditor } from "./memoEditor";
 
 /**
  * 메모 서랍 (1.28; 1.29 as the user chose it from the mocks): one folder at a time beside its bookmarks — the
@@ -27,7 +33,7 @@ const api = paper();
 const root = document.documentElement;
 const stage = document.getElementById("stage")!;
 
-let state: AppState | undefined;
+let state: MemosState | undefined;
 let shown = false;
 let dirty = true;
 /** The day the list was last drawn for (its groups and short times say "today"). */
@@ -43,6 +49,9 @@ let frozen: Map<string, Memo> | undefined;
 let selectedID: string | undefined;
 let searching = false;
 let query = "";
+/** 메모 찾기's chips (#114): only the folder (or 고정) shown, and the kinds kept to; both start over with each search. */
+let searchHere = false;
+const searchOn = new Set<SearchFilter>();
 /** The results once the keys pause (a search reads every memo); at once when the field is emptied. */
 const searchPause = 80;
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
@@ -56,6 +65,8 @@ const folderOf = (id: string) => visibleFolders(folders()).find((folder) => fold
 const viewName = (id = currentView()) => (id === pinnedView ? t("고정") : folderName(folderOf(id) ?? folders().folders[0], lang()));
 const viewColor = (id = currentView()) => (id === pinnedView ? "yellow" : shownColor(folderOf(id)?.color ?? "lavender"));
 const viewSort = (id = currentView()): FolderSort => (id === pinnedView ? state!.prefs.drawerPinnedSort : sortOf(folderOf(id)));
+/** 보기 (#115): the folder's 카드 · 제목만, or 고정's (this device's). */
+const viewShape = (id = currentView()): FolderView => (id === pinnedView ? state!.prefs.drawerPinnedView : viewOf(folderOf(id)));
 const memoOf = (id: string | undefined) => (id ? state?.memos.find((memo) => memo.id === id) : undefined);
 const digitKey = (index: number) => (index < 9 ? `Ctrl+${index + 1}` : undefined);
 
@@ -71,12 +82,17 @@ const folderButton = h("button", { class: "fname", "aria-haspopup": "menu", "ari
 const findInput = h("input", { type: "search", placeholder: t("모든 폴더에서 찾기"), "aria-label": t("메모 찾기"), spellcheck: "false" });
 const find = h("div", { class: "find", hidden: "" }, findInput);
 const searchButton = h("button", { class: "ib", title: t("검색 (Ctrl+F)"), "aria-label": t("검색") }, icon("search", 15));
-const pinButton = h("button", { class: "ib", title: t("다른 창 위에 띄우기"), "aria-label": t("다른 창 위에 띄우기") }, icon("pin", 15));
-const closeButton = h("button", { class: "ib", title: t("서랍 닫기"), "aria-label": t("서랍 닫기") }, icon("close", 14));
-const header = h("div", { class: "hd" }, sub, h("div", { class: "ttl" }, folderButton, find, h("span", { class: "ic" }, searchButton, pinButton, closeButton)));
+/** #114: where to look (모든 폴더 · {지금 폴더}만) and what to keep to (체크 남음 · 링크 · 고정), under the field. */
+const chips = h("div", { class: "chips", hidden: "" });
+// #83: no × in the header any more; the small bar on the paper's inner edge closes the drawer (and Esc, the shortcut).
+const header = h("div", { class: "hd" }, sub, h("div", { class: "ttl" }, folderButton, find, h("span", { class: "ic" }, searchButton)), chips);
+/** 서랍 닫기 (#83, like SideNotes): a small upright pill in the middle of the inner edge — a click closes, a drag resizes. */
+const closeBar = h("button", { class: "closebar", title: t("서랍 닫기"), "aria-label": t("서랍 닫기") }, h("span", { class: "bar", "aria-hidden": "true" }, icon("chevronRight", 11, 2.4)));
 const tapeStrip = h("div", { class: "tape", "aria-hidden": "true" });
 const quick = h("textarea", { rows: "1", placeholder: t("여기에 바로 적어요"), "aria-label": t("새 메모"), spellcheck: "false" });
-const quickHint = h("div", { class: "qk-hint", hidden: "" }, h("span", {}, t("Enter 넣기")), h("span", {}, t("Shift+Enter 줄바꿈")));
+/** #117: once something is written, where it goes (`회사에 넣어요`) and the keys, as the 빠른 메모 slip says its folder. */
+const quickTo = h("span", { class: "qk-to" });
+const quickHint = h("div", { class: "qk-hint", hidden: "" }, quickTo, h("div", { class: "qk-keys" }, h("span", {}, t("Enter 넣기")), h("span", {}, t("Shift+Enter 줄바꿈"))));
 const qk = h("div", { class: "qk" }, tapeStrip, quick, quickHint);
 const list = h("div", { class: "list", role: "list", "aria-label": t("메모") });
 const count = h("span", {});
@@ -86,8 +102,9 @@ const footer = h("div", { class: "ft" }, gearButton, h("span", { class: "count" 
 const toastHost = h("div", { class: "toast-host" });
 const toast = toaster(toastHost);
 const tip = h("div", { class: "tip", hidden: "", role: "tooltip" });
+// #164: the close tab is out of the paper, on the stage beside the bookmarks; after the paper, so Tab reaches it last.
 dr.append(cat.element, grip, header, qk, list, footer, toastHost, tip);
-stage.append(tabs, dr);
+stage.append(tabs, dr, closeBar);
 scrollFade(list);
 const menuHost = { container: dr, closed: () => { folderButton.setAttribute("aria-expanded", "false"); gearButton.setAttribute("aria-expanded", "false"); } };
 
@@ -114,12 +131,15 @@ function setView(next: string): void {
 // ─── The open memo's editor: the first line in handwriting, the rest below ────
 
 interface Editor {
-  id: string; titleField: HTMLInputElement; body: HTMLTextAreaElement;
+  /**
+   * The title line (handwriting) and, since #84, the words under it in CodeMirror (memoEditor.ts); since #134 the title
+   * line is a one-line CodeMirror too (`titleField` is its element), its marks hidden or faint as on the Mac.
+   */
+  id: string; titleField: HTMLElement; title: TitleEditor; body: BodyEditor;
   /** The last few texts sent (a state that comes back with one of them is this editor's own echo). */
   sent: Set<string>;
   /** The text last sent. */
   value: string;
-  composing: boolean;
   /** Typed and not sent yet. */
   waiting: boolean;
   /** Sends what's typed now, if anything waits. */
@@ -141,38 +161,16 @@ function splitText(text: string): { first: string; rest: string; breakAfter: boo
 }
 
 function editorText(fields: Editor): string {
-  return fields.body.value.length > 0 || bodyHadBreak.get(fields) ? `${fields.titleField.value}\n${fields.body.value}` : fields.titleField.value;
+  const body = fields.body.text();
+  return body.length > 0 || bodyHadBreak.get(fields) ? `${fields.title.value()}\n${body}` : fields.title.value();
 }
 const bodyHadBreak = new WeakMap<Editor, boolean>();
 
-/** The open memo's text as tall as its lines (at least two of 26 px): measured from nothing (the whole drawer laid out). */
-const editorLeast = 52;
-function fit(area: HTMLTextAreaElement): void {
-  if (big) return;
-  area.style.height = "0px";
-  area.style.height = `${Math.max(editorLeast, area.scrollHeight)}px`;
-}
-
-/**
- * A key typed: a text that only got longer can only grow, which its own scroll height tells without laying out
- * the rest of the drawer (setting the height to 0 first, on every key, did). A text that got shorter (a key that
- * takes words away, typing over a selection, undo) is measured from nothing as before.
- */
-const typedLength = new WeakMap<HTMLTextAreaElement, number>();
-function fitTyped(area: HTMLTextAreaElement): void {
-  if (big) return;
-  const before = typedLength.get(area);
-  typedLength.set(area, area.value.length);
-  if (before === undefined || area.value.length < before || !area.style.height) { fit(area); return; }
-  if (area.scrollHeight > area.clientHeight) area.style.height = `${Math.max(editorLeast, area.scrollHeight)}px`;
-}
+/** Is this element the open memo's text (its title or its words)? */
+const isEditorField = (element: Element | null): boolean => Boolean(editor && element && (editor.titleField.contains(element) || editor.body.dom.contains(element)));
 
 function makeEditor(memo: Memo): Editor {
   const parts = splitText(memo.text);
-  const titleField = h("input", { class: "hw-field", spellcheck: "false", "aria-label": t("메모 제목"), placeholder: t("제목") });
-  const body = h("textarea", { class: "editor", spellcheck: "false", "aria-label": t("메모 내용"), placeholder: t("생각나는 걸 적어 보세요") });
-  titleField.value = parts.first;
-  body.value = parts.rest;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let since = 0;
   /** The text to send, or undefined when nothing changed since the last. */
@@ -194,13 +192,56 @@ function makeEditor(memo: Memo): Editor {
   };
   // A key: the text goes once the keys pause (each key used to send the whole text, 1 MB a key for a long memo).
   const later = () => {
+    if (fields.title.composing || fields.body.composing) return;
+    // #134: a ``` typed on the title line (or taken away) opens (closes) a code block for the words under it.
+    fields.body.setOpenAbove(isFenceLine(fields.title.value()));
     if (!fields.waiting) since = performance.now();
     fields.waiting = true;
     clearTimeout(timer);
     timer = setTimeout(send, Math.max(0, Math.min(sendPause, since + sendAtMost - performance.now())));
   };
+  const body = memoBodyEditor({
+    text: parts.rest, label: t("메모 내용"), placeholder: t("생각나는 걸 적어 보세요"),
+    typed: later, composed: later, blur: () => fields.flush(), openLink,
+    toggleMarks: () => act({ type: "setPref", key: "drawerShowMarks", value: !state!.prefs.drawerShowMarks }),
+    paste: () => act({ type: "editCommand", command: "paste" }),
+    doneToBottom: () => state!.prefs.drawerDoneToBottom,
+    openAbove: isFenceLine(parts.first),
+    askLink: (request) => askLink(request),
+    // Backspace at the words' start joins their first line to the title again.
+    backspaceAtStart: () => {
+      const at = title.value().length;
+      const rest = body.text();
+      const cut = rest.indexOf("\n");
+      title.setValue(title.value() + (cut < 0 ? rest : rest.slice(0, cut)));
+      bodyHadBreak.set(fields, cut >= 0);
+      body.replace(cut < 0 ? "" : rest.slice(cut + 1), 0);
+      body.setOpenAbove(isFenceLine(title.value()));
+      title.focus(at);
+      send();
+      return true;
+    },
+    upAtStart: () => { title.focus(); return true; },
+  });
+  // Enter in the title: the rest of the line starts the words under it. ↓ goes to them.
+  const title = memoTitleEditor({
+    text: parts.first, label: t("메모 제목"), placeholder: t("제목"),
+    typed: later, composed: later, blur: () => fields.flush(),
+    enter: (at) => {
+      const line = title.value();
+      title.setValue(line.slice(0, at), at);
+      const rest = body.text();
+      body.replace(line.slice(at) + (rest.length || bodyHadBreak.get(fields) ? `\n${rest}` : ""), 0);
+      bodyHadBreak.set(fields, true);
+      body.setOpenAbove(isFenceLine(title.value()));
+      body.focus(0);
+      send();
+      return true;
+    },
+    down: () => { body.focus(0); return true; },
+  });
   const fields: Editor = {
-    id: memo.id, titleField, body, sent: new Set([memo.text]), value: memo.text, composing: false, waiting: false,
+    id: memo.id, titleField: title.dom, title, body, sent: new Set([memo.text]), value: memo.text, waiting: false,
     flush: () => { if (fields.waiting) send(); },
     flushNow: () => {
       const next = fields.waiting ? take() : undefined;
@@ -208,78 +249,31 @@ function makeEditor(memo: Memo): Editor {
     },
   };
   bodyHadBreak.set(fields, parts.breakAfter);
-  for (const field of [titleField, body]) {
-    field.addEventListener("compositionstart", () => { fields.composing = true; });
-    field.addEventListener("compositionend", () => { fields.composing = false; later(); });
-    field.addEventListener("input", () => { if (field === body) fitTyped(body); later(); });
-    // Leaving the text (another card, the window let go): sent at once.
-    field.addEventListener("blur", () => fields.flush());
-  }
-  // Enter in the title: the rest of the line starts the body. Backspace at the body's start joins them again.
-  titleField.addEventListener("keydown", (event) => {
-    if (event.isComposing) return;
-    if (event.key === "Enter") {
-      event.preventDefault();
-      const at = titleField.selectionStart ?? titleField.value.length;
-      const tail = titleField.value.slice(at);
-      titleField.value = titleField.value.slice(0, at);
-      body.value = tail + (body.value.length || bodyHadBreak.get(fields) ? `\n${body.value}` : "");
-      bodyHadBreak.set(fields, true);
-      body.focus();
-      body.setSelectionRange(0, 0);
-      fit(body);
-      send();
-    } else if (event.key === "ArrowDown") {
-      event.preventDefault();
-      body.focus();
-      body.setSelectionRange(0, 0);
-    }
-  });
-  body.addEventListener("keydown", (event) => {
-    if (event.isComposing) return;
-    if (event.key === "Backspace" && body.selectionStart === 0 && body.selectionEnd === 0) {
-      event.preventDefault();
-      const at = titleField.value.length;
-      const cut = body.value.indexOf("\n");
-      titleField.value += cut < 0 ? body.value : body.value.slice(0, cut);
-      body.value = cut < 0 ? "" : body.value.slice(cut + 1);
-      bodyHadBreak.set(fields, cut >= 0);
-      titleField.focus();
-      titleField.setSelectionRange(at, at);
-      fit(body);
-      send();
-    } else if (event.key === "ArrowUp" && body.selectionStart === 0) {
-      event.preventDefault();
-      titleField.focus();
-    }
-  });
   return fields;
 }
 
 /** Another device's (or the note's) change to the open memo: shown, the caret kept where it was. */
 function refreshEditor(fields: Editor, memo: Memo): void {
-  if (fields.composing || memo.text === fields.value || fields.sent.has(memo.text)) return;
+  if (fields.title.composing || fields.body.composing || memo.text === fields.value || fields.sent.has(memo.text)) return;
   // Another change came while keys wait here: they go first (the main process joins the two), and the joined text
   // comes back to be shown.
   if (fields.waiting) { fields.flush(); return; }
   const focused = document.activeElement;
-  const caret = focused === fields.body ? fields.body.selectionStart : focused === fields.titleField ? fields.titleField.selectionStart : null;
+  const inBody = Boolean(focused && fields.body.dom.contains(focused));
+  const inTitle = Boolean(focused && fields.titleField.contains(focused));
+  const caret = inBody ? fields.body.view.state.selection.main.head : inTitle ? fields.title.caret() : null;
   const parts = splitText(memo.text);
-  fields.titleField.value = parts.first;
-  fields.body.value = parts.rest;
+  fields.title.setValue(parts.first, inTitle && caret !== null ? caret : undefined);
+  fields.body.replace(parts.rest, inBody && caret !== null ? caret : undefined);
+  fields.body.setOpenAbove(isFenceLine(fields.title.value()));
   bodyHadBreak.set(fields, parts.breakAfter);
   fields.value = memo.text;
   fields.sent = new Set([memo.text]);
-  const target = focused === fields.body ? fields.body : focused === fields.titleField ? fields.titleField : undefined;
-  if (caret !== null && target) {
-    const at = Math.min(caret, target.value.length);
-    target.setSelectionRange(at, at);
-  }
-  fit(fields.body);
 }
 
 /** The open memo put away: a blank one quietly goes (as in the note). */
 function closeOpen(): void {
+  closeLink();
   editor?.flush();
   if (!openID) return;
   const id = openID;
@@ -304,17 +298,15 @@ function openMemo(id: string, edit: boolean, line?: number): void {
   if (edit && editor) {
     const fields = editor;
     requestAnimationFrame(() => {
-      fit(fields.body);
+      const doc = fields.body.view.state.doc;
       if (line === undefined) {
-        if (fields.body.value) { fields.body.focus(); fields.body.setSelectionRange(fields.body.value.length, fields.body.value.length); }
-        else { fields.titleField.focus(); fields.titleField.setSelectionRange(fields.titleField.value.length, fields.titleField.value.length); }
+        if (doc.length) fields.body.focus();
+        else fields.title.focus();
       } else if (line === 0) {
-        fields.titleField.focus();
+        fields.title.focus();
       } else {
-        const lines = fields.body.value.split("\n");
-        const offset = lines.slice(0, line - 1).reduce((sum, entry) => sum + entry.length + 1, 0) + (lines[line - 1]?.length ?? 0);
-        fields.body.focus();
-        fields.body.setSelectionRange(offset, offset);
+        // The end of that line of the memo (its line 1 is the words' first line).
+        fields.body.focus(doc.line(Math.min(line, doc.lines)).to);
       }
     });
   }
@@ -326,7 +318,7 @@ function showBig(memo: Memo): void {
   if (!editing || !editor) { editor = makeEditor(memo); editing = true; }
   big = true;
   render();
-  requestAnimationFrame(() => editor?.body.focus());
+  requestAnimationFrame(() => editor?.body.view.focus());
 }
 
 // ─── What a memo can do (the buttons, the menus and the keys all come here) ───
@@ -394,8 +386,12 @@ function openLink(url: string): void {
 
 const square = (color: string) => h("span", { class: `sq ${colorClass(color)}` });
 const cnt = (text: string) => h("span", { class: "cnt" }, text);
-const sheetWords = (): Record<MemoPaper, string> => ({ day: t("낮 종이"), night: t("밤 종이"), kraft: t("크라프트지"), grid: t("모눈 노트") });
-const shortPaperWords = (): Record<MemoPaper, string> => ({ day: t("낮"), night: t("밤"), kraft: t("크라프트"), grid: t("모눈") });
+const sheetWords = (): Record<MemoPaper, string> => ({
+  day: t("낮 종이"), night: t("밤 종이"), kraft: t("크라프트지"), grid: t("모눈 노트"), hanji: t("한지"), sage: t("쑥색 종이"), blossom: t("벚꽃 종이"), ink: t("먹색 종이"),
+});
+const shortPaperWords = (): Record<MemoPaper, string> => ({
+  day: t("낮"), night: t("밤"), kraft: t("크라프트"), grid: t("모눈"), hanji: t("한지"), sage: t("쑥색"), blossom: t("벚꽃"), ink: t("먹색"),
+});
 
 /** 이 메모의 종이: 서랍 따라 · 낮 · 밤 · 크라프트 · 모눈, as swatches. */
 function paperChips(memo: Memo): MenuEntry {
@@ -404,7 +400,7 @@ function paperChips(memo: Memo): MenuEntry {
     kind: "chips", label: t("이 메모의 종이"),
     options: [
       { value: "", label: t("서랍과 같게"), swatch: "s-follow", checked: !own },
-      ...(["day", "night", "kraft", "grid"] as MemoPaper[]).map((value) => ({ value, label: shortPaperWords()[value], swatch: `s-${value}`, checked: own === value })),
+      ...memoPapers.map((value) => ({ value, label: shortPaperWords()[value], swatch: `s-${value}`, checked: own === value })),
     ],
     pick: (value) => setPaper(memo, (value || undefined) as MemoPaper | undefined),
   };
@@ -416,7 +412,7 @@ function paperItems(memo: Memo): MenuEntry[] {
   return [
     { kind: "item", label: t("서랍과 같게"), icon: null, checked: !own, run: () => setPaper(memo, undefined) },
     { kind: "sep" },
-    ...(["day", "night", "kraft", "grid"] as MemoPaper[]).map((value): MenuEntry => ({ kind: "item", label: sheetWords()[value], icon: null, extra: [h("i", { class: `sq-paper s-${value}` })], checked: own === value, run: () => setPaper(memo, value) })),
+    ...memoPapers.map((value): MenuEntry => ({ kind: "item", label: sheetWords()[value], icon: null, extra: [h("i", { class: `sq-paper s-${value}` })], checked: own === value, run: () => setPaper(memo, value) })),
   ];
 }
 
@@ -441,7 +437,8 @@ function memoMenu(memo: Memo, at: DOMRect | { x: number; y: number }, keyboard =
   markSelected();
   const pinned = placementOf(folders(), memo.id).pinned;
   const entries: MenuEntry[] = [
-    { kind: "head", nodes: [icon("sheet", 14), h("b", {}, cardTitle(memo, lang()))] },
+    // #104: the memo's title as a quiet grey line in the menu's own face (it only says what the menu is about).
+    { kind: "head", nodes: [icon("sheet", 14), h("span", { class: "t" }, cardTitle(memo, lang()))] },
     { kind: "sep" },
     { kind: "item", label: t("펼쳐서 고치기"), icon: "edit", key: "Enter", run: () => openMemo(memo.id, true) },
     { kind: "item", label: t("크게 보기"), icon: "expand", run: () => showBig(memo) },
@@ -450,7 +447,7 @@ function memoMenu(memo: Memo, at: DOMRect | { x: number; y: number }, keyboard =
     { kind: "item", label: t("복제"), icon: "duplicate", run: () => duplicateMemo(memo) },
     { kind: "sep" },
     { kind: "item", label: t("고정", undefined, "action"), icon: "pin", checked: pinned, run: () => togglePin(memo) },
-    { kind: "sub", label: t("폴더로 옮기기"), icon: "folderMove", entries: () => moveEntries(memo) },
+    { kind: "sub", label: t("폴더로 옮기기"), icon: "folder", entries: () => moveEntries(memo) },
     { kind: "sep" },
     paperChips(memo),
     ...(hasCheckedLines(memo.text) ? [{ kind: "item", label: t("체크한 줄 지우기"), icon: "clearChecked", run: () => clearChecked(memo) } as MenuEntry] : []),
@@ -460,22 +457,32 @@ function memoMenu(memo: Memo, at: DOMRect | { x: number; y: number }, keyboard =
   openMenu(menuHost, entries, t("메모 메뉴"), at, keyboard);
 }
 
-/** The open memo's ⚙: 고정 · 이 메모의 종이 · 체크한 줄 지우기 (checklists). */
-function memoGear(memo: Memo, anchor: DOMRect): void {
+/** Ctrl+Shift+M (#118): the memo's title, then 폴더로 옮기기's rows, under the folder's name (the keyboard on its first row). */
+function moveList(memo: Memo): void {
+  if (searching) leaveSearch();
+  selectedID = memo.id;
+  markSelected();
   const entries: MenuEntry[] = [
-    { kind: "item", label: t("고정", undefined, "action"), icon: "pin", checked: placementOf(folders(), memo.id).pinned, run: () => togglePin(memo) },
+    { kind: "head", nodes: [icon("sheet", 14), h("span", { class: "t" }, cardTitle(memo, lang()))] },
     { kind: "sep" },
-    paperChips(memo),
-    ...(hasCheckedLines(memo.text) ? [{ kind: "sep" } as MenuEntry, { kind: "item", label: t("체크한 줄 지우기"), icon: "clearChecked", run: () => clearChecked(memo) } as MenuEntry] : []),
+    ...moveEntries(memo),
   ];
-  openMenu(menuHost, entries, t("메모 설정"), anchor);
+  openMenu(menuHost, entries, t("폴더로 옮기기"), folderButton.getBoundingClientRect(), true);
 }
 
-/** The folder list (the folder's name ▾, Ctrl+L): colour · name · count · Ctrl+n, then 고정, then 새 폴더…. */
+/**
+ * The folder list (the folder's name ▾, Ctrl+L): #115 first how the folder shown looks — 보기 · 이 폴더 (카드 · 제목만) and
+ * 정렬 — then colour · name · count · Ctrl+n, then 고정, then 새 폴더….
+ */
 function folderList(keyboard = false): void {
   const shown = visibleFolders(folders());
   const current = searching ? "" : currentView();
+  const looks: MenuEntry[] = searching ? [] : [
+    { kind: "label", text: current === pinnedView ? t("보기 · 고정") : t("보기 · 이 폴더") }, ...viewItems(current),
+    { kind: "label", text: t("정렬") }, ...sortItems(current), { kind: "sep" },
+  ];
   const entries: MenuEntry[] = [
+    ...looks,
     { kind: "label", text: t("폴더") },
     ...shown.map((folder, index): MenuEntry => ({
       kind: "item", label: folderName(folder, lang()), icon: null, extra: [square(folder.color)], key: digitKey(index), checked: folder.id === current ? true : undefined,
@@ -484,11 +491,14 @@ function folderList(keyboard = false): void {
     { kind: "item", label: t("고정"), icon: "pin", key: "Ctrl+0", checked: current === pinnedView ? true : undefined, run: () => setView(pinnedView) },
     { kind: "sep" },
     { kind: "item", label: t("새 폴더…"), icon: "plus", run: () => folderForm(folderButton.getBoundingClientRect()) },
+    // #120: 지운 메모 at the bottom, only when there are some.
+    ...trashRow(),
   ];
   // Counts beside the names.
   const menu = openMenu(menuHost, entries, t("폴더"), folderButton.getBoundingClientRect(), keyboard);
   const counts = [...shown.map((folder) => memosIn(folders(), state!.memos, folder.id).length), memosIn(folders(), state!.memos, pinnedView).length];
-  [...menu.querySelectorAll<HTMLElement>(":scope > button.mi")].slice(0, counts.length).forEach((row, index) => {
+  const before = looks.filter((entry) => entry.kind === "item").length;
+  [...menu.querySelectorAll<HTMLElement>(":scope > button.mi")].slice(before, before + counts.length).forEach((row, index) => {
     row.querySelector(".tick")?.remove();
     if (row.getAttribute("aria-checked") === "true") row.classList.add("open");
     row.querySelector(".k")?.before(cnt(String(counts[index])));
@@ -507,6 +517,7 @@ function folderMenu(folder: MemoFolder, at: DOMRect | { x: number; y: number }, 
     { kind: "sep" },
     { kind: "item", label: t("이름 바꾸기"), icon: "rename", run: () => folderForm(anchor, folder) },
     { kind: "sub", label: t("색"), icon: "colorWheel", entries: () => [{ kind: "node", node: swatches(shownColor(folder.color), (color) => { closeMenus(); act({ type: "folderColor", id: folder.id, color }); }) }] },
+    { kind: "sub", label: t("보기"), icon: "sheet", entries: () => viewItems(folder.id) },
     { kind: "sub", label: t("정렬"), icon: "sort", entries: () => sortItems(folder.id) },
     { kind: "item", label: t("복제"), icon: "duplicate", run: () => duplicateFolder(folder) },
   ];
@@ -520,10 +531,18 @@ function pinnedMenu(at: DOMRect | { x: number; y: number }, keyboard = false): v
   const entries: MenuEntry[] = [
     { kind: "head", nodes: [icon("pin", 13), h("b", {}, t("고정")), h("span", { class: "c" }, pinned.length ? sheetCountWords(pinned.length) : t("비어 있어요"))] },
     { kind: "sep" },
+    { kind: "sub", label: t("보기"), icon: "sheet", entries: () => viewItems(pinnedView) },
     { kind: "sub", label: t("정렬"), icon: "sort", entries: () => sortItems(pinnedView) },
     ...(pinned.length ? [{ kind: "item", label: t("고정 모두 풀기"), icon: "pin", run: unpinAll } as MenuEntry] : []),
   ];
   openMenu(menuHost, entries, t("고정"), at, keyboard);
+}
+
+/** 보기 (#115): 카드 · 제목만. */
+function viewItems(id: string): MenuEntry[] {
+  const now = viewShape(id);
+  const words: Record<FolderView, string> = { cards: t("카드"), titles: t("제목만") };
+  return folderViews.map((view) => ({ kind: "item", label: words[view], icon: null, checked: view === now, run: () => act({ type: "folderView", id, view }) }));
 }
 
 function sortItems(id: string): MenuEntry[] {
@@ -558,16 +577,20 @@ function deleteFolder(folder: MemoFolder): void {
 /** The ⚙ menu (the footer's ⚙, a right-click on the paper): 새 메모 · 종이 · 바탕 · 쪽 · 설정 · 도움말 · 끝내기. */
 function gearMenu(at: DOMRect | { x: number; y: number }, keyboard = false): void {
   const prefs = state!.prefs;
-  const paperWords = { auto: t("자동", undefined, "chip"), ...shortPaperWords() };
+  // #142: the paper picked for the day (밤에는 밤 종이로 is in 설정 → 메모 서랍).
+  const picked = drawerPaper(prefs.drawerTheme, prefs.drawerNightPaper);
   const backdropWords: Record<DrawerBackdrop, string> = { solid: t("불투명"), frost: t("반투명"), strong: t("강하게"), none: t("바탕 없음") };
   const entries: MenuEntry[] = [
     { kind: "item", label: t("새 메모"), icon: "plus", key: "Ctrl+N", run: () => { closeOpen(); render(); quick.focus(); } },
     { kind: "item", label: t("복사한 글로 새 메모"), icon: "paste", run: pasteMemo },
+    ...trashRow().filter((entry) => entry.kind === "item"),
     { kind: "sep" },
-    { kind: "chips", label: t("종이"), options: (["auto", "day", "night", "kraft", "grid"] as const).map((value) => ({ value, label: paperWords[value], swatch: value === "auto" ? "s-auto" : `s-${value} s-drawer`, checked: prefs.drawerTheme === value })), pick: (value) => act({ type: "setPref", key: "drawerTheme", value }) },
+    { kind: "chips", label: t("종이"), options: memoPapers.map((value) => ({ value, label: shortPaperWords()[value], swatch: `s-${value} s-drawer`, checked: picked.paper === value })), pick: (value) => act({ type: "setPref", key: "drawerTheme", value: drawerThemeValue(value as MemoPaper, picked.nightPaper) }) },
     { kind: "chips", label: t("바탕"), options: (["solid", "frost", "strong", "none"] as DrawerBackdrop[]).map((value) => ({ value, label: backdropWords[value], swatch: `s-${value}`, checked: prefs.drawerBackdrop === value })), pick: (value) => act({ type: "setPref", key: "drawerBackdrop", value }) },
     { kind: "sep" },
     { kind: "item", label: prefs.drawerSide === "right" ? t("왼쪽에 두기") : t("오른쪽에 두기"), icon: "panel", run: () => act({ type: "setPref", key: "drawerSide", value: prefs.drawerSide === "right" ? "left" : "right" }) },
+    // #111: from the header (its pin read as 고정); also in 설정 → 메모 서랍.
+    { kind: "item", label: t("다른 창 위에 띄우기"), icon: "pin", checked: prefs.drawerPinned, run: () => act({ type: "setPref", key: "drawerPinned", value: !prefs.drawerPinned }) },
     { kind: "item", label: t("메모 서랍 설정…"), icon: "gear", key: "Ctrl+,", run: () => act({ type: "openSettings", tab: "drawer" }) },
     { kind: "item", label: t("도움말"), icon: "help", run: () => act({ type: "openHelp", topic: "drawer" }) },
     { kind: "sep" },
@@ -585,7 +608,7 @@ function pasteMemo(): void {
 }
 
 /** Writing in a field: 오려 두기 · 복사하기 · 붙여넣기 · 모두 선택, and in a memo `이 메모`'s 폴더로 옮기기 · 종이 · 체크한 줄 지우기. */
-function textMenu(field: HTMLInputElement | HTMLTextAreaElement, at: DOMRect | { x: number; y: number }, keyboard = false): void {
+function textMenu(field: HTMLElement, at: DOMRect | { x: number; y: number }, keyboard = false): void {
   const edit = (command: "cut" | "copy" | "paste" | "selectAll") => () => { field.focus(); act({ type: "editCommand", command }); };
   const entries: MenuEntry[] = [
     { kind: "item", label: t("오려 두기"), icon: "cut", key: "Ctrl+X", run: edit("cut") },
@@ -593,14 +616,76 @@ function textMenu(field: HTMLInputElement | HTMLTextAreaElement, at: DOMRect | {
     { kind: "item", label: t("붙여넣기"), icon: "paste", key: "Ctrl+V", run: edit("paste") },
     { kind: "item", label: t("모두 선택"), icon: "selectAll", key: "Ctrl+A", run: edit("selectAll") },
   ];
-  const memo = editor && (field === editor.titleField || field === editor.body) ? memoOf(editor.id) : undefined;
+  const memo = editor && isEditorField(field) ? memoOf(editor.id) : undefined;
   if (memo) {
     entries.push({ kind: "sep" }, { kind: "label", text: t("이 메모") },
-      { kind: "sub", label: t("폴더로 옮기기"), icon: "folderMove", entries: () => moveEntries(memo) },
+      { kind: "sub", label: t("폴더로 옮기기"), icon: "folder", entries: () => moveEntries(memo) },
       { kind: "sub", label: t("이 메모의 종이"), icon: "sheet", entries: () => paperItems(memo) });
     if (hasCheckedLines(memo.text)) entries.push({ kind: "item", label: t("체크한 줄 지우기"), icon: "clearChecked", run: () => clearChecked(memo) });
   }
   openMenu(menuHost, entries, t("글 메뉴"), at, keyboard);
+}
+
+// ─── 지운 메모 (#120) ─────────────────────────────────────────────────────────
+
+/** Memos just restored here (the state with them in memos.json may not have come yet). */
+const restoring = new Set<string>();
+/** 지운 메모 as the drawer shows them: newest deleted first; one whose memo is alive again isn't listed. */
+function trashEntries(): TrashEntry[] {
+  const entries = state?.memoTrash.entries ?? [];
+  if (!entries.length) return [];
+  const alive = new Set([...state!.memos.map((memo) => memo.id), ...restoring]);
+  return entries.filter((entry) => !alive.has(entry.memo.id));
+}
+
+/** `지운 메모 세 장` (a separator, then the row), opening the slip of deleted memos; nothing when there are none. */
+function trashRow(): MenuEntry[] {
+  const count = trashEntries().length;
+  if (!count) return [];
+  return [{ kind: "sep" }, { kind: "item", label: trashMenuLabel(count, lang()), icon: "trash", run: () => requestAnimationFrame(() => trashSlip()) }];
+}
+
+/**
+ * 지운 메모: a slip under the folder name (as 새 폴더's) — `지운 메모 · 30일 동안 둬요`, a row for each (its title; its folder ·
+ * 3일 전; 되돌리기), then `되돌리면 원래 폴더로 가요` and 지금 모두 비우기…, which asks first (`지운 메모 세 장을 완전히
+ * 지울까요?` / `되돌릴 수 없어요.` · 취소 · 모두 비우기). Esc closes it.
+ */
+function trashSlip(confirming = false, keyboard = false): void {
+  const entries = trashEntries();
+  const now = new Date();
+  const rows = entries.map((entry) => {
+    const folder = folderOf(entry.folder) ?? folderOf(inboxID);
+    const back = h("button", { class: "btn back" }, t("되돌리기", undefined, "restore"));
+    back.addEventListener("click", () => {
+      const name = folder ? folderName(folder, lang()) : viewName(inboxID);
+      restoring.add(entry.memo.id);
+      act({ type: "memoUntrash", id: entry.memo.id });
+      toast.show({ icon: "check", text: restoredWords(name, lang()) });
+      if (entries.length <= 1) closeMenus(); else requestAnimationFrame(() => trashSlip());
+    });
+    return h("div", { class: "trow" },
+      h("span", { class: "hw", title: cardTitle(entry.memo, lang()) }, cardTitle(entry.memo, lang())),
+      h("span", { class: "m" }, `${folder ? folderName(folder, lang()) : ""} · ${trashAgo(entry.deletedAt, now, lang())}`), back);
+  });
+  const head = h("div", { class: "thead" }, h("b", {}, t("지운 메모")), h("span", {}, t("30일 동안 둬요")));
+  let foot: HTMLElement;
+  if (confirming) {
+    const cancel = h("button", { class: "btn" }, t("취소"));
+    const go = h("button", { class: "btn go danger" }, t("모두 비우기"));
+    cancel.addEventListener("click", () => trashSlip(false));
+    go.addEventListener("click", () => { closeMenus(); act({ type: "memoTrashEmpty" }); toast.show({ icon: "trash", text: t("지운 메모를 비웠어요") }); });
+    foot = h("div", { class: "tfoot ask" }, h("b", {}, emptyQuestion(entries.length, lang())), h("span", {}, t("되돌릴 수 없어요.")), h("div", { class: "row-btns" }, cancel, go));
+  } else {
+    const empty = h("button", { class: "btn danger", ...(entries.length ? {} : { disabled: "" }) }, t("지금 모두 비우기…"));
+    empty.addEventListener("click", () => trashSlip(true));
+    foot = h("div", { class: "tfoot" }, h("span", {}, t("되돌리면 원래 폴더로 가요")), empty);
+  }
+  const panel = h("div", { class: "form trash", "aria-label": t("지운 메모") }, head,
+    entries.length ? h("div", { class: "trows" }, ...rows) : h("p", { class: "tnone" }, t("지운 메모가 없어요")), foot);
+  panel.style.display = "contents";
+  closeMenus();
+  openMenu(menuHost, [{ kind: "node", node: panel }], t("지운 메모"), folderButton.getBoundingClientRect(), keyboard);
+  (panel.querySelector<HTMLElement>(confirming ? ".btn.go" : ".btn.back") ?? panel.querySelector<HTMLElement>("button"))?.focus();
 }
 
 function swatches(selected: string, pick: (color: string) => void): HTMLElement {
@@ -688,7 +773,7 @@ function marked(text: string, range?: [number, number]): Node[] {
 }
 
 function box(on: boolean, tag: "span" | "button" = "span"): HTMLElement {
-  return h(tag, { class: `bx${on ? " on" : ""}` }, icon("check", 9, 3));
+  return h(tag, { class: `bx${on ? " on" : ""}` }, icon("check", 10, 3));
 }
 
 function toolButton(symbol: string, label: string, run: (event: MouseEvent, button: HTMLElement) => void, pressed?: boolean, extraClass = ""): HTMLButtonElement {
@@ -705,7 +790,7 @@ function slipShell(memo: Memo, open: boolean, extra: Record<string, string> = {}
   const place = placementOf(folders(), memo.id);
   const own = paperOf(folders(), memo.id);
   const color = colorClass(folderOf(place.folder)?.color ?? "lavender");
-  const element = h("div", { class: `it ${color}${open ? " open" : ""}${selectedID === memo.id ? " selected" : ""}`, role: "listitem", "data-id": memo.id, ...(own ? { "data-sheet": own } : {}), ...extra });
+  const element = h("div", { class: `it ${color}${open ? " open" : ""}${selectedID === memo.id ? " selected" : ""}`, role: "listitem", "data-id": memo.id, ...(selectedID === memo.id ? { "aria-current": "true" } : {}), ...(own ? { "data-sheet": own } : {}), ...extra });
   const tape = tapePlace(memo.id);
   const strip = h("span", { class: "tp", "aria-hidden": "true" });
   strip.style.left = `${tape.left.toFixed(2)}%`;
@@ -715,8 +800,7 @@ function slipShell(memo: Memo, open: boolean, extra: Record<string, string> = {}
 }
 
 /** A kind's chip: a link (opens it), a phone number (copies it), a checklist's count and bar. */
-function kindRow(memo: Memo, time: string): HTMLElement | null {
-  const kind = memoKind(memo.text);
+function kindRow(memo: Memo, time: string, kind = memoKind(memo.text)): HTMLElement | null {
   if (!kind) return null;
   const row = h("div", { class: "kind" });
   if (kind.kind === "link") {
@@ -741,30 +825,44 @@ function kindRow(memo: Memo, time: string): HTMLElement | null {
  * three preview lines (a checklist's first items); the kind row when it has a kind; the hover pill (복사 · 고정 · ⋯). In search: the matched line
  * and the folder's name instead.
  */
-function closedSlip(memo: Memo, group?: { kind: GroupKind; proxy: Memo }, hit?: DrawerHit): HTMLElement {
+function closedSlip(memo: Memo, group?: { kind: GroupKind; proxy: Memo }, hit?: DrawerHit, titleOnly = false): HTMLElement {
   const now = new Date();
   const heading = cardTitle(memo, lang());
   const pinned = placementOf(folders(), memo.id).pinned;
-  const time = group ? memoCardTime(group.proxy, group.kind, viewSort(), now, lang()) : dayTime(new Date(memo.updatedAt), now, lang());
+  // #114: a result says its day as a date (today the clock): its group is a folder, not a day.
+  const time = group ? memoCardTime(group.proxy, group.kind, viewSort(), now, lang()) : foundTime(new Date(memo.updatedAt), now, lang());
   const element = slipShell(memo, false, { tabindex: "-1", draggable: "true" });
-  const kinds = hit ? null : kindRow(memo, time);
+  const kind = hit || titleOnly ? undefined : memoKind(memo.text);
+  const kinds = hit || titleOnly ? null : kindRow(memo, time, kind);
   const showPaw = pinned && currentView() !== pinnedView && !hit;
-  const right = h("span", { class: "right" }, showPaw ? h("span", { class: "paw", title: t("고정"), "aria-label": t("고정") }, icon("pin", 12)) : null, kinds ? null : h("span", { class: "m" }, time));
-  element.append(h("div", { class: "row" }, h("span", { class: "hw", title: heading }, ...(hit && hit.text === heading ? marked(heading, hit.range) : [document.createTextNode(heading)])), right));
-  if (hit) {
-    if (hit.text !== heading) element.append(h("div", { class: `p hit${isCodeLine(hit.text) ? " code" : ""}` }, ...marked(hit.text, hit.range)));
-    const folder = folderOf(hit.folder);
-    element.append(h("div", { class: `where ${colorClass(folder?.color ?? "lavender")}` }, h("span", { class: "dot" }), folder ? folderName(folder, lang()) : ""));
+  // #115: 제목만 — one line: the title, a checklist's `1/3`, the paw, the short time.
+  const progress = titleOnly ? checklistProgress(memo.text) : undefined;
+  // #119 (Narrator): the card read as one line — `제목, 9:20, 고정, 2/4 완료` (in search: the line found and the folder) —
+  // instead of every piece of it; its preview follows as the description.
+  const said = [heading, time, pinned ? t("고정") : "",
+    kind?.kind === "checklist" ? t("{done}/{total} 완료", { done: kind.done, total: kind.total }) : kind?.kind === "link" ? kind.label : kind?.kind === "phone" ? kind.number
+      : progress ? t("{done}/{total} 완료", progress) : "",
+    hit && hit.text !== heading ? hit.text : "", hit ? folderName(folderOf(hit.folder) ?? folders().folders[0], lang()) : ""].filter(Boolean);
+  element.setAttribute("aria-label", said.join(", "));
+  const right = h("span", { class: "right" }, progress ? h("span", { class: "m", "aria-label": t("{done}/{total} 완료", progress) }, `${progress.done}/${progress.total}`) : null,
+    showPaw ? h("span", { class: "paw", title: t("고정"), "aria-label": t("고정") }, icon("pin", 12)) : null, kinds ? null : h("span", { class: "m" }, time));
+  const found = hit ? hitSnippet(hit.text, hit.range) : undefined;
+  const onTitle = Boolean(hit?.range) && hit!.text === heading;
+  element.append(h("div", { class: "row" }, h("span", { class: "hw", title: heading }, ...(found && onTitle ? marked(found.text, found.range) : [document.createTextNode(heading)])), right));
+  if (titleOnly) {
+    element.classList.add("ti");
+  } else if (hit && found) {
+    // #114: the found line in the preview's place, brought near its start; a result the chips alone picked (or a folder
+    // name, or a match in the title) shows its preview. The folder is the group's header.
+    if (hit.range && !onTitle) element.append(h("div", { class: `p hit${isCodeLine(hit.text) ? " code" : ""}` }, ...marked(found.text, found.range)));
+    else { const preview = previewBlock(memo); if (preview) element.append(preview); else element.classList.add("short"); }
   } else {
     const preview = previewBlock(memo);
-    if (preview) element.append(preview);
+    if (preview) { element.append(preview); element.setAttribute("aria-description", (previews.get(memo.id)?.rows ?? []).map((row) => (row.checked === undefined ? row.text : `${row.checked ? t("완료됨") : t("미완료")} ${row.text}`)).join(", ")); }
     if (kinds) element.append(kinds);
     if (!preview && !kinds) element.classList.add("short");
   }
-  element.addEventListener("click", () => {
-    if (hit) { leaveSearch(false); view = hit.folder; act({ type: "drawerView", view: hit.folder }); }
-    openMemo(memo.id, !checklistProgress(memo.text));
-  });
+  element.addEventListener("click", () => (hit ? revealHit(memo) : openMemo(memo.id, !checklistProgress(memo.text))));
   element.addEventListener("dragstart", (event) => {
     event.dataTransfer?.setData("application/x-jongi-memo", memo.id);
     if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
@@ -796,18 +894,19 @@ function previewBlock(memo: Memo): HTMLElement | null {
   }
   const words = rows.map((row) => row.text).join("\n");
   // One text node unless a line is code (a list of 2,000 cards is drawn again on every change).
-  if (!rows.some((row) => isCodeLine(row.text))) return h("div", { class: "p", title: words }, words);
+  const code = (row: PreviewRow) => row.code === true || isCodeLine(row.text);
+  if (!rows.some(code)) return h("div", { class: "p", title: words }, words);
   const parts: (Node | string)[] = [];
   rows.forEach((row, index) => {
     if (index > 0) parts.push("\n");
-    parts.push(isCodeLine(row.text) ? h("span", { class: "code" }, row.text) : row.text);
+    parts.push(code(row) ? h("span", { class: "code" }, row.text) : row.text);
   });
   return h("div", { class: "p", title: words }, ...parts);
 }
 
 /** The hover pill (복사 · 고정 · ⋯), made for the card the mouse is on (not for every card up front). */
 function hoverPill(card: HTMLElement): void {
-  if (card.classList.contains("open") || card.querySelector(":scope > .hov")) return;
+  if (card.classList.contains("open") || card.classList.contains("ti") || card.querySelector(":scope > .hov")) return;
   const memo = memoOf(card.dataset.id);
   if (!memo || searching) return;
   list.querySelector(".it > .hov")?.remove();
@@ -823,17 +922,144 @@ list.addEventListener("mouseover", (event) => {
 });
 
 /** The open memo's bar: [크게 보기 · 복사 · ⚙] · when it was edited · [폴더로 옮기기 · 지우기]. */
+/**
+ * The open memo's bar (#112, SideNotes): [Aa] [⤢] [⋯] at the left, `10:12 고침` at the right. Aa opens the format bar
+ * (typing the memo if it wasn't); ⋯ is the memo's right-click menu — copy, pin, move, its paper, delete … are there.
+ */
 function actions(memo: Memo): HTMLElement {
+  const typed = editing && editor?.id === memo.id;
+  const format = h("button", { class: "ib aa", title: t("서식"), "aria-label": t("서식"), "aria-pressed": String(typed && formatOpen) }, "Aa");
+  format.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (typed) { formatOpen = !formatOpen; placeFormatBar(); return; }
+    formatOpen = true;
+    openMemo(memo.id, true);
+  });
   return h("div", { class: "acts" },
+    h("span", { class: "pill" }, format),
     h("span", { class: "pill" },
-      big ? toolButton("shrink", t("작게 보기"), () => { big = false; render(); requestAnimationFrame(() => editor && fit(editor.body)); })
-        : toolButton("expand", t("크게 보기"), () => showBig(memo)),
-      toolButton("copy", t("복사"), () => copyMemo(memo)),
-      toolButton("gear", t("메모 설정"), (_event, button) => memoGear(memo, button.getBoundingClientRect()))),
-    h("span", { class: "when" }, editedLabel(memo.updatedAt, new Date(), lang())),
+      big ? toolButton("shrink", t("작게 보기"), () => { big = false; render(); requestAnimationFrame(() => editor?.body.view.focus()); })
+        : toolButton("expand", t("크게 보기"), () => showBig(memo))),
     h("span", { class: "pill" },
-      toolButton("folderMove", t("폴더로 옮기기"), (_event, button) => openMenu(menuHost, moveEntries(memo), t("폴더로 옮기기"), button.getBoundingClientRect())),
-      toolButton("trash", t("지우기"), () => deleteMemo(memo), undefined, "danger")));
+      // A keyboard press (Enter · Space) opens it with its first row chosen.
+      toolButton("more", t("더 보기"), (event, button) => memoMenu(memo, button.getBoundingClientRect(), event.detail === 0))),
+    // Narrow drawers: `어제 고침`, else the card's short time (as the Mac's bar), else under the buttons (stackBars).
+    // 크게 보기 adds the letters (#113): `어제 21:40 고침 · 412자`.
+    h("span", { class: "when", "data-short": slipTime(memo.updatedAt, new Date(), lang()) },
+      big ? `${editedLabel(memo.updatedAt, new Date(), lang())} · ${characterWords(characterCount(textNow(memo)), lang())}` : editedLabel(memo.updatedAt, new Date(), lang())));
+}
+
+/**
+ * 서식 막대 (Aa, #84 — SideNotes' way): what the keys do, as buttons under the memo being typed, on the selection or at
+ * the caret (a line's format on the caret's line; a second press takes it off); then the drawer's face and size, and 기호
+ * 늘 보이기. A button never takes the caret from the words.
+ */
+let formatOpen = false;
+function formatBar(): HTMLElement {
+  const button = (label: Node | string, name: string, run: () => void, extra = "", pressed?: boolean) => {
+    const element = h("button", { class: `fb${extra ? ` ${extra}` : ""}`, title: name, "aria-label": name, ...(pressed !== undefined ? { "aria-pressed": String(pressed) } : {}) }, label);
+    element.addEventListener("mousedown", (event) => event.preventDefault());
+    element.addEventListener("click", (event) => { event.stopPropagation(); run(); });
+    return element;
+  };
+  const format = (name: MemoFormat) => () => editor?.body.format(name);
+  const prefs = state!.prefs;
+  const faces = h("button", { class: "fb face", title: t("글꼴과 글자 크기"), "aria-label": t("글꼴과 글자 크기"), "aria-haspopup": "menu" },
+    `Aa ${prefs.drawerFont === "mono" ? t("고정폭") : fontTitles[lang()][prefs.drawerFont]} · ${prefs.drawerTextPt} px`);
+  faces.addEventListener("mousedown", (event) => event.preventDefault());
+  faces.addEventListener("click", (event) => {
+    event.stopPropagation();
+    openMenu(menuHost, [
+      { kind: "chips", label: t("글꼴"), options: (["clean", "pen", "brush", "mono"] as const).map((value) => ({ value, label: value === "mono" ? t("고정폭") : fontTitles[lang()][value], swatch: `f-${value}`, checked: prefs.drawerFont === value })), pick: (value) => act({ type: "setPref", key: "drawerFont", value }) },
+      { kind: "chips", label: t("글자 크기"), options: drawerPoints.map((value) => ({ value: String(value), label: String(value), swatch: `z-${value}`, checked: prefs.drawerTextPt === value })), pick: (value) => act({ type: "setPref", key: "drawerTextPt", value: Number(value) }) },
+    ], t("글꼴과 글자 크기"), faces.getBoundingClientRect());
+  });
+  return h("div", { class: "fmt", role: "toolbar", "aria-label": t("서식") },
+    h("span", { class: "fbs" },
+      button(h("b", {}, "B"), t("굵게 (Ctrl+B)"), format("bold")),
+      button(h("i", {}, "I"), t("기울임 (Ctrl+I)"), format("italic")),
+      button(h("s", {}, "S"), t("취소선 (Ctrl+Shift+X)"), format("strike")),
+      button("H", t("제목 (Ctrl+Alt+1–3)"), format("heading")),
+      button("•", t("목록"), format("list")),
+      button("1.", t("번호 목록"), format("olist")),
+      button(icon("checkBox", 14), t("체크 목록 (Ctrl+Shift+L)"), format("check")),
+      button(icon("quote", 14), t("인용"), format("quote")),
+      button("</>", t("코드 (Ctrl+E)"), format("code"), "mono"),
+      button(icon("minus", 14), t("가로줄"), format("rule")),
+      button(icon("link", 14), t("링크 (Ctrl+K)"), format("link"))),
+    h("span", { class: "fbs end" }, faces,
+      button("¶", t("기호 늘 보이기 (Ctrl+Shift+R)"), () => act({ type: "setPref", key: "drawerShowMarks", value: !prefs.drawerShowMarks }), "", prefs.drawerShowMarks)));
+}
+
+/** The Aa bar under the open memo (or in 크게 보기), out or put away, the memo's words left as they are. */
+function placeFormatBar(): void {
+  for (const bar of dr.querySelectorAll(".fmt")) bar.remove();
+  for (const button of dr.querySelectorAll<HTMLElement>(".acts .ib[aria-label]")) if (button.getAttribute("aria-label") === t("서식")) button.setAttribute("aria-pressed", String(formatOpen));
+  if (!formatOpen || !editing || !editor) return;
+  const host = bigBox ?? list.querySelector<HTMLElement>(".it.open");
+  host?.querySelector(":scope > .acts")?.before(formatBar());
+}
+
+/**
+ * 링크 (#135, SideNotes' way): Ctrl+K on chosen words (or in a link) opens this small field under the memo — the
+ * address, Enter to finish (the words become `[words](address)`, or the link's address changes), Esc to leave it; in a
+ * link, 링크 빼기 (or an empty address) takes the link out. The memo changes once, at Enter (one Ctrl+Z).
+ */
+let linkEdit: LinkRequest | undefined;
+let linkBox: HTMLElement | undefined;
+
+function askLink(request: LinkRequest): void {
+  closeLink();
+  linkEdit = request;
+  linkBox = linkField(request);
+  placeLinkBar();
+  requestAnimationFrame(() => { const input = linkBox?.querySelector<HTMLInputElement>("input"); input?.focus(); input?.select(); });
+}
+
+function linkField(request: LinkRequest): HTMLElement {
+  const name = request.existing ? t("링크 고치기") : t("링크 넣기");
+  const input = h("input", { type: "text", class: "lk-url", placeholder: "https://", "aria-label": t("링크 주소"), spellcheck: "false" });
+  input.value = request.url;
+  const finish = (url: string) => {
+    const fields = editor, asked = linkEdit;
+    closeLink();
+    if (fields && asked) fields.body.setLink(asked, url);
+  };
+  input.addEventListener("keydown", (event) => {
+    if (event.isComposing) return;
+    if (event.key === "Enter") { event.preventDefault(); event.stopPropagation(); finish(input.value); }
+    else if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); cancelLink(); }
+  });
+  const remove = request.existing ? h("button", { class: "lk-out" }, t("링크 빼기")) : null;
+  remove?.addEventListener("mousedown", (event) => event.preventDefault());
+  remove?.addEventListener("click", (event) => { event.stopPropagation(); finish(""); });
+  return h("div", { class: "lnk", role: "group", "aria-label": name },
+    h("div", { class: "lk-head" }, name),
+    h("label", { class: "lk-row" }, icon("link", 13), input),
+    h("div", { class: "lk-foot" }, h("span", { class: "lk-keys" }, request.existing ? t("Enter 고치기 · Esc 그만") : t("Enter 넣기 · Esc 그만")), remove));
+}
+
+function closeLink(): void {
+  linkEdit = undefined;
+  linkBox?.remove();
+  linkBox = undefined;
+}
+
+/** Esc: nothing changes, the keyboard back in the memo where it was. */
+function cancelLink(): void {
+  closeLink();
+  editor?.body.view.focus();
+}
+
+/** The link field under the memo being typed (or in 크게 보기), above the Aa bar; left where it is when it is there. */
+function placeLinkBar(): void {
+  if (!linkBox) return;
+  if (!editing || !editor) { closeLink(); return; }
+  const host = bigBox ?? list.querySelector<HTMLElement>(".it.open");
+  const before = host?.querySelector<HTMLElement>(":scope > .fmt") ?? host?.querySelector<HTMLElement>(":scope > .acts");
+  if (!host || !before) return;
+  if (linkBox.parentElement === host && linkBox.nextElementSibling === before) return;
+  before.before(linkBox);
 }
 
 function progressText(memo: Memo): HTMLElement | null {
@@ -841,43 +1067,90 @@ function progressText(memo: Memo): HTMLElement | null {
   return progress ? h("span", { class: "m" }, `${progress.done}/${progress.total}`) : null;
 }
 
-/** An open memo, as it reads: every line, checklist boxes that tick; a click on a line edits there. */
+/**
+ * An open memo, as it reads: every line, checklist boxes that tick; a click on a line edits there. #84: each line styled
+ * as the editor styles it (a heading, a list's hanging words, a quote's bar, a code block, a rule; the marks faint).
+ */
 function openSlip(memo: Memo): HTMLElement {
   const element = slipShell(memo, true);
   if (editing && editor && !big) {
-    element.append(h("div", { class: "row" }, editor.titleField, progressText(memo)), editor.body, actions(memo));
+    element.append(h("div", { class: "row" }, editor.titleField, progressText(memo)), editor.body.dom, actions(memo));
     return element;
   }
-  const lines = memo.text.split("\n");
-  const first = lines.findIndex((line) => line.trim());
-  const titleIsCheck = first >= 0 && Boolean(checklistLine(lines[first]));
-  const titleText = first >= 0 && !titleIsCheck ? lines[first].trim() : "";
-  const titleLine = h("span", { class: "hw", title: titleText }, titleText);
+  const lines = [...markdownLines(memo.text)];
+  const first = lines.findIndex(({ line }) => line.trim());
+  const titleIsCheck = first >= 0 && Boolean(checklistLine(lines[first].line));
+  const titleText = first >= 0 && !titleIsCheck ? lines[first].line.trim() : "";
+  const titleLine = h("span", { class: "hw", title: titleText }, ...(titleText ? markdownNodes(titleText, readLine(titleText, false)) : []));
   titleLine.addEventListener("click", () => openMemo(memo.id, true, 0));
   const body = h("div", { class: "body" });
-  lines.forEach((line, index) => {
+  // 문단 간격 (#141): the room under each paragraph's last line (a list's lines stay together).
+  const para = (index: number) => (endsParagraph(lines[index].read.kind, lines[index + 1]?.read.kind) ? " md-para" : "");
+  lines.forEach(({ line, read }, index) => {
     if (index < first || (index === first && !titleIsCheck)) return;
-    const entry = checklistLine(line);
+    const entry = read.kind === "check" ? checklistLine(line) : undefined;
+    let row: HTMLElement;
     if (entry) {
       const tick = box(entry.checked, "button");
+      const motion = cardTicked && cardTicked.id === memo.id && cardTicked.line === index && performance.now() - cardTicked.at < 400 ? (cardTicked.on ? " pop" : " unpop") : "";
+      if (motion) tick.classList.add(motion.trim());
       tick.setAttribute("aria-label", entry.checked ? t("{title} 완료 취소", { title: entry.text }) : t("{title} 완료", { title: entry.text }));
-      tick.addEventListener("click", (event) => { event.stopPropagation(); act({ type: "memoCheck", id: memo.id, line: index }); });
-      const words = h("span", { class: "ckt" }, entry.text);
+      tick.addEventListener("click", (event) => { event.stopPropagation(); tickInCard(memo, index, entry.checked); });
+      const words = h("span", { class: "ckt" }, ...markdownNodes(line, read, read.words));
       words.addEventListener("click", () => openMemo(memo.id, true, index));
-      body.append(h("div", { class: `ln ck${entry.checked ? " done" : ""}` }, tick, words));
-    } else {
-      const row = h("div", { class: `ln${isCodeLine(line) ? " code" : ""}` }, line);
-      row.addEventListener("click", () => openMemo(memo.id, true, index));
-      body.append(row);
+      body.append(h("div", { class: `ln ck${entry.checked ? " done" : ""}${motion === " pop" ? " pop" : ""}${para(index)}` }, tick, words));
+      return;
     }
+    const kind = read.kind === "heading" ? `md-h${Math.min(3, read.level)}` : read.kind === "code" || read.kind === "fence" ? `md-codeline${read.kind === "fence" ? " md-fence" : ""}`
+      : read.kind === "quote" ? "md-quote" : read.kind === "rule" ? "md-rule" : read.kind === "text" && !line.includes("`") && isCodeLine(line) ? "code" : "";
+    if (read.kind === "list" || read.kind === "olist") {
+      // The mark, then the words hanging after it.
+      // Hidden marks (2026-10-30): a list's `- ` as •, a number as it is (기호 늘 보이기: the marks as written).
+      const dot = read.kind === "list" && !state!.prefs.drawerShowMarks;
+      const head = dot ? h("span", { class: "md-dot md-bullet" }, `${line.slice(0, read.markFrom)}• `) : h("span", { class: "md-mark md-num md-bullet" }, line.slice(0, read.words));
+      row = h("div", { class: `ln md-item${para(index)}` }, head, h("span", {}, ...markdownNodes(line, read, read.words)));
+    } else {
+      row = h("div", { class: `ln${kind ? ` ${kind}` : ""}${para(index)}` }, ...markdownNodes(line, read));
+    }
+    row.addEventListener("click", () => openMemo(memo.id, true, index));
+    body.append(row);
   });
+  // #163: a click near a box (within about 25 × 25 round it, not on its words) ticks it, as the note's boxes do.
+  body.addEventListener("click", (event) => {
+    if (!(event.target instanceof Element) || event.target.closest(".bx, .ckt")) return;
+    const near = nearBox(body, event.clientX, event.clientY, ".ck > .bx");
+    if (near) { event.stopPropagation(); near.click(); }
+  }, true);
   element.append(h("div", { class: "row" }, titleLine, progressText(memo)), body, actions(memo));
   return element;
 }
 
+/**
+ * #163: a box ticked in an open memo as it reads, as in the editor: the words change at once (in place) and the box is
+ * drawn ticking; with 끝낸 항목 아래로 the line goes down once that is drawn (0.36 s; unticked 0.14 s). Reduce motion: one
+ * change at once, as before.
+ */
+let cardTicked: { id: string; line: number; at: number; on: boolean } | undefined;
+function tickInCard(memo: Memo, line: number, checked: boolean): void {
+  if (reduceMotion()) { act({ type: "memoCheck", id: memo.id, line }); return; }
+  const before = memo.text;
+  const inPlace = toggleDone(before, line, false);
+  if (inPlace === before) return;
+  const on = !checked;
+  cardTicked = { id: memo.id, line, at: performance.now(), on };
+  act({ type: "memoSetText", id: memo.id, text: inPlace });
+  if (!state!.prefs.drawerDoneToBottom) return;
+  setTimeout(() => {
+    if (memoOf(memo.id)?.text !== inPlace) return;
+    cardTicked = undefined;
+    act({ type: "memoSetText", id: memo.id, text: toggleDone(before, line, true) });
+  }, (on ? motion.enter + motion.change : motion.quick) + 20);
+}
+
 function groupHeader(group: CardGroup): HTMLElement {
+  // #119: a space between the words and the count (Narrator read `고정1`); the flex row ignores it.
   return h("div", { class: "grp", role: "presentation" },
-    h("span", { class: "lbl" }, group.kind === "pinned" ? icon("pin", 11) : null, h("span", {}, group.label)),
+    h("span", { class: "lbl" }, group.kind === "pinned" ? icon("pin", 11) : null, h("span", {}, group.label)), " ",
     h("span", { class: "n" }, String(group.memos.length)));
 }
 
@@ -885,15 +1158,21 @@ function groupHeader(group: CardGroup): HTMLElement {
 
 function renderTabs(): void {
   const data = folders();
-  const current = searching ? "" : currentView();
-  const bookmarks: HTMLElement[] = visibleFolders(data).map((folder, index) => {
+  // #114: the folder shown stays picked while searching.
+  const current = currentView();
+  const shown = visibleFolders(data);
+  // #116: first letters that collide among the un-picked bookmarks get a second one.
+  const letters = bookmarkLetters(shown.map((folder) => folderName(folder, lang())), current ? shown.findIndex((folder) => folder.id === current) : null);
+  const bookmarks: HTMLElement[] = shown.map((folder, index) => {
     const on = folder.id === current;
     const name = folderName(folder, lang());
-    const element = h("button", { class: `bk ${colorClass(folder.color)}${on ? " on" : ""}`, role: "tab", "aria-selected": String(on), "aria-label": name, draggable: "true", "data-folder": folder.id }, on ? name : [...name][0] ?? "");
+    const element = h("button", { class: `bk ${colorClass(folder.color)}${on ? " on" : ""}`, role: "tab", "aria-selected": String(on), "aria-label": name, draggable: "true", "data-folder": folder.id, ...(!on && [...letters[index]].length > 1 ? { "data-two": /[\uAC00-\uD7A3\u3131-\u318E]/.test(letters[index]) ? "stack" : "" } : {}) }, on ? name : letters[index]);
     element.addEventListener("click", () => setView(folder.id));
     element.addEventListener("contextmenu", (event) => { event.preventDefault(); event.stopPropagation(); hideTip(); folderMenu(folder, { x: event.clientX, y: event.clientY }); });
     element.addEventListener("mouseenter", () => showTip(element, name, memosIn(data, state!.memos, folder.id).length, digitKey(index)));
     element.addEventListener("mouseleave", hideTip);
+    // #119: its count said after its name, worked out when it takes the keyboard (not on every redraw).
+    element.addEventListener("focus", () => element.setAttribute("aria-description", sheetCountWords(memosIn(data, state!.memos, folder.id).length)));
     element.addEventListener("dragstart", (event) => { hideTip(); event.dataTransfer?.setData("application/x-jongi-folder", folder.id); element.classList.add("lifted"); });
     element.addEventListener("dragend", () => element.classList.remove("lifted"));
     dropTarget(element, folder.id);
@@ -904,8 +1183,9 @@ function renderTabs(): void {
   pinned.addEventListener("contextmenu", (event) => { event.preventDefault(); event.stopPropagation(); hideTip(); pinnedMenu({ x: event.clientX, y: event.clientY }); });
   pinned.addEventListener("mouseenter", () => showTip(pinned, t("고정"), memosIn(data, state!.memos, pinnedView).length, "Ctrl+0"));
   pinned.addEventListener("mouseleave", hideTip);
+  pinned.addEventListener("focus", () => pinned.setAttribute("aria-description", sheetCountWords(memosIn(data, state!.memos, pinnedView).length)));
   dropTarget(pinned, pinnedView);
-  const add = h("button", { class: "bk add", title: t("새 폴더"), "aria-label": t("새 폴더") }, icon("plus", 12, 2));
+  const add = h("button", { class: "bk add", title: t("새 폴더"), "aria-label": t("새 폴더") }, icon("plus", 13, 2));
   add.addEventListener("click", () => folderForm(add.getBoundingClientRect()));
   tabs.replaceChildren(...bookmarks, pinned, add);
 }
@@ -960,25 +1240,34 @@ function renderHeader(): void {
   find.hidden = !searching;
   title.textContent = viewName();
   folderButton.title = `${viewName()} — ${t("폴더 목록 (Ctrl+L)")}`;
+  // #119: Narrator read only the folder's name; it says it is the folder list too.
+  folderButton.setAttribute("aria-label", folderButton.title);
   searchButton.setAttribute("aria-pressed", String(searching));
-  const pinned = state!.prefs.drawerPinned;
-  pinButton.setAttribute("aria-pressed", String(pinned));
-  pinButton.title = pinned ? t("다른 창 위에 늘 떠 있어요 (누르면 풀기)") : t("다른 창 위에 띄우기");
   qk.className = `qk c-${viewColor()}`;
+  quickTo.textContent = t("{name}에 넣어요", { name: viewName() });
+  // #114: the results take the quick-write slip's place while searching (as on the Mac).
+  qk.hidden = searching;
+  renderChips();
 }
 
 function renderList(): void {
   if (!state) return;
-  if (searching && query.trim()) {
-    const hits = drawerSearch(folders(), state.memos, query, lang());
-    list.classList.toggle("dense", hits.length > 20);
-    list.replaceChildren(...hits.map((hit) => closedSlip(hit.memo, undefined, hit)));
-    // One shape for every search that finds nothing (#39): the words looked for, then 없어요.
-    if (hits.length === 0) list.append(h("div", { class: "empty" }, h("p", {}, t("‘{query}’에 맞는 게 없어요", { query: query.trim() }))));
-    count.textContent = drawerFooter("search", hits.length, "", lang());
+  if (searching) {
+    // #114: the results by folder — each group under its colour, name and count — kept to the chips.
+    const groups = drawerFind(folders(), state.memos, query, searchHere ? currentView() : undefined, searchFilters.filter((filter) => searchOn.has(filter)), lang());
+    const total = groups.reduce((sum, group) => sum + group.hits.length, 0);
+    list.classList.toggle("dense", total > 20);
+    list.replaceChildren(...groups.flatMap((group) => [findHeader(group.folder, group.hits.length), ...group.hits.map((hit) => closedSlip(hit.memo, undefined, hit))]));
+    const asked = query.trim() || [...searchOn].map(filterWord).join(" · ");
+    // One shape for every search that finds nothing (#39): the words looked for (or the chips), then 없어요; before
+    // anything is asked, the 초성 hint.
+    if (total === 0) list.append(h("div", { class: "empty" }, h("p", {}, asked ? t("‘{query}’에 맞는 게 없어요", { query: asked }) : t("초성으로도 찾을 수 있어요 (예: ㅂㄱㅅ → 보고서)"))));
+    count.textContent = searchFooterWords(total, groups.length, lang());
     return;
   }
   const groups = shownGroups();
+  // #115: 제목만 — one line a memo (the open one is its card).
+  const titles = viewShape() === "titles";
   const proxies = groups.flatMap((group) => group.memos);
   const real = new Map(state.memos.map((memo) => [memo.id, memo]));
   const keep = editor && editing && !big ? list.querySelector<HTMLElement>(`.it.open[data-id="${CSS.escape(editor.id)}"]`) : null;
@@ -989,7 +1278,7 @@ function renderList(): void {
       const memo = real.get(proxy.id);
       if (!memo) continue;
       // A memo written while another is open has no earlier self: its own time.
-      if (memo.id !== openID) { nodes.push(closedSlip(memo, { kind: group.kind, proxy: frozen?.has(memo.id) ? proxy : memo })); continue; }
+      if (memo.id !== openID) { nodes.push(closedSlip(memo, { kind: group.kind, proxy: frozen?.has(memo.id) ? proxy : memo }, undefined, titles)); continue; }
       if (keep && editor && keep.dataset.sheet === (paperOf(folders(), memo.id) ?? undefined)) {
         refreshEditor(editor, memo);
         keep.querySelector(".acts")?.replaceWith(actions(memo));
@@ -1005,8 +1294,24 @@ function renderList(): void {
   }
   // The open memo went (deleted, moved away elsewhere): nothing stays open.
   if (openID && !proxies.some((memo) => memo.id === openID)) { openID = undefined; editing = false; big = false; editor = undefined; frozen = undefined; }
-  list.classList.toggle("dense", proxies.length > 20);
-  list.replaceChildren(...nodes);
+  list.classList.toggle("dense", proxies.length > 20 && !titles);
+  list.classList.toggle("titles", titles);
+  const kept = keep ? nodes.indexOf(keep) : -1;
+  if (keep && kept >= 0 && keep.parentNode === list) {
+    // The memo being typed stays where it is in the page (CodeMirror keeps its focus, caret and measurements): only
+    // the cards around it are replaced.
+    const range = document.createRange();
+    range.setStart(list, 0);
+    range.setEndBefore(keep);
+    range.deleteContents();
+    range.setStartAfter(keep);
+    range.setEnd(list, list.childNodes.length);
+    range.deleteContents();
+    keep.before(...nodes.slice(0, kept));
+    keep.after(...nodes.slice(kept + 1));
+  } else {
+    list.replaceChildren(...nodes);
+  }
   if (proxies.length === 0) {
     list.append(currentView() === pinnedView
       // One line under the cat (#39); the footer only says 비어 있어요.
@@ -1017,21 +1322,32 @@ function renderList(): void {
   count.textContent = currentView() === pinnedView
     ? (n ? footerWords(t("고정"), n, lang()) : drawerFooter("pinned", 0, "", lang()))
     : (n ? footerWords(viewName(), n, lang()) : drawerFooter("folder", 0, viewName(), lang()));
-  for (const area of list.querySelectorAll<HTMLTextAreaElement>("textarea.editor")) fit(area);
   stackBars();
 }
 
-/** The open memo's bar: when its time doesn't fit between the pills, it goes under them. */
+/** The open memo's bar: when its time doesn't fit beside the buttons, the short time; failing that, under them. */
 function stackBars(): void {
   for (const bar of dr.querySelectorAll<HTMLElement>(".acts")) {
     bar.classList.remove("stack");
     const when = bar.querySelector<HTMLElement>(".when");
-    if (when && when.scrollWidth > when.clientWidth + 1) bar.classList.add("stack");
+    if (!when) continue;
+    when.dataset.full ??= when.textContent ?? "";
+    when.textContent = when.dataset.full;
+    when.title = "";
+    if (when.scrollWidth <= when.clientWidth + 1) continue;
+    when.title = when.dataset.full;
+    if (when.dataset.short) when.textContent = when.dataset.short;
+    if (when.scrollWidth > when.clientWidth + 1) bar.classList.add("stack");
   }
 }
 
 function markSelected(): void {
-  for (const slip of list.querySelectorAll<HTMLElement>(".it")) slip.classList.toggle("selected", slip.dataset.id === selectedID);
+  for (const slip of list.querySelectorAll<HTMLElement>(".it")) {
+    const on = slip.dataset.id === selectedID;
+    slip.classList.toggle("selected", on);
+    // #119: the keyboard's pick, said as the current one.
+    if (on) slip.setAttribute("aria-current", "true"); else slip.removeAttribute("aria-current");
+  }
 }
 
 /** 크게 보기: the open memo over the list, the drawer's whole height. */
@@ -1042,12 +1358,20 @@ function renderBig(): void {
   refreshEditor(editor, memo);
   const own = paperOf(folders(), memo.id);
   const fresh = h("div", { class: `big ${colorClass(folderOf(placementOf(folders(), memo.id).folder)?.color ?? "lavender")}`, role: "dialog", "aria-label": t("크게 보기"), ...(own ? { "data-sheet": own } : {}) },
-    h("div", { class: "row" }, editor.titleField, progressText(memo)), editor.body, actions(memo));
+    h("div", { class: "row" }, editor.titleField, progressText(memo)), editor.body.dom, actions(memo));
   fresh.style.setProperty("--big-top", `${Math.round(qk.offsetTop)}px`);
-  editor.body.style.height = "";
   if (bigBox) bigBox.replaceWith(fresh); else dr.append(fresh);
   bigBox = fresh;
   stackBars();
+}
+
+/** 크게 보기 came or went (#113): the main process widens the window toward the screen, or back to the user's width. */
+let sentBig = false;
+function sendBig(): void {
+  const wide = big && Boolean(bigBox);
+  if (wide === sentBig) return;
+  sentBig = wide;
+  api.send("drawer:big", wide);
 }
 
 function renderFooter(): void {
@@ -1057,18 +1381,49 @@ function renderFooter(): void {
   keyHint.title = shortcut ? t("{key}로 열고 닫아요", { key: shortcutLabel(shortcut) }) : "";
 }
 
+/**
+ * 메모 글꼴 · 크기 (#84): the drawer's face and size step on the page — the words' face and size, their lines, the
+ * preview's size (drawer.css reads them as --m-*). A handwriting face is the titles' face too; the plain and fixed-width
+ * faces leave the titles in the notebook's handwriting.
+ */
+let memoTextKey = "";
+function applyMemoText(): void {
+  const prefs = state!.prefs;
+  const face = prefs.drawerFont;
+  root.dataset.font = face === "pen" || face === "brush" ? face : prefs.font;
+  const key = `${face}|${prefs.drawerTextPt}|${prefs.drawerLineHeight}|${prefs.drawerParagraph}|${prefs.drawerCodeFont}|${prefs.drawerShowMarks}`;
+  root.toggleAttribute("data-show-marks", prefs.drawerShowMarks);
+  if (key === memoTextKey) return;
+  memoTextKey = key;
+  const metrics = drawerMetrics(prefs.drawerTextPt, prefs.drawerLineHeight, prefs.drawerParagraph);
+  root.dataset.memoFont = face;
+  // 코드 글꼴 (#143): D2Coding for code and the 고정폭 face (drawer.css), or the system's.
+  root.dataset.codeFont = prefs.drawerCodeFont;
+  // The handwriting faces run as much larger as the notebook's (pen 23 : 15, brush 22 : 15).
+  const faceSize = face === "pen" ? Math.round((metrics.body * 23) / 15) : face === "brush" ? Math.round((metrics.body * 22) / 15) : face === "mono" ? metrics.body - 1 : metrics.body;
+  for (const [name, value] of [["--m-size", metrics.body], ["--m-face-size", faceSize], ["--m-line", metrics.line], ["--m-para", metrics.paragraph], ["--m-preview", metrics.preview], ["--m-preview-line", metrics.previewLine]] as const) {
+    root.style.setProperty(name, `${value}px`);
+  }
+  editor?.body.refont(prefs.drawerShowMarks);
+  editor?.title.refont(prefs.drawerShowMarks);
+}
+
 function render(): void {
   if (!state) return;
   if (!shown) { dirty = true; return; }
   dirty = false;
   renderedDay = new Date().toDateString();
-  root.dataset.font = state.prefs.font;
+  applyMemoText();
   const focused = document.activeElement;
   renderTabs();
+  placeCloseTab();
   renderHeader();
   renderList();
   renderBig();
   renderFooter();
+  placeFormatBar();
+  placeLinkBar();
+  sendBig();
   // Redrawing never takes the caret away from where it was.
   if (focused instanceof HTMLElement && focused.isConnected && document.activeElement !== focused) focused.focus();
   queueShape();
@@ -1091,7 +1446,60 @@ function leaveSearch(draw = true): void {
   searching = false;
   query = "";
   findInput.value = "";
+  searchHere = false;
+  searchOn.clear();
   if (draw) render();
+}
+
+/** A result opened (a click, Enter): its folder shown, the memo open in it (#114). */
+function revealHit(memo: Memo): void {
+  const folder = placementOf(folders(), memo.id).folder;
+  leaveSearch(false);
+  view = folder;
+  act({ type: "drawerView", view: folder });
+  openMemo(memo.id, !checklistProgress(memo.text));
+}
+
+const filterWord = (filter: SearchFilter): string => ({ open: t("체크 남음"), link: t("링크"), pinned: t("고정") }[filter]);
+
+/** A folder's group in the results: its colour as a small square, its name and count, a hairline (#114). */
+function findHeader(id: string, count: number): HTMLElement {
+  const folder = folderOf(id);
+  return h("div", { class: "grp found", role: "presentation" },
+    h("span", { class: "lbl" }, h("span", { class: `sq ${colorClass(folder?.color ?? "lavender")}` }), h("span", {}, folder ? folderName(folder, lang()) : "")),
+    h("span", { class: "n" }, String(count)));
+}
+
+/** The chips under the field (#114): 모든 폴더 · {이름}만 (one of the two), then 체크 남음 · 링크 · 고정 (any of them). */
+function renderChips(): void {
+  chips.hidden = !searching;
+  if (!searching) return;
+  const chip = (label: string, on: boolean, press: () => void, toggles: boolean) => {
+    const button = h("button", { class: `chip${on ? " on" : ""}`, "aria-pressed": String(on), ...(toggles ? {} : { role: "radio", "aria-checked": String(on) }) }, label);
+    button.addEventListener("click", () => { press(); findInput.focus(); });
+    return button;
+  };
+  const here = viewName();
+  const pick = (value: boolean) => () => { if (searchHere !== value) { searchHere = value; selectedID = undefined; renderSearch(); } };
+  chips.replaceChildren(
+    h("div", { class: "chip-row", role: "radiogroup", "aria-label": t("찾는 곳") },
+      chip(t("모든 폴더"), !searchHere, pick(false), false), chip(t("{name}만", { name: here }), searchHere, pick(true), false)),
+    h("div", { class: "chip-row", role: "group", "aria-label": t("거르기") },
+      ...searchFilters.map((filter) => chip(filterWord(filter), searchOn.has(filter), () => {
+        if (searchOn.has(filter)) searchOn.delete(filter); else searchOn.add(filter);
+        selectedID = undefined;
+        renderSearch();
+      }, true))));
+  findInput.placeholder = searchHere ? t("{name}에서 찾기", { name: here }) : t("모든 폴더에서 찾기");
+}
+
+/** The chips and the results again, at once. */
+function renderSearch(): void {
+  clearTimeout(searchTimer);
+  searchTimer = undefined;
+  renderChips();
+  renderList();
+  list.scrollTop = 0;
 }
 
 searchButton.addEventListener("click", () => (searching ? leaveSearch() : enterSearch()));
@@ -1104,6 +1512,7 @@ function showResults(): void {
 findInput.addEventListener("input", () => {
   query = findInput.value;
   clearTimeout(searchTimer);
+  selectedID = undefined;
   if (!query.trim()) { showResults(); return; }
   searchTimer = setTimeout(showResults, searchPause);
 });
@@ -1111,9 +1520,15 @@ findInput.addEventListener("keydown", (event) => {
   if (event.isComposing) return;
   if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); leaveSearch(); quick.focus(); }
   if (event.key === "ArrowDown") { event.preventDefault(); if (searchTimer !== undefined) showResults(); step(1); }
+  // #114: Enter opens the picked result, else the first.
+  if (event.key === "Enter") {
+    event.preventDefault();
+    if (searchTimer !== undefined) showResults();
+    const card = (selectedID ? list.querySelector<HTMLElement>(`.it[data-id="${CSS.escape(selectedID)}"]`) : null) ?? list.querySelector<HTMLElement>(".it[data-id]");
+    const memo = memoOf(card?.dataset.id);
+    if (memo) revealHit(memo);
+  }
 });
-pinButton.addEventListener("click", () => act({ type: "setPref", key: "drawerPinned", value: !state?.prefs.drawerPinned }));
-closeButton.addEventListener("click", close);
 folderButton.addEventListener("click", () => (menuOpen() && folderButton.getAttribute("aria-expanded") === "true" ? closeMenus() : folderList()));
 gearButton.addEventListener("click", () => (menuOpen() && gearButton.getAttribute("aria-expanded") === "true" ? closeMenus() : gearMenu(gearButton.getBoundingClientRect())));
 
@@ -1149,7 +1564,7 @@ function step(by: 1 | -1): void {
   if (slips.length === 0) return;
   const index = slips.findIndex((slip) => slip.dataset.id === selectedID);
   const next = index < 0 ? (by > 0 ? 0 : slips.length - 1) : Math.max(0, Math.min(slips.length - 1, index + by));
-  if (index === 0 && by < 0) { selectedID = undefined; markSelected(); quick.focus(); return; }
+  if (index === 0 && by < 0) { selectedID = undefined; markSelected(); (searching ? findInput : quick).focus(); return; }
   selectedID = slips[next].dataset.id;
   markSelected();
   slips[next].focus({ preventScroll: true });
@@ -1157,12 +1572,13 @@ function step(by: 1 | -1): void {
 }
 
 const selectedMemo = (): Memo | undefined => memoOf(selectedID ?? openID);
-const inField = (target: EventTarget | null) => target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement;
+/** A text the keys type into: a field, or the open memo's words (CodeMirror's editable element, #84). */
+const inField = (target: EventTarget | null) => target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || (target instanceof HTMLElement && target.isContentEditable);
 
 /** Shift+F10 or the Menu key: the menu of what has the focus (a field's text menu, a memo's, a bookmark's, else ⚙). */
 function keyedMenu(): void {
   const focused = document.activeElement as HTMLElement | null;
-  if (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement) { const r = focused.getBoundingClientRect(); textMenu(focused, { x: r.left + 12, y: r.top + Math.min(r.height, 26) }, true); return; }
+  if (focused && inField(focused)) { const r = focused.getBoundingClientRect(); textMenu(focused, { x: r.left + 12, y: r.top + Math.min(r.height, 26) }, true); return; }
   const bookmark = focused?.closest<HTMLElement>(".bk[data-folder]");
   if (bookmark) {
     const id = bookmark.dataset.folder!;
@@ -1186,7 +1602,8 @@ window.addEventListener("keydown", (event) => {
     if (event.defaultPrevented) return;
     event.preventDefault();
     if (closeMenus()) return;
-    if (big) { big = false; render(); requestAnimationFrame(() => editor?.body.focus()); return; }
+    if (linkEdit) { cancelLink(); return; }
+    if (big) { big = false; render(); requestAnimationFrame(() => editor?.body.view.focus()); return; }
     if (openID) { const id = openID; closeOpen(); selectedID = id; render(); list.querySelector<HTMLElement>(`.it[data-id="${CSS.escape(id)}"]`)?.focus(); return; }
     if (searching) { leaveSearch(); return; }
     close();
@@ -1198,6 +1615,16 @@ window.addEventListener("keydown", (event) => {
     if (key === "f") { event.preventDefault(); enterSearch(); return; }
     if (key === "l") { event.preventDefault(); if (searching) leaveSearch(); folderList(true); return; }
     if (event.key === ",") { event.preventDefault(); act({ type: "openSettings", tab: "drawer" }); return; }
+    // #118: Ctrl+/ the drawer's keys on a slip; Ctrl+Enter 크게 보기 of the open or picked memo (and back) — not in
+    // the quick-write slip, whose Ctrl+Enter is its own.
+    if (event.key === "/" || event.code === "Slash") { event.preventDefault(); act({ type: "drawerShortcuts" }); return; }
+    if (event.key === "Enter" && event.target !== quick) {
+      const memo = big ? memoOf(openID) : selectedMemo();
+      if (!memo) return;
+      event.preventDefault();
+      if (big && openID === memo.id) { big = false; render(); requestAnimationFrame(() => editor?.body.view.focus()); } else showBig(memo);
+      return;
+    }
     if (/^[0-9]$/.test(event.key)) {
       event.preventDefault();
       const target = viewForDigit(folders(), Number(event.key));
@@ -1216,13 +1643,22 @@ window.addEventListener("keydown", (event) => {
     if (memo) { event.preventDefault(); copyMemo(memo); }
     return;
   }
-  if (inField(event.target)) return;
+  // #118: Ctrl+Shift+M the picked (or open) memo's 폴더로 옮기기, under the folder's name.
+  if (ctrl && event.shiftKey && !event.altKey && event.key.toLowerCase() === "m") {
+    const memo = selectedMemo();
+    if (memo) { event.preventDefault(); moveList(memo); }
+    return;
+  }
+  // A field's own keys; on the close bar, Enter and Space press it (the button's own click).
+  if (inField(event.target) || event.target === closeBar) return;
   if (event.key === "ArrowDown") { event.preventDefault(); step(1); }
   else if (event.key === "ArrowUp") { event.preventDefault(); step(-1); }
   else if (event.key === "Enter" && selectedID) {
     event.preventDefault();
     const memo = selectedMemo();
-    if (memo) openMemo(memo.id, !checklistProgress(memo.text));
+    // #114: a result opens in its folder.
+    if (memo && searching) revealHit(memo);
+    else if (memo) openMemo(memo.id, !checklistProgress(memo.text));
   }
 });
 
@@ -1238,7 +1674,7 @@ document.addEventListener("contextmenu", (event) => {
   if (target.closest(".menu")) return;
   hideTip();
   const at = { x: event.clientX, y: event.clientY };
-  const field = target.closest<HTMLInputElement | HTMLTextAreaElement>("input, textarea");
+  const field = target.closest<HTMLElement>("input, textarea, .cm-content");
   if (field) { textMenu(field, at); return; }
   const card = target.closest<HTMLElement>(".it[data-id]");
   const memo = card ? memoOf(card.dataset.id) : undefined;
@@ -1256,8 +1692,8 @@ function setInteractive(value: boolean): void {
 }
 let dragging = false;
 const catches = () => (backdrop === "none"
-  ? ".hd, .qk, .it, .grp, .ft .gear, .ft .count, .ft .key, .empty, .bk, .menu, .big, .toast, .grip, .list"
-  : ".dr, .bk, .ears, .menu");
+  ? ".hd, .qk, .it, .grp, .ft .gear, .ft .count, .ft .key, .empty, .bk, .menu, .big, .toast, .grip, .closebar, .list"
+  : ".dr, .bk, .ears, .menu, .closebar");
 window.addEventListener("mousemove", (event) => {
   if (dragging) return;
   const target = event.target as Element | null;
@@ -1267,25 +1703,87 @@ document.documentElement.addEventListener("mouseleave", () => { if (!dragging) s
 
 // The inner edge, dragged: the width follows (the main process keeps it within 260–480).
 let queued: number | undefined;
+const resizeTo = (x: number) => {
+  if (queued !== undefined) cancelAnimationFrame(queued);
+  queued = requestAnimationFrame(() => { queued = undefined; api.send("drawer:resize", x, false); });
+};
+const resizeDone = (x: number) => {
+  dragging = false;
+  if (queued !== undefined) cancelAnimationFrame(queued);
+  api.send("drawer:resize", x, true);
+};
 grip.addEventListener("pointerdown", (event) => {
   if (event.button !== 0) return;
   grip.setPointerCapture(event.pointerId);
   dragging = true;
 });
 grip.addEventListener("pointermove", (event) => {
-  if (!dragging) return;
-  const x = event.screenX;
-  if (queued !== undefined) cancelAnimationFrame(queued);
-  queued = requestAnimationFrame(() => { queued = undefined; api.send("drawer:resize", x, false); });
+  if (dragging) resizeTo(event.screenX);
 });
 const endDrag = (event: PointerEvent) => {
-  if (!dragging) return;
-  dragging = false;
-  if (queued !== undefined) cancelAnimationFrame(queued);
-  api.send("drawer:resize", event.screenX, true);
+  if (dragging) resizeDone(event.screenX);
 };
 grip.addEventListener("pointerup", endDrag);
 grip.addEventListener("pointercancel", endDrag);
+
+/**
+ * #164: the close tab in the middle of the paper's inner edge (drawer.css), or, when the bookmarks reach that far, 12px
+ * under the last of them (never into the footer's height). Worked out when the bookmarks are drawn and on a resize.
+ */
+function placeCloseTab(): void {
+  closeBar.style.top = "";
+  tabs.style.bottom = "";
+  const last = tabs.lastElementChild as HTMLElement | null;
+  if (!last) return;
+  const box = stage.getBoundingClientRect();
+  // Where the bookmarks end as laid out, not as scrolled (the tab never moves with a scroll).
+  const bookmarks = last.offsetTop + last.offsetHeight + tabs.offsetTop;
+  // `top` is the tab's centre (its margin pulls it up by half); offsetTop is its top edge.
+  const half = closeBar.offsetHeight / 2;
+  const edge = closeBar.offsetTop;
+  if (edge >= bookmarks + 12) return;
+  const lowest = Math.max(edge + half, box.height - 52 - half);
+  const centre = Math.min(bookmarks + 12 + half, lowest);
+  closeBar.style.top = `${Math.round(centre)}px`;
+  // No room under them (a short screen, many folders): the bookmarks end 12px above the tab and scroll.
+  if (bookmarks + 12 + half > lowest) tabs.style.bottom = `${Math.round(box.height - (centre - half - 12))}px`;
+}
+
+// #83: the close bar in the middle of that edge. A press that moves more than `closeSlop` px is the edge being dragged
+// (the width follows, as on the rest of the edge, and the click that follows doesn't close); one that doesn't closes
+// the drawer. Enter and Space press it as a button (the same click).
+const closeSlop = 3;
+let barPress: { x: number; y: number; moved: boolean } | undefined;
+let barDragged = false;
+closeBar.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0) return;
+  closeBar.setPointerCapture(event.pointerId);
+  barPress = { x: event.screenX, y: event.screenY, moved: false };
+  barDragged = false;
+});
+closeBar.addEventListener("pointermove", (event) => {
+  if (!barPress) return;
+  if (!barPress.moved && Math.hypot(event.screenX - barPress.x, event.screenY - barPress.y) > closeSlop) {
+    barPress.moved = true;
+    dragging = true;
+  }
+  if (barPress.moved) resizeTo(event.screenX);
+});
+const endBar = (event: PointerEvent) => {
+  const press = barPress;
+  barPress = undefined;
+  if (!press?.moved) return;
+  resizeDone(event.screenX);
+  // The click this press makes (if any) comes in the same turn; after it, a click closes again.
+  barDragged = true;
+  setTimeout(() => { barDragged = false; }, 0);
+};
+closeBar.addEventListener("pointerup", endBar);
+closeBar.addEventListener("pointercancel", endBar);
+closeBar.addEventListener("click", () => {
+  if (barDragged) { barDragged = false; return; }
+  close();
+});
 
 // ─── 반투명 · 강하게 on Windows 11: the window cut to the paper, the bookmarks and the ears ──
 
@@ -1301,6 +1799,7 @@ function sendShape(): void {
   const add = (r: DOMRect, grow = 0) => { if (r.width > 0 && r.height > 0) rects.push({ x: r.left - (side === "right" ? grow : 0), y: r.top, width: r.width + grow, height: r.height }); };
   add(dr.getBoundingClientRect());
   for (const bookmark of tabs.querySelectorAll<HTMLElement>(".bk")) add(bookmark.getBoundingClientRect(), 6);
+  add(closeBar.getBoundingClientRect());
   // Each ear as a few steps (wide at its foot, narrow at its tip).
   const ears = cat.element.getBoundingClientRect();
   for (const [from, to] of [[0, 30], [44, 76]]) {
@@ -1313,7 +1812,7 @@ function sendShape(): void {
   }
   api.send("drawer:shape", rects);
 }
-window.addEventListener("resize", () => { queueShape(); stackBars(); });
+window.addEventListener("resize", () => { placeCloseTab(); queueShape(); stackBars(); });
 
 // ─── Opening and closing ──────────────────────────────────────────────────────
 
@@ -1373,6 +1872,7 @@ api.on("drawer:shut", (payload) => {
   if (searching) leaveSearch(false);
   toast.hide();
   shown = false;
+  sentBig = false; // the main process puts the width back as it closes (#113)
   dirty = dirty || changed;
   if (!slide) { api.send("drawer:hidden"); return; }
   stage.classList.add("away");
@@ -1385,8 +1885,10 @@ api.on("drawer:backdrop", (mode) => applyBackdrop(mode as DrawerBackdrop));
 /** Opened on a memo before the first state came: it opens once the state is here. */
 let pendingMemo: string | undefined;
 
-api.on("state", (next) => {
-  state = next as AppState;
+api.on("state:memos", (next) => {
+  state = next as MemosState;
+  // Restored memos the trash still lists only until the state says where they are.
+  for (const id of restoring) if (!state.memoTrash.entries.some((entry) => entry.memo.id === id)) restoring.delete(id);
   if (view === undefined) view = state.prefs.drawerLastFolder || inboxID;
   render();
 });
@@ -1412,6 +1914,9 @@ const cardRect = (id: string) => list.querySelector<HTMLElement>(`.it[data-id="$
   open: (id: string, edit: boolean) => openMemo(id, edit),
   select: (id: string) => { selectedID = id; render(); },
   search: (text: string) => { enterSearch(); findInput.value = text; query = text; renderList(); },
+  /** #114: a filter chip on, or only the folder shown. */
+  searchFilter: (filter: SearchFilter) => { if (!searching) enterSearch(); searchOn.add(filter); renderSearch(); },
+  searchHere: () => { if (!searching) enterSearch(); searchHere = true; renderSearch(); },
   view: (id: string) => setView(id),
   big: () => { const memo = selectedMemo(); if (memo) showBig(memo); },
   folderMenu: (id: string) => { const element = tabs.querySelector<HTMLElement>(`[data-folder="${CSS.escape(id)}"]`); const folder = folderOf(id); if (element && folder) { const r = element.getBoundingClientRect(); folderMenu(folder, { x: r.right + 4, y: r.top + 6 }); } },
@@ -1420,12 +1925,34 @@ const cardRect = (id: string) => list.querySelector<HTMLElement>(`.it[data-id="$
   newFolder: () => { const add = tabs.querySelector<HTMLElement>(".bk.add"); if (add) folderForm(add.getBoundingClientRect()); },
   moveMenu: () => { const button = list.querySelector<HTMLElement>(".it.open .acts .pill:last-child .ib"); button?.click(); },
   memoMenu: (id: string, sub = false) => { const memo = memoOf(id); const r = cardRect(id); if (memo && r) { memoMenu(memo, { x: r.left + 30, y: r.top + 20 }); if (sub) [...document.querySelectorAll<HTMLElement>(".menu .mi")].find((row) => row.textContent?.includes(t("폴더로 옮기기")))?.click(); } },
-  memoGear: () => { list.querySelector<HTMLElement>(".it.open .acts .pill .ib:nth-child(3)")?.click(); },
+  memoMore: () => { list.querySelector<HTMLElement>(".it.open .acts .pill:nth-child(3) .ib")?.click(); },
   gearMenu: () => gearMenu(gearButton.getBoundingClientRect()),
   folderList: () => folderList(),
-  textMenu: (id: string) => { openMemo(id, true); requestAnimationFrame(() => { if (editor) { editor.body.focus(); const r = editor.body.getBoundingClientRect(); textMenu(editor.body, { x: r.left + 40, y: r.top + 10 }); } }); },
+  /** #120: 지운 메모's slip, and its question before 모두 비우기. */
+  trash: (confirming = false) => trashSlip(confirming),
+  textMenu: (id: string) => { openMemo(id, true); requestAnimationFrame(() => { if (editor) { editor.body.view.focus(); const r = editor.body.dom.getBoundingClientRect(); textMenu(editor.body.view.contentDOM, { x: r.left + 40, y: r.top + 10 }); } }); },
   tip: (id: string) => { const element = tabs.querySelector<HTMLElement>(`[data-folder="${CSS.escape(id)}"]`); element?.dispatchEvent(new MouseEvent("mouseenter")); },
   hover: (id: string) => { for (const slip of list.querySelectorAll<HTMLElement>(".it")) { slip.classList.toggle("preview-hover", slip.dataset.id === id); if (slip.dataset.id === id) hoverPill(slip); } },
   type: (text: string) => { quick.value = text; fitQuick(); },
-  reset: () => { closeMenus(); hideTip(); closeOpen(); if (searching) leaveSearch(false); big = false; selectedID = undefined; quick.value = ""; fitQuick(); toast.hide(); render(); list.scrollTop = 0; },
+  /** #84: words typed at the end of the open memo, as keys would (the editor styles them as they come). */
+  /** #84: the Aa bar out under the open memo. */
+  formatBar: () => { formatOpen = true; requestAnimationFrame(() => { placeFormatBar(); list.querySelector(".it.open > .acts")?.scrollIntoView({ block: "end" }); }); },
+  /** #118: Ctrl+Shift+M's list for a memo. */
+  moveList: (id: string) => { const memo = memoOf(id); if (memo) moveList(memo); },
+  /** #134: the open memo's title as if it had the caret (its marks faint) or not (hidden). */
+  titleCaret: (on: boolean) => { showTitleCaret(on); editor?.title.refont(state!.prefs.drawerShowMarks); },
+  /** #135: the link field under the open memo, its address typed (or the link's). */
+  linkField: (url: string, existing: boolean) => { requestAnimationFrame(() => { askLink({ from: 0, to: 0, url, existing }); list.querySelector(".it.open > .acts")?.scrollIntoView({ block: "end" }); }); },
+  typeInMemo: (text: string) => {
+    requestAnimationFrame(() => {
+      const view = editor?.body.view;
+      if (!view) return;
+      const end = view.state.doc.length;
+      view.focus();
+      view.dispatch({ changes: { from: end, insert: text }, selection: { anchor: end + text.length }, userEvent: "input.type", scrollIntoView: true });
+    });
+  },
+  /** #82 · #83: the empty bookmark (+) and the close bar drawn as if under the pointer. */
+  edgeHover: () => stage.classList.add("edge-hover"),
+  reset: () => { stage.classList.remove("edge-hover"); formatOpen = false; closeLink(); showTitleCaret(false); closeMenus(); hideTip(); closeOpen(); if (searching) leaveSearch(false); big = false; selectedID = undefined; quick.value = ""; fitQuick(); toast.hide(); render(); list.scrollTop = 0; },
 };

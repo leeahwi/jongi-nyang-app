@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Memo } from "../src/core/memo";
+import { markdownPlain, markdownTitle } from "../src/core/memoMarkdown";
 import {
   addFolder, changedToday, checklistProgress, deleteFolder, drawerFooter, drawerSearch, emptyMemoFolders, folderName, inboxID, isCodeLine, lastFolderOf,
   memosIn, mergeMemoFolders, moveMemo, parseMemoFolders, pinnedView, placeNew, placementOf, pruneMemoFolders, quickWriteText, readDrawerShortcut,
@@ -180,10 +181,10 @@ test("D12 (1.30): the prepared query, the folds kept and the memos' lines kept f
     const out: [string, string, [number, number] | undefined, string][] = [];
     for (const memo of list) {
       const place = placementOf(data, memo.id);
-      const title = slipSummary(memo, "ko").title;
+      const title = markdownTitle(memo.text, "ko"); // #84: read without marks
       const titleRange = matchBefore(title, query);
       if (titleRange) { out.push([memo.id, title, titleRange, place.folder]); continue; }
-      const line = memo.text.split("\n").map((entry) => entry.trim()).find((entry) => matchBefore(entry, query));
+      const line = markdownPlain(memo.text).split("\n").map((entry) => entry.trim()).find((entry) => matchBefore(entry, query));
       if (line !== undefined) out.push([memo.id, line, matchBefore(line, query), place.folder]);
       else if (names.has(place.folder)) out.push([memo.id, title, undefined, place.folder]);
     }

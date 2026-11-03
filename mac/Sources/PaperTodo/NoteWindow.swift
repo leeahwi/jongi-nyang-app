@@ -1,6 +1,9 @@
 import AppKit
 
 @MainActor
+/// An AppKit view in the note's header that takes clicks itself; the header's window drag leaves it alone.
+protocol HeaderClickable: NSView {}
+
 final class NoteWindow: NSWindow {
     static let headerHeight: CGFloat = NoteHeader.height
     /// The top row holds the window buttons, the page tabs and the tools; those take clicks.
@@ -62,6 +65,12 @@ final class NoteWindow: NSWindow {
         case (51, []), (117, []): return .delete
         case (126, [.command]): return .moveUp
         case (125, [.command]): return .moveDown
+        // 2b (S44): ⌥⌘↑ · ⌥⌘↓ to the group above or below.
+        // #168: ⇧↑ · ⇧↓ pick more rows (or fewer).
+        case (126, [.shift]): return .extendUp
+        case (125, [.shift]): return .extendDown
+        case (126, [.command, .option]): return .groupUp
+        case (125, [.command, .option]): return .groupDown
         case (53, []): return .clear
         // 1.38: ⌥→ / ⌥← a day later or earlier, ⌥↓ 언젠가, F 이거 집중.
         case (124, [.option]): return .later
@@ -82,6 +91,12 @@ final class NoteWindow: NSWindow {
     /// is pulled back onto a screen as it comes up — the check's note came up at the screen's left edge.
     var keepsOffscreen = false
 
+    /// The level changed (항상 위에 두기): the ears above the note (NoteEars.swift) take the same one.
+    var onLevelChange: (() -> Void)?
+    override var level: NSWindow.Level {
+        didSet { if level != oldValue { onLevelChange?() } }
+    }
+
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
         keepsOffscreen ? frameRect : super.constrainFrameRect(frameRect, to: screen)
     }
@@ -91,8 +106,29 @@ final class NoteWindow: NSWindow {
         let contentPoint = contentView.convert(point, from: nil)
         let bounds = contentView.bounds
         let fromTop = contentView.isFlipped ? contentPoint.y - bounds.minY : bounds.maxY - contentPoint.y
-        return bounds.contains(contentPoint) && fromTop >= 0 && fromTop < dragHeight && !isOverToolbar(contentPoint)
+        let x = contentPoint.x - bounds.minX
+        // The window's top edge and its top corners resize it (AppKit does that after us): leave them alone, or a
+        // press on the top-right corner moved the note instead of resizing it.
+        let onEdge = fromTop < Self.resizeBorder || x < Self.resizeBorder || x > bounds.width - Self.resizeBorder
+        let inCorner = fromTop < Self.resizeCorner && (x < Self.resizeCorner || x > bounds.width - Self.resizeCorner)
+        return bounds.contains(contentPoint) && fromTop >= 0 && fromTop < dragHeight && !onEdge && !inCorner
+            && !isOverToolbar(contentPoint) && !isOverHeaderButton(point)
     }
+
+    /// A button of ours below the top row (모든 스페이스 ▾ on the date line): its press is a click, not a drag.
+    private func isOverHeaderButton(_ windowPoint: NSPoint) -> Bool {
+        guard let contentView, let frameView = contentView.superview else { return false }
+        var view = contentView.hitTest(frameView.convert(windowPoint, from: nil))
+        while let current = view, current !== contentView {
+            if current is HeaderClickable { return true }
+            view = current.superview
+        }
+        return false
+    }
+
+    /// How far in from the top and side edges a press resizes the window, and the size of a top corner's square.
+    static let resizeBorder: CGFloat = 5
+    static let resizeCorner: CGFloat = 12
 
     override func performDrag(with event: NSEvent) {
         guard event.window === self, event.type == .leftMouseDown,
@@ -143,8 +179,8 @@ final class NoteWindow: NSWindow {
 
     private func recordInteraction(_ event: NSEvent, phase: String) {
         guard [.leftMouseDown, .leftMouseDragged, .leftMouseUp].contains(event.type),
-              let index = ProcessInfo.processInfo.arguments.firstIndex(of: "--interaction-log"),
-              ProcessInfo.processInfo.arguments.indices.contains(index + 1),
+              let index = TestHooks.arguments.firstIndex(of: "--interaction-log"),
+              TestHooks.arguments.indices.contains(index + 1),
               let contentView else { return }
         let point = contentView.convert(event.locationInWindow, from: nil)
         let record: [String: Any] = [
@@ -155,7 +191,7 @@ final class NoteWindow: NSWindow {
         ]
         guard var data = try? JSONSerialization.data(withJSONObject: record, options: [.sortedKeys]) else { return }
         data.append(10)
-        let path = ProcessInfo.processInfo.arguments[index + 1]
+        let path = TestHooks.arguments[index + 1]
         if !FileManager.default.fileExists(atPath: path) { FileManager.default.createFile(atPath: path, contents: nil) }
         guard let handle = FileHandle(forWritingAtPath: path) else { return }
         defer { try? handle.close() }

@@ -7,7 +7,7 @@ import PaperCore
 @MainActor
 enum StorageFolder {
     static let preferenceKey = "storage.folder"
-    static let files = ["todos.json", "memos.json", "repeats.json", "events.json", "alarms.json", MemoFolders.fileName]
+    static let files = ["todos.json", "memos.json", "repeats.json", "events.json", "alarms.json", MemoFolders.fileName, TodoSpaces.fileName, MemoTrash.fileName]
 
     /// The folder chosen in Settings, if it still exists.
     static func chosen(_ preferences: UserDefaults) -> URL? {
@@ -26,9 +26,9 @@ enum StorageFolder {
         if FileManager.default.fileExists(atPath: destination.appendingPathComponent("todos.json").path) {
             let message = target == nil ? L("이 Mac에 전에 쓰던 목록이 있어요.") : L("이 폴더에 이미 종이냥 목록이 있어요.")
             let detail = target == nil
-                ? L("공유 폴더로 옮기기 전의 목록으로 돌아가려면 ‘전에 쓰던 목록 쓰기’를 고르세요. 덮어쓰면 전에 쓰던 목록은 사라지고 되돌릴 수 없어요.")
-                : L("다른 기기에서 쓰던 목록이면 ‘폴더 목록 쓰기’를 고르세요. 덮어쓰면 폴더에 있던 목록은 사라지고 되돌릴 수 없어요.")
-            // Nothing is backed up before an overwrite (#35): only the record is merged, either way.
+                ? L("공유 폴더로 옮기기 전의 목록으로 돌아가려면 ‘전에 쓰던 목록 쓰기’를 고르세요. 덮어써도 바꾸기 전 상태를 백업해 둬요.")
+                : L("다른 기기에서 쓰던 목록이면 ‘폴더 목록 쓰기’를 고르세요. 덮어써도 바꾸기 전 상태를 이 Mac에 백업해 둬요.")
+            // An overwrite backs the overwritten list up first (#137, see move); the record is merged either way.
             let after = L("어느 쪽이든 완료 기록은 합쳐지고, 종이냥이 다시 시작돼요.")
             let answer = SlipAlert.run(symbol: "folder", title: L("저장 폴더"), message: message, detail: detail + "\n" + after,
                                        choices: [.init(title: L("취소"), isCancel: true),
@@ -43,26 +43,60 @@ enum StorageFolder {
         }
         model.saveMemosNow()
         do {
-            try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: true)
-            if copyCurrent {
-                for name in files {
-                    let source = current.appendingPathComponent(name)
-                    let target = destination.appendingPathComponent(name)
-                    guard FileManager.default.fileExists(atPath: source.path) else { continue }
-                    if FileManager.default.fileExists(atPath: target.path) { try FileManager.default.removeItem(at: target) }
-                    try FileManager.default.copyItem(at: source, to: target)
-                }
-            }
-            // Whichever list is kept, what this Mac already filed stays in the record.
-            try mergeArchive(from: current.appendingPathComponent("archive"), into: destination.appendingPathComponent("archive"))
-            // …and the focus record: the sessions the other folder lacks are added (by id), none removed.
-            try mergeFocus(from: current, into: destination)
+            try move(from: current, to: destination, copyCurrent: copyCurrent, backups: model.backups?.activeFolder ?? BackupController.backupsFolder)
         } catch {
             SlipAlert.inform(title: L("저장 폴더"), message: L("폴더로 옮기지 못했어요. 지금 목록은 그대로예요."))
             return
         }
         if let target { preferences.set(target.path, forKey: preferenceKey) } else { preferences.removeObject(forKey: preferenceKey) }
+        // #195: the restarted app says once where the list went — the folder's name (as Finder shows it), never its path.
+        preferences.set(["folder": target.map { FileManager.default.displayName(atPath: $0.path) } ?? "", "kept": copyCurrent ? "moved" : "folder"],
+                        forKey: movedKey)
         relaunch()
+    }
+
+    /// #195: the note the move leaves for the restarted app (`switchTo`), read and forgotten at launch.
+    static let movedKey = "storage.moved"
+
+    /// The toast after a move, once: where the list went (`folder` empty = this Mac's own folder), or whose list is kept.
+    static func movedNotice(_ preferences: UserDefaults) -> String? {
+        guard let note = preferences.dictionary(forKey: movedKey) else { return nil }
+        preferences.removeObject(forKey: movedKey)
+        return movedText(folder: note["folder"] as? String ?? "", moved: note["kept"] as? String != "folder")
+    }
+
+    static func movedText(folder: String, moved: Bool) -> String {
+        switch (folder.isEmpty, moved) {
+        case (false, true): L("목록을 ‘\(folder)’ 폴더로 옮겼어요")
+        case (false, false): L("‘\(folder)’ 폴더의 목록을 써요")
+        case (true, true): L("목록을 이 Mac의 기본 위치로 옮겼어요")
+        case (true, false): L("이 Mac에 전에 쓰던 목록을 써요")
+        }
+    }
+
+    /// The move itself, without questions. `copyCurrent`: this Mac's list goes over whatever `destination` holds — and
+    /// what it holds goes to `backups` first (폴더-바꾸기-전-…, the same place and format as before an import, #137);
+    /// a failed backup stops the move. Either way the record and the focus record are merged.
+    static func move(from current: URL, to destination: URL, copyCurrent: Bool, backups: URL, now: Date = Date()) throws {
+        let manager = FileManager.default
+        try manager.createDirectory(at: destination, withIntermediateDirectories: true)
+        if copyCurrent {
+            let overwritten = try BackupController.files(in: destination)
+            if !overwritten.isEmpty { try BackupController.saveCopy(overwritten, reason: .beforeFolderSwitch, in: backups, now: now) }
+            for name in files {
+                let source = current.appendingPathComponent(name)
+                let target = destination.appendingPathComponent(name)
+                guard manager.fileExists(atPath: source.path) else { continue }
+                // #173: a link or an oversized file on either side is left alone (never copied, never replaced).
+                if SafeFile.isRefused(source) || SafeFile.isRefused(target) { continue }
+                if manager.fileExists(atPath: target.path) { try manager.removeItem(at: target) }
+                try manager.copyItem(at: source, to: target)
+            }
+        }
+        // Whichever list is kept, what this Mac already filed stays in the record.
+        try mergeArchive(from: current.appendingPathComponent("archive"), into: destination.appendingPathComponent("archive"))
+        // …and the focus record: the sessions the other folder lacks are added (by id), none removed.
+        try mergeFocus(from: current, into: destination)
     }
 
     /// The record is never overwritten: each month's lines are added to what the other device
@@ -74,8 +108,10 @@ enum StorageFolder {
         try manager.createDirectory(at: target, withIntermediateDirectories: true)
         for month in months where month.pathExtension == "jsonl" {
             let destination = target.appendingPathComponent(month.lastPathComponent)
-            let incoming = (try? String(contentsOf: month, encoding: .utf8)) ?? ""
-            let existing = (try? String(contentsOf: destination, encoding: .utf8)) ?? ""
+            // #173: a linked or oversized month on either side is skipped (not read into the record, not written through).
+            if SafeFile.isRefused(month) || SafeFile.isRefused(destination) { continue }
+            let incoming = (try? SafeFile.text(month)) ?? ""
+            let existing = (try? SafeFile.text(destination)) ?? ""
             var have = Set(existing.split(separator: "\n").map { entryID(String($0)) })
             let added = incoming.split(separator: "\n").map(String.init).filter { line in
                 !line.isEmpty && have.insert(entryID(line)).inserted
@@ -88,10 +124,11 @@ enum StorageFolder {
 
     /// focus.jsonl: this folder's sessions added to the target's by id (see Focus.merge).
     static func mergeFocus(from source: URL, into target: URL) throws {
-        let incoming = (try? String(contentsOf: source.appendingPathComponent(Focus.fileName), encoding: .utf8)) ?? ""
+        let incoming = (try? SafeFile.text(source.appendingPathComponent(Focus.fileName))) ?? ""
         guard !incoming.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         let destination = target.appendingPathComponent(Focus.fileName)
-        let existing = (try? String(contentsOf: destination, encoding: .utf8)) ?? ""
+        if SafeFile.isRefused(destination) { return }
+        let existing = (try? SafeFile.text(destination)) ?? ""
         let merged = Focus.merge(existing, incoming)
         guard merged != existing else { return }
         try merged.write(to: destination, atomically: true, encoding: .utf8)
@@ -108,8 +145,9 @@ enum StorageFolder {
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
-        panel.prompt = L("이 폴더 쓰기")
-        panel.message = L("다른 기기와 함께 쓸 폴더를 골라요(iCloud Drive, Dropbox, OneDrive …). 고르면 종이냥이 다시 시작돼요.")
+        // #195: the button and the line above say what picking does — the list moves there, then the app restarts.
+        panel.prompt = L("이 폴더로 옮기기")
+        panel.message = L("다른 기기와 함께 쓸 폴더를 골라요(iCloud Drive, Dropbox, OneDrive …). 지금 목록이 그 폴더로 옮겨지고 종이냥이 다시 시작돼요.")
         NSApp.activate(ignoringOtherApps: true)
         guard panel.runModal() == .OK, let folder = panel.url else { return }
         switchTo(folder, defaultFolder: defaultFolder, current: current, model: model, preferences: preferences)

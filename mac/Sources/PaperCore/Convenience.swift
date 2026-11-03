@@ -290,21 +290,108 @@ public enum Search {
     }
 
     public static func match(_ query: Query, in text: String) -> Range<Int>? {
-        let wanted = query.wanted, count = wanted.count
-        guard count > 0 else { return nil }
-        let line = scalars(text)
-        guard line.count >= count else { return nil }
-        let folded = line.map(foldKey)
-        outer: for start in 0...(line.count - count) {
+        guard !query.isEmpty else { return nil }
+        return match(query, keys: keys(text))
+    }
+
+    /// The text as `match` reads it: the `foldKey` of each scalar of its NFC form.
+    static func keys(_ text: String) -> [UInt32] { scalars(text).map(foldKey) }
+
+    /// `match` on a text's keys (`keys`): a syllable's key is the syllable itself (`foldKey`), so a lone consonant
+    /// of the query still finds the syllables it starts.
+    static func match(_ query: Query, keys folded: [UInt32]) -> Range<Int>? {
+        let count = query.wanted.count
+        guard count > 0, folded.count >= count else { return nil }
+        outer: for start in 0...(folded.count - count) {
             for offset in 0..<count {
-                if query.keys[offset] == folded[start + offset] { continue }
+                let key = folded[start + offset]
+                if query.keys[offset] == key { continue }
                 let initial = query.initials[offset]
-                if initial >= 0, let syllable = choseong(of: line[start + offset]), syllable == initial { continue }
+                if initial >= 0, (0xAC00...0xD7A3).contains(key), Int((key - 0xAC00) / 588) == initial { continue }
                 continue outer
             }
             return start..<(start + count)
         }
         return nil
+    }
+
+    /// What a search reads, made ready once and kept (#69): the to-dos' titles and the record's as keys (`keys`), in
+    /// the list's order and the record's newest first; each memo's lines. The note's search slip keeps one while it's
+    /// open, so a key no longer folds every to-do, memo and record line again, nor sorts the record. The same results
+    /// as without it (`find`'s `index`).
+    public final class Index {
+        /// Every title folded so far: a list read again (a to-do changed) folds only the new ones.
+        private var folded: [String: [UInt32]] = [:]
+        private var items: (given: [TodoItem], keys: [[UInt32]])?
+        private var history: (given: [ArchiveEntry], newest: [ArchiveEntry], keys: [[UInt32]])?
+        private var memos: [String: (text: String, lines: [(text: String, keys: [UInt32])])] = [:]
+
+        public init() {}
+
+        private func keys(_ text: String) -> [UInt32] {
+            if let known = folded[text] { return known }
+            let made = Search.keys(text)
+            folded[text] = made
+            return made
+        }
+
+        /// The to-dos' titles' keys, in the list's order.
+        func titles(_ items: [TodoItem]) -> [[UInt32]] {
+            if let known = self.items, known.given == items { return known.keys }
+            let made = items.map { keys($0.title) }
+            self.items = (items, made)
+            return made
+        }
+
+        /// The record newest first (`find`'s order) and its titles' keys, sorted again only when it's another record.
+        func newestFirst(_ history: [ArchiveEntry]) -> (entries: [ArchiveEntry], keys: [[UInt32]]) {
+            if let known = self.history, known.given == history { return (known.newest, known.keys) }
+            let newest = Search.newestFirst(history)
+            let made = newest.map { keys($0.title) }
+            self.history = (history, newest, made)
+            return (newest, made)
+        }
+
+        /// A memo's lines as `find` reads them (trimmed) with their keys, kept while its text is the same.
+        func lines(_ memo: Memo) -> [(text: String, keys: [UInt32])] {
+            if let known = memos[memo.id], known.text == memo.text { return known.lines }
+            let lines = Search.memoLines(memo.text).map { ($0, Search.keys($0)) }
+            memos[memo.id] = (memo.text, lines)
+            return lines
+        }
+
+        /// The to-dos and the record read ahead, on any thread (the slip reads them while it opens), for `take`.
+        public struct Read: Sendable {
+            fileprivate var items: [TodoItem], titles: [[UInt32]]
+            fileprivate var history: [ArchiveEntry], newest: [ArchiveEntry], record: [[UInt32]]
+        }
+
+        public static func read(items: [TodoItem], history: [ArchiveEntry]) -> Read {
+            let newest = Search.newestFirst(history)
+            return Read(items: items, titles: items.map { Search.keys($0.title) }, history: history, newest: newest,
+                        record: newest.map { Search.keys($0.title) })
+        }
+
+        /// What was read ahead, unless a search has read them already.
+        public func take(_ read: Read) {
+            if items == nil { items = (read.items, read.titles) }
+            if history == nil { history = (read.history, read.newest, read.record) }
+        }
+
+        /// Only the memos still there are kept (checked once there are a few more than them).
+        func keep(_ memos: [Memo]) {
+            guard self.memos.count > memos.count + 64 else { return }
+            let ids = Set(memos.map(\.id))
+            self.memos = self.memos.filter { ids.contains($0.key) }
+        }
+    }
+
+    static func memoLines(_ text: String) -> [String] {
+        text.split(whereSeparator: \.isNewline).map { $0.trimmingCharacters(in: .whitespaces) }
+    }
+
+    static func newestFirst(_ history: [ArchiveEntry]) -> [ArchiveEntry] {
+        history.sorted { ($0.completedAt ?? .distantPast) > ($1.completedAt ?? .distantPast) }
     }
 
     static func cleanQuery(_ query: String) -> [Unicode.Scalar] {
@@ -370,9 +457,11 @@ public enum Search {
     /// (newest first), 일정 (coming ones soonest first, then past ones latest first). At most `limit` each.
     /// `memoFolders` (1.43, 메모 서랍): memo id → its folder's name (memos in 메모 left out). A memo whose words don't match
     /// but whose folder's name does comes too (its title, nothing marked), and every memo hit names its folder.
+    /// `index` (#69): what was read for an earlier search, kept — the same results, sooner. Each group stops at its
+    /// limit, and a to-do's page and a hit's date are worked out for the hits only.
     public static func find(_ query: String, items: [TodoItem], memos: [Memo], history: [ArchiveEntry], events: [EventEntry],
                             now: Date, calendar: Calendar = .paper, language: AppLanguage = .ko, limit: Int = Search.limit,
-                            memoFolders: [String: String] = [:]) -> [(group: Group, hits: [Hit])] {
+                            memoFolders: [String: String] = [:], index: Index? = nil) -> [(group: Group, hits: [Hit])] {
         let query = Query(query)
         guard !query.isEmpty else { return [] }
         let todayKey = Archive.dayKey(now, calendar: calendar)
@@ -395,10 +484,8 @@ public enum Search {
             }
             return ""
         }
-        func taskHit(_ item: TodoItem, _ group: Group) -> Hit? {
-            match(query, in: item.title).map {
-                Hit(group: group, id: item.id.uuidString, text: item.title, range: $0, detail: taskDetail(item), done: item.isCompleted, day: item.dueDate)
-            }
+        func taskHit(_ item: TodoItem, _ range: Range<Int>, _ group: Group) -> Hit {
+            Hit(group: group, id: item.id.uuidString, text: item.title, range: range, detail: taskDetail(item), done: item.isCompleted, day: item.dueDate)
         }
 
         var groups: [(group: Group, hits: [Hit])] = []
@@ -406,36 +493,44 @@ public enum Search {
             if !hits.isEmpty { groups.append((group, Array(hits.prefix(group == .history ? max(limit, historyLimit) : limit)))) }
         }
 
-        let onToday = items.filter { Shelf.page(of: $0, now: now, calendar: calendar) == .today }
-        add(.today, (onToday.filter { !$0.isCompleted } + onToday.filter(\.isCompleted)).compactMap { taskHit($0, .today) })
+        // The to-dos that match, in the list's order, and their pages: each group is the matching part of the
+        // list it was cut from, in the same order.
+        let titles = index?.titles(items) ?? items.map { keys($0.title) }
+        let found = items.enumerated().compactMap { offset, item in
+            match(query, keys: titles[offset]).map { (offset: offset, item: item, range: $0, today: Shelf.page(of: item, now: now, calendar: calendar) == .today) }
+        }
+        let onToday = found.filter(\.today)
+        add(.today, (onToday.filter { !$0.item.isCompleted } + onToday.filter(\.item.isCompleted)).prefix(limit).map { taskHit($0.item, $0.range, .today) })
 
-        let ahead = items.enumerated().filter { Shelf.page(of: $0.element, now: now, calendar: calendar) != .today }
-        let dated = ahead.filter { $0.element.dueDate != nil }.sorted { ($0.element.dueDate!, $0.offset) < ($1.element.dueDate!, $1.offset) }
-        let someday = ahead.filter { $0.element.dueDate == nil }
-        add(.ahead, (dated + someday).compactMap { taskHit($0.element, .ahead) })
+        let ahead = found.filter { !$0.today }
+        let dated = ahead.filter { $0.item.dueDate != nil }.sorted { ($0.item.dueDate!, $0.offset) < ($1.item.dueDate!, $1.offset) }
+        let someday = ahead.filter { $0.item.dueDate == nil }
+        add(.ahead, (dated + someday).prefix(limit).map { taskHit($0.item, $0.range, .ahead) })
 
-        add(.memos, memos.sorted { $0.updatedAt > $1.updatedAt }.compactMap { memo in
+        index?.keep(memos)
+        var memoHits: [Hit] = []
+        for memo in memos.sorted(by: { $0.updatedAt > $1.updatedAt }) where memoHits.count < limit {
             let folder = memoFolders[memo.id]
-            let detail = folder.map { $0 + " · " + dayText(memo.updatedAt) } ?? dayText(memo.updatedAt)
+            func detail() -> String { folder.map { $0 + " · " + dayText(memo.updatedAt) } ?? dayText(memo.updatedAt) }
             // The title line if it matches, else the first line that does.
-            for line in memo.text.split(whereSeparator: \.isNewline) {
-                let text = line.trimmingCharacters(in: .whitespaces)
-                if let range = match(query, in: text) {
-                    return Hit(group: .memos, id: memo.id, text: text, range: range, detail: detail, done: false, day: nil)
-                }
+            let lines = index?.lines(memo) ?? memoLines(memo.text).map { ($0, keys($0)) }
+            if let (text, range) = lines.lazy.compactMap({ line in match(query, keys: line.keys).map { (line.text, $0) } }).first {
+                memoHits.append(Hit(group: .memos, id: memo.id, text: text, range: range, detail: detail(), done: false, day: nil))
+            } else if let folder, match(query, in: folder) != nil {
+                memoHits.append(Hit(group: .memos, id: memo.id, text: memo.title(language), range: 0..<0, detail: detail(), done: false, day: nil))
             }
-            if let folder, match(query, in: folder) != nil {
-                return Hit(group: .memos, id: memo.id, text: memo.title(language), range: 0..<0, detail: detail, done: false, day: nil)
-            }
-            return nil
-        })
+        }
+        add(.memos, memoHits)
 
-        add(.history, history.sorted { ($0.completedAt ?? .distantPast) > ($1.completedAt ?? .distantPast) }.compactMap { entry in
-            match(query, in: entry.title).map {
-                Hit(group: .history, id: entry.id, text: entry.title, range: $0, detail: entry.completedAt.map(dayText) ?? "",
-                    done: true, day: entry.completedAt.map { Archive.dayKey($0, calendar: calendar) })
-            }
-        })
+        var historyHits: [Hit] = []
+        let historyCap = max(limit, historyLimit)
+        let record: (entries: [ArchiveEntry], keys: [[UInt32]]) = index?.newestFirst(history) ?? (newestFirst(history), [])
+        for (offset, entry) in record.entries.enumerated() where historyHits.count < historyCap {
+            guard let range = record.keys.isEmpty ? match(query, in: entry.title) : match(query, keys: record.keys[offset]) else { continue }
+            historyHits.append(Hit(group: .history, id: entry.id, text: entry.title, range: range, detail: entry.completedAt.map(dayText) ?? "",
+                                   done: true, day: entry.completedAt.map { Archive.dayKey($0, calendar: calendar) }))
+        }
+        add(.history, historyHits)
 
         let coming = events.filter { $0.date >= todayKey }.sorted { $0.date < $1.date }
         let past = events.filter { $0.date < todayKey }.sorted { $0.date > $1.date }

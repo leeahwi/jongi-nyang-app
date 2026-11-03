@@ -4,10 +4,12 @@ import { pageOf } from "../../src/core/shelf";
 import { rangeDay, rangeDayText, rangeOf, rangeText } from "../../src/core/timeRange";
 import { dayKey } from "../../src/core/archive";
 import type { TodoItem } from "../../src/core/notebook";
+import type { Ids } from "./ids";
 
 /**
- * What the tools say back, in the app's language (ko · en · nl). Short and plain; ids go along so Claude can
- * name an item in preview_changes. Dates and times through the core's helpers, so they read as in the app.
+ * What the tools say back, in the app's language (ko · en · nl). The text is the short summary a person reads;
+ * the structured data has the fields (C3). Ids go along short (P1) so Claude can name an item in
+ * preview_changes. Dates and times through the core's helpers, so they read as in the app.
  */
 
 export const say = (lang: Lang, ko: string, en: string, nl: string): string => (lang === "ko" ? ko : lang === "en" ? en : nl);
@@ -36,23 +38,30 @@ export function reminderText(at: Date, day: string | undefined, lang: Lang): str
   return `${say(lang, "알림", "reminder", "herinnering")} ${when}`;
 }
 
-/** One task as a line: "- [ ] 보고서 쓰기 · 오늘 15:00–16:00 · 알림 14:50 · id …". */
-export function taskLine(item: TodoItem, now: Date, lang: Lang): string {
+/** What a task line and its data need besides the task: the short ids, and each repeat's words by series id. */
+export interface TaskWords { ids: Ids; repeats: ReadonlyMap<string, string> }
+
+/** One task as a line: "- [ ] 보고서 쓰기 · 오늘 15:00–16:00 · 알림 14:50 · 반복 매주 월 · id 1A2B3C4D". */
+export function taskLine(item: TodoItem, now: Date, lang: Lang, words: TaskWords): string {
   const parts = [`- [${item.isCompleted ? "x" : " "}] ${item.title}`, taskWhen(item, now, lang)];
   if (item.reminderAt && !item.isCompleted) parts.push(reminderText(new Date(item.reminderAt), rangeDay(item, now), lang));
-  parts.push(`id ${item.id}`);
+  const repeat = item.seriesID ? words.repeats.get(item.seriesID) : undefined;
+  if (repeat) parts.push(`${say(lang, "반복", "repeats", "herhaalt")} ${repeat}`);
+  parts.push(`id ${words.ids.short(item.id)}`);
   return parts.join(" · ");
 }
 
-/** A task as the structured result gives it. */
-export function taskData(item: TodoItem, now: Date): Record<string, unknown> {
+/** A task as the structured result gives it (the shape is taskOut in schemas.ts). */
+export function taskData(item: TodoItem, now: Date, words: TaskWords): Record<string, unknown> {
   const day = rangeDay(item, now);
+  const repeat = item.seriesID ? words.repeats.get(item.seriesID) : undefined;
   return {
-    id: item.id, title: item.title, done: item.isCompleted, where: whereOf(item, now),
+    id: words.ids.short(item.id), title: item.title, done: item.isCompleted, where: whereOf(item, now),
     ...(day ? { date: day } : {}), ...(item.dueDate ? { dueDate: item.dueDate } : {}),
     ...(item.timeStart ? { timeStart: item.timeStart } : {}), ...(item.timeEnd ? { timeEnd: item.timeEnd } : {}),
     ...(item.reminderAt ? { remindAt: localStamp(new Date(item.reminderAt)) } : {}),
     ...(item.completedAt ? { completedAt: localStamp(new Date(item.completedAt)) } : {}),
+    ...(repeat ? { repeat } : {}),
   };
 }
 
@@ -62,12 +71,11 @@ export const dayText = (day: string, lang: Lang): string => {
   return date ? shortDate(date, lang, date.getFullYear() !== new Date().getFullYear()) : day;
 };
 
+/** "1,234" · "1.234". */
+export const count = (value: number, lang: Lang): string => value.toLocaleString(lang === "nl" ? "nl-NL" : "en-US");
+
 /** Messages shared by several tools. */
 export const words = {
-  unreadable: (file: string, lang: Lang) =>
-    say(lang, `${file}을 읽지 못해서 손대지 않았어요. 종이냥 앱에서 먼저 열어 주세요.`, `${file} couldn’t be read, so nothing was changed. Open 종이냥 first.`, `${file} kon niet worden gelezen, dus er is niets gewijzigd. Open eerst 종이냥.`),
-  busy: (file: string, lang: Lang) =>
-    say(lang, `${file}이 계속 바뀌고 있어서 쓰지 못했어요. 잠시 뒤에 다시 해 주세요.`, `${file} kept changing, so it wasn’t written. Try again in a moment.`, `${file} bleef veranderen, dus er is niets geschreven. Probeer het zo nog eens.`),
   badDate: (value: string, lang: Lang) => say(lang, `날짜를 읽지 못했어요: ‘${value}’ (yyyy-MM-dd).`, `Couldn’t read the date ‘${value}’ (yyyy-MM-dd).`, `De datum ‘${value}’ is onleesbaar (yyyy-MM-dd).`),
   badTime: (value: string, lang: Lang) => say(lang, `시간을 읽지 못했어요: ‘${value}’ (HH:mm).`, `Couldn’t read the time ‘${value}’ (HH:mm).`, `De tijd ‘${value}’ is onleesbaar (HH:mm).`),
   tooLong: (days: number, lang: Lang) => say(lang, `기간은 ${days}일까지예요.`, `The period can be at most ${days} days.`, `De periode mag hoogstens ${days} dagen zijn.`),

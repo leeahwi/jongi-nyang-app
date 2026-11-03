@@ -18,9 +18,15 @@ public struct MemoFolders: Equatable, Sendable {
         case edited, created, title
     }
 
-    /// 이 메모의 종이 (1.44): a memo's own paper; absent = 서랍 따라 (the drawer's).
+    /// 보기 (#115, B2): a folder's memos as cards (the default, absent in the file) or one line each, 제목만.
+    public enum View: String, CaseIterable, Sendable {
+        case cards, titles
+    }
+
+    /// 이 메모의 종이 (1.44): a memo's own paper; absent = 서랍 따라 (the drawer's). #142: 한지 · 쑥색 · 벚꽃 · 먹색 too (an
+    /// older version reads a paper it doesn't know as 서랍 따라 — the file keeps it as a string).
     public enum Paper: String, CaseIterable, Sendable {
-        case day, night, kraft, grid
+        case day, night, kraft, grid, hanji, sage, blossom, ink
     }
 
     public struct Folder: Equatable, Sendable {
@@ -33,11 +39,13 @@ public struct MemoFolders: Equatable, Sendable {
         public var deleted: Bool
         /// 정렬 as written (nil: 고친 순); a value a newer app wrote is kept and read as 고친 순.
         public var sort: String?
+        /// 보기 as written (#115; nil: 카드); a value a newer app wrote is kept and read as 카드.
+        public var view: String?
         /// Keys this version doesn't know, kept as read (1.44: they survive a read and a write).
         public var extra: [String: KeptJSON]
 
         public init(id: String, name: String, color: String, order: Int, updatedAt: Date, deleted: Bool = false,
-                    sort: String? = nil, extra: [String: KeptJSON] = [:]) {
+                    sort: String? = nil, view: String? = nil, extra: [String: KeptJSON] = [:]) {
             self.id = id
             self.name = name
             self.color = color
@@ -45,11 +53,13 @@ public struct MemoFolders: Equatable, Sendable {
             self.updatedAt = updatedAt
             self.deleted = deleted
             self.sort = sort
+            self.view = view
             self.extra = extra
         }
 
         public var colorKey: Color { Color(rawValue: color) ?? .lavender }
         public var sortKey: Sort { sort.flatMap(Sort.init(rawValue:)) ?? .edited }
+        public var viewKey: View { view.flatMap(View.init(rawValue:)) ?? .cards }
         public var isInbox: Bool { id == MemoFolders.inbox }
 
         /// The inbox's untouched default name follows the app's language; any other name is the user's.
@@ -132,6 +142,9 @@ public struct MemoFolders: Equatable, Sendable {
     /// 정렬 of a folder (고친 순 when it has none or is gone).
     public func sort(of folderID: String) -> Sort { folder(folderID)?.sortKey ?? .edited }
 
+    /// 보기 of a folder (#115; 카드 when it has none or is gone).
+    public func view(of folderID: String) -> View { folder(folderID)?.viewKey ?? .cards }
+
     /// The memos shown under a bookmark, in the given order (the app keeps memos newest first).
     public func memos(_ all: [Memo], in folderID: String) -> [Memo] { all.filter { self.folderID(of: $0.id) == folderID } }
 
@@ -175,6 +188,16 @@ public struct MemoFolders: Equatable, Sendable {
         touch(now)
     }
 
+    /// 보기 (#115): 카드 is written as no key; like 정렬 a change of the folder (its `updatedAt`), so the newer copy of the
+    /// folder wins a merge. A value a newer app wrote is replaced only when one is picked here.
+    public mutating func setView(_ folderID: String, _ view: View, now: Date) {
+        let raw = view == .cards ? nil : view.rawValue
+        guard let i = folders.firstIndex(where: { $0.id == folderID && !$0.deleted }), folders[i].view != raw else { return }
+        folders[i].view = raw
+        folders[i].updatedAt = Self.second(now)
+        touch(now)
+    }
+
     /// 고정 모두 풀기 (D28): every pinned memo let go; returns them (for 되돌리기).
     @discardableResult
     public mutating func unpinAll(now: Date) -> [String] {
@@ -207,7 +230,7 @@ public struct MemoFolders: Equatable, Sendable {
             folders[i].order += 1
             folders[i].updatedAt = stamp
         }
-        folders.append(Folder(id: newID, name: name, color: original.color, order: original.order + 1, updatedAt: stamp, sort: original.sort))
+        folders.append(Folder(id: newID, name: name, color: original.color, order: original.order + 1, updatedAt: stamp, sort: original.sort, view: original.view))
         for (from, to) in copies {
             placement[to] = Placement(folder: newID, pinned: isPinned(from), at: stamp, paper: placement[from]?.paper)
         }
@@ -336,7 +359,7 @@ public struct MemoFolders: Equatable, Sendable {
     public enum ReadError: Error, Equatable { case unreadable }
 
     static let fileKeys: Set<String> = ["v", "folders", "placement", "updatedAt"]
-    static let folderKeys: Set<String> = ["id", "name", "color", "order", "updatedAt", "deleted", "sort"]
+    static let folderKeys: Set<String> = ["id", "name", "color", "order", "updatedAt", "deleted", "sort", "view"]
     static let placementKeys: Set<String> = ["folder", "pinned", "at", "paper"]
 
     /// D15: anything that isn't the file's shape throws (the app moves it aside and starts fresh).
@@ -354,7 +377,8 @@ public struct MemoFolders: Equatable, Sendable {
             guard let f = entry as? [String: Any], let id = f["id"] as? String, !id.isEmpty, !folders.contains(where: { $0.id == id }) else { continue }
             folders.append(Folder(id: id, name: f["name"] as? String ?? "", color: f["color"] as? String ?? Color.lavender.rawValue,
                                   order: (f["order"] as? Int) ?? index, updatedAt: date(f["updatedAt"]), deleted: f["deleted"] as? Bool ?? false,
-                                  sort: (f["sort"] as? String).flatMap { $0 == Sort.edited.rawValue ? nil : $0 }, extra: unknown(f, folderKeys)))
+                                  sort: (f["sort"] as? String).flatMap { $0 == Sort.edited.rawValue ? nil : $0 },
+                                  view: (f["view"] as? String).flatMap { $0 == View.cards.rawValue ? nil : $0 }, extra: unknown(f, folderKeys)))
         }
         var placement: [String: Placement] = [:]
         for (memo, entry) in object["placement"] as? [String: Any] ?? [:] {
@@ -425,6 +449,7 @@ public struct MemoFolders: Equatable, Sendable {
             var fields = ["\"id\": \(Self.quote(f.id))", "\"name\": \(Self.quote(f.name))", "\"color\": \(Self.quote(f.color))",
                           "\"order\": \(f.order)", "\"updatedAt\": \(Self.quote(Self.iso(f.updatedAt)))"]
             if let sort = f.sort { fields.append("\"sort\": \(Self.quote(sort))") }
+            if let view = f.view { fields.append("\"view\": \(Self.quote(view))") }
             if f.deleted { fields.append("\"deleted\": true") }
             fields += Self.extraFields(f.extra)
             return "    { " + fields.joined(separator: ", ") + " }"
@@ -561,6 +586,19 @@ public struct MemoFolders: Equatable, Sendable {
         ["비어 있어요", "Empty", "Leeg"][language.index]
     }
 
+    /// What each visible bookmark shows (#116, D-2): the picked one its name; the others their first letter, or two
+    /// where another un-picked one starts with the same letter (Shopping · Study → Sh · St), never more. Letters are
+    /// counted past spaces and compared without case. The shared cases B1… in docs/plans/drawer-bookmark-cases.json.
+    public static func bookmarkLetters(_ names: [String], picked: Int?) -> [String] {
+        func letters(_ name: String, _ count: Int) -> String { String(name.filter { !$0.isWhitespace }.prefix(count)) }
+        let firsts = names.map { letters($0, 1).lowercased() }
+        return names.enumerated().map { index, name in
+            if index == picked { return name }
+            let shared = firsts[index].isEmpty ? false : firsts.indices.contains { $0 != index && $0 != picked && firsts[$0] == firsts[index] }
+            return letters(name, shared ? 2 : 1)
+        }
+    }
+
     /// A bookmark's label (1.44): "장보기 · 세 장 · ⌘3"; empty "공부 · 비어 있어요" · "Study · empty" · "Studie · leeg"; past the
     /// ninth no key. `key` is the app's way of writing it (⌘3, Ctrl+3).
     public static func bookmarkLabel(_ name: String, count: Int, key: String?, language: AppLanguage = .ko) -> String {
@@ -596,6 +634,18 @@ public struct MemoFolders: Equatable, Sendable {
         case .ko: return "찾은 메모 \(sheets(count))"
         case .en: return "\(AppLanguage.plural(count, "note", "notes")) found"
         case .nl: return "\(AppLanguage.plural(count, "notitie", "notities")) gevonden"
+        }
+    }
+
+    /// Search with its results in folders (#114): "찾은 메모 네 장 · 폴더 3개" · "4 notes found · 3 folders" ·
+    /// "4 notities gevonden · 3 mappen"; one folder (or none) just the count.
+    public static func searchFooter(count: Int, folders: Int, language: AppLanguage = .ko) -> String {
+        let found = searchFooter(count: count, language: language)
+        guard folders > 1 else { return found }
+        switch language {
+        case .ko: return "\(found) · 폴더 \(folders)개"
+        case .en: return "\(found) · \(AppLanguage.plural(folders, "folder", "folders"))"
+        case .nl: return "\(found) · \(AppLanguage.plural(folders, "map", "mappen"))"
         }
     }
 

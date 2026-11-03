@@ -322,6 +322,10 @@ private enum AheadTests {
             try expectEqual(TodayGlance.shortTitle("치과 정기 검진과 스케일링 예약"), "치과 정기 검진과 스케…", "12 characters and …")
             try expectEqual(TodayGlance.shortTitle("Dentist"), "Dentist", "short titles stay")
             try expectEqual(TodayGlance.eventLine(title: "Dentist", minutes: 40, language: .en), "in\u{00A0}40\u{00A0}min\u{00A0}· Dentist", "event line")
+            // #136: no break between a number and its unit — ‘3시간 40’ / ‘분 뒤’ was one.
+            try expectEqual(AppLanguage.allCases.map { TodayGlance.eventLine(title: "치과", minutes: 220, language: $0) },
+                            ["3\u{2060}시간\u{00A0}40\u{2060}분\u{00A0}뒤\u{00A0}· 치과", "in\u{00A0}3\u{00A0}h\u{00A0}40\u{00A0}min\u{00A0}· 치과",
+                             "over\u{00A0}3\u{00A0}u\u{00A0}40\u{00A0}min\u{00A0}· 치과"], "the time away stays whole")
             let seven = at(2026, 10, 9, 7)
             try expectEqual(AppLanguage.allCases.map { TodayGlance.alarmLine(fire: seven, days: [1, 2, 3, 4, 5], now: thursday, calendar: seoul, language: $0) },
                             ["내일\u{00A0}· 평일", "Tomorrow\u{00A0}· Weekdays", "Morgen\u{00A0}· Doordeweeks"], "alarm line")

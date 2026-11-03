@@ -129,17 +129,18 @@ enum HandwritingFont {
 
     private static func bundledFontURLs() -> [URL] {
         // Built by scripts/tighten-handwriting-jamo.py from Nanum Pen/Brush with narrower jamo;
-        // Caveat and Kalam (Google Fonts, OFL) for English and Dutch.
+        // Caveat and Kalam (Google Fonts, OFL) for English and Dutch; D2Coding (NAVER, OFL, unchanged) for the drawer's
+        // code (#143).
         [
             bundledFontURL(resource: "HanJangPen-Regular", subdirectory: "Assets/Fonts"),
             bundledFontURL(resource: "HanJangBrush-Regular", subdirectory: "Assets/Fonts"),
             bundledFontURL(resource: "Caveat", subdirectory: "Assets/Fonts"),
-            bundledFontURL(resource: "Kalam-Regular", subdirectory: "Assets/Fonts")
+            bundledFontURL(resource: "Kalam-Regular", subdirectory: "Assets/Fonts"),
+            bundledFontURL(resource: "D2Coding-Regular", subdirectory: "Assets/Fonts")
         ].compactMap(\.self)
     }
 
     private static func bundledFontURL(resource: String, subdirectory: String) -> URL? {
-        Bundle.main.url(forResource: resource, withExtension: "ttf", subdirectory: subdirectory)
-            ?? Bundle.module.url(forResource: resource, withExtension: "ttf", subdirectory: subdirectory)
+        AppResources.url(resource, extension: "ttf", in: subdirectory)
     }
 }

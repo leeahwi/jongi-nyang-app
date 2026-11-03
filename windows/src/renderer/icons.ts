@@ -79,7 +79,6 @@ export const iconPaths: Record<string, string> = {
   bellDot: '<path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M13.9 2.3A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-1-.7-1.9-2.8"/><circle cx="18" cy="7.5" r="3"/>',
   // 메모 서랍 (1.28): copy, 폴더 옮기기, 크게 보기 · 작게 보기.
   copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
-  folderMove: '<path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2l2 2h8.8A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/><path d="M9 13.5h6M13 11.5l2 2-2 2"/>',
   expand: '<path d="M15 4h5v5M20 4l-6 6M9 20H4v-5M4 20l6-6"/>',
   shrink: '<path d="M19 10h-5V5M14 10l6-6M5 14h5v5M10 14l-6 6"/>',
   /** A paw print (the drawer's 고정 bookmark, its handle and footer; filled there). */
@@ -115,6 +114,14 @@ export const iconPaths: Record<string, string> = {
   contrast: '<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 0 0 17z" fill="currentColor" stroke="none"/>',
   // 메모 서랍 칸 ‘폭’: two arrows apart (the Mac's arrow.left.and.right).
   width: '<path d="M4 12h16M8 8l-4 4 4 4M16 8l4 4-4 4"/>',
+  // 메모 서랍 ‘글꼴’ · ‘글자 크기’ (#84): a capital A over a line (the Mac's textformat); a big and a small T (textformat.size).
+  font: '<path d="M5 18 10.5 5h1L17 18M7.2 13.5h7.6M4 21h16"/>',
+  textSize: '<path d="M3 6.5V5h10v1.5M8 5v14M6 19h4M14 11.5V10.5h7v1M17.5 10.5V19M16 19h3"/>',
+  // 메모 글꼴 ‘줄 간격’ · ‘문단 간격’ (#141): lines with arrows up and down beside them; two blocks of lines with room between.
+  lineHeight: '<path d="M11 6h9M11 12h9M11 18h9M5.5 4.5v15M3.5 7l2-2.5 2 2.5M3.5 17l2 2.5 2-2.5"/>',
+  paragraph: '<path d="M4 5h16M4 9h11M4 15h16M4 19h11"/>',
+  // 메모 글꼴 ‘코드 글꼴’ (#143): ‹ › (the Mac's chevron.left.forwardslash.chevron.right).
+  code: '<path d="M8.5 7 3.5 12l5 5M15.5 7l5 5-5 5M13.5 5l-3 14"/>',
 };
 
 const madeIcons = new Map<string, SVGSVGElement>();

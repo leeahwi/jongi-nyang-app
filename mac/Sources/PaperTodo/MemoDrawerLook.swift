@@ -84,8 +84,8 @@ struct DrawerPaperShape: Shape {
 /// A memo's paper in the drawer (#14, sheet D, the user's pick 2026-10-28): a clean square sheet — no rules and no
 /// margin line — with 16 pt round its words; the paper hints are the folder-colour tape, a 1 pt edge with a soft
 /// shadow, and a row of tiny perforation holes along the straight top edge. Open or picked, the shadow goes a little
-/// deeper instead of a box round it; picked (the keyboard's place) also takes a faint 1.5 pt edge in the folder's
-/// colour, so it shows by depth and edge, not by colour alone. Used by the list, search results and 크게 보기.
+/// deeper instead of a box round it; picked (the keyboard's place) also takes a 2 pt edge in the folder's line colour
+/// (#118), so it shows by depth and edge, not by colour alone. Used by the list, search results and 크게 보기.
 struct MemoSlipStyle: ViewModifier {
     struct State {
         var open = false
@@ -112,27 +112,12 @@ struct MemoSlipStyle: ViewModifier {
     static let top: CGFloat = 16
     static let bottom: CGFloat = 14
     static let side: CGFloat = 16
-    /// The handwritten title's row (22 pt, option B) and an open memo's body line (14 pt on 26 pt).
+    /// The handwritten title's row (22 pt, option B); the body's lines and sizes are the drawer's setting (MemoText, #84).
     static let titleRow: CGFloat = 28
-    static let line: CGFloat = 26
-    static let bodySize: CGFloat = 14
-    /// A card's preview: 13 pt on 20 pt lines, up to three (dense two); the kind row's chip.
-    static let previewSize: CGFloat = 13
-    static let previewLine: CGFloat = 20
     static let kindRow: CGFloat = 24
     /// A collapsed card's least height (a title-only memo), and when dense.
     static let cardHeight: CGFloat = 68
     static let denseHeight: CGFloat = 56
-    /// Body text drawn so each line takes exactly `line`: the font's own line height plus this.
-    @MainActor static let lineSpacing: CGFloat = {
-        let font = NSFont.systemFont(ofSize: bodySize)
-        return max(0, line - NSLayoutManager().defaultLineHeight(for: font))
-    }()
-    /// The same for a card's preview lines.
-    @MainActor static let previewSpacing: CGFloat = {
-        let font = NSFont.systemFont(ofSize: previewSize)
-        return max(0, previewLine - NSLayoutManager().defaultLineHeight(for: font))
-    }()
 
     func body(content: Content) -> some View {
         let shape = SheetShape()
@@ -154,7 +139,9 @@ struct MemoSlipStyle: ViewModifier {
             }
             .overlay {
                 if state.selected && !state.open {
-                    Rectangle().strokeBorder(DrawerPalette.openLine(state.folder, drawer: drawer ?? palette, sheet: palette).opacity(0.55), lineWidth: 1.5)
+                    // #118: a 2 pt edge in the folder's line colour (3:1 on the sheet, scripts/check-contrast.py), so the
+                    // keyboard's place shows by its edge, not by colour alone.
+                    Rectangle().strokeBorder(DrawerPalette.openLine(state.folder, drawer: drawer ?? palette, sheet: palette), lineWidth: 2)
                         .allowsHitTesting(false)
                 }
             }
@@ -164,6 +151,121 @@ struct MemoSlipStyle: ViewModifier {
     private func shadow(_ deep: Bool) -> Color {
         if deep { return state.floating ? .black.opacity(0.34) : palette.deepShadow }
         return state.floating ? .black.opacity(0.22) : palette.shadow
+    }
+}
+
+/// 메모 글꼴 · 크기 (#84, docs/plans/memo-markdown.md): the drawer's one face and size step for memo words, this Mac's
+/// own (`drawer.font` · `drawer.textSize`; never in the shared folder). The body, an open memo, 크게 보기 and the editor
+/// follow both; a card's preview follows only the step (always the plain face, so three lines cut alike). Lines are the
+/// size × 1.85 (보통 14 → 26, as in 1.45). The handwriting faces run as much larger as the notebook's (pen 23 : 15,
+/// brush 22 : 15), the Latin faces corrected as HandwritingFont does. The same steps as the Windows app.
+struct MemoText: Equatable {
+    enum Face: String, CaseIterable, Identifiable {
+        case clean, pen, brush, mono
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .clean: L("기본 글씨")
+            case .pen: L("손글씨 펜")
+            case .brush: L("손글씨 붓")
+            case .mono: L("고정폭")
+            }
+        }
+        /// The notebook face it is (titles take it too), nil for the plain and fixed-width faces.
+        var notebook: NotebookFont? {
+            switch self {
+            case .pen: .pen
+            case .brush: .brush
+            case .clean, .mono: nil
+            }
+        }
+    }
+
+    /// 글자 크기 (#141): nine steps of a point, 12–20 (1.45's four were 13 · 14 · 16 · 18, read as those points).
+    enum Size: Int, CaseIterable, Identifiable {
+        case pt12 = 12, pt13, pt14, pt15, pt16, pt17, pt18, pt19, pt20
+        static let small = Size.pt13, regular = Size.pt14, large = Size.pt16, extraLarge = Size.pt18
+        var id: Int { rawValue }
+        var title: String { "\(rawValue) pt" }
+        /// What VoiceOver says (‘14포인트’).
+        var spoken: String { L("\(rawValue)포인트") }
+        /// A snapshot's name: 1.45's four by their old names, the others by their points.
+        var name: String { [13: "small", 14: "regular", 16: "large", 18: "extraLarge"][rawValue] ?? "\(rawValue)" }
+    }
+
+    /// 줄 간격 · 문단 간격 (#141, F2): the words' line (size × 1.6 · 1.85 · 2.1) and the room after a paragraph (+0 · 0.35 ·
+    /// 0.7 of a line; a list's lines stay together).
+    typealias LineSpacing = TextSteps.LineSpacing
+    typealias ParagraphSpacing = TextSteps.ParagraphSpacing
+
+    /// 코드 글꼴 (#143): the fixed-width face of code (a code block, `code`, the old code lines) and of the 고정폭 body —
+    /// the system's (SF Mono, Hangul from Apple SD Gothic Neo) or the bundled D2Coding (NAVER, OFL), whose Hangul is two
+    /// Latin columns wide, so a code line with Korean in it keeps its columns.
+    enum CodeFace: String, CaseIterable, Identifiable {
+        case system, d2coding
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .system: L("고정폭(시스템)")
+            case .d2coding: "D2Coding"
+            }
+        }
+    }
+
+    var face: Face = .clean
+    var size: Size = .regular
+    var codeFace: CodeFace = .system
+    /// 기호 늘 보이기 (#84, 2026-10-30): every line's marks shown faint, not only the caret's.
+    var showMarks = false
+    var lineSpacingChoice: LineSpacing = .regular
+    var paragraphChoice: ParagraphSpacing = .regular
+
+    private var metrics: TextSteps.DrawerMetrics { TextSteps.drawerMetrics(points: size.rawValue, line: lineSpacingChoice, paragraph: paragraphChoice) }
+    /// 12–20 pt, on lines of size × 1.85 (보통 14 → 26, as in 1.45).
+    var bodySize: CGFloat { CGFloat(metrics.body) }
+    var line: CGFloat { CGFloat(metrics.line) }
+    /// The room under a paragraph's last line.
+    var paragraph: CGFloat { CGFloat(metrics.paragraph) }
+    /// A card's preview: 11–16 pt (1.45's 12 · 13 · 14 · 15 at its four steps) on lines of × 20 / 13.
+    var previewSize: CGFloat { CGFloat(metrics.preview) }
+    var previewLine: CGFloat { CGFloat(metrics.previewLine) }
+
+    /// The words' face at a scale of the body (headings 1.45 · 1.25 · 1.1).
+    @MainActor func font(scale: CGFloat = 1) -> NSFont {
+        let size = bodySize * scale
+        switch face {
+        case .clean: return .systemFont(ofSize: size)
+        case .mono: return Self.mono((size - 1).rounded(), codeFace)
+        case .pen: return HandwritingFont.native(face: .pen, size: (size * 23 / 15).rounded())
+        case .brush: return HandwritingFont.native(face: .brush, size: (size * 22 / 15).rounded())
+        }
+    }
+
+    /// Code (a code block, `code`, the old code lines): fixed-width a point under the body, in the 코드 글꼴.
+    @MainActor var codeFont: NSFont { Self.mono(bodySize - 1, codeFace) }
+
+    /// A fixed-width face at `size`: D2Coding when it's picked (and loaded), else the system's.
+    @MainActor static func mono(_ size: CGFloat, _ face: CodeFace) -> NSFont {
+        if face == .d2coding {
+            HandwritingFont.register()
+            if let font = NSFont(name: "D2Coding", size: size) { return font }
+        }
+        return .monospacedSystemFont(ofSize: size, weight: .regular)
+    }
+
+    /// Body text drawn so each line takes exactly `line`: the font's own line height plus this.
+    @MainActor var lineSpacing: CGFloat { max(0, line - Self.lineHeight(font())) }
+    /// The same for a card's preview lines (the plain face).
+    @MainActor var previewSpacing: CGFloat { max(0, previewLine - Self.lineHeight(.systemFont(ofSize: previewSize))) }
+
+    /// A face's own line height, worked out once per face and size (every card asks on every redraw of the list).
+    @MainActor private static var heights: [String: CGFloat] = [:]
+    @MainActor static func lineHeight(_ font: NSFont) -> CGFloat {
+        let key = "\(font.fontName)@\(font.pointSize)"
+        if let known = heights[key] { return known }
+        let height = NSLayoutManager().defaultLineHeight(for: font)
+        heights[key] = height
+        return height
     }
 }
 

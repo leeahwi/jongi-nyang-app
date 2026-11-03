@@ -1,4 +1,4 @@
-import { aiEntry, aiTargetOf, sameSaved, type AiChange, type AiItem, type AiTarget } from "../../src/core/ai";
+import { aiEntry, aiExtVersion, aiTargetOf, sameSaved, type AiChange, type AiItem, type AiTarget } from "../../src/core/ai";
 import { dayKey } from "../../src/core/archive";
 import { nextFire, timeText as alarmTimeText } from "../../src/core/alarm";
 import { allDayText, dateKey, dayBounds, localDate, todayEvents, validate, type CalendarDraft, type CalendarEvent } from "../../src/core/calendar";
@@ -6,24 +6,31 @@ import { todaySinceUpdates } from "../../src/core/carry";
 import { draftFromEvent, eventFromDraft, expand, occurrences, parseOccurrenceKey, type LocalEvent } from "../../src/core/events";
 import { focusByTask, focusTime, focusTotal, focusTotals, sessionsText } from "../../src/core/focus";
 import { days as dayCount, timeRange, type Lang } from "../../src/core/lang";
-import { memoPreview, memoTitle, newMemo, type Memo } from "../../src/core/memo";
 import { cleanedTitle, isoDate, newID, type TodoItem } from "../../src/core/notebook";
+import { describe as describeRepeat, nextOccurrence } from "../../src/core/repeat";
 import { pageOf } from "../../src/core/shelf";
 import { toEntry, type ArchiveEntry } from "../../src/core/archive";
 import { clockKey, clockMinutes, logicalMinutes, rangeDay, rangeDayText, rangeOf, rangeText, validRange, withRange, type TimeRange } from "../../src/core/timeRange";
 import { Folder } from "./files";
-import { dayText, localStamp, reminderText, say, taskData, taskLine, words } from "./words";
+import { Ids } from "./ids";
+import { page, pageNote, type PageArgs } from "./pages";
+import { Problem } from "./problem";
+import { dayText, localStamp, reminderText, say, taskData, taskLine, words, type TaskWords } from "./words";
+
+export { Problem } from "./problem";
 
 /**
  * The tools themselves, apart from MCP: each takes what the call gave and answers with a short text in the
- * app's language and the same as data. Rules from the shared AI connection spec §4–5 (cases M3–M12).
+ * app's language and the same as data (its shape: schemas.ts). Rules from the shared AI connection spec §4–5
+ * (cases M3–M12; the newer cases M19–M41 are in mcp/test). The memo drawer's tools are in memos.ts.
  */
 
-export interface Ctx { folder: Folder; lang: Lang; now: Date; client: string }
-export interface Reply { text: string; data: Record<string, unknown>; error?: boolean }
-
-/** Something asked that can't be done; its words go back as the answer (isError). */
-export class Problem extends Error {}
+export interface Ctx {
+  folder: Folder; lang: Lang; now: Date; client: string;
+  /** The extension version the app carries (ai-link.json's ext; 1 for apps before it). */
+  appExt: number;
+}
+export interface Reply { text: string; data: Record<string, unknown> }
 
 export const maxItems = 20;
 const maxTitle = 200;
@@ -32,10 +39,12 @@ const maxDays = 31;
 export const tokenMs = 10 * 60_000;
 /** A to-do's end stops at 03:45 the next morning (an end at 04:00 isn't kept on a to-do; ribbon-cases R6). */
 const lastEnd = 1665;
+/** Pages (P1): how many by default and at most. */
+export const pages = { todos: [50, 100], events: [50, 100], history: [50, 200], repeats: [50, 100], today: [30, 100] } as const;
 
 // ─── Reading what was given ───────────────────────────────────────────────────
 
-function readDay(value: string, lang: Lang): string {
+export function readDay(value: string, lang: Lang): string {
   const date = localDate(value.trim());
   if (!date) throw new Problem(words.badDate(value, lang));
   return dateKey(date);
@@ -48,7 +57,7 @@ function readClock(value: string, lang: Lang): number {
 }
 
 const noon = (day: string): Date => { const [y, m, d] = day.split("-").map(Number); return new Date(y, m - 1, d, 12); };
-const plusDays = (day: string, count: number): string => { const date = noon(day); date.setDate(date.getDate() + count); return dateKey(date); };
+export const plusDays = (day: string, count: number): string => { const date = noon(day); date.setDate(date.getDate() + count); return dateKey(date); };
 const spanDays = (from: string, to: string): number => Math.round((noon(to).getTime() - noon(from).getTime()) / 86_400_000) + 1;
 /** A clock on a 4 a.m. day: before 04:00 is the night after. */
 const atOn = (day: string, minutes: number): Date => { const [y, m, d] = day.split("-").map(Number); return new Date(y, m - 1, d, 0, logicalMinutes(minutes)); };
@@ -100,7 +109,38 @@ function readTitle(value: string | undefined, lang: Lang): string {
   return title;
 }
 
-const lower = (text: string) => text.trim().toLowerCase();
+export const lower = (text: string) => text.trim().toLowerCase();
+
+// ─── Ids ──────────────────────────────────────────────────────────────────────
+
+export type Noun = "todo" | "event" | "memo" | "folder";
+const nounKo: Record<Noun, string> = { todo: "할 일이", event: "일정이", memo: "메모가", folder: "메모 폴더가" };
+const nounEn: Record<Noun, string> = { todo: "task", event: "event", memo: "memo", folder: "memo folder" };
+const nounNl: Record<Noun, string> = { todo: "taak", event: "afspraak", memo: "notitie", folder: "notitiemap" };
+
+/**
+ * The whole id a given id names (P1: the whole id, or a start of 8 characters or more that fits one item).
+ * One that fits several is refused with the candidates (M40), one that fits none says so.
+ */
+export function pick(ids: Ids, given: string, lang: Lang, noun: Noun, titleOf: (id: string) => string): string {
+  const found = ids.find(given);
+  if (found && "id" in found) return found.id;
+  if (found) {
+    const list = found.candidates.slice(0, 10).map((id) => `${ids.short(id)} ‘${titleOf(id)}’`).join(", ");
+    throw new Problem(say(lang,
+      `id ‘${given}’로 시작하는 ${nounKo[noun]} 여럿이에요: ${list}. 더 긴 id를 써 주세요.`,
+      `More than one ${nounEn[noun]} starts with id ‘${given}’: ${list}. Use a longer id.`,
+      `Meer dan één ${nounNl[noun]} begint met id ‘${given}’: ${list}. Gebruik een langere id.`));
+  }
+  throw new Problem(say(lang, `이 id의 ${nounKo[noun]} 없어요: ${given}.`, `No ${nounEn[noun]} with id ${given}.`, `Geen ${nounNl[noun]} met id ${given}.`));
+}
+
+/** Each repeating task's words ("매주 월") by series id; repeats.json that doesn't read: none. */
+export function repeatWords(folder: Folder, lang: Lang): Map<string, string> {
+  return new Map(folder.loadLoose("repeats.json").map((series) => [series.id, describeRepeat(series.rule, undefined, lang)]));
+}
+
+const taskWordsOf = (ctx: Ctx, items: readonly TodoItem[]): TaskWords => ({ ids: new Ids(items.map((item) => item.id)), repeats: repeatWords(ctx.folder, ctx.lang) });
 
 // ─── Reading tools ────────────────────────────────────────────────────────────
 
@@ -111,41 +151,56 @@ const byTime = (items: readonly TodoItem[], now: Date): TodoItem[] => {
   return [...items].sort((a, b) => (day(a) < day(b) ? -1 : day(a) > day(b) ? 1 : order(a) - order(b)));
 };
 
-function eventLine(event: CalendarEvent, lang: Lang): string {
+const none = (lang: Lang) => say(lang, "- 없음", "- none", "- geen");
+
+function eventLine(event: CalendarEvent, lang: Lang, ids: Ids): string {
   const days = event.allDay ? Math.round((event.end.getTime() - event.start.getTime()) / 86_400_000) : 1;
   const when = event.allDay ? (days > 1 ? `${allDayText(lang)} · ${dayCount(days, lang)}` : allDayText(lang)) : timeRange({ hour: event.start.getHours(), minute: event.start.getMinutes() }, { hour: event.end.getHours(), minute: event.end.getMinutes() }, lang);
-  return [`- ${when} ${event.title}`, ...(event.location ? [event.location] : []), ...(event.recurring ? [say(lang, "반복", "repeats", "herhaalt")] : []), `id ${event.eventId}`].join(" · ");
+  return [`- ${when} ${event.title}`, ...(event.location ? [event.location] : []), ...(event.recurring ? [say(lang, "반복", "repeats", "herhaalt")] : []), `id ${ids.short(event.eventId)}`].join(" · ");
 }
 
-function eventData(event: CalendarEvent, source: LocalEvent | undefined): Record<string, unknown> {
+/** An event as the structured result gives it (eventOut in schemas.ts). */
+function eventData(event: CalendarEvent, source: LocalEvent | undefined, ids: Ids): Record<string, unknown> {
   const pad = (value: number) => String(value).padStart(2, "0");
   const clock = (date: Date) => `${pad(date.getHours())}:${pad(date.getMinutes())}`;
   return {
-    id: event.eventId, key: event.key, title: event.title, date: dateKey(event.start), allDay: event.allDay,
+    id: ids.short(event.eventId), title: event.title, date: dateKey(event.start), allDay: event.allDay,
     ...(event.allDay ? { days: source?.days ?? 1 } : { start: clock(event.start), end: clock(event.end), ...(dateKey(event.end) !== dateKey(event.start) ? { endDate: dateKey(event.end) } : {}) }),
     ...(event.location ? { location: event.location } : {}), repeat: source?.repeat ?? "none", canChange: !event.recurring,
   };
 }
 
-export function getToday({ folder, now, lang }: Ctx): Reply {
+/** The events of a file by id, and their short ids. */
+const eventIndex = (events: readonly LocalEvent[]) => ({ byId: new Map(events.map((event) => [event.id, event])), ids: new Ids(events.map((event) => event.id)) });
+
+export function getToday(ctx: Ctx, args: { limit?: number; detail?: boolean } = {}): Reply {
+  const { folder, now, lang } = ctx;
   const today = dayKey(now);
   const items = folder.load("todos.json");
   const events = folder.load("events.json");
-  const tasks = byTime(items.filter((item) => pageOf(item, now) === "today" && (!item.isCompleted || (item.completedAt !== undefined && dayKey(new Date(item.completedAt)) === today))), now);
+  const words = taskWordsOf(ctx, items);
+  const sheet = items.filter((item) => pageOf(item, now) === "today");
+  const open = byTime(sheet.filter((item) => !item.isCompleted), now);
+  const done = byTime(sheet.filter((item) => item.isCompleted && item.completedAt !== undefined && dayKey(new Date(item.completedAt)) === today), now);
+  // Today's sheet isn't cut by default; a very long one gives its first tasks and the cursor list_todos goes on with (P1).
+  const shown = page(open, { limit: args.limit }, pages.today[0], pages.today[1], lang);
   const { start, end } = dayBounds(now);
-  const shown = todayEvents(expand(events, start, end, lang), now);
+  const index = eventIndex(events);
+  const happening = todayEvents(expand(events, start, end, lang), now);
   const alarms = folder.alarms().map((alarm) => ({ alarm, at: nextFire(alarm, now) })).filter((entry) => entry.at && entry.at < end)
     .sort((a, b) => a.at!.getTime() - b.at!.getTime());
   const focus = focusTotal(folder.focus(), now, now);
-  const open = tasks.filter((item) => !item.isCompleted).length;
+  const more = shown.next ? open.length - Number(shown.next) : 0;
   const lines = [
     `${say(lang, "오늘", "Today", "Vandaag")} · ${dayText(today, lang)}`,
     "",
-    `${say(lang, "할 일", "Tasks", "Taken")} (${say(lang, `남은 것 ${open}개, 끝낸 것 ${tasks.length - open}개`, `${open} open, ${tasks.length - open} done`, `${open} open, ${tasks.length - open} klaar`)})`,
-    ...(tasks.length ? tasks.map((item) => taskLine(item, now, lang)) : [say(lang, "- 없음", "- none", "- geen")]),
+    `${say(lang, "할 일", "Tasks", "Taken")} (${say(lang, `남은 것 ${open.length}개, 끝낸 것 ${done.length}개`, `${open.length} open, ${done.length} done`, `${open.length} open, ${done.length} klaar`)})`,
+    ...(open.length || (args.detail && done.length) ? shown.shown.map((item) => taskLine(item, now, lang, words)) : [none(lang)]),
+    ...(shown.next ? [say(lang, `… ${more}개 더: list_todos(where today) cursor ‘${shown.next}’`, `… ${more} more: list_todos (where today) with cursor ‘${shown.next}’`, `… nog ${more}: list_todos (where today) met cursor ‘${shown.next}’`)] : []),
+    ...(args.detail ? done.slice(0, pages.today[1]).map((item) => taskLine(item, now, lang, words)) : []),
     "",
-    `${say(lang, "일정", "Events", "Afspraken")} (${shown.length})`,
-    ...(shown.length ? shown.map((event) => eventLine(event, lang)) : [say(lang, "- 없음", "- none", "- geen")]),
+    `${say(lang, "일정", "Events", "Afspraken")} (${happening.length})`,
+    ...(happening.length ? happening.map((event) => eventLine(event, lang, index.ids)) : [none(lang)]),
     ...(alarms.length ? ["", say(lang, "알람", "Alarms", "Wekkers"), ...alarms.map(({ alarm }) => `- ${alarmTimeText(alarm, lang)}${alarm.label ? ` ${alarm.label}` : ""}`)] : []),
     "",
     `${say(lang, "집중", "Focus", "Focus")} ${focusTime(focus.minutes, lang)} · ${sessionsText(focus.sessions, lang)}`,
@@ -153,71 +208,72 @@ export function getToday({ folder, now, lang }: Ctx): Reply {
   return {
     text: lines.join("\n"),
     data: {
-      date: today, tasks: tasks.map((item) => taskData(item, now)),
-      events: shown.map((event) => eventData(event, events.find((entry) => entry.id === event.eventId))),
-      alarms: alarms.map(({ alarm, at }) => ({ id: alarm.id, time: alarm.time, label: alarm.label, at: localStamp(at!) })),
+      date: today, open: open.length, done: done.length,
+      tasks: [...shown.shown, ...(args.detail ? done.slice(0, pages.today[1]) : [])].map((item) => taskData(item, now, words)),
+      ...(shown.next ? { nextCursor: shown.next } : {}),
+      events: happening.map((event) => eventData(event, index.byId.get(event.eventId), index.ids)),
+      alarms: alarms.map(({ alarm, at }) => ({ time: alarm.time, ...(alarm.label ? { label: alarm.label } : {}), at: localStamp(at!) })),
       focus: { minutes: focus.minutes, sessions: focus.sessions },
     },
   };
 }
 
-export function listTodos({ folder, now, lang }: Ctx, args: { where?: "today" | "later" | "all"; from?: string; to?: string }): Reply {
-  const where = args.where ?? "all";
+export type TodoWhere = "today" | "later" | "all";
+
+export function listTodos(ctx: Ctx, args: { where?: TodoWhere; from?: string; to?: string; query?: string } & PageArgs = {}): Reply {
+  const { folder, now, lang } = ctx;
+  const query = lower(args.query ?? "");
+  // Today's sheet unless asked otherwise (P1); a word looks through everything (N1).
+  const where = args.where ?? (query ? "all" : "today");
   const today = dayKey(now);
   const period = args.from || args.to ? readPeriod(args.from, args.to, today, 366, lang) : undefined;
-  const items = folder.load("todos.json").filter((item) => {
+  const all = folder.load("todos.json");
+  const items = all.filter((item) => {
     const page = pageOf(item, now);
     if (item.isCompleted && !(where === "all" && item.completedAt && dayKey(new Date(item.completedAt)) === today)) return false;
     if (where === "today" && page !== "today") return false;
     if (where === "later" && page === "today") return false;
+    if (query && !item.title.toLowerCase().includes(query)) return false;
     if (!period) return true;
     const day = rangeDay(item, now);
     return day !== undefined && day >= period.from && day <= period.to;
   });
   const sorted = byTime(items, now);
+  const shown = page(sorted, args, pages.todos[0], pages.todos[1], lang);
+  const words = taskWordsOf(ctx, all);
   const heading = say(lang, `할 일 ${sorted.length}개`, `${sorted.length} ${sorted.length === 1 ? "task" : "tasks"}`, `${sorted.length} ${sorted.length === 1 ? "taak" : "taken"}`);
+  const note = pageNote(shown, lang);
   return {
-    text: [heading, ...sorted.map((item) => taskLine(item, now, lang))].join("\n"),
-    data: { where, ...(period ?? {}), tasks: sorted.map((item) => taskData(item, now)) },
+    text: [heading, ...shown.shown.map((item) => taskLine(item, now, lang, words)), ...(note ? [note] : [])].join("\n"),
+    data: { where, ...(period ?? {}), ...(query ? { query: args.query!.trim() } : {}), count: sorted.length, tasks: shown.shown.map((item) => taskData(item, now, words)), ...(shown.next ? { nextCursor: shown.next } : {}) },
   };
 }
 
-export function listEvents({ folder, now, lang }: Ctx, args: { from: string; to?: string }): Reply {
+export function listEvents(ctx: Ctx, args: { from: string; to?: string } & PageArgs): Reply {
+  const { folder, now, lang } = ctx;
   const period = readPeriod(args.from, args.to, dayKey(now), maxDays, lang);
   const events = folder.load("events.json");
-  const shown = expand(events, localDate(period.from)!, localDate(plusDays(period.to, 1))!, lang);
-  const lines: string[] = [say(lang, `일정 ${shown.length}개`, `${shown.length} ${shown.length === 1 ? "event" : "events"}`, `${shown.length} ${shown.length === 1 ? "afspraak" : "afspraken"}`)];
+  const index = eventIndex(events);
+  const all = expand(events, localDate(period.from)!, localDate(plusDays(period.to, 1))!, lang);
+  const shown = page(all, args, pages.events[0], pages.events[1], lang);
+  const lines: string[] = [say(lang, `일정 ${all.length}개`, `${all.length} ${all.length === 1 ? "event" : "events"}`, `${all.length} ${all.length === 1 ? "afspraak" : "afspraken"}`)];
   let day = "";
-  for (const event of shown) {
+  for (const event of shown.shown) {
     const key = dateKey(event.start) < period.from ? period.from : dateKey(event.start);
     if (key !== day) { day = key; lines.push("", dayText(day, lang)); }
-    lines.push(eventLine(event, lang));
+    lines.push(eventLine(event, lang, index.ids));
   }
-  return { text: lines.join("\n"), data: { ...period, events: shown.map((event) => eventData(event, events.find((entry) => entry.id === event.eventId))) } };
+  const note = pageNote(shown, lang);
+  if (note) lines.push("", note);
+  return { text: lines.join("\n"), data: { ...period, count: all.length, events: shown.shown.map((event) => eventData(event, index.byId.get(event.eventId), index.ids)), ...(shown.next ? { nextCursor: shown.next } : {}) } };
 }
 
-export function listMemos({ folder, lang }: Ctx, args: { query?: string; limit?: number }): Reply {
-  const limit = Math.max(1, Math.min(100, Math.floor(args.limit ?? 20)));
-  const query = lower(args.query ?? "");
-  const memos = folder.load("memos.json").filter((memo) => memo.text.trim() && (!query || memo.text.toLowerCase().includes(query)))
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  const shown = memos.slice(0, limit);
-  const line = (memo: Memo) => {
-    const preview = memoPreview(memo);
-    return `- ${memoTitle(memo, lang)}${preview ? ` — ${preview.length > 120 ? `${preview.slice(0, 120)}…` : preview}` : ""} · ${dayText(dateKey(new Date(memo.updatedAt)), lang)} · id ${memo.id}`;
-  };
-  return {
-    text: [say(lang, `메모 ${memos.length}개${memos.length > shown.length ? ` 중 최근 ${shown.length}개` : ""}`, `${memos.length} memos${memos.length > shown.length ? `, newest ${shown.length}` : ""}`, `${memos.length} notities${memos.length > shown.length ? `, nieuwste ${shown.length}` : ""}`), ...shown.map(line)].join("\n"),
-    data: { count: memos.length, memos: shown.map((memo) => ({ id: memo.id, text: memo.text.length > 4000 ? `${memo.text.slice(0, 4000)}…` : memo.text, createdAt: localStamp(new Date(memo.createdAt)), updatedAt: localStamp(new Date(memo.updatedAt)) })) },
-  };
-}
-
-export function getFocus({ folder, now, lang }: Ctx, args: { from?: string; to?: string }): Reply {
+export function getFocus({ folder, now, lang }: Ctx, args: { from?: string; to?: string } = {}): Reply {
   const period = readPeriod(args.from, args.to, dayKey(now), 366, lang);
   const records = folder.focus();
   const [from, to] = [noon(period.from), noon(period.to)];
   const total = focusTotal(records, from, to);
-  const top = focusByTask(records, from, to, 5);
+  const top = focusByTask(records, from, to, 5).map(({ title, minutes, sessions }) => ({ title, minutes, sessions }));
   const when = period.from === period.to ? dayText(period.from, lang) : `${dayText(period.from, lang)} – ${dayText(period.to, lang)}`;
   const lines = [
     `${say(lang, "집중", "Focus", "Focus")} ${focusTime(total.minutes, lang)} · ${sessionsText(total.sessions, lang)} (${when})`,
@@ -226,30 +282,80 @@ export function getFocus({ folder, now, lang }: Ctx, args: { from?: string; to?:
   return { text: lines.join("\n"), data: { ...period, minutes: total.minutes, sessions: total.sessions, days: Object.fromEntries(focusTotals(records, from, to)), top } };
 }
 
-export function searchHistory({ folder, now, lang }: Ctx, args: { query?: string; from?: string; to?: string; limit?: number }): Reply {
+export function searchHistory({ folder, now, lang }: Ctx, args: { query?: string; from?: string; to?: string } & PageArgs = {}): Reply {
   const period = args.from || args.to ? readPeriod(args.from, args.to, dayKey(now), 3660, lang) : undefined;
   const query = lower(args.query ?? "");
-  const limit = Math.max(1, Math.min(200, Math.floor(args.limit ?? 50)));
   const found = new Map<string, ArchiveEntry>();
-  for (const entry of folder.archive()) found.set(entry.id, entry);
+  // Only the months the period can touch are read (P2).
+  for (const entry of folder.archive(folder.archiveMonths(period?.from, period?.to))) found.set(entry.id, entry);
   for (const item of folder.load("todos.json")) if (item.isCompleted) found.set(item.id, toEntry(item));
   const entries = [...found.values()].filter((entry) => {
     if (!entry.completedAt || (query && !entry.title.toLowerCase().includes(query))) return false;
     const day = dayKey(new Date(entry.completedAt));
     return !period || (day >= period.from && day <= period.to);
   }).sort((a, b) => b.completedAt!.localeCompare(a.completedAt!));
-  const shown = entries.slice(0, limit);
-  const lines = [say(lang, `끝낸 일 ${entries.length}개${entries.length > shown.length ? ` 중 최근 ${shown.length}개` : ""}`, `${entries.length} done${entries.length > shown.length ? `, newest ${shown.length}` : ""}`, `${entries.length} afgerond${entries.length > shown.length ? `, nieuwste ${shown.length}` : ""}`)];
+  const shown = page(entries, args, pages.history[0], pages.history[1], lang);
+  const ids = new Ids(found.keys());
+  const lines = [say(lang, `끝낸 일 ${entries.length}개`, `${entries.length} done`, `${entries.length} afgerond`)];
   let day = "";
-  for (const entry of shown) {
+  for (const entry of shown.shown) {
     const key = dayKey(new Date(entry.completedAt!));
     if (key !== day) { day = key; lines.push(dayText(day, lang)); }
     const range = entry.timeStart ? rangeOf(entry) : undefined;
     lines.push(`- ${entry.title}${range ? ` (${rangeText(range, lang)})` : ""}`);
   }
+  const note = pageNote(shown, lang);
+  if (note) lines.push(note);
   return {
     text: lines.join("\n"),
-    data: { ...(period ?? {}), count: entries.length, items: shown.map((entry) => ({ id: entry.id, title: entry.title, day: dayKey(new Date(entry.completedAt!)), completedAt: localStamp(new Date(entry.completedAt!)), ...(entry.timeStart ? { timeStart: entry.timeStart } : {}), ...(entry.timeEnd ? { timeEnd: entry.timeEnd } : {}) })) },
+    data: {
+      ...(period ?? {}), count: entries.length,
+      items: shown.shown.map((entry) => ({ id: ids.short(entry.id), title: entry.title, day: dayKey(new Date(entry.completedAt!)), completedAt: localStamp(new Date(entry.completedAt!)), ...(entry.timeStart ? { timeStart: entry.timeStart } : {}), ...(entry.timeEnd ? { timeEnd: entry.timeEnd } : {}) })),
+      ...(shown.next ? { nextCursor: shown.next } : {}),
+    },
+  };
+}
+
+/**
+ * N1: the repeating tasks (repeats.json) — each rule in the app's words, its reminder, the next day it
+ * falls on, and today's open copy when there is one. Rules aren't changed here; a copy on the list is a
+ * task like any other (its day only, through preview_changes).
+ */
+export function listRepeats(ctx: Ctx, args: PageArgs = {}): Reply {
+  const { folder, now, lang } = ctx;
+  const today = dayKey(now);
+  const series = folder.load("repeats.json");
+  const items = folder.loadLoose("todos.json");
+  const taskIds = new Ids(items.map((item) => item.id));
+  const ids = new Ids(series.map((entry) => entry.id));
+  const rows = series.map((entry) => {
+    // Today's copy already placed: the next is from tomorrow on.
+    const from = entry.lastPlaced === today ? atOn(plusDays(today, 1), 12 * 60) : now;
+    const next = nextOccurrence(entry.rule, from);
+    const open = items.find((item) => item.seriesID === entry.id && !item.isCompleted);
+    return { entry, next: next ? dateKey(next) : undefined, open };
+  }).sort((a, b) => (a.next ?? "9999").localeCompare(b.next ?? "9999") || a.entry.title.localeCompare(b.entry.title));
+  const shown = page(rows, args, pages.repeats[0], pages.repeats[1], lang);
+  const lines = [say(lang, `반복 할 일 ${rows.length}개`, `${rows.length} repeating ${rows.length === 1 ? "task" : "tasks"}`, `${rows.length} herhalende ${rows.length === 1 ? "taak" : "taken"}`),
+    ...shown.shown.map(({ entry, next, open }) => [
+      `- ${entry.title}`, describeRepeat(entry.rule, entry.remindAt, lang),
+      ...(next ? [`${say(lang, "다음", "next", "volgende")} ${next === today ? say(lang, "오늘", "today", "vandaag") : dayText(next, lang)}`] : []),
+      ...(open ? [`${say(lang, "목록에 있음", "on the list", "op de lijst")} id ${taskIds.short(open.id)}`] : []),
+      `id ${ids.short(entry.id)}`,
+    ].join(" · "))];
+  const note = pageNote(shown, lang);
+  if (note) lines.push(note);
+  return {
+    text: lines.join("\n"),
+    data: {
+      count: rows.length,
+      repeats: shown.shown.map(({ entry, next, open }) => ({
+        id: ids.short(entry.id), title: entry.title, rule: describeRepeat(entry.rule, undefined, lang), kind: entry.rule.kind,
+        ...(entry.rule.kind === "weekly" ? { weekdays: [...(entry.rule.weekdays ?? [])] } : {}), ...(entry.rule.kind === "monthly" ? { monthDay: entry.rule.monthDay ?? 1 } : {}),
+        ...(entry.remindAt ? { remindAt: entry.remindAt } : {}), ...(next ? { next } : {}), ...(open ? { task: taskIds.short(open.id) } : {}),
+      })),
+      ...(shown.next ? { nextCursor: shown.next } : {}),
+    },
   };
 }
 
@@ -286,10 +392,11 @@ function newTask(input: TodoInput, now: Date, lang: Lang): TodoItem {
   return item;
 }
 
-function logged(ctx: Ctx, tool: string, kind: "add" | "change", target: AiTarget, changes: AiChange[]): void {
+/** One line in ai-log.jsonl for what was added or changed, with this extension's version (I1). */
+export function logged(ctx: Ctx, tool: string, kind: "add" | "change", target: AiTarget, changes: AiChange[]): void {
   if (changes.length === 0) return;
   const title = String((changes[0].after ?? changes[0].before)?.[target === "memos" ? "text" : "title"] ?? "");
-  ctx.folder.log(aiEntry({ client: ctx.client, tool, kind, target, title: target === "memos" ? title.split("\n")[0].trim() : title, changes }, ctx.now));
+  ctx.folder.log({ ...aiEntry({ client: ctx.client, tool, kind, target, title: target === "memos" ? title.split("\n")[0].trim() : title, changes }, ctx.now), ext: aiExtVersion });
 }
 
 export function addTodos(ctx: Ctx, args: { items: TodoInput[] }): Reply {
@@ -307,7 +414,7 @@ export function addTodos(ctx: Ctx, args: { items: TodoInput[] }): Reply {
   });
   if (problems.length) throw new Problem([say(lang, "아무것도 넣지 않았어요.", "Nothing was added.", "Er is niets toegevoegd."), ...problems].join("\n"));
   const today = dayKey(now);
-  const { added, skipped } = folder.update("todos.json", (list) => {
+  const { added, skipped, all } = folder.update("todos.json", (list) => {
     const added: TodoItem[] = [], skipped: { item: TodoItem; existing: TodoItem }[] = [];
     for (const item of made) {
       const key = `${lower(item.title)}@${dupDay(item, today)}`;
@@ -316,15 +423,16 @@ export function addTodos(ctx: Ctx, args: { items: TodoInput[] }): Reply {
       added.push({ ...item });
     }
     list.push(...added);
-    return { changed: added.length > 0, result: { added, skipped } };
+    return { changed: added.length > 0, result: { added, skipped, all: [...list] } };
   });
   logged(ctx, "add_todos", "add", "todos", added.map((item) => ({ file: "todos.json", id: item.id, before: null, after: item as unknown as AiItem })));
+  const words = taskWordsOf(ctx, all);
   const lines: string[] = [];
-  if (added.length) lines.push(say(lang, `할 일 ${added.length}개를 넣었어요.`, `Added ${added.length} ${added.length === 1 ? "task" : "tasks"}.`, `${added.length} ${added.length === 1 ? "taak" : "taken"} toegevoegd.`), ...added.map((item) => taskLine(item, now, lang)));
-  if (skipped.length) lines.push(say(lang, "이미 있어서 넣지 않았어요:", "Already there, so not added:", "Staat er al, dus niet toegevoegd:"), ...skipped.map(({ existing }) => taskLine(existing, now, lang)));
+  if (added.length) lines.push(say(lang, `할 일 ${added.length}개를 넣었어요.`, `Added ${added.length} ${added.length === 1 ? "task" : "tasks"}.`, `${added.length} ${added.length === 1 ? "taak" : "taken"} toegevoegd.`), ...added.map((item) => taskLine(item, now, lang, words)));
+  if (skipped.length) lines.push(say(lang, "이미 있어서 넣지 않았어요:", "Already there, so not added:", "Staat er al, dus niet toegevoegd:"), ...skipped.map(({ existing }) => taskLine(existing, now, lang, words)));
   return {
     text: lines.join("\n"),
-    data: { added: added.map((item) => taskData(item, now)), skipped: skipped.map(({ item, existing }) => ({ title: item.title, reason: "duplicate", id: existing.id })) },
+    data: { added: added.map((item) => taskData(item, now, words)), skipped: skipped.map(({ item, existing }) => ({ title: item.title, reason: "duplicate", id: words.ids.short(existing.id) })) },
   };
 }
 
@@ -349,44 +457,37 @@ function eventDraft(input: EventInput, lang: Lang): CalendarDraft {
   return draft;
 }
 
-function localEventLine(event: LocalEvent, lang: Lang): string {
-  const shown = occurrences(event, localDate(event.date)!, localDate(plusDays(event.date, Math.max(1, event.days)))!, lang)[0];
-  return shown ? `${dayText(event.date, lang)} ${eventLine(shown, lang).slice(2)}` : `${event.title} · id ${event.id}`;
+/** An event's first occurrence (what a line and the data show of an event just added or changed). */
+const firstOf = (event: LocalEvent, lang: Lang): CalendarEvent | undefined =>
+  occurrences(event, localDate(event.date)!, localDate(plusDays(event.date, Math.max(1, event.days)))!, lang)[0];
+
+function localEventLine(event: LocalEvent, lang: Lang, ids: Ids): string {
+  const shown = firstOf(event, lang);
+  return shown ? `${dayText(event.date, lang)} ${eventLine(shown, lang, ids).slice(2)}` : `${event.title} · id ${ids.short(event.id)}`;
+}
+
+function localEventData(event: LocalEvent, lang: Lang, ids: Ids): Record<string, unknown> {
+  const shown = firstOf(event, lang);
+  return shown ? eventData(shown, event, ids) : { id: ids.short(event.id), title: event.title, date: event.date, allDay: event.allDay, repeat: event.repeat, canChange: event.repeat === "none" };
 }
 
 export function addEvent(ctx: Ctx, args: EventInput): Reply {
   const { folder, now, lang } = ctx;
   const draft = eventDraft(args, lang);
   const event = eventFromDraft(draft, newID(), now);
-  const { added, existing } = folder.update("events.json", (list): { changed: boolean; result: { added?: LocalEvent; existing?: LocalEvent } } => {
+  const { added, existing, all } = folder.update("events.json", (list): { changed: boolean; result: { added?: LocalEvent; existing?: LocalEvent; all: LocalEvent[] } } => {
     const from = localDate(draft.date)!, to = localDate(plusDays(draft.date, 1))!;
     const existing = list.find((entry) => lower(entry.title) === lower(draft.title) && occurrences(entry, from, to, lang).some((shown) => dateKey(shown.start) === draft.date));
-    if (existing) return { changed: false, result: { added: undefined, existing } };
+    if (existing) return { changed: false, result: { added: undefined, existing, all: list } };
     list.push({ ...event });
-    return { changed: true, result: { added: event, existing: undefined } };
+    return { changed: true, result: { added: event, existing: undefined, all: [...list] } };
   });
+  const ids = new Ids(all.map((entry) => entry.id));
   if (existing) {
-    return { text: `${say(lang, "이미 있어서 넣지 않았어요:", "Already there, so not added:", "Staat er al, dus niet toegevoegd:")}\n- ${localEventLine(existing, lang)}`, data: { added: null, skipped: { title: draft.title, reason: "duplicate", id: existing.id } } };
+    return { text: `${say(lang, "이미 있어서 넣지 않았어요:", "Already there, so not added:", "Staat er al, dus niet toegevoegd:")}\n- ${localEventLine(existing, lang, ids)}`, data: { added: null, skipped: { title: draft.title, reason: "duplicate", id: ids.short(existing.id) } } };
   }
   logged(ctx, "add_event", "add", "events", [{ file: "events.json", id: added!.id, before: null, after: added as unknown as AiItem }]);
-  return { text: `${say(lang, "일정을 넣었어요.", "Added the event.", "Afspraak toegevoegd.")}\n- ${localEventLine(added!, lang)}`, data: { added: { ...added } } };
-}
-
-export function addMemo(ctx: Ctx, args: { text: string }): Reply {
-  const { folder, now, lang } = ctx;
-  const text = (args.text ?? "").replace(/\r\n/g, "\n").trim();
-  if (!text) throw new Problem(say(lang, "메모가 비어 있어요.", "The memo is empty.", "De notitie is leeg."));
-  if (text.length > 4000) throw new Problem(say(lang, "메모는 4,000자까지예요.", "A memo can be at most 4,000 characters.", "Een notitie mag hoogstens 4.000 tekens zijn."));
-  const memo: Memo = { ...newMemo(now), text };
-  const { added, existing } = folder.update("memos.json", (list): { changed: boolean; result: { added?: Memo; existing?: Memo } } => {
-    const existing = list.find((entry) => entry.text.trim() === text);
-    if (existing) return { changed: false, result: { added: undefined, existing } };
-    list.unshift({ ...memo });
-    return { changed: true, result: { added: memo, existing: undefined } };
-  });
-  if (existing) return { text: `${say(lang, "같은 메모가 이미 있어요.", "The same memo is already there.", "Dezelfde notitie staat er al.")} id ${existing.id}`, data: { added: null, skipped: { reason: "duplicate", id: existing.id } } };
-  logged(ctx, "add_memo", "add", "memos", [{ file: "memos.json", id: added!.id, before: null, after: added as unknown as AiItem }]);
-  return { text: `${say(lang, "메모를 남겼어요:", "Left a memo:", "Notitie achtergelaten:")} ${memoTitle(added!, lang)} · id ${added!.id}`, data: { added: { ...added } } };
+  return { text: `${say(lang, "일정을 넣었어요.", "Added the event.", "Afspraak toegevoegd.")}\n- ${localEventLine(added!, lang, ids)}`, data: { added: localEventData(added!, lang, ids) } };
 }
 
 // ─── Changing, after a yes ────────────────────────────────────────────────────
@@ -394,11 +495,12 @@ export function addMemo(ctx: Ctx, args: { text: string }): Reply {
 export type ChangeSet = Record<string, unknown>;
 export interface ChangeInput { kind: "todo" | "event"; id: string; set: ChangeSet }
 
-const todoKeys = ["title", "date", "timeStart", "timeEnd", "remindAt", "later", "done"];
-const eventKeys = ["title", "date", "start", "end", "allDay", "days", "location"];
+/** The fields a change may set (the input schema says the same per kind, C3; this stays as the tools' own check). */
+export const todoKeys = ["title", "date", "timeStart", "timeEnd", "remindAt", "later", "done"] as const;
+export const eventKeys = ["title", "date", "start", "end", "allDay", "days", "location"] as const;
 
 function checkKeys(set: ChangeSet, allowed: readonly string[], lang: Lang): void {
-  const keys = Object.keys(set);
+  const keys = Object.keys(set).filter((key) => set[key] !== undefined);
   if (keys.length === 0) throw new Problem(say(lang, "바꿀 것이 없어요.", "There is nothing to change.", "Er is niets te wijzigen."));
   const wrong = keys.filter((key) => !allowed.includes(key));
   if (wrong.some((key) => /delete|remove|deleted|trash/i.test(key))) throw new Problem(say(lang, "지우기는 할 수 없어요. 종이냥에서 직접 지워 주세요.", "Deleting isn’t possible. Delete it in 종이냥 itself.", "Verwijderen kan niet. Verwijder het in 종이냥 zelf."));
@@ -489,12 +591,12 @@ export function changedEvent(event: LocalEvent, set: ChangeSet, now: Date, lang:
 function taskFields(item: TodoItem, now: Date, lang: Lang): [string, string][] {
   const day = rangeDay(item, now);
   const range = rangeOf(item);
-  const none = say(lang, "없음", "none", "geen");
+  const nothing = say(lang, "없음", "none", "geen");
   return [
     [say(lang, "제목", "Title", "Titel"), item.title],
     [say(lang, "날짜", "Day", "Dag"), day ? rangeDayText(day, now, lang) : say(lang, "언젠가", "someday", "ooit")],
-    [say(lang, "시간", "Time", "Tijd"), range ? rangeText(range, lang) : none],
-    [say(lang, "알림", "Reminder", "Herinnering"), item.reminderAt ? reminderText(new Date(item.reminderAt), day, lang).replace(/^\S+ /, "") : none],
+    [say(lang, "시간", "Time", "Tijd"), range ? rangeText(range, lang) : nothing],
+    [say(lang, "알림", "Reminder", "Herinnering"), item.reminderAt ? reminderText(new Date(item.reminderAt), day, lang).replace(/^\S+ /, "") : nothing],
     [say(lang, "상태", "Status", "Status"), item.isCompleted ? say(lang, "끝냄", "done", "klaar") : say(lang, "남음", "open", "open")],
   ];
 }
@@ -526,8 +628,11 @@ function newToken(): string {
   return token;
 }
 
-/** An event's id, or an occurrence key ("local/<id>@<day>") from list_events. */
-const eventId = (id: string): string => parseOccurrenceKey(id)?.id ?? id;
+/** An event's id as given: its id (whole or short), or an occurrence key ("local/<id>@<day>", "<id>@<day>"). */
+const eventId = (id: string): string => parseOccurrenceKey(id.trim())?.id ?? id.trim().replace(/@\d{4}-\d{2}-\d{2}$/, "");
+
+/** The fields actually given (a schema's absent optional keys can come through as undefined). */
+const given = (set: ChangeSet | undefined): ChangeSet => Object.fromEntries(Object.entries(set ?? {}).filter(([, value]) => value !== undefined));
 
 export function previewChanges(ctx: Ctx, args: { changes: ChangeInput[] }): Reply {
   const { folder, now, lang } = ctx;
@@ -536,27 +641,28 @@ export function previewChanges(ctx: Ctx, args: { changes: ChangeInput[] }): Repl
   if (inputs.length > maxItems) throw new Problem(say(lang, `한 번에 ${maxItems}개까지 고칠 수 있어요.`, `At most ${maxItems} changes at a time.`, `Hoogstens ${maxItems} wijzigingen tegelijk.`));
   const todos = inputs.some((input) => input.kind === "todo") ? folder.load("todos.json") : [];
   const events = inputs.some((input) => input.kind === "event") ? folder.load("events.json") : [];
+  const todoIds = new Ids(todos.map((item) => item.id)), eventIds = new Ids(events.map((event) => event.id));
+  const todoById = new Map(todos.map((item) => [item.id, item])), eventById = new Map(events.map((event) => [event.id, event]));
   const problems: string[] = [];
   const lines: string[] = [];
   const accepted: Pending["changes"] = [];
   inputs.forEach((input, index) => {
     try {
+      const set = given(input.set);
       if (input.kind === "todo") {
-        const item = todos.find((entry) => entry.id === input.id);
-        if (!item) throw new Problem(say(lang, `이 id의 할 일이 없어요: ${input.id}.`, `No task with id ${input.id}.`, `Geen taak met id ${input.id}.`));
-        const after = changedTask(item, input.set ?? {}, now, lang);
+        const item = todoById.get(pick(todoIds, input.id, lang, "todo", (id) => todoById.get(id)?.title ?? ""))!;
+        const after = changedTask(item, set, now, lang);
         const changes = diffLines(taskFields(item, now, lang), taskFields(after, now, lang));
         if (!changes.length) throw new Problem(say(lang, `바뀌는 게 없어요: ‘${item.title}’.`, `Nothing changes for ‘${item.title}’.`, `Er verandert niets aan ‘${item.title}’.`));
-        lines.push(`${accepted.length + 1}. ${item.title} · id ${item.id}`, ...changes);
-        accepted.push({ kind: "todo", id: item.id, set: input.set, before: item as unknown as AiItem });
+        lines.push(`${accepted.length + 1}. ${item.title} · id ${todoIds.short(item.id)}`, ...changes);
+        accepted.push({ kind: "todo", id: item.id, set, before: item as unknown as AiItem });
       } else {
-        const event = events.find((entry) => entry.id === eventId(input.id));
-        if (!event) throw new Problem(say(lang, `이 id의 일정이 없어요: ${input.id}.`, `No event with id ${input.id}.`, `Geen afspraak met id ${input.id}.`));
-        const after = changedEvent(event, input.set ?? {}, now, lang);
+        const event = eventById.get(pick(eventIds, eventId(input.id), lang, "event", (id) => eventById.get(id)?.title ?? ""))!;
+        const after = changedEvent(event, set, now, lang);
         const changes = diffLines(eventFields(event, lang), eventFields(after, lang));
         if (!changes.length) throw new Problem(say(lang, `바뀌는 게 없어요: ‘${event.title}’.`, `Nothing changes for ‘${event.title}’.`, `Er verandert niets aan ‘${event.title}’.`));
-        lines.push(`${accepted.length + 1}. ${event.title} · id ${event.id}`, ...changes);
-        accepted.push({ kind: "event", id: event.id, set: input.set, before: event as unknown as AiItem });
+        lines.push(`${accepted.length + 1}. ${event.title} · id ${eventIds.short(event.id)}`, ...changes);
+        accepted.push({ kind: "event", id: event.id, set, before: event as unknown as AiItem });
       }
     } catch (error) {
       if (!(error instanceof Problem)) throw error;
@@ -571,11 +677,16 @@ export function previewChanges(ctx: Ctx, args: { changes: ChangeInput[] }): Repl
     "아직 아무것도 바뀌지 않았어요. 사용자에게 이대로 보여 주고 분명히 ‘응’이라고 하면 apply_changes로 적용하세요.",
     "Nothing has changed yet. Show this to the user as it is, and only after a clear yes, apply it with apply_changes.",
     "Er is nog niets gewijzigd. Laat dit zo aan de gebruiker zien en pas het pas na een duidelijk ja toe met apply_changes.");
-  return { text: [head, ...lines, "", tail].join("\n"), data: { token, expiresAt: localStamp(new Date(now.getTime() + tokenMs)), changes: accepted.map(({ kind, id }) => ({ kind, id })) } };
+  return {
+    text: [head, ...lines, "", tail].join("\n"),
+    data: { token, expiresAt: localStamp(new Date(now.getTime() + tokenMs)), changes: accepted.map(({ kind, id, before }) => ({ kind, id: (kind === "todo" ? todoIds : eventIds).short(id), title: String(before.title ?? "") })) },
+  };
 }
 
 /** Thrown inside a write when an item is no longer what the preview showed (M10). */
-class Changed extends Error {}
+class Changed extends Error {
+  constructor(readonly titles: string[]) { super("changed"); }
+}
 
 export function applyChanges(ctx: Ctx, args: { token: string }): Reply {
   const { folder, now, lang } = ctx;
@@ -584,44 +695,67 @@ export function applyChanges(ctx: Ctx, args: { token: string }): Reply {
   if (!preview) throw new Problem(say(lang, `기다리는 확인 번호가 아니에요: ${token || "(없음)"}. preview_changes로 다시 미리보기해 주세요.`, `No confirmation ${token || "(none)"} is waiting. Preview again with preview_changes.`, `Bevestiging ${token || "(geen)"} is onbekend. Maak opnieuw een voorbeeld met preview_changes.`));
   pending.delete(token);
   if (now.getTime() - preview.at > tokenMs) throw new Problem(say(lang, "확인 번호의 10분이 지나서 적용하지 않았어요. preview_changes로 다시 미리보기해 주세요.", "The confirmation is older than 10 minutes, so nothing was applied. Preview again with preview_changes.", "De bevestiging is ouder dan 10 minuten, dus er is niets toegepast. Maak opnieuw een voorbeeld met preview_changes."));
-  const stale = (titles: string[]) => new Problem(say(lang,
-    `미리보기 뒤에 바뀐 항목이 있어서 적용하지 않았어요: ${titles.map((title) => `‘${title}’`).join(", ")}. preview_changes로 다시 미리보기해 주세요.`,
-    `${titles.map((title) => `‘${title}’`).join(", ")} changed after the preview, so nothing was applied. Preview again with preview_changes.`,
-    `${titles.map((title) => `‘${title}’`).join(", ")} is na het voorbeeld gewijzigd, dus er is niets toegepast. Maak opnieuw een voorbeeld met preview_changes.`));
+  const stale = (titles: string[]) => {
+    const named = titles.map((title) => `‘${title}’`).join(", ");
+    return new Problem(say(lang,
+      `미리보기 뒤에 바뀐 항목이 있어서 적용하지 않았어요: ${named}. preview_changes로 다시 미리보기해 주세요. (코드 ITEM_CHANGED)`,
+      `${named} changed after the preview, so nothing was applied. Preview again with preview_changes. (code ITEM_CHANGED)`,
+      `${named} is na het voorbeeld gewijzigd, dus er is niets toegepast. Maak opnieuw een voorbeeld met preview_changes. (code ITEM_CHANGED)`), "ITEM_CHANGED");
+  };
   const todoChanges = preview.changes.filter((change) => change.kind === "todo");
   const eventChanges = preview.changes.filter((change) => change.kind === "event");
-  // Every item checked first, so either all of it goes in or none.
-  const moved = (file: "todos.json" | "events.json", list: readonly { id: string }[], changes: Pending["changes"]) =>
-    changes.filter((change) => !sameSaved(aiTargetOf(file), list.find((item) => item.id === change.id) as Record<string, unknown> | undefined, change.before)).map((change) => String(change.before.title ?? ""));
-  const movedNow = [...moved("todos.json", todoChanges.length ? folder.load("todos.json") : [], todoChanges), ...moved("events.json", eventChanges.length ? folder.load("events.json") : [], eventChanges)];
-  if (movedNow.length) throw stale(movedNow);
-  const lines: string[] = [say(lang, "바꿨어요.", "Changed.", "Gewijzigd.")];
-  const write = <K extends "todos.json" | "events.json">(file: K, changes: Pending["changes"], apply: (item: never, set: ChangeSet) => object): AiChange[] => {
-    if (!changes.length) return [];
-    try {
-      return folder.update(file, (list) => {
-        const done: AiChange[] = [];
-        for (const change of changes) {
-          const index = (list as { id: string }[]).findIndex((item) => item.id === change.id);
-          const current = list[index] as unknown as AiItem | undefined;
-          if (!current || !sameSaved(aiTargetOf(file), current, change.before)) throw new Changed(String(change.before.title ?? ""));
-          const after = apply(current as never, change.set) as unknown as AiItem;
-          (list as unknown[])[index] = after;
-          done.push({ file, id: change.id, before: { ...current }, after: { ...after } });
-        }
-        return { changed: true, result: done };
-      });
-    } catch (error) {
-      if (error instanceof Changed) throw stale([error.message]);
-      throw error;
+  const files = [...(todoChanges.length ? ["todos.json" as const] : []), ...(eventChanges.length ? ["events.json" as const] : [])];
+  /** One file's changes made on its list (every item was checked first). */
+  const applyTo = (file: "todos.json" | "events.json", list: { id: string }[], changes: Pending["changes"], apply: (item: never, set: ChangeSet) => object): AiChange[] => {
+    const done: AiChange[] = [];
+    for (const change of changes) {
+      const index = list.findIndex((item) => item.id === change.id);
+      const current = list[index] as unknown as AiItem;
+      const after = apply(current as never, change.set) as unknown as AiItem;
+      list[index] = after as unknown as { id: string };
+      done.push({ file, id: change.id, before: { ...current }, after: { ...after } });
     }
+    return done;
   };
-  const todoDone = write("todos.json", todoChanges, (item: TodoItem, set) => changedTask(item, set, now, lang));
+  // Both files checked and written under one hold of the lock: all of it goes in, or none (#110). Whatever
+  // stops it (an item changed, a file that changed in between, a failed write) leaves both files as they
+  // were, and nothing is logged.
+  let todoDone: AiChange[] = [], eventDone: AiChange[] = [];
+  let todoIds = new Ids([]), eventIds = new Ids([]);
+  try {
+    ({ todoDone, eventDone, todoIds, eventIds } = folder.updateAll(files, (lists) => {
+      const todos = lists["todos.json"] ?? [], events = lists["events.json"] ?? [];
+      const moved = [
+        ...todoChanges.filter((change) => !sameSaved(aiTargetOf("todos.json"), todos.find((item) => item.id === change.id) as Record<string, unknown> | undefined, change.before)),
+        ...eventChanges.filter((change) => !sameSaved(aiTargetOf("events.json"), events.find((item) => item.id === change.id) as Record<string, unknown> | undefined, change.before)),
+      ].map((change) => String(change.before.title ?? ""));
+      if (moved.length) throw new Changed(moved);
+      return {
+        changed: true,
+        result: {
+          todoDone: applyTo("todos.json", todos, todoChanges, (item: TodoItem, set) => changedTask(item, set, now, lang)),
+          eventDone: applyTo("events.json", events, eventChanges, (event: LocalEvent, set) => changedEvent(event, set, now, lang)),
+          todoIds: new Ids(todos.map((item) => item.id)), eventIds: new Ids(events.map((event) => event.id)),
+        },
+      };
+    }));
+  } catch (error) {
+    if (error instanceof Changed) throw stale(error.titles);
+    throw error;
+  }
   logged(ctx, "apply_changes", "change", "todos", todoDone);
-  const eventDone = write("events.json", eventChanges, (event: LocalEvent, set) => changedEvent(event, set, now, lang));
   logged(ctx, "apply_changes", "change", "events", eventDone);
-  for (const change of todoDone) lines.push(taskLine(change.after as unknown as TodoItem, now, lang));
-  for (const change of eventDone) lines.push(`- ${localEventLine(change.after as unknown as LocalEvent, lang)}`);
-  return { text: lines.join("\n"), data: { changed: [...todoDone, ...eventDone].map((change) => ({ kind: change.file === "todos.json" ? "todo" : "event", id: change.id, after: change.after })) } };
+  const words: TaskWords = { ids: todoIds, repeats: repeatWords(folder, lang) };
+  const lines: string[] = [say(lang, "바꿨어요.", "Changed.", "Gewijzigd.")];
+  for (const change of todoDone) lines.push(taskLine(change.after as unknown as TodoItem, now, lang, words));
+  for (const change of eventDone) lines.push(`- ${localEventLine(change.after as unknown as LocalEvent, lang, eventIds)}`);
+  return {
+    text: lines.join("\n"),
+    data: {
+      changed: [
+        ...todoDone.map((change) => ({ kind: "todo" as const, id: todoIds.short(change.id), title: String(change.after?.title ?? "") })),
+        ...eventDone.map((change) => ({ kind: "event" as const, id: eventIds.short(change.id), title: String(change.after?.title ?? "") })),
+      ],
+    },
+  };
 }
-

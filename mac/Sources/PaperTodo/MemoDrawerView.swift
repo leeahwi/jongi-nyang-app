@@ -10,6 +10,8 @@ struct MemoDrawerView: View {
     @ObservedObject var drawer: MemoDrawer
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// How tall the bookmarks are (#164: the close tab goes under them when they reach the middle).
+    @State private var bookmarksHeight: CGFloat = 0
 
     static let tabsWidth: CGFloat = 34
     /// Room above the paper for its cat ears (DrawerCat).
@@ -23,9 +25,9 @@ struct MemoDrawerView: View {
     /// The picked bookmark covers the paper's edge by this much.
     static let tabOverlap: CGFloat = 2
 
-    private var palette: DrawerPalette { drawer.theme.palette(scheme) }
+    private var palette: DrawerPalette { drawer.palette(scheme) }
     private var right: Bool { drawer.side == .right }
-    private var font: NotebookFont { drawer.model.notebookFont }
+    private var font: NotebookFont { drawer.titleFont }
     private var backdrop: MemoDrawer.Backdrop { drawer.shownBackdrop }
     private var floating: Bool { backdrop == .none }
 
@@ -71,7 +73,8 @@ struct MemoDrawerView: View {
             }
             footer
         }
-        .frame(width: drawer.width)
+        // The window's width less the bookmarks (and the shadow): the user's, or 크게 보기's while it slides wider (#113).
+        .frame(minWidth: drawer.width, maxWidth: .infinity)
         .frame(maxHeight: .infinity)
         .background(alignment: .top) {
             if !floating {
@@ -88,7 +91,10 @@ struct MemoDrawerView: View {
         .background { DrawerContextArea(drawer: drawer) { DrawerMenus.drawer(drawer) } }
         .overlay(alignment: .bottom) { toast }
         .overlay { folderSheet }
-        .overlay(alignment: right ? .leading : .trailing) { WidthGrip(drawer: drawer) }
+        .overlay { trashSheet }
+        // 크게 보기 has its own width (#113): the edge doesn't resize while it shows.
+        .overlay(alignment: right ? .leading : .trailing) { if drawer.bigID == nil { WidthGrip(drawer: drawer) } }
+        // #164: 서랍 닫기 is no longer on the paper: it is a tab outside it, beside the bookmarks (`tabs`).
         .padding(.top, Self.catRoom)
     }
 
@@ -124,18 +130,18 @@ struct MemoDrawerView: View {
                 HStack(spacing: 2) {
                     DrawerIconButton(symbol: drawer.searching ? "xmark.circle" : "magnifyingglass", palette: palette,
                                      help: drawer.searching ? L("검색 닫기") : L("검색 (⌘F)")) { drawer.toggleSearch() }
-                    DrawerIconButton(symbol: drawer.pinned ? "pin.fill" : "pin", palette: palette,
-                                     help: drawer.pinned ? L("다른 창 위에 늘 떠 있어요 (누르면 풀기)") : L("다른 창 위에 띄우기")) {
-                        drawer.pinned.toggle()
-                        drawer.onPin()
-                    }
-                    .accessibilityLabel(L("위에 고정"))
-                    .accessibilityValue(drawer.pinned ? L("켬") : L("끔"))
-                    DrawerIconButton(symbol: "xmark", palette: palette, help: L("서랍 닫기 (Esc)")) { drawer.onClose() }
+                    // #83: no × here any more; the small bar on the paper's inner edge closes the drawer (and Esc, the shortcut).
+                    // #111: nor the pin — 다른 창 위에 띄우기 is in the ⚙ menu and Desk → 메모 서랍 (it read as 고정).
                 }
                 .padding(.top, 4)
             }
             .frame(minHeight: 40)
+            // #114: where to look and what to keep to, under the field.
+            if drawer.searching {
+                SearchChips(drawer: drawer, palette: palette)
+                    .padding(.top, 6)
+                    .padding(.bottom, 4)
+            }
         }
         .padding(.top, floating ? 6 : 8)
         .padding(.horizontal, floating ? 12 : 16)
@@ -158,7 +164,7 @@ struct MemoDrawerView: View {
         let shown = drawer.list
         let sections = shown.sections, byID = shown.byID
         let hasPinned = sections.contains { $0.group == .pinned }
-        let gap: CGFloat = shown.dense ? 12 : 16
+        let gap: CGFloat = shown.titles ? MemoTitleRow.gap : (shown.dense ? 12 : 16)
         return ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
@@ -169,9 +175,17 @@ struct MemoDrawerView: View {
                         }
                         ForEach(section.ids, id: \.self) { id in
                             if let memo = byID[id] {
-                                MemoCard(drawer: drawer, memo: memo, palette: palette, font: font, group: section.group)
-                                    .padding(.bottom, gap)
-                                    .id(id)
+                                // #115: 제목만 — one line a memo; the open one is its card, where it was.
+                                if shown.titles && drawer.expandedID != id {
+                                    MemoTitleRow(drawer: drawer, memo: memo, palette: palette, font: font, group: section.group)
+                                        .padding(.bottom, gap)
+                                        .id(id)
+                                } else {
+                                    MemoCard(drawer: drawer, memo: memo, palette: palette, font: font, group: section.group)
+                                        .padding(.bottom, shown.titles ? 10 : gap)
+                                        .padding(.top, shown.titles ? 4 : 0)
+                                        .id(id)
+                                }
                             }
                         }
                     }
@@ -211,43 +225,15 @@ struct MemoDrawerView: View {
         .frame(maxWidth: .infinity)
     }
 
+    /// #114: the results by folder (MemoDrawerSearch.swift).
     private var searchResults: some View {
-        let hits = drawer.hits
-        return ScrollView {
-            LazyVStack(spacing: 14) {
-                ForEach(hits, id: \.memoID) { hit in
-                    SearchSlip(drawer: drawer, hit: hit, palette: palette, font: font)
-                        .id(hit.memoID)
-                }
-                if hits.isEmpty && !drawer.searchedQuery.trimmingCharacters(in: .whitespaces).isEmpty {
-                    // One shape for every search that finds nothing (#39): the words looked for, then 없어요.
-                    Text(Search.emptyText(drawer.searchedQuery, language: .current).keepingParticles)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 18)
-                        .font(.system(size: 12))
-                        .foregroundStyle(palette.secondary)
-                        .padding(.top, 24)
-                } else if hits.isEmpty {
-                    Text(L("초성으로도 찾을 수 있어요 (예: ㅂㄱㅅ → 보고서)"))
-                        .font(.system(size: 12))
-                        .foregroundStyle(palette.secondary)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.horizontal, 18)
-                        .padding(.top, 24)
-                }
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
-            .padding(.bottom, 14)
-        }
-        .scrollIndicators(.never)
+        DrawerSearchResults(drawer: drawer, palette: palette, font: font, floating: floating)
     }
 
     // MARK: Footer
 
     private var footerText: String {
-        if drawer.searching { return MemoFolders.searchFooter(count: drawer.hits.count, language: .current) }
+        if drawer.searching { return MemoFolders.searchFooter(count: drawer.hits.count, folders: drawer.found.count, language: .current) }
         switch drawer.tab {
         case .pinned: return MemoFolders.pinnedFooterShort(count: drawer.shown.count, language: .current)
         case .folder: return MemoFolders.footerShort(folder: drawer.currentFolder?.displayName(.current) ?? "", count: drawer.shown.count, language: .current)
@@ -261,6 +247,7 @@ struct MemoDrawerView: View {
                 Image(systemName: "pawprint.fill")
                     .font(.system(size: 10))
                     .foregroundStyle(palette.paw)
+                    .accessibilityHidden(true)
                 Text(footerText.keepingParticles)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -321,7 +308,7 @@ struct MemoDrawerView: View {
     @ViewBuilder private var folderSheet: some View {
         if drawer.folderSheet != nil {
             ZStack(alignment: .top) {
-                paperShape.fill(Color.black.opacity(palette.kind == .night ? 0.35 : 0.12))
+                paperShape.fill(Color.black.opacity(palette.scheme == .dark ? 0.35 : 0.12))
                     .onTapGesture { drawer.folderSheet = nil }
                 FolderSheetView(drawer: drawer, palette: palette, font: font)
                     .padding(.horizontal, 14)
@@ -330,36 +317,67 @@ struct MemoDrawerView: View {
         }
     }
 
+    /// 지운 메모 (#120): its slip over the paper, as the folder sheet (MemoDrawerTrash.swift).
+    @ViewBuilder private var trashSheet: some View {
+        if drawer.trashOpen {
+            ZStack(alignment: .top) {
+                paperShape.fill(Color.black.opacity(palette.scheme == .dark ? 0.35 : 0.12))
+                    .onTapGesture { drawer.closeTrash() }
+                TrashSheetView(drawer: drawer, palette: palette, font: font)
+                    .padding(.horizontal, 14)
+                    .padding(.top, 74)
+            }
+        }
+    }
+
     // MARK: Bookmarks
 
+    /// The bookmarks, and #164's 서랍 닫기: a tab out of the paper's inner edge, as the handle comes out of the screen's — in
+    /// the middle of the edge, or 12 pt under the bookmarks when they reach that far; when there's no room for it there
+    /// (a short screen, many folders) it keeps the lowest place above the footer and the bookmarks scroll above it.
     private var tabs: some View {
+        GeometryReader { geometry in
+            let height = geometry.size.height
+            let room = CloseTab.room.height
+            let middle = Self.catRoom + (height - Self.catRoom) / 2
+            let lowest = max(middle, height - room / 2 - 52)
+            let wanted = max(middle, Self.bookmarksTop + bookmarksHeight + 12 + room / 2)
+            let y = min(wanted, lowest)
+            ZStack(alignment: .top) {
+                bookmarks.frame(height: wanted > lowest ? max(0, y - room / 2 - 12) : height, alignment: .top)
+                CloseTab(drawer: drawer)
+                    .position(x: right ? geometry.size.width - Self.tabOverlap - CloseTab.room.width / 2 : Self.tabOverlap + CloseTab.room.width / 2, y: y)
+            }
+        }
+        .frame(width: Self.tabsWidth + Self.tabOverlap)
+        .padding(right ? .trailing : .leading, -Self.tabOverlap)
+        .zIndex(1)
+    }
+
+    static let bookmarksTop = catRoom + 104
+
+    private var bookmarks: some View {
         ScrollView(.vertical) {
+            let visible = drawer.folders.visible
+            // #116: first letters that collide among the un-picked bookmarks get a second one. #114: the folder shown stays
+            // picked while searching.
+            let picked = visible.firstIndex { drawer.tab == .folder($0.id) }
+            let letters = MemoFolders.bookmarkLetters(visible.map { $0.displayName(.current) }, picked: picked)
             VStack(alignment: right ? .trailing : .leading, spacing: 5) {
-                ForEach(Array(drawer.folders.visible.enumerated()), id: \.element.id) { index, folder in
-                    FolderTab(drawer: drawer, folder: folder, number: index + 1, palette: palette, font: font, right: right)
+                ForEach(Array(visible.enumerated()), id: \.element.id) { index, folder in
+                    FolderTab(drawer: drawer, folder: folder, number: index + 1, letters: letters[index], palette: palette, font: font, right: right)
                 }
                 PinTab(drawer: drawer, palette: palette, right: right)
-                Button { drawer.newFolder() } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(palette.kind == .night ? palette.faint : palette.icon)
-                        .frame(width: 22, height: 26)
-                        .background { if floating { Circle().fill(palette.sheet).frame(width: 20, height: 20) } }
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .help(L("새 폴더"))
-                .accessibilityLabel(L("새 폴더"))
-                .padding(right ? .trailing : .leading, Self.tabOverlap)
+                AddTab(drawer: drawer, palette: palette, right: right)
             }
             .frame(width: Self.tabsWidth + Self.tabOverlap, alignment: right ? .trailing : .leading)
-            .padding(.top, Self.catRoom + 104)
+            // Its height (not where it is): scrolling the bookmarks never moves the close tab.
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bookmarksHeight = $0 }
+            .padding(.top, Self.bookmarksTop)
             .padding(.bottom, 40)
         }
         .scrollIndicators(.never)
         .frame(width: Self.tabsWidth + Self.tabOverlap)
-        .padding(right ? .trailing : .leading, -Self.tabOverlap)
-        .zIndex(1)
     }
 }
 
@@ -382,6 +400,8 @@ private struct FolderName: View {
             Image(systemName: "chevron.down")
                 .font(.system(size: 9.5, weight: .semibold))
                 .foregroundStyle(palette.faint)
+                // #119: VoiceOver read the symbol's own name (‘아래로 이동’); the menu button says what it does.
+                .accessibilityHidden(true)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 1)
@@ -390,7 +410,8 @@ private struct FolderName: View {
         .onHover { hovering = $0 }
         .overlay {
             DrawerMenuButtonArea(drawer: drawer, label: L("폴더 목록 (⌘L)"), items: { DrawerMenus.folderList(drawer) },
-                                 register: { [weak drawer] open in drawer?.openFolderList = open })
+                                 register: { [weak drawer] open in drawer?.openFolderList = open },
+                                 registerPop: { [weak drawer] pop in drawer?.popUnderName = pop })
         }
     }
 }
@@ -405,6 +426,7 @@ private struct GearButton: View {
         Image(systemName: "gearshape")
             .font(.system(size: 13, weight: .light))
             .foregroundStyle(palette.icon)
+            .accessibilityHidden(true)
             .frame(width: 26, height: 26)
             .background(drawer.shownBackdrop == .none ? palette.sheet : palette.pill, in: Circle())
             .background(palette.ink.opacity(hovering ? 0.06 : 0), in: Circle())
@@ -424,7 +446,7 @@ enum MemoDrawerArt {
     static let emptyCat: NSImage = PetArt.image(.tea).map { PaperTheme.downsampled($0, maxPixels: 200) } ?? PaperTheme.mascot
 }
 
-/// The drawer's paper: its colour, its texture and rules (day ruled, kraft grain, grid squares), its edge and shadow.
+/// The drawer's paper: its colour, its texture (kraft grain, grid squares; #111: no ruled lines), its edge and shadow.
 /// 반투명 / 강하게: the paper at 82 % / 62 % over the blur the panel puts behind it (snapshots draw a blurred desktop).
 private struct PaperBack<S: Shape>: View {
     let palette: DrawerPalette
@@ -448,14 +470,6 @@ private struct PaperBack<S: Shape>: View {
             .overlay {
                 Canvas { context, size in
                     switch palette.background {
-                    case .ruled:
-                        var y: CGFloat = 27.5
-                        var path = Path()
-                        while y < size.height {
-                            path.addRect(CGRect(x: 0, y: y, width: size.width, height: 1))
-                            y += 28
-                        }
-                        context.fill(path, with: .color(palette.rule))
                     case .grid:
                         var path = Path()
                         var x: CGFloat = 0
@@ -471,12 +485,12 @@ private struct PaperBack<S: Shape>: View {
                 .allowsHitTesting(false)
             }
             .overlay { shape.stroke(palette.edge, lineWidth: 0.6) }
-            .shadow(color: .black.opacity((palette.kind == .night ? 0.45 : 0.16) * (opacity < 1 ? 0.6 : 1)), radius: 10, x: 0, y: 2)
+            .shadow(color: .black.opacity((palette.scheme == .dark ? 0.45 : 0.16) * (opacity < 1 ? 0.6 : 1)), radius: 10, x: 0, y: 2)
             .accessibilityHidden(true)
     }
 }
 
-/// Drag the drawer's inner edge: 260–480 pt.
+/// Drag the drawer's inner edge: 260–480 pt (its middle is the close bar, which drags the same way).
 private struct WidthGrip: View {
     @ObservedObject var drawer: MemoDrawer
     @State private var hovering = false
@@ -503,6 +517,85 @@ private struct WidthGrip: View {
     }
 }
 
+/// 서랍 닫기 (#83, like SideNotes; #164): a tab out of the paper's inner edge, on the desktop's side, as the handle comes
+/// out of the screen's edge when the drawer is shut — the handle's cream, edge and shadow, rounded on the outer side,
+/// with the way it closes (› on a right drawer, ‹ on a left one). In the middle of the edge (under the bookmarks when
+/// they reach that far, `MemoDrawerView.tabs`); it follows the edge as the drawer widens (#113). Under the pointer or the
+/// keyboard it comes out 4 pt more; with the keyboard its edge is drawn in the paw's ink too. A click closes the drawer;
+/// a press that moves more than `slop` is the edge being dragged, so the width follows as on the rest of the edge
+/// (`WidthGrip`). Tab reaches it; Space or ↩ presses it. The paper itself carries no line any more.
+struct CloseTab: View {
+    @ObservedObject var drawer: MemoDrawer
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pointerOn = false
+    @State private var start: CGPoint?
+    @State private var dragged = false
+    @FocusState private var focused: Bool
+
+    private var lit: Bool { pointerOn || focused || drawer.previewEdgeHover }
+    /// The tab at rest and how much more it comes out, its room, and how far a press may move and still close.
+    static let tab = CGSize(width: 18, height: 46)
+    static let peek: CGFloat = 4
+    static let room = CGSize(width: 24, height: 50)
+    static let slop: CGFloat = 3
+
+    var body: some View {
+        let right = drawer.side == .right
+        let shape = right ? UnevenRoundedRectangle(topLeadingRadius: 10, bottomLeadingRadius: 10, style: .continuous)
+            : UnevenRoundedRectangle(bottomTrailingRadius: 10, topTrailingRadius: 10, style: .continuous)
+        HStack(spacing: 0) {
+            if right { Spacer(minLength: 0) }
+            ZStack {
+                shape.fill(DrawerHandleView.fill)
+                shape.strokeBorder(focused ? DrawerHandleView.paw : DrawerHandleView.edge, lineWidth: focused ? 1.5 : 1)
+                    // No edge on the paper's side: the tab comes out from under the paper.
+                    .mask(Rectangle().padding(right ? .trailing : .leading, 1))
+                Image(systemName: right ? "chevron.right" : "chevron.left")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(DrawerHandleView.paw)
+                    .offset(x: right ? 1 : -1)
+            }
+            .frame(width: Self.tab.width + (lit ? Self.peek : 0), height: Self.tab.height)
+            .shadow(color: .black.opacity(0.18), radius: 3, x: right ? -1 : 1, y: 1)
+            if !right { Spacer(minLength: 0) }
+        }
+            .frame(width: Self.room.width, height: Self.room.height)
+            .contentShape(Rectangle())
+            .onHover { inside in
+                withAnimation(Motion.animation(.quick, reduce: reduceMotion)) { pointerOn = inside }
+            }
+            .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                .onChanged { _ in
+                    // The screen's mouse, not the view's: the window moves under the pointer as it widens.
+                    let mouse = NSEvent.mouseLocation
+                    if start == nil { start = mouse }
+                    if let start, !dragged, hypot(mouse.x - start.x, mouse.y - start.y) > Self.slop { dragged = true }
+                    if dragged { drawer.onWidth(mouse.x) }
+                }
+                .onEnded { _ in
+                    if !dragged { drawer.onClose() }
+                    dragged = false
+                    start = nil
+                })
+            // Reached with Tab only (a click or the drawer opening doesn't focus it), and no system blue ring: the tab
+            // coming out, its edge in the paw's ink, is its focus mark.
+            .focusable(true, interactions: .activate)
+            .focusEffectDisabled()
+            .focused($focused)
+            .onKeyPress(.space) {
+                drawer.onClose()
+                return .handled
+            }
+            .onChange(of: focused) { _, on in drawer.closeBarFocused = on }
+            .onDisappear { drawer.closeBarFocused = false }
+            .help(L("서랍 닫기"))
+            .accessibilityElement()
+            .accessibilityLabel(L("서랍 닫기"))
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { drawer.onClose() }
+    }
+}
+
 // MARK: - Bookmarks
 
 /// A folder's bookmark: its colour (solid on every paper since 1.45) with a 1 pt edge in the folder's edge colour; an
@@ -513,12 +606,14 @@ private struct FolderTab: View {
     @ObservedObject var drawer: MemoDrawer
     let folder: MemoFolders.Folder
     let number: Int
+    /// What it shows un-picked (#116): its first letter, or two where another starts the same.
+    let letters: String
     let palette: DrawerPalette
     let font: NotebookFont
     let right: Bool
     @State private var targeted = false
 
-    private var picked: Bool { drawer.tab == .folder(folder.id) && !drawer.searching }
+    private var picked: Bool { drawer.tab == .folder(folder.id) }
 
     var body: some View {
         let colors = palette.tab(folder.colorKey)
@@ -534,10 +629,20 @@ private struct FolderTab: View {
                 if picked {
                     VerticalName(name: name, font: font, color: palette.pickedTab?.ink ?? colors.ink)
                         .padding(.vertical, 8)
-                } else if let first = name.first {
-                    Text(String(first).handwritten)
-                        .font(font.handFont(15))
+                } else if letters.count > 1, VerticalName.stacked(letters) {
+                    // Two Hangul letters stacked, as the picked name is (#116).
+                    VStack(spacing: -1) {
+                        ForEach(Array(letters.enumerated()), id: \.offset) { _, letter in
+                            Text(String(letter).handwritten).font(font.handFont(13)).foregroundStyle(colors.ink)
+                        }
+                    }
+                    .offset(x: right ? 1 : -1)
+                } else if !letters.isEmpty {
+                    Text(letters.handwritten)
+                        .font(font.handFont(letters.count > 1 ? 13 : 15))
                         .foregroundStyle(colors.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                         .offset(x: right ? 1 : -1)
                 }
             }
@@ -587,7 +692,7 @@ private struct PinTab: View {
     let right: Bool
     @State private var targeted = false
 
-    private var picked: Bool { drawer.tab == .pinned && !drawer.searching }
+    private var picked: Bool { drawer.tab == .pinned }
 
     var body: some View {
         let shape = right ? UnevenRoundedRectangle(topLeadingRadius: 9, bottomLeadingRadius: 9, style: .continuous)
@@ -608,6 +713,8 @@ private struct PinTab: View {
         .padding(right ? .trailing : .leading, picked ? 0 : MemoDrawerView.tabOverlap)
         .help(MemoFolders.bookmarkLabel(L("고정"), count: drawer.folders.pinnedMemos(drawer.memos).count, key: "⌘0", language: .current))
         .accessibilityLabel(L("고정"))
+        // #119: its count, as the folders' bookmarks say theirs.
+        .accessibilityValue(MemoFolders.sheetCount(drawer.folders.pinnedMemos(drawer.memos).count, language: .current))
         .accessibilityAddTraits(picked ? .isSelected : [])
         .overlay { DrawerContextArea(drawer: drawer) { DrawerMenus.pinned(drawer) } }
         .dropDestination(for: String.self) { items, _ in
@@ -616,6 +723,46 @@ private struct PinTab: View {
             if !drawer.folders.isPinned(id) { drawer.togglePin(id) }
             return true
         } isTargeted: { targeted = $0 }
+    }
+}
+
+/// 새 폴더 (#82): an empty bookmark under 고정 — the un-picked bookmarks' shape, a little shorter (22 × 30), in the
+/// sheet's paper with a dashed edge in the open checkbox's colour and a 12.5 pt + in the secondary ink (3:1 or more on
+/// every paper); under the pointer a touch darker, the + in ink. A click opens the new-folder slip.
+private struct AddTab: View {
+    @ObservedObject var drawer: MemoDrawer
+    let palette: DrawerPalette
+    let right: Bool
+    @State private var pointerOn = false
+
+    private var lit: Bool { pointerOn || drawer.previewEdgeHover }
+    static let size = CGSize(width: 22, height: 30)
+
+    var body: some View {
+        let shape = right ? UnevenRoundedRectangle(topLeadingRadius: 9, bottomLeadingRadius: 9, style: .continuous)
+            : UnevenRoundedRectangle(bottomTrailingRadius: 9, topTrailingRadius: 9, style: .continuous)
+        Button { drawer.newFolder() } label: {
+            ZStack {
+                shape.fill(palette.sheet)
+                shape.fill(palette.ink.opacity(lit ? 0.06 : 0))
+                Image(systemName: "plus")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(lit ? palette.ink : palette.secondary)
+                    .offset(x: right ? 1 : -1)
+            }
+            .frame(width: Self.size.width, height: Self.size.height)
+            .overlay {
+                // No edge on the paper's side, so it reads as a tab coming out from under the paper.
+                shape.strokeBorder(lit ? palette.icon : palette.box, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+                    .mask(Rectangle().padding(right ? .trailing : .leading, 1))
+            }
+            .contentShape(shape)
+        }
+        .buttonStyle(.plain)
+        .onHover { pointerOn = $0 }
+        .padding(right ? .trailing : .leading, MemoDrawerView.tabOverlap)
+        .help(L("새 폴더"))
+        .accessibilityLabel(L("새 폴더"))
     }
 }
 
@@ -675,7 +822,7 @@ private struct VerticalName: View {
 }
 
 /// The quick-write slip: lined paper with a tape, `여기에 바로 적어요`; ↩ makes a memo in this folder (in 고정: in
-/// 메모, pinned), ⇧↩ a new line.
+/// 메모, pinned), ⇧↩ a new line. #117: once something is written, a line under it says where it goes and the keys.
 private struct QuickSlip: View {
     @ObservedObject var drawer: MemoDrawer
     let palette: DrawerPalette
@@ -684,16 +831,21 @@ private struct QuickSlip: View {
     var floating = false
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            DrawerTextView(text: $drawer.quickText, palette: palette, bodyFont: font.handNSFont(MemoDrawerView.hand(19)), submitsOnReturn: true,
-                           onSubmit: { drawer.quickWrite() }, onEscape: { drawer.onEscape() },
-                           focus: drawer.focusQuick, minHeight: 24, accessibilityLabel: L("여기에 바로 적어요"))
-            if drawer.quickText.isEmpty {
-                Text(L("여기에 바로 적어요").handwritten)
-                    .font(font.handFont(MemoDrawerView.hand(19)))
-                    .foregroundStyle(palette.placeholder)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .topLeading) {
+                DrawerTextView(text: $drawer.quickText, palette: palette, bodyFont: font.handNSFont(MemoDrawerView.hand(19)), submitsOnReturn: true,
+                               onSubmit: { drawer.quickWrite() }, onEscape: { drawer.onEscape() },
+                               focus: drawer.focusQuick, minHeight: 24, accessibilityLabel: L("여기에 바로 적어요"))
+                if drawer.quickText.isEmpty {
+                    Text(L("여기에 바로 적어요").handwritten)
+                        .font(font.handFont(MemoDrawerView.hand(19)))
+                        .foregroundStyle(palette.placeholder)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
+            }
+            if !drawer.quickText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                hint
             }
         }
         .padding(.horizontal, 12)
@@ -711,6 +863,33 @@ private struct QuickSlip: View {
         }
         .help(L("↩ 새 메모 · ⇧↩ 줄 바꿈 · ⌘N"))
     }
+
+    /// `회사에 넣어요 · ↩ 넣기 · ⇧↩ 줄 바꿈` under a thin line (the 빠른 메모 slip shows its folder and keys too).
+    private var hint: some View {
+        let target = drawer.folders.quickWriteTarget(drawer.tab)
+        let name = target.pinned ? L("고정") : drawer.folders.folder(target.folder)?.displayName(.current) ?? ""
+        let place = Text(L("\(name)에 넣어요"))
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(palette.secondary)
+            .lineLimit(1)
+            .fixedSize()
+        let keys = Text(L("↩ 넣기 · ⇧↩ 줄 바꿈"))
+            .font(.system(size: 11))
+            .foregroundStyle(palette.faint)
+            .lineLimit(1)
+            .fixedSize()
+        // A narrow drawer in a long language: the keys under where it goes, never cut.
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) { place; Spacer(minLength: 4); keys }
+            VStack(alignment: .leading, spacing: 2) { place; keys }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 7)
+        .overlay(alignment: .top) {
+            Rectangle().fill(palette.slipEdge).frame(height: 0.5).padding(.top, 3)
+        }
+        .accessibilityElement(children: .combine)
+    }
 }
 
 /// The search field in the header (⌘F; Esc closes it).
@@ -721,8 +900,10 @@ private struct SearchField: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(palette.icon)
-            TextField(L("모든 폴더에서 찾기"), text: $drawer.query)
+            Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundStyle(palette.icon).accessibilityHidden(true)
+            TextField(drawer.searchHere ? L("\(drawer.hereName)에서 찾기") : L("모든 폴더에서 찾기"), text: $drawer.query)
+                // #119: the field had no name for VoiceOver (only its placeholder).
+                .accessibilityLabel(L("메모 찾기"))
                 .textFieldStyle(.plain)
                 .font(.system(size: 14))
                 .foregroundStyle(palette.ink)
@@ -786,7 +967,7 @@ private struct FolderSheetView: View {
                     Button(L("지우기")) { drawer.deleteFolder(id) }
                         .buttonStyle(.plain)
                         .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(Color(drawerHex: palette.kind == .night ? "#e29a7c" : "#955842"))
+                        .foregroundStyle(Color(drawerHex: palette.scheme == .dark ? "#e29a7c" : "#955842"))
                         .help(L("폴더만 지워요. 안의 메모는 ‘메모’ 폴더로 가요."))
                 }
                 Spacer()
