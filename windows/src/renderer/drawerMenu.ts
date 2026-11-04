@@ -10,7 +10,8 @@ import { h, icon, t } from "./api";
  */
 
 export type MenuEntry =
-  | { kind: "item"; label: string; icon?: string | null; key?: string; run: () => void; danger?: boolean; checked?: boolean; extra?: Node[]; /** A count before the shortcut (1.30). */ count?: string; disabled?: boolean }
+  | { kind: "item"; label: string; icon?: string | null; key?: string; run: () => void; danger?: boolean; checked?: boolean; extra?: Node[]; /** A count before the shortcut (1.30). */ count?: string; disabled?: boolean;
+      /** #185: a plain key (a digit) that picks this row while its menu has the keys; `key` stays the shortcut shown. */ digit?: string }
   | { kind: "sub"; label: string; icon?: string | null; entries: () => MenuEntry[]; extra?: Node[] }
   | { kind: "sep" }
   | { kind: "label"; text: string }
@@ -93,6 +94,7 @@ function build(entries: MenuEntry[], level: number, label: string): HTMLElement 
           entry.key ? h("span", { class: "k" }, entry.key) : null,
           entry.checked ? h("span", { class: "tick" }, icon("check", 13, 2)) : null);
         if (entry.disabled) button.disabled = true;
+        if (entry.digit) button.dataset.digit = entry.digit;
         button.addEventListener("click", () => { closeMenus(); entry.run(); });
         button.addEventListener("mouseenter", () => { window.clearTimeout(hoverTimer); hoverTimer = window.setTimeout(() => closeFrom(level + 1), 160); });
         menu.append(button);
@@ -155,6 +157,15 @@ function keys(event: KeyboardEvent, menu: HTMLElement, level: number): void {
       if (level > 0) back(level); else closeMenus();
       break;
     case "Tab": event.preventDefault(); go(at + (event.shiftKey ? -1 : 1)); break;
+    default: {
+      // #185: a row's digit (모든 스페이스 ▾: 1–9, 0) picks it — only here, in an open menu that has the keys, and only the
+      // plain key, so typing anywhere else and the Ctrl+Shift shortcuts are left as they are.
+      if (!/^[0-9]$/.test(event.key) || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) break;
+      const row = menu.querySelector<HTMLButtonElement>(`:scope > button.mi[data-digit="${event.key}"]:not(:disabled)`);
+      if (!row) break;
+      event.preventDefault(); event.stopPropagation();
+      row.click();
+    }
   }
 }
 

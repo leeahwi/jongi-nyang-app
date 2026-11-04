@@ -5,7 +5,7 @@ import type { DrawerFont, TextSize } from "./types";
 import { memoTitle } from "./memo";
 import { isoDate } from "./notebook";
 import { markdownPlain, markdownTitle } from "./memoMarkdown";
-import { fold, matchRange, prepareQuery } from "./search";
+import { fold, matchRange, prepareQuery } from "./match";
 
 /**
  * 메모 서랍 (1.28): memos from the screen's edge, one folder at a time. The memos stay in memos.json as
@@ -751,6 +751,13 @@ export type DrawerTheme = "auto" | MemoPaper;
 export const drawerThemes: DrawerTheme[] = ["auto", ...memoPapers];
 /** The papers that are dark already: 밤에는 밤 종이로 leaves them as they are. */
 export const darkPapers: MemoPaper[] = ["night", "ink"];
+/**
+ * #184: whether 반투명 · 강하게 would put this paper on an acrylic of the other kind. Windows tints the acrylic light or dark
+ * with the whole app (Electron's nativeTheme: there is no theme per window, and setBackgroundMaterial takes no tint), not
+ * with the drawer paper — so 먹색 under a light app, or 크라프트 under a dark one, would sink its words into it. Such a pair
+ * is drawn on 불투명 instead.
+ */
+export const backdropClashes = (look: MemoPaper, darkApp: boolean): boolean => darkPapers.includes(look) !== darkApp;
 export const drawerWidth = { min: 260, max: 480, default: 300 };
 export const clampDrawerWidth = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) ? Math.round(Math.min(drawerWidth.max, Math.max(drawerWidth.min, value))) : drawerWidth.default);
 /**
@@ -779,7 +786,7 @@ export const readDrawerFont = (value: unknown): DrawerFont => ((drawerFonts as u
 export const readDrawerTextSize = (value: unknown): TextSize => ((drawerTextSizes as unknown[]).includes(value) ? value as TextSize : "regular");
 /**
  * A size step's numbers (px, the same as the Mac's pt): the words 13 · 14 · 16 · 18 on lines of × 1.85 (24 · 26 · 30 · 33;
- * 보통 as in 1.30), a card's preview 12 · 13 · 14 · 15 on 18 · 20 · 22 · 23 (always the plain face, so three lines cut alike).
+ * 보통 as in 1.30), a card's preview 12 · 13 · 14 · 15 on 18 · 20 · 22 · 23 (in the words' face since #198, scaled as the body's: textSteps.ts drawerFaceMetrics).
  */
 export function drawerTextMetrics(size: TextSize): { body: number; line: number; preview: number; previewLine: number } {
   const index = Math.max(0, drawerTextSizes.indexOf(size));

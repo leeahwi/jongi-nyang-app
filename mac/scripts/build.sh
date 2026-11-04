@@ -29,8 +29,12 @@ binary_directory="$(swift build -c release "${app_build[@]}" "${release_flag[@]}
 bundle="$task_root/dist/종이냥.app"
 mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
 cp "$binary_directory/PaperTodo" "$bundle/Contents/MacOS/PaperTodo"
-# Stop before packing if a build path (with this Mac's home folder name) is in the binary again. Counts only.
-home_paths="$(strings -a "$bundle/Contents/MacOS/PaperTodo" | grep -cF -e '/Users/' -e "$HOME" || true)"
+# #220: the linker lists each object file's absolute path (N_OSO debug-map entries) for later symbol lookup, and the
+# prefix map doesn't reach it. Drop the debug symbols before signing; the app keeps its global symbols.
+strip -S "$bundle/Contents/MacOS/PaperTodo"
+# Stop before packing if a build path (with this Mac's home folder name) is in the binary again. Counts only. Searched
+# in the bytes: `strings` missed the debug-map paths (#220).
+home_paths="$({ LC_ALL=C grep -a -o -F -e '/Users/' -e "$HOME" "$bundle/Contents/MacOS/PaperTodo" || true; } | wc -l | tr -d ' ')"
 if [ "$home_paths" != "0" ]; then
     echo "The binary holds $home_paths absolute home path(s) — see #182." >&2
     exit 1

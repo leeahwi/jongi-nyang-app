@@ -155,10 +155,11 @@ struct MemoSlipStyle: ViewModifier {
 }
 
 /// 메모 글꼴 · 크기 (#84, docs/plans/memo-markdown.md): the drawer's one face and size step for memo words, this Mac's
-/// own (`drawer.font` · `drawer.textSize`; never in the shared folder). The body, an open memo, 크게 보기 and the editor
-/// follow both; a card's preview follows only the step (always the plain face, so three lines cut alike). Lines are the
-/// size × 1.85 (보통 14 → 26, as in 1.45). The handwriting faces run as much larger as the notebook's (pen 23 : 15,
-/// brush 22 : 15), the Latin faces corrected as HandwritingFont does. The same steps as the Windows app.
+/// own (`drawer.font` · `drawer.textSize`; never in the shared folder). The body, an open memo, 크게 보기, the editor and
+/// (#198) a card's preview, 찾기's found line and their checklist rows follow both, so a memo reads the same folded and
+/// open; code stays in the code face. Lines are the size × 1.85 (보통 14 → 26, as in 1.45). The handwriting faces run as
+/// much larger as the notebook's (pen 23 : 15, brush 22 : 15, TextSteps.faceSize), the Latin faces corrected as
+/// HandwritingFont does. The same steps as the Windows app.
 struct MemoText: Equatable {
     enum Face: String, CaseIterable, Identifiable {
         case clean, pen, brush, mono
@@ -226,23 +227,36 @@ struct MemoText: Equatable {
     var line: CGFloat { CGFloat(metrics.line) }
     /// The room under a paragraph's last line.
     var paragraph: CGFloat { CGFloat(metrics.paragraph) }
-    /// A card's preview: 11–16 pt (1.45's 12 · 13 · 14 · 15 at its four steps) on lines of × 20 / 13.
+    /// A card's preview: 11–16 pt (1.45's 12 · 13 · 14 · 15 at its four steps) on lines of × 20 / 13, before the face's
+    /// own scale (previewFont).
     var previewSize: CGFloat { CGFloat(metrics.preview) }
-    var previewLine: CGFloat { CGFloat(metrics.previewLine) }
+    /// The preview's line (#198): × 20 / 13 of its size, a quarter taller in the Latin pen (Caveat reaches higher and
+    /// lower than the Korean pen; TextSteps.drawerFaceMetrics, the same as the Windows app).
+    var previewLine: CGFloat {
+        CGFloat(TextSteps.drawerFaceMetrics(points: size.rawValue, face: face.rawValue, latin: AppLanguage.current != .ko).previewLine)
+    }
 
     /// The words' face at a scale of the body (headings 1.45 · 1.25 · 1.1).
-    @MainActor func font(scale: CGFloat = 1) -> NSFont {
-        let size = bodySize * scale
+    @MainActor func font(scale: CGFloat = 1) -> NSFont { font(ofSize: bodySize * scale) }
+
+    /// A card's preview, 찾기's found line and their checklist rows (#198): the words' face at the preview's size, scaled
+    /// as the body is (보통: pen 20, brush 19, 고정폭 12 — the plain face's 13), so the folded card reads as the open memo.
+    @MainActor var previewFont: NSFont { font(ofSize: previewSize) }
+
+    @MainActor private func font(ofSize size: CGFloat) -> NSFont {
+        let scaled = CGFloat(TextSteps.faceSize(face.rawValue, Double(size)))
         switch face {
-        case .clean: return .systemFont(ofSize: size)
-        case .mono: return Self.mono((size - 1).rounded(), codeFace)
-        case .pen: return HandwritingFont.native(face: .pen, size: (size * 23 / 15).rounded())
-        case .brush: return HandwritingFont.native(face: .brush, size: (size * 22 / 15).rounded())
+        case .clean: return .systemFont(ofSize: scaled)
+        case .mono: return Self.mono(scaled, codeFace)
+        case .pen: return HandwritingFont.native(face: .pen, size: scaled)
+        case .brush: return HandwritingFont.native(face: .brush, size: scaled)
         }
     }
 
     /// Code (a code block, `code`, the old code lines): fixed-width a point under the body, in the 코드 글꼴.
     @MainActor var codeFont: NSFont { Self.mono(bodySize - 1, codeFace) }
+    /// A code line on a card's preview: a point under the preview's plain size, in the 코드 글꼴.
+    @MainActor var previewCodeFont: NSFont { Self.mono(previewSize - 1, codeFace) }
 
     /// A fixed-width face at `size`: D2Coding when it's picked (and loaded), else the system's.
     @MainActor static func mono(_ size: CGFloat, _ face: CodeFace) -> NSFont {
@@ -255,8 +269,14 @@ struct MemoText: Equatable {
 
     /// Body text drawn so each line takes exactly `line`: the font's own line height plus this.
     @MainActor var lineSpacing: CGFloat { max(0, line - Self.lineHeight(font())) }
-    /// The same for a card's preview lines (the plain face).
-    @MainActor var previewSpacing: CGFloat { max(0, previewLine - Self.lineHeight(.systemFont(ofSize: previewSize))) }
+    /// The same for a card's preview lines, in the preview's face.
+    @MainActor var previewSpacing: CGFloat { max(0, previewLine - previewTextLine) }
+    /// A line of the preview's face as SwiftUI's Text sets it: its rounded ascent and descent, no leading (HanJang Pen 20
+    /// → 20, Brush 19 → 19, the plain 13 → 16, as NSLayoutManager's; Caveat 24 → 30, Kalam 17 → 27).
+    @MainActor var previewTextLine: CGFloat {
+        let font = previewFont
+        return face == .clean ? Self.lineHeight(font) : font.ascender.rounded() + (-font.descender).rounded()
+    }
 
     /// A face's own line height, worked out once per face and size (every card asks on every redraw of the list).
     @MainActor private static var heights: [String: CGFloat] = [:]

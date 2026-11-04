@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { dueForArchive, monthKey, parseArchiveLines, toEntry, type ArchiveEntry } from "../core/archive";
+import { spaceOf } from "../core/todoSpaces";
 import type { Store } from "./store";
 import type { TodoItem } from "../core/notebook";
 import { t } from "../i18n";
@@ -24,7 +25,7 @@ export class ArchiveStore {
   run(now = new Date()): void {
     const due = dueForArchive(this.store.items, now, this.store.prefs.archiveAfterDays);
     if (due.length === 0) return;
-    const saved = this.append(due.map(toEntry));
+    const saved = this.append(due.map((item) => this.entry(item)));
     // Only tasks that actually reached the file leave the list.
     if (saved.size > 0) this.store.mutate((history) => history.archive(saved));
   }
@@ -33,7 +34,7 @@ export class ArchiveStore {
   fileToday(): TodoItem[] {
     const done = this.store.todayItems.filter((item) => item.isCompleted);
     if (done.length === 0) return [];
-    const saved = this.append(done.map(toEntry));
+    const saved = this.append(done.map((item) => this.entry(item)));
     if (saved.size > 0) this.store.mutate((history) => history.archive(saved));
     return done.filter((item) => saved.has(item.id)).map((item) => ({ ...item }));
   }
@@ -63,8 +64,13 @@ export class ArchiveStore {
   all(): ArchiveEntry[] {
     const archived = this.load();
     const archivedIDs = new Set(archived.map((entry) => entry.id));
-    const listed = this.store.items.filter((item) => item.isCompleted && !archivedIDs.has(item.id)).map(toEntry);
+    const listed = this.store.items.filter((item) => item.isCompleted && !archivedIDs.has(item.id)).map((item) => this.entry(item));
     return [...archived, ...listed];
+  }
+
+  /** A finished to-do as its line, with its space then (C5, spaces-phase2.md 2c; none for 일반). */
+  private entry(item: TodoItem): ArchiveEntry {
+    return toEntry(item, spaceOf(this.store.todoSpaces, item.id));
   }
 
   seed(entries: ArchiveEntry[]): void {

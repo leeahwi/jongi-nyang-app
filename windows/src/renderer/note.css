@@ -692,6 +692,11 @@
 .ahead > .lens-more { padding: 0 0 0 calc(var(--key-w) + 10px + 30px); }
 .lens-all { flex: none; height: 22px; margin-left: -4px; padding: 0 4px; border-radius: 6px; font: 600 11px var(--ui); color: var(--ink-2); white-space: nowrap; }
 .lens-all:hover { background: var(--d-hover); color: var(--ink); }
+/* #196 (D9 · D6): 회사는 이 기기에서 숨겨 뒀어요 · 잠깐 보기 — the same faint row, with a small eye. */
+.device-more-icon { flex: none; display: inline-flex; color: var(--ink-3); }
+/* The words are never cut (nl on a narrow note): the line takes a second line instead, the button with the words. */
+.lens-more.device-more { height: auto; min-height: var(--row); flex-wrap: wrap; row-gap: 0; padding-block: 5px; white-space: normal; }
+.device-more .lens-more-text { overflow: visible; text-overflow: clip; }
 /* The paper menus over the note (the row menu, 모든 스페이스 ▾, the editor's 스페이스): the note's tokens. */
 .menu-layer { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
 .menu-layer > .menu { position: absolute; pointer-events: auto; }

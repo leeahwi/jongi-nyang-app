@@ -2,7 +2,9 @@ import { currentStreak, dayKey, groupByDay, heatLevel, heatLevelTitlesIn, logica
 import { clock, longDate as longDateIn, monthName, monthShort, monthTitle as langMonthTitle, shortDate, weekdayLetter, weekdayShort } from "../core/lang";
 import type { PrefsState } from "../core/types";
 import { focusByTask, focusDay, focusTime, focusTotal, focusTotals, sessionsText, type FocusRecord } from "../core/focus";
+import { inHistory, lensNone, spaceColor } from "../core/todoSpaces";
 import { edgeFade, h, icon, lang, paper, t } from "./api";
+import { closeMenus, menuOpen, openMenu, type MenuEntry } from "./drawerMenu";
 import { paneSight } from "./paneSight";
 
 const api = paper();
@@ -20,6 +22,16 @@ let archivePath = "";
 let entries: ArchiveEntry[] = [];
 /** 집중 기록 (focus.jsonl): the sessions, and their minutes per day. */
 let focus: FocusRecord[] = [];
+/** 스페이스 2c (H1–H5): every line as main gave it (each with its space worked out), the live spaces, 일반's name. */
+let allEntries: ArchiveEntry[] = [];
+let allFocus: FocusRecord[] = [];
+let spaces: { id: string; name: string; color: string }[] = [];
+let generalLabel = "";
+/** The space looked at (H4: not kept — every opening starts at 모든 스페이스): an id, "none" for 일반, undefined for all. */
+let spaceFilter: string | undefined;
+/** Where 모든 스페이스 ▾'s menu is drawn: over the whole pane. */
+const menuLayer = h("div", { class: "menu-layer" });
+document.body.append(menuLayer);
 let focusDays = new Map<string, number>();
 let now = new Date();
 let days = new Map<string, ArchiveEntry[]>();
@@ -226,6 +238,36 @@ function dayPanel(): HTMLElement {
  * The pane's header: its name, a word about the streak (or, before the first, how to start), and the range to look at.
  * (1.30: no "지금까지 564개를 끝냈어요" — the first tile says that number; the Mac's the same.)
  */
+/**
+ * H1: 모든 스페이스 ▾ beside the range (only while there are spaces): 모든 스페이스, the spaces with their dots, 일반. The
+ * button names the pick (‘● 회사’).
+ */
+function spacePick(): HTMLElement | null {
+  if (spaces.length === 0) return null;
+  const picked = spaces.find((space) => space.id === spaceFilter);
+  const name = picked ? picked.name : spaceFilter === lensNone ? generalLabel : t("모든 스페이스");
+  const dot = h("span", { class: `space-dot${picked ? "" : spaceFilter === lensNone ? " general" : " all"}` });
+  if (picked) dot.style.setProperty("--band", `var(--band-${spaceColor(picked.color)})`);
+  const button = h("button", { class: `space-pick${spaceFilter !== undefined ? " on" : ""}`, "aria-haspopup": "menu", "aria-expanded": "false", "aria-label": t("스페이스: {name}", { name }) },
+    dot, h("span", { class: "space-pick-label" }, name), icon("chevron", 11, 2));
+  if (picked) button.style.setProperty("--band", `var(--band-${spaceColor(picked.color)})`);
+  const pick = (value: string | undefined) => { spaceFilter = value; apply(); render(); };
+  const swatch = (band: string) => { const element = h("span", { class: "dot" }); element.style.setProperty("--band", band); return element; };
+  button.addEventListener("click", () => {
+    if (menuOpen()) { closeMenus(); return; }
+    const entries: MenuEntry[] = [
+      // #185, as in the note's menu: while it's open a plain 1–9 picks the space in that place and 0 모든 스페이스.
+      { kind: "item", label: t("모든 스페이스"), digit: "0", checked: spaceFilter === undefined, run: () => pick(undefined) },
+      { kind: "sep" },
+      ...spaces.map((space, index): MenuEntry => ({ kind: "item", label: space.name, extra: [swatch(`var(--band-${spaceColor(space.color)})`)], ...(index < 9 ? { digit: String(index + 1) } : {}), checked: spaceFilter === space.id, run: () => pick(space.id) })),
+      { kind: "item", label: generalLabel, extra: [swatch("var(--rule-strong)")], checked: spaceFilter === lensNone, run: () => pick(lensNone) },
+    ];
+    button.setAttribute("aria-expanded", "true");
+    openMenu({ container: menuLayer, closed: () => button.setAttribute("aria-expanded", "false") }, entries, t("모든 스페이스"), button.getBoundingClientRect());
+  });
+  return button;
+}
+
 function paneHead(ranges: HTMLElement): HTMLElement {
   const total = entries.filter((entry) => entry.completedAt).length;
   const streak = currentStreak(days, now);
@@ -234,7 +276,7 @@ function paneHead(ranges: HTMLElement): HTMLElement {
       : t("하나만 끝내도 오늘 칸이 초록으로 채워져요.");
   return h("header", { class: "pane-head" },
     h("div", { class: "ph-text" }, h("h1", {}, t("완료 기록")), h("p", { class: "ph-sub" }, total === 0 ? `${t("첫 칸을 채워 볼까요?")} · ${word}` : word)),
-    ranges);
+    spacePick(), ranges);
 }
 
 function showTooltip(target: Element, html: string): void {
@@ -278,14 +320,25 @@ function render(): void {
   edgeFade(content);
 }
 
-async function refresh(): Promise<void> {
-  const history = await api.getHistory();
-  entries = history.entries;
-  focus = history.focus ?? [];
-  now = new Date(history.now);
+/** H2 · H3: the lines in the space looked at, and everything worked out from them (the days, the focus per day). */
+function apply(): void {
+  entries = allEntries.filter((entry) => inHistory(spaceFilter, entry));
+  focus = allFocus.filter((record) => inHistory(spaceFilter, record, true));
   days = groupByDay(entries);
   const far = new Date(2000, 0, 1), later = new Date(now.getTime() + 2 * 86_400_000);
   focusDays = focusTotals(focus, far, later);
+}
+
+async function refresh(): Promise<void> {
+  const history = await api.getHistory();
+  allEntries = history.entries;
+  allFocus = history.focus ?? [];
+  spaces = history.spaces ?? [];
+  generalLabel = history.general ?? "";
+  now = new Date(history.now);
+  // H4: a space deleted meanwhile (or none left): back to 모든 스페이스.
+  if (spaceFilter !== undefined && (spaces.length === 0 || (spaceFilter !== lensNone && !spaces.some((space) => space.id === spaceFilter)))) spaceFilter = undefined;
+  apply();
   render();
 }
 
@@ -312,6 +365,8 @@ api.on("desk:pane", (payload) => {
   const { pane, day } = (payload ?? {}) as { pane?: unknown; day?: unknown };
   if (pane !== "history" || typeof day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
   selected = day;
+  // H5: the line picked in search is never filtered away.
+  if (spaceFilter !== undefined) { spaceFilter = undefined; apply(); }
   const bounds = rangeBounds();
   const date = keyDate(day);
   if (date < bounds.start || date > bounds.end) range = date.getFullYear();

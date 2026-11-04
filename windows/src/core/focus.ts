@@ -32,6 +32,11 @@ export interface FocusRecord {
   kind: FocusKind;
   /** 다 했어요: the task was checked when the session ended. */
   done: boolean;
+  /**
+   * 스페이스 2c (H3): the task's space id when the session ended (absent for 일반, a plain timer, and lines from before
+   * 1.32). Read through `entrySpace` (todoSpaces.ts).
+   */
+  space?: string;
 }
 
 type Json = Record<string, unknown>;
@@ -52,7 +57,7 @@ export function parseFocus(text: string): FocusRecord[] {
     let value: unknown;
     try { value = JSON.parse(line); } catch { continue; }
     if (!isObject(value)) continue;
-    const { id, taskId, title, start, end, minutes, kind, done } = value;
+    const { id, taskId, title, start, end, minutes, kind, done, space } = value;
     if (typeof id !== "string" || !id || seen.has(id) || typeof title !== "string" || !validTime(start) || !validTime(end)) continue;
     if (typeof minutes !== "number" || !Number.isFinite(minutes) || minutes < 0) continue;
     seen.add(id);
@@ -61,6 +66,7 @@ export function parseFocus(text: string): FocusRecord[] {
       id, ...(task ? { taskId: task } : {}), title, start, end, minutes: Math.round(minutes),
       kind: kind === "focus" || kind === "timer" ? kind : task ? "focus" : "timer",
       done: done === true,
+      ...(task && typeof space === "string" && space ? { space } : {}),
     });
   }
   return records;
@@ -68,8 +74,8 @@ export function parseFocus(text: string): FocusRecord[] {
 
 /** One line of the file (no newline), keys in the order above. */
 export function focusLine(record: FocusRecord): string {
-  const { id, taskId, title, start, end, minutes, kind, done } = record;
-  return JSON.stringify({ id, ...(taskId ? { taskId } : {}), title, start, end, minutes, kind, done });
+  const { id, taskId, title, start, end, minutes, kind, done, space } = record;
+  return JSON.stringify({ id, ...(taskId ? { taskId } : {}), title, start, end, minutes, kind, done, ...(taskId && space ? { space } : {}) });
 }
 
 /**

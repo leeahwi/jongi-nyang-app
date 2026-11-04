@@ -8,6 +8,7 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 
 | Phase | Milestone | Mac | Windows |
 | --- | --- | --- | --- |
+| Widen | [Spaces per device · a new Today window](#spaces-per-device--a-new-today-window) | 1.47.0 | 1.32.0 |
 | Widen | [Group by space · automatic backups](#group-by-space--automatic-backups) | 1.45.1 – 1.46.0 | 1.30.1 – 1.31.0 |
 | Widen | [To-do spaces · a clearer notes drawer](#to-do-spaces--a-clearer-notes-drawer) | 1.45.0 | 1.30.0 |
 | Polish | [An easier notes drawer](#an-easier-notes-drawer) | 1.44.0 | 1.29.0 |
@@ -38,6 +39,19 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 | Mac | [From a first notepad to the cat](#from-a-first-notepad-to-the-cat) | 1.0 – 1.10 | — |
 
 ---
+
+## Spaces per device · a new Today window
+
+**Mac 1.47.0 · Windows 1.32.0** — shared cases: both apps read the same ten case files in `docs/plans/` (spaces, the Today window, note Markdown, settings, file safety, the notes drawer)
+
+![Desk → Spaces with Work hidden on this device and Study shown only at set weekday times](docs/screenshots/mac/spaces-device-desk.png)
+
+- With several devices sharing one list through a shared folder, there were times you'd rather not see work to-dos on the home computer. So each row in Desk → Spaces gained an "On this device" popup: Show, Hide or Set times, and with set times the space shows itself only on those days and hours. The setting stays on that device; the files in the shared folder don't change.
+- To-dos in a hidden space stay off the notepad, the Today window, the day ribbon and the evening tidy-up, and their reminders don't ring on that device. "Peek" at the end of the list shows them again, and History keeps them.
+- The Today window in the menu bar (the notification area on Windows) shows the event, timer and alarm as cards only when there is one, and lists up to seven to-dos. The top shows how many of today's to-dos are done, with a thin progress bar.
+- Type `#Work report` in search to look in one space only, and filter History and focus records by space. Finished to-dos now keep the space they were in.
+- Jongi-nyang for Claude sees to-dos by space and shows a preview before moving one to another space. You can also attach today's page, this week or a single note to a conversation.
+- Typing in a long note shows each letter right away, and folding a long note or opening a 2,000-line checklist no longer stalls. The Mac app's program file no longer contains folder paths from the computer it was built on.
 
 ## Group by space · automatic backups
 

@@ -148,13 +148,97 @@ extension DesignSnapshots {
         try render(TaskReminderEditorView(item: plain, model: model, onSave: { _ in }, onRemove: {}, onCancel: {}),
                    size: nil, to: output.appendingPathComponent("spaces-editor-none.png"))
 
+        // 2a draws a fixed day (13:20): the demo list's reminder, an hour from the real clock, waits at a fixed 21:30 meanwhile
+        // (as the 하루 띠's shots do), so it doesn't land somewhere else on the day each time (#191).
+        let scheduledAt = model.items.first { $0.id == scheduled.id }?.reminderAt
+        model.setTaskReminder(scheduled.id, at: sampleTime(21, 30))
         try renderSpaces2a(model: model, work: work, home: home, output: output)
+        model.setTaskReminder(scheduled.id, at: scheduledAt)
         try renderSpaces2b(folder: folder, preferences: preferences, output: output)
+        try renderSpaces2c(folder: folder, preferences: preferences, output: output)
     }
 
     /// 2b 스페이스별로 묶기 (spaces-phase2.md): F 메모지 and E 책갈피 on a mixed sheet, folded groups and a finished row open,
     /// the shortcut chips, a drag over another group, the wide note's columns, the header's menu and the desk's switch.
     /// The day is fixed at 12:40. Made-up to-dos only. `PAPERTODO_ONLY=spaces2b`.
+    /// Spaces 2c (C1–C4, H1–H3): the search slip with `#회사 보고서`, `#회사` alone and the blank slip's hint, and 완료 기록
+    /// filtered by 회사 (wide, and the desk's narrowest). Made-up lines over the last months, each in a space or 일반.
+    static func renderSpaces2c(folder: URL, preferences: UserDefaults, output: URL) throws {
+        let storage = folder.appendingPathComponent("spaces2c/todos.json")
+        try FileManager.default.createDirectory(at: storage.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try NotebookFile(url: storage).save(Notebook())
+        let model = AppModel(storageURL: storage, isolated: true, preferences: preferences)
+        keptModels.append(model)
+        model.paperColor = night ? .night : .day
+        model.notebookFont = .pen
+        let work = model.addTodoSpace(name: t("회사", "Work", "Werk"), color: .pink)!
+        let home = model.addTodoSpace(name: t("집", "Home", "Thuis"), color: .mint)!
+        let study = model.addTodoSpace(name: t("공부", "Study", "Studie"), color: .sky)!
+        func add(_ title: String, in space: String?, due: Int? = nil) {
+            model.add(title, literal: true)
+            let id = model.items.last!.id
+            if let space { model.moveTodo(id, toSpace: space, toast: false) }
+            if let due, let day = Calendar.current.date(byAdding: .day, value: due, to: Date()) { model.setDue(id, to: Deadline.key(day)) }
+        }
+        add(t("주간 보고서 초안", "Draft the weekly report", "Weekrapport opzetten"), in: work)
+        add(t("보고서 표 다듬기", "Tidy the report’s tables", "Tabellen in het rapport bijwerken"), in: work)
+        add(t("분기 보고서 검토", "Review the quarterly report", "Kwartaalrapport nakijken"), in: work, due: 3)
+        add(t("가계부 보고 정리", "Sum up the household report", "Huishoudrapport bijwerken"), in: home)
+        add(t("독서 보고서 쓰기", "Write the reading report", "Leesrapport schrijven"), in: study)
+        add(t("세탁기 돌리기", "Run the washing machine", "Wasmachine aanzetten"), in: home)
+        model.toast = nil
+        model.selectedTaskID = nil
+        // The record: about five months of made-up lines, a space written on each (일반 for some).
+        var seed: UInt64 = 0x2c2c
+        func random() -> Double { seed = seed &* 6364136223846793005 &+ 1442695040888963407; return Double(seed >> 33) / Double(1 << 31) }
+        let titles: [(String, String?)] = [
+            (t("주간 보고서 제출", "Hand in the weekly report", "Weekrapport inleveren"), work),
+            (t("회의 보고서 정리", "Write up the meeting report", "Vergaderverslag uitwerken"), work),
+            (t("견적서 보내기", "Send the quote", "Offerte sturen"), work),
+            (t("장보기", "Groceries", "Boodschappen"), home),
+            (t("빨래 개기", "Fold the laundry", "Was opvouwen"), home),
+            (t("독서 보고서 쓰기", "Write the reading report", "Leesrapport schrijven"), study),
+            (t("단어 20개 외우기", "Learn 20 words", "20 woorden leren"), study),
+            (t("화분 물 주기", "Water the plants", "Planten water geven"), nil),
+        ]
+        let today = Calendar.current.startOfDay(for: Date())
+        var lines: [ArchiveEntry] = []
+        var sessions: [FocusRecord] = []
+        for back in stride(from: 150, through: 1, by: -1) {
+            let day = Calendar.current.date(byAdding: .day, value: -back, to: today)!.addingTimeInterval(10 * 3600)
+            for index in 0..<Int(random() * 5) {
+                let pick = Int(random() * Double(titles.count))
+                let (title, space) = titles[pick]
+                let at = day.addingTimeInterval(Double(index) * 53 * 60)
+                lines.append(ArchiveEntry(id: "s2c-\(back)-\(index)", title: title, createdAt: at, completedAt: at, space: space))
+                if back <= 60, random() < 0.5 {
+                    let minutes = [25, 25, 50, 40][Int(random() * 4)]
+                    sessions.append(FocusRecord(id: "s2c-focus-\(back)-\(index)", taskId: "s2c-task-\(pick)", title: title, start: at,
+                                                end: at.addingTimeInterval(Double(minutes) * 60), minutes: minutes, kind: .focus, space: space))
+                }
+            }
+        }
+        let archive = ArchiveStore(model: model)
+        archive.seed(lines)
+        model.focusLog.seed(sessions)
+
+        let searchHistory = archive.allEntries()
+        try slip(SearchView(model: model, history: searchHistory, previewQuery: t("#회사 보고서", "#Work report", "#Werk rapport")),
+                 to: output.appendingPathComponent("spaces2c-search.png"))
+        try slip(SearchView(model: model, history: searchHistory, previewQuery: t("#집", "#Home", "#Thuis")),
+                 to: output.appendingPathComponent("spaces2c-search-space.png"))
+        try slip(SearchView(model: model, history: searchHistory), to: output.appendingPathComponent("spaces2c-search-blank.png"))
+        let controller = ReminderController(model: model, preferences: preferences, onOpen: {})
+        func desk(_ name: String, _ filter: SpaceFilter, size: NSSize = DeskMetrics.size) throws {
+            try render(DeskView(state: DeskState(pane: .history), model: model, archive: archive, reminders: controller, previewTitlebar: true,
+                                previewHistorySpace: filter),
+                       size: size, to: output.appendingPathComponent("spaces2c-\(name).png"))
+        }
+        try desk("history-work", .space(work))
+        try desk("history-general", .general)
+        try desk("history-work-narrow", .space(work), size: DeskMetrics.minimum)
+    }
+
     static func renderSpaces2b(folder: URL, preferences: UserDefaults, output: URL) throws {
         let storage = folder.appendingPathComponent("spaces2b/todos.json")
         try FileManager.default.createDirectory(at: storage.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -163,8 +247,7 @@ extension DesignSnapshots {
         keptModels.append(model)
         model.paperColor = night ? .night : .day
         model.notebookFont = .pen
-        let now = Date()
-        func at(_ hour: Int, _ minute: Int = 0) -> Date { Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: now)! }
+        func at(_ hour: Int, _ minute: Int = 0) -> Date { sampleTime(hour, minute) }
         let stripNow = at(12, 40)
         let work = model.addTodoSpace(name: t("회사", "Work", "Werk"), color: .pink)!
         let home = model.addTodoSpace(name: t("집", "Home", "Thuis"), color: .mint)!
@@ -178,11 +261,12 @@ extension DesignSnapshots {
         }
         let coffee = add(L("창문 열고, 커피 한 잔"), in: nil, done: true)
         let plan = add(L("오늘 꼭 해야 할 일 정리하기"), in: work)
-        model.setTimeRange(plan, to: TimeRange(start: 13 * 60 + 40, end: 14 * 60 + 10))
+        // Against the scene's own clock: 13:40 is ahead of 12:40, so it has its reminder (the bell in 다음, #191).
+        model.setTimeRange(plan, to: TimeRange(start: 13 * 60 + 40, end: 14 * 60 + 10), now: stripNow)
         _ = add(t("주간 보고서 초안", "Draft the weekly report", "Weekrapport opzetten"), in: work)
         _ = add(t("회의록 올리기", "Post the meeting notes", "Notulen delen"), in: work, done: true)
         let laundry = add(t("세탁기 돌리기", "Run the washing machine", "Wasmachine aanzetten"), in: home)
-        model.setTimeRange(laundry, to: TimeRange(start: 19 * 60, end: 19 * 60 + 30))
+        model.setTimeRange(laundry, to: TimeRange(start: 19 * 60, end: 19 * 60 + 30), now: stripNow)
         _ = add(L("잠깐, 바깥 공기 쐬기"), in: home)
         let book = add(L("미뤄 둔 책 10쪽 읽기"), in: study)
         _ = add(L("내일의 나에게 메모 남기기"), in: nil)
@@ -359,8 +443,7 @@ extension DesignSnapshots {
     /// edges), the 오늘 창 (bands, the lens line), the focus card's space, the rule editor's 스페이스 field and a repeat's
     /// chip in the line. The day is fixed at 13:20 so it looks the same whenever it's drawn. `PAPERTODO_ONLY=spaces2a`.
     static func renderSpaces2a(model: AppModel, work: String, home: String, output: URL) throws {
-        let now = Date()
-        func at(_ hour: Int, _ minute: Int = 0) -> Date { Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: now)! }
+        func at(_ hour: Int, _ minute: Int = 0) -> Date { sampleTime(hour, minute) }
         let stripNow = at(13, 20)
         let day = CalendarDraft.day(CalendarDay.window(stripNow).start)
         func event(_ id: String, _ title: String, _ color: LocalEvent.Color, _ from: Date, _ to: Date) -> LocalEvent {
@@ -378,7 +461,7 @@ extension DesignSnapshots {
         }
         func ranged(_ title: String, _ start: Int, _ end: Int, in space: String?) -> UUID {
             let id = add(title, in: space)
-            model.setTimeRange(id, to: TimeRange(start: start, end: end))
+            model.setTimeRange(id, to: TimeRange(start: start, end: end), now: stripNow)
             return id
         }
         let plan = ranged(t("기획안 검토", "Review the plan", "Plan nalopen"), 13 * 60, 14 * 60, in: work)

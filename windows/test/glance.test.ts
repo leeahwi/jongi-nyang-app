@@ -71,15 +71,19 @@ test("glance cards: next event, timer, next alarm — the urgent one hot", () =>
     ["타이머", "—", "‘타이머 25’", false, true],
     ["다음 알람", "07:00", "내일 · 평일", false, false],
   ]);
-  const en = glanceCards([event("Meeting", at(10, 0, 9), at(11, 0, 9))], running, alarms, new Set(), now, "en");
+  // #200: today's events only, as on the Mac — tomorrow's meeting leaves the card empty.
+  const en = glanceCards([event("Meeting", at(10, 0, 9), at(11, 0, 9)), event("Review", at(17, 15), at(18))], running, alarms, new Set(), now, "en");
   assert.deepEqual(en.map((card) => [card.label, card.big, card.small, card.hot]), [
-    ["Next event", "10:00 AM", "Tomorrow · Meeting", false],
+    ["Next event", "5:15 PM", "in 2 h 25 min · Review", false],
     ["Timer", "13 min", "Ends at 3:03 PM", true],
     ["Next alarm", "7:00 AM", "Tomorrow · Weekdays", false],
   ]);
-  const nl = glanceCards([event("Overleg", at(9, 0, 12), at(10, 0, 12))], { ...running, paused: true, caption: "Focus 1/4", countdown: false }, [], new Set(), now, "nl");
+  assert.deepEqual(glanceCards([event("Meeting", at(10, 0, 9), at(11, 0, 9))], undefined, [], new Set(), now, "en")[0].small, "None today", "tomorrow's isn't today's");
+  // Past midnight but before 4 a.m. is still today (the 4시 규칙).
+  assert.equal(glanceCards([event("Late", at(1, 30, 9), at(2, 0, 9))], undefined, [], new Set(), now, "en")[0].big, "1:30 AM");
+  const nl = glanceCards([event("Overleg", at(19, 0), at(20, 0))], { ...running, paused: true, caption: "Focus 1/4", countdown: false }, [], new Set(), now, "nl");
   assert.deepEqual(nl.map((card) => [card.label, card.big, card.small, card.hot, card.empty]), [
-    ["Afspraak", "09:00", "ma · Overleg", false, false],
+    ["Afspraak", "19:00", "over 4 u 10 min · Overleg", false, false],
     ["Timer", "13 min", "Focus 1/4 · Gepauzeerd", false, false],
     ["Wekker", "—", "‘wekker 7:00’", false, true],
   ]);
@@ -95,12 +99,17 @@ test("glance cards: next event, timer, next alarm — the urgent one hot", () =>
   assert.equal(glanceCards([], { ...running, caption: "Focus 2/4", countdown: false }, [], new Set(), now, "nl")[1].small, "Focus 2/4");
 });
 
-test("glance tasks: 다음 first (at most three), then three more, and how many are left out", () => {
+test("glance tasks: 다음 first (at most three), then the rest up to seven rows in all, and how many are left out", () => {
   const today = [task("a"), task("b", at(16)), task("c", at(15)), task("d"), task("e", undefined, true), task("f"), task("g"), task("h", at(13))];
   const { next, rest, hidden } = glanceTasks(today, now);
   assert.deepEqual(next.map((item) => item.id), ["c", "b"]);
-  assert.deepEqual(rest.map((item) => item.id), ["a", "d", "f"]);
-  assert.equal(hidden, 2);
+  assert.deepEqual(rest.map((item) => item.id), ["a", "d", "f", "g", "h"], "seven rows hold them all (h's reminder is past)");
+  assert.equal(hidden, 0);
+  // A short screen's cap: 다음 counts toward it.
+  const short = glanceTasks(today, now, 4);
+  assert.deepEqual([short.rest.map((item) => item.id), short.hidden], [["a", "d"], 3]);
+  // One left over is shown instead of ‘외 1개’.
+  assert.deepEqual(glanceTasks(today, now, 6).hidden, 0);
   assert.deepEqual(glanceTasks([], now), { next: [], rest: [], hidden: 0 });
 });
 

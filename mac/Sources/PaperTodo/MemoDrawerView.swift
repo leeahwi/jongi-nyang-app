@@ -193,12 +193,13 @@ struct MemoDrawerView: View {
                 }
                 .padding(.horizontal, 12)
                 .padding(.bottom, 14)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: drawer.expandedID)
+                // M3: a memo opened or put away, the cards under it move with 바뀜 (Motion; none under Reduce Motion).
+                .animation(Motion.animation(.change, reduce: reduceMotion), value: drawer.expandedID)
             }
             .scrollIndicators(.never)
             .onChange(of: drawer.selectedID) { _, id in
                 guard let id else { return }
-                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) { proxy.scrollTo(id) }
+                withAnimation(Motion.animation(.quick, reduce: reduceMotion)) { proxy.scrollTo(id) }
             }
         }
     }
@@ -277,30 +278,37 @@ struct MemoDrawerView: View {
 
     // MARK: Toast
 
-    @ViewBuilder private var toast: some View {
-        if let toast = drawer.toast {
-            HStack(spacing: 10) {
-                Text(toast.text.keepingParticles)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let action = toast.action {
-                    Button(action) { drawer.performToast() }
-                        .buttonStyle(.plain)
-                        .fontWeight(.semibold)
-                        .underline()
-                }
-            }
-            .font(.system(size: 12))
-            .foregroundStyle(palette.toastText)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(palette.toast, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-            .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 52)
-            .transition(.opacity.combined(with: .move(edge: .bottom)))
-            .id(toast.id)
+    /// M14 (#166): as the note's toast (N10), it rises 6 pt as it comes in with 등장 and fades with 살짝 as it goes; at
+    /// once under Reduce Motion and in snapshots (`toastMotion`). The ZStack stays, so the toast's coming and going animate.
+    private var toast: some View {
+        ZStack {
+            if let toast = drawer.toast { toastSlip(toast) }
         }
+        .toastMotion(shown: drawer.toast != nil)
+    }
+
+    private func toastSlip(_ toast: MemoDrawer.DrawerToast) -> some View {
+        HStack(spacing: 10) {
+            Text(toast.text.keepingParticles)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            if let action = toast.action {
+                Button(action) { drawer.performToast() }
+                    .buttonStyle(.plain)
+                    .fontWeight(.semibold)
+                    .underline()
+            }
+        }
+        .font(.system(size: 12))
+        .foregroundStyle(palette.toastText)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .background(palette.toast, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .shadow(color: .black.opacity(0.18), radius: 6, y: 2)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 52)
+        .transition(.toast)
+        .id(toast.id)
     }
 
     // MARK: Folder sheet

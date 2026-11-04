@@ -1,12 +1,30 @@
 /* 오늘 창: a paper slip without tape, 320 wide — three cards, today's tasks, the input line, links. */
 /* One column the slip's width: nothing inside (a long link row in Dutch) may widen it. */
 .slip.glance { width: 320px; padding: 12px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
-.slip.glance.appear { animation: glance-in 0.18s ease-out; }
+.slip.glance.appear { animation: glance-in var(--motion-enter) var(--ease-out); }
 @keyframes glance-in { from { opacity: 0; transform: translateY(8px); } }
 
-/* The three cards: next event · timer · next alarm; the one within the hour (or a running timer) in clay. */
-.cards3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-.c3 { position: relative; display: grid; gap: 1px; min-width: 0; padding: 7px 8px 8px; border-radius: 10px; background: var(--card); border: 1px solid var(--rule); }
+/* #200: the date and today's progress (11월 3일 화요일 · 11개 중 2개 끝냈어요), a 3 px bar under them. */
+.g-top { display: grid; gap: 5px; padding: 0 2px; min-width: 0; }
+.g-top-line { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
+.g-date { font: 600 12px/16px var(--ui); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.g-progress { flex: none; font: 500 11px/16px var(--ui); color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.g-bar { height: 3px; border-radius: 2px; background: var(--rule); overflow: hidden; }
+.g-bar i { display: block; height: 100%; border-radius: 2px; background: var(--sage); transition: width var(--motion-change) var(--ease-out); }
+
+/* The cards with something in them (next event · timer · next alarm; the one within the hour in clay), then the empty
+   ones as chips in one row (#200). */
+.g-cards { display: grid; gap: 6px; min-width: 0; }
+.g-chips { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.g-chip { padding: 3px 10px 3px 8px; gap: 5px; font-size: 11.5px; }
+.g-chip .icon { color: var(--ink-3); }
+.g-chip:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
+.cards3 { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 6px; }
+/* One card alone lies flat: the caption over the time and its line side by side. */
+.c3.wide { grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; align-items: baseline; padding: 7px 10px 8px; }
+.c3.wide small { grid-column: 1 / -1; }
+/* Top-aligned: a card beside a taller one (a two-line event) keeps its caption, time and line together at the top. */
+.c3 { position: relative; display: grid; gap: 1px; align-content: start; min-width: 0; padding: 7px 8px 8px; border-radius: 10px; background: var(--card); border: 1px solid var(--rule); }
 .c3 small { font: 600 9.5px/13px var(--ui); letter-spacing: 0.04em; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .c3 b { font: 600 17px/22px var(--ui); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Up to two lines (between words), so "Tomorrow · Weekdays" or a title with its time keeps both. */
@@ -24,7 +42,7 @@
 .c3.timer.hot b { color: var(--sage-text); }
 .c3.link:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
 /* The timer's pause and stop sit in its corner, shown on hover (and to the keyboard). */
-.c3-tools { position: absolute; top: 4px; right: 4px; display: flex; gap: 2px; opacity: 0; transition: opacity 0.12s; }
+.c3-tools { position: absolute; top: 4px; right: 4px; display: flex; gap: 2px; opacity: 0; transition: opacity var(--motion-quick); }
 .c3:hover .c3-tools, .c3-tools:focus-within { opacity: 1; }
 .c3-tool { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; color: var(--clay-text); background: var(--card); box-shadow: 0 0 0 1px var(--rule); }
 .c3:not(.hot) .c3-tool { color: var(--ink-2); }
@@ -34,11 +52,11 @@
 .g-tasks { display: grid; gap: 0; min-width: 0; }
 .g-head { font: 600 10.5px/14px var(--ui); letter-spacing: 0.04em; color: var(--ink-3); padding: 4px 2px 1px; }
 .g-row { position: relative; display: flex; align-items: center; gap: 4px; min-width: 0; min-height: 32px; border-radius: 8px; }
-.g-row:hover { background: color-mix(in srgb, var(--sage) 5%, transparent); }
+.g-row:hover, .g-row.preview-hover { background: color-mix(in srgb, var(--sage) 5%, transparent); }
 /* T3 (as the note's N4): a finished row folds away when its hold ends (0.18 s, ease-in); Reduce Motion: at once. */
 .g-row.leaving { animation: g-row-out var(--motion-enter) var(--ease-in) forwards; overflow: hidden; pointer-events: none; }
 @keyframes g-row-out { to { height: 0; min-height: 0; opacity: 0; } }
-.g-row .check { width: 28px; height: 30px; display: grid; place-items: center; flex: none; }
+.g-row .check { width: 28px; height: 32px; display: grid; place-items: center; flex: none; }
 .g-row .box { width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid var(--check-border); display: grid; place-items: center; color: var(--on-sage); transform: rotate(-3deg); }
 .g-row .box .icon { opacity: 0; }
 .g-row:hover .box { border-color: var(--ink-2); }
@@ -46,6 +64,10 @@
 .g-row.done .box .icon { opacity: 1; }
 .g-row.pop .box { animation: g-pop var(--motion-change) var(--ease-out); }
 @keyframes g-pop { from { transform: rotate(-3deg) scale(0.85); } }
+/* #200: the title is a button — it opens the note on its row; a faint underline under the pointer. */
+.g-row .label { min-height: 32px; text-align: left; text-decoration: underline transparent; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.g-row:hover .label, .g-row.preview-hover .label { text-decoration-color: color-mix(in srgb, var(--ink-3) 45%, transparent); }
+.g-row.done .label { text-decoration-color: transparent; }
 .g-row .label { position: relative; flex: 1; min-width: 0; font-family: var(--body-font); font-size: calc(var(--body-size) * 0.84); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); padding-right: var(--ink-over); }
 :root[data-font="clean"] .g-row .label { font-size: 13.5px; }
 .g-row.done .label { color: var(--ink-3); }
@@ -54,7 +76,8 @@
 .g-row.done .strike { clip-path: inset(0 0 0 0); }
 .g-row.pop .strike { transition: clip-path var(--motion-draw) var(--ease-out) 0.08s; }
 .g-row .meta { flex: none; display: inline-flex; align-items: center; gap: 4px; padding-right: 6px; font: 500 11px var(--ui); color: var(--sage-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.g-empty { padding: 6px 4px; font: 500 12px var(--ui); color: var(--ink-3); }
+.g-empty { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 2px 4px; font: 500 12px var(--ui); color: var(--ink-3); }
+.g-empty img { width: 30px; height: 30px; flex: none; object-fit: contain; }
 /* "외 3개 · 노트에서 보기": a sage text link under the rows, as on the Mac (#52). */
 .g-more { justify-self: start; height: 24px; padding: 0 2px; margin: 0 0 0 2px; border-radius: 4px; font: 500 11.5px var(--ui); color: var(--sage-text); background: none; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .g-more:hover { text-decoration: underline; text-underline-offset: 2px; }
@@ -95,7 +118,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .slip.glance.appear, .g-row.pop .box { animation: none; }
-  .g-row.pop .strike { transition: none; }
+  .g-row.pop .strike, .g-bar i, .c3-tools { transition: none; }
 }
 @media (forced-colors: active) {
   .c3.hot { outline: 2px solid Highlight; }

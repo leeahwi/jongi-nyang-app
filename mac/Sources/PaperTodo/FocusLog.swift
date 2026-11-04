@@ -30,6 +30,9 @@ final class FocusLog: ObservableObject {
 
     func append(_ record: FocusRecord) {
         guard model?.savingStopped != true else { return }
+        var record = record
+        // Spaces 2c (H3): the task's space as the session ends (none for 일반 and plain timers).
+        if record.space == nil, let task = record.taskId { record.space = model?.todoSpaces.spaceID(of: task.uppercased()) }
         do {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try SafeFile.check(url) // #173: never appended through a link, nor onto a file past 32MB

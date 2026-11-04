@@ -78,7 +78,7 @@ struct MenuBarState {
         if focusing, let remaining, model.menuBarText != .hide { text = Focus.menuBarText(remaining: remaining, language: language) }
         // VoiceOver and the tooltip still name a paused timer's time.
         let accessibility = TodayGlance.accessibilityText(appName: PaperTheme.mascotName, timerRemaining: timer.map { $0.remaining(at: now) }, soon: soon,
-                                                          openTasks: model.remainingCount, language: language)
+                                                          openTasks: model.hereRemainingCount, language: language)
         let progress = timer.map { $0.duration > 0 ? 1 - $0.remaining(at: now) / $0.duration : 1 }
         return MenuBarState(text: text, accessibility: accessibility, progress: progress)
     }
@@ -178,10 +178,14 @@ final class TodayWindowController: NSObject {
         guard let button = statusItem.button, let buttonWindow = button.window else { return }
         let panel = panel ?? makePanel()
         focus += 1
-        panel.show(TodayWindowView(model: model, timer: timer, alarms: model.alarms, calendar: model.calendar, focus: focus,
-                                   onOpenNote: { [weak self] in self?.close(); self?.onOpenNote() },
-                                   onCalendar: { [weak self] in self?.close(); self?.onCalendar() }))
         let itemFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        // #200: the to-do rows follow the room under the menu bar on the item's screen (TodayGlance.rowCap).
+        let screen = NSScreen.screens.first { $0.frame.contains(NSPoint(x: itemFrame.midX, y: itemFrame.midY)) } ?? NSScreen.main
+        panel.show(TodayWindowView(model: model, timer: timer, alarms: model.alarms, calendar: model.calendar, focus: focus,
+                                   rowRoom: screen.map { Double($0.visibleFrame.height) },
+                                   onOpenNote: { [weak self] in self?.close(); self?.onOpenNote() },
+                                   onCalendar: { [weak self] in self?.close(); self?.onCalendar() },
+                                   onReveal: { [weak self] id in self?.close(); self?.model.reveal(id) }))
         panel.placeSlip(topCenter: NSPoint(x: itemFrame.midX, y: itemFrame.minY - 4))
         panel.makeKeyAndOrderFront(nil)
         button.highlight(true)
@@ -268,8 +272,9 @@ final class TodayPanel: SlipPanel {
 
 // MARK: - The view
 
-/// 오늘 창: three cards (다음 일정 · 타이머 · 다음 알람 — the one within the hour, or a running
-/// timer, in clay), 다음 and a few more of today's open tasks with working checkboxes, the input
+/// 오늘 창: the date and today's progress; the cards with something in them (다음 일정 · 타이머 · 다음 알람 — the
+/// one within the hour in clay, a running timer in sage) and the empty ones as a row of chips (#200); 다음 and more of
+/// today's open tasks (seven rows at most) with working checkboxes, a title opening the note on its row; the input
 /// line, and links to the note, the calendar and the desktop cat.
 struct TodayWindowView: View {
     @ObservedObject var model: AppModel
@@ -277,26 +282,31 @@ struct TodayWindowView: View {
     @ObservedObject var alarms: AlarmBook
     @ObservedObject var calendar: EventBook
     var focus = 0
-    /// Snapshots: a fixed now, a toast already showing, and a timer card drawn as if hovered.
+    /// The screen's height under the menu bar, for how many to-do rows fit (`TodayGlance.rowCap`); nil: seven.
+    var rowRoom: Double? = nil
+    /// Snapshots: a fixed now, a toast already showing, a timer card and the first to-do drawn as if hovered.
     var now: Date?
     var previewToast: PaperToast?
     var previewTimerHover = false
+    var previewRowHover = false
     var onOpenNote: () -> Void = {}
     var onCalendar: () -> Void = {}
+    /// A to-do's title: the note, on its row.
+    var onReveal: (UUID) -> Void = { _ in }
     @State private var toast: PaperToast?
     @State private var timerHover = false
     /// 1.38: an empty card's suggestion, put into the line below (‘타이머 25’, ‘알람 7시’).
     @State private var lineFill: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     static let width: CGFloat = 320
-    /// Tasks under 다음.
-    static let moreLimit = 3
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { timeline in
             let now = self.now ?? timeline.date
             PaperSlip(kind: .todo, width: Self.width, taped: false) {
                 VStack(alignment: .leading, spacing: 10) {
+                    header(now: now)
                     cards(now: now)
                     tasks(now: now)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -332,71 +342,156 @@ struct TodayWindowView: View {
     }
 
     static func reminders(model: AppModel) -> [DayRibbon.Reminder] {
-        model.todayItems.compactMap { item in
+        model.hereTodayItems.compactMap { item in
             guard !item.isCompleted, let at = item.reminderAt else { return nil }
             return DayRibbon.Reminder(id: item.id.uuidString, title: item.title, at: at)
         }
     }
 
+    // MARK: Header
+
+    /// The to-dos this window lists and counts: today's sheet. (#196, the spaces a device hides, filters them here — in
+    /// this one place, so the rows and the progress agree.)
+    private var dayItems: [TodoItem] { model.hereTodayItems }
+
+    /// Today's open to-dos (and those just checked, still playing their check), from `dayItems`.
+    private var openItems: [TodoItem] {
+        let open = Set(model.glanceTodayItems.map(\.id))
+        return dayItems.filter { open.contains($0.id) }
+    }
+
+    /// #200: the note's date and today's progress — ‘11월 3일 화요일 · 11개 중 2개 끝냈어요’ — with a thin bar under them.
+    /// Every space's to-dos, whatever the lens shows (A5: the window's counts are everyone's).
+    private func header(now: Date) -> some View {
+        let language = AppLanguage.current
+        let items = dayItems
+        let done = items.filter(\.isCompleted).count
+        let date = TodayGlance.headerDate(now, language: language)
+        let progress = TodayGlance.progressText(total: items.count, done: done, language: language)
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(date)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(PaperTheme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Spacer(minLength: 0)
+                if let progress {
+                    Text(progress)
+                        .font(.system(size: 11, weight: .medium).monospacedDigit())
+                        .foregroundStyle(PaperTheme.ink3)
+                        .lineLimit(1)
+                        .fixedSize()
+                }
+            }
+            if !items.isEmpty { GlanceProgressBar(fraction: Double(done) / Double(items.count)) }
+        }
+        .padding(.horizontal, 2)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(progress.map { date + ", " + $0 } ?? date)
+        .accessibilityAddTraits(.isHeader)
+    }
+
+    // MARK: Cards
+
     private func cards(now: Date) -> some View {
         let language = AppLanguage.current
         let events = calendar.todayEvents(now: now)
         let next = events.filter { !$0.allDay && $0.start > now }.min { $0.start < $1.start }
-        let nextMinutes = next.map { max(1, Int(($0.start.timeIntervalSince(now) / 60).rounded(.up))) }
         let alarm = alarms.next(now: now)
         let running = timer.timer
-        return HStack(alignment: .top, spacing: 6) {
-            // 다음 일정
-            GlanceCard(caption: L("다음 일정"),
-                       value: next.map { clock($0.start, language) } ?? "—",
-                       line: next.map { TodayGlance.eventLine(title: $0.title, minutes: nextMinutes ?? 0, language: language) } ?? TodayGlance.noEvent(language),
-                       hot: (nextMinutes ?? .max) <= TodayGlance.window,
-                       accessibility: next.map { L("다음 일정") + ": " + $0.title + ", " + clock($0.start, language) + ", " + DayRibbon.away(nextMinutes ?? 0, language: language) }
-                           ?? L("다음 일정") + ": " + TodayGlance.noEvent(language))
-                // 1.38: none today → a new event.
-                .onTapGesture {
-                    if let next { calendar.sheet = .edit(next, in: calendar) } else { model.newEvent() }
-                    onOpenNote()
+        // #200: only the cards with something in them take full size; the empty ones are chips in one row.
+        let layout = TodayGlance.layout(filled: Set([next.map { _ in .event }, running.map { _ in .timer }, alarm.map { _ in .alarm }]
+            .compactMap { $0 } as [TodayGlance.CardKind]))
+        return VStack(alignment: .leading, spacing: 6) {
+            if !layout.cards.isEmpty {
+                HStack(alignment: .top, spacing: 6) {
+                    ForEach(layout.cards, id: \.self) { kind in
+                        switch kind {
+                        case .event: if let next { eventCard(next, now: now, wide: layout.wide, language: language) }
+                        case .timer: if let running { timerCard(running, now: now, wide: layout.wide, language: language) }
+                        case .alarm: if let alarm { alarmCard(alarm, now: now, wide: layout.wide, language: language) }
+                        }
+                    }
                 }
-            // 타이머
-            // While focusing: the to-do's title under the time (focus-cases.md glance rule).
-            let focusTitle = timer.isFocusing ? timer.session?.title : nil
-            GlanceCard(caption: L("타이머"),
-                       // #46: a length ("21분" + small "남음"), not "20:50" beside the clock times either side.
-                       value: running.map { TodayGlance.timerLength($0.remaining(at: now), language: language) } ?? "—",
-                       unit: running.map { _ in TodayGlance.timerLeftWord(language) },
-                       unitFirst: TodayGlance.timerLeftWordFirst(language),
-                       line: running.map { timer in
-                           guard let focusTitle else {
-                               // A plain timer: when it ends (the caption already says 타이머).
-                               if timer.phase == .timer && !timer.isPaused {
-                                   return L("\(clock(now.addingTimeInterval(timer.remaining(at: now)), language))에 끝나요")
-                               }
-                               return timer.caption(language) + (timer.isPaused ? " · " + L("멈춤") : "")
-                           }
-                           return timer.isPaused ? L("멈춤") + " · " + focusTitle : focusTitle
-                       } ?? TodayGlance.timerHint(language),
-                       hot: false,
-                       running: running.map { !$0.isPaused } ?? false,
-                       accessibility: running.map { L("타이머") + ": " + TodayGlance.timerLeftText($0.remaining(at: now), language: language) + ", " + $0.caption(language) }
-                           ?? L("타이머") + ": " + L("없음"))
-                .overlay(alignment: .topTrailing) {
-                    if running != nil && (timerHover || previewTimerHover) { timerButtons(paused: running?.isPaused ?? false) }
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            if !layout.chips.isEmpty {
+                FlowLayout(spacing: 6, lineSpacing: 6) {
+                    ForEach(layout.chips, id: \.self) { chip($0, language: language) }
                 }
-                .onHover { timerHover = $0 }
-                // 1.38: an empty timer card puts ‘타이머 25’ into the line.
-                .onTapGesture { if running == nil { lineFill = TodayGlance.timerWords(language) } }
-            // 다음 알람
-            GlanceCard(caption: L("다음 알람"),
-                       value: alarm.map { Alarm.clockText($0.alarm, language: language) } ?? "—",
-                       line: alarm.map { TodayGlance.alarmLine(fire: $0.fire, days: $0.alarm.days, now: now, language: language) } ?? TodayGlance.alarmHint(language),
-                       hot: alarm.map { $0.fire.timeIntervalSince(now) <= TimeInterval(TodayGlance.window * 60) } ?? false,
-                       accessibility: alarm.map { L("다음 알람") + ": " + Alarm.timeText($0.alarm, language: language) + ", " + Alarm.untilText($0.fire, now: now, language: language) }
-                           ?? L("다음 알람") + ": " + L("없음"))
-                // 1.38: an alarm opens 시계; none puts ‘알람 7시’ into the line.
-                .onTapGesture { if alarm == nil { lineFill = TodayGlance.alarmWords(language) } else { model.showAlarmSettings() } }
+            }
         }
-        .fixedSize(horizontal: false, vertical: true)
+        .animation(Motion.animation(.change, reduce: reduceMotion), value: layout)
+    }
+
+    private func eventCard(_ next: CalendarEvent, now: Date, wide: Bool, language: AppLanguage) -> some View {
+        let minutes = max(1, Int((next.start.timeIntervalSince(now) / 60).rounded(.up)))
+        return GlanceCard(caption: L("다음 일정"), value: clock(next.start, language),
+                          line: TodayGlance.eventLine(title: next.title, minutes: minutes, language: language),
+                          hot: minutes <= TodayGlance.window, wide: wide,
+                          accessibility: L("다음 일정") + ": " + next.title + ", " + clock(next.start, language) + ", " + DayRibbon.away(minutes, language: language)) {
+            calendar.sheet = .edit(next, in: calendar)
+            onOpenNote()
+        }
+    }
+
+    private func timerCard(_ running: FocusTimer, now: Date, wide: Bool, language: AppLanguage) -> some View {
+        // While focusing: the to-do's title under the time (focus-cases.md glance rule).
+        let focusTitle = timer.isFocusing ? timer.session?.title : nil
+        let line: String = {
+            guard let focusTitle else {
+                // A plain timer: when it ends (the caption already says 타이머).
+                if running.phase == .timer && !running.isPaused {
+                    return L("\(clock(now.addingTimeInterval(running.remaining(at: now)), language))에 끝나요")
+                }
+                return running.caption(language) + (running.isPaused ? " · " + L("멈춤") : "")
+            }
+            return running.isPaused ? L("멈춤") + " · " + focusTitle : focusTitle
+        }()
+        // #46: a length ("21분" + small "남음"), not "20:50" beside the clock times either side. No action of its own:
+        // pause and stop are its two small buttons.
+        return GlanceCard(caption: L("타이머"), value: TodayGlance.timerLength(running.remaining(at: now), language: language),
+                          unit: TodayGlance.timerLeftWord(language), unitFirst: TodayGlance.timerLeftWordFirst(language),
+                          line: line, hot: false, running: !running.isPaused, wide: wide,
+                          accessibility: L("타이머") + ": " + TodayGlance.timerLeftText(running.remaining(at: now), language: language) + ", " + running.caption(language))
+            .overlay(alignment: .topTrailing) {
+                if timerHover || previewTimerHover { timerButtons(paused: running.isPaused) }
+            }
+            .onHover { timerHover = $0 }
+    }
+
+    private func alarmCard(_ alarm: (alarm: Alarm, fire: Date), now: Date, wide: Bool, language: AppLanguage) -> some View {
+        GlanceCard(caption: L("다음 알람"), value: Alarm.clockText(alarm.alarm, language: language),
+                   line: TodayGlance.alarmLine(fire: alarm.fire, days: alarm.alarm.days, now: now, language: language),
+                   hot: alarm.fire.timeIntervalSince(now) <= TimeInterval(TodayGlance.window * 60), wide: wide,
+                   accessibility: L("다음 알람") + ": " + Alarm.timeText(alarm.alarm, language: language) + ", " + Alarm.untilText(alarm.fire, now: now, language: language)) {
+            // 1.38: an alarm opens 시계.
+            model.showAlarmSettings()
+        }
+    }
+
+    /// An empty card as a chip: none today → a new event (1.38); ‘타이머 25’ · ‘알람 7시’ into the line below.
+    private func chip(_ kind: TodayGlance.CardKind, language: AppLanguage) -> some View {
+        let text = TodayGlance.chipText(kind, language: language)
+        let symbol: String
+        let label: String
+        let action: () -> Void
+        switch kind {
+        case .event:
+            symbol = "calendar"
+            label = L("다음 일정") + ": " + TodayGlance.noEvent(language)
+            action = { model.newEvent(); onOpenNote() }
+        case .timer:
+            symbol = "timer"
+            label = L("타이머") + ": " + L("없음") + ", " + text
+            action = { lineFill = TodayGlance.timerWords(language) }
+        case .alarm:
+            symbol = "alarm"
+            label = L("다음 알람") + ": " + L("없음") + ", " + text
+            action = { lineFill = TodayGlance.alarmWords(language) }
+        }
+        return GlanceChip(symbol: symbol, text: text, accessibility: label, action: action)
     }
 
     private func timerButtons(paused: Bool) -> some View {
@@ -428,33 +523,35 @@ struct TodayWindowView: View {
     private func tasks(now: Date) -> some View {
         // 2a (A5): the note's lens — one space's to-dos (the menu bar's words and the counts stay everyone's).
         let shown = model.spaceShown
-        let open = shown == .all ? model.glanceTodayItems : model.glanceTodayItems.filter { shown.includes(model.spaceOf($0.id)?.id) }
+        let items = openItems
+        let open = shown == .all ? items : items.filter { shown.includes(model.spaceOf($0.id)?.id) }
         let split = TodayGroups.split(open, series: model.series, now: now)
         let byID = Dictionary(uniqueKeysWithValues: open.map { ($0.id, $0) })
         let next = split.next.compactMap { byID[$0] }
-        let rest = split.rest.compactMap { byID[$0] }.prefix(Self.moreLimit)
-        let more = open.filter { !$0.isCompleted }.count - next.filter { !$0.isCompleted }.count - rest.filter { !$0.isCompleted }.count
+        let others = split.rest.compactMap { byID[$0] }
+        // #200: seven rows at most (fewer on a short screen, never under three), 다음 counted; one left over is shown.
+        let slots = TodayGlance.slots(next: next.count, others: others.count, cap: TodayGlance.rowCap(room: rowRoom))
+        let rest = others.prefix(slots.rest)
+        let more = others.dropFirst(slots.rest).filter { !$0.isCompleted }.count
+        let first = (next.first ?? rest.first)?.id
         VStack(alignment: .leading, spacing: 0) {
-            if open.isEmpty && (shown == .all || model.hiddenOpenCount == 0) {
+            if open.isEmpty && (shown == .all || model.hiddenOpenCount(here: true) == 0) {
                 // 1.38: the small cat, like every other empty sheet.
                 HStack(spacing: 8) {
-                    Image(nsImage: PetArt.image(model.todayItems.isEmpty ? .happy : .cheer) ?? PaperTheme.mascot)
+                    Image(nsImage: PetArt.image(dayItems.isEmpty ? .happy : .cheer) ?? PaperTheme.mascot)
                         .resizable().scaledToFit().frame(width: 30, height: 30)
                         .accessibilityHidden(true)
-                    Text(model.todayItems.isEmpty ? L("오늘 할 일을 한 줄 적어 볼까요?") : L("오늘 한 장 끝! 수고했어요"))
+                    Text(dayItems.isEmpty ? L("오늘 할 일을 한 줄 적어 볼까요?") : L("오늘 한 장 끝! 수고했어요"))
                         .font(.system(size: 12))
                         .foregroundStyle(PaperTheme.ink3)
                 }
                 .frame(maxWidth: .infinity, minHeight: 36)
             }
-            if !next.isEmpty {
-                GlanceHeader(title: L("다음"))
-                ForEach(next) { GlanceTaskRow(item: $0, model: model, time: split.times[$0.id]) }
-            }
-            if !rest.isEmpty {
-                if !next.isEmpty { GlanceHeader(title: L("그 밖에")).padding(.top, 4) } // #52: as the note and Windows
-                ForEach(Array(rest)) { GlanceTaskRow(item: $0, model: model, time: nil) }
-            }
+            // #52 · #200: the small heads only when both groups have rows, as on the note and Windows.
+            if split.showsHeaders { GlanceHeader(title: L("다음")) }
+            ForEach(next) { GlanceTaskRow(item: $0, model: model, time: split.times[$0.id], previewHover: previewRowHover && $0.id == first, onReveal: onReveal) }
+            if split.showsHeaders && !rest.isEmpty { GlanceHeader(title: L("그 밖에")).padding(.top, 4) }
+            ForEach(Array(rest)) { GlanceTaskRow(item: $0, model: model, time: nil, previewHover: previewRowHover && $0.id == first, onReveal: onReveal) }
             if more > 0 {
                 Button(action: onOpenNote) {
                     Text(L("외 \(more)개 · 노트에서 보기"))
@@ -499,7 +596,9 @@ struct TodayWindowView: View {
     }
 }
 
-/// One of the three cards: a small caption, a big tabular value, a line under it (two lines at most).
+/// A card with something in it: a small caption, a big tabular value, a line under it (two lines at most). One card
+/// alone (`wide`, #200) lies flat: the line beside the value. A card with an action is a button (the keyboard and
+/// VoiceOver reach it); the running timer's has none — its pause and stop are buttons of their own.
 private struct GlanceCard: View {
     let caption: String
     let value: String
@@ -511,12 +610,26 @@ private struct GlanceCard: View {
     let hot: Bool
     /// A timer that's running: sage, so it doesn't sit as a second clay card beside a soon event.
     var running = false
+    var wide = false
     let accessibility: String
+    var action: (() -> Void)? = nil
     @Environment(\.colorSchemeContrast) private var contrast
 
     private var accent: Color? { hot ? PaperTheme.clayText : running ? PaperTheme.sageText : nil }
 
     var body: some View {
+        if let action {
+            Button(action: action) { card }
+                .buttonStyle(.plain)
+                .accessibilityLabel(accessibility)
+        } else {
+            card
+                .accessibilityElement(children: .contain)
+                .accessibilityLabel(accessibility)
+        }
+    }
+
+    private var card: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(caption)
                 .font(.system(size: 9.5, weight: .semibold))
@@ -524,19 +637,22 @@ private struct GlanceCard: View {
                 .foregroundStyle(accent ?? PaperTheme.ink3)
                 .lineLimit(1)
                 .minimumScaleFactor(0.85)
-            // The small word steps aside when the card is too narrow for it (the value never gets "…").
-            ViewThatFits(in: .horizontal) {
-                valueLine(unit: unit)
-                valueLine(unit: nil)
+            if wide {
+                HStack(alignment: .firstTextBaseline, spacing: 10) {
+                    valueLine(unit: unit).foregroundStyle(accent ?? PaperTheme.ink)
+                    lineText
+                }
+            } else {
+                // The small word steps aside when the card is too narrow for it (the value never gets "…").
+                ViewThatFits(in: .horizontal) {
+                    valueLine(unit: unit)
+                    valueLine(unit: nil)
+                }
+                .foregroundStyle(accent ?? PaperTheme.ink)
+                lineText
             }
-            .foregroundStyle(accent ?? PaperTheme.ink)
-            Text(line)
-                .font(.system(size: 10.5).monospacedDigit())
-                .foregroundStyle(PaperTheme.ink2)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.horizontal, 8)
+        .padding(.horizontal, wide ? 10 : 8)
         .padding(.vertical, 7)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(hot ? PaperTheme.clay2 : running ? PaperTheme.sage2 : PaperTheme.card, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
@@ -545,8 +661,14 @@ private struct GlanceCard: View {
                 .strokeBorder(hot ? PaperTheme.clay : running ? PaperTheme.sage : contrast == .increased ? PaperTheme.ink3 : PaperTheme.rule, lineWidth: 1)
         }
         .contentShape(RoundedRectangle(cornerRadius: 10))
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(accessibility)
+    }
+
+    private var lineText: some View {
+        Text(line)
+            .font(.system(size: 10.5).monospacedDigit())
+            .foregroundStyle(PaperTheme.ink2)
+            .lineLimit(2)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private func valueLine(unit: String?) -> some View {
@@ -562,6 +684,54 @@ private struct GlanceCard: View {
     }
 }
 
+/// #200: an empty card as a quiet chip (the slips' chip: paper-2, ink-2, a small symbol) — ‘오늘 일정 없음’,
+/// ‘‘타이머 25’’, ‘‘알람 7시’’.
+private struct GlanceChip: View {
+    let symbol: String
+    let text: String
+    let accessibility: String
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                Image(systemName: symbol).font(.system(size: 10.5, weight: .medium)).foregroundStyle(PaperTheme.ink3)
+                Text(text).lineLimit(1).fixedSize()
+            }
+            .font(.system(size: 11.5, weight: .medium))
+            .foregroundStyle(hovering ? PaperTheme.ink : PaperTheme.ink2)
+            .padding(.leading, 8)
+            .padding(.trailing, 10)
+            .frame(minHeight: 26)
+            .background(hovering ? PaperTheme.sage2 : PaperTheme.paper2, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help(text)
+        .accessibilityLabel(accessibility)
+    }
+}
+
+/// #200: today's progress under the header — a 3 pt line, sage over the rule; its length eases (Motion.change).
+private struct GlanceProgressBar: View {
+    let fraction: Double
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                Capsule().fill(PaperTheme.rule)
+                Capsule().fill(PaperTheme.sage).frame(width: proxy.size.width * min(1, max(0, fraction)))
+            }
+        }
+        .frame(height: 3)
+        .animation(Motion.animation(.change, reduce: reduceMotion), value: fraction)
+        .accessibilityHidden(true)
+    }
+}
+
 /// 2a (A5): under the 오늘 창's to-dos while one space shows — `● 회사만`, and with hidden open to-dos
 /// ` · 다른 스페이스에 N개 더 · 모두 보기` (모두 보기 lets the lens go everywhere).
 private struct GlanceLensLine: View {
@@ -569,7 +739,7 @@ private struct GlanceLensLine: View {
     let shown: SpaceLens.Shown
 
     var body: some View {
-        let hidden = model.hiddenOpenCount
+        let hidden = model.hiddenOpenCount(here: true)
         let name = model.spaceName(shown) ?? ""
         // One line when it fits; else the name on its own line and the rest under it (Dutch is long), never cut.
         ViewThatFits(in: .horizontal) {
@@ -641,21 +811,27 @@ private struct GlanceHeader: View {
     }
 }
 
-/// A task in the 오늘 창: the checkbox (with the note's pop and pencil line), the handwritten
-/// title, and for 다음 its time.
+/// A task in the 오늘 창: the checkbox (with the note's pop and pencil line, 28 × 32 to press), the handwritten
+/// title — pressing it opens the note on the row (#200) — and for 다음 its time.
 private struct GlanceTaskRow: View {
     let item: TodoItem
     @ObservedObject var model: AppModel
     let time: Date?
+    /// Snapshots: drawn as if the pointer were on it.
+    var previewHover = false
+    var onReveal: (UUID) -> Void = { _ in }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var strike: CGFloat = 0
     @State private var pops = 0
     @State private var hovering = false
 
+    private static let height: CGFloat = 32
+    private var hovered: Bool { hovering || previewHover }
+
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Button {
-                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) { model.toggle(item.id) }
+                withAnimation(Motion.animation(.enter, reduce: reduceMotion)) { model.toggle(item.id) }
             } label: {
                 ZStack {
                     RoundedRectangle(cornerRadius: 5).fill(item.isCompleted ? PaperTheme.sage : PaperTheme.card)
@@ -667,7 +843,7 @@ private struct GlanceTaskRow: View {
                 }
                 .frame(width: 17, height: 17)
                 .checkPop(pops)
-                .frame(width: 22, height: 30)
+                .frame(width: 28, height: Self.height)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -675,16 +851,25 @@ private struct GlanceTaskRow: View {
             .accessibilityLabel("\(item.title) 완료")
             .accessibilityValue(item.isCompleted ? L("완료됨") : L("미완료"))
 
-            Text(item.title.handwritten)
-                .font(model.notebookFont.bodyFont(.small))
-                .foregroundStyle(item.isCompleted ? PaperTheme.ink3 : PaperTheme.ink)
-                .lineLimit(1)
-                .overlay {
-                    PencilStrike().trim(from: 0, to: strike)
-                        .stroke(PaperTheme.ink.opacity(0.62), style: StrokeStyle(lineWidth: 1.25, lineCap: .round))
-                        .allowsHitTesting(false)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // #200: the title opens the note with this row picked.
+            Button { onReveal(item.id) } label: {
+                Text(item.title.handwritten)
+                    .font(model.notebookFont.bodyFont(.small))
+                    .foregroundStyle(item.isCompleted ? PaperTheme.ink3 : PaperTheme.ink)
+                    .lineLimit(1)
+                    .underline(hovered && !item.isCompleted, color: PaperTheme.ink3.opacity(0.45))
+                    .overlay {
+                        PencilStrike().trim(from: 0, to: strike)
+                            .stroke(PaperTheme.ink.opacity(0.62), style: StrokeStyle(lineWidth: 1.25, lineCap: .round))
+                            .allowsHitTesting(false)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: Self.height, alignment: .leading)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(L("노트에서 보기"))
+            .accessibilityLabel(item.title)
+            .accessibilityHint(L("노트에서 보기"))
             // 1.39: a task with a time today shows its range (clock), else the reminder (bell).
             if let range = item.timeRange, TimeBlock.day(of: item, now: Date()) != nil {
                 HStack(spacing: 3) {
@@ -705,13 +890,13 @@ private struct GlanceTaskRow: View {
             }
         }
         .padding(.trailing, 4)
-        .frame(minHeight: 30)
-        .background(PaperTheme.sage.opacity(hovering ? 0.055 : 0), in: RoundedRectangle(cornerRadius: 4))
+        .frame(minHeight: Self.height)
+        .background(PaperTheme.sage.opacity(hovered ? 0.055 : 0), in: RoundedRectangle(cornerRadius: 4))
         .overlay(alignment: .leading) {
             // 2a (A5): the space's band at the row's left end, in the window's margin clear of the box.
-            if let space = model.spaceOf(item.id) { SpaceBand(space: space, height: 30, faded: item.isCompleted).offset(x: -8) }
+            if let space = model.spaceOf(item.id) { SpaceBand(space: space, height: Self.height, faded: item.isCompleted).offset(x: -8) }
         }
-        .overlay(alignment: .bottom) { Rectangle().fill(PaperTheme.rule).frame(height: 0.6).padding(.leading, 26) }
+        .overlay(alignment: .bottom) { Rectangle().fill(PaperTheme.rule).frame(height: 0.6).padding(.leading, 30) }
         .onHover { hovering = $0 }
         .onAppear { strike = item.isCompleted ? 1 : 0 }
         .onChange(of: item.isCompleted) { _, done in

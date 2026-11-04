@@ -37,7 +37,8 @@ import { emptyTrash, trashMemo } from "../core/memoTrash";
 import { addFolder, deleteFolder, restoreFolder, folderName, inboxID, moveNotice, shortcutLabel, placementOf, moveMemo, pinAll, pinnedView, recolorFolder, renameFolder, reorderFolders, setFolderSort, setFolderView, setMemoPaper, setPinned, targetOf } from "../core/memoDrawer";
 import { narrowNote, returnPoint, wideNote } from "../core/spaceGroups";
 import { movedBlock, movedManyWords, restoredOrder } from "../core/selection";
-import { addSpace, deleteSpace, findSpace, spaceIndex, generalName, liveSpaces, moveTodo, newSpaceID, recolorSpace, renameGeneral, renameSpace, reorderSpaces, restoreSpace, seriesSpaceOf, lensFor, lensNone, spaceColor, spaceOf, toSpaceWords, type SpaceChoice } from "../core/todoSpaces";
+import { addSpace, deleteSpace, findSpace, historySpaces, spaceIndex, generalName, liveSpaces, moveTodo, newSpaceID, recolorSpace, renameGeneral, renameSpace, reorderSpaces, restoreSpace, seriesSpaceOf, lensFor, lensNone, spaceColor, spaceOf, toSpaceWords, type SpaceChoice } from "../core/todoSpaces";
+import { deviceWords } from "../core/spaceDevice";
 import { drawerLegacy } from "../core/textSteps";
 import { TimerSheet } from "./timerSheet";
 import { AlarmClock } from "./alarms";
@@ -569,6 +570,40 @@ function startDayKeeper(): void {
   armBoundary();
   setInterval(tick, 30 * 60_000);
   powerMonitor.on("resume", () => { tick(); resendState(); store.changed(); armBoundary(); });
+  startDeviceClock();
+}
+
+/**
+ * 기기마다 보일 스페이스 (#196, D4): while a time rule is set, what this PC hides is worked out on each minute (and after
+ * waking); every window draws again only when it changed. A lens on a space that just went hidden lets go (D7).
+ */
+let deviceClock: NodeJS.Timeout | undefined;
+let deviceHiddenSeen = "";
+function refreshDeviceHidden(): void {
+  const hidden = store.hiddenNow();
+  const seen = [...hidden].sort().join("\t");
+  const lens = store.prefs.spaceLens?.spaceId;
+  if (lens && hidden.has(lens) && !store.devicePeek.includes(lens)) store.setPref("spaceLens", null);
+  if (seen === deviceHiddenSeen) return;
+  deviceHiddenSeen = seen;
+  store.changed();
+}
+function startDeviceClock(): void {
+  const arm = () => {
+    clearTimeout(deviceClock);
+    deviceClock = undefined;
+    deviceHiddenSeen = [...store.hiddenNow()].sort().join("\t");
+    const timed = Object.values(store.prefs.spaceDevice).some((rule) => rule.show === "time");
+    if (!timed) return;
+    const tickAt = () => {
+      refreshDeviceHidden();
+      deviceClock = setTimeout(tickAt, 60_000 - (Date.now() % 60_000) + 200);
+    };
+    deviceClock = setTimeout(tickAt, 60_000 - (Date.now() % 60_000) + 200);
+  };
+  arm();
+  store.on("prefs", (key: keyof Prefs) => { if (key === "spaceDevice") { arm(); refreshDeviceHidden(); } });
+  powerMonitor.on("resume", () => { refreshDeviceHidden(); arm(); });
 }
 
 /**
@@ -1269,6 +1304,7 @@ function handle(action: Action, sender: Electron.WebContents, frame?: WebFrameMa
     case "moveMany": return void store.mutate((history) => history.reorder(movedBlock(history.items.map((item) => item.id), action.ids, action.targetID, action.after)));
     case "restoreOrder": return void store.mutate((history) => history.reorder(restoredOrder(history.items.map((item) => item.id), action.ids, action.previous)));
     case "spaceLens": return store.setPref("spaceLens", action.space ? lensFor(action.space) : null);
+    case "spacePeek": return store.setDevicePeek(action.spaces);
     case "openSpaces": return void openDesk("spaces");
     case "folderAdd": return store.changeFolders((data) => addFolder(data, action.name, action.color, action.id));
     case "folderRename": return store.changeFolders((data) => renameFolder(data, action.id, action.name));
@@ -1648,19 +1684,32 @@ function intentRequest(request: IntentRequest): IntentResult {
     store.setPref("intentPrefer", memory.prefer);
     return {};
   }
-  const result = commitWithSpace(request.candidate, request.from === "quick" ? "today" : request.page, request.space);
+  const made = commitWithSpace(request.candidate, request.from === "quick" ? "today" : request.page, request.space);
+  // #196 (D12): a to-do put where this PC hides it — the toast says so.
+  const hiddenIn = madeHiddenIn(made.made);
+  const result: IntentResult = hiddenIn ? { ...made, hiddenIn } : made;
   // 빠른 입력 while the note is up: the card closes at once and the note shows the toast.
   if (result.made && request.from === "quick" && note.isVisible() && !note.isMinimized() && request.candidates && request.text !== undefined) {
     const index = request.candidates.findIndex((entry) => JSON.stringify(entry) === JSON.stringify(request.candidate));
-    note.webContents.send("note:toast", { made: result.made, candidates: request.candidates, index: Math.max(0, index), text: request.text, ...(request.space ? { space: request.space } : {}) });
+    note.webContents.send("note:toast", { made: result.made, candidates: request.candidates, index: Math.max(0, index), text: request.text, ...(request.space ? { space: request.space } : {}), ...(hiddenIn ? { hiddenIn } : {}) });
     return { ...result, inNote: true };
   }
   return result;
 }
 
+/** #196: the name of the space a to-do just made went into, when this PC hides it (일반 by its name). */
+function madeHiddenIn(made: IntentMade | undefined): string | undefined {
+  if (made?.kind !== "todo" || !made.id) return undefined;
+  const item = store.items.find((entry) => entry.id === made.id);
+  if (!item || !store.hidesHere(item)) return undefined;
+  return findSpace(store.todoSpaces, spaceOf(store.todoSpaces, item.id))?.name ?? generalName(store.todoSpaces, lang());
+}
+
 function setPref<K extends keyof Prefs>(key: K, value: Prefs[K]): void {
   // 언어 asks first and starts the app again.
   if (key === "language") return void setLanguage(value as LanguageSetting);
+  // #196: 이 기기에서 — kept cleaned, a space made visible noted (D10), its 잠깐 보기 ended (D6).
+  if (key === "spaceDevice") return store.setDeviceRules(value as Prefs["spaceDevice"]);
   store.setPref(key, value);
 }
 
@@ -1699,7 +1748,7 @@ function refreshTrayImage(): void {
 /** Something within the hour: the face gets its dot (and loses it after). The tooltip names it. */
 function refreshTrayDot(now = new Date()): void {
   const events = nearEvents(now);
-  const dot = soonest(events, store.items, now) !== undefined;
+  const dot = soonest(events, store.hereItems, now) !== undefined;
   if (dot === trayDot) return;
   trayDot = dot;
   if (tray && process.platform !== "darwin") tray.setImage(trayImage());
@@ -1778,9 +1827,9 @@ function glanceTimer(now = Date.now()): GlanceTimer | undefined {
 function trayTooltip(now = new Date()): string {
   const events = nearEvents(now);
   const timer = glanceTimer(now.getTime());
-  const text = glanceText(events, store.items, timer, now, lang());
+  const text = glanceText(events, store.hereItems, timer, now, lang());
   // A timer runs and something comes within the hour (the dot): both, so the dot is named.
-  const soon = timer && !timer.paused ? glanceText(events, store.items, undefined, now, lang()) : undefined;
+  const soon = timer && !timer.paused ? glanceText(events, store.hereItems, undefined, now, lang()) : undefined;
   return [t("종이냥"), text, soon].filter(Boolean).join(" · ");
 }
 
@@ -2023,7 +2072,7 @@ function dockedSide(): "left" | "right" | undefined {
 /** The tray's menu: the note (with how today stands), then the windows, alerts and the pet. */
 function trayMenu(): MenuItemConstructorOptions[] {
   const count = store.remainingCount;
-  const description = store.todayItems.length === 0 ? t("새 할 일을 적어 보세요") : count === 0 ? t("다 했어요") : t("{count}개 남음", { count });
+  const description = store.hereTodayItems.length === 0 ? t("새 할 일을 적어 보세요") : count === 0 ? t("다 했어요") : t("{count}개 남음", { count });
   return [
     { label: t("노트 열기 ({description})", { description }), click: showNote },
     { label: t("새 할 일"), click: () => { showNote(); note.webContents.send("note:focus-new"); } },
@@ -2088,7 +2137,13 @@ function registerIPC(): void {
   });
   // 밤 종이: asked by every page (and frame) as it loads, before it draws.
   ipcMain.on("paper:get", (event) => { event.returnValue = from(event) ? paperNight() : false; });
-  ipcMain.handle("history:get", (event) => (from(event, "history:get") ? { entries: archive.all(), focus: focusLog.all(), now: Date.now() } : undefined));
+  ipcMain.handle("history:get", (event) => {
+    if (!from(event, "history:get")) return undefined;
+    // 스페이스 2c (H1–H3): each line with its space worked out, the live spaces and 일반's name, for the filter.
+    const lines = historySpaces(store.todoSpaces, archive.all(), focusLog.all());
+    const spaces = liveSpaces(store.todoSpaces).map(({ id, name, color }) => ({ id, name, color }));
+    return { ...lines, now: Date.now(), spaces, general: generalName(store.todoSpaces, lang()) };
+  });
   ipcMain.handle("calendar:write", (event, value: unknown) => {
     const request = from(event, "calendar:write") ? readCalendarRequest(value) : undefined;
     return request ? calendar.write(request) : { ok: false, error: "" };
@@ -2098,7 +2153,7 @@ function registerIPC(): void {
     return request ? intentRequest(request) : {};
   });
   ipcMain.handle("search", (event, query: unknown) => (from(event, "search") && typeof query === "string" && query.length <= 200
-    ? search({ items: store.items, memos: store.memos, archive: archive.all(), events: store.events, dueStyle: store.prefs.dueStyle, memoFolder: memoFolderName }, query, new Date(), lang())
+    ? search({ items: store.items, memos: store.memos, archive: archive.all(), events: store.events, dueStyle: store.prefs.dueStyle, memoFolder: memoFolderName, spaces: store.todoSpaces }, query, new Date(), lang())
     : []));
 }
 
@@ -2243,6 +2298,10 @@ async function runSnapshots(directory: string): Promise<void> {
   if (process.env.PAPERTODO_SNAPSHOT_ONLY === "drawer") {
     return finishSnapshots(await drawerShots(directory, save, wait));
   }
+  // `npm run snapshot -- cardfont`: only the cards' preview lines in each face (#198).
+  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "cardfont") {
+    return finishSnapshots(await drawerShots(directory, save, wait));
+  }
   // `npm run snapshot -- markdown`: only the drawer's memo markdown, font and size shots (#84).
   if (process.env.PAPERTODO_SNAPSHOT_ONLY === "markdown") {
     return finishSnapshots(await drawerShots(directory, save, wait));
@@ -2258,6 +2317,14 @@ async function runSnapshots(directory: string): Promise<void> {
   // `npm run snapshot -- spaces2b`: only 스페이스별로 묶기's shots (1.31), day and night.
   if (process.env.PAPERTODO_SNAPSHOT_ONLY === "spaces2b") {
     return finishSnapshots(await spaces2bShots(directory, save, wait, settled));
+  }
+  // `npm run snapshot -- device`: 기기마다 보일 스페이스 (#196), day and night.
+  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "device") {
+    return finishSnapshots(await deviceShots(directory, save, wait, settled));
+  }
+  // `npm run snapshot -- spaces2c`: 찾기의 #스페이스 and 완료 기록 by space (1.32), day and night.
+  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "spaces2c") {
+    return finishSnapshots(await spaces2cShots(directory, save, wait, settled));
   }
   // `npm run snapshot -- ears`: the note with the cat's ears on its top edge (#151), day and night.
   if (process.env.PAPERTODO_SNAPSHOT_ONLY === "ears") {
@@ -2280,6 +2347,10 @@ async function runSnapshots(directory: string): Promise<void> {
   // `npm run snapshot -- shortcuts`: only the shortcut list and the note's key row (#85 · #86), day and night.
   if (process.env.PAPERTODO_SNAPSHOT_ONLY === "shortcuts") {
     return finishSnapshots(await shortcutShots(directory, save, wait));
+  }
+  // `npm run snapshot -- glance`: only the 오늘 창's states (#200), day and night, into glance/.
+  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "glance") {
+    return finishSnapshots(await todayWindowShots(directory, save, wait, settled));
   }
   // `npm run snapshot -- stage2`: only 앞으로 and the 오늘 창.
   if (process.env.PAPERTODO_SNAPSHOT_ONLY === "stage2") {
@@ -2559,9 +2630,11 @@ async function redesignShots(save: Save, wait: Wait, settled: (window: BrowserWi
   openDay(true);
   await shot("note-ribbon-open");
   openDay(false);
+  const unpin = pinSampleReminders(today);
   await run(`window.ribbonNow = ${JSON.stringify(new Date(today.getTime() + 19.83 * 3_600_000).toISOString())}; window.dispatchEvent(new Event("ribbon-now"))`);
   await shot("note-ribbon-nothing-ahead");
   await run(`window.ribbonNow = undefined; window.dispatchEvent(new Event("ribbon-now"))`);
+  unpin();
   // The input line while typing each kind.
   const type = async (text: string, pick = 0) => {
     // An off-screen window never has the focus: the line is drawn as if it had.
@@ -3038,6 +3111,18 @@ async function convenienceShots(directory: string, save: Save, wait: Wait, settl
 }
 
 /**
+ * #191: a scene drawn at a fixed moment (`window.ribbonNow`) keeps the run's earlier sample reminders — an hour or two
+ * from the real clock — at fixed times of that day meanwhile (21:30, 21:40 …, as the Mac's 하루 띠 shots keep the demo
+ * list's reminder at 21:30), so they don't land somewhere else on the day each time it's drawn. Returns the step that
+ * puts them back.
+ */
+function pinSampleReminders(dayStart: Date): () => void {
+  const kept = store.items.filter((item) => item.reminderAt && !item.isCompleted).map((item) => [item.id, item.reminderAt!] as const);
+  store.mutate((history) => kept.forEach(([id], index) => history.setReminder(id, new Date(dayStart.getTime() + (21 - 4) * 3_600_000 + (30 + index * 10) * 60_000))));
+  return () => store.mutate((history) => { for (const [id, at] of kept) history.setReminder(id, new Date(at)); });
+}
+
+/**
  * 1.24's shots, day and night: the ribbon with task blocks (beside events, two lanes, done, over, a start alone;
  * hovered; a narrow note), rows with their hours, the editor's 시간 with its time list open, the line reading
  * "3시부터 5시까지 보고서", 앞으로 and the desk's week and day panel with a ranged task, the alarm editor's
@@ -3070,6 +3155,7 @@ async function timeblockShots(directory: string, save: Save, wait: Wait, settled
   const today = dayKey(new Date());
   const tomorrow = dayKey(new Date(dayStart.getTime() + 30 * 3_600_000));
   const ribbonNow = new Date(dayStart.getTime() + (14 - 4) * 3_600_000 + 50 * 60_000);
+  const unpin = pinSampleReminders(dayStart);
   const made: string[] = [];
   store.mutate((history) => {
     const add = (title: string, range: { start: number; end?: number }, due?: string) => { const item = history.addTo(title, undefined, new Date(), due, undefined, range); if (item) made.push(item.id); return item; };
@@ -3168,6 +3254,7 @@ async function timeblockShots(directory: string, save: Save, wait: Wait, settled
   store.setPref("paper", "day");
   await run(`window.ribbonNow = undefined; window.dispatchEvent(new Event("ribbon-now"))`);
   store.mutate((history) => { for (const id of made) history.delete(id); });
+  unpin();
   console.log(problems ? `TIMEBLOCK PROBLEMS: ${problems}` : "TIMEBLOCK OK");
   return problems;
 }
@@ -3264,7 +3351,7 @@ async function stripShots(directory: string, save: Save, wait: Wait, settled: (w
     event(t("엄마 생신"), 540, 600, "yellow", undefined, true),
     event(t("주간 회의"), 540, 600, "sage", t("회의실 A")),
     event(t("디자인 리뷰"), 780, 840, "sage", t("회의실 B")),
-    event(t("치과 정기 검진"), 930, 990, "blue", t("연세치과")),
+    event(t("치과 정기 검진"), 930, 990, "blue", t("동네 치과")),
     event(t("요가"), 1140, 1200, "purple"),
   ];
   const kept = store.items.map((item) => ({ ...item }));
@@ -3372,7 +3459,7 @@ async function stripShots(directory: string, save: Save, wait: Wait, settled: (w
     }
     noteMouse("mouseMove", 2, 2);
     // A crowded hour (side by side, +N), a done and a late to-do, reminders; now 14:20.
-    store.replaceEvents([...baseEvents, event(t("점심 약속"), 720, 810, "blue", t("김밥천국"))]);
+    store.replaceEvents([...baseEvents, event(t("점심 약속"), 720, 810, "blue", t("회사 앞 김밥집"))]);
     add("walk", t("아침 산책"), { start: 540, end: 570 });
     store.mutate((history) => history.toggle(made.walk));
     add("quote", t("견적서 보내기"), { start: 660, end: 720 });
@@ -3870,6 +3957,92 @@ async function nightShots(directory: string, save: Save, wait: Wait, settled: (w
   console.log(`day again: note ${await note.webContents.executeJavaScript(`document.documentElement.dataset.paper`)}, desk pane ${await inPane("calendar", `document.documentElement.dataset.paper`)}, background ${note.getBackgroundColor()}`);
 }
 
+/**
+ * #200: the 오늘 창's states, day and night, into glance/ (glance/night/) — the Mac's `today-window-state-*` set: nothing
+ * on and everything on (the sample events, a running timer, an alarm), each with 0 · 3 · many to-dos; one card only (the
+ * alarm) with nine to-dos left, as the user's window; a to-do hovered; a short screen (three rows); everything done; two
+ * cards and eight to-dos (no ‘외 1개’). Each shot checks that the window holds the slip and that no words are cut.
+ */
+async function todayWindowShots(directory: string, save: Save, wait: Wait, settled: (window: BrowserWindow) => Promise<unknown>): Promise<number> {
+  let problems = 0;
+  fs.mkdirSync(path.join(directory, "glance", "night"), { recursive: true });
+  const titles = [
+    t("보고서 초안 다듬기"), t("화분에 물 주기"),
+    t("택배 반품 접수"), t("회의실 예약 확인"),
+    t("운동 30분"), t("세탁소 들르기"),
+    t("도서관 책 반납"), t("다음 주 일정 정리"),
+    t("고양이 사료 주문"), t("영수증 정리"),
+    t("사진 백업하기"), t("편지 답장 쓰기"),
+    t("우유 사 오기"), t("책상 정리"), t("물 마시기"),
+  ];
+  const reset = () => {
+    focusTimer.command({ kind: "stop" });
+    calendar.clearSample();
+    store.replaceAlarms([]);
+    store.mutate((history) => { for (const item of [...history.items]) history.delete(item.id); });
+  };
+  /** `open` to-dos (the first `timed` with a reminder later today, for 다음), then `done` finished ones. */
+  const todos = (open: number, timed = 0, done = 0, from = 0) => store.mutate((history) => {
+    titles.slice(from, from + open + done).forEach((title, index) => {
+      const item = history.addTo(title, undefined, new Date(), undefined, index < timed ? isoDate(new Date(Date.now() + (100 + 45 * index) * 60_000)) : undefined);
+      if (item && index >= open) history.toggle(item.id);
+    });
+  });
+  const fill = (event = true, timer = true, alarm = true) => {
+    if (event) calendar.showSample();
+    if (timer) focusTimer.command({ kind: "countdown", minutes: 25 });
+    if (alarm) store.replaceAlarms([sampleAlarms()[0]]);
+  };
+  const check = `(() => {
+    const out = [];
+    for (const el of document.querySelectorAll(".g-date, .g-progress, .c3 small, .c3 b, .g-chip span, .g-more, .g-link span, .g-head")) if (el.offsetParent && el.scrollWidth > el.clientWidth + 1) out.push("cut: " + el.textContent);
+    const slip = document.getElementById("card").getBoundingClientRect();
+    for (const el of document.querySelectorAll(".g-chip, .c3")) { const r = el.getBoundingClientRect(); if (r.right > slip.right - 11) out.push("past the slip: " + el.textContent); }
+    return out;
+  })()`;
+  const shots: [string, () => void, number?, boolean?][] = [
+    ["user", () => { fill(false, false); todos(9, 0, 2, 1); }],
+    ["user-hover", () => { fill(false, false); todos(9, 0, 2, 1); }, undefined, true],
+    ["nothing-0", () => {}],
+    ["nothing-3", () => todos(3, 1)],
+    ["nothing-many", () => todos(12, 1, 3)],
+    ["short", () => todos(12, 1, 3), 470],
+    ["filled-0", () => fill()],
+    ["filled-3", () => { fill(); todos(3, 1, 1); }],
+    ["filled-many", () => { fill(); todos(12, 1, 3); }],
+    ["timer-all-done", () => { fill(false, true, false); todos(0, 0, 3); }],
+    ["two-cards-eight", () => { fill(true, false); todos(8); }],
+  ];
+  const alarms = [...store.alarms];
+  for (const paper of ["day", "night"] as const) {
+    const prefix = paper === "night" ? "night/" : "";
+    store.setPref("paper", paper);
+    for (const [name, set, room, hover] of shots) {
+      reset();
+      set();
+      const window = await glance.showForSnapshot();
+      await wait(500);
+      await window.webContents.executeJavaScript(`(() => {
+        ${room ? `document.documentElement.dataset.room = "${room}";` : "delete document.documentElement.dataset.room;"}
+        window.dispatchEvent(new Event("glance-room"));
+        ${hover ? `document.querySelector(".g-row")?.classList.add("preview-hover");` : ""}
+      })()`);
+      await wait(300);
+      await settled(window);
+      const fit = await glanceFit(window);
+      const found = await window.webContents.executeJavaScript(check).catch((error: Error) => [`script failed: ${error.message}`]) as string[];
+      console.log(`glance ${prefix}${name}: ${fit}${found.length ? ` · ${found.join("; ")}` : ""}`);
+      problems += found.length + (fit.startsWith("CUT") ? 1 : 0);
+      await save(`glance/${prefix}${name}`, window.webContents.capturePage());
+    }
+  }
+  glance.snapshotWindow?.hide();
+  reset();
+  store.replaceAlarms(alarms);
+  store.setPref("paper", "day");
+  return problems;
+}
+
 const glanceStateNames = ["nothing", "event-soon", "event-later", "timer", "alarm", "many", "busy"] as const;
 type GlanceStateName = typeof glanceStateNames[number];
 
@@ -4063,6 +4236,7 @@ async function aiShots(directory: string, save: Save, wait: Wait, settled: (wind
   ai.setEnabled(true);
   const dayStart = logicalDayStart(new Date());
   const tenAM = new Date(dayStart.getTime() + 6 * 3_600_000).toISOString();
+  const unpin = pinSampleReminders(dayStart);
   for (const paper of ["day", "night"] as const) {
     store.setPref("paper", paper);
     const prefix = paper === "night" ? "night/" : "";
@@ -4124,6 +4298,7 @@ async function aiShots(directory: string, save: Save, wait: Wait, settled: (wind
   store.setPref("paper", "day");
   ai.setEnabled(false);
   await run(`window.ribbonNow = undefined; window.dispatchEvent(new Event("ribbon-now"))`);
+  unpin();
   console.log(problems ? `AI PROBLEMS: ${problems}` : "AI OK");
   return problems;
 }
@@ -4316,6 +4491,20 @@ async function spacesShots(directory: string, save: Save, wait: Wait, settled: (
     // 모든 스페이스 ▾
     await run(`document.querySelector(".space-pick").click()`);
     await shot("picker", prefix);
+    // #185: while it's open a plain 2 picks the second space and 0 모든 스페이스; a 2 in the input line is only typed.
+    const press = (key: string, where: string) => run(`${where}?.dispatchEvent(new KeyboardEvent("keydown", { key: ${JSON.stringify(key)}, bubbles: true, cancelable: true }))`);
+    await press("2", `document.querySelector(".menu")`);
+    await wait(250);
+    const second = store.prefs.spaceLens?.spaceId === ids.home && !(await run(`Boolean(document.querySelector(".menu"))`));
+    await run(`document.querySelector(".space-pick").click()`);
+    await press("0", `document.querySelector(".menu")`);
+    await wait(250);
+    const all = !store.prefs.spaceLens;
+    await press("2", `document.querySelector(".inp .typed")`);
+    await wait(250);
+    const typed = !store.prefs.spaceLens;
+    console.log(`spaces ${prefix}picker digits: ${second ? "2 → the second space" : "2 DIDN'T PICK"}, ${all ? "0 → all" : "0 DIDN'T PICK ALL"}, ${typed ? "2 in the line left alone" : "2 IN THE LINE PICKED A SPACE"}`);
+    if (!second || !all || !typed) problems += 1;
     await run(`document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
     // Right-click → 스페이스로 옮기기 ▸
     const point = await run(`(() => { const row = document.querySelector('.row[data-id=${JSON.stringify(rowID)}]'); const box = row.getBoundingClientRect(); return { x: Math.round(box.left + 90), y: Math.round(box.top + box.height / 2) }; })()`) as { x: number; y: number };
@@ -4387,6 +4576,7 @@ async function spaces2aShots(ids: { work: string; home: string; study: string },
   // Today at 14:50 (as the timeblock shots): to-dos with hours in three spaces and 일반, and a few ahead.
   const dayStart = logicalDayStart(new Date());
   const ribbonNow = new Date(dayStart.getTime() + (14 - 4) * 3_600_000 + 50 * 60_000);
+  const unpin = pinSampleReminders(dayStart);
   const dayAfter = (days: number) => dayKey(new Date(dayStart.getTime() + days * 86_400_000 + 12 * 3_600_000));
   const made: Record<string, string> = {};
   store.mutate((history) => {
@@ -4514,6 +4704,7 @@ async function spaces2aShots(ids: { work: string; home: string; study: string },
   store.setPref("spaceLens", null);
   store.setPref("paper", "day");
   await run(`window.ribbonNow = undefined; window.dispatchEvent(new Event("ribbon-now"))`);
+  unpin();
   return problems;
 }
 
@@ -4522,6 +4713,90 @@ async function spaces2aShots(ids: { work: string; home: string; study: string },
  * folded groups, the shortcut chips, a drag over another group, the wide note's columns, the header's menu and the
  * settings' switch. Day and night, at 12:40; nothing cut, nothing past the note's edge.
  */
+/**
+ * Spaces 2c's shots (spaces-phase2.md C1–C5 · H1–H5), day and night (night/): the search slip with `#회사 보고서` and
+ * the empty slip's second hint, and 완료 기록 filtered by 회사 and by 일반. Sample data only: three spaces, the sample
+ * record's lines and focus placed by their titles.
+ */
+async function spaces2cShots(directory: string, save: Save, wait: Wait, settled: (window: BrowserWindow) => Promise<unknown>): Promise<number> {
+  let problems = 0;
+  const run = (script: string) => note.webContents.executeJavaScript(script).catch((error: Error) => `script failed: ${error.message}`);
+  fs.mkdirSync(path.join(directory, "spaces2c", "night"), { recursive: true });
+  const ids = { work: "s-a1b2c3", home: "s-d4e5f6", study: "s-0a9b8c" };
+  store.changeSpaces((data) => addSpace(addSpace(addSpace(data, t("회사"), ids.work, "pink"), t("집"), ids.home, "mint"), t("공부"), ids.study, "sky"));
+  store.mutate((history) => { history.add(t("주간 보고서 초안")); history.add(t("장보기")); });
+  const byTitle: [string, string][] = [
+    [t("보고서 초안"), ids.work], [t("회의 준비"), ids.work], [t("메일 정리"), ids.work], [t("주간 보고서 초안"), ids.work], [t("보고서 마무리"), ids.work], [t("발표 자료 만들기"), ids.work],
+    [t("장보기"), ids.home], [t("빨래"), ids.home], [t("책 10쪽 읽기"), ids.study],
+  ];
+  const spaceFor = (title: string) => byTitle.find(([name]) => name === title)?.[1];
+  const focusTasks: [string, string][] = [["F-1", t("보고서 마무리")], ["F-2", t("책 10쪽 읽기")], ["F-3", t("발표 자료 만들기")], ["F-4", t("메일 정리")]];
+  store.changeSpaces((data) => [...store.items.map((item) => [item.id, item.title] as const), ...archive.all().map((entry) => [entry.id, entry.title] as const), ...focusTasks]
+    .reduce((next, [id, title]) => { const space = spaceFor(title); return space ? moveTodo(next, id, space) : next; }, data));
+  const word = t("보고서 초안").split(" ")[0];
+  const query = `#${t("회사")} ${word}`;
+  note.setSize(400, 640);
+  for (const paper of ["day", "night"] as const) {
+    const prefix = paper === "night" ? "night/" : "";
+    store.setPref("paper", paper);
+    // The slip: #회사 보고서, then empty with the hint about #.
+    for (const [name, text] of [["search-space", query], ["search-empty", ""]] as const) {
+      await run(`window.showSearch(); document.querySelector(".search-slip") && window.showSearch().set(${JSON.stringify(text)})`);
+      await wait(350);
+      await settled(note);
+      const report = await run(`(() => {
+        const card = document.querySelector(".search-slip");
+        if (!card) return "NO SLIP";
+        const r = card.getBoundingClientRect(), out = [];
+        if (r.top < 0 || r.bottom > innerHeight + 0.5 || r.left < 0 || r.right > innerWidth + 0.5) out.push("slip off the note");
+        for (const row of card.querySelectorAll(".search-row")) { const text = row.querySelector(".search-text").getBoundingClientRect(), meta = row.querySelector(".search-meta")?.getBoundingClientRect(); if (meta && text.right > meta.left + 0.5) out.push("text under the date"); }
+        const hint = card.querySelector(".search-hint");
+        if (hint && hint.scrollWidth > hint.clientWidth + 1) out.push("hint cut");
+        const heads = [...card.querySelectorAll(".search-head")].map((head) => head.textContent).join(" / ");
+        return (out.join("; ") || "ok") + " · " + heads + (hint ? " · " + hint.textContent : "");
+      })()`) as string;
+      console.log(`spaces2c ${prefix}${name}: ${report}`);
+      if (!report.startsWith("ok")) problems += 1;
+      // C3: with a space, no memos and no events.
+      const heads = report.split(" · ")[1] ?? "";
+      if (name === "search-space" && [searchGroupTitle("memos", lang()), searchGroupTitle("events", lang())].some((title) => heads.includes(title))) problems += 1;
+      if (name === "search-empty" && !report.includes("#")) problems += 1;
+      await save(`spaces2c/${prefix}${name}`, note.webContents.capturePage());
+      await run(`document.querySelector(".search-field")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+    }
+    // 완료 기록 by 회사, then by 일반: the menu, then the pane with the filter on.
+    await showDeskPane("history", wait);
+    for (const [name, label] of [["history-work", t("회사")], ["history-general", generalName(store.todoSpaces, lang())]] as const) {
+      await inPane("history", `document.querySelector(".space-pick")?.click()`);
+      await wait(250);
+      if (name === "history-work") await save(`spaces2c/${prefix}history-menu`, captureDesk(wait));
+      await inPane("history", `[...document.querySelectorAll(".menu .mi")].find((row) => row.textContent.includes(${JSON.stringify(label)}))?.click()`);
+      await wait(400);
+      await inPane("history", settledScript);
+      const report = await inPane("history", `(() => {
+        const out = [], pick = document.querySelector(".space-pick"), label = pick?.querySelector(".space-pick-label");
+        if (!pick) return "NO PICK";
+        if (label.scrollWidth > label.clientWidth + 1) out.push("pick cut");
+        const head = document.querySelector(".pane-head"), ranges = document.querySelector(".ranges");
+        if (ranges && ranges.getBoundingClientRect().right > head.getBoundingClientRect().right + 0.5) out.push("ranges past the header");
+        if (pick.getBoundingClientRect().right > ranges.getBoundingClientRect().left + 0.5) out.push("pick over the ranges");
+        for (const tile of document.querySelectorAll(".tile .kt, .tile .d")) if (tile.scrollWidth > tile.clientWidth + 1 && getComputedStyle(tile).textOverflow !== "ellipsis") out.push("tile cut");
+        return (out.join("; ") || "ok") + " · " + label.textContent + " · " + [...document.querySelectorAll(".tile .v")].map((value) => value.textContent).join(" | ");
+      })()`) as string;
+      console.log(`spaces2c ${prefix}${name}: ${report}`);
+      if (!String(report).startsWith("ok")) problems += 1;
+      await save(`spaces2c/${prefix}${name}`, captureDesk(wait));
+    }
+    // Back to 모든 스페이스 for the next paper.
+    await inPane("history", `document.querySelector(".space-pick")?.click()`);
+    await wait(200);
+    await inPane("history", `document.querySelector(".menu .mi")?.click()`);
+  }
+  store.setPref("paper", "day");
+  console.log(problems ? `SPACES2C PROBLEMS: ${problems}` : "SPACES2C OK");
+  return problems;
+}
+
 async function spaces2bShots(directory: string, save: Save, wait: Wait, settled: (window: BrowserWindow) => Promise<unknown>): Promise<number> {
   let problems = 0;
   const run = (script: string) => note.webContents.executeJavaScript(script).catch((error: Error) => `script failed: ${error.message}`);
@@ -4555,9 +4830,13 @@ async function spaces2bShots(directory: string, save: Save, wait: Wait, settled:
   const ribbonNow = new Date(dayStart.getTime() + (12 - 4) * 3_600_000 + 40 * 60_000);
   const made: Record<string, string> = {};
   store.mutate((history) => {
+    // The hours as the app sets them, against the scene's 12:40 (#191): a start still ahead brings its reminder, so
+    // 13:40's to-do has the bell in 다음 as on the Mac, whenever this is drawn.
     const add = (key: string, title: string, range?: { start: number; end?: number }) => {
-      const item = history.addTo(title, undefined, new Date(), undefined, undefined, range);
-      if (item) made[key] = item.id;
+      const item = history.addTo(title, undefined, new Date());
+      if (!item) return;
+      made[key] = item.id;
+      if (range) history.setRange(item.id, range, ribbonNow);
     };
     add("coffee", t("창문 열고, 커피 한 잔"));
     add("plan", t("오늘 꼭 해야 할 일 정리하기"), { start: 13 * 60 + 40, end: 14 * 60 + 10 });
@@ -4705,6 +4984,125 @@ async function spaces2bShots(directory: string, save: Save, wait: Wait, settled:
   store.setPref("paper", "day");
   store.setPref("spaceGroups", false);
   await run(`window.ribbonNow = undefined; window.dispatchEvent(new Event("ribbon-now"))`);
+  return problems;
+}
+
+/**
+ * 기기마다 보일 스페이스 (#196, spaces-device.md §4): the desk's rows with their 이 기기에서 lines and marks, its popup open,
+ * the 시간 정하기 slip (several ranges; 주말 picked with a row added), the header's menu with 이 기기에서 숨김 and
+ * 이 기기에서 숨기기 ▸ open, and the note with 회사 hidden (mixed, 메모지, peeked at, narrow) and the toast after `#회사`.
+ * 공부's line says what its times mean at the moment the run draws it. Made-up to-dos only.
+ */
+async function deviceShots(directory: string, save: Save, wait: Wait, settled: (window: BrowserWindow) => Promise<unknown>): Promise<number> {
+  let problems = 0;
+  const run = (script: string) => note.webContents.executeJavaScript(script).catch((error: Error) => `script failed: ${error.message}`);
+  const cutScript = `(() => {
+    const out = [];
+    const cut = (el) => el && getComputedStyle(el).display !== "none" && el.scrollWidth > el.clientWidth + 1;
+    for (const el of document.querySelectorAll(".lens-more-text, .device-status, .menu .mi > .t, .device-summary b, .device-summary span, .device-lead, .search-text")) if (cut(el)) out.push("cut: " + el.textContent);
+    for (const el of document.querySelectorAll(".lens-more, .device-slip, .menu")) { const r = el.getBoundingClientRect(); if (r.width && (r.right > window.innerWidth + 0.5 || r.left < -0.5)) out.push("past the window: " + el.className); }
+    return out;
+  })()`;
+  const report = (name: string, found: unknown) => {
+    const list = Array.isArray(found) ? found as string[] : found ? [String(found)] : [];
+    console.log(`device ${name}: ${list.length ? list.join("; ") : "ok"}`);
+    problems += list.length;
+  };
+  const shot = async (name: string) => {
+    await wait(380);
+    await settled(note);
+    report(name, await run(cutScript));
+    await save(`device/${name}`, note.webContents.capturePage());
+  };
+  const send = (command: string, id = "") => note.webContents.send("note:row-command", { id, command });
+  fs.mkdirSync(path.join(directory, "device", "night"), { recursive: true });
+  const old = store.items.map((item) => item.id);
+  store.mutate((history) => { for (const id of old) history.delete(id); });
+  const ids = { work: "s-d1a2b3", home: "s-d4c5d6", study: "s-d7e8f9" };
+  store.changeSpaces((data) => addSpace(addSpace(addSpace(data, t("회사"), ids.work, "pink"), t("집"), ids.home, "mint"), t("공부"), ids.study, "sky"));
+  const made: Record<string, string> = {};
+  store.mutate((history) => {
+    const add = (key: string, title: string, range?: { start: number; end?: number }) => {
+      const item = history.addTo(title, undefined, new Date(), undefined, undefined, range);
+      if (item) made[key] = item.id;
+    };
+    add("shopping", t("세탁기 돌리기"), { start: 20 * 60 + 30, end: 21 * 60 });
+    add("laundry", t("빨래 개기"));
+    add("report", t("주간 보고서 초안"));
+    add("meeting", t("회의록 올리기"));
+    add("book", t("미뤄 둔 책 10쪽 읽기"));
+    add("plants", t("잠깐, 바깥 공기 쐬기"));
+    if (made.laundry) history.toggle(made.laundry);
+  });
+  const places: [string, string][] = [["shopping", ids.home], ["laundry", ids.home], ["report", ids.work], ["meeting", ids.work], ["book", ids.study]];
+  store.changeSpaces((data) => places.reduce((next, [key, space]) => (made[key] ? moveTodo(next, made[key], space) : next), data));
+  store.setPref("spaceLens", null);
+  store.setPref("spaceGroups", false);
+  store.setDevicePeek([]);
+  store.setDeviceRules({
+    [ids.work]: { show: "hide" },
+    [ids.study]: { show: "time", times: [{ days: [1, 2, 3, 4, 5], from: "07:00", to: "08:30" }, { days: [1, 2, 3, 4, 5], from: "19:00", to: "23:00" }] },
+  });
+  send("page-today");
+  for (const paper of ["day", "night"] as const) {
+    const prefix = paper === "night" ? "night/" : "";
+    store.setPref("paper", paper);
+    store.setPref("spaceGroups", false);
+    store.setDevicePeek([]);
+    note.setSize(420, 640);
+    await run(`document.querySelector(".sheet").scrollTop = 0`);
+    await shot(`${prefix}note`);
+    note.setSize(350, 520);
+    await shot(`${prefix}note-narrow`);
+    note.setSize(420, 720);
+    store.setPref("spaceGroups", true);
+    store.setPref("spaceGroupStyle", "card");
+    await shot(`${prefix}note-cards`);
+    note.setSize(1200, 640);
+    await shot(`${prefix}note-board`);
+    store.setPref("spaceGroups", false);
+    note.setSize(420, 640);
+    await run(`document.querySelector(".device-more .lens-all")?.click()`);
+    await shot(`${prefix}note-peek`);
+    store.setDevicePeek([]);
+    // The toast after `보고서 쓰기 #회사` on this PC (회사 hidden): 되돌리기 takes it back.
+    if (made.report) note.webContents.send("note:toast", { made: { kind: "todo", id: made.report }, candidates: [{ kind: "todo", title: t("주간 보고서 초안") }], index: 0, text: `${t("주간 보고서 초안")} #${t("회사")}`, hiddenIn: t("회사") });
+    await shot(`${prefix}toast`);
+    note.setSize(350, 520);
+    await shot(`${prefix}toast-narrow`);
+    await run(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+    // The header's menu: 회사 under 이 기기에서 숨김 (보이기), 공부's hint, and 이 기기에서 숨기기 ▸ open.
+    note.setSize(560, 640);
+    await run(`document.querySelector(".space-pick").click()`);
+    await wait(200);
+    await run(`(() => { const row = [...document.querySelectorAll(".menu .mi")].find((el) => el.textContent.includes(${JSON.stringify(deviceWords.hideHere[lang()])})); row?.click(); })()`);
+    await shot(`${prefix}menu`);
+    await run(`document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
+    await run(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+    note.setSize(420, 640);
+    // 설정 → 스페이스: the rows, the popup open on 공부, the slip.
+    await showDeskPane("spaces", wait);
+    const deskCut = `(() => { const out = []; for (const el of document.querySelectorAll(".row .grow, .device-status, .space-name, .group .foot, .menu .mi > .t, .device-summary b, .device-summary span, .device-lead")) if (getComputedStyle(el).display !== "none" && el.scrollWidth > el.clientWidth + 1) out.push("cut: " + (el.textContent || el.value)); for (const el of document.querySelectorAll(".device-slip, .menu")) { const r = el.getBoundingClientRect(); if (r.width && (r.right > window.innerWidth + 0.5 || r.bottom > window.innerHeight + 0.5 || r.top < -0.5)) out.push("past the pane: " + el.className); } return out.join("; "); })()`;
+    report(`${prefix}desk`, await inPane("settings", deskCut));
+    await save(`device/${prefix}desk`, captureDesk(wait));
+    await inPane("settings", `document.querySelector('.space-row[data-id="${ids.study}"] .space-device').click()`);
+    await wait(250);
+    report(`${prefix}desk-popup`, await inPane("settings", deskCut));
+    await save(`device/${prefix}desk-popup`, captureDesk(wait));
+    await inPane("settings", `(() => { const rows = [...document.querySelectorAll(".menu .mi")]; rows[rows.length - 1]?.click(); })()`);
+    await wait(350);
+    report(`${prefix}times`, await inPane("settings", deskCut));
+    await save(`device/${prefix}times`, captureDesk(wait));
+    await inPane("settings", `(() => { const chips = document.querySelectorAll(".device-presets .chip"); chips[2]?.click(); document.querySelector(".device-add")?.click(); })()`);
+    await wait(250);
+    report(`${prefix}times-preset`, await inPane("settings", deskCut));
+    await save(`device/${prefix}times-preset`, captureDesk(wait));
+    await inPane("settings", `document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+    await wait(150);
+  }
+  store.setPref("paper", "day");
+  store.setDeviceRules({});
+  store.setDevicePeek([]);
   return problems;
 }
 
@@ -5007,6 +5405,58 @@ async function drawerShots(directory: string, save: Save, wait: Wait): Promise<n
     store.saveMemos();
     return problems;
   }
+  /**
+   * #198: the cards' preview lines in the words' face — 기본 글씨, 손글씨 펜 and 손글씨 붓 on 낮 종이 and 먹색 종이, in the
+   * drawer at 300 and at its narrowest (260); and 찾기's found lines in the pen. Each shot also checks that no preview
+   * line is taller than the preview's line (the card keeps its height) and that a card's words stay on its sheet.
+   */
+  const cardFontSection = async () => {
+    const lines = `(() => {
+      const out = [];
+      const line = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--m-preview-line"));
+      for (const p of document.querySelectorAll(".it:not(.open) .p")) {
+        const clamp = Number(getComputedStyle(p).webkitLineClamp) || 3;
+        const style = getComputedStyle(p);
+        const inner = p.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+        if (inner > clamp * line + 0.5) out.push("preview taller than its lines: " + p.textContent.slice(0, 20));
+      }
+      for (const row of document.querySelectorAll(".it:not(.open) .pr")) if (Math.abs(row.getBoundingClientRect().height - line) > 0.5) out.push("checklist row off its line");
+      for (const card of document.querySelectorAll(".it:not(.open)")) {
+        const edge = card.getBoundingClientRect();
+        for (const p of card.querySelectorAll(".p, .pr")) { const r = p.getBoundingClientRect(); if (r.bottom > edge.bottom + 0.5 || r.right > edge.right + 0.5) out.push("preview off its sheet: " + p.textContent.slice(0, 20)); }
+      }
+      return out;
+    })()`;
+    const fontShot = async (name: string, prepare: string) => {
+      await shot(name, prepare);
+      const found = await run(lines) as string[] | string;
+      if (Array.isArray(found) && found.length) { console.log(`drawer ${name}: ${found.join("; ")}`); problems += found.length; }
+    };
+    for (const face of ["clean", "pen", "brush"] as const) {
+      store.setPref("drawerFont", face);
+      for (const theme of ["day", "ink"] as const) {
+        store.setPref("drawerTheme", theme);
+        for (const width of [300, 260]) {
+          store.setPref("drawerWidth", width);
+          await run(reset);
+          await fontShot(`drawer-card-font-${face}-${theme}${width === 260 ? "-260" : ""}`, `window.drawerTest.view("DRAWER-WORK")`);
+        }
+      }
+      store.setPref("drawerWidth", 300);
+      store.setPref("drawerTheme", "day");
+      await run(reset);
+      await fontShot(`drawer-card-font-${face}-search`, `window.drawerTest.view("DRAWER-WORK"); window.drawerTest.search("QA")`);
+    }
+    store.setPref("drawerFont", "clean");
+    store.setPref("drawerTheme", "day");
+    store.setPref("drawerWidth", 300);
+    await run(reset);
+  };
+  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "cardfont") {
+    await cardFontSection();
+    return problems;
+  }
+  await cardFontSection();
   // The list in date groups with its kinds and the hover pill, then the open checklist with its bar — each paper.
   // #142: 한지 · 쑥색 · 벚꽃 · 먹색 too.
   for (const theme of ["day", "night", "kraft", "grid", "hanji", "sage", "blossom", "ink"] as const) {
@@ -5351,7 +5801,8 @@ async function checkHeader(save: (name: string, image?: Promise<Electron.NativeI
       for (const command of ["page-today", "page-ahead"]) {
         note.webContents.send("note:row-command", { id: "", command });
         await wait(160);
-        const report = await note.webContents.executeJavaScript(`(() => {
+        // A missing element is a problem on the list, not a thrown script that stops the run (#178).
+        const report = await note.webContents.executeJavaScript(`(() => { try {
           const r = (el) => el.getBoundingClientRect();
           const tabs = document.querySelector(".index-tabs"), tools = document.querySelector(".tools");
           const out = [];
@@ -5378,9 +5829,11 @@ async function checkHeader(save: (name: string, image?: Promise<Electron.NativeI
           });
           const title = document.querySelector(".title");
           if (title.scrollWidth > title.clientWidth + 1) out.push("title clipped: " + title.textContent);
-          if (r(document.querySelector(".title-text")).right > r(document.querySelector(".peek")).left + 0.5) out.push("title runs under the cat");
+          // #151: the cat left the header for the ears on the window's top edge (#178: this line still measured it).
+          if (document.querySelector(".peek")) out.push("a cat in the header");
+          if (r(document.querySelector(".title-text")).right > r(document.querySelector(".title-row")).right + 0.5) out.push("title runs out of its row");
           return out.join("; ");
-        })()`);
+        } catch (error) { return "check failed: " + error.message; } })()`);
         const line = `header ${font} ${width} ${command.replace("page-", "")}: ${report || "ok"}`;
         console.log(line);
         if (report) problems.push(line);
@@ -5728,11 +6181,19 @@ async function sizeSweep(directory: string, save: Save, wait: Wait, settled: (wi
   let deleted = 0; // the empty pages' tasks, put back with undo
   let dragging: { x: number; y: number } | undefined; // the open day's block held by the mouse
   // After Esc the block is where it was and nothing was written (a toast would say otherwise).
-  const heldTime = () => run(`[...document.querySelectorAll(".tt-block")].find((element) => element.querySelector(".tb-hand")?.textContent === ${JSON.stringify(t("보고서 쓰기"))})?.querySelector(".tb-time")?.textContent + (document.querySelector(".toast") ? " + toast" : "")`);
+  // The block found as blockPoint finds it (its title in .tb-hand or .tb-title).
+  const heldTime = () => run(`[...document.querySelectorAll(".tt-block")].find((element) => element.querySelector(".tb-hand, .tb-title")?.textContent === ${JSON.stringify(t("보고서 쓰기"))})?.querySelector(".tb-time")?.textContent + (document.querySelector(".toast") ? " + toast" : "")`);
   let heldBefore: unknown;
   const putBack = async () => {
-    const after = await heldTime();
-    if (after !== heldBefore) { console.log(`sweep: the held block wasn't put back (${heldBefore} → ${after})`); problems += 1; }
+    // The day is drawn again after Esc; on a small, busy run that can take longer than the drag's own 300 ms, so the
+    // block gets a second to come back before it counts as not put back (#178: the default run's one miss, 350 × 400).
+    let after = await heldTime();
+    for (let tries = 0; after !== heldBefore && tries < 10; tries += 1) { await wait(100); after = await heldTime(); }
+    if (after !== heldBefore) {
+      const blocks = await run(`[...document.querySelectorAll(".tt-block")].map((element) => element.textContent.trim().slice(0, 40)).join(" | ")`);
+      console.log(`sweep: the held block wasn't put back (${heldBefore} → ${after}; blocks now: ${blocks})`);
+      problems += 1;
+    }
   };
   const closeCards = async () => { send("close-editor"); await wait(200); };
   let aiMade: ReturnType<typeof aiSample> | undefined;
@@ -6165,7 +6626,9 @@ app.whenReady().then(() => {
   // not on every change of the list (each keystroke in a memo used to make it fetch the whole record).
   let historyKey = "";
   store.on("change", () => {
-    const key = JSON.stringify(store.items.filter((item) => item.isCompleted).map((item) => [item.id, item.title, item.createdAt, item.completedAt, item.timeStart, item.timeEnd]));
+    // 2c: the spaces too (their names and colours, and each finished to-do's), for the record's filter.
+    const key = JSON.stringify([store.items.filter((item) => item.isCompleted).map((item) => [item.id, item.title, item.createdAt, item.completedAt, item.timeStart, item.timeEnd, spaceOf(store.todoSpaces, item.id)]),
+      liveSpaces(store.todoSpaces).map((space) => [space.id, space.name, space.color]), store.todoSpaces.general?.name]);
     if (key === historyKey) return;
     historyKey = key;
     desk.sendAll("history:changed");
@@ -6200,7 +6663,8 @@ app.whenReady().then(() => {
   });
   focusTimer = new FocusTimerWidget(store, rendererDirectory, {
     changed: broadcast, cheer: () => pet?.cheer(), custom: (start) => timerSheet.open(start),
-    record: (record) => { if (focusLog.append(record)) desk.sendAll("history:changed"); },
+    // H3: the to-do's space when the session ended (none for 일반 and a plain timer).
+    record: (record) => { const space = record.taskId ? spaceOf(store.todoSpaces, record.taskId) : undefined; if (focusLog.append(space ? { ...record, space } : record)) desk.sendAll("history:changed"); },
     complete: (taskId) => store.complete(taskId),
     showNote: () => { if (!snapshotDirectory) showNote(); else note.showInactive(); },
     noteVisible: () => note.isVisible() && !note.isMinimized(),
@@ -6307,7 +6771,11 @@ app.whenReady().then(() => {
     powerMonitor.on("resume", lookBack);
   }
   if (snapshotDirectory) { for (const record of sampleFocus()) focusLog.append(record); }
-  if (snapshotDirectory) void runSnapshots(snapshotDirectory);
+  // A step that throws ends the run as a failure (#178: the error was logged and the run waited for its 90-minute timeout).
+  if (snapshotDirectory) runSnapshots(snapshotDirectory).catch((error: unknown) => {
+    console.log("SNAPSHOT RUN STOPPED:", error instanceof Error ? error.stack : error);
+    finishSnapshots(1);
+  });
 });
 
 // Keeps links out of the app's windows and frames, and refuses every permission request (#171, security.ts).

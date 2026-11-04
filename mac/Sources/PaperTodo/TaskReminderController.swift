@@ -22,7 +22,11 @@ final class TaskReminderController {
     var isVisible: Bool { popup.isVisible }
     /// 집중: alerts wait while a focus runs, then come together once it ends (`release`).
     var isHeld: () -> Bool = { false }
-    private var schedulableItems: [TodoItem] { model.items.filter { $0.id != model.editingTaskReminderID } }
+    /// #196 (D10): a reminder of a space this Mac hides never rings here, nor late once the space shows.
+    private var schedulableItems: [TodoItem] {
+        let now = Date()
+        return model.items.filter { $0.id != model.editingTaskReminderID && model.reminderRingsHere($0, now: now) }
+    }
 
     init(model: AppModel, duration: @escaping () -> TimeInterval, snapshotURL: URL? = nil,
          beforeShow: @escaping () -> Void, onOpen: @escaping () -> Void) {

@@ -348,12 +348,13 @@ export class DesktopPet {
   /** What the cat knows when it speaks up: today's sheet and the deadlines. */
   private chatterContext(): ChatterContext {
     const now = new Date();
-    const today = this.store.todayItems;
+    // #196: the cat says nothing of what this PC hides.
+    const today = this.store.hereTodayItems;
     const open = today.filter((item) => !item.isCompleted);
     const start = logicalDayStart(now);
     const todayKey = dueKey(start);
     const tomorrowKey = dueKey(new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1));
-    const waiting = this.store.items.filter((item) => !item.isCompleted && item.dueDate).map((item) => item.dueDate!);
+    const waiting = this.store.hereItems.filter((item) => !item.isCompleted && item.dueDate).map((item) => item.dueDate!);
     return {
       hour: now.getHours(), open: open.length, done: today.length - open.length,
       overdue: waiting.filter((day) => day < todayKey).length,

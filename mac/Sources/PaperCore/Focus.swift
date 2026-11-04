@@ -22,11 +22,13 @@ public struct FocusRecord: Codable, Equatable, Sendable {
     public var kind: Kind
     /// The task was checked at the end ("다 했어요").
     public var done: Bool
+    /// The task's space id when the session ended (spaces 2c, H3); omitted for 일반 and plain timers.
+    public var space: String?
 
     public init(id: String = UUID().uuidString, taskId: String? = nil, title: String, start: Date, end: Date,
-                minutes: Int, kind: Kind, done: Bool = false) {
+                minutes: Int, kind: Kind, done: Bool = false, space: String? = nil) {
         self.id = id; self.taskId = taskId; self.title = title; self.start = start; self.end = end
-        self.minutes = minutes; self.kind = kind; self.done = done
+        self.minutes = minutes; self.kind = kind; self.done = done; self.space = space
     }
 }
 
@@ -39,12 +41,13 @@ public enum Focus {
     /// span when nil), as whole minutes counted down (24 min 59 s → 24) — nil under a minute. The title
     /// is trimmed; start and end drop their fractions of a second.
     public static func record(id: String = UUID().uuidString, taskId: String? = nil, title: String, start: Date, end: Date,
-                              seconds: TimeInterval? = nil, kind: FocusRecord.Kind, done: Bool = false) -> FocusRecord? {
+                              seconds: TimeInterval? = nil, kind: FocusRecord.Kind, done: Bool = false, space: String? = nil) -> FocusRecord? {
         let active = max(0, seconds ?? end.timeIntervalSince(start))
         let minutes = Int((active / 60).rounded(.down))
         guard minutes >= 1 else { return nil }
         return FocusRecord(id: id, taskId: taskId, title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-                           start: whole(start), end: whole(end), minutes: minutes, kind: kind, done: done)
+                           start: whole(start), end: whole(end), minutes: minutes, kind: kind, done: done,
+                           space: taskId == nil ? nil : space)
     }
 
     /// One line of the file (no newline): keys sorted, no `taskId` when there's no task.
@@ -76,8 +79,9 @@ public enum Focus {
             let taskId = (object["taskId"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             let kind = (object["kind"] as? String).flatMap(FocusRecord.Kind.init(rawValue:)) ?? (taskId == nil ? .timer : .focus)
             let done = (object["done"] as? NSNumber).map { isBool($0) && $0.boolValue } ?? false
+            let space = (object["space"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             records.append(FocusRecord(id: id, taskId: taskId, title: title, start: start, end: end,
-                                       minutes: Int(number.doubleValue.rounded()), kind: kind, done: done))
+                                       minutes: Int(number.doubleValue.rounded()), kind: kind, done: done, space: space))
         }
         return records
     }

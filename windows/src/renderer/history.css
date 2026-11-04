@@ -9,6 +9,23 @@
   padding: max(0px, calc((100vh - 1040px) / 2)) max(0px, calc((100vw - 1240px) / 2));
 }
 .pane-head { padding-bottom: 6px; }
+/* 스페이스 2c (H1): 모든 스페이스 ▾ beside the range, the note's pill. */
+.space-pick { flex: none; max-width: 34%; height: 30px; padding: 0 10px; display: inline-flex; align-items: center; gap: 6px; border-radius: 15px;
+  border: 1px solid var(--rule-strong); background: color-mix(in srgb, var(--card) 70%, transparent); color: var(--ink-2); font: 500 12px var(--ui); white-space: nowrap; }
+.space-pick:hover, .space-pick[aria-expanded="true"] { background: var(--card); color: var(--ink); }
+.space-pick.on { border-color: color-mix(in srgb, var(--band, var(--ink-3)) 65%, transparent); background: color-mix(in srgb, var(--band, var(--ink-3)) 8%, var(--card)); color: var(--ink); font-weight: 600; }
+.space-pick-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.space-pick .icon { flex: none; color: var(--ink-3); }
+.space-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--band); flex: none; }
+.space-dot.all { background: conic-gradient(var(--band-pink) 0 33%, var(--band-mint) 33% 66%, var(--band-yellow) 66% 100%); }
+.space-dot.general { background: transparent; border: 1.5px solid var(--rule-strong); }
+/* Its menu (drawerMenu.ts) over everything, with the note's paper tokens. */
+.menu-layer { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
+.menu-layer > .menu { position: absolute; pointer-events: auto; }
+:root {
+  --d-menu: var(--card); --d-menu-edge: var(--rule-strong); --d-ink: var(--ink); --d-meta: var(--ink-3); --d-icon: var(--ink-2); --d-hover: color-mix(in srgb, var(--ink) 7%, transparent);
+  --d-danger: var(--clay-text); --d-sub: var(--sage-text); --d-hand: var(--body-font);
+}
 .ranges { flex: none; display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--paper-2); }
 .ranges button { height: 26px; padding: 0 12px; border-radius: 6px; font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ranges button[aria-pressed="true"] { background: var(--raised); color: var(--ink); font-weight: 600; box-shadow: var(--lift); }

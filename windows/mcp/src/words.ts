@@ -5,6 +5,7 @@ import { rangeDay, rangeDayText, rangeOf, rangeText } from "../../src/core/timeR
 import { dayKey } from "../../src/core/archive";
 import type { TodoItem } from "../../src/core/notebook";
 import type { Ids } from "./ids";
+import { taskSpace, type SpaceWords } from "./spaces";
 
 /**
  * What the tools say back, in the app's language (ko · en · nl). The text is the short summary a person reads;
@@ -38,8 +39,11 @@ export function reminderText(at: Date, day: string | undefined, lang: Lang): str
   return `${say(lang, "알림", "reminder", "herinnering")} ${when}`;
 }
 
-/** What a task line and its data need besides the task: the short ids, and each repeat's words by series id. */
-export interface TaskWords { ids: Ids; repeats: ReadonlyMap<string, string> }
+/**
+ * What a task line and its data need besides the task: the short ids, each repeat's words by series id, and the spaces
+ * (N3-2: the line names a space only while there are spaces, and never 일반; the data always has `space` · `spaceId`).
+ */
+export interface TaskWords { ids: Ids; repeats: ReadonlyMap<string, string>; spaces?: SpaceWords }
 
 /** One task as a line: "- [ ] 보고서 쓰기 · 오늘 15:00–16:00 · 알림 14:50 · 반복 매주 월 · id 1A2B3C4D". */
 export function taskLine(item: TodoItem, now: Date, lang: Lang, words: TaskWords): string {
@@ -47,6 +51,8 @@ export function taskLine(item: TodoItem, now: Date, lang: Lang, words: TaskWords
   if (item.reminderAt && !item.isCompleted) parts.push(reminderText(new Date(item.reminderAt), rangeDay(item, now), lang));
   const repeat = item.seriesID ? words.repeats.get(item.seriesID) : undefined;
   if (repeat) parts.push(`${say(lang, "반복", "repeats", "herhaalt")} ${repeat}`);
+  const space = words.spaces?.any ? taskSpace(words.spaces, item.id) : undefined;
+  if (space && !space.general) parts.push(`${say(lang, "스페이스", "space", "ruimte")} ${space.name}`);
   parts.push(`id ${words.ids.short(item.id)}`);
   return parts.join(" · ");
 }
@@ -55,6 +61,7 @@ export function taskLine(item: TodoItem, now: Date, lang: Lang, words: TaskWords
 export function taskData(item: TodoItem, now: Date, words: TaskWords): Record<string, unknown> {
   const day = rangeDay(item, now);
   const repeat = item.seriesID ? words.repeats.get(item.seriesID) : undefined;
+  const space = words.spaces ? taskSpace(words.spaces, item.id) : undefined;
   return {
     id: words.ids.short(item.id), title: item.title, done: item.isCompleted, where: whereOf(item, now),
     ...(day ? { date: day } : {}), ...(item.dueDate ? { dueDate: item.dueDate } : {}),
@@ -62,6 +69,7 @@ export function taskData(item: TodoItem, now: Date, words: TaskWords): Record<st
     ...(item.reminderAt ? { remindAt: localStamp(new Date(item.reminderAt)) } : {}),
     ...(item.completedAt ? { completedAt: localStamp(new Date(item.completedAt)) } : {}),
     ...(repeat ? { repeat } : {}),
+    ...(space ? { space: space.name, spaceId: space.id } : {}),
   };
 }
 

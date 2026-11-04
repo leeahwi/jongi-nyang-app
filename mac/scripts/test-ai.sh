@@ -18,4 +18,4 @@ swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/AIConnect.swift \
     Tests/PaperCoreTests/AIConnectTests.swift \
     -o .build/checks/AIConnectTests
-.build/checks/AIConnectTests
+.build/checks/AIConnectTests ../docs/plans/spaces-cases.json

@@ -8,7 +8,7 @@
 
 macOS · Windows · Free · No account
 
-[**Download for Mac**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.46.0) &nbsp;·&nbsp; [**Download for Windows**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.31.0) &nbsp;·&nbsp; [Project site](https://leeahwi.github.io/jongi-nyang-app/en/) &nbsp;·&nbsp; [한국어](README.md)
+[**Download for Mac**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.47.0) &nbsp;·&nbsp; [**Download for Windows**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.32.0) &nbsp;·&nbsp; [Project site](https://leeahwi.github.io/jongi-nyang-app/en/) &nbsp;·&nbsp; [한국어](README.md)
 
 [![Mac](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=mac-*&label=Mac&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![Windows](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=windows-*&label=Windows&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![CI](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml/badge.svg)](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml)
 
@@ -16,7 +16,7 @@ macOS · Windows · Free · No account
 
 <img src="site/assets/og-en.png" width="100%" alt="Three Jongi-nyang notes: the Mac app by day, the Mac app at night, and the Windows app">
 
-Tasks, events, notes and focus timers live in one small notebook, and a paper cat at the bottom of the screen brings your reminders. The Mac and Windows apps share one file format, so a single synced folder gives both computers the same list. [29-second intro video](site/assets/promo-en.mp4)
+Tasks, events, notes and focus timers live in one small notebook, and a paper cat at the bottom of the screen brings your reminders. The Mac and Windows apps share one file format, so a single synced folder gives both computers the same list. [40-second intro video](site/assets/promo-en.mp4)
 
 ## Why it exists
 
@@ -77,6 +77,14 @@ From 1.46 (Windows 1.31), `All spaces ▾` or <kbd>⌥⌘G</kbd> (Windows <kbd>C
 
 <img src="docs/screenshots/mac/spaces2b-board.png" width="800" alt="A wide notepad showing today's to-dos grouped into four columns: work, home, study and general">
 
+### Spaces per device
+
+From 1.47 (Windows 1.32), each device can choose which spaces it shows, even when several devices share one list through a shared folder. In Desk → Spaces, the `On this device` popup at the right of a row hides a space, or shows it only on the days and at the times you set. To-dos in a hidden space stay off the notepad, the Today window, the day ribbon and the evening tidy-up, and their reminders don't ring on that device. `Peek` at the end of the list shows them again, and History still has them. In search, type `#Work report` to look in one space only; History can be filtered by space too.
+
+The Today window in the menu bar (the notification area on Windows) is new as well. The event, timer and alarm show as cards only when there is one, up to seven to-dos fit, and the top shows how many of today's to-dos are done, with a thin progress bar.
+
+<img src="docs/screenshots/mac/spaces-device-desk.png" width="800" alt="Desk → Spaces with Work hidden on this device and Study shown only at set weekday times">
+
 ### A paper cat
 
 It celebrates finished tasks, delivers reminders, and now and then asks a question you answer with a button. Day and night paper; Korean, English and Dutch.
@@ -90,6 +98,8 @@ It celebrates finished tasks, delivers reminders, and now and then asks a questi
 
 Claude Desktop or Claude Code can look at and add tasks, events and notes while you chat, and change them after you confirm. Turn it on under Desk → AI connection (off by default). There is no background server.
 
+From 1.47 (Windows 1.32), Claude sees your to-dos by space, chooses the space for new ones, and shows a preview before moving one to another space. You can also attach today's page, this week or a single note to a conversation (`@` in Claude Code).
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/cards/claude-en-dark.png">
   <img src="docs/readme/cards/claude-en-light.png" width="800" alt="The AI connection pane on the Desk">
@@ -101,8 +111,8 @@ Everything is saved as JSON files on your computer. Pick a synced folder such as
 
 ## Installation
 
-- **macOS** 14 or later, Apple Silicon — open the [v1.46.0 DMG](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.46.0) and drag the app into Applications. Intel Macs need a source build.
-- **Windows** 10/11, x64 — run the installer (`.exe`) from [v1.31.0](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.31.0) or extract the ZIP.
+- **macOS** 14 or later, Apple Silicon — open the [v1.47.0 DMG](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.47.0) and drag the app into Applications. Intel Macs need a source build.
+- **Windows** 10/11, x64 — run the installer (`.exe`) from [v1.32.0](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.32.0) or extract the ZIP.
 - Each release has a `SHA256SUMS` file to check your download against: `shasum -a 256 file` on macOS, `Get-FileHash file -Algorithm SHA256` in Windows PowerShell.
 - Other versions are on the [releases page](https://github.com/leeahwi/jongi-nyang-app/releases).
 
@@ -113,7 +123,7 @@ The macOS release has no Developer ID signature or notarization; the Windows rel
 Data is stored as JSON and other files in a folder you choose. No account or dedicated server is required.
 
 - **Choose a location:** Change the folder in the app's **Desk → Storage & Backup** settings.
-- **Share across devices:** Choose a folder synchronized by iCloud Drive, OneDrive, Dropbox, or another provider to use the same data on macOS and Windows. The provider handles file transfer.
+- **Share across devices:** Choose a folder synchronized by iCloud Drive, OneDrive, Dropbox, or another provider to use the same data on macOS and Windows. The provider handles file transfer. Which spaces show is set on each device (1.47, Windows 1.32) and doesn't change the files in the shared folder.
 - **Automatic backups:** Once a day, and before anything overwrites the storage folder (such as an import or a restore), the app saves a `.jongi` backup (1.46, Windows 1.31). Backups pile up in this computer's `backups` folder, not in the storage folder, and **Desk → Storage & backup** lets you choose what to restore.
 - **Back up or move:** Export tasks, notes and note folders, events, alarms, completion history, and focus history to a `.jongi` file, then import it on another device.
 - **Files:** Tasks are in `todos.json`, notes in `memos.json`, the notes drawer's folders, pins, sort order and per-note paper in `memo-folders.json`, to-do spaces in `todo-spaces.json`, and deleted notes in `memo-trash.json`. The AI connection setting (`ai-link.json`) and the log of what Claude did (`ai-log.jsonl`) stay in each device's settings folder, even with a shared folder.

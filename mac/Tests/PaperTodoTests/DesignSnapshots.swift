@@ -6,6 +6,14 @@ import SwiftUI
 @main
 @MainActor
 enum DesignSnapshots {
+    /// #191: a fixed time of the day the app calls today (its day starts at 04:00). A scene drawn at a fixed moment makes its
+    /// sample data against that same moment — a to-do given a time gets a reminder only while its start is still ahead
+    /// (`TimeBlock.reminder`) — so it looks the same whatever the real clock says. (Made against the real clock, 2b's
+    /// 다음 row lost its bell whenever it was drawn after 13:40.)
+    static func sampleTime(_ hour: Int, _ minute: Int = 0) -> Date {
+        Calendar.paper.date(bySettingHour: hour, minute: minute, second: 0, of: Archive.logicalDayStart(Date()))!
+    }
+
     static func main() async throws {
         // `PAPERTODO_LANG=en` / `nl` (scripts/render-design.sh en): the app's text and the sample
         // data in that language; Korean when unset.
@@ -64,7 +72,7 @@ enum DesignSnapshots {
             LocalEvent(id: "birthday", title: t("엄마 생신", "Mom’s birthday", "Verjaardag mama"), date: todayKey, allDay: true, repeatRule: .yearly, color: .coral),
             timed("study", t("아침 스터디", "Morning study", "Ochtendstudie"), .purple, -120, -60),
             timed("standup", t("팀 회의", "Team meeting", "Teamoverleg"), .sage, -15, 30, repeating: .weekly),
-            timed("dentist", t("치과", "Dentist", "Tandarts"), .blue, 40, 80, location: t("연세바른치과", "Bright Smile Dental", "Tandartspraktijk De Linde")),
+            timed("dentist", t("치과", "Dentist", "Tandarts"), .blue, 40, 80, location: t("동네 치과", "Corner Dental", "Tandarts om de hoek")),
             timed("dinner", t("저녁 약속", "Dinner with friends", "Uit eten met vrienden"), .yellow, 300, 420),
             timed("gym", t("운동", "Gym", "Sporten"), .blue, 480, 540),
         ]
@@ -150,7 +158,7 @@ enum DesignSnapshots {
         // 1.40 하루 띠: the day of the mock (now 13:20) — on now (an event, a to-do), nothing on (the next soon, far),
         // nothing left, narrow, tall and wide; then opened into the whole day (overlaps, done and late to-dos,
         // reminders, a crowd with +N) and the timer tag at several times.
-        func at(_ hour: Int, _ minute: Int = 0) -> Date { Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: now)! }
+        func at(_ hour: Int, _ minute: Int = 0) -> Date { sampleTime(hour, minute) }
         let ribbonNow = at(13, 20)
         // The demo list's reminder (an hour from the real now) at a fixed 21:30 for these, so the day looks the same
         // whenever it's drawn (1.41; before, a morning render put it beside 메일 답장 and split that into two columns).
@@ -166,7 +174,7 @@ enum DesignSnapshots {
             LocalEvent(id: "c", title: t("청소 당번", "Cleaning duty", "Schoonmaakbeurt"), date: ribbonDay, allDay: true, color: .gray),
             event("s", t("아침 스터디", "Morning study", "Ochtendstudie"), .purple, at(9), at(10)),
             event("m", t("팀 회의", "Team meeting", "Teamoverleg"), .sage, at(13), at(14), location: t("3층 회의실", "Room 3B", "Zaal 3")),
-            event("d", t("치과", "Dentist", "Tandarts"), .blue, at(15, 30), at(16, 30), location: t("연세바른치과", "Bright Smile Dental", "Tandartspraktijk De Linde")),
+            event("d", t("치과", "Dentist", "Tandarts"), .blue, at(15, 30), at(16, 30), location: t("동네 치과", "Corner Dental", "Tandarts om de hoek")),
             event("y", t("요가", "Yoga", "Yoga"), .purple, at(19), at(20)),
         ]
         model.calendar.showForSnapshot(ribbonEvents)
@@ -174,7 +182,7 @@ enum DesignSnapshots {
             model.add(title, literal: true)
             let id = model.items.last!.id
             let startMinutes = TimeBlock.minutes(start)!
-            model.setTimeRange(id, to: TimeRange(start: startMinutes, end: end.flatMap(TimeBlock.minutes)))
+            model.setTimeRange(id, to: TimeRange(start: startMinutes, end: end.flatMap(TimeBlock.minutes)), now: ribbonNow)
             if done { model.toggle(id) }
             return id
         }
@@ -227,11 +235,11 @@ enum DesignSnapshots {
         if let dentist = model.calendar.todayEvents(now: ribbonNow).first(where: { $0.title == t("치과", "Dentist", "Tandarts") }) {
             try render(timetable(TimetablePreview(id: dentist.key, edge: .end, points: 26)), size: nil, to: output.appendingPathComponent("day-stretch-event.png"))
         }
-        model.setTimeRange(report, to: TimeRange(start: 840, end: 960))
+        model.setTimeRange(report, to: TimeRange(start: 840, end: 960), now: ribbonNow)
         model.toast = PaperToast(symbol: "clock", text: L("시간을 바꿨어요 · \(TimeRange(start: 840, end: 960).text(.current))"), action: L("되돌리기"), perform: {})
         try render(PaperView(model: model, previewNow: ribbonNow), size: NSSize(width: 420, height: 760), to: output.appendingPathComponent("note-day-stretched.png"))
         model.toast = nil
-        model.setTimeRange(report, to: TimeRange(start: 840, end: 930))
+        model.setTimeRange(report, to: TimeRange(start: 840, end: 930), now: ribbonNow)
         // A crowd at 15:30: the dentist and three to-dos and a reminder — three columns, then +N.
         let crowd = [ranged(t("발표 연습", "Practice the talk", "Presentatie oefenen"), "15:30", "16:00"),
                      ranged(t("자료 출력", "Print the slides", "Slides printen"), "15:45", "16:15"),
@@ -396,7 +404,7 @@ enum DesignSnapshots {
         // 1.39: a day row with its time.
         dated(t("발표 연습", "Practice the talk", "Presentatie oefenen"), 1)
         let aheadRanged = model.items.last!.id
-        model.setTimeRange(aheadRanged, to: TimeRange(start: 16 * 60, end: 17 * 60 + 30))
+        model.setTimeRange(aheadRanged, to: TimeRange(start: 16 * 60, end: 17 * 60 + 30), now: sampleTime(13, 20))
         try render(PaperView(model: model), size: NSSize(width: 420, height: 560), to: output.appendingPathComponent("ahead-ranges.png"))
         try render(PaperView(model: model), size: NSSize(width: 350, height: 560), to: output.appendingPathComponent("ahead-ranges-narrow.png"))
         model.delete(aheadRanged)
@@ -685,7 +693,7 @@ enum DesignSnapshots {
         let tripStart = Calendar.current.date(byAdding: .day, value: 2, to: Calendar.current.startOfDay(for: now))!
         let monthEvents = snapshotEvents + [
             LocalEvent(id: "trip", title: t("제주 여행", "Trip to Jeju", "Reis naar Jeju"), date: CalendarDraft.day(tripStart), allDay: true, days: 3, color: .sage),
-            later("check", t("치과 정기 검진", "Dental checkup", "Controle tandarts"), .blue, days: 5, hour: 14, location: t("연세바른치과", "Bright Smile Dental", "Tandartspraktijk De Linde")),
+            later("check", t("치과 정기 검진", "Dental checkup", "Controle tandarts"), .blue, days: 5, hour: 14, location: t("동네 치과", "Corner Dental", "Tandarts om de hoek")),
             later("review", t("분기 리뷰", "Quarterly review", "Kwartaalreview"), .purple, days: 8, hour: 10, length: 2),
             later("study2", t("스터디", "Study group", "Studiegroep"), .purple, days: -3, hour: 20),
             later("lunch", t("팀 점심", "Team lunch", "Teamlunch"), .yellow, days: -6, hour: 12),
@@ -699,11 +707,11 @@ enum DesignSnapshots {
         // 1.39: to-dos with a time — today's (no date) and one in two days — as outlined blocks in the week and the day panel.
         model.add(t("보고서 쓰기", "Write the report", "Verslag schrijven"), literal: true)
         let todayRanged = model.items.last!.id
-        model.setTimeRange(todayRanged, to: TimeRange(start: 14 * 60, end: 15 * 60 + 30))
+        model.setTimeRange(todayRanged, to: TimeRange(start: 14 * 60, end: 15 * 60 + 30), now: sampleTime(13, 20))
         model.add(t("치과 서류 챙기기", "Bring the dental forms", "Tandartsformulieren meenemen"), literal: true)
         let laterRanged = model.items.last!.id
         model.setDue(laterRanged, to: Deadline.key(Calendar.paper.date(byAdding: .day, value: 2, to: Archive.logicalDayStart(now))!))
-        model.setTimeRange(laterRanged, to: TimeRange(start: 10 * 60, end: 11 * 60))
+        model.setTimeRange(laterRanged, to: TimeRange(start: 10 * 60, end: 11 * 60), now: sampleTime(13, 20))
         try desk(.calendar, "desk-calendar-ranges")
         try desk(.calendar, "desk-calendar-week-ranges", week: true)
         model.delete(todayRanged)
@@ -740,7 +748,7 @@ enum DesignSnapshots {
         popup.dismiss()
         popup.show(image: model.mascotImage,
                    tasks: [ReminderPopupTask(title: t("점심 약속", "Lunch with Mia", "Lunch met Mia"), scheduledAt: Date().addingTimeInterval(10 * 60 + 30),
-                                             endsAt: Date().addingTimeInterval(70 * 60), location: t("김밥천국", "Corner Café", "Café de Hoek"))],
+                                             endsAt: Date().addingTimeInterval(70 * 60), location: t("회사 앞 김밥집", "Café by the office", "Café bij kantoor"))],
                    duration: 0, scheduled: true, notebookFont: .pen, style: .paper, canComplete: false, calendarEvents: true)
         try await Task.sleep(for: .seconds(2.8))
         popup.captureSnapshot(at: output.appendingPathComponent("reminder-event.png"))
@@ -964,10 +972,13 @@ enum DesignSnapshots {
         try renderMemoDrawer(folder: folder, output: output)
         // 1.45: 할 일 스페이스.
         try renderSpaces(folder: folder, preferences: preferences, output: output)
+        // #196: 기기마다 보일 스페이스.
+        try renderSpaceDevice(folder: folder, preferences: preferences, output: output)
         // 1.45.1: the note's key (#85) and the shortcut list (#86).
         try renderShortcuts(model: model, output: output)
         // 1.35: the menu bar item (its words in each state) and the 오늘 창 below it.
         try renderTodayWindow(model: model, alarms: sampleAlarms, events: snapshotEvents, output: output)
+        try renderTodayWindowStates(model: model, alarms: sampleAlarms, output: output)
         print("Rendered note (3 fonts + minimum size), editor, settings and 3 reminders to \(output.path)")
     }
 
@@ -1061,7 +1072,7 @@ enum DesignSnapshots {
         // 1.39: a to-do with a time shows it in the result's detail.
         model.add(t("보고서 마무리", "Finish the report", "Rapport afmaken"), literal: true)
         let searchRanged = model.items.last!.id
-        model.setTimeRange(searchRanged, to: TimeRange(start: 16 * 60, end: 17 * 60))
+        model.setTimeRange(searchRanged, to: TimeRange(start: 16 * 60, end: 17 * 60), now: sampleTime(13, 20))
         try slip(SearchView(model: model, history: searchHistory, previewQuery: t("ㅂㄱㅅ", "report", "rapport")), to: output.appendingPathComponent("conv-search.png"))
         model.delete(searchRanged)
         try slip(SearchView(model: model, history: searchHistory, previewQuery: t("검토", "review", "review")), to: output.appendingPathComponent("conv-search-events.png"))
@@ -1074,7 +1085,7 @@ enum DesignSnapshots {
                                                                                                                       endMinutes: (slot.minutes + 60) % 1440)), onClose: {}),
                  to: output.appendingPathComponent("conv-ribbon-new-event.png"))
         // 빠른 메모 with copied text (selected).
-        try slip(QuickMemoView(model: model, text: t("서울시 마포구 월드컵로 12, 3층", "12 Market Street, 3rd floor", "Marktstraat 12, 3e verdieping"), selectAll: true),
+        try slip(QuickMemoView(model: model, text: t("종이시 고양이로 12, 3층", "12 Paper Lane, 3rd floor", "Papierlaan 12, 3e verdieping"), selectAll: true),
                  to: output.appendingPathComponent("conv-quick-memo-copied.png"))
         // The task reminder with 내일로 (and the 5분 전에 다시 of an event alert is in reminder-event).
         let popup = ReminderPopupController(onOpen: {}, onSnooze: { _ in }, onComplete: { _ in })
@@ -1201,6 +1212,61 @@ enum DesignSnapshots {
         }.padding(12).frame(width: 520, alignment: .leading).background(PaperTheme.paper), size: nil, to: output.appendingPathComponent("menubar-states.png"))
         model.calendar.showForSnapshot([])
         model.alarms.showForSnapshot([])
+    }
+
+    /// #200: the 오늘 창's states — nothing on and everything on (an event in 40 minutes, a running timer, an alarm), each
+    /// with 0 · 3 · many to-dos; one card only (the alarm) with nine to-dos left, as the user's window; a to-do hovered; a
+    /// short screen (three rows); everything done. Files `today-window-state-*.png` (the same set as Windows' glance/).
+    static func renderTodayWindowStates(model: AppModel, alarms: [Alarm], output: URL) throws {
+        let now = Date()
+        let timer = FocusTimerState()
+        let titles = [t("보고서 초안 다듬기", "Polish the report draft", "Rapportconcept bijschaven"), t("화분에 물 주기", "Water the plants", "Planten water geven"),
+                      t("택배 반품 접수", "Return the parcel", "Pakket retour sturen"), t("회의실 예약 확인", "Check the room booking", "Zaalreservering nakijken"),
+                      t("운동 30분", "Exercise 30 min", "30 min sporten"), t("세탁소 들르기", "Stop by the dry cleaner", "Langs de stomerij"),
+                      t("도서관 책 반납", "Return library books", "Boeken terugbrengen"), t("다음 주 일정 정리", "Plan next week", "Volgende week plannen"),
+                      t("고양이 사료 주문", "Order cat food", "Kattenvoer bestellen"), t("영수증 정리", "Sort receipts", "Bonnetjes sorteren"),
+                      t("사진 백업하기", "Back up photos", "Foto’s back-uppen"), t("편지 답장 쓰기", "Answer a letter", "Brief beantwoorden"),
+                      t("우유 사 오기", "Buy milk", "Melk halen"), t("책상 정리", "Tidy the desk", "Bureau opruimen"), t("물 마시기", "Drink water", "Water drinken")]
+        func reset() {
+            for item in model.items { model.delete(item.id) }
+            model.calendar.showForSnapshot([])
+            model.alarms.showForSnapshot([])
+            timer.timer = nil
+        }
+        /// `open` to-dos (the first `timed` with a reminder later today, for 다음), then `done` finished ones.
+        func todos(open: Int, timed: Int = 0, done: Int = 0, from start: Int = 0) {
+            for title in titles.dropFirst(start).prefix(open + done) { model.add(title, literal: true) }
+            let ids = model.items.suffix(open + done).map(\.id)
+            for (index, id) in ids.prefix(timed).enumerated() { model.setTaskReminder(id, at: now.addingTimeInterval(Double(100 + 45 * index) * 60)) }
+            // Finished without the check's hold (they're not rows any more, only counted).
+            for id in ids.suffix(done) { model.mutate { $0.toggle(id: id) } }
+        }
+        func fill(event: Bool = true, timerOn: Bool = true, alarm: Bool = true) {
+            if event {
+                let at = now.addingTimeInterval(40 * 60)
+                model.calendar.showForSnapshot([LocalEvent(id: "team", title: t("팀 회의", "Team sync", "Teamoverleg"), date: CalendarDraft.day(at),
+                                                           start: CalendarDraft.minutes(at), end: CalendarDraft.minutes(at.addingTimeInterval(45 * 60)))])
+            }
+            if timerOn { timer.timer = FocusTimer.countdown(minutes: 25, now: now.addingTimeInterval(-7 * 60)) }
+            if alarm { model.alarms.showForSnapshot([alarms[0]]) }
+        }
+        func window(_ name: String, room: Double? = nil, hover: Bool = false) throws {
+            try slip(TodayWindowView(model: model, timer: timer, alarms: model.alarms, calendar: model.calendar, rowRoom: room, now: now, previewRowHover: hover),
+                     to: output.appendingPathComponent("today-window-state-\(name).png"))
+        }
+        reset(); fill(event: false, timerOn: false); todos(open: 9, done: 2, from: 1)
+        try window("user")
+        try window("user-hover", hover: true)
+        reset(); try window("nothing-0")
+        reset(); todos(open: 3, timed: 1); try window("nothing-3")
+        reset(); todos(open: 12, timed: 1, done: 3); try window("nothing-many")
+        try window("short", room: 470)
+        reset(); fill(); try window("filled-0")
+        reset(); fill(); todos(open: 3, timed: 1, done: 1); try window("filled-3")
+        reset(); fill(); todos(open: 12, timed: 1, done: 3); try window("filled-many")
+        reset(); fill(event: false, alarm: false); todos(open: 0, done: 3); try window("timer-all-done")
+        reset(); fill(timerOn: false); todos(open: 8); try window("two-cards-eight")
+        reset()
     }
 
     /// Drawn in 밤 종이 (`PAPERTODO_PAPER=night`).

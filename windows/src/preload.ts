@@ -62,7 +62,7 @@ const api = {
   /** 메모 서랍, the page going away: the open memo's last typed text, handed over and saved before it returns. */
   flushMemo: (action: Extract<Action, { type: "memoUpdate" }>): void => { ipcRenderer.sendSync("memo:flush", action); },
   /** 완료 기록: the record of finished tasks and the focus sessions (focus.jsonl). */
-  getHistory: (): Promise<{ entries: ArchiveEntry[]; focus: FocusRecord[]; now: number }> => ipcRenderer.invoke("history:get"),
+  getHistory: (): Promise<{ entries: ArchiveEntry[]; focus: FocusRecord[]; now: number; spaces?: { id: string; name: string; color: string }[]; general?: string }> => ipcRenderer.invoke("history:get"),
   placePopup: (size: { width: number; height: number }): Promise<{ travel: number }> => ipcRenderer.invoke("popup:place", size),
   /** The pointer's place over the reminder's window, when it is over it (a resting pointer sends no moves). */
   popupPointer: (): Promise<{ x: number; y: number } | undefined> => ipcRenderer.invoke("popup:pointer"),

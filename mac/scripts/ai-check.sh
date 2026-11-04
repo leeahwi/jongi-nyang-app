@@ -128,7 +128,6 @@ echo "  app toast, from the call $(( $(echo "$line" | awk '{print $1}') - added_
 grep -q '"보고서 쓰기"' "$storage/todos.json" || fail "not in todos.json"
 
 # 2. ⌘Z in the app undoes Claude's work (the toast is up, nothing changed here since).
-"$probe" front "$pid"; sleep 0.5
 mark=$(python3 -I -c "import time; print(int(time.time()*1000))")
 "$probe" key "$pid" 6 cmd
 line=$(wait_line "$mark" undo) || fail "no undo"
@@ -151,7 +150,6 @@ python3 -I -c "import json,sys; items=json.load(open(sys.argv[1]))['items']; sys
 
 # 3b. Both writing at once (M9 from the app's side): the app adds 20 tasks from its input line while the extension
 # adds 20 in separate calls; all 40 must be in todos.json.
-"$probe" front "$pid"; sleep 0.3
 "$probe" key "$pid" 53; sleep 0.2
 "$probe" key "$pid" 45 cmd; sleep 0.5
 ( for n in $(seq 1 20); do call add_todos "{\"items\":[{\"title\":\"claude-$n\",\"remindAt\":null}]}" >/dev/null; done ) &
@@ -179,9 +177,11 @@ echo "both writing: the app added $typed (from typed keys) and Claude 20 at the 
 "$probe" key "$pid" 53; sleep 0.3
 
 # 4. 연결: the .mcpb is opened with its default app (recorded only — nothing is installed into Claude).
+# The tab and the button are clicked (a click posted to the test copy's pid), not pressed through accessibility, and
+# nothing is brought forward (#208).
 "$probe" key "$pid" 43 cmd; sleep 1
-"$probe" press "$pid" "AI 연결" >/dev/null 2>&1 || true; sleep 0.8
-"$probe" press "$pid" "Claude 데스크톱에 연결" >/dev/null 2>&1 || true; sleep 0.8
+"$probe" click "$pid" "=AI 연결" >/dev/null 2>&1 || true; sleep 0.8
+"$probe" click "$pid" "=Claude 데스크톱에 연결" >/dev/null 2>&1 || true; sleep 0.8
 echo "연결 (stubbed opener): $(tr '\n' ' ' < "$opened")"
 grep -q "open .*jongi-nyang.mcpb" "$opened" || fail "the .mcpb wasn't opened"
 sleep 0.5
@@ -201,12 +201,12 @@ echo "away notice: ${line#* away }"
 stop; : > "$opened"
 launch --ai-no-handler
 "$probe" key "$pid" 43 cmd; sleep 1
-"$probe" press "$pid" "AI 연결" >/dev/null 2>&1 || true; sleep 0.8
-"$probe" press "$pid" "Claude 데스크톱에 연결" >/dev/null 2>&1 &
+"$probe" click "$pid" "=AI 연결" >/dev/null 2>&1 || true; sleep 0.8
+"$probe" click "$pid" "=Claude 데스크톱에 연결" >/dev/null 2>&1 &
 sleep 1.5
 slip=$("$probe" windows "$pid" 2>/dev/null | grep -c "Claude 데스크톱이 필요해요" || true)
 echo "no Claude Desktop: $(tr '\n' ' ' < "$opened")· slip windows $slip"
-"$probe" press "$pid" "닫기" >/dev/null 2>&1 || true
+"$probe" click "$pid" "=닫기" >/dev/null 2>&1 || true
 sleep 0.5
 
 # 7. Off: every tool only says "turn it on".

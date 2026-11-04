@@ -30,7 +30,7 @@ struct MemoCard: View {
         let sheet = sheet, dense = drawer.dense
         VStack(alignment: .leading, spacing: 0) {
             if expanded {
-                OpenMemo(drawer: drawer, memo: memo, palette: sheet, font: font)
+                OpenMemo(drawer: drawer, memo: memo, palette: sheet, font: font, editing: drawer.editing)
             } else {
                 closed(sheet)
             }
@@ -57,6 +57,7 @@ struct MemoCard: View {
         .onTapGesture { if !expanded { drawer.expand(memo.id) } }
         .draggableIf(!expanded, "memo:" + memo.id) { DragCard(title: drawer.cardTitle(memo), palette: sheet, font: font) }
         .modifier(CardAccessibility(drawer: drawer, memo: memo, group: group, expanded: expanded, selected: selected, pinned: pinned))
+        .modifier(MemoArrive(active: drawer.justArrived(memo.id)))
     }
 
     @ViewBuilder private func closed(_ sheet: DrawerPalette) -> some View {
@@ -186,7 +187,7 @@ struct PreviewRows: View {
     let rows: [MemoCards.PreviewRow]
     let limit: Int
     let palette: DrawerPalette
-    /// The drawer's size step (#84): the preview follows it, always in the plain face.
+    /// The drawer's face and size step (#84, #198): the preview is in the words' face, its code lines in the code face.
     var text = MemoText()
 
     var body: some View {
@@ -197,7 +198,7 @@ struct PreviewRows: View {
                     HStack(spacing: 6) {
                         CheckBox(checked: done, palette: palette, size: 11)
                         Text(verbatim: row.text.keepingParticles)
-                            .font(.system(size: text.previewSize))
+                            .font(Font(text.previewFont))
                             .foregroundStyle(done ? palette.faint : palette.preview)
                             .strikethrough(done, color: palette.faint)
                             .lineLimit(1)
@@ -208,15 +209,11 @@ struct PreviewRows: View {
             }
             .accessibilityElement(children: .combine)
         } else {
-            let spacing = text.previewSpacing
             Text(words)
-                .font(.system(size: text.previewSize))
+                .font(Font(text.previewFont))
                 .foregroundStyle(palette.preview)
-                .lineSpacing(spacing)
-                .lineLimit(limit)
                 .truncationMode(.tail)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.vertical, spacing / 2)
+                .modifier(PreviewLines(text: text, limit: limit))
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
@@ -228,10 +225,36 @@ struct PreviewRows: View {
             if index > 0 { all.append(AttributedString("\n")) }
             let code = row.code || Checklist.isCode(row.text)
             var part = AttributedString(code ? row.text : row.text.keepingParticles)
-            if code { part.font = .system(size: text.previewSize - 1, design: .monospaced) }
+            if code { part.font = Font(text.previewCodeFont) }
             all.append(part)
         }
         return all
+    }
+}
+
+/// A preview's wrapped lines each the preview's line tall (보통 20 pt, #198), in any face: the face's own line plus the
+/// room to it. A Latin handwriting face's own line is taller than that (Caveat 24 → 30, Kalam 17 → 27): from macOS 26
+/// the lines are set to the preview's exactly (the letters reach a little past them, as in the open memo, and the card
+/// keeps its height); before it they keep the face's own.
+struct PreviewLines: ViewModifier {
+    let text: MemoText
+    var limit: Int?
+
+    func body(content: Content) -> some View {
+        let own = text.previewTextLine
+        if own > text.previewLine, #available(macOS 26, *) {
+            content
+                .lineHeight(.exact(points: text.previewLine))
+                .lineLimit(limit)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            let spacing = max(0, text.previewLine - own)
+            content
+                .lineSpacing(spacing)
+                .lineLimit(limit)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, spacing / 2)
+        }
     }
 }
 
@@ -443,18 +466,22 @@ struct OpenMemo: View {
     let memo: Memo
     let palette: DrawerPalette
     let font: NotebookFont
+    /// Typing (the text view) or reading (its lines), as the card said while it was open (#3): a card closing keeps the
+    /// face it had while it slides shut — read from the drawer, a 1 MB memo put away with Esc was drawn line by line as
+    /// read for the 0.16 s it took to go (5 s of work).
+    let editing: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if drawer.editing {
+            if editing {
                 SlipEditor(drawer: drawer, memo: memo, palette: palette, font: font)
             } else {
                 CheckedText(drawer: drawer, memo: memo, palette: palette, font: font)
             }
-            if drawer.editing, drawer.linkEdit != nil {
+            if editing, drawer.linkEdit != nil {
                 LinkBar(drawer: drawer, palette: palette).padding(.top, 8)
             }
-            if drawer.editing, drawer.formatBarOpen {
+            if editing, drawer.formatBarOpen {
                 FormatBar(drawer: drawer, palette: palette).padding(.top, 8)
             }
             MemoBar(drawer: drawer, memo: memo, palette: palette, big: false)
@@ -701,7 +728,9 @@ struct CheckedText: View {
         let titleIndex = lines.firstIndex { !String(decoding: $0.units, as: UTF16.self).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
         // 문단 간격 (#141): the room under each paragraph's last line (a list's lines stay together).
         let ends = lines.indices.map { text.paragraph > 0 && TextSteps.endsParagraph(lines[$0].read.kind, next: $0 + 1 < lines.count ? lines[$0 + 1].read.kind : nil) }
-        VStack(alignment: .leading, spacing: 0) {
+        // #209: lazy — only the lines in view (and near it) are made; a 2,000-line checklist made every line's views on
+        // ↩ (1.8–3 s). The card is as tall as the lines made so far say, refined as the list scrolls.
+        LazyVStack(alignment: .leading, spacing: 0) {
             ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
                 let raw = String(decoding: line.units, as: UTF16.self)
                 Group {
@@ -897,6 +926,26 @@ struct CheckMark: Shape {
 
 /// An open memo being typed: its raw text (boxes as `- [ ]`), the title in handwriting; its right-click is the
 /// system's text menu with `이 메모` added.
+/// M4 (#166): the memo that just came in rises into its place once with 등장 (8 pt, −0.6° straightened, as a slip
+/// comes in); only that card, only as it is first drawn. Reduce Motion and snapshots: there at once.
+struct MemoArrive: ViewModifier {
+    let active: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var settled = false
+
+    func body(content: Content) -> some View {
+        let hidden = active && !settled && Motion.animation(.enter, reduce: reduceMotion) != nil
+        content
+            .opacity(hidden ? 0 : 1)
+            .offset(y: hidden ? 8 : 0)
+            .rotationEffect(.degrees(hidden ? -0.6 : 0))
+            .onAppear {
+                guard active, let animation = Motion.animation(.enter, reduce: reduceMotion) else { return }
+                withAnimation(animation) { settled = true }
+            }
+    }
+}
+
 struct SlipEditor: View {
     @ObservedObject var drawer: MemoDrawer
     let memo: Memo
@@ -981,13 +1030,11 @@ struct SearchSlip: View {
                 }
                 .frame(height: MemoSlipStyle.titleRow)
                 if hit.range != nil, !onTitle {
+                    // #198: the found line in the words' face, as the card's preview (a code line in the code face).
                     Text(highlighted(found, sheet))
-                        .font(.system(size: drawer.text.previewSize))
+                        .font(Font(Checklist.isCode(hit.text) ? drawer.text.previewCodeFont : drawer.text.previewFont))
                         .foregroundStyle(sheet.preview)
-                        .lineSpacing(drawer.text.previewSpacing)
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.vertical, drawer.text.previewSpacing / 2)
+                        .modifier(PreviewLines(text: drawer.text, limit: 2))
                 } else if let memo, case let rows = drawer.card(memo).rows, !rows.isEmpty {
                     PreviewRows(rows: rows, limit: 2, palette: sheet, text: drawer.text)
                 }

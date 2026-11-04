@@ -14,7 +14,7 @@ import { drawerLegacyName, drawerPoint, noteLegacyName, noteStep, readCodeFont, 
 import { toggleDone } from "../core/memoEdits";
 import { emptyAll, emptyTrash, memoTrashFileName, mergeTrash, parseMemoTrash, pruneTrash, serializeMemoTrash, trashMemo, untrash, type MemoTrash } from "../core/memoTrash";
 import {
-  emptyTodoSpaces, mergeTodoSpaces, packSpaceOf, parseTodoSpaces, placeSeriesCopies, pruneTodoSpaces, readLens, serializeTodoSpaces, setSeriesSpace, spaceOf, todoSpacesFileName,
+  emptyTodoSpaces, liveSpaces, mergeTodoSpaces, packSpaceOf, parseTodoSpaces, placeSeriesCopies, pruneTodoSpaces, readLens, serializeTodoSpaces, setSeriesSpace, spaceOf, todoSpacesFileName,
   type TodoSpaces,
 } from "../core/todoSpaces";
 import { pageOf } from "../core/shelf";
@@ -31,6 +31,7 @@ import { exportRange } from "../core/timeRange";
 import { takeLock } from "./aiLock";
 import { RefusedFile, readTextSafely, writeFileAtomically } from "./safeFiles";
 import { megabytes } from "../core/fileLimits";
+import { checkedDeviceRules, cleanedDeviceRules, deviceKey, deviceRings, hiddenSpaces, readDeviceRules, storedDeviceRules, type StoredRules } from "../core/spaceDevice";
 
 export interface WindowMemory {
   bounds?: { x: number; y: number; width: number; height: number };
@@ -86,6 +87,12 @@ export interface TimerMemory {
  */
 export function saveProblem(what: string): string {
   return [what, t("앱을 끄기 전까지 적은 글은 화면에 그대로 있어요."), t("다음에 바뀔 때 다시 저장해 볼게요."), t("저장 폴더가 열리는지 확인해 주세요.")].join(" ");
+}
+
+/** #196 D10: when each space was made visible here, as read (anything odd left out). */
+function readShown(value: unknown): Record<string, string> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string" && !Number.isNaN(Date.parse(entry[1]))));
 }
 
 /** An unreadable file copied aside: its name only — the storage folder button shows where (#25). */
@@ -216,12 +223,69 @@ export class Store extends EventEmitter {
   }
 
   get items(): readonly TodoItem[] { return this.history.items; }
-  /** Today's sheet — what the tray, the post-it and periodic reminders talk about. */
+  /** Today's sheet, everything on it (완료한 일 정리, the list's export). */
   get todayItems(): TodoItem[] {
     const now = new Date();
     return this.history.items.filter((item) => pageOf(item, now) === "today");
   }
-  get remainingCount() { return this.todayItems.filter((item) => !item.isCompleted).length; }
+  /** Open to-dos on today's sheet as this PC shows them — what the tray, the post-it and periodic reminders talk about. */
+  get remainingCount() { return this.hereTodayItems.filter((item) => !item.isCompleted).length; }
+
+  // ─── 기기마다 보일 스페이스 (#196, docs/plans/spaces-device.md) ─────────────────
+
+  /** 잠깐 보기 (D6): the hidden spaces the note shows anyway, until the app quits or 다시 숨기기. */
+  devicePeek: string[] = [];
+  /** What this PC hides now (live spaces' ids and `none`). */
+  hiddenNow(now = new Date()): Set<string> {
+    return hiddenSpaces(readDeviceRules(this.prefs.spaceDevice), this.todoSpaces, now);
+  }
+  /** Whether this PC hides a to-do now (peeked at or not: the tray, the post-it, the cat, 저녁 정리, the reminders). */
+  hidesHere(item: TodoItem, hidden = this.hiddenNow()): boolean {
+    return hidden.size > 0 && hidden.has(deviceKey(spaceOf(this.todoSpaces, item.id)));
+  }
+  /** Every to-do but the ones this PC hides. */
+  get hereItems(): TodoItem[] {
+    const hidden = this.hiddenNow();
+    return hidden.size ? this.history.items.filter((item) => !this.hidesHere(item, hidden)) : [...this.history.items];
+  }
+  /** Today's sheet as this PC shows it outside the note. */
+  get hereTodayItems(): TodoItem[] {
+    const hidden = this.hiddenNow();
+    const today = this.todayItems;
+    return hidden.size ? today.filter((item) => !this.hidesHere(item, hidden)) : today;
+  }
+  /** D10: whether a to-do's reminder rings on this PC (its space shows now and showed then; not from before it was shown here). */
+  reminderRingsHere(item: TodoItem, now = new Date()): boolean {
+    if (!item.reminderAt || liveSpaces(this.todoSpaces).length === 0) return true;
+    const rules = readDeviceRules(this.prefs.spaceDevice);
+    const shown = this.prefs.spaceDeviceShown;
+    if (Object.keys(rules).length === 0 && Object.keys(shown).length === 0) return true;
+    const key = deviceKey(spaceOf(this.todoSpaces, item.id));
+    const since = shown[key] ? new Date(shown[key]) : undefined;
+    return deviceRings(rules[key], new Date(item.reminderAt), now, since && !Number.isNaN(since.getTime()) ? since : undefined);
+  }
+  /**
+   * 이 기기에서 changed (a page's setPref, or the menu): kept cleaned of spaces the file no longer has (S61); a space made
+   * visible (or its times changed) is noted so what came due before stays quiet (D10), and its 잠깐 보기 ends (D6).
+   */
+  setDeviceRules(value: StoredRules, now = new Date()): void {
+    const before = readDeviceRules(this.prefs.spaceDevice);
+    const after = cleanedDeviceRules(readDeviceRules(value), this.todoSpaces);
+    const shown = Object.fromEntries(Object.entries(this.prefs.spaceDeviceShown).filter(([, at]) => now.getTime() - Date.parse(at) < 2 * 86_400_000));
+    const changed = new Set([...Object.keys(before), ...Object.keys(after)].filter((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key])));
+    for (const key of changed) if (before[key] && after[key]?.show !== "hide") shown[key] = now.toISOString();
+    if (changed.size === 0) return;
+    this.devicePeek = this.devicePeek.filter((key) => !changed.has(key));
+    if (JSON.stringify(shown) !== JSON.stringify(this.prefs.spaceDeviceShown)) this.prefs = { ...this.prefs, spaceDeviceShown: shown };
+    this.setPref("spaceDevice", storedDeviceRules(after));
+  }
+  /** 잠깐 보기 · 다시 숨기기. */
+  setDevicePeek(spaces: readonly string[]): void {
+    const next = [...new Set(spaces)];
+    if (JSON.stringify(next) === JSON.stringify(this.devicePeek)) return;
+    this.devicePeek = next;
+    this.changed();
+  }
 
   state(): AppState {
     return {
@@ -244,6 +308,7 @@ export class Store extends EventEmitter {
       memoTrash: { ...this.memoTrash, entries: this.memoTrash.entries.map((entry) => ({ ...entry, memo: { ...entry.memo } })) },
       todoSpaces: { ...this.todoSpaces, spaces: this.todoSpaces.spaces.map((space) => ({ ...space })), items: {} },
       spaceOf: this.packedSpaces(),
+      devicePeek: [...this.devicePeek],
       storage: { ...this.storage },
       calendar: this.calendarView(),
       events: this.events.map((event) => ({ ...event, skip: [...event.skip] })),
@@ -1361,6 +1426,9 @@ export class Store extends EventEmitter {
         spaceGroupStyle: known.spaceGroupStyle === "bookmark" ? "bookmark" : "card",
         spaceGroupsFolded: Array.isArray(known.spaceGroupsFolded) ? known.spaceGroupsFolded.filter((id): id is string => typeof id === "string") : [],
         spaceGroupsDoneOpen: Array.isArray(known.spaceGroupsDoneOpen) ? known.spaceGroupsDoneOpen.filter((id): id is string => typeof id === "string") : [],
+        // #196: 이 기기에서 (anything that doesn't read: shown), and when each space was made visible here.
+        spaceDevice: checkedDeviceRules(known.spaceDevice) ?? {},
+        spaceDeviceShown: readShown(known.spaceDeviceShown),
         drawerHandleY: typeof known.drawerHandleY === "number" && known.drawerHandleY >= 0 && known.drawerHandleY <= 1 ? known.drawerHandleY : defaultPrefs.drawerHandleY,
       };
       this.memory = saved.memory ?? {};

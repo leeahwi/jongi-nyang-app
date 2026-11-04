@@ -564,6 +564,58 @@ export function lensTasks<T extends { id: string }>(tasks: readonly T[], index: 
   return lens === undefined ? [...tasks] : tasks.filter((task) => inLens(lens, index.get(task.id)?.id));
 }
 
+// ─── 2c: the search's `#` and the record's spaces ───────────────────────────
+
+/**
+ * C1 · C2 (S49–S54): the search's words read for a space — the first `#name` by the input line's rules (W5, S27 ·
+ * S28). Its first choice a space or 일반: that one ("none" for 일반), and the words without the token. A token that
+ * names nothing (the input line's 새 스페이스), or no spaces at all (M2): no space, the words as typed (`#` and all).
+ */
+export function searchSpace(query: string, data: TodoSpaces): { space?: string; words: string } {
+  const words = query.trim();
+  if (liveSpaces(data).length === 0) return { words };
+  const token = findSpaceToken(words);
+  if (!token) return { words };
+  const first = spaceChoices(data, token.name)[0];
+  if (!first || first.kind === "new") return { words };
+  return { space: first.kind === "space" ? first.id : lensNone, words: withoutToken(words, token).trim() };
+}
+
+/**
+ * C5 · H3 (S51, S52, S55, S56): a record line's space — its own `space` while that space is live, else the to-do's
+ * place in todo-spaces.json (kept 30 days after it left the list), else 일반 (undefined). `id` is the to-do's id.
+ */
+export function entrySpace(data: TodoSpaces, id: string | undefined, own?: string): string | undefined {
+  if (own && findSpace(data, own)) return own;
+  return id ? spaceOf(data, id) : undefined;
+}
+
+/**
+ * H2 · H3 (S55, S56): 완료 기록's lines and the focus lines with each one's space worked out (C5 · H3: a live space id, or
+ * none for 일반) — what the history page gets, so it can filter without todo-spaces.json's places.
+ */
+export function historySpaces<E extends { id: string; space?: string }, F extends { taskId?: string; space?: string }>(
+  data: TodoSpaces, entries: readonly E[], focus: readonly F[]): { entries: E[]; focus: F[] } {
+  const placed = <T extends { space?: string }>(item: T, space: string | undefined): T => {
+    const { space: _own, ...rest } = item;
+    return (space ? { ...rest, space } : rest) as T;
+  };
+  return {
+    entries: entries.map((entry) => placed(entry, entrySpace(data, entry.id, entry.space))),
+    focus: focus.map((record) => placed(record, record.taskId ? entrySpace(data, record.taskId, record.space) : undefined)),
+  };
+}
+
+/**
+ * H2 · H3: of lines whose `space` is worked out already (`historySpaces`), those in `filter` (undefined: all; "none":
+ * 일반). A focus line without a task (a plain timer) is in no space: it shows under 모든 스페이스 only.
+ */
+export function inHistory(filter: string | undefined, line: { space?: string; taskId?: string }, focus = false): boolean {
+  if (filter === undefined) return true;
+  if (focus && !line.taskId) return false;
+  return inLens(filter, line.space);
+}
+
 /** W8: Ctrl+Shift+1–9 → the spaces in order, 0 → all (undefined); a digit with no space → nothing to do (null). */
 export function lensForDigit(data: TodoSpaces, digit: number): string | undefined | null {
   if (digit === 0) return undefined;
@@ -574,7 +626,7 @@ export function lensForDigit(data: TodoSpaces, digit: number): string | undefine
 // ─── Words ───────────────────────────────────────────────────────────────────
 
 /** The final consonant of a word's last sound: 0 none, 8 ㄹ, else another (digits and Latin letters as read). */
-function finalOf(word: string): number {
+export function finalOf(word: string): number {
   const last = [...word.trim()].pop() ?? "";
   const code = last.codePointAt(0) ?? 0;
   if (code >= 0xac00 && code <= 0xd7a3) return (code - 0xac00) % 28;

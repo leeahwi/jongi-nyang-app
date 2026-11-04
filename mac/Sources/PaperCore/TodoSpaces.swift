@@ -847,4 +847,61 @@ public enum SpaceWords {
     public static func needsTitle(_ language: AppLanguage = .ko) -> String {
         ["할 일 내용을 적어 주세요", "Write what the to-do is", "Schrijf wat de taak is"][language.index]
     }
+
+    /// C4, under the empty search slip's hint: "#회사처럼 적으면 그 스페이스에서만 찾아요" (the first space's name, blanks left
+    /// out as `#` reads it).
+    public static func searchHint(_ name: String, language: AppLanguage = .ko) -> String {
+        let tag = "#" + name.filter { !$0.isWhitespace }
+        return ["\(tag)처럼 적으면 그 스페이스에서만 찾아요", "Type \(tag) to look in that space only",
+                "Typ \(tag) om alleen in die ruimte te zoeken"][language.index]
+    }
+}
+
+// MARK: - The record's spaces (spaces 2c)
+
+extension TodoSpaces {
+    /// C5: a record line's space — its own `space` while that space is live, else the to-do's place here (kept 30 days
+    /// after it left the list), else 일반 (nil).
+    public func spaceID(of entry: ArchiveEntry) -> String? {
+        if let own = entry.space, space(own) != nil { return own }
+        return spaceID(of: entry.id)
+    }
+
+    /// H3: a focus line's space — its own `space` while live, else its task's place, else 일반 (nil). A plain timer
+    /// (no task) is in no space at all: `kept(_:in:)` leaves it out of every space and of 일반.
+    public func spaceID(of record: FocusRecord) -> String? {
+        if let own = record.space, space(own) != nil { return own }
+        return record.taskId.flatMap { spaceID(of: $0.uppercased()) }
+    }
+
+    /// H1–H2: the record lines of one space (`.all`: every line).
+    public func kept(_ entries: [ArchiveEntry], in filter: SpaceFilter) -> [ArchiveEntry] {
+        switch filter {
+        case .all: entries
+        case .general: entries.filter { spaceID(of: $0) == nil }
+        case .space(let id): entries.filter { spaceID(of: $0) == id }
+        }
+    }
+
+    /// H1–H3: the focus lines of one space; a plain timer only with `.all`.
+    public func kept(_ records: [FocusRecord], in filter: SpaceFilter) -> [FocusRecord] {
+        switch filter {
+        case .all: records
+        case .general: records.filter { $0.taskId != nil && spaceID(of: $0) == nil }
+        case .space(let id): records.filter { $0.taskId != nil && spaceID(of: $0) == id }
+        }
+    }
+}
+
+/// 완료 기록's `모든 스페이스 ▾` (spaces 2c, H1): every line, 일반's, or one space's.
+public enum SpaceFilter: Hashable, Sendable {
+    case all, general
+    case space(String)
+
+    /// The filter as it still stands: a space deleted since is back to all (H4).
+    public func live(in spaces: TodoSpaces) -> SpaceFilter {
+        if case .space(let id) = self, spaces.space(id) == nil { return .all }
+        if self == .general, spaces.isEmpty { return .all }
+        return self
+    }
 }

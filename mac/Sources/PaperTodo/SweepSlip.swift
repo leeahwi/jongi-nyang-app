@@ -33,7 +33,7 @@ final class SweepController {
     /// `opening`: the note was just opened or shown (the morning one only comes then).
     func check(opening: Bool, now: Date = Date()) {
         guard model.sweepEnabled, !isVisible, !isBusy(), !model.timerState.isFocusing, !model.showsGuide,
-              let due = Sweep.due(model.items, now: now, minutes: model.sweepTime, shown: model.sweepShown, opening: opening) else { return }
+              let due = Sweep.due(model.hereItems, now: now, minutes: model.sweepTime, shown: model.sweepShown, opening: opening) else { return }
         model.sweepShown = due.mark
         show(due.moment, items: due.items)
     }

@@ -403,7 +403,7 @@ final class MemoDrawer: ObservableObject {
         guard let view = editorView else { return }
         let length = (view.string as NSString).length
         if edit.to <= length {
-            view.apply(MemoEdits.setLink(view.string, from: edit.from, to: edit.to, url: url))
+            view.apply(MemoEdits.setLink(view.native, from: edit.from, to: edit.to, url: url))
         }
         view.window?.makeFirstResponder(view)
     }
@@ -453,8 +453,25 @@ final class MemoDrawer: ObservableObject {
         didSet {
             listChanged()
             forgetGoneCards()
+            noteArrival(after: oldValue)
         }
     }
+    /// M4 (#166): the one memo that just came in while the drawer is out (the quick-write slip's ↩, a paste, 빠른 메모, a
+    /// memo brought back from 지운 메모): its card rises into place once (MemoArrive); memos that came in while the drawer
+    /// was away, or several at once, don't.
+    private(set) var arrivedID: String?
+    private var arrivedAt = Date.distantPast
+    private func noteArrival(after old: [Memo]) {
+        guard isOpen, !opening, !old.isEmpty, memos.count == old.count + 1 else { return }
+        let known = Set(old.map(\.id))
+        let fresh = memos.filter { !known.contains($0.id) }
+        guard fresh.count == 1 else { return }
+        arrivedID = fresh[0].id
+        arrivedAt = Date()
+    }
+    /// Whether `id`'s card is the one that just came in (for the moment it is first drawn).
+    func justArrived(_ id: String) -> Bool { arrivedID == id && Date().timeIntervalSince(arrivedAt) < 1 }
+    private var opening = false
     @Published private(set) var folders = MemoFolders.fresh() { didSet { listChanged() } }
     @Published var tab: MemoFolders.Tab = .folder(MemoFolders.inbox) { didSet { listChanged() } }
     @Published var expandedID: String?
@@ -605,7 +622,9 @@ final class MemoDrawer: ObservableObject {
     func willOpen() {
         isOpen = true
         // Only what changed while it was closed is published: an unchanged drawer comes back without redrawing (1.43 perf).
+        opening = true
         if memos != model.memos { memos = model.memos }
+        opening = false
         if folders != model.memoFolders { folders = model.memoFolders }
         var wanted = tab
         if case .folder(let id) = tab, folders.folder(id) == nil { wanted = .folder(folders.lastFolder(lastFolder)) }
@@ -1014,7 +1033,7 @@ final class MemoDrawer: ObservableObject {
         selectedID = id
         model.openMemoID = id
         editLine = nil
-        editing = Checklist.lines(memo(id)?.text ?? "").isEmpty
+        editing = !Checklist.hasLines(memo(id)?.text ?? "")
     }
 
     /// 펼쳐서 고치기: open, typing.

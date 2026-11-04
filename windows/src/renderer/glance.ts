@@ -1,21 +1,23 @@
 import { logicalDayStart } from "../core/archive";
 import { expand } from "../core/events";
-import { alarmHint, glanceCards, glanceTasks, timerHint, type GlanceCard, type GlanceTimer } from "../core/glance";
+import { alarmHint, glanceCards, glanceChip, glanceDate, glanceLayout, glanceProgress, glanceRowCap, glanceTasks, timerHint, type GlanceCard, type GlanceTimer } from "../core/glance";
 import { clock } from "../core/lang";
 import type { TodoItem } from "../core/notebook";
 import { pageOf } from "../core/shelf";
 import { rangeText, rangeToday } from "../core/timeRange";
 import { bodyFontSize, type TodosState } from "../core/types";
 import { activeLens, findSpace, generalName, groupedCount, inLens, lensNone, lensTasks, spaceColor, spaceIndexOf, type TodoSpace } from "../core/todoSpaces";
+import { deviceKey, deviceLens, hiddenSpaces, readDeviceRules } from "../core/spaceDevice";
 import { h, holdMs, icon, lang, motion, paper, reduceMotion, t } from "./api";
 import { InputLine } from "./inputLine";
 import { commitReading, type FlowHost } from "./intentFlow";
 import { appear, toaster } from "./slip";
 
 /**
- * 오늘 창 (the tray's window; the Mac's menu bar popover): the next event, the timer and the next
- * alarm as three cards (the urgent one clay), today's tasks with 다음 first and working checkboxes,
- * the input line (its toast shows here), and 노트 열기 · 책상 · 종이냥 숨기기/보이기. Esc or a click
+ * 오늘 창 (the tray's window; the Mac's menu bar popover): the date and today's progress; the next event, the timer
+ * and the next alarm — the ones with something in them as cards (the urgent one clay), the empty ones as a row of
+ * chips (#200); today's tasks with 다음 first, seven rows at most, working checkboxes and titles that open the note on
+ * their row; the input line (its toast shows here), and 노트 열기 · 책상 · 종이냥 숨기기/보이기. Esc or a click
  * elsewhere closes it.
  */
 const api = paper();
@@ -27,7 +29,10 @@ const finishing = new Set<string>();
 
 const close = () => api.send("glance:close");
 
-const cards = h("div", { class: "cards3", role: "group", "aria-label": t("오늘 창") });
+const top = h("div", { class: "g-top", role: "heading", "aria-level": "2" });
+const barFill = h("i");
+const bar = h("div", { class: "g-bar", "aria-hidden": "true" }, barFill);
+const cards = h("div", { class: "g-cards", role: "group", "aria-label": t("오늘 창") });
 const tasks = h("div", { class: "g-tasks", role: "list" });
 const more = h("button", { class: "g-more" });
 more.addEventListener("click", () => { void api.act({ type: "openNote" }); close(); });
@@ -44,7 +49,7 @@ const line = new InputLine({
   onEscape: (event) => { event.preventDefault(); if (line.value) line.clear(); else close(); },
 });
 const links = h("div", { class: "g-links" });
-card.append(cards, tasks, h("div", { class: "g-line" }, toastHost, line.element), links);
+card.append(top, cards, tasks, h("div", { class: "g-line" }, toastHost, line.element), links);
 
 // Esc anywhere (the toast takes it first while it is up) closes the window.
 window.addEventListener("keydown", (event) => {
@@ -66,6 +71,17 @@ const report = () => {
   api.send("glance:size", size);
 };
 new ResizeObserver(report).observe(stage);
+
+/**
+ * #200: the work area's height, for how many to-do rows fit (`glanceRowCap`). The snapshots stand a short screen in
+ * with `data-room` on the page (then the "glance-room" event redraws).
+ */
+function rowRoom(): number | undefined {
+  const asked = Number(document.documentElement.dataset.room);
+  if (Number.isFinite(asked) && asked > 0) return asked;
+  return window.screen.availHeight > 0 ? window.screen.availHeight : undefined;
+}
+window.addEventListener("glance-room", () => render());
 
 /** The timer as the cards take it, now. */
 function timerNow(): GlanceTimer | undefined {
@@ -89,8 +105,25 @@ function keepTogether(text: string): string {
   return head.replace(/ /g, "\u00a0").replace(/(\d)(?=\p{L})/gu, "$1\u2060") + (at < 0 ? "" : text.slice(at));
 }
 
-function cardElement(entry: GlanceCard): HTMLElement {
-  const element = h("div", { class: `c3 ${entry.kind}${entry.hot ? " hot" : ""}${entry.empty ? " empty" : ""}` },
+/**
+ * #200: an empty card as a quiet chip in one row under the cards — none today → a new event (1.38); ‘타이머 25’ ·
+ * ‘알람 7시’ into the line below. Read as the card was (‘타이머: ‘타이머 25’’).
+ */
+function chipElement(entry: GlanceCard): HTMLElement {
+  const text = glanceChip(entry.kind, lang());
+  const chip = h("button", { class: "chip g-chip", title: text, "aria-label": `${entry.label}: ${entry.small}` },
+    icon(entry.kind === "event" ? "calendar" : entry.kind, 13), h("span", {}, text));
+  chip.addEventListener("click", () => {
+    if (entry.kind === "event") { void api.act({ type: "calendarNewEvent" }); close(); return; }
+    line.set(entry.kind === "timer" ? timerHint(lang()) : alarmHint(lang()));
+    line.focus();
+  });
+  return chip;
+}
+
+/** A card with something in it; one alone (`wide`, #200) lies flat across the window, its line beside the time. */
+function cardElement(entry: GlanceCard, wide = false): HTMLElement {
+  const element = h("div", { class: `c3 ${entry.kind}${entry.hot ? " hot" : ""}${entry.empty ? " empty" : ""}${wide ? " wide" : ""}` },
     h("small", {}, entry.label),
     // The timer's length with a small "남음" after it (#46).
     h("b", {}, entry.unit && entry.unitFirst ? h("span", { class: "c3-unit" }, `${entry.unit} `) : null, h("span", { class: "c3-big" }, entry.big),
@@ -136,7 +169,9 @@ function taskRow(item: TodoItem, next: boolean): HTMLElement {
   const done = item.isCompleted;
   const box = h("span", { class: "box" }, icon("check", 12, 2.6));
   const check = h("button", { class: "check", "aria-label": done ? t("{title} 완료 취소", { title: item.title }) : t("{title} 완료", { title: item.title }) }, box);
-  const label = h("span", { class: "label", title: item.title }, item.title);
+  // #200: the title opens the note with this row picked (as a task on the calendar window does).
+  const label = h("button", { class: "label", title: `${item.title}\n${t("노트에서 보기")}`, "aria-label": item.title, "aria-description": t("노트에서 보기") }, item.title);
+  label.addEventListener("click", () => { void api.act({ type: "calendarShowTask", id: item.id }); close(); });
   const strike = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   strike.setAttribute("class", "strike");
   strike.setAttribute("viewBox", "0 0 1 1");
@@ -209,21 +244,42 @@ function render(): void {
   const root = document.documentElement;
   root.dataset.font = state.prefs.font;
   root.style.setProperty("--body-size", `${bodyFontSize(state.prefs.font, "regular")}px`);
-  // Events from today on (the next one may be days away).
+  // #200: today's events only (the card says the next one left today, as on the Mac).
   const start = logicalDayStart(now);
-  const events = expand(state.events ?? [], start, new Date(start.getTime() + 8 * 86_400_000), lang());
-  cards.replaceChildren(...glanceCards(events, timerNow(), state.alarms ?? [], new Set(state.prefs.alarmHandled ?? []), now, lang()).map(cardElement));
+  const events = expand(state.events ?? [], start, new Date(start.getTime() + 86_400_000), lang());
+  const all3 = glanceCards(events, timerNow(), state.alarms ?? [], new Set(state.prefs.alarmHandled ?? []), now, lang());
+  // Only the cards with something in them take full size; the empty ones are chips in one row under them.
+  const layout = glanceLayout(all3.filter((entry) => !entry.empty).map((entry) => entry.kind));
+  const pick = (kind: GlanceCard["kind"]) => all3.find((entry) => entry.kind === kind)!;
+  const row3 = h("div", { class: "cards3" }, ...layout.cards.map((kind) => cardElement(pick(kind), layout.wide)));
+  row3.style.setProperty("--n", String(layout.cards.length));
+  cards.replaceChildren(...(layout.cards.length ? [row3] : []), ...(layout.chips.length ? [h("div", { class: "g-chips" }, ...layout.chips.map((kind) => chipElement(pick(kind))))] : []));
   fitTimerWord();
 
-  // Today's tasks: just-checked ones keep their place for a moment. 2a (A5): under the note's lens.
+  // The to-dos this window lists and counts: today's sheet. #196: without what this PC hides — here, in this one place,
+  // so the rows and the progress agree (even while the note peeks at it, D6).
   const spaces = spaceIndexOf(state.todoSpaces.spaces, state.spaceOf);
-  const lens = activeLens(state.prefs.spaceLens ?? undefined, state.todoSpaces, now);
-  const all = state.items.filter((item) => pageOf(item, now) === "today");
+  const hiddenHere = hiddenSpaces(readDeviceRules(state.prefs.spaceDevice), state.todoSpaces, now);
+  const all = state.items.filter((item) => pageOf(item, now) === "today" && !(hiddenHere.size > 0 && hiddenHere.has(deviceKey(spaces.get(item.id)?.id))));
+  // #200: the date and today's progress (every space's to-dos, whatever the lens shows — A5), a thin bar under them.
+  const doneCount = all.filter((item) => item.isCompleted).length;
+  const date = glanceDate(now, lang());
+  const progress = glanceProgress(all.length, doneCount, lang());
+  // The same bar each time, so its length eases (--motion-change) when a check lands.
+  barFill.style.width = `${all.length ? (doneCount / all.length) * 100 : 0}%`;
+  top.setAttribute("aria-label", progress ? `${date}, ${progress}` : date);
+  top.replaceChildren(h("div", { class: "g-top-line", "aria-hidden": "true" }, h("span", { class: "g-date" }, date), progress ? h("span", { class: "g-progress" }, progress) : null),
+    ...(all.length ? [bar] : []));
+
+  // Today's tasks: just-checked ones keep their place for a moment. 2a (A5): under the note's lens.
+  // D7: a lens on a space this PC hides lets go.
+  const lens = deviceLens(activeLens(state.prefs.spaceLens ?? undefined, state.todoSpaces, now), hiddenHere);
   const today = lensTasks(all, spaces, lens);
   const hiddenByLens = lens === undefined ? 0 : all.filter((item) => !item.isCompleted && !inLens(lens, spaces.get(item.id)?.id)).length;
   bandOf = (id) => spaces.get(id);
   const shown = today.map((item) => (finishing.has(item.id) ? { ...item, isCompleted: false } : item));
-  const { next, rest, hidden } = glanceTasks(shown, now);
+  // Seven rows at most, fewer when the work area is short (never under three).
+  const { next, rest, hidden } = glanceTasks(shown, now, glanceRowCap(rowRoom()));
   const real = (item: TodoItem) => today.find((entry) => entry.id === item.id) ?? item;
   const rows: HTMLElement[] = [];
   if (next.length && rest.length) rows.push(h("div", { class: "g-head", role: "heading", "aria-level": "3" }, t("다음")));
@@ -231,7 +287,11 @@ function render(): void {
   if (next.length && rest.length) rows.push(h("div", { class: "g-head", role: "heading", "aria-level": "3" }, t("그 밖에")));
   rows.push(...rest.map((item) => taskRow(real(item), false)));
   // A16: the lens hides every open to-do left — no cat words (there are to-dos left); the lens line says it.
-  if (!next.length && !rest.length && !hiddenByLens) rows.push(h("div", { class: "g-empty" }, today.length ? t("오늘 한 장 끝! 수고했어요") : t("오늘 할 일을 한 줄 적어 볼까요?")));
+  // #200: the small cat beside the words, as on the Mac (and every other empty sheet).
+  if (!next.length && !rest.length && !hiddenByLens) {
+    rows.push(h("div", { class: "g-empty" }, h("img", { src: `../../assets/pet/256/${all.length ? "cheer" : "happy"}.png`, alt: "", draggable: "false" }),
+      h("span", {}, all.length ? t("오늘 한 장 끝! 수고했어요") : t("오늘 할 일을 한 줄 적어 볼까요?"))));
+  }
   more.textContent = t("외 {n}개 · 노트에서 보기", { n: hidden });
   more.hidden = hidden === 0;
   for (const id of [...rowCache.keys()]) if (!rows.some((row) => row.dataset.id === id)) rowCache.delete(id);

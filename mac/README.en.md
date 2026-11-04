@@ -103,6 +103,15 @@
 - Desk → Appearance → **Language**: Automatic · 한국어 · English · Nederlands. Automatic follows your Mac's language order (English when none of the three is there); changing it restarts Jongi-nyang.
 - Menus, settings, help, reminders, cat talk, dates and times are all in that language. English and Dutch handwriting uses Caveat (pen) and Kalam (marker); titles written in Korean still show in Korean handwriting.
 
+### 🖥 Spaces per device · a new Today window (1.47)
+![Desk → Spaces with Work hidden on this device and Study shown only at set weekday times](../docs/screenshots/mac/spaces-device-desk.png)
+
+- **Spaces per device**: in Desk → Spaces, the `On this device` popup at the right of each row offers Show, Hide and `Set times…`. Pick days and times, or fill them in at once with the `Workdays 9–6` · `Weekday evenings 7–11` · `Weekends` chips. The setting stays on this Mac, and the files in the shared folder don't change.
+- **Hidden spaces stay quiet**: to-dos in a hidden space stay off the notepad, the Today window, the Day ribbon and the Evening tidy-up, and their reminders don't ring on this Mac. `Peek` at the end of the list shows them again until the app restarts or you click `Hide again`. History still shows them.
+- **A new Today window**: the menu bar's Today window shows the event, timer and alarm as cards only when there is one, and lists up to seven to-dos. At the top it shows how many of today's to-dos are done, with a thin progress bar; click a to-do's name to open the notepad with that row selected.
+- **Spaces in search and History**: type `#Work report` in search (`⌘F`) to look only in that space's to-dos and History. Pick a space in `All spaces ▾` at the top of Desk → History to see only its finished to-dos and focus.
+- **Jongi-nyang for Claude**: Claude sees your to-dos by space, chooses the space for new ones, and shows a preview before moving one to another space. You can attach today's page, this week or a single note to a conversation (`@` in Claude Code).
+
 ### 🧺 Group by space · automatic backups (1.46)
 ![A wide notepad with today's to-dos grouped into one column per space](../docs/screenshots/mac/spaces2b-board.png)
 

@@ -11,6 +11,7 @@ import { parseMemos, serializeMemos, type Memo } from "../../src/core/memo";
 import { emptyMemoFolders, parseMemoFolders, serializeMemoFolders, type MemoFolders } from "../../src/core/memoDrawer";
 import { parseNotebook, serializeNotebook, type TodoItem } from "../../src/core/notebook";
 import { parseSeries, serializeSeries, type Series } from "../../src/core/repeat";
+import { emptyTodoSpaces, parseTodoSpaces, serializeTodoSpaces, type TodoSpaces } from "../../src/core/todoSpaces";
 import { takeLock } from "../../src/main/aiLock";
 import { appendSafely, entryAt, readBytesSafely, readTextIfSafe, RefusedFile, temporaryPath, writeNew } from "../../src/main/safeFiles";
 
@@ -102,6 +103,8 @@ type Kinds = {
   "memo-folders.json": MemoFolders;
   /** Repeating tasks: only read (N1). */
   "repeats.json": Series[];
+  /** 할 일 스페이스 (N3): the spaces and each to-do's place (written for a new to-do's space and a move after a yes). */
+  "todo-spaces.json": TodoSpaces;
 };
 export type DataFile = keyof Kinds;
 /** The lists updateAll hands over, by file. */
@@ -114,6 +117,7 @@ const formats: { [K in DataFile]: { empty: (lang: Lang) => Kinds[K]; parse: (tex
   "memos.json": { empty: () => [], parse: parseMemos, serialize: serializeMemos },
   "memo-folders.json": { empty: (lang) => emptyMemoFolders(lang), parse: (text, lang) => parseMemoFolders(text, lang), serialize: serializeMemoFolders },
   "repeats.json": { empty: () => [], parse: parseSeries, serialize: (series) => serializeSeries(series) },
+  "todo-spaces.json": { empty: () => emptyTodoSpaces(), parse: parseTodoSpaces, serialize: serializeTodoSpaces },
 };
 
 /**
@@ -221,8 +225,11 @@ export class Folder {
         const { changed, result } = change(lists as Lists);
         if (!changed) return result;
         const texts = names.map((name) => (formats[name].serialize as (value: unknown) => string)(lists[name]));
-        for (const name of names) raceForTests(this.at(name));
-        if (this.swap(names, firsts, texts)) return result;
+        // Only the files whose bytes change are written (a move between spaces reads todos.json and writes todo-spaces.json).
+        const writing = names.map((_, index) => index).filter((index) => !sameBytes(firsts[index], Buffer.from(texts[index], "utf8")));
+        if (writing.length === 0) return result;
+        for (const index of writing) raceForTests(this.at(names[index]));
+        if (this.swap(writing.map((index) => names[index]), writing.map((index) => firsts[index]), writing.map((index) => texts[index]))) return result;
       }
       throw new Busy(names[names.length - 1]);
     } finally {

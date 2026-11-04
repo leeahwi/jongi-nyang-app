@@ -47,14 +47,18 @@ struct DrawerTextView: NSViewRepresentable {
             let layout = MemoLayoutManager()
             // #132: TextKit 1 laid the words out from the top again whenever the view's frame was set or its display
             // marked (a long memo: 0.15–0.25 s more to open, the time the TextKit 2 view of 1.45 never paid);
-            // non-contiguous layout does only the part asked for. The height is still measured whole (sizeThatFits).
+            // non-contiguous layout does only the part asked for. A long memo's height isn't measured whole either
+            // (#209, sizeThatFits): nothing is laid out ahead in idle time, only what is shown or asked for.
             layout.allowsNonContiguousLayout = true
+            layout.backgroundLayoutEnabled = false
+            layout.delegate = context.coordinator
             storage.addLayoutManager(layout)
             let container = NSTextContainer(size: NSSize(width: 240, height: CGFloat.greatestFiniteMagnitude))
             layout.addTextContainer(container)
             // Born as wide as its container, not zero (the container follows the view's width).
             view = KeyTextView(frame: NSRect(x: 0, y: 0, width: container.size.width, height: 18), textContainer: container)
             layout.boxLook = { [weak view] at in MainActor.assumeIsolated { view?.boxLook(at: at) } }
+            view.drew = { [weak coordinator = context.coordinator] in coordinator?.laidOut() }
         } else {
             view = KeyTextView()
         }
@@ -73,8 +77,10 @@ struct DrawerTextView: NSViewRepresentable {
         view.isVerticallyResizable = false
         view.isHorizontallyResizable = false
         view.delegate = context.coordinator
+        context.coordinator.textView = view
         view.setAccessibilityLabel(accessibilityLabel)
         view.string = text
+        context.coordinator.shown = text
         context.coordinator.restyle(view, full: true)
         view.onSubmit = { context.coordinator.parent.onSubmit() }
         view.onEscape = { context.coordinator.parent.onEscape() }
@@ -100,10 +106,13 @@ struct DrawerTextView: NSViewRepresentable {
         coordinator.parent = self
         view.submitsOnReturn = submitsOnReturn
         view.extraMenu = extraMenu
-        if view.string != text, !view.hasMarkedText() {
+        // #3: against the coordinator's own copy of the words, not `view.string` (a bridged NSString: comparing a Korean
+        // memo with it went through Unicode normalization, 20 ms a key at 100 KB and 0.2 s at 1 MB).
+        if text != coordinator.shown, !view.hasMarkedText() {
             // From elsewhere (another device, a box ticked): taken, the caret kept where it was.
-            let caret = TextMerge.caret(view.selectedRange().location, from: view.string, to: text)
+            let caret = TextMerge.caret(view.selectedRange().location, from: coordinator.shown, to: text)
             view.string = text
+            coordinator.shown = text
             coordinator.restyle(view, full: true)
             view.setSelectedRange(NSRange(location: min(caret, (text as NSString).length), length: 0))
             view.invalidateIntrinsicContentSize()
@@ -120,19 +129,70 @@ struct DrawerTextView: NSViewRepresentable {
         let width = proposal.width ?? 240
         guard let container = view.textContainer, let layout = view.layoutManager else { return nil }
         container.containerSize = NSSize(width: width, height: .greatestFiniteMagnitude)
+        let words = view.textStorage?.string as NSString? ?? ""
+        if words.length > Self.wholeLayout, layout.allowsNonContiguousLayout {
+            // #209: a long memo (a 1 MB one took 2–3 s here) has only its first screens laid out; past them the height
+            // is TextKit's own estimate, where it would put the words it hasn't laid out yet. It follows as TextKit lays
+            // out more: the text scrolled into view, a key at the end (Coordinator's `laidOut`).
+            layout.ensureLayout(forBoundingRect: NSRect(x: 0, y: 0, width: width, height: Self.firstScreens), in: container)
+            let height = max(minHeight, ceil(layout.usedRect(for: container).height))
+            context.coordinator.estimated = (width, height)
+            return CGSize(width: width, height: height)
+        }
+        context.coordinator.estimated = nil
         layout.ensureLayout(for: container)
         var height = layout.usedRect(for: container).height
-        if view.string.isEmpty || view.string.hasSuffix("\n") {
+        if words.length == 0 || words.hasSuffix("\n") {
             let each = lineHeight ?? layout.defaultLineHeight(for: view.font ?? bodyFont)
-            height = max(height, each * CGFloat(max(1, view.string.components(separatedBy: "\n").count)))
+            height = max(height, each * CGFloat(max(1, words.components(separatedBy: "\n").count)))
         }
         return CGSize(width: width, height: max(minHeight, ceil(height)))
     }
 
+    /// #209: up to this many characters (UTF-16) the height is measured whole, every line laid out (about 0.1 s at
+    /// this length on a busy Mac); a longer memo gets its first `firstScreens` points laid out and the rest estimated.
+    static let wholeLayout = 20_000
+    static let firstScreens: CGFloat = 2_400
+
     @MainActor
-    final class Coordinator: NSObject, NSTextViewDelegate {
+    final class Coordinator: NSObject, NSTextViewDelegate, NSLayoutManagerDelegate {
         var parent: DrawerTextView
         var focused = 0
+        /// #209: a long memo's last height given (TextKit's estimate past what it has laid out) and the width it was for;
+        /// nil: measured whole.
+        var estimated: (width: CGFloat, height: CGFloat)?
+        private var heightAsked = false
+
+        /// The memo's text view (its layout manager tells this coordinator when it laid out more).
+        weak var textView: NSTextView?
+
+        /// TextKit laid out more of a long memo (asked for, or to draw what scrolled into view: KeyTextView's `drew`):
+        /// when that moved its estimate, the view asks for its height again, once, after this turn.
+        nonisolated func layoutManager(_ layoutManager: NSLayoutManager, didCompleteLayoutFor textContainer: NSTextContainer?, atEnd layoutFinishedFlag: Bool) {
+            MainActor.assumeIsolated { laidOut() }
+        }
+
+        /// Whether a long memo's estimate moved from the height last given (never when it was measured whole, nor at
+        /// another width).
+        private func heightMoved() -> Bool {
+            guard let estimated, let view = textView, let container = view.textContainer, let layout = view.layoutManager,
+                  abs(container.containerSize.width - estimated.width) < 0.5 else { return false }
+            return abs(max(parent.minHeight, ceil(layout.usedRect(for: container).height)) - estimated.height) >= 1
+        }
+
+        func laidOut() {
+            guard !heightAsked, heightMoved() else { return }
+            heightAsked = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.heightAsked = false
+                if self.heightMoved() { self.textView?.invalidateIntrinsicContentSize() }
+            }
+        }
+
+        /// The words the view shows (outside a syllable being composed), as a native Swift string: what the binding
+        /// and the model get, and what a text from elsewhere is compared with (#3).
+        var shown = ""
         /// What the keys changed since the last restyle: from `start` to `tail` characters before the end (both stay
         /// right as later keys move the text around them). nil: nothing yet.
         private var dirty: (start: Int, tail: Int)?
@@ -161,7 +221,10 @@ struct DrawerTextView: NSViewRepresentable {
             }
             let before = parent.text
             restyle(view)
-            let now = view.string
+            // #3: copied out of the text storage once (a bridged NSString would make every later comparison of the
+            // memo — SwiftUI's, the list's, the save's — a slow one through Unicode normalization).
+            let now = (view as? KeyTextView)?.native ?? view.string
+            shown = now
             parent.text = now
             parent.onEdit?(before, now)
             view.invalidateIntrinsicContentSize()
@@ -375,7 +438,7 @@ struct DrawerTextView: NSViewRepresentable {
                 let spaced = styler.text.paragraph > 0 && !isTitle && end < text.length
                     && TextSteps.endsParagraph(read.kind, next: Self.nextKind(text, end + 1, inBlock: after))
                 if bodyDone, !isTitle, !after, !shown, !spaced, read.kind == .blank || (read.kind == .text && !units.contains(where: Self.markish)
-                                                                          && !Checklist.isCode(String(decoding: units[..<read.end], as: UTF16.self))) {
+                                                                          && !Self.mayBeCode(units, read.end)) {
                     // A plain line in a whole restyle: the body's look is already on it.
                 } else {
                     styler.style(storage, units: units, read: read, range: range, whole: whole, title: isTitle ? title : nil, fenceAfter: after, reveal: shown,
@@ -394,6 +457,16 @@ struct DrawerTextView: NSViewRepresentable {
             var units = [UInt16](repeating: 0, count: end - at)
             if end > at { text.getCharacters(&units, range: NSRange(location: at, length: end - at)) }
             return MemoMarkdown.readLine(units, inBlock: inBlock).kind
+        }
+
+        /// Whether `Checklist.isCode` could say yes to the line's first `end` units (#209): a line with Hangul, without
+        /// `$` or `` ` `` and without four spaces or a tab in front, can't be an old code line, so it isn't made a String
+        /// to ask (a 1 MB memo's lines: 50 ms on ↩); any other line is asked.
+        private static func mayBeCode(_ units: [UInt16], _ end: Int) -> Bool {
+            let line = units[..<min(end, units.count)]
+            let indented = line.first == 0x09 || (line.count >= 4 && line.prefix(4).allSatisfy { $0 == 0x20 })
+            if !indented, !line.contains(0x24), !line.contains(0x60), line.contains(where: { (0xAC00...0xD7A3).contains($0) || (0x3131...0x318E).contains($0) }) { return false }
+            return Checklist.isCode(String(decoding: line, as: UTF16.self))
         }
 
         /// A character a mark could start with (a plain line without any, and not an old code line, needs no styling).
@@ -463,6 +536,59 @@ struct DrawerTextView: NSViewRepresentable {
 
         override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: NSView.noIntrinsicMetric) }
 
+        /// After each drawing (#209): what scrolled into view was laid out for it, which may move a long memo's height.
+        var drew: () -> Void = {}
+
+        override func draw(_ dirtyRect: NSRect) {
+            super.draw(dirtyRect)
+            drew()
+        }
+
+        /// #209: being taken out of the drawer (the memo put away), it isn't marked for display: with no view above it
+        /// to clip it, all of it counts as shown (an infinite visible rect), and a long memo laid out only in part was
+        /// laid out whole for that (1 MB: 1.2–1.7 s on Esc).
+        private var wasInWindow = false
+
+        override func viewDidMoveToWindow() {
+            if window != nil { wasInWindow = true }
+            super.viewDidMoveToWindow()
+        }
+
+        override func setNeedsDisplay(_ rect: NSRect, avoidAdditionalLayout flag: Bool) {
+            guard !(wasInWindow && visibleRect.isInfinite) else { return }
+            super.setNeedsDisplay(rect, avoidAdditionalLayout: flag)
+        }
+
+        /// The words as a native Swift string, copied out of the text storage (#3): `string` is the storage's NSString
+        /// bridged, and Swift's work on a long Korean one (comparing, searching, the edits below) goes through Unicode
+        /// normalization character by character. Copied in bulk (Foundation writes its UTF-8 in one go, Swift takes the
+        /// bytes as they are): about a millisecond for 1 MB, where `makeContiguousUTF8` and `String(decoding:as: UTF16)`
+        /// went a character at a time (35–40 ms).
+        var native: String {
+            guard let words = textStorage?.string as NSString? else { return string }
+            return Self.native(words)
+        }
+
+        static func native(_ words: NSString) -> String {
+            let length = words.length
+            guard length > 0 else { return "" }
+            let capacity = length * 3
+            var bytes = [UInt8](repeating: 0, count: capacity)
+            var used = 0
+            var rest = NSRange(location: 0, length: 0)
+            let whole = bytes.withUnsafeMutableBytes { raw in
+                words.getBytes(raw.baseAddress, maxLength: capacity, usedLength: &used, encoding: String.Encoding.utf8.rawValue,
+                               options: [], range: NSRange(location: 0, length: length), remaining: &rest)
+            }
+            // A lone surrogate (UTF-8 can't hold it): the slow copy, which writes U+FFFD for it as Swift always does.
+            guard whole, rest.length == 0 else {
+                var copy = words as String
+                copy.makeContiguousUTF8()
+                return copy
+            }
+            return bytes.withUnsafeBufferPointer { String(decoding: UnsafeBufferPointer(rebasing: $0[..<used]), as: UTF8.self) }
+        }
+
         // MARK: 메모 서식 (#84, 2026-10-30): keys, the Aa bar and paste, as MemoEdits says (one change, so one undo)
 
         /// An open memo: the formatting keys, ↩ that continues a list, Tab, ⌥↑↓ and the smart paste are on.
@@ -498,7 +624,7 @@ struct DrawerTextView: NSViewRepresentable {
         /// The Aa bar's buttons and the keys: on the selection, or at the caret (a line's format on the caret's line).
         func format(_ format: Format) {
             if format == .link, linkField() { return }
-            let text = string, range = selectedRange()
+            let text = native, range = selectedRange()
             let (from, to) = (range.location, NSMaxRange(range))
             let edit: MemoEdits.Edit = switch format {
             case .bold: MemoEdits.wrap(text, from: from, to: to, mark: "**")
@@ -524,7 +650,7 @@ struct DrawerTextView: NSViewRepresentable {
         private func linkField() -> Bool {
             guard let askLink, !hasMarkedText() else { return false }
             let range = selectedRange(), (from, to) = (range.location, NSMaxRange(range))
-            if let link = MemoEdits.linkAt(string, from: from, to: to) {
+            if let link = MemoEdits.linkAt(native, from: from, to: to) {
                 askLink(MemoDrawer.LinkEdit(from: from, to: to, url: link.url, existing: true))
                 return true
             }
@@ -548,10 +674,10 @@ struct DrawerTextView: NSViewRepresentable {
             case ([.command, .option], "c"), ([.command, .option], "ç"): format(.code)
             case ([.command, .shift], "l"): format(.check)
             // The caret's box ticked or unticked (#133; Apple Notes' 체크 표시), as a click on it: one undo.
-            case ([.command, .shift], "u"): apply(MemoEdits.tickAtCaret(string, from: range.location, to: NSMaxRange(range), moveDone: doneToBottom()))
+            case ([.command, .shift], "u"): apply(MemoEdits.tickAtCaret(native, from: range.location, to: NSMaxRange(range), moveDone: doneToBottom()))
             case ([.command, .shift], "r"): toggleMarks()
             case ([.command, .control], let digit) where ["0", "1", "2", "3"].contains(digit):
-                apply(MemoEdits.heading(string, from: range.location, to: NSMaxRange(range), level: Int(digit)!))
+                apply(MemoEdits.heading(native, from: range.location, to: NSMaxRange(range), level: Int(digit)!))
             case ([.command, .option, .shift], "v"), ([.command, .option, .shift], "◊"):
                 if let plain = NSPasteboard.general.string(forType: .string) { insertText(plain, replacementRange: range) }
             default:
@@ -563,13 +689,13 @@ struct DrawerTextView: NSViewRepresentable {
         /// Tab · ⇧Tab: a list a step in or out (elsewhere Tab puts two spaces, ⇧Tab moves on as before).
         override func insertTab(_ sender: Any?) {
             let range = selectedRange()
-            if formats, apply(MemoEdits.indent(string, from: range.location, to: NSMaxRange(range), out: false)) { return }
+            if formats, apply(MemoEdits.indent(native, from: range.location, to: NSMaxRange(range), out: false)) { return }
             super.insertTab(sender)
         }
 
         override func insertBacktab(_ sender: Any?) {
             let range = selectedRange()
-            if formats, apply(MemoEdits.indent(string, from: range.location, to: NSMaxRange(range), out: true)) { return }
+            if formats, apply(MemoEdits.indent(native, from: range.location, to: NSMaxRange(range), out: true)) { return }
             super.insertBacktab(sender)
         }
 
@@ -577,7 +703,7 @@ struct DrawerTextView: NSViewRepresentable {
         override func paste(_ sender: Any?) {
             let range = selectedRange()
             if formats, let pasted = NSPasteboard.general.string(forType: .string),
-               apply(MemoEdits.paste(string, from: range.location, to: NSMaxRange(range), pasted: pasted)) { return }
+               apply(MemoEdits.paste(native, from: range.location, to: NSMaxRange(range), pasted: pasted)) { return }
             super.paste(sender)
         }
 
@@ -650,7 +776,7 @@ struct DrawerTextView: NSViewRepresentable {
         /// with 끝낸 항목 아래로 the line moves only after that, the tick undone and made again with the move so the two
         /// stay one undo. Reduce motion: one change at once, as before.
         private func tickBox(line: Int, at: Int) {
-            let range = selectedRange(), before = string
+            let range = selectedRange(), before = native
             let move = doneToBottom()
             guard !Motion.reduced, SlipMotion.enabled, let storage = textStorage else {
                 apply(MemoEdits.tick(before, line: line, from: range.location, to: NSMaxRange(range), moveDone: move))
@@ -744,7 +870,7 @@ struct DrawerTextView: NSViewRepresentable {
                 let range = selectedRange()
                 // ↩ continues a list, a checklist, a number or a quote (⇧↩: a plain new line in the same item).
                 if event.keyCode == UInt16(kVK_Return), mods.isEmpty,
-                   apply(MemoEdits.enter(string, from: range.location, to: NSMaxRange(range))) { return }
+                   apply(MemoEdits.enter(native, from: range.location, to: NSMaxRange(range))) { return }
                 if event.keyCode == UInt16(kVK_Return), mods == .shift {
                     insertText("\n", replacementRange: range)
                     return
@@ -752,7 +878,7 @@ struct DrawerTextView: NSViewRepresentable {
                 // ⌥↑ · ⌥↓: the caret's line (or the lines chosen) up or down.
                 if mods == .option,
                    event.keyCode == UInt16(kVK_UpArrow) || event.keyCode == UInt16(kVK_DownArrow) {
-                    apply(MemoEdits.moveLines(string, from: range.location, to: NSMaxRange(range), up: event.keyCode == UInt16(kVK_UpArrow)))
+                    apply(MemoEdits.moveLines(native, from: range.location, to: NSMaxRange(range), up: event.keyCode == UInt16(kVK_UpArrow)))
                     return
                 }
             }

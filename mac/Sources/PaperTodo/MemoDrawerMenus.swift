@@ -36,6 +36,9 @@ struct DrawerMenuItem {
     var key: (String, NSEvent.ModifierFlags)?
     /// Drawn only (the menu can't take it: ↩, ⌘⌫ are the drawer's own keys).
     var keyText: String?
+    /// #185: a plain key (a digit) that picks the row too while its menu is open — a hidden twin of the row with that key,
+    /// so the row still shows its own shortcut. Only an open menu takes it: typing anywhere else is left alone.
+    var digit: String?
     var checked = false
     var destructive = false
     /// The header's title as a quiet grey line in the system's face (a memo's title, #104: it only says what the menu
@@ -402,6 +405,14 @@ enum DrawerMenuBuilder {
                 row.attributedTitle = NSAttributedString(string: item.title, attributes: [.font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.systemRed])
             }
             menu.addItem(row)
+            if let digit = item.digit {
+                let twin = DrawerNSMenuItem(item.title, run: item.action)
+                twin.keyEquivalent = digit
+                twin.keyEquivalentModifierMask = []
+                twin.isHidden = true
+                twin.allowsKeyEquivalentWhenHidden = true
+                menu.addItem(twin)
+            }
         }
     }
 

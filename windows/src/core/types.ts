@@ -8,6 +8,7 @@ import type { PomodoroSettings, TimerCommand } from "./focusTimer";
 import type { RepeatRule, Series } from "./repeat";
 import type { NoteTab } from "./shelf";
 import type { CalendarView } from "./calendar";
+import type { StoredRules } from "./spaceDevice";
 import type { LocalEvent } from "./events";
 import type { Lang, LanguageSetting } from "./lang";
 import type { Alarm } from "./alarm";
@@ -168,6 +169,12 @@ export interface Prefs {
   spaceGroupStyle: SpaceGroupStyle;
   spaceGroupsFolded: string[];
   spaceGroupsDoneOpen: string[];
+  /** 기기마다 보일 스페이스 (#196), this PC's: 이 기기에서 per space (`none`: 일반) — 숨기기 or 시간 정하기; a space with no entry
+   *  shows. Never in todo-spaces.json. */
+  spaceDevice: StoredRules;
+  /** D10: when a space was last made visible here by a change of `spaceDevice` (ISO time): reminders from before stay
+   *  quiet. Kept by the main process. */
+  spaceDeviceShown: Record<string, string>;
 }
 
 /** 2b: how 오늘's groups look — F 묶음 메모지 (the default) or E 책갈피 머리말. */
@@ -276,6 +283,8 @@ export const defaultPrefs: Prefs = {
   spaceGroupStyle: "card",
   spaceGroupsFolded: [],
   spaceGroupsDoneOpen: [],
+  spaceDevice: {},
+  spaceDeviceShown: {},
 }
 
 export function pomodoroSettings(prefs: Prefs): PomodoroSettings {
@@ -394,6 +403,8 @@ export interface AppState {
   todoSpaces: TodoSpaces;
   /** Each to-do's live space: `<todo id>\t<space id>` lines (packSpaceOf; read with spaceIndexOf). */
   spaceOf: string;
+  /** 잠깐 보기 (#196, D6): hidden spaces the note shows anyway, until the app quits or 다시 숨기기 (not saved). */
+  devicePeek: string[];
   /** Where the list lives: "이 PC (기본)" or the shared folder (home shortened to ~). */
   /** Where everything is kept: the folder (todos, memos, repeats) and its archive folder for the record. */
   /** `home`: the home folder, said as ~ in the storage pane (1.30). */
@@ -537,9 +548,12 @@ export type IntentRequest =
   | { op: "commit"; candidate: WireCandidate; page: IntentPage; from: "note" | "quick" | "glance"; candidates?: WireCandidate[]; text?: string; /** A to-do's space (`#회사`, the lens). */ space?: SpaceChoice }
   | { op: "undo"; made: IntentMade }
   | { op: "learn"; key?: string; from: IntentKind; to: IntentKind };
-export interface IntentResult { made?: IntentMade; error?: string; /** 빠른 입력: the note is up and shows the toast itself. */ inNote?: boolean }
+export interface IntentResult {
+  made?: IntentMade; error?: string; /** 빠른 입력: the note is up and shows the toast itself. */ inNote?: boolean;
+  /** #196 (D12): the to-do went where this PC hides it — that space's name, for the toast. */ hiddenIn?: string;
+}
 /** The note shows the toast for a line put in from 빠른 입력. */
-export interface IntentToast { made: IntentMade; candidates: WireCandidate[]; index: number; text: string; space?: SpaceChoice }
+export interface IntentToast { made: IntentMade; candidates: WireCandidate[]; index: number; text: string; space?: SpaceChoice; /** #196: the space it went into, hidden here. */ hiddenIn?: string }
 
 export interface PopupPayload {
   tasks: PopupTask[];
@@ -718,6 +732,8 @@ export type Action =
   | { type: "moveMany"; ids: string[]; targetID: string; after: boolean }
   | { type: "restoreOrder"; ids: string[]; previous: string[] }
   | { type: "spaceLens"; space?: string }
+  /** #196 잠깐 보기 (D6): the hidden spaces the note shows anyway; none ends it (다시 숨기기). */
+  | { type: "spacePeek"; spaces: string[] }
   /** The desk's 스페이스 pane (스페이스 관리…). */
   | { type: "openSpaces" }
   /** Text to the clipboard (a memo's 복사). */

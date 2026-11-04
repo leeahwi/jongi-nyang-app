@@ -1,0 +1,49 @@
+{
+  "about": "오늘 창 공유 사례 (#200, docs/plans/today-window.md). layout: 채워진 칸(일정 · 타이머 · 알람)만 카드이고 빈 칸은 칩이에요. 차례는 늘 일정 · 타이머 · 알람이고, 카드가 하나면 넓은 카드(wide)예요. rowCap: 쓸 수 있는 높이(room, 메뉴 막대 아래 · 작업 영역, pt · px)에서 창의 나머지 360을 빼고 줄 높이 32로 나눈 만큼, 3과 7 사이. room이 없으면 7. slots: ‘다음’ 줄 수(next, 이미 3 이하)와 그 밖의 끝내지 않은 할 일 수(others), 줄 수 상한(cap)에서 ‘그 밖에’ 줄 수(rest)와 ‘외 N개’의 N(hidden). ‘다음’도 상한에 들어가고, 하나만 남으면 ‘외 1개’ 대신 그 줄을 보여요. progress: 머리의 진행 말(오늘 탭의 할 일 total, 그중 끝낸 done). null이면 날짜만 있어요. dates: 머리의 날짜는 4시 규칙의 하루예요. chips: 빈 칸 칩의 말. Mac TodayGlance(layout · rowCap · slots · progressText · headerDate · chipText), Windows core/glance.ts(glanceLayout · glanceRowCap · glanceSlots · glanceProgress · glanceDate · glanceChip)가 이 파일을 읽어요.",
+  "layout": [
+    { "case": "L1 아무것도 없으면 칩 셋만", "filled": [], "cards": [], "chips": ["event", "timer", "alarm"], "wide": false },
+    { "case": "L2 모두 채우면 카드 셋", "filled": ["event", "timer", "alarm"], "cards": ["event", "timer", "alarm"], "chips": [], "wide": false },
+    { "case": "L3 알람만: 넓은 카드 하나와 칩 둘", "filled": ["alarm"], "cards": ["alarm"], "chips": ["event", "timer"], "wide": true },
+    { "case": "L4 일정과 타이머: 카드 둘, 칩 하나", "filled": ["timer", "event"], "cards": ["event", "timer"], "chips": ["alarm"], "wide": false },
+    { "case": "L5 타이머만", "filled": ["timer"], "cards": ["timer"], "chips": ["event", "alarm"], "wide": true },
+    { "case": "L6 일정과 알람: 차례는 그대로", "filled": ["alarm", "event"], "cards": ["event", "alarm"], "chips": ["timer"], "wide": false }
+  ],
+  "rowCap": [
+    { "case": "C1 높이를 모르면 7", "room": null, "cap": 7 },
+    { "case": "C2 큰 화면 7", "room": 1000, "cap": 7 },
+    { "case": "C3 600이면 7", "room": 600, "cap": 7 },
+    { "case": "C4 560이면 6", "room": 560, "cap": 6 },
+    { "case": "C5 500이면 4", "room": 500, "cap": 4 },
+    { "case": "C6 400이면 3", "room": 400, "cap": 3 },
+    { "case": "C7 아주 짧아도 3", "room": 200, "cap": 3 }
+  ],
+  "slots": [
+    { "case": "R1 사용자 화면: 다음 없이 9개면 7줄 + 외 2개", "next": 0, "others": 9, "cap": 7, "rest": 7, "hidden": 2 },
+    { "case": "R2 8개면 외 1개 대신 8줄", "next": 0, "others": 8, "cap": 7, "rest": 8, "hidden": 0 },
+    { "case": "R3 7개면 7줄", "next": 0, "others": 7, "cap": 7, "rest": 7, "hidden": 0 },
+    { "case": "R4 다음 3 + 10개: 3 + 4 + 외 6개", "next": 3, "others": 10, "cap": 7, "rest": 4, "hidden": 6 },
+    { "case": "R5 다음 1 + 11개: 1 + 6 + 외 5개", "next": 1, "others": 11, "cap": 7, "rest": 6, "hidden": 5 },
+    { "case": "R6 다음 2 + 3개: 모두", "next": 2, "others": 3, "cap": 7, "rest": 3, "hidden": 0 },
+    { "case": "R7 할 일 없음", "next": 0, "others": 0, "cap": 7, "rest": 0, "hidden": 0 },
+    { "case": "R8 짧은 화면(3줄): 다음 3이면 그 밖에는 외 5개", "next": 3, "others": 5, "cap": 3, "rest": 0, "hidden": 5 },
+    { "case": "R9 짧은 화면(3줄): 하나 남으면 그 줄", "next": 3, "others": 1, "cap": 3, "rest": 1, "hidden": 0 },
+    { "case": "R10 짧은 화면(3줄): 다음 없이 5개면 3줄 + 외 2개", "next": 0, "others": 5, "cap": 3, "rest": 3, "hidden": 2 }
+  ],
+  "progress": [
+    { "case": "P1 할 일이 없으면 날짜만", "total": 0, "done": 0, "ko": null, "en": null, "nl": null },
+    { "case": "P2 하나도 안 끝냄", "total": 9, "done": 0, "ko": "할 일 9개", "en": "9 to-dos", "nl": "9 taken" },
+    { "case": "P3 하나", "total": 1, "done": 0, "ko": "할 일 1개", "en": "1 to-do", "nl": "1 taak" },
+    { "case": "P4 몇 개 끝냄", "total": 11, "done": 2, "ko": "11개 중 2개 끝냈어요", "en": "2 of 11 done", "nl": "2 van 11 klaar" },
+    { "case": "P5 다 끝냄", "total": 4, "done": 4, "ko": "4개 다 끝냈어요", "en": "All 4 done", "nl": "Alle 4 klaar" },
+    { "case": "P6 하나를 끝냄", "total": 1, "done": 1, "ko": "다 끝냈어요", "en": "Done", "nl": "Klaar" }
+  ],
+  "dates": [
+    { "case": "D1 오후: 오늘", "at": [2026, 11, 3, 14, 20], "ko": "11월 3일 화요일", "en": "Tuesday, November 3", "nl": "dinsdag 3 november" },
+    { "case": "D2 새벽 1시 반은 아직 어제(4시 규칙)", "at": [2026, 11, 3, 1, 30], "ko": "11월 2일 월요일", "en": "Monday, November 2", "nl": "maandag 2 november" }
+  ],
+  "chips": {
+    "event": { "ko": "오늘 일정 없음", "en": "No events today", "nl": "Geen afspraken" },
+    "timer": { "ko": "‘타이머 25’", "en": "‘timer 25’", "nl": "‘timer 25’" },
+    "alarm": { "ko": "‘알람 7시’", "en": "‘alarm 7am’", "nl": "‘wekker 7:00’" }
+  }
+}

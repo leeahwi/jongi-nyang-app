@@ -8,7 +8,7 @@
 
 macOS · Windows · 무료 · 계정 없이
 
-[**Mac 내려받기**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.46.0) &nbsp;·&nbsp; [**Windows 내려받기**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.31.0) &nbsp;·&nbsp; [소개 페이지](https://leeahwi.github.io/jongi-nyang-app/) &nbsp;·&nbsp; [English](README.en.md)
+[**Mac 내려받기**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.47.0) &nbsp;·&nbsp; [**Windows 내려받기**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.32.0) &nbsp;·&nbsp; [소개 페이지](https://leeahwi.github.io/jongi-nyang-app/) &nbsp;·&nbsp; [English](README.en.md)
 
 [![Mac](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=mac-*&label=Mac&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![Windows](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=windows-*&label=Windows&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![CI](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml/badge.svg)](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml)
 
@@ -16,7 +16,7 @@ macOS · Windows · 무료 · 계정 없이
 
 <img src="site/assets/og-ko.png" width="100%" alt="종이냥 노트 세 장: Mac 낮 화면, Mac 밤 화면, Windows 화면">
 
-할 일, 일정, 메모, 집중 타이머를 작은 노트 하나에 모으고, 화면 아래의 종이 고양이가 알림을 전합니다. Mac과 Windows 앱이 같은 파일 형식을 써서, 동기화 폴더 하나로 두 컴퓨터가 같은 목록을 씁니다. [29초 소개 영상](site/assets/promo-ko.mp4)
+할 일, 일정, 메모, 집중 타이머를 작은 노트 하나에 모으고, 화면 아래의 종이 고양이가 알림을 전합니다. Mac과 Windows 앱이 같은 파일 형식을 써서, 동기화 폴더 하나로 두 컴퓨터가 같은 목록을 씁니다. [40초 소개 영상](site/assets/promo-ko.mp4)
 
 ## 왜 만들었나
 
@@ -77,6 +77,14 @@ macOS · Windows · 무료 · 계정 없이
 
 <img src="docs/screenshots/mac/spaces2b-board.png" width="800" alt="넓은 노트에서 오늘 할 일을 회사, 집, 공부, 일반 네 칸으로 묶어 본 모습">
 
+### 기기마다 보일 스페이스
+
+1.47(Windows 1.32)부터 공유 폴더로 여러 기기가 같은 목록을 써도 기기마다 보일 스페이스를 정합니다. 책상 → 스페이스에서 줄 오른쪽의 `이 기기에서` 팝업으로 스페이스를 숨기거나, 요일과 시간을 정해 그 시간에만 보이게 합니다. 숨긴 스페이스의 할 일은 노트, 오늘 창, 하루 띠, 저녁 정리에 나오지 않고 그 기기에서는 알림도 울리지 않습니다. 목록 끝의 `잠깐 보기`로 다시 볼 수 있고, 완료 기록에는 그대로 남습니다. 찾기에서는 `#회사 보고서`처럼 적어 한 스페이스에서만 찾고, 완료 기록도 스페이스별로 거릅니다.
+
+메뉴 막대(Windows는 알림 영역)의 오늘 창도 새로 짰습니다. 일정, 타이머, 알람은 있을 때만 칸으로 보이고, 할 일은 일곱 줄까지 보이며, 맨 위에 오늘 끝낸 수와 얇은 진행 막대가 있습니다.
+
+<img src="docs/screenshots/mac/spaces-device-desk.png" width="800" alt="책상 → 스페이스에서 회사는 이 기기에서 숨기고 공부는 평일 시간대에만 보이게 정한 모습">
+
 ### 종이 고양이
 
 완료를 축하하고 알림을 전하며, 가끔 단추로 답하는 질문을 건넵니다. 낮과 밤 종이, 한국어 · 영어 · 네덜란드어 화면이 있습니다.
@@ -90,6 +98,8 @@ macOS · Windows · 무료 · 계정 없이
 
 Claude 데스크톱이나 Claude Code와 대화하면서 할 일, 일정, 메모를 보고, 넣고, 확인을 받은 뒤 고칩니다. 책상 → AI 연결에서 켜며 기본은 꺼져 있습니다. 따로 도는 서버는 없습니다.
 
+1.47(Windows 1.32)부터 Claude가 할 일을 스페이스별로 보고, 넣을 스페이스를 정하고, 미리보기를 보여 준 뒤 다른 스페이스로 옮깁니다. 오늘 한 장, 이번 주, 메모 한 장을 대화에 자료로 붙일 수도 있습니다(Claude Code에서는 `@`).
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/readme/cards/claude-ko-dark.png">
   <img src="docs/readme/cards/claude-ko-light.png" width="800" alt="책상의 AI 연결 칸">
@@ -101,8 +111,8 @@ Claude 데스크톱이나 Claude Code와 대화하면서 할 일, 일정, 메모
 
 ## 설치
 
-- **macOS** 14 이상, Apple Silicon — [v1.46.0 DMG](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.46.0)를 열어 앱을 응용 프로그램 폴더로 옮깁니다. Intel Mac은 소스에서 빌드합니다.
-- **Windows** 10/11, x64 — [v1.31.0](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.31.0)의 설치 파일(`.exe`)을 실행하거나 ZIP을 풀어 씁니다.
+- **macOS** 14 이상, Apple Silicon — [v1.47.0 DMG](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.47.0)를 열어 앱을 응용 프로그램 폴더로 옮깁니다. Intel Mac은 소스에서 빌드합니다.
+- **Windows** 10/11, x64 — [v1.32.0](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.32.0)의 설치 파일(`.exe`)을 실행하거나 ZIP을 풀어 씁니다.
 - 내려받은 파일은 릴리스의 `SHA256SUMS` 파일과 대어 확인할 수 있습니다. macOS는 `shasum -a 256 파일`, Windows PowerShell은 `Get-FileHash 파일 -Algorithm SHA256`으로 값을 봅니다.
 - 다른 버전은 [릴리스 목록](https://github.com/leeahwi/jongi-nyang-app/releases)에 있습니다.
 
@@ -113,7 +123,7 @@ macOS 배포본은 Developer ID 서명과 공증을 받지 않았고, Windows �
 데이터는 사용자가 선택한 폴더에 JSON 등의 파일로 저장합니다. 별도 계정이나 자체 서버는 필요하지 않습니다.
 
 - **저장 위치 변경:** 앱의 **책상 → 저장과 백업**에서 폴더를 선택합니다.
-- **기기 간 공유:** iCloud Drive, OneDrive, Dropbox 등의 동기화 폴더를 선택하면 macOS와 Windows에서 같은 데이터를 사용할 수 있습니다. 파일 전달은 해당 클라우드 서비스가 담당합니다.
+- **기기 간 공유:** iCloud Drive, OneDrive, Dropbox 등의 동기화 폴더를 선택하면 macOS와 Windows에서 같은 데이터를 사용할 수 있습니다. 파일 전달은 해당 클라우드 서비스가 담당합니다. 어떤 스페이스를 보일지는 기기마다 따로 정하며(1.47, Windows 1.32), 이 설정은 공유 폴더의 파일을 바꾸지 않습니다.
 - **자동 백업:** 하루 한 번, 그리고 가져오기나 되돌리기처럼 덮어쓰기 전마다 저장 폴더를 `.jongi` 파일로 남깁니다(1.46, Windows 1.31). 백업은 저장 폴더가 아니라 이 컴퓨터의 `backups` 폴더에 쌓이고, **책상 → 저장과 백업**에서 무엇을 되돌릴지 골라 되돌립니다.
 - **백업과 이전:** 할 일, 메모와 메모 폴더, 일정, 알람, 완료 기록과 집중 기록을 `.jongi` 파일로 내보내고 다른 기기에서 가져옵니다.
 - **파일:** 할 일은 `todos.json`, 메모는 `memos.json`, 메모 서랍의 폴더 · 고정 · 정렬 · 메모의 종이는 `memo-folders.json`, 할 일 스페이스는 `todo-spaces.json`, 지운 메모는 `memo-trash.json`에 있습니다. AI 연결 설정(`ai-link.json`)과 Claude가 한 일의 기록(`ai-log.jsonl`)은 공유 폴더를 써도 각 기기의 설정 폴더에 둡니다.

@@ -120,4 +120,74 @@ public enum TodayGlance {
     static func minutes(from now: Date, to date: Date) -> Int {
         max(1, Int((date.timeIntervalSince(now) / 60).rounded(.up)))
     }
+
+    // MARK: Layout (#200, docs/plans/today-window-cases.json — the Windows app's core/glance.ts reads the same file)
+
+    /// The three cards, always in this order.
+    public enum CardKind: String, CaseIterable, Sendable { case event, timer, alarm }
+
+    /// Which cards take full size (those with something in them) and which shrink to a chip in one quiet row.
+    public struct Layout: Equatable, Sendable {
+        public var cards: [CardKind]
+        public var chips: [CardKind]
+        /// One card alone lies flat across the window (its time and line side by side).
+        public var wide: Bool { cards.count == 1 }
+    }
+
+    public static func layout(filled: Set<CardKind>) -> Layout {
+        Layout(cards: CardKind.allCases.filter { filled.contains($0) }, chips: CardKind.allCases.filter { !filled.contains($0) })
+    }
+
+    /// The most to-do rows (다음 and 그 밖에 together), the fewest a short screen keeps, a row's height, and the rest of
+    /// the window (header, cards, input line, links, margins) that `rowCap` takes off the room first.
+    public static let rowLimit = 7
+    public static let rowFloor = 3
+    public static let rowHeight = 32.0
+    static let rowChrome = 360.0
+
+    /// How many rows fit in `room` (the screen's height under the menu bar), between 3 and 7; 7 when it isn't known.
+    public static func rowCap(room: Double?) -> Int {
+        guard let room else { return rowLimit }
+        return min(rowLimit, max(rowFloor, Int(((room - rowChrome) / rowHeight).rounded(.down))))
+    }
+
+    /// 그 밖에's rows and the 외 N개 left out: 다음 (already three at most) counts toward `cap`; one left over is shown
+    /// instead of ‘외 1개’ (the link would take about the same room as the row).
+    public static func slots(next: Int, others: Int, cap: Int) -> (rest: Int, hidden: Int) {
+        var room = max(0, cap - next)
+        if others == room + 1 { room += 1 }
+        let rest = min(others, room)
+        return (rest, others - rest)
+    }
+
+    /// The header's progress: "할 일 9개" · "11개 중 2개 끝냈어요" · "4개 다 끝냈어요"; nil with no to-dos (the date alone).
+    public static func progressText(total: Int, done: Int, language: AppLanguage) -> String? {
+        guard total > 0 else { return nil }
+        if done == 0 {
+            switch language {
+            case .ko: return "할 일 \(total)개"
+            case .en: return AppLanguage.plural(total, "to-do", "to-dos")
+            case .nl: return AppLanguage.plural(total, "taak", "taken")
+            }
+        }
+        if done >= total {
+            if total == 1 { return ["다 끝냈어요", "Done", "Klaar"][language.index] }
+            return ["\(total)개 다 끝냈어요", "All \(total) done", "Alle \(total) klaar"][language.index]
+        }
+        return ["\(total)개 중 \(done)개 끝냈어요", "\(done) of \(total) done", "\(done) van \(total) klaar"][language.index]
+    }
+
+    /// The header's date, as the note's header: "11월 3일 화요일" — the logical day (before 4 a.m. still yesterday).
+    public static func headerDate(_ now: Date, calendar: Calendar = .paper, language: AppLanguage) -> String {
+        language.longDate(Archive.logicalDayStart(now, calendar: calendar), calendar: calendar)
+    }
+
+    /// An empty card's chip: "오늘 일정 없음" · "No events today" · "Geen afspraken"; the timer's and the alarm's what to type.
+    public static func chipText(_ kind: CardKind, language: AppLanguage) -> String {
+        switch kind {
+        case .event: ["오늘 일정 없음", "No events today", "Geen afspraken"][language.index]
+        case .timer: timerHint(language)
+        case .alarm: alarmHint(language)
+        }
+    }
 }

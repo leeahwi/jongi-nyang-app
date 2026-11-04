@@ -2,7 +2,7 @@
 // --demo run (its own throwaway folder) on tools/perf-data.mjs's set with memos.json and memo-folders.json from
 // tools/memo-stress-data.mjs; measured over the DevTools protocol like tools/perf.mjs. Tiers: 50 500 2000 5000 long
 // (default: all). `long` adds memos of 10 KB, 100 KB and 1 MB and a 2,000-line checklist to 500 memos.
-//   node tools/perf-memo.mjs [tier …] [--out=file.json]
+//   node tools/perf-memo.mjs [tier …] [--out=file.json] [--app=<folder>]   (--app: another build on the same data, to alternate with)
 // Per tier: the drawer's first open and reopen, idle CPU with it open, scrolling the list (frame times), opening the top
 // memo, typing in it (each key to its frame) and the redraw when the keys pause (long tasks), memory. Every window off every
 // screen (PAPERTODO_OFFSCREEN); on a Mac a window on a screen stops the run (tools/offscreen-watch.mjs, #92).
@@ -74,7 +74,7 @@ async function launch(name, memoOptions) {
   const debugPort = portBase++;
   const inspectPort = portBase++;
   const started = Date.now();
-  const child = spawn(electronBinary, [root, "--demo", `--remote-debugging-port=${debugPort}`, `--inspect=${inspectPort}`, `--user-data-dir=${path.join(folder, "user-data")}`, "--disable-backgrounding-occluded-windows"], {
+  const child = spawn(electronBinary, [option("app") ?? root, "--demo", `--remote-debugging-port=${debugPort}`, `--inspect=${inspectPort}`, `--user-data-dir=${path.join(folder, "user-data")}`, "--disable-backgrounding-occluded-windows"], {
     env: { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== "ELECTRON_RUN_AS_NODE")), PAPERTODO_NO_SHORTCUTS: "1", PAPERTODO_OFFSCREEN: "1", PAPERTODO_DEMO_DATA: data, PAPERTODO_LANG: "ko", TMPDIR: tmp },
     stdio: ["ignore", "ignore", "pipe"],
   });
@@ -232,7 +232,9 @@ for (const tier of tiers) {
       await sleep(800);
       await watchLong(page);
       // Something changed while it was closed (a memo from another window): the reopen redraws the list.
-      await evaluate(page, `(window.__shown = undefined, document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") requestAnimationFrame(() => setTimeout(() => { window.__shown = performance.timeOrigin + performance.now(); }, 0)); }, { once: true }), true)`);
+      // Off-screen runs keep the page "visible" while the window is hidden (no background throttling), so the redraw is
+      // seen as the page's first change after the open, then the frame after it.
+      await evaluate(page, `(window.__shown = undefined, window.__reopen?.disconnect(), window.__reopen = new MutationObserver(() => { window.__reopen.disconnect(); requestAnimationFrame(() => setTimeout(() => { window.__shown = performance.timeOrigin + performance.now(); }, 0)); }), window.__reopen.observe(document.body, { childList: true, subtree: true, characterData: true }), true)`);
       const started = await evaluate(run.main, `Date.now()`);
       await act(run.note, { type: "drawer", command: "open" });
       if (await until(page, "window.__shown !== undefined")) reopen.push((await evaluate(page, `window.__shown`)) - started);
@@ -267,6 +269,38 @@ for (const tier of tiers) {
       await page.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
       await sleep(1000);
     }
+    // #166 M3 · M4: a card opened in the middle of the view — what moves (only cards in view, once, every animation with
+    // an end) and what the click costs with the movement; then a memo written in the quick-write slip rises in, once.
+    await ensureOpen(run, page);
+    out.motion = await evaluate(page, `new Promise((resolve) => {
+      const list = document.querySelector(".list");
+      list.scrollTop = 0;
+      requestAnimationFrame(() => {
+        const view = list.getBoundingClientRect();
+        const cards = [...list.querySelectorAll(":scope > .it")].filter((card) => { const r = card.getBoundingClientRect(); return r.top >= view.top && r.bottom <= view.bottom; });
+        const target = cards[Math.min(1, cards.length - 1)];
+        if (!target) return resolve(null);
+        const start = performance.now();
+        target.click();
+        const sync = performance.now() - start;
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          const all = document.getAnimations();
+          const cardsMoving = all.filter((a) => a.effect?.target?.classList?.contains("it") && !a.effect.target.classList.contains("open")).length;
+          const fading = all.filter((a) => a.animationName === "memo-open-in").length;
+          resolve({ openSyncMs: Math.round(sync * 10) / 10, cardsInView: cards.length, cardsMoving, fading, endless: all.filter((a) => a.effect?.getComputedTiming().endTime === Infinity).length });
+        }));
+      });
+    })`);
+    await sleep(600);
+    await page.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+    await page.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+    await sleep(800);
+    await evaluate(page, `(window.__arrived = undefined, window.__arriving?.disconnect(), window.__arriving = new MutationObserver(() => { const card = document.querySelector(".list > .it.arrive"); if (card) { window.__arriving.disconnect(); window.__arrived = { rising: card.getAnimations().length, endless: card.getAnimations().filter((a) => a.effect?.getComputedTiming().endTime === Infinity).length }; } }), window.__arriving.observe(document.querySelector(".list"), { childList: true, subtree: true, attributes: true, attributeFilter: ["class"] }), true)`);
+    await evaluate(page, `window.paper.act({ type: "drawerWrite", text: "새로 적은 메모", view: ${JSON.stringify("inbox")} })`);
+    await until(page, "window.__arrived !== undefined", 5000);
+    out.motion = { ...out.motion, arrived: await evaluate(page, "window.__arrived ?? null") };
+    log(tier, "motion: a card opened in view · a new memo (#166)", out.motion);
+    await sleep(600);
     if (tier === "long") {
       await ensureOpen(run, page);
       await watchLong(page);

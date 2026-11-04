@@ -15,7 +15,7 @@ import { call, connect, event, logOf, setup, task, todos, writeTodos } from "./h
 /**
  * The new shared cases of docs/plans/mcp-plan.md §3.6 on the bundled server: M19–M23 (finding tasks, repeats,
  * the memo drawer), M36 (prompts), M38 (result shapes and typed changes), M40 (short ids) and M41 (the
- * extension's version). M39 is size.test.ts; M24–M31, M35 and M37 come with spaces 2c and later steps.
+ * extension's version). M39 is size.test.ts; M24–M27 are spaces.test.ts and M37 resources.test.ts (spaces 2c); M29–M31 and M35 come later.
  * Fictional data only, in temporary folders.
  */
 
@@ -218,7 +218,7 @@ test("M38: every tool says its result's shape; a change's fields are typed per k
   const preview = tools.find((tool) => tool.name === "preview_changes")!;
   const items = ((preview.inputSchema.properties as Record<string, { items: { oneOf?: { properties: { set: { properties: Record<string, unknown>; additionalProperties: unknown } } }[] } }>).changes).items;
   assert.equal(items.oneOf?.length, 2, "one shape per kind, inside the item");
-  assert.deepEqual(Object.keys(items.oneOf![0].properties.set.properties).sort(), ["date", "done", "later", "remindAt", "timeEnd", "timeStart", "title"]);
+  assert.deepEqual(Object.keys(items.oneOf![0].properties.set.properties).sort(), ["date", "done", "later", "remindAt", "space", "timeEnd", "timeStart", "title"]);
   assert.deepEqual(Object.keys(items.oneOf![1].properties.set.properties).sort(), ["allDay", "date", "days", "end", "location", "start", "title"]);
   assert.equal(items.oneOf![0].properties.set.additionalProperties, false);
   // An event has no `done`; a task's time is HH:mm.

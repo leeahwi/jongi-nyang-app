@@ -50,7 +50,13 @@
 | 노트 글자 크기 일곱 칸 | 작게 · 조금 작게 · **보통** · 조금 크게 · 크게 · 더 크게 · 아주 크게 | Small · Slightly smaller · Regular · Slightly larger · Large · Larger · Extra large | Klein · Iets kleiner · Normaal · Iets groter · Groot · Groter · Extra groot | 슬라이더 오른쪽의 칸 이름. 서랍은 이름 대신 숫자(12–20). |
 | 서랍 글의 간격 | **줄 간격** (촘촘하게 · 보통 · 넉넉하게) · **문단 간격** (보통 · 넓게 · 아주 넓게) | Line spacing (Tight · Regular · Loose) · Paragraph spacing (Regular · Wide · Wider) | Regelafstand (Krap · Normaal · Ruim) · Alinea-afstand (Normaal · Breed · Extra breed) | 메모 서랍 → 메모 글꼴. 노트는 44 줄 노트라 없어요. |
 | 여러 줄을 함께 고르기 | ⌘-클릭 · ⇧-클릭 (Windows Ctrl · Shift) · ⇧↑↓ | ⌘-click · ⇧-click · ⇧↑↓ | ⌘-klik · ⇧-klik · ⇧↑↓ | #168. 도움말 제목 ‘여러 할 일을 한 번에 옮기기’ · Moving several to-dos at once · Meerdere taken tegelijk verplaatsen. 고른 상태는 ‘고른 줄’이라고 불러요(‘선택’ ✗). |
+| 찾기에서 한 스페이스만 | **찾기의 #이름** · #회사처럼 적으면 그 스페이스에서만 찾아요 | #name in search · Type #Work to look in that space only | #naam bij zoeken · Typ #Werk om alleen in die ruimte te zoeken | 2c(C1–C4). 검색 쪽지의 빈 칸 안내 둘째 줄(첫 스페이스의 이름). 도움말 → 할 일 스페이스의 제목도 같아요. |
 | 여러 개를 옮긴 뒤 | 3개를 집으로 옮겼어요 · 되돌리기 | Moved 3 to Home · Undo | 3 verplaatst naar Thuis · Herstel (Windows: Ongedaan maken) | 하나일 때는 지금처럼 ‘집으로 옮겼어요’. 끄는 그림의 배지는 ‘3개’ · ‘3’ · ‘3’. |
+| 기기마다 정하는 스페이스의 보이기 | **이 기기에서**: 보이기 · 숨기기 · 시간 정하기… | On this device: Show · Hide · Set times… | Op dit apparaat: Tonen · Verbergen · Tijden instellen… | 책상 → 스페이스의 줄 오른쪽 팝업. 이 기기의 설정이에요(공유 폴더에 쓰지 않아요). 줄 아래 상태는 ‘이 기기에서 숨겨 뒀어요’ · Hidden on this device · Verborgen op dit apparaat, 시간이면 ‘평일 09:00–18:00에만 · 지금 보여요’. ‘한 스페이스만 보기’(렌즈)와 다른 기능이라 ‘거르기’라고 부르지 않아요. |
+| 메뉴의 빠른 숨기기와 숨긴 묶음 | **이 기기에서 숨기기 ▸** · **이 기기에서 숨김** | Hide on this device ▸ · Hidden on this device | Verbergen op dit apparaat ▸ · Verborgen op dit apparaat | ‘모든 스페이스 ▾’ 메뉴. 숨긴 스페이스 줄의 오른쪽 말은 ‘보이기’(누르면 늘 보여요). |
+| 시간 정하기 쪽지 | 회사를 이 기기에서 보일 시간 · **+ 시간 더하기** · 다음 날 · 하루 전체 | When Work shows on this device · + Add a time · next day · all day | Wanneer Werk zichtbaar is op dit apparaat · + Tijd toevoegen · volgende dag · hele dag | 바로 고르기 칩: 평일 근무 9–18 · 평일 저녁 19–23 · 주말(Workdays 9–6 · Weekday evenings 7–11 · Weekends / Werkdagen 9–18 · Doordeweekse avonden 19–23 · Weekend). 요일 묶음은 매일 · 평일 · 주말(every day · weekdays · weekends / elke dag · doordeweeks · weekend). |
+| 숨긴 것을 잠시 보기 | **잠깐 보기** · **다시 숨기기** | Peek · Hide again | Even kijken · Weer verbergen | 목록 끝 ‘회사는 이 기기에서 숨겨 뒀어요 · 잠깐 보기’(Work is hidden on this device · Peek). 앱을 다시 켜거나 다시 숨기기를 누를 때까지예요. 찾기 결과의 표시는 ‘숨김’ · Hidden · Verborgen. |
+| 숨긴 곳에 넣은 뒤 | 회사에 넣었어요 · 이 기기에서는 숨겨져 있어요 · 되돌리기 | Added to Work · hidden on this device · Undo | Toegevoegd aan Werk · verborgen op dit apparaat · Herstel (Windows: Ongedaan maken) | 입력 줄의 `#회사` 또는 넣는 곳이 숨어 있을 때의 토스트. |
 
 ## 쪽지의 버튼
 

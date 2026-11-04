@@ -152,11 +152,18 @@ struct SearchView: View {
     private func results(_ groups: [(group: Search.Group, hits: [Search.Hit])], picked: Int) -> some View {
         let trimmed = searched.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
-            Text(L("초성으로도 찾을 수 있어요 (예: ㅂㄱㅅ → 보고서)"))
-                .font(.system(size: 12))
-                .foregroundStyle(PaperTheme.ink3)
-                .padding(.horizontal, 18)
-                .padding(.top, 12)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(L("초성으로도 찾을 수 있어요 (예: ㅂㄱㅅ → 보고서)"))
+                // Spaces 2c (C4): how `#` narrows it, with the first space's name.
+                if let first = model.todoSpaces.visible.first {
+                    Text(SpaceWords.searchHint(first.name, language: .current))
+                }
+            }
+            .font(.system(size: 12))
+            .foregroundStyle(PaperTheme.ink3)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 18)
+            .padding(.top, 12)
         } else if groups.isEmpty {
             HStack(spacing: 10) {
                 PetArt.image(.curious).map { Image(nsImage: $0).resizable().scaledToFit().frame(width: 40, height: 40) }
@@ -177,7 +184,8 @@ struct SearchView: View {
                             GroupHeader(title: group.group.title(.current), count: group.hits.count, leading: 18)
                                 .padding(.top, index == 0 ? 4 : 10)
                             ForEach(Array(group.hits.enumerated()), id: \.offset) { row, hit in
-                                SearchRow(hit: hit, font: model.notebookFont, picked: offsets[index] + row == picked)
+                                SearchRow(hit: hit, font: model.notebookFont, picked: offsets[index] + row == picked,
+                                          hiddenHere: (hit.group == .today || hit.group == .ahead) && UUID(uuidString: hit.id).map(model.hidesHere(id:)) == true)
                                     .id(offsets[index] + row)
                                     .onTapGesture { openHit(hit) }
                             }
@@ -204,7 +212,11 @@ struct SearchView: View {
         onClose()
         switch hit.group {
         case .today, .ahead:
-            if let id = UUID(uuidString: hit.id) { model.reveal(id) }
+            if let id = UUID(uuidString: hit.id) {
+                // #196: a to-do this Mac hides opens 잠깐 보기 for its space.
+                if model.hidesHere(id: id) { model.peekHidden([SpaceDevice.key(model.spaceOf(id)?.id)]) }
+                model.reveal(id)
+            }
         case .memos:
             // 1.43: in 메모 서랍, opened at it.
             model.revealMemo(hit.id)
@@ -232,6 +244,8 @@ final class SearchResults {
         var folders: MemoFolders
         var events: [LocalEvent]
         var history: [ArchiveEntry]
+        /// Spaces 2c: what `#회사` names and each to-do's place.
+        var spaces: TodoSpaces
         /// Today by the 4 a.m. rule, and by the clock (a date's year).
         var day: String
         var date: String
@@ -248,24 +262,27 @@ final class SearchResults {
         guard !query.isEmpty else { return [] }
         let calendar = Calendar.paper
         let key = Key(items: model.items, memos: model.memos, folders: model.memoFolders, events: model.calendar.events, history: history,
-                      day: Archive.dayKey(now, calendar: calendar), date: CalendarDraft.day(now, calendar: calendar), language: .current,
+                      spaces: model.todoSpaces, day: Archive.dayKey(now, calendar: calendar), date: CalendarDraft.day(now, calendar: calendar), language: .current,
                       calendar: calendar)
         if key != self.key {
             self.key = key
             found = [:]
         }
         if let known = found[query] { return known }
-        let words = Search.Query(query)
+        // Spaces 2c (C1–C3): `#회사` keeps to that space's to-dos and record lines; the rest of the words are looked for.
+        let reading = Search.spaceReading(query, spaces: key.spaces)
+        let only = Search.only(reading, spaces: key.spaces)
+        let words = Search.Query(reading.words)
         let today = calendar.startOfDay(for: Archive.logicalDayStart(now, calendar: calendar))
-        let events = key.events.filter { event in
+        let events = only != nil ? [] : key.events.filter { event in
             Search.match(words, in: event.title) != nil || (event.location.map { Search.match(words, in: $0) != nil } ?? false)
         }.map { event in
             Search.EventEntry(id: event.id, title: event.title, date: nextDay(event, today: today, calendar: calendar), location: event.location)
         }
         var folders: [String: String] = [:]
         for memo in key.memos { if let name = model.memoFolderName(memo.id) { folders[memo.id] = name } }
-        let groups = Search.find(query, items: key.items, memos: key.memos, history: history, events: events, now: now, calendar: calendar,
-                                 language: key.language, memoFolders: folders, index: index)
+        let groups = Search.find(reading.words, items: key.items, memos: key.memos, history: history, events: events, now: now, calendar: calendar,
+                                 language: key.language, memoFolders: folders, index: index, only: only)
         if found.count > 64 { found = [:] }
         found[query] = groups
         return groups
@@ -298,20 +315,31 @@ private struct SearchRow: View {
     let hit: Search.Hit
     let font: NotebookFont
     let picked: Bool
+    /// #196: a to-do in a space this Mac hides — faint, with a small ‘숨김’.
+    var hiddenHere = false
     @State private var hovering = false
 
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: symbol)
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(hit.done ? PaperTheme.ink3 : PaperTheme.ink2)
+                .foregroundStyle(hit.done || hiddenHere ? PaperTheme.ink3 : PaperTheme.ink2)
                 .frame(width: 16)
             Text(highlighted)
                 .font(font.bodyFont(.small))
-                .foregroundStyle(hit.done ? PaperTheme.ink3 : PaperTheme.ink)
+                .foregroundStyle(hit.done || hiddenHere ? PaperTheme.ink3 : PaperTheme.ink)
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity, alignment: .leading)
+            if hiddenHere {
+                Text(SpaceDevice.Words.hiddenTag.text(.current))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(PaperTheme.ink3)
+                    .padding(.horizontal, 5)
+                    .frame(height: 16)
+                    .overlay { RoundedRectangle(cornerRadius: 5, style: .continuous).strokeBorder(PaperTheme.rule, lineWidth: 1) }
+                    .fixedSize()
+            }
             if !hit.detail.isEmpty {
                 Text(hit.detail)
                     .font(.system(size: 11, weight: .medium).monospacedDigit())

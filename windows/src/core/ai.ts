@@ -1,6 +1,7 @@
 import { dayKey } from "./archive";
 import { isoDate } from "./notebook";
 import type { Lang } from "./lang";
+import { spaceOf, type TodoSpaces } from "./todoSpaces";
 
 /**
  * 종이냥 for Claude (1.27): the extension Claude starts (mcp/) reads and writes the same files as the app,
@@ -21,12 +22,13 @@ export const aiLockFileName = "ai-write.lock";
 
 /**
  * The extension's own small version (I1, docs/plans/mcp-plan.md): 1 before it had one, 2 since pages, memo
- * folders and prompts. The app writes the one it carries into ai-link.json and the extension writes its own
+ * folders and prompts, 3 since the to-do spaces (N3-8: an app that writes 3 can undo a move between spaces, so the
+ * extension moves to-dos only for it). The app writes the one it carries into ai-link.json and the extension writes its own
  * into each log line, so the extension can say when Claude Desktop's installed copy is older than the app,
  * and the app can say so in 설정 › AI 연결. The Mac's AIConnect.extVersion is the same number (the Mac ships
  * this extension).
  */
-export const aiExtVersion = 2;
+export const aiExtVersion = 3;
 
 export interface AiLink {
   v: 1;
@@ -78,7 +80,9 @@ export function aiOffText(lang: Lang): string {
 
 export type AiKind = "add" | "change" | "undo";
 export type AiTarget = "todos" | "events" | "memos";
-export type AiFile = "todos.json" | "events.json" | "memos.json";
+/** `todo-spaces.json` (spaces 2c, N3-6): a to-do's place, logged by the to-do's id as `{id, space, at}` (`{id, space: null}` when it had none). */
+export type AiFile = "todos.json" | "events.json" | "memos.json" | "todo-spaces.json";
+export const aiPlacesFile = "todo-spaces.json" as const;
 export type AiItem = Record<string, unknown> & { id: string };
 
 /** One item as it was and as it became; null before = added, null after = taken out (an undo of an add). */
@@ -106,7 +110,8 @@ export interface AiLogEntry {
 
 function readChange(value: unknown): AiChange | undefined {
   if (!isObject(value) || typeof value.id !== "string") return undefined;
-  const file = value.file === "todos.json" || value.file === "events.json" || value.file === "memos.json" ? value.file : undefined;
+  // M28: a file this version doesn't know (a newer extension's) is left out; the rest of the line still reads.
+  const file = value.file === "todos.json" || value.file === "events.json" || value.file === "memos.json" || value.file === aiPlacesFile ? value.file : undefined;
   const item = (side: unknown): AiItem | null | undefined => (side === null || side === undefined ? null : isObject(side) && typeof side.id === "string" ? side as AiItem : undefined);
   const before = item(value.before), after = item(value.after);
   if (!file || before === undefined || after === undefined) return undefined;
@@ -212,7 +217,7 @@ export function trimAiLog(text: string, now: Date, maxBytes = 1_000_000, days = 
 
 // ─── Comparing and undoing ────────────────────────────────────────────────────
 
-const targetOf: Record<AiFile, AiTarget> = { "todos.json": "todos", "events.json": "events", "memos.json": "memos" };
+const targetOf: Record<AiFile, AiTarget> = { "todos.json": "todos", "events.json": "events", "memos.json": "memos", "todo-spaces.json": "todos" };
 export const aiTargetOf = (file: AiFile): AiTarget => targetOf[file];
 
 /**
@@ -242,10 +247,26 @@ export function sameSaved(target: AiTarget, a: Record<string, unknown> | null | 
   return savedKeys[target].every((key) => sameField(a[key], b[key], dateKeys.has(key)));
 }
 
+/** A place (N3-7) compared by the space a person sees: no entry, `space: null` and a deleted space are all 일반. */
+const placeSpace = (value: Record<string, unknown> | null | undefined): string | null => (typeof value?.space === "string" && value.space ? value.space : null);
+
+/** A to-do's place as the undo and the stamps compare it: `{id, space}` with its live space (null for 일반). */
+export const placeNow = (data: TodoSpaces, id: string): AiItem => ({ id, space: spaceOf(data, id) ?? null });
+
+/** One change compared with the item (or the place) as it is now: the fields a person sees, the space for a place. */
+export function sameAs(change: Pick<AiChange, "file">, target: AiTarget, a: Record<string, unknown> | null | undefined, b: Record<string, unknown> | null | undefined): boolean {
+  return change.file === aiPlacesFile ? placeSpace(a) === placeSpace(b) : sameSaved(target, a, b);
+}
+
 /** What undoing one change does to the item as it is now (undefined: not there). */
 export type UndoStep = { kind: "restore"; item: AiItem } | { kind: "remove" } | { kind: "alreadyBack" } | { kind: "changedSince" };
 
 export function undoStep(change: AiChange, target: AiTarget, current: Record<string, unknown> | undefined): UndoStep {
+  if (change.file === aiPlacesFile) {
+    // A place: the to-do's live space (`placeNow`) against Claude's after and before.
+    if (sameAs(change, target, current, change.after)) return sameAs(change, target, current, change.before) ? { kind: "alreadyBack" } : { kind: "restore", item: change.before ?? { id: change.id, space: null } };
+    return sameAs(change, target, current, change.before) ? { kind: "alreadyBack" } : { kind: "changedSince" };
+  }
   if (sameSaved(target, current, change.after)) {
     if (change.before) return sameSaved(target, current, change.before) ? { kind: "alreadyBack" } : { kind: "restore", item: change.before };
     return current ? { kind: "remove" } : { kind: "alreadyBack" };
@@ -277,26 +298,88 @@ export function undoEntry<T extends { id: string }>(items: readonly T[], entry: 
   return { items: written.length ? next : [...items], undone, left, written };
 }
 
+/**
+ * Spaces 2c (N3-7, S57–S59): a to-dos entry taken back item by item, each whole or not at all — when any of a to-do's
+ * changes (its fields in todos.json, its place in todo-spaces.json) was changed since, all of them stay and it counts as
+ * left. A place whose to-do is gone, or that the same undo takes out, counts as back and writes nothing. Changes of a file
+ * this version doesn't know are not read (M28). `items` are todos.json's list now, `spaces` todo-spaces.json now; what
+ * comes back is the new list, the places to move (`moves`, each to-do's space before — null for 일반 — to apply with
+ * `moveTodo` on the file as it is then) and, for the undo's own log line, what was written. Counts are of to-dos.
+ */
+export function undoTodoEntry<T extends { id: string }>(items: readonly T[], spaces: TodoSpaces, entry: AiLogEntry):
+  { items: T[]; moves: { id: string; space: string | null }[]; undone: number; left: number; written: AiChange[] } {
+  const groups = new Map<string, AiChange[]>();
+  for (const change of entry.changes) {
+    if (change.file !== "todos.json" && change.file !== aiPlacesFile) continue;
+    const key = change.id.toUpperCase();
+    groups.set(key, [...(groups.get(key) ?? []), change]);
+  }
+  const next = [...items];
+  const moves: { id: string; space: string | null }[] = [];
+  const written: AiChange[] = [];
+  let undone = 0, left = 0;
+  for (const [key, changes] of groups) {
+    const index = next.findIndex((item) => item.id.toUpperCase() === key);
+    const current = index >= 0 ? next[index] as unknown as AiItem : undefined;
+    const steps = changes.map((change) => {
+      if (change.file !== aiPlacesFile) return undoStep(change, "todos", current);
+      return current ? undoStep(change, "todos", placeNow(spaces, current.id)) : { kind: "alreadyBack" } as UndoStep;
+    });
+    if (steps.some((step) => step.kind === "changedSince")) { left += 1; continue; }
+    undone += 1;
+    const removed = steps.some((step) => step.kind === "remove");
+    changes.forEach((change, position) => {
+      const step = steps[position];
+      if (change.file === aiPlacesFile) {
+        if (step.kind !== "restore" || removed || !current) return;
+        const space = placeSpace(step.item);
+        moves.push({ id: current.id, space });
+        written.push({ file: aiPlacesFile, id: change.id, before: placeNow(spaces, current.id), after: { id: change.id, space } });
+        return;
+      }
+      if (step.kind === "remove") {
+        const at = next.findIndex((item) => item.id.toUpperCase() === key);
+        if (at >= 0) next.splice(at, 1);
+        written.push({ file: change.file, id: change.id, before: current ? { ...current } : null, after: null });
+      } else if (step.kind === "restore") {
+        const at = next.findIndex((item) => item.id.toUpperCase() === key);
+        if (at >= 0) next[at] = { ...step.item } as unknown as T; else next.push({ ...step.item } as unknown as T);
+        written.push({ file: change.file, id: change.id, before: current ? { ...current } : null, after: { ...step.item } });
+      }
+    });
+  }
+  return { items: written.some((change) => change.file === "todos.json") ? next : [...items], moves, undone, left, written };
+}
+
 /** To-do ids are UUIDs, compared upper-cased; events keep theirs. */
 export const markId = (id: string, target: AiTarget): string => (target === "todos" ? id.toUpperCase() : id);
 
 /**
  * The rows that get the small stamp: to-dos and events Claude added or changed today (the 4 a.m. day), not
- * taken back, and still as Claude left them — an edit (here or elsewhere) takes the stamp away. `current`
- * finds an item as it is now.
+ * taken back, and still as Claude left them — an edit (here or elsewhere) takes the stamp away; with several
+ * changes (its fields and its place, N3-7), every one still as Claude left it. `current` finds an item as it is
+ * now, or (`file` todo-spaces.json) a to-do's place as `placeNow` gives it.
  */
-export function aiMarks(entries: readonly AiLogEntry[], now: Date, current: (target: AiTarget, id: string) => Record<string, unknown> | undefined): Set<string> {
+export function aiMarks(entries: readonly AiLogEntry[], now: Date, current: (target: AiTarget, id: string, file: AiFile) => Record<string, unknown> | undefined): Set<string> {
   const today = dayKey(now);
   const undone = undoneIds(entries);
-  const last = new Map<string, { target: AiTarget; change: AiChange }>();
+  const last = new Map<string, { target: AiTarget; changes: Map<AiFile, AiChange> }>();
   for (const entry of entries) {
     if (dayKey(new Date(entry.at)) !== today) continue;
-    if (entry.kind === "undo") { for (const change of entry.changes) if (!change.after) last.delete(markId(change.id, entry.target)); continue; }
+    if (entry.kind === "undo") { for (const change of entry.changes) if (!change.after && change.file !== aiPlacesFile) last.delete(markId(change.id, entry.target)); continue; }
     if (!isAiWork(entry) || entry.target === "memos" || undone.has(entry.id)) continue;
-    for (const change of entry.changes) if (change.after) last.set(markId(change.id, entry.target), { target: entry.target, change });
+    for (const change of entry.changes) {
+      if (!change.after) continue;
+      const id = markId(change.id, entry.target);
+      const known = last.get(id) ?? { target: entry.target, changes: new Map<AiFile, AiChange>() };
+      known.changes.set(change.file, change);
+      last.set(id, known);
+    }
   }
   const marks = new Set<string>();
-  for (const [id, { target, change }] of last) if (sameSaved(target, current(target, change.id), change.after)) marks.add(id);
+  for (const [id, { target, changes }] of last) {
+    if ([...changes.values()].every((change) => sameAs(change, target, current(target, change.id, change.file), change.after))) marks.add(id);
+  }
   return marks;
 }
 

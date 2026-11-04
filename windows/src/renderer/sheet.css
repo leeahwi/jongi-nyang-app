@@ -104,8 +104,12 @@
 .search-text { flex: 1; min-width: 0; padding-inline-end: var(--ink-over); font-family: var(--body-font); font-size: calc(var(--body-size) * 0.86); line-height: 1.25; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 :root[data-font="clean"] .search-text { font-size: 14px; }
 .search-row.done .search-text { color: var(--ink-3); }
+/* #196: a to-do this PC hides — faint, with a small ‘숨김’. */
+.search-row.hidden-here .search-text { color: var(--ink-3); }
+.search-hidden { flex: none; height: 16px; padding: 0 5px; border-radius: 5px; box-shadow: inset 0 0 0 1px var(--rule); font: 600 10px/16px var(--ui); color: var(--ink-3); white-space: nowrap; }
 .search-text mark { background: var(--sage-2); color: inherit; border-radius: 3px; padding: 0 0.12em; margin: 0 -0.06em; }
 .search-meta { flex: none; font: 500 11px var(--ui); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .search-more { padding: 4px 8px 2px; font: 500 11px var(--ui); color: var(--ink-3); }
 .search-empty { flex: none; padding: 8px 16px 6px; font: 500 12px var(--ui); color: var(--ink-3); line-height: 1.45; }
+.search-empty .search-hint { display: block; margin-top: 2px; }
 .search-foot { padding-top: 8px; border-top: 1px solid var(--rule); }

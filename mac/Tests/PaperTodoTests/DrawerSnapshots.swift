@@ -134,6 +134,35 @@ extension DesignSnapshots {
             drawer.closeTrash()
         }
 
+        // #198: the cards' preview lines in the words' face — 기본 글씨, 손글씨 펜 and 손글씨 붓 on 낮 종이 and 먹색 종이, at
+        // 300 and at the narrowest (260); and 찾기's found line in each. Drawn once (the day run); PAPERTODO_ONLY=card-font
+        // draws only these.
+        if !night {
+            drawer.nightPaper = false
+            for face in [MemoText.Face.clean, .pen, .brush] {
+                drawer.bodyFace = face
+                for theme in [MemoDrawer.Theme.day, .ink] {
+                    drawer.theme = theme
+                    for width: CGFloat in [300, 260] {
+                        reset()
+                        drawer.width = width
+                        try shot("card-font-\(face.rawValue)-\(theme.rawValue)\(width == 260 ? "-260" : "")", size(width))
+                    }
+                }
+                drawer.theme = .day
+                reset()
+                drawer.startSearch()
+                drawer.query = "QA"
+                try shot("card-font-\(face.rawValue)-search", size())
+                drawer.endSearch()
+            }
+            drawer.bodyFace = .clean
+            drawer.nightPaper = true
+            drawer.theme = .day
+            reset()
+        }
+        if only.contains("card-font") { return }
+
         // The list (③ 날짜 묶음 + 카드) in every paper (#142: 한지 · 쑥색 · 벚꽃 · 먹색 too), each as it is (밤에는 밤 종이로
         // off): groups, chips, the pinned group; then the checklist open.
         drawer.nightPaper = false
@@ -208,6 +237,11 @@ extension DesignSnapshots {
         reset()
         drawer.edit("deploy")
         try shot("editing-check-mid-\(paper)", size())
+        // #211 (site video): the same tick fully drawn, then the words after it, the item faint and gone to the bottom.
+        MemoLayoutManager.previewLook = (index: 2, look: 1)
+        reset()
+        drawer.edit("deploy")
+        try shot("editing-check-ticked-\(paper)", size())
         MemoLayoutManager.previewLook = nil
         reset()
         // #113: 크게 보기 widens the drawer (a 1440-wide screen: 640) and counts the letters.
@@ -532,6 +566,18 @@ extension DesignSnapshots {
                                choices: [.init(title: L("나중에"), isCancel: true), .init(title: L("서랍 열기"), role: .primary, isDefault: true)],
                                cat: .curious, width: .medium) { _ in },
                  to: output.appendingPathComponent("drawer-move-notice.png"))
+
+        // #211 (site video): after the tick, the item done (faint, struck) and down at the bottom of the list, read
+        // (no caret, so every line shows its box). Drawn last: the change stamps the memo with the real time (its
+        // ‘고침’ time is now, as in the app), so no other picture may come after it.
+        if let before = model.memos.first(where: { $0.id == "deploy" })?.text {
+            model.updateMemo("deploy", text: MemoEdits.toggleDone(before, line: 3, moveDone: true), from: before)
+            drawer.theme = .day
+            drawer.nightPaper = true
+            reset()
+            drawer.expand("deploy")
+            try shot("editing-check-done-\(paper)", size())
+        }
     }
 
     /// The text menu of a memo being typed, as the app makes it: a real text view's menu for a right-click (the

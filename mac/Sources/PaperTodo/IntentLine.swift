@@ -150,6 +150,15 @@ extension AppModel {
                                text: Intent.addedText(candidate, language: language, now: now),
                                emphasis: Intent.addedEmphasis(candidate, language: language))
         toast.commit = commit
+        // #196 (D12): a to-do put where this Mac hides it — said, with 되돌리기 for a slip of the line.
+        if case .todo(let id) = commit.made, let hidden = addedHiddenText(space: spaceIndex[id]?.id) {
+            toast.symbol = "eye.slash"
+            toast.text = hidden
+            toast.emphasis = nil
+            toast.action = L("되돌리기")
+            toast.perform = { [weak self] in self?.takeBack(commit); onChange(nil) }
+            return toast
+        }
         switch candidate {
         case .memo where commit.nextIndex == nil:
             // 1.43: memos live in 메모 서랍 — 열기 opens it on the new memo (⌘Z still takes it back).

@@ -1,4 +1,5 @@
 import { readLine, type LineKind } from "./memoMarkdown";
+import type { DrawerFont } from "./types";
 
 /**
  * 글꼴 설정 (#141, docs/plans/settings-plan.md F1 · F2): the size steps of the note and the drawer, how a 1.30 setting
@@ -69,6 +70,44 @@ export function drawerMetrics(points: number, line: LineSpacing = "regular", par
   const height = Math.round(body * lineFactor[line]);
   const preview = drawerPreview(body);
   return { body, line: height, paragraph: Math.round(height * paragraphLines[paragraph]), preview, previewLine: Math.round((preview * 20) / 13) };
+}
+
+// ─── The drawer's faces (메모 글꼴) ─────────────────────────────────────────────
+
+/**
+ * The size a drawer face draws words of `size` at: the handwriting faces as much larger as the notebook's (pen 23 : 15,
+ * brush 22 : 15), so they read as large as the plain face; 고정폭 a pixel under; the plain face as it is.
+ */
+export const faceSize = (face: DrawerFont, size: number): number =>
+  face === "pen" ? Math.round((size * 23) / 15) : face === "brush" ? Math.round((size * 22) / 15) : face === "mono" ? Math.round(size - 1) : size;
+
+export interface FaceMetrics { size: number; previewSize: number; previewLine: number }
+
+/**
+ * What one face draws with (#198): the body's size, and a card's preview in the same face (its size scaled as the
+ * body's) on the preview's lines. The Korean pen and brush fit the preview's lines at every step; the Latin pen (Caveat,
+ * English and Dutch) reaches higher and lower than its size, so its preview lines are a quarter taller (보통 20 → 25) —
+ * its letters neither touch the next line's nor are cut at the card's last line.
+ */
+export function drawerFaceMetrics(points: number, face: DrawerFont, latin: boolean): FaceMetrics {
+  const metrics = drawerMetrics(points);
+  const line = face === "pen" && latin ? Math.round(metrics.previewLine * 1.25) : metrics.previewLine;
+  return { size: faceSize(face, metrics.body), previewSize: faceSize(face, metrics.preview), previewLine: line };
+}
+
+/** The settings a closed card's look follows (a card of the drawer's list is kept from one redraw to the next, #4). */
+export interface CardFaceSettings { drawerFont: DrawerFont; drawerTextPt: number; drawerLineHeight: string; drawerParagraph: string; drawerCodeFont: string }
+
+/**
+ * #4 · #198: what every closed card's preview is drawn with — the words' face, its size and lines (drawerFaceMetrics) and
+ * the code face — as one key. The drawer keeps its cards while this key stays; when it changes, every card is made
+ * again, so none keeps the size it had in the old face (an off-screen card is laid out at its last size until it is
+ * drawn again, and the list's height follows it).
+ */
+export function cardFaceKey(settings: CardFaceSettings, latin: boolean): string {
+  const faced = drawerFaceMetrics(settings.drawerTextPt, settings.drawerFont, latin);
+  return [settings.drawerFont, settings.drawerTextPt, faced.size, faced.previewSize, faced.previewLine, settings.drawerLineHeight, settings.drawerParagraph,
+    settings.drawerCodeFont].join("|");
 }
 
 // ─── Paragraphs ──────────────────────────────────────────────────────────────

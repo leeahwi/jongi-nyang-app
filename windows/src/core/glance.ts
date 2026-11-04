@@ -1,6 +1,7 @@
 import { daysText, nextAlarm, timeParts, type Alarm } from "./alarm";
+import { logicalDayStart } from "./archive";
 import type { CalendarEvent } from "./calendar";
-import { clock, dayWord, langIndex, weekdayShort, type Lang } from "./lang";
+import { clock, dayWord, langIndex, longDate, plural, weekdayShort, type Lang } from "./lang";
 import type { TodoItem } from "./notebook";
 import { awayText, upNext } from "./ribbon";
 
@@ -136,16 +137,17 @@ function dayText(now: Date, date: Date, lang: Lang): string {
 }
 
 /**
- * The three cards: the next timed event (from `events`, occurrences from now on), the timer, the
- * next alarm that is on. A card whose thing is within the hour, and a running timer, is hot.
+ * The three cards: the next timed event left today (from `events`; #200: today's only, as on the Mac — the window is
+ * 오늘 창), the timer, the next alarm that is on. A card whose thing is within the hour, and a running timer, is hot.
  */
 export function glanceCards(events: readonly CalendarEvent[], timer: GlanceTimer | undefined, alarms: readonly Alarm[], handled: ReadonlySet<string>, now: Date, lang: Lang = "ko"): GlanceCard[] {
   const index = langIndex(lang);
   const at = now.getTime();
+  const dayEnd = logicalDayStart(now).getTime() + 24 * 3_600_000;
   const card = (kind: GlanceCardKind, fields: Omit<GlanceCard, "kind" | "label">): GlanceCard => ({ kind, label: cardLabels[kind][index], ...fields });
   const empty = (kind: GlanceCardKind) => card(kind, { big: "—", small: emptyLines[kind][index], hot: false, empty: true });
 
-  const next = events.filter((event) => !event.allDay && event.start.getTime() > at).sort((a, b) => a.start.getTime() - b.start.getTime())[0];
+  const next = events.filter((event) => !event.allDay && event.start.getTime() > at && event.start.getTime() < dayEnd).sort((a, b) => a.start.getTime() - b.start.getTime())[0];
   const eventCard = next ? card("event", {
     big: clock(next.start.getHours(), next.start.getMinutes(), lang),
     small: daysFrom(now, next.start) === 0
@@ -175,16 +177,66 @@ export function glanceCards(events: readonly CalendarEvent[], timer: GlanceTimer
 }
 
 /**
- * Today's tasks for the window: 다음 (open reminders later today, by time, at most three), then up
- * to `more` other open tasks in the list's order, and how many open ones are left out (외 N개).
+ * Today's tasks for the window: 다음 (open reminders later today, by time, at most three), then the other open tasks
+ * in the list's order up to `cap` rows in all (#200, `glanceSlots`), and how many open ones are left out (외 N개).
  */
-export function glanceTasks(today: readonly TodoItem[], now: Date, more = 3): { next: TodoItem[]; rest: TodoItem[]; hidden: number } {
+export function glanceTasks(today: readonly TodoItem[], now: Date, cap = glanceRowLimit): { next: TodoItem[]; rest: TodoItem[]; hidden: number } {
   const open = today.filter((item) => !item.isCompleted);
   const next = upNext(open, now);
   const ids = new Set(next.map((item) => item.id));
   const others = open.filter((item) => !ids.has(item.id));
-  const rest = others.slice(0, more);
-  return { next, rest, hidden: others.length - rest.length };
+  const { rest, hidden } = glanceSlots(next.length, others.length, cap);
+  return { next, rest: others.slice(0, rest), hidden };
+}
+
+// ─── Layout (#200, docs/plans/today-window-cases.json — the Mac's TodayGlance reads the same file) ──────────────
+
+const cardKinds: readonly GlanceCardKind[] = ["event", "timer", "alarm"];
+
+/** Which cards take full size (those with something in them) and which shrink to a chip in one quiet row; one card
+ * alone lies flat across the window (`wide`). Always in the order 일정 · 타이머 · 알람. */
+export function glanceLayout(filled: Iterable<GlanceCardKind>): { cards: GlanceCardKind[]; chips: GlanceCardKind[]; wide: boolean } {
+  const set = new Set(filled);
+  const cards = cardKinds.filter((kind) => set.has(kind));
+  return { cards, chips: cardKinds.filter((kind) => !set.has(kind)), wide: cards.length === 1 };
+}
+
+/** The most to-do rows (다음 and 그 밖에 together), the fewest a short screen keeps, a row's height, and the rest of the
+ * window (header, cards, input line, links, margins) taken off the room first. */
+export const glanceRowLimit = 7;
+export const glanceRowFloor = 3;
+export const glanceRowHeight = 32;
+const glanceChrome = 360;
+
+/** How many rows fit in `room` (the work area's height), between 3 and 7; 7 when it isn't known. */
+export function glanceRowCap(room?: number | null): number {
+  if (room === undefined || room === null) return glanceRowLimit;
+  return Math.min(glanceRowLimit, Math.max(glanceRowFloor, Math.floor((room - glanceChrome) / glanceRowHeight)));
+}
+
+/** 그 밖에's rows and the 외 N개 left out: 다음 counts toward `cap`; one left over is shown instead of ‘외 1개’. */
+export function glanceSlots(next: number, others: number, cap: number): { rest: number; hidden: number } {
+  let room = Math.max(0, cap - next);
+  if (others === room + 1) room += 1;
+  const rest = Math.min(others, room);
+  return { rest, hidden: others - rest };
+}
+
+/** The header's progress: "할 일 9개" · "11개 중 2개 끝냈어요" · "4개 다 끝냈어요"; undefined with no to-dos (the date alone). */
+export function glanceProgress(total: number, done: number, lang: Lang = "ko"): string | undefined {
+  if (total <= 0) return undefined;
+  const index = langIndex(lang);
+  if (done === 0) return lang === "ko" ? `할 일 ${total}개` : lang === "en" ? plural(total, "to-do", "to-dos") : plural(total, "taak", "taken");
+  if (done >= total) return total === 1 ? ["다 끝냈어요", "Done", "Klaar"][index] : [`${total}개 다 끝냈어요`, `All ${total} done`, `Alle ${total} klaar`][index];
+  return [`${total}개 중 ${done}개 끝냈어요`, `${done} of ${total} done`, `${done} van ${total} klaar`][index];
+}
+
+/** The header's date, as the note's header: "11월 3일 화요일" — the logical day (before 4 a.m. still yesterday). */
+export const glanceDate = (now: Date, lang: Lang = "ko"): string => longDate(logicalDayStart(now), lang);
+
+/** An empty card's chip: "오늘 일정 없음" · "No events today" · "Geen afspraken"; the timer's and the alarm's what to type. */
+export function glanceChip(kind: GlanceCardKind, lang: Lang = "ko"): string {
+  return kind === "event" ? ["오늘 일정 없음", "No events today", "Geen afspraken"][langIndex(lang)] : emptyLines[kind][langIndex(lang)];
 }
 
 // ─── Where the window goes ──────────────────────────────────────────────────────

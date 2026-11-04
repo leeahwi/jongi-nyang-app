@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { contrast, tokensIn } from "../src/core/contrast";
-import { folderColors } from "../src/core/memoDrawer";
+import { backdropClashes, folderColors, type MemoPaper } from "../src/core/memoDrawer";
 
 /**
  * 메모 서랍's eight papers (src/renderer/drawer.css, 1.29 colours; #142 한지 · 쑥색 · 벚꽃 · 먹색): every text colour on what it sits on at 4.5:1,
@@ -153,5 +153,45 @@ for (const look of looks) {
     ];
     for (const [where, ratio] of rows) console.log(`${look}: ${ratio >= 3 ? "ok  " : "FAIL"} ${ratio.toFixed(2)} (3) · ${where}`);
     assert.deepEqual(rows.filter(([, ratio]) => ratio < 3).map(([where]) => where), []);
+  });
+}
+
+// #184: on Windows 11 the acrylic under 반투명 · 강하게 is light or dark with the whole app (nativeTheme), not with the
+// drawer paper. Every paper under a light and a dark app, at 82 % and 62 %: what sits on the paper (the folder's name,
+// the words 반투명 · 강하게 draw in the ink, the icons, the rings, the paw, the close bar) against the paper as drawn. A
+// paper of the other kind than the app (`backdropClashes`) is drawn on 불투명, so it is measured on the solid paper; a
+// matching one over its acrylic (#ececec light, #2a2a2a dark, as above). The clashing pairs' numbers over the acrylic
+// are printed as well (what #184 measured).
+const onPaper: [string, Need, string][] = [
+  ["d-title", "text", "the folder's name"],
+  ["d-ink", "text", "메모 서랍 over the name, a date group and its count, the footer (the ink under 반투명 · 강하게)"],
+  ["d-icon", "ui", "the header's icons"],
+  ["d-select", "ui", "the focus ring on the paper"],
+  ["d-pin", "ui", "the paw on the 고정 header"],
+  ["d-closebar", "ui", "the close bar at rest"],
+];
+for (const darkApp of [false, true]) {
+  test(`drawer contrast (#184): every paper under a ${darkApp ? "dark" : "light"} app, 반투명 and 강하게 — a clashing paper is drawn on 불투명`, () => {
+    const material = darkApp ? "#2a2a2a" : "#ececec";
+    const failures: string[] = [];
+    let missed = 0;
+    for (const look of looks) {
+      const tokens = block(look);
+      const clash = backdropClashes(look as MemoPaper, darkApp);
+      assert.equal(clash, (look === "night" || look === "ink") !== darkApp, `${look}: clashes only when its light or dark differs from the app's`);
+      for (const [backdrop, alpha] of [["반투명", 0.82], ["강하게", 0.62]] as const) {
+        const seeThrough = blend(tokens["d-paper"], alpha, material);
+        const drawn = clash ? tokens["d-paper"] : seeThrough;
+        for (const [fg, need, where] of onPaper) {
+          const ratio = contrast(tokens[fg], drawn), needed = needs[need];
+          const over = contrast(tokens[fg], seeThrough);
+          if (clash && over < needed) missed += 1;
+          console.log(`${darkApp ? "dark" : "light"} app · ${look} · ${backdrop}${clash ? " → 불투명" : ""}: ${ratio >= needed ? "ok  " : "FAIL"} --${fg} ${ratio.toFixed(2)} (${needed})${clash ? ` · over the acrylic ${over.toFixed(2)}` : ""} · ${where}`);
+          if (ratio < needed) failures.push(`${look} ${backdrop} --${fg} ${ratio.toFixed(2)}`);
+        }
+      }
+    }
+    console.log(`${darkApp ? "dark" : "light"} app: ${missed} pairs would miss over the acrylic of the other kind; drawn on 불투명, none do`);
+    assert.deepEqual(failures, []);
   });
 }

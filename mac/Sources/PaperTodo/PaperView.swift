@@ -151,8 +151,12 @@ struct PaperView: View {
             let board = groups.map { SpaceBoard.fits(width: geometry.size.width, count: $0.count) } ?? false
             Group {
             if board, let groups {
-                SpaceBoard(model: model, drag: groupDrag, rowDrop: $rowDrop, groups: groups, byID: byID, shared: shared)
-                    .onAppear { if let drag = previewGroupDrag { groupDrag.preview(drag.source, onto: drag.target) } }
+                VStack(spacing: 0) {
+                    SpaceBoard(model: model, drag: groupDrag, rowDrop: $rowDrop, groups: groups, byID: byID, shared: shared)
+                        .onAppear { if let drag = previewGroupDrag { groupDrag.preview(drag.source, onto: drag.target) } }
+                    // #196 (D9): under the columns too.
+                    SpaceDeviceLine(model: model, line: model.todayDeviceLine)
+                }
             } else {
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
@@ -188,7 +192,8 @@ struct PaperView: View {
                             }.id(item.id).transition(.paperRow)
                         }
                         }
-                        if model.todayItems.isEmpty {
+                        // #196 (D9): everything hidden here — the end line says so, not the empty sheet's cat.
+                        if model.todayItems.isEmpty && model.todayDeviceLine.hidden.isEmpty {
                             EmptySheetNote(pose: .happy, text: L("오늘 할 일을 한 줄 적어 볼까요?"))
                         }
                         if model.remainingCount == 0 && !model.todayItems.isEmpty {
@@ -197,6 +202,8 @@ struct PaperView: View {
                         }
                         // 할 일 스페이스 (#87): while one space shows, how many the others hold — a faint line at the end.
                         SpaceMoreLine(model: model)
+                        // #196 (D9, D6): what this Mac hides here, and what is peeked at.
+                        SpaceDeviceLine(model: model, line: model.todayDeviceLine)
                       }
                       // Rows as tall as the sheet or taller are kept as one value: the rules below are one row then,
                       // whatever the rows add up to. The lazy stack's height is a guess that moves by a point or so on

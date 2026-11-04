@@ -323,14 +323,16 @@ private enum AIConnectTests {
         }
 
         try test("M41: the extension's version in ai-link.json and the log; Claude Desktop's copy older than the app's") {
-            try equal(AIConnect.extVersion, 2, "the same number as the Windows core's aiExtVersion")
-            let link = String(decoding: AIConnect.Link(enabled: true, dataFolder: "/x", lang: .ko, app: "mac 1.46.0", now: now).encoded(), as: UTF8.self)
-            try expect(link.contains("\"ext\" : 2"), "link: \(link)")
+            try equal(AIConnect.extVersion, 3, "the same number as the Windows core's aiExtVersion (3 since spaces 2c, N3-8)")
+            let link = String(decoding: AIConnect.Link(enabled: true, dataFolder: "/x", lang: .ko, app: "mac 1.47.0", now: now).encoded(), as: UTF8.self)
+            try expect(link.contains("\"ext\" : 3"), "link: \(link)")
             let old = line("old", now, changes: [(taskA, nil, todo(taskA, "보고서 쓰기"))])
-            let fresh = String(old.dropLast()) + ",\"ext\":2}"
+            let fresh = String(old.dropLast()) + ",\"ext\":3}"
             let parsed = AIConnect.parse(fresh)[0]
-            try equal(parsed.ext, 2, "read")
-            try expect(parsed.line().contains("\"ext\":2"), "written back: \(parsed.line())")
+            try equal(parsed.ext, 3, "read")
+            try expect(parsed.line().contains("\"ext\":3"), "written back: \(parsed.line())")
+            let two = String(old.dropLast()) + ",\"ext\":2}"
+            try expect(AIConnect.extOutdated(AIConnect.parse(two)), "a 1.46 extension (2) is older now")
             try equal(AIConnect.parse(old)[0].ext, nil, "none before")
             try expect(!AIConnect.extOutdated([]), "nothing from Claude Desktop yet")
             try expect(AIConnect.extOutdated(AIConnect.parse(old)), "no version: the one before versions")
@@ -338,6 +340,68 @@ private enum AIConnectTests {
             let code = line("code", now, client: "Claude Code", changes: [(taskB, nil, todo(taskB, "x"))])
             try expect(!AIConnect.extOutdated(AIConnect.parse(fresh + "\n" + code)), "Claude Code runs the app's own copy")
             try expect(AIConnect.extOutdated(AIConnect.parse(old + "\n" + code)), "…and doesn't hide an old Claude Desktop")
+        }
+
+        // MARK: S57–S59 (spaces 2c, N3-6 · N3-7): Claude moving to-dos between spaces, and the app's undo — the `ai`
+        // block of docs/plans/spaces-cases.json, read by the extension and the Windows app too.
+
+        let casesPath = CommandLine.arguments.dropFirst().first ?? "../docs/plans/spaces-cases.json"
+        let shared = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: casesPath))) as! [String: Any]
+        let ai = shared["ai"] as! [String: Any]
+        let live: Set<String> = Set((shared["file"] as! [String: Any])["spaces"].flatMap { $0 as? [[String: Any]] }!.compactMap { $0["id"] as? String })
+        func value(_ object: Any) -> JSONValue { JSONValue.from(object)! }
+        let logged = AIConnect.parse(value(ai["entry"]!).text)[0]
+        try test("S57 the log line of a move: place changes kept, counted by to-do") {
+            try equal(logged.changes.map(\.file), ["todo-spaces.json", "todos.json", "todo-spaces.json"], "files")
+            try equal(logged.count, 2, "to-dos")
+            try equal(logged.ext, 3, "ext")
+            try expect(logged.isAIWork, "Claude's work")
+        }
+        for entry in ai["undo"] as! [[String: Any]] {
+            try test("\(entry["case"]!) undo: \(entry["note"]!)") {
+                var log = logged
+                if let extra = entry["extraChange"] {
+                    var line = value(ai["entry"]!)
+                    if case .object(var object) = line, case .array(let list)? = object["changes"] {
+                        object["changes"] = .array(list + [value(extra)])
+                        line = .object(object)
+                    }
+                    log = AIConnect.parse(line.text)[0]
+                    try equal(log.changes.count, 3, "M28: the unknown file's change isn't read")
+                }
+                let gone = Set(entry["gone"] as? [String] ?? [])
+                // The places and titles as they are now; a deleted space would read as 일반 (it isn't live).
+                var places: [String: String?] = [:]
+                for (id, space) in entry["places"] as! [String: Any] { places[id] = (space as? String).flatMap { live.contains($0) ? $0 : nil } }
+                var todos: [String: JSONValue] = [:]
+                for item in ai["todos"] as! [[String: Any]] where !gone.contains(item["id"] as! String) {
+                    var object = item
+                    if let title = (entry["titles"] as? [String: String])?[item["id"] as! String] { object["title"] = title }
+                    todos[item["id"] as! String] = value(object)
+                }
+                let plan = AIConnect.undoPlan(log, current: { change in
+                    change.file == AIConnect.placesFile
+                        ? .object(["id": .string(change.id), "space": (places[change.id] ?? nil).map(JSONValue.string) ?? .null])
+                        : todos[change.id]
+                }, gone: { todos[$0.id] == nil })
+                for step in plan.steps {
+                    guard case .restore(let before) = step.step else { continue }
+                    if step.change.file == AIConnect.placesFile { places[step.change.id] = before["space"]?.string } else { todos[step.change.id] = before }
+                }
+                let expected = entry["expect"] as! [String: Any]
+                try equal(plan.outcome, AIConnect.UndoOutcome(undone: expected["undone"] as! Int, left: expected["left"] as! Int), "outcome")
+                for (id, space) in expected["places"] as! [String: Any] { try equal(places[id] ?? nil, space as? String, "place \(id.prefix(9))") }
+                for (id, title) in expected["titles"] as! [String: String] { try equal(todos[id]?["title"]?.string, title, "title") }
+            }
+        }
+        try test("N3-7 an add's undo takes the to-do out and writes no place for it") {
+            let id = "E0000000-0000-4000-8000-000000000009"
+            let add = AIConnect.parse(#"{"v":1,"id":"a","at":"2026-10-28T01:00:00Z","client":"Claude","tool":"add_todos","kind":"add","target":"todos","count":1,"title":"x","changes":[{"file":"todos.json","id":"\#(id)","before":null,"after":{"id":"\#(id)","title":"x","isCompleted":false,"createdAt":"2026-10-28T01:00:00Z"}},{"file":"todo-spaces.json","id":"\#(id)","before":{"id":"\#(id)","space":null},"after":{"id":"\#(id)","space":"s-a","at":"2026-10-28T01:00:00Z"}}]}"#)[0]
+            let plan = AIConnect.undoPlan(add, current: { change in
+                change.file == AIConnect.placesFile ? .object(["id": .string(id), "space": .string("s-a")]) : add.changes[0].after
+            }, gone: { _ in false })
+            try equal(plan.outcome, AIConnect.UndoOutcome(undone: 1, left: 0), "one to-do")
+            try equal(plan.steps.map(\.step), [.remove], "only the to-do goes")
         }
 
         print("\(count) AI connection tests passed")

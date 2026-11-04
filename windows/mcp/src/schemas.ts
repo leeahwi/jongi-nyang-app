@@ -12,6 +12,8 @@ const text = z.string();
 const day = z.string().describe("A day, yyyy-MM-dd (the 4 a.m. day: 01:00 belongs to the night before).");
 const clock = z.string().regex(/^\d{1,2}:\d{2}$/).describe("HH:mm");
 const shortId = z.string().describe("A short id (8 characters or more), as the tools give it; a whole id works too.");
+/** N3-1: a space by its exact name or id, or 일반 (the tasks in no space) as "general". */
+const space = z.string().describe("A space: its exact name or id (list_spaces), or \"general\" for 일반, the tasks in no space.");
 
 // ─── Inputs ───────────────────────────────────────────────────────────────────
 
@@ -24,11 +26,13 @@ export const inputs = {
   get_today: {
     limit: limit(30, 100).describe("How many open tasks to list (default 30, at most 100); the rest via list_todos with nextCursor."),
     detail: z.boolean().optional().describe("Also list the tasks finished today (otherwise only their number)."),
+    space: space.optional().describe("Only the tasks in this space (exact name or id, or \"general\"). Events, alarms and focus stay as they are."),
   },
   list_todos: {
     where: z.enum(["today", "later", "all"]).optional().describe("today = today's sheet (default); later = dated ahead and someday; all = everything, also the ones finished today (the default with query)."),
     from: day.optional(), to: day.optional(),
     query: z.string().optional().describe("Only tasks whose title contains this (any case)."),
+    space: space.optional().describe("Only the tasks in this space (exact name or id, or \"general\")."),
     limit: limit(50, 100), ...pageInput,
   },
   list_events: { from: day, to: day.optional(), limit: limit(50, 100), ...pageInput },
@@ -45,7 +49,8 @@ export const inputs = {
   list_memo_folders: {},
   list_repeats: { limit: limit(50, 100), ...pageInput },
   get_focus: { from: day.optional(), to: day.optional() },
-  search_history: { query: z.string().optional(), from: day.optional(), to: day.optional(), limit: limit(50, 200), ...pageInput },
+  search_history: { query: z.string().optional(), from: day.optional(), to: day.optional(), space: space.optional().describe("Only the tasks finished in this space."), limit: limit(50, 200), ...pageInput },
+  list_spaces: {},
   add_todos: {
     items: z.array(z.object({
       title: z.string().describe("What to do (up to 200 characters)."),
@@ -54,6 +59,7 @@ export const inputs = {
       timeEnd: clock.optional().describe("End, HH:mm; needs timeStart; at the latest 03:45 the next morning."),
       remindAt: z.string().nullable().optional().describe("A reminder: HH:mm on the task's day, or yyyy-MM-ddTHH:mm. Without it a start still ahead rings; null for none."),
       later: z.boolean().optional().describe("Put it under someday (no date, no time)."),
+      space: space.optional().describe("Put it in this existing space (exact name or id). Without it: 일반. A space that isn't there is refused; spaces are made in the app."),
     })).describe(`1 to ${maxItems} tasks.`),
   },
   add_event: {
@@ -76,6 +82,7 @@ export const inputs = {
           remindAt: z.string().nullable().optional().describe("HH:mm on the task's day or yyyy-MM-ddTHH:mm; null clears."),
           later: z.boolean().optional().describe("true: to someday."),
           done: z.boolean().optional().describe("true: finished; false: open again."),
+          space: space.nullable().optional().describe("Move it to this existing space (exact name or id); \"general\" or null: to 일반."),
         } satisfies Record<typeof todoKeys[number], unknown>).describe("Only the fields to change."),
       }),
       z.object({
@@ -97,6 +104,7 @@ const taskOut = z.object({
   id: text, title: text, done: z.boolean(), where: z.enum(["today", "ahead", "someday"]),
   date: text.optional(), dueDate: text.optional(), timeStart: text.optional(), timeEnd: text.optional(),
   remindAt: text.optional(), completedAt: text.optional(), repeat: text.optional().describe("A repeating task: its rule in the app's words."),
+  space: text.optional().describe("Its space's name (일반's name for the tasks in no space)."), spaceId: text.optional().describe("Its space's id, or \"general\"."),
 });
 const eventOut = z.object({
   id: text, title: text, date: text, allDay: z.boolean(), days: z.number().optional(), start: text.optional(), end: text.optional(), endDate: text.optional(),
@@ -117,12 +125,12 @@ const more = { count: z.number().optional(), nextCursor: text.optional() };
 
 export const outputs = {
   get_today: {
-    ...base, date: text.optional(), open: z.number().optional(), done: z.number().optional(), tasks: z.array(taskOut).optional(), nextCursor: text.optional(),
+    ...base, date: text.optional(), space: text.optional(), open: z.number().optional(), done: z.number().optional(), tasks: z.array(taskOut).optional(), nextCursor: text.optional(),
     events: z.array(eventOut).optional(),
     alarms: z.array(z.object({ time: text, label: text.optional(), at: text })).optional(),
     focus: z.object({ minutes: z.number(), sessions: z.number() }).optional(),
   },
-  list_todos: { ...base, ...more, where: z.enum(["today", "later", "all"]).optional(), from: text.optional(), to: text.optional(), query: text.optional(), tasks: z.array(taskOut).optional() },
+  list_todos: { ...base, ...more, where: z.enum(["today", "later", "all"]).optional(), from: text.optional(), to: text.optional(), query: text.optional(), space: text.optional(), tasks: z.array(taskOut).optional() },
   list_events: { ...base, ...more, from: text.optional(), to: text.optional(), events: z.array(eventOut).optional() },
   list_memos: { ...base, ...more, folder: text.optional(), memos: z.array(z.object({ ...memoOut, preview: text })).optional() },
   get_memo: {
@@ -143,12 +151,19 @@ export const outputs = {
     days: z.record(z.string(), z.number()).optional(), top: z.array(z.object({ title: text, minutes: z.number(), sessions: z.number() })).optional(),
   },
   search_history: {
-    ...base, ...more, from: text.optional(), to: text.optional(),
-    items: z.array(z.object({ id: text, title: text, day: text, completedAt: text, timeStart: text.optional(), timeEnd: text.optional() })).optional(),
+    ...base, ...more, from: text.optional(), to: text.optional(), space: text.optional(),
+    items: z.array(z.object({ id: text, title: text, day: text, completedAt: text, timeStart: text.optional(), timeEnd: text.optional(), space: text.optional(), spaceId: text.optional() })).optional(),
+  },
+  list_spaces: {
+    ...base,
+    spaces: z.array(z.object({
+      id: text.describe("The space's id, or \"general\" for 일반."), name: text, color: text.optional(), general: z.boolean(),
+      open: z.number().describe("Open tasks in it (today, ahead and someday)."), today: z.number().describe("Of those, on today's sheet."),
+    })).optional(),
   },
   add_todos: { ...base, added: z.array(taskOut).optional(), skipped: z.array(skipped).optional() },
   add_event: { ...base, added: eventOut.nullable().optional(), skipped: skipped.optional() },
   add_memo: { ...base, added: z.object(memoOut).nullable().optional(), skipped: skipped.optional() },
   preview_changes: { ...base, token: text.optional(), expiresAt: text.optional(), changes: z.array(z.object({ kind: z.enum(["todo", "event"]), id: text, title: text })).optional() },
-  apply_changes: { ...base, changed: z.array(z.object({ kind: z.enum(["todo", "event"]), id: text, title: text })).optional() },
+  apply_changes: { ...base, changed: z.array(z.object({ kind: z.enum(["todo", "event"]), id: text, title: text, space: text.optional().describe("A task moved: its space now.") })).optional() },
 };

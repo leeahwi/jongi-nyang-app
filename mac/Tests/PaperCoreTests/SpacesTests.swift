@@ -553,6 +553,80 @@ private enum SpacesTests {
             try equal(history.notebook.items.map(\.title), ["가", "나", "다", "라"], "undone")
         }
 
+        // MARK: S49–S54: 찾기의 `#스페이스` (2c)
+
+        let searching = cases["search"] as! [String: Any]
+        /// The file with the block's places (`spaces`: to-do id → space id).
+        func placed(_ places: [String: String]) throws -> TodoSpaces {
+            var file = cases["file"] as! [String: Any]
+            file["items"] = places.mapValues { ["space": $0, "at": "2026-10-20T00:00:00Z"] }
+            return try TodoSpaces.decode(json(file))
+        }
+        let searchSpaces = try placed(searching["spaces"] as! [String: String])
+        let searchItems = try todos(searching)
+        let record = Archive.parseLines((searching["archive"] as! [Any]).map { String(decoding: json($0), as: UTF8.self) }.joined(separator: "\n"))
+        let searchMemos = try todoDecoder.decode([Memo].self, from: json(searching["memos"]!))
+        try test("C5 the record's lines read their space (and a bad one reads as none)") {
+            try equal(record.map(\.space), [nil, "s-a", nil, "s-x"], "spaces")
+            try equal(record.map { searchSpaces.spaceID(of: $0) }, [nil, "s-a", "s-b", nil], "C5")
+            let odd = Archive.parseLines(#"{"id":"x","title":"t","createdAt":"2026-10-01T00:00:00Z","space":7}"#)
+            try equal(odd.map(\.space), [nil], "a number")
+            let line = Archive.encodeLine(ArchiveEntry(id: "x", title: "t", createdAt: at("2026-10-01T00:00:00Z"), completedAt: nil, space: "s-a"))
+            try equal(Archive.parseLines(line).first?.space, "s-a", "round trip")
+            try expect(!Archive.encodeLine(ArchiveEntry(id: "x", title: "t", createdAt: at("2026-10-01T00:00:00Z"), completedAt: nil)).contains("space"),
+                       "일반: no key")
+        }
+        for entry in searching["cases"] as! [[String: Any]] {
+            try test("\(entry["case"]!) search \(entry["query"]!)") {
+                let spaces = entry["noSpaces"] as? Bool == true ? TodoSpaces() : searchSpaces
+                let expected = entry["expect"] as! [String: Any]
+                let reading = Search.spaceReading(entry["query"] as! String, spaces: spaces)
+                let space: String? = switch reading.space { case .some(let id): id ?? SpaceLens.none; case nil: nil }
+                try equal(space, expected["space"] as? String, "space")
+                try equal(reading.words, expected["words"] as! String, "words")
+                for index in [nil, Search.Index()] as [Search.Index?] {
+                    let groups = Search.find(reading.words, items: searchItems, memos: searchMemos, history: record, events: [], now: now,
+                                             calendar: calendar, language: .ko, index: index, only: Search.only(reading, spaces: spaces))
+                    func hits(_ group: Search.Group) -> [String] {
+                        groups.first { $0.group == group }?.hits.map { group == .memos ? $0.id : $0.text } ?? []
+                    }
+                    for (name, group) in [("today", Search.Group.today), ("ahead", .ahead), ("memos", .memos), ("history", .history)] {
+                        try equal(hits(group), expected[name] as! [String], name + (index == nil ? "" : " (index)"))
+                    }
+                }
+            }
+        }
+
+        // MARK: S55–S56: 완료 기록 · 집중 기록 거르기 (2c)
+
+        let filtering = cases["history"] as! [String: Any]
+        let focusLines = Focus.parse((filtering["focus"] as! [Any]).map { String(decoding: json($0), as: UTF8.self) }.joined(separator: "\n"))
+        try test("H3 the focus lines read their space") {
+            try equal(focusLines.map(\.space), ["s-a", nil, nil, nil, "s-b"], "own")
+            try equal(focusLines.map { searchSpaces.spaceID(of: $0) }, ["s-a", "s-b", nil, nil, "s-b"], "H3")
+            let line = Focus.encodeLine(Focus.record(taskId: "T", title: "t", start: now, end: now.addingTimeInterval(600), kind: .focus, space: "s-a")!)
+            try equal(Focus.parse(line).first?.space, "s-a", "round trip")
+            let timer = Focus.record(title: "", start: now, end: now.addingTimeInterval(600), kind: .timer, space: "s-a")!
+            try equal(timer.space, nil, "a timer takes none")
+        }
+        for entry in filtering["cases"] as! [[String: Any]] {
+            try test("\(entry["case"]!) history filter \(entry["filter"] as? String ?? "all")") {
+                let filter: SpaceFilter = switch entry["filter"] as? String {
+                case nil: .all
+                case SpaceLens.none?: .general
+                case let id?: .space(id)
+                }
+                let expected = entry["expect"] as! [String: Any]
+                try equal(searchSpaces.kept(record, in: filter).map(\.id), expected["archive"] as! [String], "archive")
+                try equal(searchSpaces.kept(focusLines, in: filter).map(\.id), expected["focus"] as! [String], "focus")
+            }
+        }
+        try test("H4 a deleted space's filter is back to all") {
+            try equal(SpaceFilter.space("s-x").live(in: searchSpaces), .all, "gone")
+            try equal(SpaceFilter.space("s-a").live(in: searchSpaces), .space("s-a"), "live")
+            try equal(SpaceFilter.general.live(in: TodoSpaces()), .all, "no spaces")
+        }
+
         // MARK: The Mac's own cases
 
         try test("W2 the bytes: spread out, keys sorted, deleted only when true, a newline at the end") {

@@ -30,3 +30,5 @@
 /* A space's colour dot (1.30). */
 .menu .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--band); flex: none; margin: 0 3.5px; }
 .menu button.mi > .ico:empty:has(+ .dot) { display: none; }
+/* #196: a time-ruled space's hint under its row (‘지금은 숨김 · 평일 09:00–18:00에 보여요’), quiet and in the UI face. */
+.menu .menu-hint { padding: 0 12px 6px 42px; margin-top: -4px; font: 500 11px/1.35 var(--ui); color: var(--ink-3); max-width: 280px; }

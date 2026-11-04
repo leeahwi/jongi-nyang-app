@@ -2,7 +2,7 @@ import { BrowserWindow, globalShortcut, ipcMain, nativeTheme, screen, type Recta
 import os from "node:os";
 import path from "node:path";
 import { bigDrawerWidth } from "../core/memoCards";
-import { changedToday, clampDrawerWidth, drawerLook, shortcutLabel, type DrawerBackdrop } from "../core/memoDrawer";
+import { backdropClashes, changedToday, clampDrawerWidth, drawerLook, shortcutLabel, type DrawerBackdrop } from "../core/memoDrawer";
 import { t } from "../i18n";
 import { offscreen, offscreenEnabled, shortcutsDisabled } from "./env";
 import type { Store } from "./store";
@@ -72,9 +72,10 @@ export class MemoDrawer {
       if (key === "drawerSide" && this.open && this.loaded && this.window && !this.window.isDestroyed()) this.window.webContents.send("drawer:open", { slide: false, side: this.store.prefs.drawerSide, look: this.look() });
       if (key === "drawerHandle" || key === "drawerSide" || key === "drawerTheme" || key === "drawerNightPaper") this.updateHandle();
       if (key === "drawerTheme" || key === "drawerNightPaper") this.sendLook();
-      if (key === "drawerBackdrop") this.applyBackdrop();
+      // The paper picks whether 반투명 · 강하게 can be drawn over this app's acrylic (#184).
+      if (key === "drawerBackdrop" || key === "drawerTheme" || key === "drawerNightPaper") this.applyBackdrop();
     });
-    // Windows' "transparency effects" switched: 반투명 · 강하게 follow.
+    // Windows' "transparency effects" switched, or the app's 낮 · 밤 (the acrylic's light or dark, #184): 반투명 · 강하게 follow.
     nativeTheme.on("updated", () => this.applyBackdrop());
     this.noteBackdrop();
     store.on("change", () => this.sendHandle());
@@ -180,14 +181,17 @@ export class MemoDrawer {
   // ─── 바탕 (1.29) ────────────────────────────────────────────────────────────
 
   /**
-   * Why 반투명 · 강하게 can't be drawn here (Windows 10 has no acrylic; Windows' transparency effects off), or
-   * undefined when they can. Away from Windows (snapshots, perf on a Mac) the page draws them itself.
+   * Why 반투명 · 강하게 can't be drawn here, or undefined when they can: no acrylic before Windows 11 22H2 (build 22621;
+   * 21H2, build 22000, is Windows 11 too, #184), Windows' transparency effects off, or a drawer paper of the other kind
+   * than the app's 낮 · 밤 (the acrylic follows the app, `backdropClashes`). Away from Windows (snapshots, perf on a Mac)
+   * the page draws them itself.
    */
   private backdropProblem(): string | undefined {
     if (process.platform !== "win32") return undefined;
     const build = Number(os.release().split(".")[2] ?? 0);
-    if (build < 22621) return t("이 Windows에서는 반투명 · 강하게가 불투명으로 보여요(Windows 11에서 돼요).");
+    if (build < 22621) return t("이 Windows에서는 반투명 · 강하게가 불투명으로 보여요(Windows 11 22H2 이상에서 돼요).");
     if (nativeTheme.prefersReducedTransparency) return t("Windows의 투명 효과가 꺼져 있어 반투명 · 강하게가 불투명으로 보여요.");
+    if (backdropClashes(this.look(), nativeTheme.shouldUseDarkColors)) return t("서랍 종이의 밝기가 앱의 낮 · 밤과 달라서, 글씨가 잘 보이게 반투명 · 강하게를 불투명으로 보여 줘요.");
     return undefined;
   }
 

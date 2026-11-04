@@ -1,4 +1,5 @@
 import { addedText, preferenceKey, switchText, type Candidate } from "../core/intent";
+import { addedHidden } from "../core/spaceDevice";
 import type { SpaceChoice } from "../core/todoSpaces";
 import type { IntentMade, IntentPage, WireCandidate } from "../core/types";
 import { lang, paper, t } from "./api";
@@ -36,12 +37,12 @@ export interface FlowHost {
 export async function commitReading(host: FlowHost, candidate: Candidate, candidates: readonly Candidate[], text: string, from: "note" | "quick" | "glance", space?: SpaceChoice): Promise<{ made?: IntentMade; inNote?: boolean }> {
   const result = await api.intent({ op: "commit", candidate: toWire(candidate), page: host.page(), from, candidates: candidates.map(toWire), text, ...(space ? { space } : {}) });
   if (!result.made) return {};
-  if (!result.inNote) showMade(host, result.made, candidate, candidates, text, space);
+  if (!result.inNote) showMade(host, result.made, candidate, candidates, text, space, result.hiddenIn);
   return result;
 }
 
 /** The toast for something just made, with what its action does. */
-export function showMade(host: FlowHost, made: IntentMade, candidate: Candidate, candidates: readonly Candidate[], text: string, space?: SpaceChoice): void {
+export function showMade(host: FlowHost, made: IntentMade, candidate: Candidate, candidates: readonly Candidate[], text: string, space?: SpaceChoice, hiddenIn?: string): void {
   last = { made, text };
   const others = candidates.filter((entry) => entry !== candidate && entry.kind !== candidate.kind);
   const position = candidates.indexOf(candidate);
@@ -52,6 +53,11 @@ export function showMade(host: FlowHost, made: IntentMade, candidate: Candidate,
     if (restore) host.restore?.(text);
   };
   let action: ToastOptions["action"];
+  // #196 (D12): put where this PC hides it — said, with 되돌리기 for a slip of the line.
+  if (hiddenIn !== undefined) {
+    host.toast.show({ icon: "eyeOff", text: addedHidden(hiddenIn, lang()), twoLines: true, action: { label: t("되돌리기"), run: () => void undo(true) }, onHide: () => { if (last?.made === made) last = undefined; } });
+    return;
+  }
   if (candidate.kind === "timer") action = { label: t("멈추기"), run: () => void undo(false) };
   // A memo (1.28): it is in the 메모 서랍's last folder; 열기 shows it there (Ctrl+Z still takes it back).
   else if (candidate.kind === "memo" && made.id) action = { label: t("열기", undefined, "drawer"), run: () => void api.act({ type: "drawer", command: "open", memo: made.id }) };
@@ -64,7 +70,7 @@ export function showMade(host: FlowHost, made: IntentMade, candidate: Candidate,
         // Switched to a to-do: it takes the line's space as the first reading would have.
         const result = await api.intent({ op: "commit", candidate: toWire(next), page: host.page(), from: "note", ...(space ? { space } : {}) });
         void api.intent({ op: "learn", key: preferenceKey(text, new Date(), lang()), from: candidate.kind, to: next.kind });
-        if (result.made) showMade(host, result.made, next, candidates, text, space);
+        if (result.made) showMade(host, result.made, next, candidates, text, space, result.hiddenIn);
       },
     };
   }

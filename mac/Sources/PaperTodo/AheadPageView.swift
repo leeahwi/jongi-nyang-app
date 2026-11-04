@@ -93,6 +93,7 @@ struct AheadPageView: View {
                     // 2a (A1, A2): while one space shows, the to-dos ahead it hides — `다른 스페이스에 N개 더 · 모두 보기`.
                     if dragging == nil {
                         SpaceMoreLine(model: model, hidden: model.aheadLensed(now: now).hidden, leading: Self.titleLeading)
+                        SpaceDeviceLine(model: model, line: model.aheadDeviceLine(now: now), leading: Self.titleLeading)
                     }
                     Color.clear.frame(height: 12)
                 }

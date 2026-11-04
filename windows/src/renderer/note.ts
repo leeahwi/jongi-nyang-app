@@ -27,12 +27,17 @@ import { FocusCard } from "./focusCard";
 import { focusNextLine } from "../core/focus";
 import { chime } from "./chime";
 import { openSearch, type SearchSlip } from "./search";
+import { searchHint } from "../core/search";
 import { carriedDays, carriedText, movedTomorrowText, shiftedDue, tomorrowKey } from "../core/carry";
 import { dayKey } from "../core/archive";
 import { clockKey, logicalMinutes, rangeDay, rangeOf, rangeText, rangeTimes, rangeWhenText, reminderFor, validRange } from "../core/timeRange";
 import { durationText } from "../core/duration";
 import { timeList, timeOf } from "./timePick";
-import { activeLens, findSpace, generalName, groupedCount, inLens, lensForDigit, lensTasks, lensNone, liveSpaces, spaceColor, spaceIndexOf, type TodoSpace } from "../core/todoSpaces";
+import { activeLens, findSpace, generalName, groupedCount, inLens, lensTasks, lensNone, liveSpaces, spaceColor, spaceIndexOf, type TodoSpace } from "../core/todoSpaces";
+import {
+  deviceHint, deviceKey, deviceLens, deviceLensForDigit, deviceLine, deviceNone, devicePeeking, deviceWords, hiddenSpaces, hideAgainWord, lineKeys,
+  peekWord, readDeviceRules, storedDeviceRules, type DeviceRule,
+} from "../core/spaceDevice";
 import { closeMenus, menuOpen, openMenu, type MenuEntry, type MenuHost } from "./drawerMenu";
 import { badgeWords, extendSelection, oneSelected, rangeSelection, toggleSelection, type ListSelection } from "../core/selection";
 import { addToWords, boardFits, doneWords, dropHereWords, groupItems, groupOpen, groupSpace, leftWords, neighborGroup, nextWords, spaceGroups, type SpaceGroup } from "../core/spaceGroups";
@@ -111,11 +116,12 @@ document.body.append(menuLayer);
 
 /** The focus card: while a session is on, the note is this one card (see focusCard.ts). */
 const focusCard = new FocusCard({
-  todayItems: () => (state ? todayItems() : []),
+  // #196: the card's picks leave out what this PC hides, peeked at or not.
+  todayItems: () => (state ? todayItems().filter((item) => !hidesHere(item)) : []),
   spaceOf: (id) => (state ? spacesOf().get(id) : undefined),
   next: () => {
     if (!state) return undefined;
-    const next = dayRibbon(todayOccurrences(), state.items, new Date(), lang())?.next;
+    const next = dayRibbon(todayOccurrences(), noteItems(), new Date(), lang())?.next;
     return next ? focusNextLine(next.title, next.time, next.minutes, lang()) : undefined;
   },
   closeOthers: () => {
@@ -298,15 +304,84 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) catc
 
 // ─── Which tasks go where ───────────────────────────────────────────────────
 
-/** 오늘's to-dos, worked out once per state and minute (a draw asks four or five times). */
+/** 오늘's to-dos, worked out once per state and minute (a draw asks four or five times); #196: without what the note hides. */
 let todayKept: { state: TodosState; minute: number; list: TodoItem[] } | undefined;
 const todayItems = (): TodoItem[] => {
   const now = new Date();
   const minute = Math.floor(now.getTime() / 60_000);
   if (todayKept?.state === state && todayKept.minute === minute) return todayKept.list;
-  todayKept = { state, minute, list: state.items.filter((item) => pageOf(item, now) === "today") };
+  todayKept = { state, minute, list: noteItems(now).filter((item) => pageOf(item, now) === "today") };
   return todayKept.list;
 };
+
+// ─── 기기마다 보일 스페이스 (#196, docs/plans/spaces-device.md) ──────────────────
+
+/** What this PC hides now, and what the note hides (less 잠깐 보기), once per state and minute. */
+let deviceKept: { state: TodosState; minute: number; hidden: Set<string>; onNote: Set<string>; items: TodoItem[] } | undefined;
+function deviceNow(now = new Date()): { hidden: Set<string>; onNote: Set<string>; items: TodoItem[] } {
+  const minute = Math.floor(now.getTime() / 60_000);
+  if (deviceKept?.state === state && deviceKept.minute === minute) return deviceKept;
+  const hidden = hiddenSpaces(readDeviceRules(state.prefs.spaceDevice), state.todoSpaces, now);
+  const peek = new Set(state.devicePeek ?? []);
+  const onNote = new Set([...hidden].filter((key) => !peek.has(key)));
+  const items = onNote.size === 0 ? state.items : state.items.filter((item) => !onNote.has(keyOf(item.id)));
+  deviceKept = { state, minute, hidden, onNote, items };
+  return deviceKept;
+}
+/** A to-do's key for 이 기기에서: its live space's id, or `none`. */
+const keyOf = (id: string): string => deviceKey(spacesOf().get(id)?.id);
+/** Every to-do the note shows (its tabs, counts, groups, day strip and timetable). */
+const noteItems = (now = new Date()): TodoItem[] => deviceNow(now).items;
+/** Whether this PC hides a to-do, peeked at or not (the focus card's picks). */
+const hidesHere = (item: TodoItem): boolean => { const { hidden } = deviceNow(); return hidden.size > 0 && hidden.has(keyOf(item.id)); };
+/** 이 기기에서 for a space (`none`: 일반), set from the menu (the main process keeps it cleaned, D10). */
+function setDevice(key: string, rule: DeviceRule | undefined): void {
+  const rules = readDeviceRules(state.prefs.spaceDevice);
+  if (rule) rules[key] = rule;
+  else delete rules[key];
+  void api.act({ type: "setPref", key: "spaceDevice", value: storedDeviceRules(rules) });
+}
+/** The names the end line says (일반 by its name). */
+const deviceNames = (keys: string[]): string[] => keys.map((key) => (key === deviceNone ? generalNow() : findSpace(state.todoSpaces, key)?.name ?? generalNow()));
+
+/**
+ * D9 · D6: at the end of a list, ‘회사는 이 기기에서 숨겨 뒀어요 · 잠깐 보기’ and ‘회사를 잠깐 보는 중 · 다시 숨기기’ — the lens
+ * line's look. Only while no lens is on (with one, its own line is the only one). `open`: that tab's to-dos, hidden ones too.
+ */
+const deviceHiddenText = h("span", { class: "lens-more-text" });
+const devicePeekButton = h("button", { class: "lens-all" });
+const deviceHiddenLine = h("div", { class: "lens-more device-more" }, h("span", { class: "device-more-icon", "aria-hidden": "true" }, icon("eyeOff", 12)), deviceHiddenText,
+  h("span", { class: "lens-more-dot", "aria-hidden": "true" }, "·"), devicePeekButton);
+const devicePeekingText = h("span", { class: "lens-more-text" });
+const deviceHideButton = h("button", { class: "lens-all" });
+const devicePeekingLine = h("div", { class: "lens-more device-more" }, h("span", { class: "device-more-icon", "aria-hidden": "true" }, icon("eye", 12)), devicePeekingText,
+  h("span", { class: "lens-more-dot", "aria-hidden": "true" }, "·"), deviceHideButton);
+let deviceLineKeys: string[] = [];
+devicePeekButton.addEventListener("click", () => void api.act({ type: "spacePeek", spaces: [...new Set([...(state.devicePeek ?? []), ...deviceLineKeys])] }));
+deviceHideButton.addEventListener("click", () => void api.act({ type: "spacePeek", spaces: [] }));
+function deviceLines(open: readonly TodoItem[]): HTMLElement[] {
+  const { hidden, onNote } = deviceNow();
+  if (hidden.size === 0 || lensNow() !== undefined) return [];
+  const keys = open.filter((item) => !item.isCompleted).map((item) => keyOf(item.id));
+  const shown = lineKeys(keys, onNote, state.todoSpaces);
+  const peeking = lineKeys(keys, new Set((state.devicePeek ?? []).filter((key) => hidden.has(key))), state.todoSpaces);
+  const language = lang();
+  deviceLineKeys = shown;
+  const out: HTMLElement[] = [];
+  if (shown.length) {
+    deviceHiddenText.textContent = deviceLine(deviceNames(shown), language);
+    devicePeekButton.textContent = peekWord(language);
+    out.push(deviceHiddenLine);
+  }
+  if (peeking.length) {
+    devicePeekingText.textContent = devicePeeking(deviceNames(peeking), language);
+    deviceHideButton.textContent = hideAgainWord(language);
+    out.push(devicePeekingLine);
+  }
+  return out;
+}
+/** 오늘's to-dos, hidden ones too (the end line names what this PC hides there). */
+const todayAll = (): TodoItem[] => { const now = new Date(); return state.items.filter((item) => pageOf(item, now) === "today"); };
 /** Each to-do by id, and the ids put in the calendar, once per state (rows look them up). */
 let lookupKept: { state: TodosState; items: Map<string, TodoItem>; withEvents: Set<string> } | undefined;
 function lookup(): { items: Map<string, TodoItem>; withEvents: Set<string> } {
@@ -339,7 +414,7 @@ function spacesOf(): Map<string, TodoSpace> {
 }
 const hasSpaces = () => liveSpaces(state.todoSpaces).length > 0;
 /** The space 오늘 shows alone, or none — the 4 a.m. day and a deleted space let it go (S11, S12). */
-const lensNow = (now = new Date()) => activeLens(state.prefs.spaceLens ?? undefined, state.todoSpaces, now);
+const lensNow = (now = new Date()) => deviceLens(activeLens(state.prefs.spaceLens ?? undefined, state.todoSpaces, now), deviceNow(now).onNote);
 const bandStyle = (space: TodoSpace | undefined) => (space ? `var(--band-${spaceColor(space.color)})` : "");
 const setLens = (space: string | undefined) => {
   if (space && page !== "today") setPage("today");
@@ -398,14 +473,45 @@ function openSpacePicker(keyboard = false): void {
   const all = h("span", { class: "dot all" });
   const colors = liveSpaces(state.todoSpaces).slice(0, 3).map((entry) => bandStyle(entry));
   all.style.background = colors.length > 1 ? `conic-gradient(${colors.map((color, index) => `${color} ${(index * 100) / colors.length}% ${((index + 1) * 100) / colors.length}%`).join(", ")})` : colors[0] ?? "";
+  // #196: what this PC hides (not peeked at) gathers under 이 기기에서 숨김 with 보이기; a time-ruled space has its hint; the
+  // digits keep the spaces' order.
+  const { hidden: hiddenHere, onNote } = deviceNow();
+  const rules = readDeviceRules(state.prefs.spaceDevice);
+  const language = lang();
+  const hint = (key: string): MenuEntry[] => {
+    const rule = rules[key];
+    // A quiet line in the UI face under the row (the menu's labels are handwriting, for section names).
+    return rule?.show === "time" ? [{ kind: "node", node: h("div", { class: "menu-hint", role: "note" }, deviceHint(rule.times, hiddenHere.has(key), language)) }] : [];
+  };
+  const hiddenRows: MenuEntry[] = [];
+  const hideRows: MenuEntry[] = [];
+  const shownRows: MenuEntry[] = [];
+  liveSpaces(state.todoSpaces).forEach((space, index) => {
+    if (onNote.has(space.id)) {
+      hiddenRows.push({ kind: "item", label: space.name, extra: [dot(bandStyle(space))], count: deviceWords.show[language], run: () => setDevice(space.id, undefined) }, ...hint(space.id));
+      return;
+    }
+    // #202: the digit keys stay with the spaces' order (a hidden space keeps its number, unused).
+    shownRows.push({ kind: "item", label: space.name, extra: [dot(bandStyle(space))], count: count(space.id), key: lensKey(index), ...(index < 9 ? { digit: String(index + 1) } : {}), checked: lens === space.id, run: () => setLens(space.id) }, ...hint(space.id));
+    hideRows.push({ kind: "item", label: space.name, extra: [dot(bandStyle(space))], run: () => setDevice(space.id, { show: "hide" }) });
+  });
+  if (onNote.has(deviceNone)) {
+    hiddenRows.push({ kind: "item", label: generalNow(), extra: [dot("var(--rule-strong)")], count: deviceWords.show[language], run: () => setDevice(deviceNone, undefined) }, ...hint(deviceNone));
+  } else {
+    shownRows.push({ kind: "item", label: generalNow(), extra: [dot("var(--rule-strong)")], count: count(undefined), checked: lens === lensNone, run: () => setLens(lensNone) }, ...hint(deviceNone));
+    hideRows.push({ kind: "item", label: generalNow(), extra: [dot("var(--rule-strong)")], run: () => setDevice(deviceNone, { show: "hide" }) });
+  }
   const entries: MenuEntry[] = [
-    { kind: "item", label: t("모든 스페이스"), extra: [all], count: String(open.length), key: "Ctrl+Shift+0", checked: lens === undefined, run: () => setLens(undefined) },
+    // #185: while it's open a plain 1–9 · 0 picks too (Ctrl+Shift+digits may be Windows' input-language keys).
+    { kind: "item", label: t("모든 스페이스"), extra: [all], count: String(open.length), key: "Ctrl+Shift+0", digit: "0", checked: lens === undefined, run: () => setLens(undefined) },
     { kind: "sep" },
-    ...liveSpaces(state.todoSpaces).map((space, index): MenuEntry => ({
-      kind: "item", label: space.name, extra: [dot(bandStyle(space))], count: count(space.id), key: lensKey(index), checked: lens === space.id, run: () => setLens(space.id),
-    })),
-    { kind: "item", label: generalNow(), extra: [dot("var(--rule-strong)")], count: count(undefined), checked: lens === lensNone, run: () => setLens(lensNone) },
+    ...shownRows,
+    ...(hiddenRows.length ? [{ kind: "sep" } as MenuEntry, { kind: "label", text: deviceWords.hiddenSection[language] } as MenuEntry, ...hiddenRows] : []),
     { kind: "sep" },
+    // A submenu, not a button that shows on hover: → reaches it too.
+    ...(hideRows.length ? [{ kind: "sub", label: deviceWords.hideHere[language], icon: "eyeOff", entries: () => [
+      ...hideRows, { kind: "sep" } as MenuEntry, { kind: "item", label: deviceWords.setTimes[language], icon: "clock", run: () => void api.act({ type: "openSpaces" }) } as MenuEntry,
+    ] } as MenuEntry] : []),
     // 2b: 스페이스별로 묶기 (Ctrl+Shift+G), this device's.
     { kind: "item", label: t("스페이스별로 묶기"), key: "Ctrl+Shift+G", checked: state.prefs.spaceGroups, run: toggleSpaceGroups },
     { kind: "item", label: t("스페이스 관리…"), icon: "gear", run: () => void api.act({ type: "openSpaces" }) },
@@ -618,8 +724,10 @@ function renderToday(): void {
     lines.classList.toggle("cards", !board && state.prefs.spaceGroupStyle !== "bookmark");
     lines.classList.toggle("bookmarks", !board && state.prefs.spaceGroupStyle === "bookmark");
     const more = renderLensMore();
-    reconcile(lines, board ? elements : [...elements, ...(allFinished ? [allDone] : []), ...(today.length === 0 ? [emptyToday] : []), ...(more ? [lensMore] : []), linesFill]);
-    reconcile(sheet, [...(shown ? [strip.element] : []), lines]);
+    const device = deviceLines(todayAll());
+    reconcile(lines, board ? elements : [...elements, ...(allFinished ? [allDone] : []), ...(today.length === 0 && !device.length ? [emptyToday] : []), ...(more ? [lensMore] : []), ...device, linesFill]);
+    // #196 (D9): under the columns too.
+    reconcile(sheet, [...(shown ? [strip.element] : []), lines, ...(board ? device : [])]);
     sheet.classList.toggle("with-strip", shown);
     if (board) chipsRow.hidden = true; else renderChips(groups);
     if (revealing) requestAnimationFrame(revealNow);
@@ -636,9 +744,11 @@ function renderToday(): void {
   restHead.querySelector(".group-count")!.textContent = String(rest.length);
   lines.classList.toggle("grouped", grouped);
   const more = renderLensMore();
+  // #196 (D9): everything hidden here — the end line says so, not the empty sheet's cat.
+  const device = deviceLines(todayAll());
   reconcile(lines, [
     ...(grouped ? [nextHead] : []), ...nextRows, ...(grouped ? [restHead] : []), ...restRows,
-    ...(allFinished ? [allDone] : []), ...(today.length === 0 ? [emptyToday] : []), ...(more ? [lensMore] : []), ...(grouped ? [linesFill] : []),
+    ...(allFinished ? [allDone] : []), ...(today.length === 0 && !device.length ? [emptyToday] : []), ...(more ? [lensMore] : []), ...device, ...(grouped ? [linesFill] : []),
   ]);
   reconcile(sheet, [...(shown ? [strip.element] : []), lines]);
   sheet.classList.toggle("with-strip", shown);
@@ -864,7 +974,7 @@ const strip = new DayStripView({
   room: () => sheet.clientHeight || window.innerHeight - 170,
   redraw: () => { if (state) render(); },
   // 2a (A3, A4): the lens is the strip's and the timetable's too.
-  tasks: () => lensTasks(state.items, spacesOf(), lensNow()),
+  tasks: () => lensTasks(noteItems(), spacesOf(), lensNow()),
   spaceOf: (id) => spacesOf().get(id),
 });
 window.addEventListener("ribbon-now", () => { if (state) render(); });
@@ -925,7 +1035,8 @@ function aheadLensed(now = new Date()): { sections: AheadSection[]; all: number;
   const holding = [...finishing].join(",");
   const lens = lensNow(now);
   if (aheadKept && aheadKept.state === state && aheadKept.minute === minute && aheadKept.finishing === holding && aheadKept.lens === lens) return aheadKept;
-  const items = finishing.size ? state.items.map((item) => (finishing.has(item.id) && item.isCompleted ? { ...item, isCompleted: false } : item)) : state.items;
+  const listed = noteItems(now);
+  const items = finishing.size ? listed.map((item) => (finishing.has(item.id) && item.isCompleted ? { ...item, isCompleted: false } : item)) : listed;
   const spaces = spacesOf();
   const lensed = aheadLens(items, (id) => spaces.get(id)?.id, lens, now);
   const sections = aheadSections(lensed.items, state.events ?? [], now, lang());
@@ -1042,6 +1153,8 @@ function renderAhead(): void {
   if (sections.length === 0) children.push(emptyAhead);
   // 2a (A1, A2): one space showing — the open to-dos ahead it hides, on the last line (as 오늘's, #87).
   if (renderLensMore(aheadLensed(now).hidden)) children.push(lensMore);
+  // #196 (D9): what this PC hides ahead.
+  children.push(...deviceLines(state.items.filter((item) => pageOf(item, now) !== "today" && !item.isCompleted)));
   reconcile(aheadList, children);
   // What a drag (or a snapshot of one) left marked.
   for (const element of aheadList.querySelectorAll(".drop-target, .drop-before, .drop-after, .dragging")) element.classList.remove("drop-target", "drop-before", "drop-after", "dragging");
@@ -2289,7 +2402,17 @@ function showSearch(query = ""): SearchSlip | undefined {
   commitEditing();
   searchSlip = openSearch({
     closed: () => { searchSlip = undefined; },
+    hidden: (row) => {
+      if (row.kind !== "today" && row.kind !== "ahead") return undefined;
+      const { hidden } = deviceNow();
+      return hidden.size && hidden.has(keyOf(row.id)) ? deviceWords.hiddenTag[lang()] : undefined;
+    },
+    spaceHint: hasSpaces() ? searchHint(liveSpaces(state.todoSpaces)[0].name, lang()) : undefined,
     open: (row) => {
+      // #196: a to-do this PC hides opens 잠깐 보기 for its space.
+      if ((row.kind === "today" || row.kind === "ahead") && deviceNow().onNote.has(keyOf(row.id))) {
+        void api.act({ type: "spacePeek", spaces: [...new Set([...(state.devicePeek ?? []), keyOf(row.id)])] });
+      }
       if (row.kind === "today" || row.kind === "ahead") showTask(row.id, true);
       // A memo: the 메모 서랍, on its folder with the memo open (M5).
       else if (row.kind === "memos") { searchSlip?.close(); openDrawer({ memo: row.id }); }
@@ -2478,7 +2601,8 @@ window.addEventListener("keydown", (event) => {
   }
   // W8: Ctrl+Shift+1–9 shows one space (in order), Ctrl+Shift+0 all of them (by the key's place, whatever the layout).
   if (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && /^Digit[0-9]$/.test(event.code) && state && hasSpaces()) {
-    const lens = lensForDigit(state.todoSpaces, Number(event.code.slice(5)));
+    // #196 (D7): the digits keep the spaces' order; a hidden space's does nothing.
+    const lens = deviceLensForDigit(state.todoSpaces, Number(event.code.slice(5)), deviceNow().onNote);
     event.preventDefault();
     if (lens !== null) setLens(lens);
     return;
@@ -2544,9 +2668,9 @@ api.on("note:commit-editing", () => {
 });
 // 빠른 입력 while the note is up: its toast (with the switch) shows here.
 api.on("note:toast", (payload) => {
-  const { made, candidates, index, text, space } = payload as IntentToast;
+  const { made, candidates, index, text, space, hiddenIn } = payload as IntentToast;
   const readings = candidates.map(fromWire);
-  if (readings[index]) showMade(flow, made, readings[index], readings, text, space);
+  if (readings[index]) showMade(flow, made, readings[index], readings, text, space, hiddenIn);
 });
 api.on("note:row-command", (payload) => {
   const { id, command } = payload as { id: string; command: string };

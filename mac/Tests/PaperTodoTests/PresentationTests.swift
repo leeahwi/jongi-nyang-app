@@ -1101,6 +1101,37 @@ private enum PresentationTests {
             }
         }
 
+        try await test("#3: the open memo's words leave the text view as a native string, exactly as the view has them") {
+            // A bridged NSString made every later comparison of a Korean memo go through Unicode normalization (0.2 s a key
+            // at 1 MB); the copy must be the same characters, lone surrogates and NULs included.
+            let samples = ["", "a", "한글 메모\n- [ ] 우유", "e\u{301} é 각 각", "🐈‍⬛ 고양이 👍🏽", "줄\u{0}중간", String(repeating: "긴 줄 ", count: 40_000),
+                           String(utf16CodeUnits: [0x41, 0xD800, 0x42], count: 3), String(utf16CodeUnits: [0xDC00], count: 1)]
+            for sample in samples {
+                let words = NSMutableString(string: sample)
+                let copy = DrawerTextView.KeyTextView.native(words)
+                try expect(Array(copy.utf16) == Array((words as String).utf16) || copy == (words as String),
+                           "the copy of \(sample.prefix(20).debugDescription) has the same characters")
+                try expect(copy.utf8.withContiguousStorageIfAvailable { _ in true } == true, "the copy of \(sample.prefix(20).debugDescription) is native")
+            }
+            _ = NSApplication.shared
+            final class Box { var text = "" }
+            let box = Box()
+            let memoText = MemoText()
+            let parent = DrawerTextView(text: Binding(get: { box.text }, set: { box.text = $0 }), palette: DrawerPalette.of(.day), bodyFont: memoText.font(),
+                                        lineHeight: memoText.line, markdown: memoText)
+            let storage = NSTextStorage(), layout = MemoLayoutManager(), container = NSTextContainer()
+            storage.addLayoutManager(layout)
+            layout.addTextContainer(container)
+            let view = DrawerTextView.KeyTextView(frame: .zero, textContainer: container)
+            let coordinator = DrawerTextView.Coordinator(parent)
+            view.delegate = coordinator
+            view.string = "메모 제목\n본문"
+            view.setSelectedRange(NSRange(location: (view.string as NSString).length, length: 0))
+            view.insertText("가a", replacementRange: NSRange(location: NSNotFound, length: 0))
+            try expect(box.text == "메모 제목\n본문가a" && coordinator.shown == box.text, "the binding has the keys (\(box.text.debugDescription))")
+            try expect(box.text.utf8.withContiguousStorageIfAvailable { _ in true } == true, "the binding's text is native")
+        }
+
         try await test("입력 줄 (#162): pasted lines grow the line up to 4, then it scrolls with the caret in sight; the keys still work") {
             _ = NSApplication.shared
             HandwritingFont.register()
@@ -1317,6 +1348,38 @@ private enum PresentationTests {
                        "with the keyboard in it the lines stay put (\(three.ink.sorted()) vs \(typing.ink.sorted()))")
             let typingOne = try drawn("장보기 목록", editing: true)
             try expect(one.ink.symmetricDifference(typingOne.ink).count <= 1, "one line: the same rows with the keyboard (\(one.ink.sorted()) vs \(typingOne.ink.sorted()))")
+        }
+
+        try await test("#185: while 모든 스페이스 ▾ is open a plain 1–9 picks that space and 0 모든 스페이스; the rows keep ⌥⌘") {
+            _ = NSApplication.shared
+            let fixture = try Fixture(items: [("보고서 쓰기", false)])
+            defer { fixture.cleanup() }
+            let model = AppModel(storageURL: fixture.storageURL, isolated: true, preferences: fixture.preferences)
+            let work = model.addTodoSpace(name: "회사", color: .pink)!
+            let home = model.addTodoSpace(name: "집", color: .mint)!
+            let menu = DrawerMenuBuilder.menu(SpaceMenus.header(model), palette: nil, font: .pen)
+            let shown = menu.items.filter { !$0.isHidden && !$0.isSeparatorItem }
+            try expectEqual(shown.map { $0.title.components(separatedBy: "\t")[0] }[1...2], ["회사", "집"], "the spaces in order (the count after a tab)")
+            // #196 added one row, 이 기기에서 숨기기 ▸ (a submenu: no digit of its own).
+            try expectEqual(shown.count, 7, "the same rows as before (모든 스페이스, two spaces, 일반, 묶기, 관리) and 이 기기에서 숨기기 ▸, no twin in sight")
+            try expect(shown.contains { $0.hasSubmenu && $0.title.hasPrefix(SpaceDevice.Words.hideHere.text(.current)) }, "이 기기에서 숨기기 ▸ is a submenu")
+            try expectEqual(menu.items.filter(\.isHidden).map(\.keyEquivalent), ["0", "1", "2"], "a hidden twin for 0, 1 and 2")
+            try expectEqual(shown.prefix(3).map { $0.keyEquivalentModifierMask.intersection([.command, .option]) }, [[.command, .option], [.command, .option], [.command, .option]], "the rows still show ⌥⌘0–2")
+            @MainActor func press(_ key: String, _ flags: NSEvent.ModifierFlags = []) -> Bool {
+                let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0, windowNumber: 0, context: nil,
+                                             characters: key, charactersIgnoringModifiers: key, isARepeat: false, keyCode: 0)!
+                return DrawerMenuBuilder.menu(SpaceMenus.header(model), palette: nil, font: .pen).performKeyEquivalent(with: event)
+            }
+            try expect(press("2"), "2 is taken by the open menu")
+            try expectEqual(model.spaceShown, .space(home), "2: the second space")
+            try expect(press("1"), "1 is taken")
+            try expectEqual(model.spaceShown, .space(work), "1: the first space")
+            try expect(press("0"), "0 is taken")
+            try expectEqual(model.spaceShown, .all, "0: 모든 스페이스")
+            try expect(!press("3"), "3: no third space, nothing happens")
+            try expectEqual(model.spaceShown, .all, "still 모든 스페이스")
+            try expect(press("1", [.command, .option]), "⌥⌘1 still picks in the open menu")
+            try expectEqual(model.spaceShown, .space(work), "⌥⌘1: the first space")
         }
 
         print("\n\(count) checks passed.")

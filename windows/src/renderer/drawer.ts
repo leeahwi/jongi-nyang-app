@@ -8,9 +8,10 @@ import {
   drawerPaper, drawerThemeValue, memoPapers, type DrawerBackdrop, type DrawerHit, type FolderSort, type FolderView, type MemoFolder, type MemoFolders, type MemoPaper,
 } from "../core/memoDrawer";
 import { fontTitles, type MemosState } from "../core/types";
-import { drawerMetrics, drawerPoints, endsParagraph } from "../core/textSteps";
+import { cardFaceKey, drawerFaceMetrics, drawerMetrics, drawerPoints, endsParagraph } from "../core/textSteps";
 import { h, icon, lang, paper, scrollFade, t, motion, reduceMotion } from "./api";
 import { toaster } from "./slip";
+import { placeChildren } from "../core/placeChildren";
 import { drawerCat } from "./drawerCat";
 import { closeMenus, menuContains, menuOpen, openMenu, type MenuEntry } from "./drawerMenu";
 import { isFenceLine, markdownLines, readLine } from "../core/memoMarkdown";
@@ -294,7 +295,15 @@ function openMemo(id: string, edit: boolean, line?: number): void {
   editing = edit;
   frozen = frozen ?? new Map(memosIn(folders(), state!.memos, currentView()).map((entry) => [entry.id, entry]));
   if (edit && (!editor || editor.id !== id)) editor = makeEditor(memo);
-  render();
+  slideCards(render);
+  // M3 (#166): the words being typed fade in with 바뀜 as the cards under them make room.
+  if (!reduceMotion()) {
+    const card = list.querySelector<HTMLElement>(`.it.open[data-id="${CSS.escape(id)}"]`);
+    if (card && !card.classList.contains("opening")) {
+      card.classList.add("opening");
+      card.addEventListener("animationend", () => card.classList.remove("opening"), { once: true });
+    }
+  }
   if (edit && editor) {
     const fields = editor;
     requestAnimationFrame(() => {
@@ -1154,6 +1163,87 @@ function groupHeader(group: CardGroup): HTMLElement {
     h("span", { class: "n" }, String(group.memos.length)));
 }
 
+/**
+ * #4: the list's cards and headers kept from one redraw to the next. A card whose memo and look are as they were is the
+ * same element (a redraw of 3,000 cards used to build all of them again, about 22,000 nodes, after every pause in the
+ * typing); only the changed ones are made, and `placeChildren` (core/placeChildren.ts) moves only what moved.
+ */
+let slips = new Map<string, { key: string; text: string; element: HTMLElement }>();
+let headers = new Map<string, HTMLElement>();
+let slipLook = "";
+
+/** The closed card for `memo`: the one drawn last time when nothing it shows changed. */
+function cachedSlip(memo: Memo, group: { kind: GroupKind; proxy: Memo }, titles: boolean, next: typeof slips): HTMLElement {
+  const place = placementOf(folders(), memo.id);
+  const date = viewSort() === "created" ? group.proxy.createdAt : group.proxy.updatedAt;
+  const key = `${group.kind}|${date}|${selectedID === memo.id}|${place.pinned}|${folderOf(place.folder)?.color ?? ""}|${paperOf(folders(), memo.id) ?? ""}|${titles}`;
+  const known = slips.get(memo.id);
+  const element = known && known.key === key && known.text === memo.text ? known.element : closedSlip(memo, group, undefined, titles);
+  next.set(memo.id, known?.element === element ? known : { key, text: memo.text, element });
+  return element;
+}
+
+function cachedHeader(group: CardGroup, next: typeof headers): HTMLElement {
+  const key = `${group.kind}|${group.label}|${group.memos.length}`;
+  const element = headers.get(key) ?? groupHeader(group);
+  next.set(key, element);
+  return element;
+}
+
+/** The list's cards (and headers) on screen now, found by halving: 5,000 cards cost no more than ten. */
+function cardsInView(): HTMLElement[] {
+  const view = list.getBoundingClientRect();
+  const items = list.children;
+  let low = 0, high = items.length;
+  while (low < high) { const middle = (low + high) >> 1; if (items[middle].getBoundingClientRect().bottom < view.top) low = middle + 1; else high = middle; }
+  const shown: HTMLElement[] = [];
+  for (let index = low; index < items.length; index += 1) {
+    const item = items[index] as HTMLElement;
+    if (item.getBoundingClientRect().top > view.bottom) break;
+    shown.push(item);
+  }
+  return shown;
+}
+
+/** Where each card on screen is laid out in the list (scrolling and a slide under way don't move it). */
+function cardPlaces(): Map<HTMLElement, { key: string | HTMLElement; top: number }> {
+  // A card by its memo (one drawn again, picked or not, is still that card), a header by itself.
+  return new Map(cardsInView().map((item) => [item, { key: item.dataset.id ?? item, top: item.offsetTop }]));
+}
+
+/**
+ * M3 (#166): a memo opened or put away — the cards on screen whose place it changed slide there with 바뀜 (0.16 s)
+ * instead of jumping. Measured in the next frame before it is drawn, and again if the open memo's height changes before
+ * that frame is drawn (CodeMirror sets it as it measures, sometimes only after the frame's own callbacks). Only cards in
+ * view move, each once; nothing moves under Reduce Motion or while the drawer is away.
+ */
+function slideCards(change: () => void): void {
+  if (reduceMotion() || !shown || searching) { change(); return; }
+  const before = new Map([...cardPlaces().values()].map(({ key, top }) => [key, top]));
+  change();
+  const sliding = new Map<HTMLElement, Animation>();
+  let drawn = false;
+  const slide = () => {
+    if (drawn) return;
+    for (const [item, { key, top }] of cardPlaces()) {
+      const was = before.get(key);
+      if (was === undefined || item.classList.contains("open")) continue;
+      const by = Math.round(was - top);
+      sliding.get(item)?.cancel();
+      sliding.delete(item);
+      if (Math.abs(by) >= 1) sliding.set(item, item.animate([{ transform: `translateY(${by}px)` }, { transform: "none" }], { duration: motion.change, easing: "cubic-bezier(0, 0, 0.58, 1)" }));
+    }
+  };
+  const open = list.querySelector<HTMLElement>(".it.open");
+  const watch = open ? new ResizeObserver(slide) : undefined;
+  watch?.observe(open!);
+  requestAnimationFrame(() => {
+    slide();
+    // Once that frame is drawn, the slides only run out.
+    requestAnimationFrame(() => { drawn = true; watch?.disconnect(); });
+  });
+}
+
 // ─── Drawing ──────────────────────────────────────────────────────────────────
 
 function renderTabs(): void {
@@ -1272,13 +1362,19 @@ function renderList(): void {
   const real = new Map(state.memos.map((memo) => [memo.id, memo]));
   const keep = editor && editing && !big ? list.querySelector<HTMLElement>(`.it.open[data-id="${CSS.escape(editor.id)}"]`) : null;
   const nodes: HTMLElement[] = [];
+  // Everything every card reads besides its memo: when it changes, every card is made again.
+  // The words' face, size and lines too (#198: the previews are drawn in them; core/textSteps.ts cardFaceKey).
+  const look = `${lang()}|${currentView()}|${viewSort()}|${renderedDay}|${cardFaceKey(state.prefs, lang() !== "ko")}`;
+  if (look !== slipLook) { slipLook = look; slips.clear(); headers.clear(); }
+  const nextSlips: typeof slips = new Map();
+  const nextHeaders: typeof headers = new Map();
   for (const group of groups) {
-    if (group.header) nodes.push(groupHeader(group));
+    if (group.header) nodes.push(cachedHeader(group, nextHeaders));
     for (const proxy of group.memos) {
       const memo = real.get(proxy.id);
       if (!memo) continue;
       // A memo written while another is open has no earlier self: its own time.
-      if (memo.id !== openID) { nodes.push(closedSlip(memo, { kind: group.kind, proxy: frozen?.has(memo.id) ? proxy : memo }, undefined, titles)); continue; }
+      if (memo.id !== openID) { nodes.push(cachedSlip(memo, { kind: group.kind, proxy: frozen?.has(memo.id) ? proxy : memo }, titles, nextSlips)); continue; }
       if (keep && editor && keep.dataset.sheet === (paperOf(folders(), memo.id) ?? undefined)) {
         refreshEditor(editor, memo);
         keep.querySelector(".acts")?.replaceWith(actions(memo));
@@ -1296,28 +1392,23 @@ function renderList(): void {
   if (openID && !proxies.some((memo) => memo.id === openID)) { openID = undefined; editing = false; big = false; editor = undefined; frozen = undefined; }
   list.classList.toggle("dense", proxies.length > 20 && !titles);
   list.classList.toggle("titles", titles);
-  const kept = keep ? nodes.indexOf(keep) : -1;
-  if (keep && kept >= 0 && keep.parentNode === list) {
-    // The memo being typed stays where it is in the page (CodeMirror keeps its focus, caret and measurements): only
-    // the cards around it are replaced.
-    const range = document.createRange();
-    range.setStart(list, 0);
-    range.setEndBefore(keep);
-    range.deleteContents();
-    range.setStartAfter(keep);
-    range.setEnd(list, list.childNodes.length);
-    range.deleteContents();
-    keep.before(...nodes.slice(0, kept));
-    keep.after(...nodes.slice(kept + 1));
-  } else {
-    list.replaceChildren(...nodes);
+  slips = nextSlips;
+  headers = nextHeaders;
+  const arrived = arrivedID && !reduceMotion() ? nextSlips.get(arrivedID)?.element : undefined;
+  arrivedID = undefined;
+  if (arrived && !arrived.classList.contains("arrive")) {
+    arrived.classList.add("arrive");
+    arrived.addEventListener("animationend", () => arrived.classList.remove("arrive"), { once: true });
   }
   if (proxies.length === 0) {
-    list.append(currentView() === pinnedView
+    nodes.push(currentView() === pinnedView
       // One line under the cat (#39); the footer only says 비어 있어요.
       ? h("div", { class: "empty" }, h("img", { src: "../../assets/pet/256/curious.png", alt: "", draggable: "false" }), h("p", {}, t("메모를 펼쳐 핀을 누르면 여기에 모여요.")))
       : h("div", { class: "empty" }, h("img", { src: "../../assets/pet/256/tea.png", alt: "", draggable: "false" }), h("p", {}, t("위 쪽지에 적거나, 다른 폴더의 메모를 이 책갈피로 끌어 와 보세요."))));
   }
+  // The memo being typed stays where it is in the page (CodeMirror keeps its focus, caret and measurements), and so does
+  // every card that didn't change.
+  placeChildren<ChildNode>(list, nodes);
   const n = proxies.length;
   count.textContent = currentView() === pinnedView
     ? (n ? footerWords(t("고정"), n, lang()) : drawerFooter("pinned", 0, "", lang()))
@@ -1391,7 +1482,8 @@ function applyMemoText(): void {
   const prefs = state!.prefs;
   const face = prefs.drawerFont;
   root.dataset.font = face === "pen" || face === "brush" ? face : prefs.font;
-  const key = `${face}|${prefs.drawerTextPt}|${prefs.drawerLineHeight}|${prefs.drawerParagraph}|${prefs.drawerCodeFont}|${prefs.drawerShowMarks}`;
+  const latin = lang() !== "ko";
+  const key = `${face}|${prefs.drawerTextPt}|${prefs.drawerLineHeight}|${prefs.drawerParagraph}|${prefs.drawerCodeFont}|${prefs.drawerShowMarks}|${latin}`;
   root.toggleAttribute("data-show-marks", prefs.drawerShowMarks);
   if (key === memoTextKey) return;
   memoTextKey = key;
@@ -1399,9 +1491,11 @@ function applyMemoText(): void {
   root.dataset.memoFont = face;
   // 코드 글꼴 (#143): D2Coding for code and the 고정폭 face (drawer.css), or the system's.
   root.dataset.codeFont = prefs.drawerCodeFont;
-  // The handwriting faces run as much larger as the notebook's (pen 23 : 15, brush 22 : 15).
-  const faceSize = face === "pen" ? Math.round((metrics.body * 23) / 15) : face === "brush" ? Math.round((metrics.body * 22) / 15) : face === "mono" ? metrics.body - 1 : metrics.body;
-  for (const [name, value] of [["--m-size", metrics.body], ["--m-face-size", faceSize], ["--m-line", metrics.line], ["--m-para", metrics.paragraph], ["--m-preview", metrics.preview], ["--m-preview-line", metrics.previewLine]] as const) {
+  // The handwriting faces run as much larger as the notebook's (pen 23 : 15, brush 22 : 15); the card's preview, 찾기's
+  // found line and their checklist rows are in the words' face too, scaled alike (#198: 보통 pen 20, brush 19), on the
+  // preview's lines (the Latin pen's a quarter taller).
+  const faced = drawerFaceMetrics(prefs.drawerTextPt, face, latin);
+  for (const [name, value] of [["--m-size", metrics.body], ["--m-face-size", faced.size], ["--m-line", metrics.line], ["--m-para", metrics.paragraph], ["--m-preview", metrics.preview], ["--m-preview-face", faced.previewSize], ["--m-preview-line", faced.previewLine]] as const) {
     root.style.setProperty(name, `${value}px`);
   }
   editor?.body.refont(prefs.drawerShowMarks);
@@ -1604,7 +1698,7 @@ window.addEventListener("keydown", (event) => {
     if (closeMenus()) return;
     if (linkEdit) { cancelLink(); return; }
     if (big) { big = false; render(); requestAnimationFrame(() => editor?.body.view.focus()); return; }
-    if (openID) { const id = openID; closeOpen(); selectedID = id; render(); list.querySelector<HTMLElement>(`.it[data-id="${CSS.escape(id)}"]`)?.focus(); return; }
+    if (openID) { const id = openID; slideCards(() => { closeOpen(); selectedID = id; render(); }); list.querySelector<HTMLElement>(`.it[data-id="${CSS.escape(id)}"]`)?.focus(); return; }
     if (searching) { leaveSearch(); return; }
     close();
     return;
@@ -1664,7 +1758,7 @@ window.addEventListener("keydown", (event) => {
 
 // A click on the paper beside the cards puts the open one away.
 list.addEventListener("click", (event) => {
-  if (event.target === list && openID) { closeOpen(); render(); }
+  if (event.target === list && openID) slideCards(() => { closeOpen(); render(); });
 });
 
 // Right-click: a field's text menu, a memo's menu, else (the paper, the header) the ⚙ menu.
@@ -1885,8 +1979,21 @@ api.on("drawer:backdrop", (mode) => applyBackdrop(mode as DrawerBackdrop));
 /** Opened on a memo before the first state came: it opens once the state is here. */
 let pendingMemo: string | undefined;
 
+/**
+ * M4 (#166): the one memo that just came in while the drawer is out (the quick-write slip's Enter, a paste, 빠른 메모, a
+ * memo brought back) rises into its place once with 등장; memos that came while it was away don't.
+ */
+let knownIDs: Set<string> | undefined;
+let arrivedID: string | undefined;
+function noteArrivals(memos: Memo[]): void {
+  const fresh = knownIDs && shown ? memos.filter((memo) => !knownIDs!.has(memo.id)) : [];
+  arrivedID = fresh.length === 1 ? fresh[0].id : undefined;
+  knownIDs = new Set(memos.map((memo) => memo.id));
+}
+
 api.on("state:memos", (next) => {
   state = next as MemosState;
+  noteArrivals(state.memos);
   // Restored memos the trash still lists only until the state says where they are.
   for (const id of restoring) if (!state.memoTrash.entries.some((entry) => entry.memo.id === id)) restoring.delete(id);
   if (view === undefined) view = state.prefs.drawerLastFolder || inboxID;
@@ -1894,6 +2001,7 @@ api.on("state:memos", (next) => {
 });
 void api.getState().then((initial) => {
   state = initial;
+  noteArrivals(initial.memos);
   if (view === undefined) view = initial.prefs.drawerLastFolder || inboxID;
   render();
   const memo = pendingMemo;
@@ -1954,5 +2062,5 @@ const cardRect = (id: string) => list.querySelector<HTMLElement>(`.it[data-id="$
   },
   /** #82 · #83: the empty bookmark (+) and the close bar drawn as if under the pointer. */
   edgeHover: () => stage.classList.add("edge-hover"),
-  reset: () => { stage.classList.remove("edge-hover"); formatOpen = false; closeLink(); showTitleCaret(false); closeMenus(); hideTip(); closeOpen(); if (searching) leaveSearch(false); big = false; selectedID = undefined; quick.value = ""; fitQuick(); toast.hide(); render(); list.scrollTop = 0; },
+  reset: () => { stage.classList.remove("edge-hover"); formatOpen = false; closeLink(); showTitleCaret(false); closeMenus(); hideTip(); closeOpen(); if (searching) leaveSearch(false); big = false; selectedID = undefined; quick.value = ""; fitQuick(); toast.hide(); slips.clear(); headers.clear(); render(); list.scrollTop = 0; },
 };

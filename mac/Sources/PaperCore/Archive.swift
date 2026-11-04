@@ -10,19 +10,39 @@ public struct ArchiveEntry: Codable, Equatable, Sendable {
     /// The task's time range (1.39), kept as it was: "HH:mm", omitted when there was none.
     public var timeStart: String?
     public var timeEnd: String?
+    /// The to-do's space id when it was filed (spaces 2c, C5); omitted for 일반. A line without it (or from an older
+    /// version) takes its space from todo-spaces.json while the place is there, else 일반 (`TodoSpaces.spaceID(of:)`).
+    public var space: String?
 
-    public init(id: String, title: String, createdAt: Date, completedAt: Date?, timeStart: String? = nil, timeEnd: String? = nil) {
+    public init(id: String, title: String, createdAt: Date, completedAt: Date?, timeStart: String? = nil, timeEnd: String? = nil,
+                space: String? = nil) {
         self.id = id
         self.title = title
         self.createdAt = createdAt
         self.completedAt = completedAt
         self.timeStart = timeStart
         self.timeEnd = timeEnd
+        self.space = space
     }
 
-    public init(_ item: TodoItem) {
+    public init(_ item: TodoItem, space: String? = nil) {
         self.init(id: item.id.uuidString, title: item.title, createdAt: item.createdAt, completedAt: item.completedAt,
-                  timeStart: item.timeStart, timeEnd: item.timeEnd)
+                  timeStart: item.timeStart, timeEnd: item.timeEnd, space: space)
+    }
+
+    private enum CodingKeys: String, CodingKey { case id, title, createdAt, completedAt, timeStart, timeEnd, space }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        completedAt = try c.decodeIfPresent(Date.self, forKey: .completedAt)
+        timeStart = try c.decodeIfPresent(String.self, forKey: .timeStart)
+        timeEnd = try c.decodeIfPresent(String.self, forKey: .timeEnd)
+        // Tolerant: a `space` that isn't a non-empty string reads as none (the line itself still counts).
+        let kept = (try? c.decodeIfPresent(String.self, forKey: .space)) ?? nil
+        space = kept?.isEmpty == false ? kept : nil
     }
 }
 

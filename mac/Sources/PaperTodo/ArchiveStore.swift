@@ -89,7 +89,9 @@ final class ArchiveStore: ObservableObject {
     @discardableResult
     func file(_ due: [TodoItem]) -> [TodoItem] {
         guard !due.isEmpty else { return [] }
-        let saved = append(due.map(ArchiveEntry.init))
+        // Spaces 2c (C5): each line keeps the to-do's space as it was filed (none for 일반).
+        let spaces = model.todoSpaces
+        let saved = append(due.map { ArchiveEntry($0, space: spaces.spaceID(of: $0.id)) })
         // Only tasks that actually reached the file leave the list.
         let filed = due.filter { saved.contains($0.id.uuidString) }
         if !filed.isEmpty { model.archiveCompleted(Set(filed.map(\.id))) }
@@ -132,11 +134,15 @@ final class ArchiveStore: ObservableObject {
         var hasher = Hasher()
         hasher.combine(Archive.dayKey(Date()))
         hasher.combine(model.focusLog.records().count)
+        let spaces = model.todoSpaces
         for item in model.items where item.isCompleted {
             hasher.combine(item.id)
             hasher.combine(item.title)
             hasher.combine(item.completedAt)
+            // Spaces 2c: a finished to-do moved to another space is filtered anew.
+            hasher.combine(spaces.spaceID(of: item.id))
         }
+        hasher.combine(spaces.visible.map(\.id))
         return hasher.finalize()
     }
 
@@ -153,7 +159,9 @@ final class ArchiveStore: ObservableObject {
     func allEntries() -> [ArchiveEntry] {
         let archived = load()
         let archivedIDs = Set(archived.map(\.id))
-        return archived + model.items.filter { $0.isCompleted && !archivedIDs.contains($0.id.uuidString) }.map(ArchiveEntry.init)
+        let spaces = model.todoSpaces
+        return archived + model.items.filter { $0.isCompleted && !archivedIDs.contains($0.id.uuidString) }
+            .map { ArchiveEntry($0, space: spaces.spaceID(of: $0.id)) }
     }
 
     func seed(_ entries: [ArchiveEntry]) {

@@ -266,6 +266,19 @@ public enum Search {
     /// 완료 기록 shows a few more.
     public static let historyLimit = 30
 
+    /// 찾기의 `#스페이스` (spaces 2c, C1–C3): only the to-dos and record lines of one space (`space`; nil is 일반). The
+    /// caller says each one's space (TodoSpaces: `Search.spaceQuery`), so this file needs no spaces of its own.
+    public struct Only {
+        public var space: String?
+        /// A to-do's live space by its UUID string (nil: 일반).
+        public var item: (String) -> String?
+        /// A record line's space (its own, else its place, else 일반: C5).
+        public var entry: (ArchiveEntry) -> String?
+        public init(space: String?, item: @escaping (String) -> String?, entry: @escaping (ArchiveEntry) -> String?) {
+            self.space = space; self.item = item; self.entry = entry
+        }
+    }
+
     // MARK: Matching
 
     /// Where `query` first appears in `text` (scalar offsets of the NFC text), or nil. Latin letters
@@ -459,11 +472,16 @@ public enum Search {
     /// but whose folder's name does comes too (its title, nothing marked), and every memo hit names its folder.
     /// `index` (#69): what was read for an earlier search, kept — the same results, sooner. Each group stops at its
     /// limit, and a to-do's page and a hit's date are worked out for the hits only.
+    /// `only` (spaces 2c): one space's to-dos and record lines, no memos or events; with it an empty `query` finds all
+    /// of them (nothing marked).
     public static func find(_ query: String, items: [TodoItem], memos: [Memo], history: [ArchiveEntry], events: [EventEntry],
                             now: Date, calendar: Calendar = .paper, language: AppLanguage = .ko, limit: Int = Search.limit,
-                            memoFolders: [String: String] = [:], index: Index? = nil) -> [(group: Group, hits: [Hit])] {
+                            memoFolders: [String: String] = [:], index: Index? = nil, only: Only? = nil) -> [(group: Group, hits: [Hit])] {
         let query = Query(query)
-        guard !query.isEmpty else { return [] }
+        guard !query.isEmpty || only != nil else { return [] }
+        /// Everything of the space matches when only its `#` was written.
+        let all = query.isEmpty
+        let space = only?.space
         let todayKey = Archive.dayKey(now, calendar: calendar)
         let thisYear = calendar.component(.year, from: Archive.logicalDayStart(now, calendar: calendar))
         func dayText(_ date: Date) -> String {
@@ -495,9 +513,12 @@ public enum Search {
 
         // The to-dos that match, in the list's order, and their pages: each group is the matching part of the
         // list it was cut from, in the same order.
-        let titles = index?.titles(items) ?? items.map { keys($0.title) }
-        let found = items.enumerated().compactMap { offset, item in
-            match(query, keys: titles[offset]).map { (offset: offset, item: item, range: $0, today: Shelf.page(of: item, now: now, calendar: calendar) == .today) }
+        let titles: [[UInt32]] = all ? [] : index?.titles(items) ?? items.map { keys($0.title) }
+        typealias Found = (offset: Int, item: TodoItem, range: Range<Int>, today: Bool)
+        let found: [Found] = items.enumerated().compactMap { offset, item -> Found? in
+            if let only, only.item(item.id.uuidString) != space { return nil }
+            guard let range = all ? 0..<0 : match(query, keys: titles[offset]) else { return nil }
+            return (offset, item, range, Shelf.page(of: item, now: now, calendar: calendar) == .today)
         }
         let onToday = found.filter(\.today)
         add(.today, (onToday.filter { !$0.item.isCompleted } + onToday.filter(\.item.isCompleted)).prefix(limit).map { taskHit($0.item, $0.range, .today) })
@@ -509,7 +530,8 @@ public enum Search {
 
         index?.keep(memos)
         var memoHits: [Hit] = []
-        for memo in memos.sorted(by: { $0.updatedAt > $1.updatedAt }) where memoHits.count < limit {
+        // Memos and events have no space: a `#` leaves them out (C3).
+        for memo in only == nil ? memos.sorted(by: { $0.updatedAt > $1.updatedAt }) : [] where memoHits.count < limit {
             let folder = memoFolders[memo.id]
             func detail() -> String { folder.map { $0 + " · " + dayText(memo.updatedAt) } ?? dayText(memo.updatedAt) }
             // The title line if it matches, else the first line that does.
@@ -526,12 +548,14 @@ public enum Search {
         let historyCap = max(limit, historyLimit)
         let record: (entries: [ArchiveEntry], keys: [[UInt32]]) = index?.newestFirst(history) ?? (newestFirst(history), [])
         for (offset, entry) in record.entries.enumerated() where historyHits.count < historyCap {
-            guard let range = record.keys.isEmpty ? match(query, in: entry.title) : match(query, keys: record.keys[offset]) else { continue }
+            if let only, only.entry(entry) != space { continue }
+            guard let range = all ? 0..<0 : record.keys.isEmpty ? match(query, in: entry.title) : match(query, keys: record.keys[offset]) else { continue }
             historyHits.append(Hit(group: .history, id: entry.id, text: entry.title, range: range, detail: entry.completedAt.map(dayText) ?? "",
                                    done: true, day: entry.completedAt.map { Archive.dayKey($0, calendar: calendar) }))
         }
         add(.history, historyHits)
 
+        guard only == nil else { return groups }
         let coming = events.filter { $0.date >= todayKey }.sorted { $0.date < $1.date }
         let past = events.filter { $0.date < todayKey }.sorted { $0.date > $1.date }
         add(.events, (coming + past).compactMap { event in

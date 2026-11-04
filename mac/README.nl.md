@@ -103,6 +103,15 @@
 - Bureau → Weergave → **Taal**: Automatisch · 한국어 · English · Nederlands. Automatisch volgt de taalvolgorde van je Mac (Engels als geen van de drie erin staat); na een wijziging start Jongi-nyang opnieuw.
 - Menu’s, instellingen, help, herinneringen, kattenpraat, datums en tijden: alles in die taal. Engels en Nederlands handschrift gebruikt Caveat (pen) en Kalam (stift); titels die je in het Koreaans schrijft, blijven in Koreaans handschrift.
 
+### 🖥 Ruimtes per apparaat · een nieuw Vandaag-venster (1.47)
+![Bureau → Ruimtes met Werk verborgen op dit apparaat en Studie alleen zichtbaar op gekozen doordeweekse tijden](../docs/screenshots/mac/spaces-device-desk.png)
+
+- **Ruimtes per apparaat**: in Bureau → Ruimtes kies je met de keuzelijst `Op dit apparaat` rechts in een rij Tonen, Verbergen of `Tijden instellen…`. Kies dagen en tijden, of vul ze in één keer met de chips `Werkdagen 9–18` · `Doordeweekse avonden 19–23` · `Weekend`. De instelling blijft op deze Mac; de bestanden in de gedeelde map veranderen niet.
+- **Verborgen ruimtes blijven stil**: taken in een verborgen ruimte staan niet op het notitieblok, in het Vandaag-venster, de Daglint en de Avondopruiming, en hun herinneringen gaan op deze Mac niet af. Met `Even kijken` onderaan de lijst zie je ze weer, tot de app opnieuw start of je op `Weer verbergen` klikt. Geschiedenis toont ze nog.
+- **Een nieuw Vandaag-venster**: het Vandaag-venster in de menubalk toont de afspraak, de timer en de wekker alleen als kaartje als er een is, en laat tot zeven taken zien. Bovenaan staat hoeveel taken van vandaag klaar zijn, met een dunne balk; klik op de naam van een taak om hem in het notitieblok te zien.
+- **Ruimtes in zoeken en Geschiedenis**: typ in zoeken (`⌘F`) `#Werk rapport` om alleen in de taken en de Geschiedenis van die ruimte te zoeken. Kies een ruimte in `Alle ruimtes ▾` bovenaan Bureau → Geschiedenis om alleen de afgeronde taken en focus daarvan te zien.
+- **Jongi-nyang for Claude**: Claude ziet je taken per ruimte, kiest de ruimte voor nieuwe taken en laat eerst een voorbeeld zien voordat hij een taak naar een andere ruimte verplaatst. Je kunt de pagina van vandaag, deze week of één notitie als bron aan een gesprek toevoegen (`@` in Claude Code).
+
 ### 🧺 Groeperen per ruimte · automatische back-ups (1.46)
 ![Een breed notitieblok met de taken van vandaag in één kolom per ruimte](../docs/screenshots/mac/spaces2b-board.png)
 

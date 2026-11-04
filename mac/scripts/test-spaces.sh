@@ -1,6 +1,6 @@
 #!/bin/bash
 # 할 일 스페이스 (TodoSpaces.swift): todo-spaces.json, the # token, the lens, merging, pruning, the backup — the shared
-# cases S1–S48 from docs/plans/spaces-cases.json (the Windows app reads the same file), then the Mac's own.
+# cases S1–S59 from docs/plans/spaces-cases.json (the Windows app reads the same file), then the Mac's own.
 set -euo pipefail
 task_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$task_root"
@@ -36,6 +36,7 @@ swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/DayStrip.swift \
     Sources/PaperCore/Ahead.swift \
     Sources/PaperCore/Convenience.swift \
+    Sources/PaperCore/SpaceSearch.swift \
     Sources/PaperCore/PetChatter.swift \
     Sources/PaperCore/BubbleText.swift \
     Sources/PaperCore/PetAsk.swift \

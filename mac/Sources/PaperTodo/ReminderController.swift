@@ -59,7 +59,7 @@ final class ReminderController: ObservableObject {
         intervalMinutes = initialInterval
         let savedDuration = preferences.integer(forKey: "reminder.displaySeconds")
         displaySeconds = [10, 15, 25].contains(savedDuration) ? savedDuration : 15
-        hasTasks = model.remainingCount > 0
+        hasTasks = model.hereRemainingCount > 0
         schedule = ReminderSchedule(enabled: initialEnabled, intervalMinutes: initialInterval, now: .now)
         armTimer()
 
@@ -99,7 +99,7 @@ final class ReminderController: ObservableObject {
     }
 
     private func modelChanged() {
-        let available = model.remainingCount > 0
+        let available = model.hereRemainingCount > 0
         if available != hasTasks {
             hasTasks = available
             schedule.resetAfterWake(now: .now)
@@ -123,14 +123,14 @@ final class ReminderController: ObservableObject {
     private func tick() {
         guard !sleeping else { return }
         let busy = (NSApp.isActive && NSApp.keyWindow != nil) || NSApp.modalWindow != nil || popup.isVisible || isOtherReminderVisible?() == true
-        if schedule.consumeIfDue(now: .now, hasTasks: model.remainingCount > 0, isBusy: busy) {
+        if schedule.consumeIfDue(now: .now, hasTasks: model.hereRemainingCount > 0, isBusy: busy) {
             showPopup(preview: false)
         }
         armTimer()
     }
 
     private func showPopup(preview: Bool) {
-        let unfinished = model.todayItems.filter { !$0.isCompleted }
+        let unfinished = model.hereTodayItems.filter { !$0.isCompleted }
         guard preview || !unfinished.isEmpty else { return }
         showingPreview = preview
         let tasks = unfinished.isEmpty ? [ReminderPopupTask(title: L("예: 책 10쪽 읽기"))] : unfinished.map(ReminderPopupTask.init)

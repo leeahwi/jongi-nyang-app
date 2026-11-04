@@ -262,6 +262,16 @@ Since 1.30 you can split to-dos into **spaces** like Work · Home · Study. The 
 | --- | --- |
 | ![Today: a space's colour band at the edge of each to-do](../docs/screenshots/windows/en/spaces-today.png) | ![Showing Work only: ‘5 more in other spaces · Show all’ at the end of the list](../docs/screenshots/windows/en/spaces-lens.png) |
 
+## Spaces per device · a new Today window (1.32)
+
+![Desk → Spaces with Work hidden on this device and Study shown only at set weekday times](../docs/screenshots/windows/device-desk.png)
+
+- **Spaces per device**: in Desk → Spaces, the `On this device` popup at the right of each row offers Show, Hide and `Set times…`. Pick days and times, or fill them in at once with the `Workdays 9–6` · `Weekday evenings 7–11` · `Weekends` chips. The setting stays on this PC, and the files in the shared folder don't change.
+- **Hidden spaces stay quiet**: to-dos in a hidden space stay off the notepad, the Today window, the Day ribbon and the Evening tidy-up, and their reminders don't ring on this PC. `Peek` at the end of the list shows them again until the app restarts or you click `Hide again`. History still shows them.
+- **A new Today window**: the notification area's Today window shows the event, timer and alarm as cards only when there is one, and lists up to seven to-dos. At the top it shows how many of today's to-dos are done, with a thin progress bar; click a to-do's name to open the notepad with that row selected.
+- **Spaces in search and History**: type `#Work report` in search (`Ctrl+F`) to look only in that space's to-dos and History. Pick a space in `All spaces ▾` at the top of Desk → History to see only its finished to-dos and focus. While the `All spaces ▾` menu is open, the number keys `1`–`9` and `0` pick a space.
+- **Jongi-nyang for Claude**: Claude sees your to-dos by space, chooses the space for new ones, and shows a preview before moving one to another space. You can attach today's page, this week or a single note to a conversation (`@` in Claude Code).
+
 ## Group by space · automatic backups (1.31)
 
 ![A wide notepad with today's to-dos grouped into one column per space](../docs/screenshots/windows/spaces2b-board.png)

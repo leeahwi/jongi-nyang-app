@@ -717,6 +717,21 @@ public enum Checklist {
         }
     }
 
+    /// Whether `lines(text)` would find any (#209): its bytes are looked through for a `- [ ] ` first, so a long memo
+    /// without one isn't split into lines (a 1 MB one: 20 ms on ↩).
+    public static func hasLines(_ text: String) -> Bool {
+        var text = text
+        let marked = text.withUTF8 { bytes -> Bool in
+            guard bytes.count >= 6 else { return false }
+            for at in 0...(bytes.count - 6) where bytes[at + 2] == 0x5B && bytes[at + 4] == 0x5D && bytes[at + 1] == 0x20 && bytes[at + 5] == 0x20 {
+                let box = bytes[at + 3], dash = bytes[at]
+                if (dash == 0x2D || dash == 0x2A) && (box == 0x20 || box == 0x78 || box == 0x58) { return true }
+            }
+            return false
+        }
+        return marked && !lines(text).isEmpty
+    }
+
     /// D7, D8: flips `[ ]` ↔ `[x]` (`[X]` counts as checked) on that line only; anything else
     /// (not a checklist line, no such line) gives the text back unchanged.
     public static func toggle(_ text: String, line index: Int) -> String {

@@ -499,8 +499,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     /// The folded icon's summary of today's sheet.
     private func updateFoldedSummary() {
-        let open = model.todayItems.filter { !$0.isCompleted }.map(\.title)
-        floatingMascot?.updateSummary(titles: open, remaining: model.remainingCount, total: model.todayItems.count)
+        let today = model.hereTodayItems
+        let open = today.filter { !$0.isCompleted }.map(\.title)
+        floatingMascot?.updateSummary(titles: open, remaining: model.hereRemainingCount, total: today.count)
     }
 
     private func updateMascot() {
@@ -651,7 +652,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         if arguments.contains("--notice-test") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
                 guard let self else { return }
-                let open = Array(self.model.todayItems.filter { !$0.isCompleted }.prefix(2))
+                let open = Array(self.model.hereTodayItems.filter { !$0.isCompleted }.prefix(2))
                 if let index = self.arguments.firstIndex(of: "--notice-log"), self.arguments.indices.contains(index + 1) {
                     try? "notice test: \(open.count) to-dos, center \(self.notices.available)\n".write(toFile: self.arguments[index + 1], atomically: true, encoding: .utf8)
                 }
@@ -661,7 +662,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // Dock badge: today's open count (setting).
         let badge = { [weak self] in
             guard let self else { return }
-            let count = self.model.remainingCount
+            let count = self.model.hereRemainingCount
             NSApp.dockTile.badgeLabel = self.model.dockBadge && count > 0 ? "\(count)" : nil
         }
         model.objectWillChange.sink { _ in DispatchQueue.main.async { badge() } }.store(in: &subscriptions)
@@ -818,7 +819,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     /// ⌥⌘0–9: everything, or one space on 오늘 (a number past the last space does nothing).
     @objc private func showSpaceDigit(_ sender: NSMenuItem) {
-        guard !model.todoSpaces.isEmpty, let shown = SpaceLens.forDigit(sender.tag, spaces: model.todoSpaces) else { return }
+        // #196 (D7): the digits keep the spaces' order; a hidden space's does nothing.
+        guard !model.todoSpaces.isEmpty, let shown = SpaceDevice.forDigit(sender.tag, spaces: model.todoSpaces, hidden: model.hiddenOnNote) else { return }
         showWindow()
         model.page = .todos
         model.showSpace(shown)

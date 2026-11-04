@@ -2,7 +2,7 @@ import {
   bodyFontSize, calendarAlertChoicesIn, fontTitles, styleDetails, styleTitles, textStepTitles,
   type TodosState, type DrawerFont, type NotebookFont, type Prefs, type ReminderStyle, type SpaceGroupStyle, type SystemNotify,
 } from "../core/types";
-import { codeFonts, drawerMetrics, drawerPoints, lineSpacings, paragraphSpacings, type CodeFont, type LineSpacing, type ParagraphSpacing } from "../core/textSteps";
+import { codeFonts, drawerMetrics, drawerPoints, faceSize, lineSpacings, paragraphSpacings, type CodeFont, type LineSpacing, type ParagraphSpacing } from "../core/textSteps";
 import { d2codingFamily, monoFamily, paperSamples } from "../core/drawerPapers";
 import { archiveChoicesIn, logicalDayStart } from "../core/archive";
 import type { TimerCommand } from "../core/focusTimer";
@@ -25,6 +25,8 @@ import { defaultNoteShortcut, takenBy } from "../core/shortcuts";
 import { generalDefaults, generalName, liveSpaces, newSpaceID, nextSpaceColor, spaceColor, spaceColors, spaceIndexOf, seriesSpaceOf, spaceObjectWords, type SpaceColor, type TodoSpace } from "../core/todoSpaces";
 import { toaster } from "./slip";
 import { openMenu, type MenuHost } from "./drawerMenu";
+import { deviceDeskFooter, deviceNone, devicePopupLabel, devicePresets, deviceSlipTitle, deviceWords, hiddenSpaces, readDeviceRules, storedDeviceRules, type DeviceRule } from "../core/spaceDevice";
+import { deviceMark, deviceStatusLine, openTimesSlip } from "./deviceSlip";
 import { folderPlace, placeSeparator, placeText } from "../core/storage";
 import { countsText, savedWhen, sizeText, type BackupReason } from "../core/backup";
 import type { BackupEntry } from "../core/types";
@@ -173,7 +175,7 @@ function drawerFontPreview(prefs: Prefs): HTMLElement {
   const sample = paperSamples[drawerLook(prefs.drawerTheme, night, prefs.drawerNightPaper)];
   const metrics = drawerMetrics(prefs.drawerTextPt, prefs.drawerLineHeight, prefs.drawerParagraph);
   const face = prefs.drawerFont;
-  const faceSize = face === "pen" ? Math.round((metrics.body * 23) / 15) : face === "brush" ? Math.round((metrics.body * 22) / 15) : face === "mono" ? metrics.body - 1 : metrics.body;
+  const size = faceSize(face, metrics.body);
   const hand = face === "pen" || face === "brush" ? face : prefs.font;
   const box = (done: boolean) => h("span", { class: `dfp-box${done ? " on" : ""}` }, done ? icon("check", 9, 3) : null);
   const element = h("div", { class: "dfp", role: "img", "aria-label": t("메모 글꼴 미리보기") },
@@ -186,7 +188,7 @@ function drawerFontPreview(prefs: Prefs): HTMLElement {
   const style: Record<string, string> = {
     "--p-paper": sample.paper, "--p-edge": sample.edge, "--p-card": sample.card, "--p-card-edge": sample.cardEdge, "--p-ink": sample.ink,
     "--p-sub": sample.sub, "--p-meta": sample.meta, "--p-box": sample.box, "--p-check": sample.check, "--p-on-check": sample.onCheck,
-    "--p-face": drawerFace(face, prefs.drawerCodeFont), "--p-mono": codeFamily(prefs.drawerCodeFont), "--p-size": `${faceSize}px`, "--p-mono-size": `${metrics.body - 1}px`, "--p-line": `${metrics.line}px`, "--p-para": `${metrics.paragraph}px`,
+    "--p-face": drawerFace(face, prefs.drawerCodeFont), "--p-mono": codeFamily(prefs.drawerCodeFont), "--p-size": `${size}px`, "--p-mono-size": `${metrics.body - 1}px`, "--p-line": `${metrics.line}px`, "--p-para": `${metrics.paragraph}px`,
     "--p-hand": hand === "brush" ? "var(--brush-font)" : hand === "pen" ? "var(--pen-font)" : "var(--ui)",
   };
   for (const [name, value] of Object.entries(style)) element.style.setProperty(name, value);
@@ -1160,7 +1162,7 @@ function drawerPane(): Node[] {
     ].filter(Boolean).join(" ")),
     h("div", { class: "group" }, h("div", { class: "label" }, t("미리보기")), drawerFontPreview(prefs)),
     group(t("메모 글꼴"), [fontRow, codeRow, sizeRow, lineRow, paragraphRow],
-      `${t("글꼴과 글자 크기는 서랍의 모든 메모에 같이 써요. 카드 미리보기는 크기만 따라요.")} ${t("코드 글꼴은 ‘코드’ 표시와 코드 묶음, 고정폭 글꼴에 써요. D2Coding은 한글이 영문 두 칸 폭이라 코드 줄의 칸이 맞아요.")}`),
+      `${t("글꼴과 글자 크기는 서랍의 모든 메모와 카드 미리보기에 같이 써요.")} ${t("코드 글꼴은 ‘코드’ 표시와 코드 묶음, 고정폭 글꼴에 써요. D2Coding은 한글이 영문 두 칸 폭이라 코드 줄의 칸이 맞아요.")}`),
   ];
 }
 
@@ -1192,11 +1194,66 @@ function settleSpaces(): void {
   if (spaceRedraw) { spaceRedraw = false; render(); }
 }
 
+// ─── 기기마다 보일 스페이스 (#196) ─────────────────────────────────────────────────
+
+/** This PC's 이 기기에서 for a space (`none`: 일반): undefined is 보이기. */
+const deviceRuleOf = (key: string): DeviceRule | undefined => readDeviceRules(state.prefs.spaceDevice)[key];
+/** What this PC hides now. */
+const deviceHiddenNow = (): Set<string> => hiddenSpaces(readDeviceRules(state.prefs.spaceDevice), state.todoSpaces, new Date());
+
+/** Sets 이 기기에서 (the main process keeps it cleaned and notes a space made visible). */
+function setDevice(key: string, rule: DeviceRule | undefined): void {
+  const rules = readDeviceRules(state.prefs.spaceDevice);
+  if (rule) rules[key] = rule;
+  else delete rules[key];
+  void set("spaceDevice", storedDeviceRules(rules));
+}
+
+/** 시간 정하기…: the slip over the desk, starting from the space's times (or 평일 09:00–18:00). */
+function openDeviceTimes(key: string, name: string, back?: HTMLElement): void {
+  const rule = deviceRuleOf(key);
+  const times = rule?.show === "time" && rule.times.length ? rule.times : devicePresets.workday.times;
+  spaceBusy = true;
+  openTimesSlip({ title: deviceSlipTitle(name, lang()), times, save: (picked) => setDevice(key, { show: "time", times: picked }), closed: () => { settleSpaces(); back?.focus(); } });
+}
+
+/**
+ * The row's 이 기기에서 popup at the right: its button the state's mark and ▾ (a screen reader hears "회사, 이 기기에서:
+ * 숨기기"); Enter · Space · ↓ open 보이기 · 숨기기 · 시간 정하기….
+ */
+function devicePopup(key: string, name: string): HTMLElement {
+  const rule = deviceRuleOf(key);
+  const symbol = !rule ? "eye" : rule.show === "hide" ? "eyeOff" : "clock";
+  const button = h("button", { class: `space-device ${!rule ? "" : rule.show === "hide" ? "hidden" : "timed"}`.trim(), "aria-haspopup": "menu", "aria-label": devicePopupLabel(name, rule, lang()), title: deviceWords.onThisDevice[lang()] },
+    icon(symbol, 15), icon("chevron", 10));
+  const open = (keyboard: boolean) => {
+    const language = lang();
+    openMenu(rowMenuHost, [
+      { kind: "item", label: deviceWords.show[language], icon: "eye", checked: !rule, run: () => setDevice(key, undefined) },
+      { kind: "item", label: deviceWords.hide[language], icon: "eyeOff", checked: rule?.show === "hide", run: () => setDevice(key, { show: "hide" }) },
+      { kind: "sep" },
+      { kind: "item", label: deviceWords.setTimes[language], icon: "clock", checked: rule?.show === "time", run: () => openDeviceTimes(key, name, button) },
+    ], devicePopupLabel(name, rule, language), button.getBoundingClientRect(), keyboard);
+  };
+  button.addEventListener("click", (event) => open(event.detail === 0));
+  button.addEventListener("keydown", (event) => { if (event.key === "ArrowDown") { event.preventDefault(); open(true); } });
+  return button;
+}
+
+/** The name and, under it, this PC's 이 기기에서 in words (none for 보이기). */
+function deviceNameBox(name: HTMLElement, key: string, hidden: Set<string>): HTMLElement {
+  const status = deviceStatusLine(deviceRuleOf(key), hidden.has(key));
+  return h("div", { class: `space-name-box${status ? " with-status" : ""}` }, name, status);
+}
+
 /** A space's row: the grip, its colour, its name (typed over), how many to-dos are open in it, 지우기. */
-function spaceRow(space: TodoSpace, open: number): HTMLElement[] {
+function spaceRow(space: TodoSpace, open: number, hidden: Set<string>): HTMLElement[] {
   const grip = h("span", { class: "space-grip", title: t("끌어서 순서 바꾸기"), "aria-hidden": "true" }, icon("more", 14));
   const swatch = h("button", { class: "space-swatch", "aria-label": t("{name} 색", { name: space.name }), "aria-expanded": String(colorsOpen === space.id), title: colorNames()[spaceColor(space.color)] });
   swatch.style.setProperty("--band", `var(--band-${spaceColor(space.color)})`);
+  // #196: the mark on the dot (hidden · time rule).
+  const mark = deviceMark(deviceRuleOf(space.id));
+  if (mark) swatch.append(mark);
   swatch.addEventListener("click", () => { colorsOpen = colorsOpen === space.id ? undefined : space.id; render(); });
   const name = h("input", { class: "space-name", type: "text", value: space.name, maxlength: "40", spellcheck: "false", "aria-label": t("스페이스 이름"), "data-keep": `space-${space.id}` });
   name.addEventListener("focus", () => { spaceBusy = true; });
@@ -1224,7 +1281,7 @@ function spaceRow(space: TodoSpace, open: number): HTMLElement[] {
   const count = h("span", { class: "space-count" }, open ? t("남은 할 일 {n}개", { n: open }) : "");
   const remove = h("button", { class: "quiet space-delete", title: t("지우기"), "aria-label": t("{name} 지우기", { name: space.name }) }, icon("trash", 15));
   remove.addEventListener("click", () => deleteSpaceNow(space));
-  const row = h("div", { class: "row space-row", "data-id": space.id }, grip, swatch, name, count, remove);
+  const row = h("div", { class: "row space-row", "data-id": space.id }, grip, swatch, deviceNameBox(name, space.id, hidden), count, devicePopup(space.id, space.name), remove);
   grip.addEventListener("pointerdown", (event) => dragSpace(event, row));
   rowMenu(row, space.name, () => { name.focus(); name.select(); }, () => deleteSpaceNow(space));
   if (colorsOpen !== space.id) return [row];
@@ -1243,7 +1300,7 @@ function spaceRow(space: TodoSpace, open: number): HTMLElement[] {
  * (blank or a default name: back to 일반 · General · Algemeen), its open to-dos; no 지우기, not dragged. Shown once
  * there is a space: before that every to-do is in it, and the name is shown nowhere.
  */
-function generalRow(open: number): HTMLElement {
+function generalRow(open: number, hidden: Set<string>): HTMLElement {
   const shown = generalName(state.todoSpaces, lang());
   const name = h("input", {
     class: "space-name", type: "text", value: shown, maxlength: "40", spellcheck: "false", placeholder: generalDefaults[lang()],
@@ -1263,7 +1320,8 @@ function generalRow(open: number): HTMLElement {
   });
   const count = h("span", { class: "space-count" }, open ? t("남은 할 일 {n}개", { n: open }) : "");
   return h("div", { class: "row space-row general" },
-    h("span", { class: "space-grip", "aria-hidden": "true" }), h("span", { class: "space-swatch still", "aria-hidden": "true" }), name, count, h("span", { class: "space-delete", "aria-hidden": "true" }));
+    h("span", { class: "space-grip", "aria-hidden": "true" }), h("span", { class: "space-swatch still", "aria-hidden": "true" }, deviceMark(deviceRuleOf(deviceNone))),
+    deviceNameBox(name, deviceNone, hidden), count, devicePopup(deviceNone, shown), h("span", { class: "space-delete", "aria-hidden": "true" }));
 }
 
 /** Dragging a row by its grip: the rows reorder under the pointer, and the order is kept on letting go. */
@@ -1305,7 +1363,8 @@ function spacesPane(): Node[] {
     else openGeneral += 1;
   }
   // 일반 first and fixed (#89); the spaces' rows are the only ones dragged.
-  const rows = [...(spaces.length ? [generalRow(openGeneral)] : []), ...spaces.flatMap((space) => spaceRow(space, open.get(space.id) ?? 0))];
+  const hidden = deviceHiddenNow();
+  const rows = [...(spaces.length ? [generalRow(openGeneral, hidden)] : []), ...spaces.flatMap((space) => spaceRow(space, open.get(space.id) ?? 0, hidden))];
   let lastRow: HTMLElement;
   if (spaceDraft !== undefined) {
     const color = nextSpaceColor(state.todoSpaces);
@@ -1335,7 +1394,8 @@ function spacesPane(): Node[] {
   return [
     // #53: the pane's header says what spaces are for; the footnote only what comes after (as on the Mac).
     group(t("스페이스"), [...rows, lastRow],
-      t("머리말에서 한 스페이스만 볼 수 있어요. 입력 줄에 {tag}을 붙이면 그 스페이스로 들어가요.", { tag: `#${t("이름").toLowerCase()}` }), false, "spaces"),
+      [t("머리말에서 한 스페이스만 볼 수 있어요. 입력 줄에 {tag}을 붙이면 그 스페이스로 들어가요.", { tag: `#${t("이름").toLowerCase()}` }),
+        ...(spaces.length ? [deviceDeskFooter(lang(), lang() === "nl" ? "pc" : "PC")] : [])].join(" "), false, "spaces"),
     // 2b: 스페이스별로 묶기 and its look (메모지 · 책갈피), only once there is a space to group by.
     ...(spaces.length ? [group(t("스페이스별로 묶기"), [
       h("div", { class: "row" }, glyph("spaces"), h("span", { class: "grow" }, t("스페이스별로 묶기")), rowKeys(["Ctrl", "Shift", "G"]),

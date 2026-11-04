@@ -113,7 +113,7 @@ export class PeriodicReminders {
   }
 
   private show(preview: boolean): void {
-    const open = this.store.todayItems.filter((item) => !item.isCompleted);
+    const open = this.store.hereTodayItems.filter((item) => !item.isCompleted);
     if (!preview && open.length === 0) return;
     this.previewing = preview;
     const prefs = this.store.prefs;
@@ -183,7 +183,9 @@ export class TaskReminders {
   }
 
   private get schedulable() {
-    return this.store.items.filter((item) => item.id !== this.store.editingReminderID);
+    // #196 (D10): a reminder of a space this PC hides never rings here, nor late once the space shows.
+    const now = new Date();
+    return this.store.items.filter((item) => item.id !== this.store.editingReminderID && this.store.reminderRingsHere(item, now));
   }
 
   private arm(minimumDelay = 1000): void {

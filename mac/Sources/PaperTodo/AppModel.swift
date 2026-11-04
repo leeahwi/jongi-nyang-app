@@ -225,7 +225,41 @@ final class AppModel: ObservableObject {
             spacesRevision &+= 1
             // The last space gone (or the first made) while grouping is on: the note's widest changes too.
             if todoSpaces.isEmpty != oldValue.isEmpty { onNoteWidthCap?() }
+            // #196: a to-do moved in or out of a hidden space comes or goes on the note; a space made, deleted or put
+            // back elsewhere changes what this Mac hides.
+            if !hiddenHere.isEmpty { revision &+= 1 }
+            refreshDeviceHidden()
         }
+    }
+    /// 기기마다 보일 스페이스 (#196, SpaceDeviceModel.swift): this Mac's 이 기기에서 per space (`spaces.device`, never in
+    /// todo-spaces.json).
+    @Published var deviceRules: SpaceDevice.Rules = [:] {
+        didSet {
+            guard deviceRules != oldValue else { return }
+            preferences.set(SpaceDevice.encode(deviceRules), forKey: "spaces.device")
+            refreshDeviceHidden()
+        }
+    }
+    /// D10: when a space was last made visible by a change here (`spaces.deviceShown`): reminders from before stay quiet.
+    var deviceShown: [String: Date] = [:]
+    /// What is hidden on this Mac now (live spaces' ids and `none`), worked out on the minute (D4).
+    @Published private(set) var hiddenHere: Set<String> = []
+    /// 잠깐 보기 (D6): hidden spaces the note shows anyway, until the app quits or 다시 숨기기. Not saved.
+    @Published private(set) var peeked: Set<String> = []
+    /// What the note hides: hidden here, less what is peeked at.
+    private(set) var hiddenOnNote: Set<String> = []
+    /// The minute's tick while a time rule is set, and the wake and time-zone observers (SpaceDeviceModel.swift).
+    var deviceClock: Timer?
+    var deviceObservers: [NSObjectProtocol] = []
+    /// Sets what is hidden and peeked at; the lists are worked out again, at once (no row animation, as a lens change).
+    func setDeviceView(hidden: Set<String>? = nil, peeked newPeeked: Set<String>? = nil) {
+        let hidden = hidden ?? hiddenHere, newPeeked = (newPeeked ?? peeked)
+        guard hidden != hiddenHere || newPeeked != peeked else { return }
+        hiddenHere = hidden
+        peeked = newPeeked
+        hiddenOnNote = hidden.subtracting(newPeeked)
+        revision &+= 1
+        spacesRevision &+= 1
     }
     /// todo-spaces.json as this Mac last read or wrote it.
     var knownSpacesData: Data?
@@ -625,6 +659,7 @@ final class AppModel: ObservableObject {
         groupStyle = SpaceGroupStyle(rawValue: preferences.string(forKey: "spaces.groupStyle") ?? "") ?? .card
         foldedGroups = Set(preferences.stringArray(forKey: "spaces.folded") ?? [])
         openDoneGroups = Set(preferences.stringArray(forKey: "spaces.doneOpen") ?? [])
+        loadSpaceDevice()
         if SafeFile.isRefused(storageURL) {
             // #173 (review L-04 · L-05): todos.json is a link or past 32MB — not read, and never saved over.
             canSave = false
@@ -669,8 +704,9 @@ final class AppModel: ObservableObject {
         let now = Date()
         let day = Archive.dayKey(now)
         if let derived, derived.revision == revision, derived.day == day { return (derived.today, derived.ahead, derived.done) }
-        let today = items.filter { Shelf.page(of: $0, now: now) == .today }
-        let ahead = items.filter { Ahead.isAhead($0, now: now) }.count
+        // #196: the note leaves out what this Mac hides (D2 of spaces-device.md), its tab counts too.
+        let today = items.filter { Shelf.page(of: $0, now: now) == .today && !noteHides($0) }
+        let ahead = items.filter { Ahead.isAhead($0, now: now) && !noteHides($0) }.count
         let done = today.reduce(0) { $0 + ($1.isCompleted ? 1 : 0) }
         derived = (revision, day, today, ahead, done)
         return (today, ahead, done)
@@ -721,11 +757,12 @@ final class AppModel: ObservableObject {
 
     /// What the cat knows when it speaks up: today's sheet and the deadlines.
     func chatterContext(now: Date = Date()) -> PetChatter.Context {
-        let today = todayItems
+        // #196: the cat says nothing of what this Mac hides (not even while it is peeked at).
+        let today = hereTodayItems
         let open = today.filter { !$0.isCompleted }
         let todayKey = Deadline.key(Archive.logicalDayStart(now))
         let tomorrowKey = Deadline.key(Calendar.paper.date(byAdding: .day, value: 1, to: Archive.logicalDayStart(now))!)
-        let waiting = items.filter { !$0.isCompleted }.compactMap(\.dueDate)
+        let waiting = hereItems.filter { !$0.isCompleted }.compactMap(\.dueDate)
         let events = calendar.hasEvents ? CalendarDay.chatter(calendar.visibleEvents, now: now) : nil
         return PetChatter.Context(
             hour: Calendar.paper.component(.hour, from: now),
@@ -760,7 +797,8 @@ final class AppModel: ObservableObject {
     /// 2a (A2, S37): while one space shows, 앞으로 lays out its to-dos only (events all); `hidden` is the end line's N.
     func aheadLensed(_ list: [TodoItem]? = nil, now: Date = Date()) -> (items: [TodoItem], hidden: Int) {
         let lens = spaceShown
-        let all = list ?? items
+        // #196: what the note hides isn't on 앞으로 either.
+        let all = (list ?? items).filter { !noteHides($0) }
         guard lens != .all else { return (all, 0) }
         return Ahead.lensed(all, now: now) { lens.includes(spaceIndex[$0.id]?.id) }
     }
@@ -816,7 +854,7 @@ final class AppModel: ObservableObject {
         self.toast = toast
     }
     /// The 오늘 창's tasks: today's open ones (and one just checked, for its animation).
-    var glanceTodayItems: [TodoItem] { todayItems.filter { !$0.isCompleted || finishingIDs.contains($0.id) } }
+    var glanceTodayItems: [TodoItem] { hereTodayItems.filter { !$0.isCompleted || finishingIDs.contains($0.id) } }
     /// Counts for today's sheet — what the footer, menu bar and reminders talk about.
     /// Once per change too (#61: the header, the footer, the menu bar and the reminders each counted the sheet).
     var completedCount: Int { derivedLists().done }
@@ -1156,7 +1194,9 @@ final class AppModel: ObservableObject {
     }
     func setTaskReminder(_ id: UUID, at date: Date?) { mutate { $0.setReminder(id: id, at: date) } }
     /// 시간 정하기 (1.39): the range (nil clears it) and the reminder that goes with it, one undo step.
-    func setTimeRange(_ id: UUID, to range: TimeRange?) { mutate { $0.setTimeRange(id: id, to: range) } }
+    /// `now` decides whether the range brings a reminder (one only for a start still ahead); the snapshots pass their
+    /// fixed clock (#191).
+    func setTimeRange(_ id: UUID, to range: TimeRange?, now: Date = Date()) { mutate { $0.setTimeRange(id: id, to: range, now: now) } }
     func markTaskReminderDelivered(_ id: UUID, at date: Date) { mutate { $0.markReminderDelivered(id: id, at: date) } }
     func completeTask(_ id: UUID) {
         guard items.contains(where: { $0.id == id && !$0.isCompleted }) else { return }
@@ -1437,7 +1477,8 @@ final class AppModel: ObservableObject {
     private var plainText: String {
         let line = { (item: TodoItem) in "\(item.isCompleted ? "[x]" : "[ ]") \(item.title)" + TimeBlock.exportText(item, language: .current) }
         let now = Date()
-        var text = todayItems.map(line).joined(separator: "\n") + "\n"
+        // Everything, as the file has it (#196: what this Mac hides is still the list's).
+        var text = allTodayItems.map(line).joined(separator: "\n") + "\n"
         // 앞으로: dated tasks by date, then 언젠가 in the list's order.
         let ahead = items.enumerated().filter { Shelf.page(of: $0.element, now: now) != .today }
         let dated = ahead.filter { $0.element.dueDate != nil }.sorted { ($0.element.dueDate!, $0.offset) < ($1.element.dueDate!, $1.offset) }.map(\.element)

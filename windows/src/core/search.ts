@@ -10,76 +10,18 @@ import { pageOf } from "./shelf";
 import { compactTime } from "./timeText";
 import { rangeOf, rangeText } from "./timeRange";
 import { logicalDayStart } from "./archive";
+import { entrySpace, inLens, searchSpace, spaceOf, type TodoSpaces } from "./todoSpaces";
+import { matchRange, prepareQuery } from "./match";
 
 /**
  * 검색 (편의 기능 8): one query over the tasks (오늘 · 앞으로), the memos, the record of finished tasks
  * and the events. Korean matches whole syllables or their first consonants (`ㅂㄱㅅ` → 보고서, `보고ㅅ`
  * too); English and Dutch ignore case and accents (`cafe` → Café). Shared cases:
- * convenience-cases.md §5.
+ * convenience-cases.md §5. 스페이스 2c (C1–C5, S49–S54 in docs/plans/spaces-cases.json): a `#name` looks in
+ * that space only — its to-dos and its record lines; memos and events, which have no space, are left out.
  */
 
-const initials = ["ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ", "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ"];
-const syllableStart = 0xac00;
-const syllableEnd = 0xd7a3;
-
-/** One character folded for comparing: lower case, accents dropped (Hangul syllables stay whole). */
-function foldOnce(character: string): string {
-  const code = character.codePointAt(0)!;
-  if (code >= syllableStart && code <= syllableEnd) return character;
-  const plain = character.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  return plain.length ? plain : character;
-}
-/** Each character's fold worked out once (a search folds every letter of every memo). */
-const folds = new Map<string, string>();
-export function fold(character: string): string {
-  let folded = folds.get(character);
-  if (folded === undefined) {
-    folded = foldOnce(character);
-    if (folds.size > 50_000) folds.clear();
-    folds.set(character, folded);
-  }
-  return folded;
-}
-
-/** A syllable's first consonant ("보" → "ㅂ"), or undefined for anything else. */
-function initialOf(character: string): string | undefined {
-  const code = character.codePointAt(0)!;
-  if (code < syllableStart || code > syllableEnd) return undefined;
-  return initials[Math.floor((code - syllableStart) / 588)];
-}
-
-/** A query made ready once for many lines: its characters, their folds, which are lone consonants. */
-export interface PreparedQuery { wanted: string[]; folded: string[]; initial: boolean[]; /** No lone consonant: a match is the folds' joined text found in the line's. */ plain: boolean; joined: string }
-export function prepareQuery(query: string): PreparedQuery {
-  const wanted = [...query.trim()];
-  const folded = wanted.map(fold);
-  const initial = wanted.map((character) => initials.includes(character));
-  return { wanted, folded, initial, plain: !initial.includes(true), joined: folded.join("") };
-}
-
-/** Where `query` first stands in `text` ([start, end) in UTF-16 units), or undefined; a blank query matches nothing. */
-export function matchRange(text: string, query: string | PreparedQuery): [number, number] | undefined {
-  const { wanted, folded, initial } = typeof query === "string" ? prepareQuery(query) : query;
-  if (wanted.length === 0) return undefined;
-  const characters = [...text];
-  // Offsets of each character (astral characters take two units).
-  const offsets: number[] = [];
-  let offset = 0;
-  for (const character of characters) { offsets.push(offset); offset += character.length; }
-  offsets.push(offset);
-  for (let start = 0; start + wanted.length <= characters.length; start += 1) {
-    let index = 0;
-    while (index < wanted.length && (fold(characters[start + index]) === folded[index] || (initial[index] && initialOf(characters[start + index]) === wanted[index]))) index += 1;
-    if (index === wanted.length) return [offsets[start], offsets[start + wanted.length]];
-  }
-  return undefined;
-}
-
-/** The matched words themselves (tests and the shared cases' notation). */
-export function matchText(text: string, query: string): string | undefined {
-  const range = matchRange(text, query);
-  return range ? text.slice(range[0], range[1]) : undefined;
-}
+export { fold, matchRange, matchText, prepareQuery, type PreparedQuery } from "./match";
 
 // ─── Groups ───────────────────────────────────────────────────────────────────
 
@@ -115,6 +57,17 @@ export interface SearchInput {
   dueStyle?: "dday" | "date";
   /** 메모 서랍 (1.28): a memo's folder name (none for 메모), so a memo in a folder whose name matches is found too. */
   memoFolder?: (id: string) => string | undefined;
+  /** 할 일 스페이스 (2c): the spaces and each to-do's place, for a `#name` in the words (none: `#` is plain text). */
+  spaces?: TodoSpaces;
+}
+
+/**
+ * C4: the empty slip's second hint while there are spaces — "#회사처럼 적으면 그 스페이스에서만 찾아요" with the first
+ * space's name, blanks left out as `#` reads it.
+ */
+export function searchHint(name: string, lang: Lang = "ko"): string {
+  const tag = `#${name.replace(/\s+/gu, "")}`;
+  return { ko: `${tag}처럼 적으면 그 스페이스에서만 찾아요`, en: `Type ${tag} to look in that space only`, nl: `Typ ${tag} om alleen in die ruimte te zoeken` }[lang];
 }
 
 const pad = (value: number) => String(value).padStart(2, "0");
@@ -123,6 +76,11 @@ const keyOf = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}
 /** Everything that matches, in the order 오늘 · 앞으로 · 메모 · 완료 기록 · 일정 (empty groups left out). */
 export function search(input: SearchInput, query: string, now: Date, lang: Lang = "ko", limit = 20): SearchGroup[] {
   if (!query.trim()) return [];
+  // C1 · C2: a `#name` that names a space (or 일반) looks there only, with the rest of the words; `#회사` alone, everything in it.
+  const spaces = input.spaces;
+  const { space, words } = spaces ? searchSpace(query, spaces) : { space: undefined, words: query.trim() };
+  const prepared = prepareQuery(words);
+  const find = (text: string): [number, number] | undefined => (words ? matchRange(text, prepared) : [0, 0]);
   const groups: SearchGroup[] = [];
   const add = (kind: SearchGroupKind, rows: SearchRow[], max = limit) => {
     if (rows.length) groups.push({ kind, title: searchGroupTitle(kind, lang), rows: rows.slice(0, max), count: rows.length });
@@ -138,39 +96,41 @@ export function search(input: SearchInput, query: string, now: Date, lang: Lang 
   };
   const tasks = (page: "today" | "ahead") => input.items.flatMap((item) => {
     if ((pageOf(item, now) === "today") !== (page === "today")) return [];
-    const range = matchRange(item.title, query);
-    return range ? [taskRow(item, page, range)] : [];
+    const range = find(item.title);
+    if (!range || (space !== undefined && !inLens(space, spaces ? spaceOf(spaces, item.id) : undefined))) return [];
+    return [taskRow(item, page, range)];
   });
   add("today", tasks("today"));
   add("ahead", tasks("ahead"));
-  add("memos", input.memos.flatMap((memo) => {
+  // C3: memos and events have no space — not there while looking in one.
+  if (space === undefined) add("memos", input.memos.flatMap((memo) => {
     const title = memoTitle(memo, lang);
-    const titleRange = matchRange(title, query);
+    const titleRange = matchRange(title, prepared);
     const updated = new Date(memo.updatedAt);
     const meta = dayMonth(updated.getMonth() + 1, updated.getDate(), undefined, lang);
     if (titleRange) return [{ kind: "memos" as const, id: memo.id, text: title, range: titleRange, meta }];
     for (const line of memo.text.split("\n")) {
-      const range = matchRange(line, query);
+      const range = matchRange(line, prepared);
       if (range) return [{ kind: "memos" as const, id: memo.id, text: line.trim() ? line : title, range: line.trim() ? range : [0, 0] as [number, number], meta }];
     }
     // In a drawer folder whose name matches: the memo's title, nothing marked, the folder in the meta.
     const folder = input.memoFolder?.(memo.id);
-    if (folder && matchRange(folder, query)) return [{ kind: "memos" as const, id: memo.id, text: title, range: [0, 0] as [number, number], meta: `${folder} · ${meta}` }];
+    if (folder && matchRange(folder, prepared)) return [{ kind: "memos" as const, id: memo.id, text: title, range: [0, 0] as [number, number], meta: `${folder} · ${meta}` }];
     return [];
   }));
   const seen = new Set<string>();
   add("history", input.archive
     .filter((entry) => { if (seen.has(entry.id)) return false; seen.add(entry.id); return true; })
     .flatMap((entry) => {
-      const range = matchRange(entry.title, query);
-      if (!range) return [];
+      const range = find(entry.title);
+      if (!range || (space !== undefined && !inLens(space, spaces ? entrySpace(spaces, entry.id, entry.space) : undefined))) return [];
       const at = entry.completedAt ? new Date(entry.completedAt) : undefined;
       const day = at ? logicalDayStart(at) : undefined;
       return [{ kind: "history" as const, id: entry.id, text: entry.title, range, meta: day ? dayMonth(day.getMonth() + 1, day.getDate(), day.getFullYear() !== now.getFullYear() ? day.getFullYear() : undefined, lang) : "", done: true, ...(day ? { day: keyOf(day) } : {}), sort: at?.getTime() ?? 0 }];
     })
     .sort((a, b) => b.sort - a.sort)
     .map(({ sort: _sort, ...row }) => row), 30);
-  add("events", eventRows(input.events, query, now, lang));
+  if (space === undefined) add("events", eventRows(input.events, words, now, lang));
   return groups;
 }
 

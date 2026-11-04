@@ -3,6 +3,7 @@ import type { CalendarWriteRequest } from "./calendar";
 import { deskPanes, paperSettings } from "./desk";
 import { drawerBackdrops, drawerFonts, drawerTextSizes, drawerThemes, folderSorts, folderViews, memoPapers } from "./memoDrawer";
 import { codeFonts, drawerPoints, lineSpacings, noteScales, paragraphSpacings } from "./textSteps";
+import { checkedDeviceRules } from "./spaceDevice";
 import { timerSizes } from "./timerWidget";
 import { defaultPrefs, textSizes, type Action, type IntentRequest, type Prefs } from "./types";
 import { deskFramePages, ownPage } from "./webGuard";
@@ -45,6 +46,8 @@ export const pageActions: Partial<Record<PageName, ReadonlySet<ActionType>>> = {
     "openSettings", "openSpaces", "redo", "rename", "rowMenuPick", "saveSeries", "setDeadline", "setPref", "setRange", "setReminder",
     "showEventMenu", "showMenu", "showRowMenu", "showStorageProblem", "spaceAdd", "spaceLens", "timerCommand", "todoSpace", "toggle", "undo",
     "unfileCompleted", "window",
+    // #196: 잠깐 보기 · 다시 숨기기 at the end of the list (and a hidden to-do opened from 찾기).
+    "spacePeek",
     // #168: several picked rows moved together, and put back by the toast's 되돌리기.
     "moveMany", "restoreOrder",
   ),
@@ -58,7 +61,11 @@ export const pageActions: Partial<Record<PageName, ReadonlySet<ActionType>>> = {
   history: actions("openArchiveFolder"),
   calendarWindow: actions("calendarShowTask", "setPref", "showEventMenu"),
   quick: actions("drawer"),
-  glance: actions("calendarEditEvent", "calendarNewEvent", "drawer", "openCalendar", "openNote", "openSettings", "setPref", "spaceLens", "timerCommand", "toggle"),
+  // #200: a to-do's title opens the note on its row (`calendarShowTask`, read as `{ id }` like the calendar window's).
+  glance: actions(
+    "calendarEditEvent", "calendarNewEvent", "calendarShowTask", "drawer", "openCalendar", "openNote", "openSettings", "setPref", "spaceLens",
+    "timerCommand", "toggle",
+  ),
   desk: actions("deskPane", "openGuide", "openSearch"),
   drawer: actions(
     "copyText", "drawerPaste", "drawerView", "drawerWrite", "editCommand", "folderAdd", "folderColor", "folderDelete", "folderDuplicate",
@@ -77,14 +84,14 @@ const prefs = (...keys: PrefKey[]): ReadonlySet<PrefKey> => new Set(keys);
 
 /** The settings each page may change with `setPref` (the settings panes nearly all; the others their own few). */
 export const pagePrefs: Partial<Record<PageName, ReadonlySet<PrefKey>>> = {
-  note: prefs("alwaysOnTop", "dayOpen", "guideSeen", "hideCompleted", "openAtLogin", "spaceGroups", "spaceGroupsDoneOpen", "spaceGroupsFolded", "starredTask", "textStep"),
+  note: prefs("alwaysOnTop", "dayOpen", "guideSeen", "hideCompleted", "openAtLogin", "spaceDevice", "spaceGroups", "spaceGroupsDoneOpen", "spaceGroupsFolded", "starredTask", "textStep"),
   settings: prefs(
     "archiveAfterDays", "calendarAlertMinutes", "calendarStrip", "chatter", "chatterFrequency", "chatterQuestions", "displaySeconds", "drawerBackdrop",
     "drawerCodeFont", "drawerDoneToBottom", "drawerFont", "drawerHandle", "drawerLineHeight", "drawerNightPaper", "drawerParagraph", "drawerPinned",
     "drawerShortcut", "drawerShortcutLast", "drawerShowMarks", "drawerSide", "drawerTextPt", "drawerTheme", "drawerWidth", "dueStyle", "eveningSweep",
     "eveningSweepTime", "font", "intervalMinutes", "language", "morningPick", "noteHotkey", "noteShortcut", "openAtLogin", "paper", "petVisible",
     "petWanders", "pomodoroAutoContinue", "pomodoroFocusMinutes", "pomodoroLongRestMinutes", "pomodoroRestMinutes", "pomodoroRounds", "quickEntry",
-    "quickMemo", "quickMemoClipboard", "reminderEnabled", "reminderStyle", "spaceGroupStyle", "spaceGroups", "systemNotify", "taskbarBadge",
+    "quickMemo", "quickMemoClipboard", "reminderEnabled", "reminderStyle", "spaceDevice", "spaceGroupStyle", "spaceGroups", "systemNotify", "taskbarBadge",
     "textStep", "timerSize", "timerSound",
   ),
   calendarWindow: prefs("calendarView"),
@@ -228,6 +235,7 @@ const actionFields: { [K in ActionType]: Record<string, Reader> } = {
   moveMany: { ids: picked, targetID: id, after: bool },
   restoreOrder: { ids: picked, previous: ids },
   spaceLens: { space: optional(id) },
+  spacePeek: { spaces: list(id, 64) },
   openSpaces: {},
   copyText: { text: longText },
 };
@@ -248,8 +256,10 @@ const prefReaders: Partial<Record<PrefKey, Reader>> = {
   eveningSweepTime: time, drawerWidth: num(100, 2000), drawerHandleY: num(0, 1), drawerNightPaper: bool,
   dayOpen: test((value) => value === "" || (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value))),
   timerRecent: list(num(0, 100_000), 50), quickMemoDraft: str(100_000),
+  // #196: 이 기기에서 per space — read as the main process reads it (unknown fields and odd ranges dropped).
+  spaceDevice: (value) => checkedDeviceRules(value) ?? bad,
   // Not written by any page: the main process keeps these itself.
-  spaceLens: () => bad, intentPrefer: () => bad, intentLearning: () => bad,
+  spaceLens: () => bad, intentPrefer: () => bad, intentLearning: () => bad, spaceDeviceShown: () => bad,
 };
 
 /** A setting's value as a page sent it, checked; `bad` when it isn't one this setting can hold. */

@@ -37,12 +37,12 @@ test("ai-log.jsonl: lines read back, a torn line and unknown kinds left out", ()
 
 test("M41: the extension's version in ai-link.json and on each log line; Claude Desktop's extension older than the app's", () => {
   const link = serializeAiLink({ v: 1, enabled: true, dataFolder: "/x", lang: "ko", app: "windows 1.31.0", updatedAt: "", ext: aiExtVersion });
-  assert.match(link, /"updatedAt": "",\n  "ext": 2\n\}\n$/);
+  assert.match(link, /"updatedAt": "",\n  "ext": 3\n\}\n$/);
   assert.equal(parseAiLink(link)?.ext, aiExtVersion);
   assert.equal(parseAiLink('{"enabled":true,"ext":"2"}')?.ext, undefined, "only a whole number");
   assert.equal(parseAiLink('{"app":"mac 1.46.0","ext":2,"enabled":true}')?.ext, 2, "the Mac's sorted keys");
   const one = { ...entry({ changes: [added(item({ id: "A" }))] }), ext: aiExtVersion };
-  assert.match(aiLogLine(one), /"title":"보고서 쓰기","ext":2,"changes":\[/);
+  assert.match(aiLogLine(one), /"title":"보고서 쓰기","ext":3,"changes":\[/);
   assert.deepEqual(parseAiLog(aiLogLine(one))[0], one);
   const old = entry({ changes: [added(item({ id: "B" }))] });
   assert.equal(aiExtOutdated([]), false);
@@ -50,7 +50,7 @@ test("M41: the extension's version in ai-link.json and on each log line; Claude 
   assert.equal(aiExtOutdated([old, one]), false, "the newest line counts");
   assert.equal(aiExtOutdated([one, { ...old, client: "Claude Code" }]), false, "Claude Code runs the app's own copy");
   assert.equal(aiExtOutdated([one, { ...old, client: "app", kind: "undo" }]), false, "the app's undo lines don't count");
-  assert.equal(aiExtVersion, 2);
+  assert.equal(aiExtVersion, 3, "3 since the to-do spaces (N3-8)");
 });
 
 test("toasts, as on the Mac (AIText.toast)", () => {

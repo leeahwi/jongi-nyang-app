@@ -15,6 +15,10 @@ export interface SearchHost {
   /** Where a result goes when chosen. */
   open(row: SearchRow): void;
   closed(): void;
+  /** #196: a to-do in a space this PC hides — drawn faint with a small ‘숨김’ (its word). */
+  hidden?: (row: SearchRow) => string | undefined;
+  /** C4 (spaces 2c): the empty slip's line about `#` while there are spaces ("#회사처럼 적으면 …"). */
+  spaceHint?: string;
 }
 
 const groupIcon: Record<SearchGroup["kind"], string> = { today: "sun", ahead: "calendar", memos: "note", history: "leaf", events: "calendarClock" };
@@ -51,8 +55,10 @@ export function openSearch(host: SearchHost, initial = ""): SearchSlip {
     const blocks = groups.map((group) => {
       const list = group.rows.map((row) => {
         const before = row.text.slice(0, row.range[0]), match = row.text.slice(row.range[0], row.range[1]), after = row.text.slice(row.range[1]);
-        const element = h("button", { class: `search-row${row.done ? " done" : ""}`, role: "option", "aria-selected": "false", title: row.text },
+        const hiddenTag = host.hidden?.(row);
+        const element = h("button", { class: `search-row${row.done ? " done" : ""}${hiddenTag ? " hidden-here" : ""}`, role: "option", "aria-selected": "false", title: row.text },
           h("span", { class: "search-text" }, before, match ? h("mark", {}, match) : null, after),
+          hiddenTag ? h("span", { class: "search-hidden" }, hiddenTag) : null,
           row.meta ? h("span", { class: "search-meta" }, row.meta) : null);
         const index = rows.length;
         element.addEventListener("mouseenter", () => highlight(index, false));
@@ -67,7 +73,8 @@ export function openSearch(host: SearchHost, initial = ""): SearchSlip {
     results.replaceChildren(...blocks);
     results.hidden = blocks.length === 0;
     empty.hidden = blocks.length > 0;
-    empty.textContent = query.trim() ? t("‘{query}’에 맞는 게 없어요", { query: query.trim() }) : t("초성으로도 찾을 수 있어요 (예: ㅂㄱㅅ → 보고서)");
+    if (query.trim()) empty.textContent = t("‘{query}’에 맞는 게 없어요", { query: query.trim() });
+    else empty.replaceChildren(h("span", {}, t("초성으로도 찾을 수 있어요 (예: ㅂㄱㅅ → 보고서)")), ...(host.spaceHint ? [h("span", { class: "search-hint" }, host.spaceHint)] : []));
     highlight(0, false);
     results.scrollTop = 0;
   };

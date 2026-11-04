@@ -8,7 +8,7 @@ import path from "node:path";
 import { after } from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-import { parseAiLog, serializeAiLink, type AiLink } from "../../src/core/ai";
+import { aiExtVersion, parseAiLog, serializeAiLink, type AiLink } from "../../src/core/ai";
 import type { LocalEvent } from "../../src/core/events";
 import { parseNotebook, serializeNotebook, type TodoItem } from "../../src/core/notebook";
 
@@ -34,7 +34,7 @@ export function setup(options: { link?: Partial<AiLink> | null; shared?: boolean
   const clockFile = path.join(home, "clock.txt");
   fs.writeFileSync(clockFile, options.now ?? "2026-10-27T10:00:00+09:00");
   if (options.link !== null) {
-    const link: AiLink = { v: 1, enabled: true, dataFolder: data, lang: "ko", app: "windows 1.27.0", updatedAt: "2026-10-27T00:00:00Z", ext: 2, ...options.link };
+    const link: AiLink = { v: 1, enabled: true, dataFolder: data, lang: "ko", app: "windows 1.27.0", updatedAt: "2026-10-27T00:00:00Z", ext: aiExtVersion, ...options.link };
     fs.writeFileSync(path.join(home, "ai-link.json"), serializeAiLink(link));
   }
   return { home, data, clockFile, env: { PAPERTODO_AI_HOME: home, PAPERTODO_AI_CLOCK: clockFile, TZ: "Asia/Seoul", LANG: options.lang ?? "ko_KR.UTF-8" } };
@@ -73,7 +73,7 @@ export function assertNoPath(text: string, label: string, ...folders: string[]):
 export type Result = { text: string; data: Record<string, unknown>; error: boolean };
 export async function call(client: Client, name: string, args: Record<string, unknown> = {}): Promise<Result> {
   const result = await client.callTool({ name, arguments: args }) as { content: { type: string; text: string }[]; structuredContent?: Record<string, unknown>; isError?: boolean };
-  return { text: result.content.map((part) => part.text).join("\n"), data: result.structuredContent ?? {}, error: Boolean(result.isError) };
+  return { text: result.content.filter((part) => part.type === "text").map((part) => part.text).join("\n"), data: result.structuredContent ?? {}, error: Boolean(result.isError) };
 }
 
 export const todos = (folder: string): TodoItem[] => parseNotebook(fs.readFileSync(path.join(folder, "todos.json"), "utf8")).items;

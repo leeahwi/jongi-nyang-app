@@ -90,6 +90,37 @@ public enum TextSteps {
                              preview: preview, previewLine: Int((Double(preview) * 20 / 13).rounded()))
     }
 
+    // MARK: The drawer's faces (메모 글꼴)
+
+    /// The size a drawer face draws words of `size` at: the handwriting faces as much larger as the notebook's (pen
+    /// 23 : 15, brush 22 : 15), so they read as large as the plain face; 고정폭 a point under; the plain face as it is.
+    /// `face` is the setting's name (clean · pen · brush · mono).
+    public static func faceSize(_ face: String, _ size: Double) -> Double {
+        switch face {
+        case "pen": (size * 23 / 15).rounded()
+        case "brush": (size * 22 / 15).rounded()
+        case "mono": (size - 1).rounded()
+        default: size
+        }
+    }
+
+    /// What one face draws with (#198): the body's size, and a card's preview in the same face (its size scaled as the
+    /// body's) on the preview's lines. The Korean pen and brush fit the preview's lines at every step; the Latin pen
+    /// (Caveat, English and Dutch) reaches higher and lower than its size, so its preview lines are a quarter taller
+    /// (보통 20 → 25) — its letters neither touch the next line's nor are cut at the card's last line.
+    public struct FaceMetrics: Equatable, Sendable {
+        public var size: Int
+        public var previewSize: Int
+        public var previewLine: Int
+    }
+
+    public static func drawerFaceMetrics(points: Int, face: String, latin: Bool) -> FaceMetrics {
+        let metrics = drawerMetrics(points: points)
+        let line = face == "pen" && latin ? Int((Double(metrics.previewLine) * 1.25).rounded()) : metrics.previewLine
+        return FaceMetrics(size: Int(faceSize(face, Double(metrics.body))), previewSize: Int(faceSize(face, Double(metrics.preview))),
+                           previewLine: line)
+    }
+
     // MARK: Paragraphs
 
     /// The block a line belongs to (nil: a blank line). A heading and a rule are each a block of their own.

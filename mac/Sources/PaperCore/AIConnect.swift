@@ -15,7 +15,13 @@ public enum AIConnect {
     /// The extension's own small version (I1, docs/plans/mcp-plan.md), the same number as the Windows core's
     /// `aiExtVersion` (this app ships that extension): written into ai-link.json, and the extension writes its
     /// own into each log line, so an older Claude Desktop copy can be told apart.
-    public static let extVersion = 2
+    /// 3 (spaces 2c, N3-8): the extension moves to-dos between spaces, and an app that writes 3 can undo that.
+    public static let extVersion = 3
+
+    /// Spaces 2c (N3-6): a to-do's place, logged by its to-do id as `{id, space, at}` (`{id, space: null}` when it had none).
+    public static let placesFile = "todo-spaces.json"
+    /// The files this version reads changes of; a change of any other file (a newer extension's) is left out (M28).
+    public static let knownFiles: Set<String> = ["todos.json", "events.json", "memos.json", placesFile]
 
     // MARK: ai-link.json
 
@@ -183,6 +189,8 @@ public enum AIConnect {
               let kindText = o["kind"]?.string else { return nil }
         let changes: [Change] = (o["changes"]?.array ?? []).compactMap { item in
             guard case .object(let c) = item, let id = c["id"]?.string else { return nil }
+            // M28: a file this version doesn't know (a newer extension's) is left out; the rest of the line still reads.
+            if let file = c["file"]?.string, !file.isEmpty, !knownFiles.contains(file) { return nil }
             return Change(file: c["file"]?.string ?? "", id: id, before: c["before"]?.nonNull, after: c["after"]?.nonNull)
         }
         return Entry(id: id, at: at, client: o["client"]?.string ?? "Claude", tool: o["tool"]?.string ?? "",
@@ -299,6 +307,57 @@ public enum AIConnect {
         }
         if sameSaved(current, change.before, target) { return .alreadyBack }
         return .changedSince
+    }
+
+    /// A place change (N3-7) compared by the space a person sees: `current` is `{space}` with the to-do's live space
+    /// (a deleted one reads as 일반, null). No place and `space: null` are both 일반.
+    public static func placeStep(_ change: Change, current: JSONValue?) -> UndoStep {
+        func space(_ value: JSONValue?) -> JSONValue? { value?["space"]?.nonNull }
+        let now = space(current)
+        if now == space(change.after) {
+            return now == space(change.before) ? .alreadyBack : .restore(change.before ?? .object(["id": .string(change.id), "space": .null]))
+        }
+        return now == space(change.before) ? .alreadyBack : .changedSince
+    }
+
+    /// One change put back by an undo plan: `before` back (`.restore`) or the added item out (`.remove`).
+    public struct PlannedStep: Equatable, Sendable {
+        public var change: Change
+        public var step: UndoStep
+    }
+
+    /// What undoing `entry` does, item by item (N3-7, M13–M14): an item comes back whole or not at all — when any of its
+    /// changes (its fields, its place) was changed since, every one of them stays and it counts as left. A place whose
+    /// to-do is no longer on the list (`gone`) counts as back and writes nothing; so does the place of a to-do the same
+    /// undo takes out. `current` is the item as it is now for a change of `todos.json` · `events.json` · `memos.json`, and
+    /// `{space}` for a place. Counts are of items, not changes.
+    public static func undoPlan(_ entry: Entry, current: (Change) -> JSONValue?, gone: (Change) -> Bool) -> (steps: [PlannedStep], outcome: UndoOutcome) {
+        var order: [String] = []
+        var byItem: [String: [PlannedStep]] = [:]
+        for change in entry.changes where change.file.isEmpty || knownFiles.contains(change.file) {
+            let key = markID(change.id, entry.target)
+            let step: UndoStep = change.file == placesFile
+                ? (gone(change) ? .alreadyBack : placeStep(change, current: current(change)))
+                : undoStep(change, target: entry.target, current: current(change))
+            if byItem[key] == nil { order.append(key) }
+            byItem[key, default: []].append(PlannedStep(change: change, step: step))
+        }
+        var steps: [PlannedStep] = []
+        var outcome = UndoOutcome(undone: 0, left: 0)
+        for key in order {
+            let planned = byItem[key] ?? []
+            if planned.contains(where: { $0.step == .changedSince }) { outcome.left += 1; continue }
+            outcome.undone += 1
+            let removed = planned.contains { $0.step == .remove }
+            steps += planned.filter { planned in
+                switch planned.step {
+                case .restore: !(removed && planned.change.file == placesFile)
+                case .remove: true
+                case .alreadyBack, .changedSince: false
+                }
+            }
+        }
+        return (steps, outcome)
     }
 
     /// The outcome of undoing an entry: how many items went back and how many were left as they are.

@@ -1,9 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  advanceSeen, aiAwayText, aiCatLine, aiEntry, aiExtOutdated, aiExtVersion, aiLinkFileName, aiLockFileName, aiLogFileName, aiLogLine, aiMarks, aiToastText, aiUndoText,
-  awayCount, isAiWork, parseAiLog, recentAi, serializeAiLink, trimAiLog, undoEntry, undoneIds, unseenAi, type AiLogEntry, type AiSeen,
+  advanceSeen, aiAwayText, aiCatLine, aiEntry, aiExtOutdated, aiExtVersion, aiLinkFileName, aiLockFileName, aiLogFileName, aiLogLine, aiMarks, aiPlacesFile, aiToastText, aiUndoText,
+  awayCount, isAiWork, parseAiLog, placeNow, recentAi, serializeAiLink, trimAiLog, undoEntry, undoneIds, undoTodoEntry, unseenAi, type AiLogEntry, type AiSeen,
 } from "../core/ai";
+import { findSpace, moveTodo, todoSpacesFileName } from "../core/todoSpaces";
 import { dayKey } from "../core/archive";
 import { clock } from "../core/lang";
 import type { AiView, NoteNotice } from "../core/types";
@@ -145,7 +146,7 @@ export class AiConnection {
     if (!this.enabled) return;
     this.read();
     // The data first, so the toast's item is already on the list (Claude writes the file before the log).
-    this.store.catchUp(["todos.json", "events.json", "memos.json", "memo-folders.json"]);
+    this.store.catchUp(["todos.json", "events.json", "memos.json", "memo-folders.json", todoSpacesFileName]);
     this.tell(this.hooks.noteVisible() && !this.waiting ? "live" : "away");
     this.hooks.changed();
   }
@@ -212,11 +213,18 @@ export class AiConnection {
     if (!entry || !isAiWork(entry) || undoneIds(this.entries).has(id)) return;
     let outcome = { undone: 0, left: entry.changes.length, written: [] as ReturnType<typeof undoEntry>["written"] };
     if (entry.target === "todos") {
+      // Spaces 2c (N3-7): each to-do whole or not at all — its fields here, its place in todo-spaces.json.
+      this.store.catchUp([todoSpacesFileName]);
+      let moves: { id: string; space: string | null }[] = [];
       this.store.mutate((history) => {
-        const result = undoEntry(history.items, entry);
+        const result = undoTodoEntry(history.items, this.store.todoSpaces, entry);
         outcome = result;
-        if (result.written.length) history.replaceItems(result.items);
+        moves = result.moves;
+        if (result.written.some((change) => change.file === "todos.json")) history.replaceItems(result.items);
       });
+      // A space deleted since: the to-do goes to 일반.
+      const now = new Date();
+      if (moves.length) this.store.changeSpaces((data) => moves.reduce((next, move) => moveTodo(next, move.id, move.space && findSpace(next, move.space) ? move.space : null, now), data));
     } else if (entry.target === "events") {
       this.store.locked(() => {
         this.store.catchUp(["events.json"]);
@@ -289,7 +297,10 @@ export class AiConnection {
     const entries = this.recentEntries;
     const undone = undoneIds(entries);
     const items = new Map(this.store.items.map((item) => [item.id.toUpperCase(), item]));
-    const marks = enabled ? aiMarks(entries, now, (target, id) => (target === "todos" ? items.get(id.toUpperCase()) : this.store.events.find((event) => event.id === id)) as Record<string, unknown> | undefined) : new Set<string>();
+    const marks = enabled ? aiMarks(entries, now, (target, id, file) => {
+      if (file === aiPlacesFile) { const item = items.get(id.toUpperCase()); return item ? placeNow(this.store.todoSpaces, item.id) : undefined; }
+      return (target === "todos" ? items.get(id.toUpperCase()) : this.store.events.find((event) => event.id === id)) as Record<string, unknown> | undefined;
+    }) : new Set<string>();
     const recent = recentAi(entries, now).slice(0, 30).map((entry) => {
       const at = new Date(entry.at);
       return { id: entry.id, day: dayKey(at) === today ? "today" as const : "yesterday" as const, time: clock(at.getHours(), at.getMinutes(), lang()), text: aiToastText(entry, lang()), undone: undone.has(entry.id) };

@@ -7,9 +7,92 @@ reverted; it is kept as [`perf-memo-stress-prototype.patch`](perf-memo-stress-pr
 **Update — the fixes (Mac 1.45.0, Windows 1.30.0):** see [After the fixes](#after-the-fixes-mac-1450-windows-1300) just
 below. The sections after it are the first measurements, on 1.44.0 / 1.29.0, kept as they were.
 
+**Update 2 — Mac 1.47.0, Windows 1.32.0:** see [The long memos and the 5,000 cards](#the-long-memos-and-the-5000-cards-mac-1470-windows-1320).
+
 **Machine:** Apple M4, macOS 26.5.1, release build. The Windows app was run in Electron 44 on the same Mac, not on a
 Windows PC. The Mac was busy with other work (load average 3–7), so treat single numbers as ±30 %. UI runs that
 overlapped someone else's snapshot renders were thrown away and run again.
+
+## The long memos and the 5,000 cards (Mac 1.47.0, Windows 1.32.0)
+
+Dev main `e9e68dbc` (Windows with CodeMirror in the drawer since 1.31) against branch `perf/drawer`, built by turns and
+run on the same data. Other agents were building at the same time (load 5–16), so every number is a median of the runs
+listed, and ranges are the runs themselves.
+
+### Windows (`tools/perf-memo.mjs`, Electron on this Mac)
+
+**Cause:** every redraw of the list built every card again (3,025 cards and 22,617 nodes at 5,000 memos), and a redraw
+comes after each pause in the typing, on each reopen after a change and on each click that opens a memo.
+
+**Fix:** the cards and the date headers are kept from one redraw to the next, keyed by memo; a card is made again only
+when its memo's words, its time, its group, its pin, its folder's colour, its own paper, the pick or the view changed
+(`renderer/drawer.ts`, `cachedSlip`). `core/placeChildren.ts` puts the list's children in the new order moving as few
+as it can, so the card being typed stays where it is (as the old range cut did) and so do all the others.
+
+5,000 memos, three runs each (before: dev main; after: this branch); times in ms:
+
+| | before | after |
+| --- | --- | --- |
+| reopen after a change (to the frame) | 149 · 205 (the third run's measure failed) | **38 · 44 · 47** |
+| its longest task | 105 · 118 · 173 | **0 · 0 · 0** |
+| click to open the top memo (its own work) | 148 · 155 · 171 | **43 · 44 · 71** |
+| typing, per key (median / p95) | 7.4–9.7 / 34–49 | 8.4–14.5 / 26–45 |
+| long tasks while typing (count · longest) | 4–5 · 153–172 | 0–4 · 0–72 |
+| memory, all processes (MB) | 539–563 | 581–808 (no clear direction; it swings by hundreds of MB between runs) |
+
+The `long` tier (500 memos and 10 KB · 100 KB · 1 MB memos) is unchanged within the noise: a key 1.7–2.8 ms (p95 5–60)
+in every memo, the 1 MB memo opening in 15–17 ms (22–27 ms to its frame). CodeMirror (1.31) is what made the 1 MB memo fast; the 0.2–0.4 s a
+key of 1.30's textarea is gone.
+
+`tools/perf-memo.mjs` measured the reopen by `visibilitychange`, which an off-screen run never fires (the page stays
+"visible" while the window is hidden): it now takes the page's first change after the open, then the frame after it.
+`--app=<folder>` runs another build on the same data.
+
+### Mac (`scripts/perf-drawer.sh`, new, in one process)
+
+**Why a new tool:** the old `scripts/perf-memo.sh` brought its test copy to the front (`perf-probe front`), opened the marker memo
+with an accessibility press (which gives a text field the keyboard: the input-source indicator came on screen once) and
+posted keys to it. Since 1.47 `perf-memo.sh` runs `perf-drawer.sh` for the same tiers, and no script under
+`mac/scripts` brings anything forward or presses anything through accessibility. `perf-drawer.sh` builds the app's views with `Tests/PaperTodoTests/DrawerBench.swift` (optimised, like
+`bench-app.sh`) and draws the drawer and the note in borderless windows 40,000 points off every screen, never key, in
+an accessory process; keys go to the open memo's text view directly (`insertText`). Each step is the main thread's CPU
+for it and for what it set off within 60 ms (a key) or 300 ms (an open, Esc), less an idle window's own, so another
+process's load moves it little. Slip motion is off in it (a window off every screen gets no frames for an animation).
+
+**Causes (sample(1) of the bench, `PROFILE=1`):**
+1. `textDidChange` handed the binding `view.string`, the text storage's NSString bridged. Every later comparison of
+   that memo (SwiftUI comparing the views' inputs, `updateNSView`'s `view.string != text`, the list, `memos !=`, the save)
+   was Swift's slow path for a foreign string: Unicode normalization (`_NFDNormalizer`, `_slowCompare`) character by
+   character. 1 MB: 0.22 s a key, 5 s for the list to catch up after the keys.
+2. Esc on a long memo: `collapse()` sets `editing = false` with the card still sliding shut, so the closing card drew the
+   memo again in its reading face (`CheckedText`, every line as a view) — 5 s for 1 MB.
+
+**Fixes:** the text view's words are copied out once per key as a native string, in bulk (`KeyTextView.native`:
+Foundation writes the UTF-8, Swift takes the bytes; `makeContiguousUTF8` and `String(decoding:as: UTF16)` both went a
+character at a time, 35–40 ms for 1 MB); the coordinator keeps that copy (`shown`) and compares a text from elsewhere
+with it, never with `view.string`; the formatting keys and the link field work on the copy. `OpenMemo` takes the face
+(`editing`) from its card, so a closing card keeps the face it had. The drawer's own 0.16 s for opening and closing a
+card and its 0.12 s scroll now go through `Motion.animation` (off under Reduce Motion and with `SlipMotion.enabled`
+false), so the bench and the snapshots don't wait on them.
+
+Two runs each, by turns (before: dev main's views; after: this branch's), load 8–16; main-thread CPU in ms:
+
+| | before | after |
+| --- | --- | --- |
+| **typing, 1 MB memo, per key (median / p95)** | 224 / 236 (the second run's 1 MB memo didn't open in 30 s) | **12–13 / 13–15** |
+| typing, 100 KB memo | 23–27 / 28–30 | **5 / 8–11** |
+| typing, 10 KB memo | 6–7 / 8–9 | 3–4 / 5–10 |
+| the list catching up after the keys, 1 MB · 100 KB | 5,047 · 251–335 | **217–220 · 65–70** |
+| Esc, 1 MB · 100 KB | 5,104 · 762–1,365 | **121–126 · 343–349** |
+| ↩ open, 1 MB | 2,395–2,713 | 2,060–2,109 (the whole text laid out for its height) |
+| ↩ open, the 2,000-line checklist | 1,841–2,845 | 2,785–2,967 (its reading face, every line a view) |
+| drawer first open, 500 memos | 138–189 | 185–223 |
+| typing, the top memo at 5,000 memos | 5.6–8.1 / 7–11 | 6.8–8.0 / 7–10 |
+
+↩ and Esc on short memos read lower after (106 vs 244 ms at 500 memos) only because the bench now runs them without
+the card's 0.16 s animation; they aren't compared here. Typing stays under 16 ms a key at every size and length now.
+Still over its target: the first open (150 ms at 500 memos), ↩ on a 1 MB memo (TextKit 1 lays the whole text out to
+learn its height, `DrawerTextView.sizeThatFits`) and on the 2,000-line checklist (its reading face draws every line).
 
 ## After the fixes (Mac 1.45.0, Windows 1.30.0)
 
@@ -29,7 +112,7 @@ with other agents' builds and perf runs (load 5–11), so single numbers move by
 | Win 6 | The open memo's text goes 150 ms after the last key (at least once a second), at once on blur, window blur, hidden, close, delete and before any other action. Quitting: a sync IPC (`memo:flush`) writes it before the page goes; `will-quit` flushes the store again. Only the last 8 sent texts are kept (was up to 200). | `renderer/drawer.ts`, `preload.ts`, `main/drawer.ts`, `main/main.ts` |
 | Both 7 | Search: the query prepared once; Mac folds a letter to a number from a table (a string per letter before) and keeps each memo's folded lines per text (read ahead off the main thread when the field opens); Windows caches folds per character and each memo's title, lines and folded text per text, and reads a memo line by line only when the folded query can be in it. 80 ms after the last key (at once when emptied, ↩, ↑↓). Results and order unchanged: tests compare with the old matching on random lines and memos. | `PaperCore/Convenience.swift` (`Search.Query`, `foldKey`), `PaperCore/MemoFolderSearch.swift` (`SearchIndex`), `core/search.ts`, `core/memoDrawer.ts` (`drawerSearch`) |
 
-### Mac UI (`scripts/perf-memo.sh`)
+### Mac UI (`scripts/perf-memo.sh` before 1.47: a test copy of the app)
 
 Times in ms; before → after.
 

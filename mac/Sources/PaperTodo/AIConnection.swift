@@ -239,15 +239,27 @@ final class AIConnection: ObservableObject {
         var notebook = model.history.notebook
         var eventChanges: [EventBook.Change] = []
         var memoRemovals: [String] = []
+        // Spaces 2c (N3-7): places put back, by to-do id (nil: 일반).
+        var placeMoves: [(id: String, space: String?)] = []
         var written: [AIConnect.Change] = []
-        var outcome = AIConnect.UndoOutcome(undone: 0, left: 0)
-        for change in entry.changes {
-            let current = currentJSON(change.id, entry.target)
-            switch AIConnect.undoStep(change, target: entry.target, current: current) {
-            case .alreadyBack:
-                outcome.undone += 1
-            case .changedSince:
-                outcome.left += 1
+        // Item by item, whole or not at all; a place is compared by the space it shows now.
+        let plan = AIConnect.undoPlan(entry, current: { [model] change in
+            change.file == AIConnect.placesFile ? Self.placeJSON(change.id, spaces: model.todoSpaces) : self.currentJSON(change.id, entry.target)
+        }, gone: { [model] change in !model.items.contains { $0.id.uuidString == change.id.uppercased() } })
+        var outcome = plan.outcome
+        for planned in plan.steps {
+            let change = planned.change
+            let current = change.file == AIConnect.placesFile ? Self.placeJSON(change.id, spaces: model.todoSpaces) : currentJSON(change.id, entry.target)
+            if change.file == AIConnect.placesFile {
+                guard case .restore(let before) = planned.step else { continue }
+                let space = before["space"]?.string
+                placeMoves.append((change.id.uppercased(), space))
+                written.append(.init(file: change.file, id: change.id, before: current, after: before))
+                continue
+            }
+            switch planned.step {
+            case .alreadyBack, .changedSince:
+                continue
             case .remove:
                 switch entry.target {
                 case .todos: if let uuid = UUID(uuidString: change.id) { notebook.delete(id: uuid) }
@@ -256,26 +268,33 @@ final class AIConnection: ObservableObject {
                 case .unknown: break
                 }
                 written.append(.init(file: change.file, id: change.id, before: current, after: nil))
-                outcome.undone += 1
             case .restore(let before):
+                // What can't be read back (or a memo: Claude can't change memos) stays, and counts as left.
+                func stays() { outcome.undone -= 1; outcome.left += 1 }
                 switch entry.target {
                 case .todos:
-                    guard let item = AIConnect.decode(TodoItem.self, from: before) else { outcome.left += 1; continue }
+                    guard let item = AIConnect.decode(TodoItem.self, from: before) else { stays(); continue }
                     let order = notebook.items.map(\.id) + [item.id]
                     notebook.merge(changed: [item], added: [item], removed: [], order: order)
                 case .events:
-                    guard let event = AIConnect.decode(LocalEvent.self, from: before) else { outcome.left += 1; continue }
+                    guard let event = AIConnect.decode(LocalEvent.self, from: before) else { stays(); continue }
                     eventChanges.append(.put(event))
                 case .memos, .unknown:
-                    // Claude can't change memos; nothing else to put back.
-                    outcome.left += 1
+                    stays()
                     continue
                 }
                 written.append(.init(file: change.file, id: change.id, before: current, after: before))
-                outcome.undone += 1
             }
         }
         if notebook != model.history.notebook { model.adoptExternal(notebook) }
+        if !placeMoves.isEmpty {
+            model.changeTodoSpaces { spaces, now in
+                for move in placeMoves {
+                    // A space deleted since: the to-do goes to 일반, as everywhere it reads.
+                    spaces.move(move.id, to: move.space.flatMap { spaces.space($0) == nil ? nil : $0 }, now: now)
+                }
+            }
+        }
         for change in eventChanges { model.calendar.perform(change) }
         for memo in memoRemovals { model.removeMemoQuietly(memo) }
         if outcome.undone > 0 {
@@ -289,6 +308,11 @@ final class AIConnection: ObservableObject {
         model.toast = PaperToast(symbol: outcome.undone > 0 ? "arrow.uturn.backward" : "exclamationmark.circle", text: AIText.undoResult(outcome, language))
         note("undo \(id) items=\(model.items.count) \(outcome.undone)/\(outcome.left) \(AIText.undoResult(outcome, language))")
         return outcome
+    }
+
+    /// A to-do's place as an undo compares it (N3-7): `{id, space}` with the space it shows now (null: 일반).
+    static func placeJSON(_ id: String, spaces: TodoSpaces) -> JSONValue {
+        .object(["id": .string(id), "space": spaces.spaceID(of: id.uppercased()).map(JSONValue.string) ?? .null])
     }
 
     private func currentJSON(_ id: String, _ target: AIConnect.Target) -> JSONValue? {

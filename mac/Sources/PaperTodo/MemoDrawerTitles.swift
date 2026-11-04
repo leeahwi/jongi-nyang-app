@@ -61,5 +61,6 @@ struct MemoTitleRow: View {
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityAction { drawer.expand(memo.id) }
+        .modifier(MemoArrive(active: drawer.justArrived(memo.id)))
     }
 }

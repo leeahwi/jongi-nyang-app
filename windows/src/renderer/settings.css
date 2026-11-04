@@ -258,6 +258,60 @@ input.step-value:focus { background: var(--card); outline: 2px solid color-mix(i
 .space-colors button { width: 20px; height: 20px; border-radius: 50%; background: var(--band); flex: none; }
 .space-colors button:hover, .space-colors button:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--card), 0 0 0 3.5px var(--band); }
 .space-colors button[aria-checked="true"] { box-shadow: 0 0 0 2px var(--card), 0 0 0 3.5px var(--ink); }
+
+/* 기기마다 보일 스페이스 (#196): the name with this PC's state under it, the mark on the dot, the popup at the right. */
+.space-name-box { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+.space-name-box .space-name { flex: none; width: 100%; }
+.space-row:has(.space-name-box.with-status) { min-height: 54px; }
+.device-status { padding: 0 9px 2px; margin-left: 2px; font-size: 11px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.device-status.hidden { color: var(--clay-text); }
+.device-status.timed { color: var(--sage-text); }
+.space-swatch { position: relative; }
+.device-mark { position: absolute; right: -5px; bottom: -5px; width: 12px; height: 12px; border-radius: 50%; background: var(--card); display: flex; align-items: center; justify-content: center; }
+.device-mark.hidden { color: var(--clay-text); }
+.device-mark.timed { color: var(--sage-text); }
+.space-device { flex: none; height: 26px; padding: 0 6px 0 7px; border-radius: 7px; display: inline-flex; align-items: center; gap: 3px; background: var(--paper-2); color: var(--ink-2); }
+.space-device.hidden { color: var(--clay-text); }
+.space-device.timed { color: var(--sage-text); }
+.space-device:hover { background: color-mix(in srgb, var(--sage) 9%, var(--paper-2)); }
+.space-device:focus-visible { outline: 2px solid var(--sage); outline-offset: 1px; }
+
+/* 시간 정하기 (#196): an L slip over the desk on a scrim — 바로 고르기 chips, the ranges, + 시간 더하기, the summary. */
+.device-scrim { position: fixed; inset: 0; z-index: 25; background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.slip.l.device-slip { position: fixed; z-index: 26; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(460px, calc(100vw - 24px)); max-height: calc(100vh - 32px); overflow-y: auto; }
+.device-body { display: flex; flex-direction: column; gap: 10px; }
+.device-lead { margin: 0; font-size: 12px; color: var(--ink-2); }
+.device-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.device-rows { border-top: 1px solid var(--rule); }
+.device-row { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; border-bottom: 1px solid var(--rule); }
+.device-line { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.device-line .spacer { flex: 1; }
+.device-days { display: flex; gap: 4px; border-radius: 10px; }
+.device-days.empty { box-shadow: 0 0 0 1.5px var(--clay); outline-offset: 2px; padding: 2px; margin: -2px; }
+.chip.device-day { min-width: 30px; justify-content: center; padding-inline: 6px; }
+.chip.device-time { font-weight: 600; font-variant-numeric: tabular-nums; }
+.device-dash { color: var(--ink-3); padding: 0 2px; }
+.device-note { margin-left: 4px; font-size: 11px; color: var(--ink-3); }
+.device-remove { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--ink-3); }
+.device-remove:hover { background: color-mix(in srgb, var(--clay) 10%, transparent); color: var(--clay-text); }
+.device-add { align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; font: 600 12px var(--ui); color: var(--sage-text); padding: 2px 0; }
+.device-add[disabled] { opacity: 0.45; }
+.device-summary { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border-radius: 9px; background: var(--sage-2); color: var(--sage-text); font-size: 11.5px; }
+.device-summary b { font-size: 12px; }
+.device-summary .bad { color: var(--clay-text); }
+.device-summary[hidden] { display: none; }
+/* The time chips' list (the event sheet's, sheet.css). */
+.pop-scrim { position: fixed; inset: 0; z-index: 30; }
+.sheet-pop { position: fixed; z-index: 31; padding: 8px; border-radius: 12px; background: var(--card); box-shadow: var(--shadow-float); font-family: var(--ui); }
+.pop-times { display: flex; flex-direction: column; gap: 6px; width: 148px; }
+.pop-field { height: 30px; padding: 0 8px; border: 0; border-bottom: 1.5px solid var(--rule); background: transparent; font: 13px var(--ui); color: var(--ink); outline: none; user-select: text; font-variant-numeric: tabular-nums; }
+.pop-field:focus { border-color: var(--sage); }
+.pop-hint { min-height: 14px; font: 600 11px var(--ui); color: var(--sage-text); font-variant-numeric: tabular-nums; }
+.pop-hint.bad { color: var(--clay-text); font-weight: 500; }
+.pop-list { display: flex; flex-direction: column; max-height: 210px; overflow-y: auto; }
+.pop-list button { min-height: 28px; padding: 0 10px; border-radius: 8px; text-align: left; font: 500 13px var(--ui); color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pop-list button:hover { background: color-mix(in srgb, var(--sage) 9%, transparent); }
+.pop-list button[aria-selected="true"] { background: var(--sage-2); color: var(--sage-text); font-weight: 600; }
 .choice.space-add { gap: 6px; }
 .settings-toast { position: fixed; left: 0; right: 0; bottom: 18px; display: flex; justify-content: center; pointer-events: none; z-index: 20; padding: 0 16px; }
 

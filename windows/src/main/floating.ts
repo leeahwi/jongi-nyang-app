@@ -81,7 +81,7 @@ export class FloatingNote {
 
   private sendSummary(): void {
     if (!this.window || this.window.isDestroyed()) return;
-    const today = this.store.todayItems;
+    const today = this.store.hereTodayItems;
     const open = today.filter((item) => !item.isCompleted);
     this.window.webContents.send("floating:summary", {
       titles: open.map((item) => item.title),

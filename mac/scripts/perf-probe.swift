@@ -1,6 +1,8 @@
 // The performance check's helper (scripts/perf.sh). It only ever reads or drives the one process
 // whose pid it is given: CPU time, wakeups and memory from proc_pid_rusage, and keys or clicks
 // posted to that pid alone (never to the frontmost app or the whole session).
+// #208: it never brings the app forward and never presses anything through accessibility (no `front`, `press` or
+// `menu` any more): a press could put the cursor in a text field, and the system could show the input-source indicator.
 import AppKit
 import ApplicationServices
 import Darwin
@@ -128,25 +130,6 @@ case "rightclick": // rightclick <pid> <label>: the element's centre, right-clic
     guard let hit = list.first(where: { label($0).contains(a[3]) && frame($0).width > 0 }) else { print("NOT FOUND", a[3]); exit(1) }
     let f = frame(hit)
     click(at: CGPoint(x: f.midX, y: f.midY), right: true)
-case "showmenu": // showmenu <pid> <label>: the element's context menu, through accessibility
-    let windows = (attr(app, "AXWindows") as? [AXUIElement]) ?? []
-    var list: [AXUIElement] = []
-    for w in windows { all(w, &list) }
-    guard let hit = list.first(where: { label($0).contains(a[3]) && frame($0).width > 0 }) else { print("NOT FOUND", a[3]); exit(1) }
-    print("showmenu", AXUIElementPerformAction(hit, "AXShowMenu" as CFString).rawValue)
-case "menuitem": // menuitem <pid> <title>: press an item of the menu that is open now (a context menu)
-    var list: [AXUIElement] = []
-    all(app, &list)
-    guard let item = list.first(where: { str($0, "AXRole") == "AXMenuItem" && str($0, "AXTitle") == a[3] }) else { print("NO ITEM", a[3]); exit(1) }
-    print("press", AXUIElementPerformAction(item, "AXPress" as CFString).rawValue)
-case "press": // press <pid> <label> [role]: an accessibility press on the element
-    let windows = (attr(app, "AXWindows") as? [AXUIElement]) ?? []
-    var list: [AXUIElement] = []
-    for w in windows { all(w, &list) }
-    let exact = a[3].hasPrefix("=") ? String(a[3].dropFirst()) : nil
-    guard let hit = list.first(where: { el in (exact.map { str(el, "AXTitle") == $0 || str(el, "AXDescription") == $0 } ?? label(el).contains(a[3]))
-        && (a.count < 5 || str(el, "AXRole") == a[4]) }) else { print("NOT FOUND", a[3]); exit(1) }
-    print("press", AXUIElementPerformAction(hit, "AXPress" as CFString).rawValue)
 case "clickxy": // clickxy <pid> <x> <y> (screen points, top-left origin)
     click(at: CGPoint(x: Double(a[3])!, y: Double(a[4])!))
 case "find": // find <pid> <label>: the element's frame
@@ -159,19 +142,6 @@ case "windows": // windows <pid>: on-screen windows
     for w in info where (w[kCGWindowOwnerPID as String] as? Int32) == pid {
         print(w[kCGWindowNumber as String] ?? "", w[kCGWindowLayer as String] ?? "", w[kCGWindowName as String] ?? "-", w[kCGWindowBounds as String] ?? "")
     }
-case "menu": // menu <pid> <top> <item> …: through the app's own menu bar
-    guard let bar = attr(app, "AXMenuBar") else { print("NO MENU BAR"); exit(1) }
-    var current = bar as! AXUIElement
-    for (index, title) in a.dropFirst(3).enumerated() {
-        var list: [AXUIElement] = []; all(current, &list)
-        guard let item = list.first(where: { ["AXMenuBarItem", "AXMenuItem"].contains(str($0, "AXRole")) && str($0, "AXTitle") == title }) else {
-            print("NO ITEM", title); exit(1) }
-        AXUIElementPerformAction(item, "AXPress" as CFString)
-        if index < a.count - 4 { usleep(300_000) }
-        current = item
-    }
-case "front": // front <pid>
-    _ = AXUIElementSetAttributeValue(app, "AXFrontmost" as CFString, kCFBooleanTrue)
 case "shot": // shot <pid> <out.png> [title contains]
     let info = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]) ?? []
     let mine = info.filter { ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowLayer as String] as? Int) == 0

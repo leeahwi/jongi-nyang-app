@@ -8,6 +8,7 @@ import { page, pageNote, type PageArgs } from "./pages";
 import { Problem } from "./problem";
 import { logged, lower, pick, type Ctx, type Reply } from "./tools";
 import { count, dayText, localStamp, say } from "./words";
+import { memoUri } from "./resources";
 
 /**
  * 메모 서랍 for Claude (N2, docs/plans/mcp-plan.md): memos with their folder and 고정, one memo's whole text
@@ -89,6 +90,8 @@ export function listMemos(ctx: Ctx, args: { query?: string; folder?: string; pin
       memos: shown.shown.map((memo) => ({ ...memoData(memo, data, ids, lang), preview: preview(memo) })),
       ...(shown.next ? { nextCursor: shown.next } : {}),
     },
+    // C2-2: each memo shown as a link the client can attach whole.
+    links: shown.shown.map((memo) => ({ uri: memoUri(ids.short(memo.id)), name: memoTitle(memo, lang), mimeType: "text/markdown" })),
   };
 }
 
@@ -127,6 +130,7 @@ export function getMemo(ctx: Ctx, args: { id: string; offset?: number }): Reply 
   return {
     text: [partLine ? `${head} · ${partLine}` : head, "", part, ...(more ? ["", more] : [])].join("\n"),
     data: { ...summary, offset, text: part, ...(end < memo.text.length ? { nextOffset: end } : {}) },
+    links: [{ uri: memoUri(ids.short(memo.id)), name: memoTitle(memo, lang), mimeType: "text/markdown" }],
   };
 }
 

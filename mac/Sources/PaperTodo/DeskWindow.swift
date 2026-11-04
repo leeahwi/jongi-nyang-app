@@ -271,6 +271,8 @@ struct DeskView: View {
     var previewHelp: (topic: String, query: String)?
     /// Snapshots: the calendar on its week.
     var previewCalendarWeek = false
+    /// Snapshots: 완료 기록 filtered by a space (spaces 2c, H1).
+    var previewHistorySpace: SpaceFilter = .all
     @State private var width: CGFloat = DeskMetrics.size.width
 
     private var compact: Bool { width < DeskMetrics.compactBelow }
@@ -313,7 +315,7 @@ struct DeskView: View {
         switch state.pane {
         case .calendar:
             if previewCalendarWeek { CalendarWindowView(model: model, today: CalendarDraft.day(Date()), mode: .week) } else { CalendarWindowView(model: model) }
-        case .history: HistoryView(archive: archive, model: model)
+        case .history: HistoryView(archive: archive, model: model, previewSpace: previewHistorySpace)
         case .help:
             if let previewHelp { HelpView(topic: previewHelp.topic, query: previewHelp.query) } else { HelpView() }
         default: SettingsPaneView(controller: reminders, model: model, pane: state.pane, alarmEditing: previewAlarmEditing)

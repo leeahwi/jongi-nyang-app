@@ -1,4 +1,5 @@
-import { aiEntry, aiExtVersion, aiTargetOf, sameSaved, type AiChange, type AiItem, type AiTarget } from "../../src/core/ai";
+import { aiEntry, aiExtVersion, aiPlacesFile, aiTargetOf, sameSaved, type AiChange, type AiItem, type AiTarget } from "../../src/core/ai";
+import { entrySpace, findSpace, moveTodo, spaceOf, type TodoSpaces } from "../../src/core/todoSpaces";
 import { dayKey } from "../../src/core/archive";
 import { nextFire, timeText as alarmTimeText } from "../../src/core/alarm";
 import { allDayText, dateKey, dayBounds, localDate, todayEvents, validate, type CalendarDraft, type CalendarEvent } from "../../src/core/calendar";
@@ -15,6 +16,7 @@ import { Folder } from "./files";
 import { Ids } from "./ids";
 import { page, pageNote, type PageArgs } from "./pages";
 import { Problem } from "./problem";
+import { generalKey, movesFromExt, oldAppProblem, readSpace, spaceName, spacesNow, taskSpace, type SpaceWords } from "./spaces";
 import { dayText, localStamp, reminderText, say, taskData, taskLine, words, type TaskWords } from "./words";
 
 export { Problem } from "./problem";
@@ -30,7 +32,9 @@ export interface Ctx {
   /** The extension version the app carries (ai-link.json's ext; 1 for apps before it). */
   appExt: number;
 }
-export interface Reply { text: string; data: Record<string, unknown> }
+/** A link to a resource put after the text (C2-2: each memo shown, as jongi-nyang://memo/<id>). */
+export interface ResourceLink { uri: string; name: string; mimeType: string }
+export interface Reply { text: string; data: Record<string, unknown>; links?: ResourceLink[] }
 
 export const maxItems = 20;
 const maxTitle = 200;
@@ -140,7 +144,14 @@ export function repeatWords(folder: Folder, lang: Lang): Map<string, string> {
   return new Map(folder.loadLoose("repeats.json").map((series) => [series.id, describeRepeat(series.rule, undefined, lang)]));
 }
 
-const taskWordsOf = (ctx: Ctx, items: readonly TodoItem[]): TaskWords => ({ ids: new Ids(items.map((item) => item.id)), repeats: repeatWords(ctx.folder, ctx.lang) });
+export const taskWordsOf = (ctx: Ctx, items: readonly TodoItem[], spaces: SpaceWords = spacesNow(ctx)): TaskWords => ({ ids: new Ids(items.map((item) => item.id)), repeats: repeatWords(ctx.folder, ctx.lang), spaces });
+
+/** N3-2: the tasks in the space `given` names (none given: all of them); the space's id (null: 일반) for the reply. */
+function inSpace<T extends { id: string }>(items: readonly T[], given: string | undefined, spaces: SpaceWords, lang: Lang, of: (item: T) => string | undefined = (item) => spaceOf(spaces.data, item.id)): { items: T[]; space?: string } {
+  if (given === undefined || !given.trim()) return { items: [...items] };
+  const wanted = readSpace(given, spaces, lang);
+  return { items: items.filter((item) => (of(item) ?? null) === wanted), space: wanted ?? generalKey };
+}
 
 // ─── Reading tools ────────────────────────────────────────────────────────────
 
@@ -153,7 +164,7 @@ const byTime = (items: readonly TodoItem[], now: Date): TodoItem[] => {
 
 const none = (lang: Lang) => say(lang, "- 없음", "- none", "- geen");
 
-function eventLine(event: CalendarEvent, lang: Lang, ids: Ids): string {
+export function eventLine(event: CalendarEvent, lang: Lang, ids: Ids): string {
   const days = event.allDay ? Math.round((event.end.getTime() - event.start.getTime()) / 86_400_000) : 1;
   const when = event.allDay ? (days > 1 ? `${allDayText(lang)} · ${dayCount(days, lang)}` : allDayText(lang)) : timeRange({ hour: event.start.getHours(), minute: event.start.getMinutes() }, { hour: event.end.getHours(), minute: event.end.getMinutes() }, lang);
   return [`- ${when} ${event.title}`, ...(event.location ? [event.location] : []), ...(event.recurring ? [say(lang, "반복", "repeats", "herhaalt")] : []), `id ${ids.short(event.eventId)}`].join(" · ");
@@ -171,15 +182,18 @@ function eventData(event: CalendarEvent, source: LocalEvent | undefined, ids: Id
 }
 
 /** The events of a file by id, and their short ids. */
-const eventIndex = (events: readonly LocalEvent[]) => ({ byId: new Map(events.map((event) => [event.id, event])), ids: new Ids(events.map((event) => event.id)) });
+export const eventIndex = (events: readonly LocalEvent[]) => ({ byId: new Map(events.map((event) => [event.id, event])), ids: new Ids(events.map((event) => event.id)) });
 
-export function getToday(ctx: Ctx, args: { limit?: number; detail?: boolean } = {}): Reply {
+export function getToday(ctx: Ctx, args: { limit?: number; detail?: boolean; space?: string } = {}): Reply {
   const { folder, now, lang } = ctx;
   const today = dayKey(now);
   const items = folder.load("todos.json");
   const events = folder.load("events.json");
-  const words = taskWordsOf(ctx, items);
-  const sheet = items.filter((item) => pageOf(item, now) === "today");
+  const spaces = spacesNow(ctx);
+  const words = taskWordsOf(ctx, items, spaces);
+  // N3-2: a space filters the tasks and their counts only (events, alarms and focus have no space).
+  const filtered = inSpace(items.filter((item) => pageOf(item, now) === "today"), args.space, spaces, lang);
+  const sheet = filtered.items;
   const open = byTime(sheet.filter((item) => !item.isCompleted), now);
   const done = byTime(sheet.filter((item) => item.isCompleted && item.completedAt !== undefined && dayKey(new Date(item.completedAt)) === today), now);
   // Today's sheet isn't cut by default; a very long one gives its first tasks and the cursor list_todos goes on with (P1).
@@ -192,7 +206,7 @@ export function getToday(ctx: Ctx, args: { limit?: number; detail?: boolean } = 
   const focus = focusTotal(folder.focus(), now, now);
   const more = shown.next ? open.length - Number(shown.next) : 0;
   const lines = [
-    `${say(lang, "오늘", "Today", "Vandaag")} · ${dayText(today, lang)}`,
+    `${say(lang, "오늘", "Today", "Vandaag")} · ${dayText(today, lang)}${filtered.space ? ` · ${say(lang, "스페이스", "space", "ruimte")} ${spaceName(spaces, filtered.space === generalKey ? null : filtered.space)}` : ""}`,
     "",
     `${say(lang, "할 일", "Tasks", "Taken")} (${say(lang, `남은 것 ${open.length}개, 끝낸 것 ${done.length}개`, `${open.length} open, ${done.length} done`, `${open.length} open, ${done.length} klaar`)})`,
     ...(open.length || (args.detail && done.length) ? shown.shown.map((item) => taskLine(item, now, lang, words)) : [none(lang)]),
@@ -208,7 +222,7 @@ export function getToday(ctx: Ctx, args: { limit?: number; detail?: boolean } = 
   return {
     text: lines.join("\n"),
     data: {
-      date: today, open: open.length, done: done.length,
+      date: today, ...(filtered.space ? { space: filtered.space } : {}), open: open.length, done: done.length,
       tasks: [...shown.shown, ...(args.detail ? done.slice(0, pages.today[1]) : [])].map((item) => taskData(item, now, words)),
       ...(shown.next ? { nextCursor: shown.next } : {}),
       events: happening.map((event) => eventData(event, index.byId.get(event.eventId), index.ids)),
@@ -220,7 +234,7 @@ export function getToday(ctx: Ctx, args: { limit?: number; detail?: boolean } = 
 
 export type TodoWhere = "today" | "later" | "all";
 
-export function listTodos(ctx: Ctx, args: { where?: TodoWhere; from?: string; to?: string; query?: string } & PageArgs = {}): Reply {
+export function listTodos(ctx: Ctx, args: { where?: TodoWhere; from?: string; to?: string; query?: string; space?: string } & PageArgs = {}): Reply {
   const { folder, now, lang } = ctx;
   const query = lower(args.query ?? "");
   // Today's sheet unless asked otherwise (P1); a word looks through everything (N1).
@@ -238,14 +252,16 @@ export function listTodos(ctx: Ctx, args: { where?: TodoWhere; from?: string; to
     const day = rangeDay(item, now);
     return day !== undefined && day >= period.from && day <= period.to;
   });
-  const sorted = byTime(items, now);
+  const spaces = spacesNow(ctx);
+  const filtered = inSpace(items, args.space, spaces, lang);
+  const sorted = byTime(filtered.items, now);
   const shown = page(sorted, args, pages.todos[0], pages.todos[1], lang);
-  const words = taskWordsOf(ctx, all);
+  const words = taskWordsOf(ctx, all, spaces);
   const heading = say(lang, `할 일 ${sorted.length}개`, `${sorted.length} ${sorted.length === 1 ? "task" : "tasks"}`, `${sorted.length} ${sorted.length === 1 ? "taak" : "taken"}`);
   const note = pageNote(shown, lang);
   return {
     text: [heading, ...shown.shown.map((item) => taskLine(item, now, lang, words)), ...(note ? [note] : [])].join("\n"),
-    data: { where, ...(period ?? {}), ...(query ? { query: args.query!.trim() } : {}), count: sorted.length, tasks: shown.shown.map((item) => taskData(item, now, words)), ...(shown.next ? { nextCursor: shown.next } : {}) },
+    data: { where, ...(period ?? {}), ...(query ? { query: args.query!.trim() } : {}), ...(filtered.space ? { space: filtered.space } : {}), count: sorted.length, tasks: shown.shown.map((item) => taskData(item, now, words)), ...(shown.next ? { nextCursor: shown.next } : {}) },
   };
 }
 
@@ -282,14 +298,19 @@ export function getFocus({ folder, now, lang }: Ctx, args: { from?: string; to?:
   return { text: lines.join("\n"), data: { ...period, minutes: total.minutes, sessions: total.sessions, days: Object.fromEntries(focusTotals(records, from, to)), top } };
 }
 
-export function searchHistory({ folder, now, lang }: Ctx, args: { query?: string; from?: string; to?: string } & PageArgs = {}): Reply {
+export function searchHistory(ctx: Ctx, args: { query?: string; from?: string; to?: string; space?: string } & PageArgs = {}): Reply {
+  const { folder, now, lang } = ctx;
   const period = args.from || args.to ? readPeriod(args.from, args.to, dayKey(now), 3660, lang) : undefined;
   const query = lower(args.query ?? "");
   const found = new Map<string, ArchiveEntry>();
   // Only the months the period can touch are read (P2).
   for (const entry of folder.archive(folder.archiveMonths(period?.from, period?.to))) found.set(entry.id, entry);
   for (const item of folder.load("todos.json")) if (item.isCompleted) found.set(item.id, toEntry(item));
-  const entries = [...found.values()].filter((entry) => {
+  // N3-2 · C5: a line's space is its own (while live), else the to-do's place, else 일반.
+  const spaces = spacesNow(ctx);
+  const lineSpace = (entry: ArchiveEntry) => entrySpace(spaces.data, entry.id, entry.space);
+  const filtered = inSpace([...found.values()], args.space, spaces, lang, lineSpace);
+  const entries = filtered.items.filter((entry) => {
     if (!entry.completedAt || (query && !entry.title.toLowerCase().includes(query))) return false;
     const day = dayKey(new Date(entry.completedAt));
     return !period || (day >= period.from && day <= period.to);
@@ -302,15 +323,22 @@ export function searchHistory({ folder, now, lang }: Ctx, args: { query?: string
     const key = dayKey(new Date(entry.completedAt!));
     if (key !== day) { day = key; lines.push(dayText(day, lang)); }
     const range = entry.timeStart ? rangeOf(entry) : undefined;
-    lines.push(`- ${entry.title}${range ? ` (${rangeText(range, lang)})` : ""}`);
+    const space = spaces.any && !filtered.space ? lineSpace(entry) : undefined;
+    lines.push(`- ${entry.title}${range ? ` (${rangeText(range, lang)})` : ""}${space ? ` · ${say(lang, "스페이스", "space", "ruimte")} ${spaceName(spaces, space)}` : ""}`);
   }
   const note = pageNote(shown, lang);
   if (note) lines.push(note);
   return {
     text: lines.join("\n"),
     data: {
-      ...(period ?? {}), count: entries.length,
-      items: shown.shown.map((entry) => ({ id: ids.short(entry.id), title: entry.title, day: dayKey(new Date(entry.completedAt!)), completedAt: localStamp(new Date(entry.completedAt!)), ...(entry.timeStart ? { timeStart: entry.timeStart } : {}), ...(entry.timeEnd ? { timeEnd: entry.timeEnd } : {}) })),
+      ...(period ?? {}), ...(filtered.space ? { space: filtered.space } : {}), count: entries.length,
+      items: shown.shown.map((entry) => {
+        const space = lineSpace(entry);
+        return {
+          id: ids.short(entry.id), title: entry.title, day: dayKey(new Date(entry.completedAt!)), completedAt: localStamp(new Date(entry.completedAt!)), ...(entry.timeStart ? { timeStart: entry.timeStart } : {}), ...(entry.timeEnd ? { timeEnd: entry.timeEnd } : {}),
+          space: spaceName(spaces, space ?? null), spaceId: space ?? generalKey,
+        };
+      }),
       ...(shown.next ? { nextCursor: shown.next } : {}),
     },
   };
@@ -361,7 +389,7 @@ export function listRepeats(ctx: Ctx, args: PageArgs = {}): Reply {
 
 // ─── Adding ───────────────────────────────────────────────────────────────────
 
-export interface TodoInput { title: string; date?: string; timeStart?: string; timeEnd?: string; remindAt?: string | null; later?: boolean }
+export interface TodoInput { title: string; date?: string; timeStart?: string; timeEnd?: string; remindAt?: string | null; later?: boolean; space?: string }
 
 /** Where a task counts for "already there" (M7): its deadline, else 언젠가 or today. */
 const dupDay = (item: Pick<TodoItem, "dueDate" | "shelf">, today: string) => item.dueDate ?? (item.shelf === "later" ? "someday" : today);
@@ -392,11 +420,20 @@ function newTask(input: TodoInput, now: Date, lang: Lang): TodoItem {
   return item;
 }
 
-/** One line in ai-log.jsonl for what was added or changed, with this extension's version (I1). */
-export function logged(ctx: Ctx, tool: string, kind: "add" | "change", target: AiTarget, changes: AiChange[]): void {
+/**
+ * One line in ai-log.jsonl for what was added or changed, with this extension's version (I1). A to-do with two changes
+ * (its fields and its place, N3-6) is one item: `count` is the items, `title` the first one's.
+ */
+export function logged(ctx: Ctx, tool: string, kind: "add" | "change", target: AiTarget, changes: AiChange[], named?: { title: string; count: number }): void {
   if (changes.length === 0) return;
-  const title = String((changes[0].after ?? changes[0].before)?.[target === "memos" ? "text" : "title"] ?? "");
-  ctx.folder.log({ ...aiEntry({ client: ctx.client, tool, kind, target, title: target === "memos" ? title.split("\n")[0].trim() : title, changes }, ctx.now), ext: aiExtVersion });
+  const title = named?.title ?? String((changes[0].after ?? changes[0].before)?.[target === "memos" ? "text" : "title"] ?? "");
+  ctx.folder.log({ ...aiEntry({ client: ctx.client, tool, kind, target, title: target === "memos" ? title.split("\n")[0].trim() : title, changes, ...(named ? { count: named.count } : {}) }, ctx.now), ext: aiExtVersion });
+}
+
+/** A place as the log keeps it (N3-6): `{id, space, at}` from the file, `{id, space: null}` for a to-do that had none. */
+function placeOf(data: TodoSpaces, id: string): AiItem {
+  const place = data.items[id];
+  return place ? { id, space: place.space, at: place.at } : { id, space: null };
 }
 
 export function addTodos(ctx: Ctx, args: { items: TodoInput[] }): Reply {
@@ -406,26 +443,51 @@ export function addTodos(ctx: Ctx, args: { items: TodoInput[] }): Reply {
   if (inputs.length > maxItems) throw new Problem(say(lang, `한 번에 ${maxItems}개까지 넣을 수 있어요. 나눠서 넣어 주세요.`, `At most ${maxItems} tasks at a time. Add them in parts.`, `Hoogstens ${maxItems} taken tegelijk. Voeg ze in delen toe.`));
   const made: TodoItem[] = [];
   const problems: string[] = [];
+  // N3-4 (M25): each one's space, read before anything is written; one that isn't there stops them all.
+  const spaces = spacesNow(ctx);
+  const placed = new Map<string, string>();
   inputs.forEach((input, index) => {
-    try { made.push(newTask(input, now, lang)); } catch (error) {
+    try {
+      const space = input.space !== undefined && input.space.trim() ? readSpace(input.space, spaces, lang) : null;
+      const item = newTask(input, now, lang);
+      made.push(item);
+      if (space) placed.set(item.id, space);
+    } catch (error) {
       if (!(error instanceof Problem)) throw error;
       problems.push(`${index + 1}. ‘${(input.title ?? "").trim()}’: ${error.message}`);
     }
   });
   if (problems.length) throw new Problem([say(lang, "아무것도 넣지 않았어요.", "Nothing was added.", "Er is niets toegevoegd."), ...problems].join("\n"));
   const today = dayKey(now);
-  const { added, skipped, all } = folder.update("todos.json", (list) => {
+  // With a space: todos.json and todo-spaces.json in one hold of the lock, all or nothing (#110).
+  const files = placed.size ? (["todos.json", "todo-spaces.json"] as const) : (["todos.json"] as const);
+  const { added, skipped, all, places } = folder.updateAll([...files], (lists) => {
+    const list = lists["todos.json"]!;
+    let data = lists["todo-spaces.json"];
     const added: TodoItem[] = [], skipped: { item: TodoItem; existing: TodoItem }[] = [];
+    const places = new Map<string, { before: AiItem; after: AiItem }>();
     for (const item of made) {
       const key = `${lower(item.title)}@${dupDay(item, today)}`;
       const existing = [...list, ...added].find((entry) => !entry.isCompleted && `${lower(entry.title)}@${dupDay(entry, today)}` === key);
       if (existing) { skipped.push({ item, existing }); continue; }
       added.push({ ...item });
+      const space = placed.get(item.id);
+      if (space && data) {
+        // Deleted in the app since the call was read: nothing goes in.
+        if (!findSpace(data, space)) throw new Problem(say(lang, "그새 종이냥에서 스페이스가 바뀌었어요. 아무것도 넣지 않았어요. list_spaces로 다시 봐 주세요.", "The spaces changed in 종이냥 meanwhile. Nothing was added; look again with list_spaces.", "De ruimtes zijn intussen in 종이냥 gewijzigd. Er is niets toegevoegd; kijk opnieuw met list_spaces."));
+        const before = placeOf(data, item.id);
+        data = moveTodo(data, item.id, space, now);
+        places.set(item.id, { before, after: placeOf(data, item.id) });
+      }
     }
     list.push(...added);
-    return { changed: added.length > 0, result: { added, skipped, all: [...list] } };
+    if (data) lists["todo-spaces.json"] = data;
+    return { changed: added.length > 0, result: { added, skipped, all: [...list], places } };
   });
-  logged(ctx, "add_todos", "add", "todos", added.map((item) => ({ file: "todos.json", id: item.id, before: null, after: item as unknown as AiItem })));
+  logged(ctx, "add_todos", "add", "todos", added.flatMap((item): AiChange[] => {
+    const place = places.get(item.id);
+    return [{ file: "todos.json", id: item.id, before: null, after: item as unknown as AiItem }, ...(place ? [{ file: aiPlacesFile, id: item.id, before: place.before, after: place.after }] : [])];
+  }), added.length ? { title: added[0].title, count: added.length } : undefined);
   const words = taskWordsOf(ctx, all);
   const lines: string[] = [];
   if (added.length) lines.push(say(lang, `할 일 ${added.length}개를 넣었어요.`, `Added ${added.length} ${added.length === 1 ? "task" : "tasks"}.`, `${added.length} ${added.length === 1 ? "taak" : "taken"} toegevoegd.`), ...added.map((item) => taskLine(item, now, lang, words)));
@@ -496,7 +558,7 @@ export type ChangeSet = Record<string, unknown>;
 export interface ChangeInput { kind: "todo" | "event"; id: string; set: ChangeSet }
 
 /** The fields a change may set (the input schema says the same per kind, C3; this stays as the tools' own check). */
-export const todoKeys = ["title", "date", "timeStart", "timeEnd", "remindAt", "later", "done"] as const;
+export const todoKeys = ["title", "date", "timeStart", "timeEnd", "remindAt", "later", "done", "space"] as const;
 export const eventKeys = ["title", "date", "start", "end", "allDay", "days", "location"] as const;
 
 function checkKeys(set: ChangeSet, allowed: readonly string[], lang: Lang): void {
@@ -516,6 +578,8 @@ const bool = (value: unknown, key: string, lang: Lang): boolean => {
 /** A task with `set` applied, by the app's own rules (a new range brings its reminder along; see timeRange.ts). */
 export function changedTask(item: TodoItem, set: ChangeSet, now: Date, lang: Lang): TodoItem {
   checkKeys(set, todoKeys, lang);
+  // The space is todo-spaces.json's (N3-5), not the task's.
+  if (Object.keys(set).every((key) => key === "space" || set[key] === undefined)) return item;
   const today = dayKey(now);
   let next: TodoItem = { ...item };
   const later = set.later === undefined ? undefined : bool(set.later, "later", lang);
@@ -617,7 +681,12 @@ function diffLines(before: [string, string][], after: [string, string][]): strin
   return before.flatMap(([name, was], index) => (was === after[index][1] ? [] : [`   ${name}: ${was} → ${after[index][1]}`]));
 }
 
-interface Pending { at: number; changes: { kind: "todo" | "event"; id: string; set: ChangeSet; before: AiItem }[] }
+/** A to-do's move (N3-5): to `space` (null: 일반), from where it was at the preview. */
+interface Move { space: string | null; from: string | null }
+interface Pending { at: number; changes: { kind: "todo" | "event"; id: string; set: ChangeSet; before: AiItem; move?: Move }[] }
+
+/** `set` without `space` (the task's own fields). */
+const fieldsOf = (set: ChangeSet): ChangeSet => Object.fromEntries(Object.entries(set).filter(([key]) => key !== "space"));
 /** Previews waiting for a yes, by confirmation number (this process only; gone when Claude stops it). */
 const pending = new Map<string, Pending>();
 
@@ -640,6 +709,7 @@ export function previewChanges(ctx: Ctx, args: { changes: ChangeInput[] }): Repl
   if (inputs.length === 0) throw new Problem(say(lang, "바꿀 것이 없어요.", "There is nothing to change.", "Er is niets te wijzigen."));
   if (inputs.length > maxItems) throw new Problem(say(lang, `한 번에 ${maxItems}개까지 고칠 수 있어요.`, `At most ${maxItems} changes at a time.`, `Hoogstens ${maxItems} wijzigingen tegelijk.`));
   const todos = inputs.some((input) => input.kind === "todo") ? folder.load("todos.json") : [];
+  const spaces = spacesNow(ctx);
   const events = inputs.some((input) => input.kind === "event") ? folder.load("events.json") : [];
   const todoIds = new Ids(todos.map((item) => item.id)), eventIds = new Ids(events.map((event) => event.id));
   const todoById = new Map(todos.map((item) => [item.id, item])), eventById = new Map(events.map((event) => [event.id, event]));
@@ -653,9 +723,20 @@ export function previewChanges(ctx: Ctx, args: { changes: ChangeInput[] }): Repl
         const item = todoById.get(pick(todoIds, input.id, lang, "todo", (id) => todoById.get(id)?.title ?? ""))!;
         const after = changedTask(item, set, now, lang);
         const changes = diffLines(taskFields(item, now, lang), taskFields(after, now, lang));
+        // N3-5: a move to another space (null or "general": 일반), only for an app that can undo it (N3-8).
+        let move: Move | undefined;
+        if (set.space !== undefined) {
+          const space = readSpace(set.space === null ? null : String(set.space), spaces, lang);
+          const from = spaceOf(spaces.data, item.id) ?? null;
+          if (space !== from) {
+            if (ctx.appExt < movesFromExt) throw oldAppProblem(lang);
+            move = { space, from };
+            changes.push(`   ${say(lang, "스페이스", "Space", "Ruimte")}: ${spaceName(spaces, from)} → ${spaceName(spaces, space)}`);
+          }
+        }
         if (!changes.length) throw new Problem(say(lang, `바뀌는 게 없어요: ‘${item.title}’.`, `Nothing changes for ‘${item.title}’.`, `Er verandert niets aan ‘${item.title}’.`));
         lines.push(`${accepted.length + 1}. ${item.title} · id ${todoIds.short(item.id)}`, ...changes);
-        accepted.push({ kind: "todo", id: item.id, set, before: item as unknown as AiItem });
+        accepted.push({ kind: "todo", id: item.id, set: fieldsOf(set), before: item as unknown as AiItem, ...(move ? { move } : {}) });
       } else {
         const event = eventById.get(pick(eventIds, eventId(input.id), lang, "event", (id) => eventById.get(id)?.title ?? ""))!;
         const after = changedEvent(event, set, now, lang);
@@ -702,9 +783,14 @@ export function applyChanges(ctx: Ctx, args: { token: string }): Reply {
       `${named} changed after the preview, so nothing was applied. Preview again with preview_changes. (code ITEM_CHANGED)`,
       `${named} is na het voorbeeld gewijzigd, dus er is niets toegepast. Maak opnieuw een voorbeeld met preview_changes. (code ITEM_CHANGED)`), "ITEM_CHANGED");
   };
-  const todoChanges = preview.changes.filter((change) => change.kind === "todo");
+  // N3-5: the task's own fields go to todos.json, a move to todo-spaces.json; only the files that change are written.
+  const moves = preview.changes.filter((change) => change.kind === "todo" && change.move);
+  if (moves.length && ctx.appExt < movesFromExt) throw oldAppProblem(lang);
+  const todoChanges = preview.changes.filter((change) => change.kind === "todo" && Object.keys(change.set).length > 0);
   const eventChanges = preview.changes.filter((change) => change.kind === "event");
-  const files = [...(todoChanges.length ? ["todos.json" as const] : []), ...(eventChanges.length ? ["events.json" as const] : [])];
+  const files = [
+    ...(todoChanges.length || moves.length ? ["todos.json" as const] : []), ...(moves.length ? ["todo-spaces.json" as const] : []), ...(eventChanges.length ? ["events.json" as const] : []),
+  ];
   /** One file's changes made on its list (every item was checked first). */
   const applyTo = (file: "todos.json" | "events.json", list: { id: string }[], changes: Pending["changes"], apply: (item: never, set: ChangeSet) => object): AiChange[] => {
     const done: AiChange[] = [];
@@ -720,22 +806,38 @@ export function applyChanges(ctx: Ctx, args: { token: string }): Reply {
   // Both files checked and written under one hold of the lock: all of it goes in, or none (#110). Whatever
   // stops it (an item changed, a file that changed in between, a failed write) leaves both files as they
   // were, and nothing is logged.
-  let todoDone: AiChange[] = [], eventDone: AiChange[] = [];
+  let todoDone: AiChange[] = [], eventDone: AiChange[] = [], placeDone: AiChange[] = [];
   let todoIds = new Ids([]), eventIds = new Ids([]);
+  let spacesAfter: TodoSpaces | undefined;
   try {
-    ({ todoDone, eventDone, todoIds, eventIds } = folder.updateAll(files, (lists) => {
+    ({ todoDone, eventDone, placeDone, todoIds, eventIds, spacesAfter } = folder.updateAll(files, (lists) => {
       const todos = lists["todos.json"] ?? [], events = lists["events.json"] ?? [];
+      let places = lists["todo-spaces.json"];
       const moved = [
         ...todoChanges.filter((change) => !sameSaved(aiTargetOf("todos.json"), todos.find((item) => item.id === change.id) as Record<string, unknown> | undefined, change.before)),
+        // M27: moved in the app since the preview (or the task is gone): not applied.
+        ...moves.filter((change) => !todos.some((item) => item.id === change.id) || (places && (spaceOf(places, change.id) ?? null) !== change.move!.from)),
         ...eventChanges.filter((change) => !sameSaved(aiTargetOf("events.json"), events.find((item) => item.id === change.id) as Record<string, unknown> | undefined, change.before)),
       ].map((change) => String(change.before.title ?? ""));
-      if (moved.length) throw new Changed(moved);
+      if (moved.length) throw new Changed([...new Set(moved)]);
+      const todoDone = applyTo("todos.json", todos, todoChanges, (item: TodoItem, set) => changedTask(item, set, now, lang));
+      const placeDone: AiChange[] = [];
+      if (places) {
+        for (const change of moves) {
+          // A space deleted in the app since the preview: nothing goes in.
+          if (change.move!.space && !findSpace(places, change.move!.space)) throw new Changed([String(change.before.title ?? "")]);
+          const before = placeOf(places, change.id);
+          places = moveTodo(places, change.id, change.move!.space, now);
+          placeDone.push({ file: aiPlacesFile, id: change.id, before, after: placeOf(places, change.id) });
+        }
+        lists["todo-spaces.json"] = places;
+      }
       return {
         changed: true,
         result: {
-          todoDone: applyTo("todos.json", todos, todoChanges, (item: TodoItem, set) => changedTask(item, set, now, lang)),
+          todoDone, placeDone,
           eventDone: applyTo("events.json", events, eventChanges, (event: LocalEvent, set) => changedEvent(event, set, now, lang)),
-          todoIds: new Ids(todos.map((item) => item.id)), eventIds: new Ids(events.map((event) => event.id)),
+          todoIds: new Ids(todos.map((item) => item.id)), eventIds: new Ids(events.map((event) => event.id)), spacesAfter: places,
         },
       };
     }));
@@ -743,17 +845,22 @@ export function applyChanges(ctx: Ctx, args: { token: string }): Reply {
     if (error instanceof Changed) throw stale(error.titles);
     throw error;
   }
-  logged(ctx, "apply_changes", "change", "todos", todoDone);
+  // N3-6: one line for the tasks, each one's fields (todos.json) and then its place (todo-spaces.json), counted by task.
+  const order = preview.changes.filter((change) => change.kind === "todo").map((change) => change.id);
+  const taskChanges = order.flatMap((id) => [...todoDone.filter((change) => change.id === id), ...placeDone.filter((change) => change.id === id)]);
+  const changedIds = [...new Set(taskChanges.map((change) => change.id))];
+  const todoAfter = (id: string): TodoItem => (todoDone.find((change) => change.id === id)?.after ?? preview.changes.find((change) => change.id === id)!.before) as unknown as TodoItem;
+  logged(ctx, "apply_changes", "change", "todos", taskChanges, changedIds.length ? { title: todoAfter(changedIds[0]).title, count: changedIds.length } : undefined);
   logged(ctx, "apply_changes", "change", "events", eventDone);
-  const words: TaskWords = { ids: todoIds, repeats: repeatWords(folder, lang) };
+  const words: TaskWords = { ids: todoIds, repeats: repeatWords(folder, lang), spaces: spacesAfter ? { ...spacesNow(ctx), data: spacesAfter } : spacesNow(ctx) };
   const lines: string[] = [say(lang, "바꿨어요.", "Changed.", "Gewijzigd.")];
-  for (const change of todoDone) lines.push(taskLine(change.after as unknown as TodoItem, now, lang, words));
+  for (const id of changedIds) lines.push(taskLine(todoAfter(id), now, lang, words));
   for (const change of eventDone) lines.push(`- ${localEventLine(change.after as unknown as LocalEvent, lang, eventIds)}`);
   return {
     text: lines.join("\n"),
     data: {
       changed: [
-        ...todoDone.map((change) => ({ kind: "todo" as const, id: todoIds.short(change.id), title: String(change.after?.title ?? "") })),
+        ...changedIds.map((id) => ({ kind: "todo" as const, id: todoIds.short(id), title: todoAfter(id).title, ...(placeDone.some((change) => change.id === id) ? { space: taskSpace(words.spaces!, id).name } : {}) })),
         ...eventDone.map((change) => ({ kind: "event" as const, id: eventIds.short(change.id), title: String(change.after?.title ?? "") })),
       ],
     },

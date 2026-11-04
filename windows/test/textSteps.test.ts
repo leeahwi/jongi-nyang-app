@@ -3,10 +3,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import {
-  drawerLegacy, drawerLegacyName, drawerMetrics, drawerPoint, noteLegacy, noteLegacyName, noteScales, noteStep, paragraphEnds,
+  drawerFaceMetrics, drawerLegacy, drawerLegacyName, drawerMetrics, drawerPoint, noteLegacy, noteLegacyName, noteScales, noteStep, paragraphEnds,
   type LineSpacing, type ParagraphSpacing,
 } from "../src/core/textSteps";
-import { bodyFontSize } from "../src/core/types";
+import { bodyFontSize, type DrawerFont } from "../src/core/types";
 import { drawerLook, drawerPaper, drawerThemeValue, readDrawerTheme } from "../src/core/memoDrawer";
 
 // 글꼴 · 종이 설정 (#141 · #142): the shared cases from docs/plans/settings-cases.json (the Mac's test-settings.sh reads
@@ -20,6 +20,7 @@ const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs"
   drawerLegacyNames: Record<string, string>;
   drawerMetrics: { case: string; points: number; line?: LineSpacing; paragraph?: ParagraphSpacing; expect: Record<string, number> }[];
   paragraphs: { case: string; text: string; ends: boolean[] }[];
+  drawerFaces: { case: string; points: number; face: DrawerFont; latin: boolean; expect: Record<string, number> }[];
   drawerPapers: { case: string; theme?: string; saved?: boolean; paper: string; nightPaper: boolean; writes: string; shown: string[] }[];
 };
 
@@ -43,6 +44,8 @@ test("F1 the drawer's points written back as the nearest of 1.30's four", () => 
 for (const entry of file.drawerMetrics) {
   test(`${entry.case} (metrics)`, () => assert.deepEqual(drawerMetrics(entry.points, entry.line ?? "regular", entry.paragraph ?? "regular"), entry.expect));
 }
+// #198: a face's body and preview sizes and the preview's lines (the card's preview follows the body's face).
+for (const entry of file.drawerFaces) test(`${entry.case} (face)`, () => assert.deepEqual(drawerFaceMetrics(entry.points, entry.face, entry.latin), entry.expect));
 for (const entry of file.paragraphs) test(entry.case, () => assert.deepEqual(paragraphEnds(entry.text), entry.ends));
 for (const entry of file.drawerPapers) {
   test(entry.case, () => {

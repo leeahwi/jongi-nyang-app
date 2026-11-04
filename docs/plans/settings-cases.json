@@ -54,5 +54,17 @@
     { "case": "P4 먹색 stays itself at night", "theme": "ink", "saved": true, "paper": "ink", "nightPaper": true, "writes": "ink", "shown": ["ink", "ink"] },
     { "case": "P4 한지 with the switch off", "theme": "hanji", "saved": false, "paper": "hanji", "nightPaper": false, "writes": "hanji", "shown": ["hanji", "hanji"] },
     { "case": "P4 벚꽃 with the switch on", "theme": "blossom", "saved": true, "paper": "blossom", "nightPaper": true, "writes": "blossom", "shown": ["blossom", "night"] }
+  ],
+  "drawerFaces": [
+    { "case": "#198 보통 in the plain face: the preview as before", "points": 14, "face": "clean", "latin": false, "expect": { "size": 14, "previewSize": 13, "previewLine": 20 } },
+    { "case": "#198 보통 in the pen: the preview as much larger as the body", "points": 14, "face": "pen", "latin": false, "expect": { "size": 21, "previewSize": 20, "previewLine": 20 } },
+    { "case": "#198 보통 in the brush", "points": 14, "face": "brush", "latin": false, "expect": { "size": 21, "previewSize": 19, "previewLine": 20 } },
+    { "case": "#198 보통 in 고정폭: a point under", "points": 14, "face": "mono", "latin": false, "expect": { "size": 13, "previewSize": 12, "previewLine": 20 } },
+    { "case": "#198 보통 in the Latin pen: its preview lines a quarter taller", "points": 14, "face": "pen", "latin": true, "expect": { "size": 21, "previewSize": 20, "previewLine": 25 } },
+    { "case": "#198 보통 in the Latin brush: the preview's lines", "points": 14, "face": "brush", "latin": true, "expect": { "size": 21, "previewSize": 19, "previewLine": 20 } },
+    { "case": "#198 the smallest step in the brush", "points": 12, "face": "brush", "latin": false, "expect": { "size": 18, "previewSize": 16, "previewLine": 17 } },
+    { "case": "#198 the smallest step in the Latin pen", "points": 12, "face": "pen", "latin": true, "expect": { "size": 18, "previewSize": 17, "previewLine": 21 } },
+    { "case": "#198 the largest step in the pen", "points": 20, "face": "pen", "latin": false, "expect": { "size": 31, "previewSize": 25, "previewLine": 25 } },
+    { "case": "#198 the largest step in the Latin pen", "points": 20, "face": "pen", "latin": true, "expect": { "size": 31, "previewSize": 25, "previewLine": 31 } }
   ]
 }

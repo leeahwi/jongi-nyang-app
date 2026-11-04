@@ -1,5 +1,5 @@
 {
-  "about": "할 일 스페이스의 공유 사례: 1단계 S1–S28 (spaces-phase1.md §6), 2a S29–S38 · 2b S39–S45 (spaces-phase2.md) · 여러 개 옮기기 S46–S48 (#168). 두 앱이 같은 입력에서 같은 기대값을 내요. Mac: mac/scripts/test-spaces.sh가 이 파일을 읽어요.",
+  "about": "할 일 스페이스의 공유 사례: 1단계 S1–S28 (spaces-phase1.md §6), 2a S29–S38 · 2b S39–S45 (spaces-phase2.md) · 여러 개 옮기기 S46–S48 (#168) · 2c S49–S59 (찾기의 `#` · 기록 거르기 · Claude의 옮기기) · 기기마다 보일 스페이스 S60–S72 (#196, `device`). 두 앱이 같은 입력에서 같은 기대값을 내요. Mac: mac/scripts/test-spaces.sh가 이 파일을 읽어요.",
   "timeZone": "Asia/Seoul",
   "now": "2026-10-28T01:00:00Z",
   "file": {
@@ -928,6 +928,306 @@
       { "case": "S48", "note": "고른 줄 모두가 키보드 줄의 아래 묶음으로", "ids": ["C0000000-0000-4000-8000-000000000002", "C0000000-0000-4000-8000-000000000006"], "focus": "C0000000-0000-4000-8000-000000000006", "direction": "down", "to": "none", "moved": 2 },
       { "case": "S48", "ids": ["C0000000-0000-4000-8000-000000000002", "C0000000-0000-4000-8000-000000000006"], "focus": "C0000000-0000-4000-8000-000000000002", "direction": "down", "to": "s-b", "moved": 1 },
       { "case": "S48", "note": "맨 위 묶음에서 ↑: 아무 일 없음", "ids": ["C0000000-0000-4000-8000-000000000002", "C0000000-0000-4000-8000-000000000006"], "focus": "C0000000-0000-4000-8000-000000000002", "direction": "up", "to": null, "moved": 0 }
+    ]
+  },
+  "search": {
+    "about": "S49–S54 (spaces-phase2.md 2c, C1–C5): 노트의 찾기에서 `#스페이스`. 위의 `now` · `file`(회사 s-a · 집 s-b · 공부 s-c)을 써요. `todos`는 목록(오늘 · 앞으로), `spaces`는 todo-spaces.json의 자리(할 일 id → 스페이스), `archive`는 완료 기록 줄(`space`는 2c부터 줄에 적는 스페이스 id), `memos`는 메모예요. `#`는 입력 줄과 같은 규칙으로 찾아요(첫 토큰, 이름 전체 → 앞부분 → 초성, 일반도). 맞는 스페이스나 일반이 없으면 스페이스로 거르지 않고 찾는 말 전체를 글자로 찾아요. 스페이스가 0개면 `#`를 읽지 않아요(M2). 기대값 `space`는 거르는 스페이스(일반은 \"none\", 거르지 않으면 null), `words`는 `#` 토큰을 뺀 찾는 말, 그 밖에는 묶음마다 보이는 제목(메모는 id) 순서예요. 없는 묶음은 비어 있어요. 스페이스로 거르면 메모 · 일정은 나오지 않아요. 완료 기록 줄의 스페이스는 줄의 `space`(살아 있는 스페이스일 때) → todo-spaces.json의 자리 → 일반 순서예요.",
+    "todos": [
+      { "id": "D0000000-0000-4000-8000-000000000001", "title": "주간 보고서", "isCompleted": false, "createdAt": "2026-10-20T00:00:00Z" },
+      { "id": "D0000000-0000-4000-8000-000000000002", "title": "보고서 검토", "isCompleted": false, "createdAt": "2026-10-20T00:00:00Z", "dueDate": "2026-10-30" },
+      { "id": "D0000000-0000-4000-8000-000000000003", "title": "장보기", "isCompleted": false, "createdAt": "2026-10-20T00:00:00Z" },
+      { "id": "D0000000-0000-4000-8000-000000000004", "title": "가계부 보고", "isCompleted": false, "createdAt": "2026-10-20T00:00:00Z" },
+      { "id": "D0000000-0000-4000-8000-000000000006", "title": "C# 공부", "isCompleted": false, "createdAt": "2026-10-20T00:00:00Z" }
+    ],
+    "spaces": {
+      "D0000000-0000-4000-8000-000000000001": "s-a",
+      "D0000000-0000-4000-8000-000000000002": "s-a",
+      "D0000000-0000-4000-8000-000000000003": "s-b",
+      "D0000000-0000-4000-8000-000000000006": "s-c",
+      "A0000000-0000-4000-8000-000000000002": "s-b"
+    },
+    "archive": [
+      { "id": "A0000000-0000-4000-8000-000000000003", "title": "옛 보고서", "createdAt": "2026-08-30T00:00:00Z", "completedAt": "2026-09-01T02:00:00Z" },
+      { "id": "A0000000-0000-4000-8000-000000000001", "title": "월간 보고서", "createdAt": "2026-10-19T00:00:00Z", "completedAt": "2026-10-20T02:00:00Z", "space": "s-a" },
+      { "id": "A0000000-0000-4000-8000-000000000002", "title": "보고서 초안", "createdAt": "2026-10-19T00:00:00Z", "completedAt": "2026-10-21T02:00:00Z" },
+      { "id": "A0000000-0000-4000-8000-000000000004", "title": "보고서 정리", "createdAt": "2026-10-19T00:00:00Z", "completedAt": "2026-10-22T02:00:00Z", "space": "s-x" }
+    ],
+    "memos": [
+      { "id": "M0000000-0000-4000-8000-000000000001", "text": "회의 메모\n#휴가 보고서 쓰기", "createdAt": "2026-10-27T00:00:00Z", "updatedAt": "2026-10-27T00:00:00Z" }
+    ],
+    "cases": [
+      { "case": "S49", "note": "`#` 없이는 지금 그대로: 모든 묶음", "query": "보고서", "expect": { "space": null, "words": "보고서", "today": ["주간 보고서"], "ahead": ["보고서 검토"], "memos": ["M0000000-0000-4000-8000-000000000001"], "history": ["보고서 정리", "보고서 초안", "월간 보고서", "옛 보고서"] } },
+      { "case": "S50", "note": "#회사 + 말: 회사의 할 일과 완료 기록만, 메모는 없음", "query": "#회사 보고서", "expect": { "space": "s-a", "words": "보고서", "today": ["주간 보고서"], "ahead": ["보고서 검토"], "memos": [], "history": ["월간 보고서"] } },
+      { "case": "S50", "note": "토큰은 줄 어디에 있어도 돼요(앞이 빈칸이면)", "query": "보고서 #회사", "expect": { "space": "s-a", "words": "보고서", "today": ["주간 보고서"], "ahead": ["보고서 검토"], "memos": [], "history": ["월간 보고서"] } },
+      { "case": "S50", "note": "#회사만: 회사의 모든 할 일과 완료 기록(칠할 글자는 없음)", "query": "#회사", "expect": { "space": "s-a", "words": "", "today": ["주간 보고서"], "ahead": ["보고서 검토"], "memos": [], "history": ["월간 보고서"] } },
+      { "case": "S51", "note": "앞부분 · 초성도 입력 줄처럼", "query": "#ㅎ 보고", "expect": { "space": "s-a", "words": "보고", "today": ["주간 보고서"], "ahead": ["보고서 검토"], "memos": [], "history": ["월간 보고서"] } },
+      { "case": "S51", "note": "줄에 스페이스가 없으면 todo-spaces.json의 자리", "query": "#집", "expect": { "space": "s-b", "words": "", "today": ["장보기"], "ahead": [], "memos": [], "history": ["보고서 초안"] } },
+      { "case": "S52", "note": "#일반: 자리 없는 할 일, 지운 스페이스의 줄, 자리를 모르는 줄", "query": "#일반 보고", "expect": { "space": "none", "words": "보고", "today": ["가계부 보고"], "ahead": [], "memos": [], "history": ["보고서 정리", "옛 보고서"] } },
+      { "case": "S52", "query": "#gen", "expect": { "space": "none", "words": "", "today": ["가계부 보고"], "ahead": [], "memos": [], "history": ["보고서 정리", "옛 보고서"] } },
+      { "case": "S53", "note": "맞는 스페이스가 없으면 글자 그대로 찾아요(새 스페이스를 만들지 않아요)", "query": "#휴가 보고서", "expect": { "space": null, "words": "#휴가 보고서", "today": [], "ahead": [], "memos": ["M0000000-0000-4000-8000-000000000001"], "history": [] } },
+      { "case": "S53", "note": "낱말 속 #는 토큰이 아니에요", "query": "C# 공부", "expect": { "space": null, "words": "C# 공부", "today": ["C# 공부"], "ahead": [], "memos": [], "history": [] } },
+      { "case": "S54", "note": "스페이스가 0개면 `#`를 읽지 않아요(M2)", "noSpaces": true, "query": "#회사 보고서", "expect": { "space": null, "words": "#회사 보고서", "today": [], "ahead": [], "memos": [], "history": [] } }
+    ]
+  },
+  "history": {
+    "about": "S55–S56 (spaces-phase2.md 2c, H1–H5): 완료 기록과 집중 기록을 스페이스로 거르기. 할 일 · 자리 · 완료 기록 줄은 `search`의 것을 써요. `focus`는 focus.jsonl 줄(`space`는 2c부터 적는 스페이스 id)이에요. 집중 줄의 스페이스는 줄의 `space`(살아 있을 때) → 그 할 일(`taskId`)의 todo-spaces.json 자리 → 일반 순서이고, 할 일이 없는 타이머는 어느 스페이스에도 들지 않아요(모든 스페이스에서만 보여요). `filter`는 거르는 스페이스(일반은 \"none\", 모두는 null), 기대값은 남는 줄의 id를 파일 순서로.",
+    "focus": [
+      { "id": "F1", "taskId": "D0000000-0000-4000-8000-000000000001", "title": "주간 보고서", "start": "2026-10-27T01:00:00Z", "end": "2026-10-27T01:25:00Z", "minutes": 25, "kind": "focus", "done": false, "space": "s-a" },
+      { "id": "F2", "taskId": "D0000000-0000-4000-8000-000000000003", "title": "장보기", "start": "2026-10-27T03:00:00Z", "end": "2026-10-27T03:20:00Z", "minutes": 20, "kind": "focus", "done": false },
+      { "id": "F3", "taskId": "A0000000-0000-4000-8000-000000000003", "title": "옛 보고서", "start": "2026-08-31T01:00:00Z", "end": "2026-08-31T01:30:00Z", "minutes": 30, "kind": "focus", "done": true },
+      { "id": "F4", "title": "", "start": "2026-10-27T05:00:00Z", "end": "2026-10-27T05:10:00Z", "minutes": 10, "kind": "timer", "done": false },
+      { "id": "F5", "taskId": "D0000000-0000-4000-8000-000000000001", "title": "주간 보고서", "start": "2026-10-26T01:00:00Z", "end": "2026-10-26T01:25:00Z", "minutes": 25, "kind": "focus", "done": false, "space": "s-b" }
+    ],
+    "cases": [
+      { "case": "S55", "note": "거르지 않으면 모두(타이머도)", "filter": null, "expect": { "archive": ["A0000000-0000-4000-8000-000000000003", "A0000000-0000-4000-8000-000000000001", "A0000000-0000-4000-8000-000000000002", "A0000000-0000-4000-8000-000000000004"], "focus": ["F1", "F2", "F3", "F4", "F5"] } },
+      { "case": "S55", "note": "줄에 적힌 스페이스가 먼저: F5는 그때 집", "filter": "s-a", "expect": { "archive": ["A0000000-0000-4000-8000-000000000001"], "focus": ["F1"] } },
+      { "case": "S55", "filter": "s-b", "expect": { "archive": ["A0000000-0000-4000-8000-000000000002"], "focus": ["F2", "F5"] } },
+      { "case": "S56", "note": "일반: 지운 스페이스(s-x)의 줄과 자리를 모르는 줄, 타이머는 빠져요", "filter": "none", "expect": { "archive": ["A0000000-0000-4000-8000-000000000003", "A0000000-0000-4000-8000-000000000004"], "focus": ["F3"] } },
+      { "case": "S56", "note": "끝낸 일이 없는 스페이스", "filter": "s-c", "expect": { "archive": [], "focus": [] } }
+    ]
+  },
+  "ai": {
+    "about": "S57–S59 (spaces-phase2.md 2c N3 · mcp-plan.md M26–M28): Claude가 할 일을 다른 스페이스로 옮긴 기록과 앱의 되돌리기. 위의 `now` · `file`을 써요. `todos` · `places`는 Claude가 고치기 전이고, `changes`는 preview_changes에 준 것, `entry`는 apply_changes가 ai-log.jsonl에 쓴 줄이에요(줄의 `id` · `at`과 자리의 `at`은 적용한 때라 시험마다 달라요). 자리의 변경은 `file: todo-spaces.json`, `id`는 할 일 id, 전 · 후는 `{id, space, at}`이고 자리가 없던 할 일의 전은 `{id, space: null}`이에요. `count`는 할 일 수예요. `undo`는 앱의 되돌리기: 그때의 자리(`places`, 없으면 일반)와 제목(`titles`)에서 되돌린 뒤의 `places` · `titles`와 할 일 단위의 `undone` · `left`. 한 할 일의 변경 가운데 하나라도 그새 바뀌었으면 그 할 일은 통째로 그대로예요. 모르는 `file`의 변경은 읽지 않고 셈에도 들지 않아요(M28). 목록에 없는 할 일(`gone`)의 자리는 되돌린 것으로 세고 아무것도 쓰지 않아요.",
+    "todos": [
+      { "id": "E0000000-0000-4000-8000-000000000001", "title": "견적서 보내기", "isCompleted": false, "createdAt": "2026-10-20T00:00:00Z" },
+      { "id": "E0000000-0000-4000-8000-000000000002", "title": "장보기", "isCompleted": false, "createdAt": "2026-10-20T00:00:00Z" }
+    ],
+    "places": { "E0000000-0000-4000-8000-000000000001": { "space": "s-a", "at": "2026-10-01T00:00:00Z" } },
+    "changes": [
+      { "kind": "todo", "id": "E0000000-0000-4000-8000-000000000001", "set": { "space": "집" } },
+      { "kind": "todo", "id": "E0000000-0000-4000-8000-000000000002", "set": { "title": "장보기 목록", "space": "회사" } }
+    ],
+    "entry": {
+      "v": 1, "id": "AI-ENTRY-1", "at": "2026-10-28T01:00:00Z", "client": "Claude", "tool": "apply_changes", "kind": "change", "target": "todos", "count": 2, "title": "견적서 보내기", "ext": 3,
+      "changes": [
+        { "file": "todo-spaces.json", "id": "E0000000-0000-4000-8000-000000000001", "before": { "id": "E0000000-0000-4000-8000-000000000001", "space": "s-a", "at": "2026-10-01T00:00:00Z" }, "after": { "id": "E0000000-0000-4000-8000-000000000001", "space": "s-b", "at": "2026-10-28T01:00:00Z" } },
+        { "file": "todos.json", "id": "E0000000-0000-4000-8000-000000000002", "before": { "id": "E0000000-0000-4000-8000-000000000002", "title": "장보기", "isCompleted": false, "createdAt": "2026-10-20T00:00:00Z" }, "after": { "id": "E0000000-0000-4000-8000-000000000002", "title": "장보기 목록", "isCompleted": false, "createdAt": "2026-10-20T00:00:00Z" } },
+        { "file": "todo-spaces.json", "id": "E0000000-0000-4000-8000-000000000002", "before": { "id": "E0000000-0000-4000-8000-000000000002", "space": null }, "after": { "id": "E0000000-0000-4000-8000-000000000002", "space": "s-a", "at": "2026-10-28T01:00:00Z" } }
+      ]
+    },
+    "undo": [
+      { "case": "S57", "note": "Claude가 두고 간 그대로면 자리와 제목 모두 처음으로", "places": { "E0000000-0000-4000-8000-000000000001": "s-b", "E0000000-0000-4000-8000-000000000002": "s-a" }, "titles": { "E0000000-0000-4000-8000-000000000002": "장보기 목록" }, "expect": { "places": { "E0000000-0000-4000-8000-000000000001": "s-a", "E0000000-0000-4000-8000-000000000002": null }, "titles": { "E0000000-0000-4000-8000-000000000002": "장보기" }, "undone": 2, "left": 0 } },
+      { "case": "S58", "note": "그새 앱에서 견적서를 공부로 옮겼으면 견적서는 그대로", "places": { "E0000000-0000-4000-8000-000000000001": "s-c", "E0000000-0000-4000-8000-000000000002": "s-a" }, "titles": { "E0000000-0000-4000-8000-000000000002": "장보기 목록" }, "expect": { "places": { "E0000000-0000-4000-8000-000000000001": "s-c", "E0000000-0000-4000-8000-000000000002": null }, "titles": { "E0000000-0000-4000-8000-000000000002": "장보기" }, "undone": 1, "left": 1 } },
+      { "case": "S58", "note": "그새 장보기 제목을 고쳤으면 장보기는 자리까지 통째로 그대로", "places": { "E0000000-0000-4000-8000-000000000001": "s-b", "E0000000-0000-4000-8000-000000000002": "s-a" }, "titles": { "E0000000-0000-4000-8000-000000000002": "장보기 (우유)" }, "expect": { "places": { "E0000000-0000-4000-8000-000000000001": "s-a", "E0000000-0000-4000-8000-000000000002": "s-a" }, "titles": { "E0000000-0000-4000-8000-000000000002": "장보기 (우유)" }, "undone": 1, "left": 1 } },
+      { "case": "S59", "note": "모르는 파일의 변경은 버리고 다른 변경은 그대로 되돌려요(M28). 목록에 없는 할 일은 되돌린 셈이에요", "extraChange": { "file": "todo-labels.json", "id": "E0000000-0000-4000-8000-000000000002", "before": null, "after": { "id": "E0000000-0000-4000-8000-000000000002", "label": "급함" } }, "gone": ["E0000000-0000-4000-8000-000000000001"], "places": { "E0000000-0000-4000-8000-000000000001": "s-b", "E0000000-0000-4000-8000-000000000002": "s-a" }, "titles": { "E0000000-0000-4000-8000-000000000002": "장보기 목록" }, "expect": { "places": { "E0000000-0000-4000-8000-000000000001": "s-b", "E0000000-0000-4000-8000-000000000002": null }, "titles": { "E0000000-0000-4000-8000-000000000002": "장보기" }, "undone": 2, "left": 0 } }
+    ]
+  },
+  "device": {
+    "about": "S60–S72 (#196, spaces-device.md): 기기마다 보일 스페이스. `rules`는 이름 붙인 설정(Mac `spaces.device` · Windows `prefs.spaceDevice`의 한 항목)이고, `null`은 보이기(설정 없음)예요. 요일은 1 월요일 … 7 일요일, 시각은 이 기기의 벽시계 `HH:mm`이에요. `instants`는 UTC 순간을 `timeZone`(Asia/Seoul)으로 바꿔 읽어요. `spaces`와 `todos`는 S66–S68의 준비예요(운동 s-d는 지운 표시, 회의록 s-e는 다른 기기가 새로 만든 것). 요약의 말은 앱의 시계를 정하지 않은 때(ko · nl 24시간, en 12시간)예요. `fits`는 책상 줄과 메뉴 힌트가 쓰는 꼴이에요(긴 꼴이 24자를 넘으면 짧은 꼴).",
+    "fitLength": 24,
+    "rules": {
+      "work": {"show": "time", "times": [{"days": [1, 2, 3, 4, 5], "from": "09:00", "to": "18:00"}]},
+      "split": {
+        "show": "time",
+        "times": [
+          {"days": [1, 2, 3, 4, 5], "from": "09:00", "to": "12:00"},
+          {"days": [1, 2, 3, 4, 5], "from": "13:00", "to": "18:00"},
+          {"days": [6], "from": "10:00", "to": "14:00"}
+        ]
+      },
+      "night": {"show": "time", "times": [{"days": [1, 2, 3, 4, 5], "from": "22:00", "to": "06:00"}]},
+      "allday": {"show": "time", "times": [{"days": [6, 7], "from": "00:00", "to": "00:00"}]},
+      "sameStart": {"show": "time", "times": [{"days": [3], "from": "10:00", "to": "10:00"}]},
+      "overlap": {"show": "time", "times": [{"days": [1], "from": "09:00", "to": "13:00"}, {"days": [1], "from": "12:00", "to": "18:00"}]},
+      "adjacent": {
+        "show": "time",
+        "times": [
+          {"days": [1, 2, 3, 4, 5], "from": "12:00", "to": "13:00"},
+          {"days": [1, 2, 3, 4, 5], "from": "13:00", "to": "18:00"}
+        ]
+      },
+      "mixed": {
+        "show": "time",
+        "times": [
+          {"days": [1, 2, 3, 4, 5], "from": "07:00", "to": "08:30"},
+          {"days": [5], "from": "22:00", "to": "02:00"}
+        ]
+      },
+      "twoRows": {
+        "show": "time",
+        "times": [
+          {"days": [1, 2, 3, 4, 5], "from": "09:00", "to": "12:00"},
+          {"days": [1], "from": "19:00", "to": "21:00"}
+        ]
+      },
+      "hide": {"show": "hide"},
+      "empty": {"show": "time", "times": []}
+    },
+    "visible": [
+      {"case": "S60", "rule": "work", "day": 2, "time": "08:59", "visible": false, "note": "시작 전"},
+      {"case": "S60", "rule": "work", "day": 2, "time": "09:00", "visible": true, "note": "시작은 들어요"},
+      {"case": "S60", "rule": "work", "day": 2, "time": "17:59", "visible": true},
+      {"case": "S60", "rule": "work", "day": 2, "time": "18:00", "visible": false, "note": "끝은 들지 않아요"},
+      {"case": "S60", "rule": "work", "day": 1, "time": "09:00", "visible": true},
+      {"case": "S60", "rule": "work", "day": 5, "time": "17:59", "visible": true},
+      {"case": "S60", "rule": "work", "day": 6, "time": "10:00", "visible": false, "note": "요일 밖"},
+      {"case": "S60", "rule": "work", "day": 7, "time": "12:00", "visible": false},
+      {"case": "S60", "rule": "hide", "day": 2, "time": "10:00", "visible": false},
+      {"case": "S60", "rule": "empty", "day": 2, "time": "10:00", "visible": false, "note": "시간대 0개는 숨기기"},
+      {"case": "S61", "rule": "night", "day": 5, "time": "22:00", "visible": true},
+      {"case": "S61", "rule": "night", "day": 5, "time": "23:59", "visible": true},
+      {"case": "S61", "rule": "night", "day": 6, "time": "00:00", "visible": true, "note": "금요일 밤의 것"},
+      {"case": "S61", "rule": "night", "day": 6, "time": "05:59", "visible": true},
+      {"case": "S61", "rule": "night", "day": 6, "time": "06:00", "visible": false},
+      {"case": "S61", "rule": "night", "day": 6, "time": "22:00", "visible": false, "note": "토요일은 평일이 아니에요"},
+      {"case": "S61", "rule": "night", "day": 1, "time": "01:00", "visible": false, "note": "월요일 새벽은 일요일 밤의 것"},
+      {"case": "S61", "rule": "night", "day": 2, "time": "01:00", "visible": true, "note": "화요일 새벽은 월요일 밤의 것"},
+      {"case": "S61", "rule": "night", "day": 1, "time": "21:59", "visible": false},
+      {"case": "S61", "rule": "night", "day": 1, "time": "22:00", "visible": true},
+      {"case": "S62", "rule": "allday", "day": 6, "time": "00:00", "visible": true},
+      {"case": "S62", "rule": "allday", "day": 7, "time": "23:59", "visible": true},
+      {"case": "S62", "rule": "allday", "day": 1, "time": "00:00", "visible": false},
+      {"case": "S62", "rule": "allday", "day": 5, "time": "23:59", "visible": false},
+      {"case": "S62", "rule": "sameStart", "day": 3, "time": "09:59", "visible": false},
+      {"case": "S62", "rule": "sameStart", "day": 3, "time": "10:00", "visible": true, "note": "시작 = 끝은 24시간"},
+      {"case": "S62", "rule": "sameStart", "day": 4, "time": "09:59", "visible": true},
+      {"case": "S62", "rule": "sameStart", "day": 4, "time": "10:00", "visible": false},
+      {"case": "S63", "rule": "overlap", "day": 1, "time": "12:30", "visible": true, "note": "겹치는 곳"},
+      {"case": "S63", "rule": "overlap", "day": 1, "time": "08:59", "visible": false},
+      {"case": "S63", "rule": "overlap", "day": 1, "time": "17:59", "visible": true},
+      {"case": "S63", "rule": "overlap", "day": 1, "time": "18:00", "visible": false},
+      {"case": "S63", "rule": "overlap", "day": 2, "time": "12:30", "visible": false},
+      {"case": "S63", "rule": "adjacent", "day": 3, "time": "11:59", "visible": false},
+      {"case": "S63", "rule": "adjacent", "day": 3, "time": "12:59", "visible": true},
+      {"case": "S63", "rule": "adjacent", "day": 3, "time": "13:00", "visible": true, "note": "맞닿은 곳은 끊기지 않아요"},
+      {"case": "S63", "rule": "adjacent", "day": 3, "time": "18:00", "visible": false},
+      {"case": "S63", "rule": "mixed", "day": 5, "time": "07:30", "visible": true},
+      {"case": "S63", "rule": "mixed", "day": 5, "time": "08:30", "visible": false},
+      {"case": "S63", "rule": "mixed", "day": 5, "time": "23:00", "visible": true},
+      {"case": "S63", "rule": "mixed", "day": 6, "time": "01:59", "visible": true, "note": "금요일 밤을 넘긴 것"},
+      {"case": "S63", "rule": "mixed", "day": 6, "time": "02:00", "visible": false},
+      {"case": "S63", "rule": "mixed", "day": 4, "time": "23:00", "visible": false},
+      {"case": "S63", "rule": "mixed", "day": 6, "time": "07:30", "visible": false},
+      {"case": "S63", "rule": "twoRows", "day": 1, "time": "10:00", "visible": true},
+      {"case": "S63", "rule": "twoRows", "day": 1, "time": "20:00", "visible": true, "note": "같은 요일이 두 줄"},
+      {"case": "S63", "rule": "twoRows", "day": 2, "time": "20:00", "visible": false},
+      {"case": "S63", "rule": "twoRows", "day": 1, "time": "21:00", "visible": false},
+      {"case": "S63", "rule": "split", "day": 2, "time": "11:59", "visible": true},
+      {"case": "S63", "rule": "split", "day": 2, "time": "12:00", "visible": false},
+      {"case": "S63", "rule": "split", "day": 2, "time": "13:00", "visible": true},
+      {"case": "S63", "rule": "split", "day": 6, "time": "10:00", "visible": true},
+      {"case": "S63", "rule": "split", "day": 6, "time": "14:00", "visible": false},
+      {"case": "S63", "rule": "split", "day": 7, "time": "10:00", "visible": false}
+    ],
+    "instants": [
+      {"case": "S64", "at": "2026-11-03T00:00:00Z", "day": 2, "time": "09:00", "logicalDay": "2026-11-03", "visible": {"work": true, "night": false}},
+      {"case": "S64", "at": "2026-11-02T23:59:00Z", "day": 2, "time": "08:59", "logicalDay": "2026-11-03", "visible": {"work": false, "night": false}},
+      {"case": "S64", "note": "화요일 03:59: 4시 규칙의 날은 아직 월요일, 시계는 화요일 새벽(월요일 밤의 시간대)", "at": "2026-11-02T18:59:00Z", "day": 2, "time": "03:59", "logicalDay": "2026-11-02", "visible": {"work": false, "night": true}},
+      {"case": "S64", "note": "토요일 01:00: 오늘 한 장은 아직 금요일(4시 규칙)이지만 시간대는 시계의 토요일", "at": "2026-11-06T16:00:00Z", "day": 6, "time": "01:00", "logicalDay": "2026-11-06", "visible": {"work": false, "night": true}},
+      {"case": "S64", "at": "2026-11-08T16:30:00Z", "day": 1, "time": "01:30", "logicalDay": "2026-11-08", "visible": {"work": false, "night": false}}
+    ],
+    "read": [
+      {"case": "S65", "note": "그대로", "value": {"s-a": {"show": "hide"}, "none": {"show": "time", "times": [{"days": [1, 2, 3, 4, 5], "from": "09:00", "to": "18:00"}]}}, "expect": {"none": {"show": "time", "times": [{"days": [1, 2, 3, 4, 5], "from": "09:00", "to": "18:00"}]}, "s-a": {"show": "hide"}}},
+      {"case": "S65", "note": "요일은 정렬하고 겹친 것은 하나로", "value": {"s-a": {"show": "time", "times": [{"days": [5, 1, 3, 3], "from": "09:00", "to": "18:00"}]}}, "expect": {"s-a": {"show": "time", "times": [{"days": [1, 3, 5], "from": "09:00", "to": "18:00"}]}}},
+      {"case": "S65", "note": "틀린 항목은 버려요(보이기)", "value": {"s-a": {"show": "sometimes"}, "s-b": "hide", "s-c": {"show": "time", "times": "09:00"}, "": {"show": "hide"}}, "expect": {}},
+      {"case": "S65", "note": "틀린 시간대는 빠지고, 남은 게 없으면 숨기기", "value": {"s-a": {"show": "time", "times": [{"days": [0, 8], "from": "09:00", "to": "18:00"}, {"days": [1], "from": "9:00", "to": "18:00"}, {"days": [1], "from": "09:00", "to": "24:00"}, {"days": [], "from": "09:00", "to": "18:00"}, {"days": [2], "from": "10:00"}]}}, "expect": {"s-a": {"show": "time", "times": []}}},
+      {"case": "S65", "note": "모르는 키는 읽지 않아요, 시간대는 12개까지", "value": {"s-b": {"show": "time", "note": "x", "times": [{"days": [1], "from": "08:00", "to": "08:30", "color": "red"}, {"days": [1], "from": "09:00", "to": "09:30", "color": "red"}, {"days": [1], "from": "10:00", "to": "10:30", "color": "red"}, {"days": [1], "from": "11:00", "to": "11:30", "color": "red"}, {"days": [1], "from": "12:00", "to": "12:30", "color": "red"}, {"days": [1], "from": "13:00", "to": "13:30", "color": "red"}, {"days": [1], "from": "14:00", "to": "14:30", "color": "red"}, {"days": [1], "from": "15:00", "to": "15:30", "color": "red"}, {"days": [1], "from": "16:00", "to": "16:30", "color": "red"}, {"days": [1], "from": "17:00", "to": "17:30", "color": "red"}, {"days": [1], "from": "18:00", "to": "18:30", "color": "red"}, {"days": [1], "from": "19:00", "to": "19:30", "color": "red"}, {"days": [1], "from": "20:00", "to": "20:30", "color": "red"}, {"days": [1], "from": "21:00", "to": "21:30", "color": "red"}]}}, "expect": {"s-b": {"show": "time", "times": [{"days": [1], "from": "08:00", "to": "08:30"}, {"days": [1], "from": "09:00", "to": "09:30"}, {"days": [1], "from": "10:00", "to": "10:30"}, {"days": [1], "from": "11:00", "to": "11:30"}, {"days": [1], "from": "12:00", "to": "12:30"}, {"days": [1], "from": "13:00", "to": "13:30"}, {"days": [1], "from": "14:00", "to": "14:30"}, {"days": [1], "from": "15:00", "to": "15:30"}, {"days": [1], "from": "16:00", "to": "16:30"}, {"days": [1], "from": "17:00", "to": "17:30"}, {"days": [1], "from": "18:00", "to": "18:30"}, {"days": [1], "from": "19:00", "to": "19:30"}]}}},
+      {"case": "S65", "note": "객체가 아니면 모두 보이기", "value": ["s-a"], "expect": {}}
+    ],
+    "spaces": [
+      {"color": "pink", "id": "s-a", "name": "회사", "order": 0, "updatedAt": "2026-10-01T00:00:00Z"},
+      {"color": "mint", "id": "s-b", "name": "집", "order": 1, "updatedAt": "2026-10-01T00:00:00Z"},
+      {"color": "yellow", "id": "s-c", "name": "공부", "order": 2, "updatedAt": "2026-10-01T00:00:00Z"},
+      {"color": "sky", "deleted": true, "id": "s-d", "name": "운동", "order": 3, "updatedAt": "2026-10-20T00:00:00Z"},
+      {"color": "peach", "id": "s-e", "name": "회의록", "order": 4, "updatedAt": "2026-11-02T00:00:00Z"}
+    ],
+    "hidden": [
+      {"case": "S66", "note": "화 20:00, 회사는 평일 9–18, 일반은 숨김", "at": "2026-11-03T11:00:00Z", "rules": {"s-a": "work", "none": "hide"}, "expect": ["none", "s-a"]},
+      {"case": "S66", "note": "화 10:00", "at": "2026-11-03T01:00:00Z", "rules": {"s-a": "work", "none": "hide"}, "expect": ["none"]},
+      {"case": "S66", "note": "지운 스페이스와 파일에 없는 스페이스의 설정은 아무것도 숨기지 않아요", "at": "2026-11-03T01:00:00Z", "rules": {"s-d": "hide", "s-zz": "hide"}, "expect": []},
+      {"case": "S66", "note": "다른 기기가 만든 새 스페이스(회의록)는 설정이 없어 보여요", "at": "2026-11-03T01:00:00Z", "rules": {"s-a": "hide"}, "expect": ["s-a"]},
+      {"case": "S66", "note": "살아 있는 스페이스가 0개면 아무것도 숨기지 않아요", "at": "2026-11-03T01:00:00Z", "noSpaces": true, "rules": {"none": "hide"}, "expect": []}
+    ],
+    "places": [
+      {"case": "S66", "note": "지운 스페이스(운동)의 할 일은 일반이라 일반의 설정을 따라요", "rules": {"none": "hide"}, "space": "s-d", "hidden": true},
+      {"case": "S66", "rules": {"none": "hide"}, "space": "s-b", "hidden": false},
+      {"case": "S66", "rules": {"none": "hide"}, "space": null, "hidden": true},
+      {"case": "S66", "note": "없는 스페이스를 가리키는 자리도 일반", "rules": {"none": "hide", "s-zz": "hide"}, "space": "s-zz", "hidden": true}
+    ],
+    "todos": [
+      {"id": "D0000000-0000-4000-8000-000000000001", "title": "주간 보고서 쓰기", "space": "s-a", "done": false},
+      {"id": "D0000000-0000-4000-8000-000000000002", "title": "팀 회의 자료 보내기", "space": "s-a", "done": false},
+      {"id": "D0000000-0000-4000-8000-000000000003", "title": "장보기 목록 정리", "space": "s-b", "done": false},
+      {"id": "D0000000-0000-4000-8000-000000000004", "title": "빨래 개기", "space": "s-b", "done": true},
+      {"id": "D0000000-0000-4000-8000-000000000005", "title": "책 10쪽 읽기", "space": "s-c", "done": false},
+      {"id": "D0000000-0000-4000-8000-000000000006", "title": "화분에 물 주기", "space": null, "done": false}
+    ],
+    "sheet": [
+      {"case": "S67", "note": "회사 숨김: 끝의 줄은 회사", "hide": ["s-a"], "shown": 4, "line": ["s-a"]},
+      {"case": "S67", "note": "회사 · 공부 숨김", "hide": ["s-a", "s-c"], "shown": 3, "line": ["s-a", "s-c"]},
+      {"case": "S67", "note": "끝내지 않은 할 일이 없는 스페이스는 줄에 없어요", "hide": ["s-c", "s-e"], "shown": 5, "line": ["s-c"]},
+      {"case": "S67", "note": "모두 숨김: 보이는 할 일 0개, 줄은 넷(셋 이상의 꼴)", "hide": ["s-a", "s-b", "s-c", "s-e", "none"], "shown": 0, "line": ["s-a", "s-b", "s-c", "none"]},
+      {"case": "S67", "note": "잠깐 보기(공부): 노트에 보이고 줄에서 빠져요", "hide": ["s-a", "s-c"], "peek": ["s-c"], "shown": 4, "line": ["s-a"], "peeking": ["s-c"]}
+    ],
+    "lens": [
+      {"case": "S68", "note": "렌즈의 스페이스가 숨으면 렌즈를 풀어요", "hide": ["s-a"], "lens": "s-a", "expect": null, "more": 0},
+      {"case": "S68", "note": "G7의 N은 보이는 다른 스페이스만", "hide": ["s-a"], "lens": "s-b", "expect": "s-b", "more": 2},
+      {"case": "S68", "note": "일반만 보는데 일반을 숨김", "hide": ["none"], "lens": "none", "expect": null, "more": 0},
+      {"case": "S68", "note": "잠깐 보는 스페이스는 렌즈를 따라요", "hide": ["s-a"], "peek": ["s-a"], "lens": "s-a", "expect": "s-a", "more": 3}
+    ],
+    "digits": [
+      {"case": "S68", "note": "숫자는 스페이스 순서 그대로, 숨은 것의 숫자는 아무것도 아니에요", "hide": ["s-a"], "digit": 1, "expect": "nothing"},
+      {"case": "S68", "hide": ["s-a"], "digit": 2, "expect": "s-b"},
+      {"case": "S68", "hide": ["s-a"], "digit": 4, "expect": "s-e"},
+      {"case": "S68", "hide": ["s-a"], "digit": 0, "expect": "all"}
+    ],
+    "reminders": [
+      {"case": "S69", "note": "숨은 동안의 알림은 보이게 되어도 울리지 않아요", "rule": "work", "alert": "2026-11-02T23:30:00Z", "now": "2026-11-03T00:00:00Z", "rings": false},
+      {"case": "S69", "note": "보이는 동안의 알림", "rule": "work", "alert": "2026-11-03T00:30:00Z", "now": "2026-11-03T00:30:00Z", "rings": true},
+      {"case": "S69", "note": "알림 시각엔 보였지만 지금은 숨음(늦게 깨어남)", "rule": "work", "alert": "2026-11-03T08:55:00Z", "now": "2026-11-03T09:05:00Z", "rings": false},
+      {"case": "S69", "rule": "hide", "alert": "2026-11-03T00:30:00Z", "now": "2026-11-03T00:30:00Z", "rings": false},
+      {"case": "S69", "note": "숨기기에서 보이기로: 그 전의 알림은 울리지 않아요", "rule": null, "shownSince": "2026-11-03T02:00:00Z", "alert": "2026-11-03T01:30:00Z", "now": "2026-11-03T02:00:00Z", "rings": false},
+      {"case": "S69", "note": "보이게 된 때 뒤의 알림", "rule": null, "shownSince": "2026-11-03T02:00:00Z", "alert": "2026-11-03T02:30:00Z", "now": "2026-11-03T02:30:00Z", "rings": true},
+      {"case": "S69", "note": "보이게 된 때와 같은 순간", "rule": null, "shownSince": "2026-11-03T02:00:00Z", "alert": "2026-11-03T02:00:00Z", "now": "2026-11-03T02:00:00Z", "rings": true},
+      {"case": "S69", "note": "설정이 없던 스페이스의 놓친 알림은 지금처럼 울려요", "rule": null, "alert": "2026-11-02T23:00:00Z", "now": "2026-11-03T00:00:00Z", "rings": true}
+    ],
+    "summary": [
+      {"case": "S70", "rule": "split", "lang": "ko", "full": "평일 09:00–12:00, 13:00–18:00 · 토 10:00–14:00", "short": "평일 2개 시간대 · 토", "fits": "평일 2개 시간대 · 토", "sentence": "평일 09:00–12:00, 13:00–18:00 · 토 10:00–14:00에만 보여요", "hintHidden": "지금은 숨김 · 평일 2개 시간대 · 토에 보여요", "hintShown": "평일 2개 시간대 · 토에만 보여요", "statusShown": "평일 2개 시간대 · 토에만 · 지금 보여요", "statusHidden": "평일 2개 시간대 · 토에만 · 지금 숨어 있어요"},
+      {"case": "S70", "rule": "work", "lang": "ko", "full": "평일 09:00–18:00", "short": "평일", "fits": "평일 09:00–18:00", "sentence": "평일 09:00–18:00에만 보여요", "hintHidden": "지금은 숨김 · 평일 09:00–18:00에 보여요", "hintShown": "평일 09:00–18:00에만 보여요", "statusShown": "평일 09:00–18:00에만 · 지금 보여요", "statusHidden": "평일 09:00–18:00에만 · 지금 숨어 있어요"},
+      {"case": "S70", "rule": "allday", "lang": "ko", "full": "주말", "short": "주말", "fits": "주말", "sentence": "주말에만 보여요", "hintHidden": "지금은 숨김 · 주말에 보여요", "hintShown": "주말에만 보여요", "statusShown": "주말에만 · 지금 보여요", "statusHidden": "주말에만 · 지금 숨어 있어요"},
+      {"case": "S70", "rule": "work", "lang": "en", "full": "weekdays 9:00 AM–6:00 PM", "short": "weekdays", "fits": "weekdays 9:00 AM–6:00 PM", "sentence": "Shown only weekdays 9:00 AM–6:00 PM", "hintHidden": "Hidden now · shows weekdays 9:00 AM–6:00 PM", "hintShown": "Shown only weekdays 9:00 AM–6:00 PM", "statusShown": "Weekdays 9:00 AM–6:00 PM only · showing now", "statusHidden": "Weekdays 9:00 AM–6:00 PM only · hidden now"},
+      {"case": "S70", "rule": "split", "lang": "en", "full": "weekdays 9:00 AM–12:00 PM, 1:00–6:00 PM · Sat 10:00 AM–2:00 PM", "short": "weekdays, 2 times · Sat", "fits": "weekdays, 2 times · Sat", "sentence": "Shown only weekdays 9:00 AM–12:00 PM, 1:00–6:00 PM · Sat 10:00 AM–2:00 PM", "hintHidden": "Hidden now · shows weekdays, 2 times · Sat", "hintShown": "Shown only weekdays, 2 times · Sat", "statusShown": "Weekdays, 2 times · Sat only · showing now", "statusHidden": "Weekdays, 2 times · Sat only · hidden now"},
+      {"case": "S70", "rule": "split", "lang": "nl", "full": "doordeweeks 09:00–12:00, 13:00–18:00 · za 10:00–14:00", "short": "doordeweeks, 2 tijden · za", "fits": "doordeweeks, 2 tijden · za", "sentence": "Alleen zichtbaar doordeweeks 09:00–12:00, 13:00–18:00 · za 10:00–14:00", "hintHidden": "Nu verborgen · zichtbaar doordeweeks, 2 tijden · za", "hintShown": "Alleen zichtbaar doordeweeks, 2 tijden · za", "statusShown": "Alleen doordeweeks, 2 tijden · za · nu zichtbaar", "statusHidden": "Alleen doordeweeks, 2 tijden · za · nu verborgen"},
+      {"case": "S70", "rule": "night", "lang": "nl", "full": "doordeweeks 22:00–06:00", "short": "doordeweeks", "fits": "doordeweeks 22:00–06:00", "sentence": "Alleen zichtbaar doordeweeks 22:00–06:00", "hintHidden": "Nu verborgen · zichtbaar doordeweeks 22:00–06:00", "hintShown": "Alleen zichtbaar doordeweeks 22:00–06:00", "statusShown": "Alleen doordeweeks 22:00–06:00 · nu zichtbaar", "statusHidden": "Alleen doordeweeks 22:00–06:00 · nu verborgen"}
+    ],
+    "days": [
+      {"case": "S70", "days": [1, 2, 3, 4, 5, 6, 7], "ko": "매일", "en": "every day", "nl": "elke dag"},
+      {"case": "S70", "days": [1, 2, 3, 4, 5], "ko": "평일", "en": "weekdays", "nl": "doordeweeks"},
+      {"case": "S70", "days": [6, 7], "ko": "주말", "en": "weekends", "nl": "weekend"},
+      {"case": "S70", "days": [1, 2, 3, 4], "ko": "월–목", "en": "Mon–Thu", "nl": "ma–do"},
+      {"case": "S70", "days": [1, 3, 5], "ko": "월/수/금", "en": "Mon/Wed/Fri", "nl": "ma/wo/vr"},
+      {"case": "S70", "days": [1, 2, 3, 5], "ko": "월–수/금", "en": "Mon–Wed/Fri", "nl": "ma–wo/vr"},
+      {"case": "S70", "days": [2, 3], "ko": "화/수", "en": "Tue/Wed", "nl": "di/wo"},
+      {"case": "S70", "days": [7], "ko": "일", "en": "Sun", "nl": "zo"},
+      {"case": "S70", "days": [5, 6, 7], "ko": "금–일", "en": "Fri–Sun", "nl": "vr–zo"}
+    ],
+    "groupsOrder": [
+      {"case": "S70", "note": "같은 요일 묶음은 모으고, 묶음은 첫 요일 순서, 안은 시작 순서, 똑같은 줄은 한 번", "times": [{"days": [6], "from": "10:00", "to": "14:00"}, {"days": [1, 2, 3, 4, 5], "from": "13:00", "to": "18:00"}, {"days": [1, 2, 3, 4, 5], "from": "09:00", "to": "12:00"}, {"days": [1, 2, 3, 4, 5], "from": "09:00", "to": "12:00"}], "ko": "평일 09:00–12:00, 13:00–18:00 · 토 10:00–14:00"},
+      {"case": "S70", "note": "같은 첫 요일이면 이른 시작의 묶음이 먼저", "times": [{"days": [1], "from": "19:00", "to": "21:00"}, {"days": [1, 2, 3, 4, 5], "from": "09:00", "to": "12:00"}], "ko": "평일 09:00–12:00 · 월 19:00–21:00"}
+    ],
+    "words": [
+      {"case": "S71", "lang": "ko", "names": ["회사"], "line": "회사는 이 기기에서 숨겨 뒀어요", "peek": "잠깐 보기", "peeking": "회사를 잠깐 보는 중", "hideAgain": "다시 숨기기"},
+      {"case": "S71", "lang": "ko", "names": ["집"], "line": "집은 이 기기에서 숨겨 뒀어요", "peek": "잠깐 보기", "peeking": "집을 잠깐 보는 중", "hideAgain": "다시 숨기기"},
+      {"case": "S71", "lang": "ko", "names": ["회사", "공부"], "line": "회사 · 공부는 이 기기에서 숨겨 뒀어요", "peek": "잠깐 보기", "peeking": "회사 · 공부를 잠깐 보는 중", "hideAgain": "다시 숨기기"},
+      {"case": "S71", "lang": "ko", "names": ["회사", "집", "공부"], "line": "스페이스 3개는 이 기기에서 숨겨 뒀어요", "peek": "잠깐 보기", "peeking": "스페이스 3개를 잠깐 보는 중", "hideAgain": "다시 숨기기"},
+      {"case": "S71", "lang": "en", "names": ["Work"], "line": "Work is hidden on this device", "peek": "Peek", "peeking": "Peeking at Work", "hideAgain": "Hide again"},
+      {"case": "S71", "lang": "en", "names": ["Work", "Study"], "line": "Work · Study are hidden on this device", "peek": "Peek", "peeking": "Peeking at Work · Study", "hideAgain": "Hide again"},
+      {"case": "S71", "lang": "en", "names": ["Work", "Home", "Study"], "line": "3 spaces are hidden on this device", "peek": "Peek", "peeking": "Peeking at 3 spaces", "hideAgain": "Hide again"},
+      {"case": "S71", "lang": "nl", "names": ["Werk"], "line": "Werk is verborgen op dit apparaat", "peek": "Even kijken", "peeking": "Werk even zichtbaar", "hideAgain": "Weer verbergen"},
+      {"case": "S71", "lang": "nl", "names": ["Werk", "Studie"], "line": "Werk · Studie zijn verborgen op dit apparaat", "peek": "Even kijken", "peeking": "Werk · Studie even zichtbaar", "hideAgain": "Weer verbergen"},
+      {"case": "S71", "lang": "nl", "names": ["Werk", "Thuis", "Studie"], "line": "3 ruimtes zijn verborgen op dit apparaat", "peek": "Even kijken", "peeking": "3 ruimtes even zichtbaar", "hideAgain": "Weer verbergen"}
+    ],
+    "toasts": [
+      {"case": "S71", "lang": "ko", "name": "회사", "toast": "회사에 넣었어요 · 이 기기에서는 숨겨져 있어요"},
+      {"case": "S71", "lang": "ko", "name": "일반", "toast": "일반에 넣었어요 · 이 기기에서는 숨겨져 있어요"},
+      {"case": "S71", "lang": "en", "name": "Work", "toast": "Added to Work · hidden on this device"},
+      {"case": "S71", "lang": "nl", "name": "Werk", "toast": "Toegevoegd aan Werk · verborgen op dit apparaat"}
+    ],
+    "clean": {"case": "S72", "note": "파일에 없는 스페이스의 설정은 빠지고, 지운 표시가 남은 것(되돌릴 수 있어요)과 일반은 남아요", "rules": {"none": "hide", "s-a": "work", "s-d": "hide", "s-zz": "hide"}, "expect": ["none", "s-a", "s-d"]},
+    "presets": [
+      {"id": "workday", "ko": "평일 근무 9–18", "en": "Workdays 9–6", "nl": "Werkdagen 9–18", "times": [{"days": [1, 2, 3, 4, 5], "from": "09:00", "to": "18:00"}]},
+      {"id": "evening", "ko": "평일 저녁 19–23", "en": "Weekday evenings 7–11", "nl": "Doordeweekse avonden 19–23", "times": [{"days": [1, 2, 3, 4, 5], "from": "19:00", "to": "23:00"}]},
+      {"id": "weekend", "ko": "주말", "en": "Weekends", "nl": "Weekend", "times": [{"days": [6, 7], "from": "00:00", "to": "00:00"}]}
     ]
   }
 }

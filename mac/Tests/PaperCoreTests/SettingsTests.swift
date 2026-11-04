@@ -60,6 +60,14 @@ private enum SettingsTests {
                           [want["body"]!, want["line"]!, want["paragraph"]!, want["preview"]!, want["previewLine"]!], "metrics")
             }
         }
+        // #198: a face's body and preview sizes and the preview's lines (the card's preview follows the body's face).
+        for entry in file["drawerFaces"] as! [[String: Any]] {
+            try test("\(entry["case"]!) (face)") {
+                let made = TextSteps.drawerFaceMetrics(points: entry["points"] as! Int, face: entry["face"] as! String, latin: entry["latin"] as! Bool)
+                let want = entry["expect"] as! [String: Int]
+                try equal([made.size, made.previewSize, made.previewLine], [want["size"]!, want["previewSize"]!, want["previewLine"]!], "face")
+            }
+        }
         for entry in file["paragraphs"] as! [[String: Any]] {
             try test("\(entry["case"]!)") {
                 try equal(TextSteps.paragraphEnds(entry["text"] as! String), entry["ends"] as! [Bool], "ends")

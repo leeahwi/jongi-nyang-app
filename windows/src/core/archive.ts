@@ -11,6 +11,11 @@ export interface ArchiveEntry {
   /** 시간 정하기: the task's range, kept as it was ("HH:mm"). */
   timeStart?: string;
   timeEnd?: string;
+  /**
+   * 스페이스 2c (C5): the to-do's space id when it was filed (absent for 일반, and on lines from before 1.32). Read
+   * through `entrySpace` (todoSpaces.ts): a space deleted since reads as its place, else 일반.
+   */
+  space?: string;
 }
 
 export type ArchiveAfterDays = 0 | 1 | 3 | 7;
@@ -52,11 +57,13 @@ export function dueForArchive(items: readonly TodoItem[], now: Date, days: Archi
   return items.filter((item) => item.isCompleted && (!item.completedAt || new Date(item.completedAt) < cutoff));
 }
 
-export function toEntry(item: TodoItem): ArchiveEntry {
+/** A finished to-do as a record line; `space` (C5): its live space id then, none for 일반. */
+export function toEntry(item: TodoItem, space?: string): ArchiveEntry {
   const entry: ArchiveEntry = { id: item.id, title: item.title, createdAt: item.createdAt };
   if (item.completedAt) entry.completedAt = item.completedAt;
   if (item.timeStart) entry.timeStart = item.timeStart;
   if (item.timeEnd) entry.timeEnd = item.timeEnd;
+  if (space) entry.space = space;
   return entry;
 }
 
@@ -85,6 +92,7 @@ export function parseArchiveLines(text: string): ArchiveEntry[] {
         entries.push({
           id: value.id, title: value.title, createdAt: value.createdAt, ...(typeof value.completedAt === "string" ? { completedAt: value.completedAt } : {}),
           ...(typeof value.timeStart === "string" ? { timeStart: value.timeStart } : {}), ...(typeof value.timeEnd === "string" ? { timeEnd: value.timeEnd } : {}),
+          ...(typeof value.space === "string" && value.space ? { space: value.space } : {}),
         });
       }
     } catch {

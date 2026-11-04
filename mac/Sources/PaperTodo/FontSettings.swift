@@ -155,7 +155,7 @@ struct DrawerFontGroup: View {
                     .accessibilityAddTraits(.isHeader)
                 DrawerFontPreview(drawer: drawer)
             }
-            SettingsGroup(title: L("메모 글꼴"), footer: L("글꼴과 글자 크기는 서랍의 모든 메모에 같이 써요. 카드 미리보기는 크기만 따라요.")
+            SettingsGroup(title: L("메모 글꼴"), footer: L("글꼴과 글자 크기는 서랍의 모든 메모와 카드 미리보기에 같이 써요.")
                           + " " + L("코드 글꼴은 ‘코드’ 표시와 코드 묶음, 고정폭 글꼴에 써요. D2Coding은 한글이 영문 두 칸 폭이라 코드 줄의 칸이 맞아요.")) {
                 HStack(spacing: 12) {
                     SettingsLabel(L("글꼴"), systemImage: "textformat")

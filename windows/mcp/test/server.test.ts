@@ -23,7 +23,7 @@ import { assertNoPath, call, connect, event, logOf, setup, stderrOf, task, tempo
 
 const allTools: [string, Record<string, unknown>][] = [
   ["get_today", {}], ["list_todos", {}], ["list_events", { from: "2026-10-27" }], ["list_memos", {}], ["get_focus", {}], ["search_history", {}],
-  ["get_memo", { id: "ABCDEFGH" }], ["list_memo_folders", {}], ["list_repeats", {}],
+  ["get_memo", { id: "ABCDEFGH" }], ["list_memo_folders", {}], ["list_repeats", {}], ["list_spaces", {}],
   ["add_todos", { items: [{ title: "x" }] }], ["add_event", { title: "x", date: "2026-10-28", start: "10:00" }], ["add_memo", { text: "x" }],
   ["preview_changes", { changes: [{ kind: "todo", id: "A", set: { title: "y" } }] }], ["apply_changes", { token: "ABCDEF" }],
 ];
@@ -358,7 +358,7 @@ test("M32: tools/list marks reading, adding and changing; apply_changes asks a p
   const { env } = setup();
   const client = await connect(env);
   const tools = Object.fromEntries((await client.listTools()).tools.map((tool) => [tool.name, tool]));
-  for (const name of ["get_today", "list_todos", "list_events", "list_memos", "get_memo", "list_memo_folders", "list_repeats", "get_focus", "search_history", "preview_changes"]) {
+  for (const name of ["get_today", "list_todos", "list_events", "list_memos", "get_memo", "list_memo_folders", "list_repeats", "get_focus", "search_history", "list_spaces", "preview_changes"]) {
     assert.equal(tools[name].annotations?.readOnlyHint, true, name);
     assert.equal(tools[name].annotations?.openWorldHint, false, name);
     assert.equal(tools[name]._meta?.["anthropic/requiresUserInteraction"], undefined, name);

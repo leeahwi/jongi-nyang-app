@@ -35,13 +35,14 @@ export class EveningSweep {
 
   /** Every minute: the evening's time come (and nothing in the way)? */
   check(now = new Date()): void {
-    if (!eveningDue(this.store.items, now, this.settings) || this.hooks.isBusy() || this.popup.isVisible) return;
-    this.show("evening", sweepItems(this.store.items, now), now);
+    // #196: what this PC hides is left to the device that shows it.
+    if (!eveningDue(this.store.hereItems, now, this.settings) || this.hooks.isBusy() || this.popup.isVisible) return;
+    this.show("evening", sweepItems(this.store.hereItems, now), now);
   }
 
   /** The note opened (or the day turned with it open): the morning version, when yesterday's evening never came. */
   noteOpened(now = new Date()): void {
-    const items = morningItems(this.store.items, now, this.settings);
+    const items = morningItems(this.store.hereItems, now, this.settings);
     if (items.length === 0 || this.hooks.isBusy() || this.popup.isVisible) return;
     this.store.setPref("sweepShown", yesterdayKey(now));
     this.show("morning", items, now);
@@ -49,7 +50,7 @@ export class EveningSweep {
 
   /** Snapshots and the demo: the bubble as it comes, without the clock. */
   preview(variant: "evening" | "morning", now = new Date()): void {
-    const items = variant === "evening" ? sweepItems(this.store.items, now) : this.store.todayItems.filter((item) => !item.isCompleted && !item.seriesID);
+    const items = variant === "evening" ? sweepItems(this.store.hereItems, now) : this.store.hereTodayItems.filter((item) => !item.isCompleted && !item.seriesID);
     this.show(variant, items, now, true);
   }
 

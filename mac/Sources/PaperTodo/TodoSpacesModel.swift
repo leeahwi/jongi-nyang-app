@@ -69,7 +69,12 @@ extension AppModel {
         if !items.isEmpty {
             spaces = spaces.pruned(todoIDs: Set(items.map(\.id.uuidString)), seriesIDs: repeatsUnreadable ? nil : Set(series.map(\.id)), now: now)
         }
-        if spaces != todoSpaces { todoSpaces = spaces }
+        if spaces != todoSpaces {
+            // N3-7: a to-do moved here loses Claude's stamp, as an edit of the row does.
+            let moved = aiMarks.ids.filter { spaces.spaceID(of: $0) != todoSpaces.spaceID(of: $0) }
+            todoSpaces = spaces
+            if !moved.isEmpty { ai?.clearMarks(moved) }
+        }
         // The lens goes with its space (S12).
         if let lens = spaceLens, lens.spaceId != SpaceLens.none, spaces.space(lens.spaceId) == nil { spaceLens = nil }
         guard spaces.encoded().utf8.elementsEqual(knownSpacesData ?? Data()) == false else { return }
@@ -88,14 +93,16 @@ extension AppModel {
     /// What the today tab shows now (everything once the 4 a.m. day has turned — S11).
     var spaceShown: SpaceLens.Shown {
         guard spaceLens != nil else { return .all }
-        return SpaceLens.shown(spaceLens, spaces: todoSpaces, now: Date())
+        // #196 (D7): a lens on a space this Mac hides lets go.
+        return SpaceDevice.lens(SpaceLens.shown(spaceLens, spaces: todoSpaces, now: Date()), hidden: hiddenOnNote)
     }
 
     func spaceOf(_ id: UUID) -> TodoSpaces.Space? { spaceIndex[id] }
 
     /// Open to-dos on today's sheet in a space (nil: in none); every one for `.all`.
-    func openCount(_ shown: SpaceLens.Shown) -> Int {
-        todayItems.reduce(0) { $0 + (!$1.isCompleted && shown.includes(spaceIndex[$1.id]?.id) ? 1 : 0) }
+    /// `everything` (the desk, D13): what this Mac hides counts too.
+    func openCount(_ shown: SpaceLens.Shown, everything: Bool = false) -> Int {
+        (everything ? allTodayItems : todayItems).reduce(0) { $0 + (!$1.isCompleted && shown.includes(spaceIndex[$1.id]?.id) ? 1 : 0) }
     }
 
     /// 2a (A1, A3–A5): today's sheet as the lens shows it (finished ones too) — the day strip, the timetable, the 오늘 창.
@@ -109,11 +116,13 @@ extension AppModel {
     func spaceOf(taskID: String?) -> TodoSpaces.Space? { taskID.flatMap(UUID.init(uuidString:)).flatMap { spaceIndex[$0] } }
 
     /// The band's N: open to-dos the lens hides.
-    var hiddenOpenCount: Int {
+    /// The band's N: open to-dos the lens hides (#196: of what this Mac shows; `here` leaves out what is peeked at too).
+    func hiddenOpenCount(here: Bool) -> Int {
         let shown = spaceShown
         guard shown != .all else { return 0 }
-        return todayItems.reduce(0) { $0 + (!$1.isCompleted && !shown.includes(spaceIndex[$1.id]?.id) ? 1 : 0) }
+        return (here ? hereTodayItems : todayItems).reduce(0) { $0 + (!$1.isCompleted && !shown.includes(spaceIndex[$1.id]?.id) ? 1 : 0) }
     }
+    var hiddenOpenCount: Int { hiddenOpenCount(here: false) }
 
     /// The name of what's shown — a space's, or 일반's (#89); nil showing everything.
     func spaceName(_ shown: SpaceLens.Shown) -> String? {
@@ -373,29 +382,78 @@ struct SpaceBand: View {
 @MainActor
 enum SpaceMenus {
     /// `모든 스페이스 ▾`: 모든 스페이스 (N), the spaces (colour, name, open count, ⌥⌘1–9), 일반 (N), 스페이스 관리….
+    /// #185: while it is open a plain 1–9 picks the space in that place and 0 모든 스페이스, as on Windows (where
+    /// Ctrl+Shift+digits may be the system's input-language keys).
     static func header(_ model: AppModel) -> [DrawerMenuItem] {
         let shown = model.spaceShown
         let language = AppLanguage.current
         var all = DrawerMenuItem.action(SpaceWords.allSpaces(language), symbol: nil, key: ("0", [.command, .option]), checked: shown == .all) { model.showSpace(.all) }
+        all.digit = "0"
         all.dot = .all
         all.detail = SpaceWords.grouped(model.openCount(.all), .current)
         var items: [DrawerMenuItem] = [all, .separator]
+        // #196: what this Mac hides (not peeked at) gathers under 이 기기에서 숨김, each with 보이기; the digits keep the order.
+        let hidden = model.hiddenOnNote
+        var hiddenRows: [DrawerMenuItem] = []
+        var hideRows: [DrawerMenuItem] = []
         for (index, space) in model.todoSpaces.visible.enumerated() {
+            if hidden.contains(space.id) {
+                hiddenRows += hiddenRow(model, key: space.id, name: space.name, dot: .color(space.colorKey))
+                continue
+            }
             var row = DrawerMenuItem.action(space.name, symbol: nil, key: index < 9 ? ("\(index + 1)", [.command, .option]) : nil,
                                             checked: shown == .space(space.id)) { model.showSpace(.space(space.id)) }
+            row.digit = index < 9 ? "\(index + 1)" : nil
             row.dot = .color(space.colorKey)
             row.detail = SpaceWords.grouped(model.openCount(.space(space.id)), .current)
             items.append(row)
+            items += timeHint(model, key: space.id)
+            var hide = DrawerMenuItem.action(space.name, symbol: nil) { model.setDeviceRule(space.id, .hide) }
+            hide.dot = .color(space.colorKey)
+            hideRows.append(hide)
         }
-        var none = DrawerMenuItem.action(model.todoSpaces.generalName(language), symbol: nil, checked: shown == .noSpace) { model.showSpace(.noSpace) }
-        none.dot = .empty
-        none.detail = SpaceWords.grouped(model.openCount(.noSpace), .current)
-        items.append(none)
+        let general = model.todoSpaces.generalName(language)
+        if hidden.contains(SpaceDevice.none) {
+            hiddenRows += hiddenRow(model, key: SpaceDevice.none, name: general, dot: .empty)
+        } else {
+            var none = DrawerMenuItem.action(general, symbol: nil, checked: shown == .noSpace) { model.showSpace(.noSpace) }
+            none.dot = .empty
+            none.detail = SpaceWords.grouped(model.openCount(.noSpace), .current)
+            items.append(none)
+            items += timeHint(model, key: SpaceDevice.none)
+            var hide = DrawerMenuItem.action(general, symbol: nil) { model.setDeviceRule(SpaceDevice.none, .hide) }
+            hide.dot = .empty
+            hideRows.append(hide)
+        }
+        if !hiddenRows.isEmpty {
+            items.append(.separator)
+            items.append(.section(SpaceDevice.Words.hiddenSection.text(language)))
+            items += hiddenRows
+        }
         items.append(.separator)
+        if !hideRows.isEmpty {
+            // A submenu, not a button that shows on hover: the keyboard (→) reaches it too.
+            items.append(.submenu(SpaceDevice.Words.hideHere.text(language), symbol: "eye.slash",
+                                  hideRows + [.separator, .action(SpaceDevice.Words.setTimes.text(language), symbol: "clock") { model.showDesk(.spaces) }]))
+        }
         // 2b: 스페이스별로 묶기 (⌥⌘G), this Mac's.
         items.append(.action(L("스페이스별로 묶기"), symbol: nil, key: ("g", [.command, .option]), checked: model.groupBySpace) { model.toggleGroupBySpace() })
         items.append(.action(L("스페이스 관리…"), symbol: "slider.horizontal.3") { model.showDesk(.spaces) })
         return items
+    }
+
+    /// #196: under a time-ruled space, its hint (‘지금은 숨김 · 평일 09:00–18:00에 보여요’ or ‘…에만 보여요’).
+    private static func timeHint(_ model: AppModel, key: String) -> [DrawerMenuItem] {
+        guard case .times(let times) = model.deviceRule(key) else { return [] }
+        return [.section(SpaceDevice.hint(times, hiddenNow: model.isHiddenHere(key), .current))]
+    }
+
+    /// #196: a hidden space under 이 기기에서 숨김 — picking it shows it again (보이기, the time rule too), its hint below.
+    private static func hiddenRow(_ model: AppModel, key: String, name: String, dot: SpaceDot) -> [DrawerMenuItem] {
+        var row = DrawerMenuItem.action(name, symbol: nil) { model.setDeviceRule(key, nil) }
+        row.dot = dot
+        row.detail = SpaceDevice.Words.show.text(.current)
+        return [row] + timeHint(model, key: key)
     }
 
     /// A row's 스페이스로 옮기기 ▸: the spaces (✓ the one it's in), 일반, 새 스페이스… (the editor's field: no
@@ -631,6 +689,84 @@ struct SpaceHeaderButton: View {
             .frame(width: 8, height: 8)
             .clipShape(RoundedRectangle(cornerRadius: 2))
         }
+    }
+}
+
+/// Spaces 2c (H1): 완료 기록's `모든 스페이스 ▾` — the same pill as the note's, with its own choice (not the lens): 모든
+/// 스페이스 · the spaces · 일반. The pill names what's picked (`● 회사`).
+struct SpaceFilterButton: View {
+    let spaces: TodoSpaces
+    let filter: SpaceFilter
+    let language: AppLanguage
+    var font: NotebookFont = .pen
+    let pick: @MainActor (SpaceFilter) -> Void
+
+    private var space: TodoSpaces.Space? { if case .space(let id) = filter { spaces.space(id) } else { nil } }
+
+    private var title: String {
+        switch filter {
+        case .all: SpaceWords.allSpaces(language)
+        case .general: spaces.generalName(language)
+        case .space: space?.name ?? SpaceWords.allSpaces(language)
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: 5) {
+            dot
+            Text(title).lineLimit(1).fixedSize()
+            Image(systemName: "chevron.down").font(.system(size: 8, weight: .bold))
+        }
+        .font(.system(size: 11.5, weight: filter == .all ? .medium : .semibold))
+        .foregroundStyle(filter == .all ? PaperTheme.ink2 : PaperTheme.ink)
+        .padding(.horizontal, 9)
+        .frame(height: 24)
+        .background {
+            RoundedRectangle(cornerRadius: 9, style: .continuous).fill(PaperTheme.card)
+            if let space { RoundedRectangle(cornerRadius: 9, style: .continuous).fill(PaperTheme.space(space.colorKey).opacity(0.16)) }
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(space.map { PaperTheme.space($0.colorKey) } ?? PaperTheme.rule, lineWidth: 1)
+        }
+        .fixedSize()
+        .overlay { SpaceMenuArea(label: title, items: { items }, font: font) }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L("스페이스") + ": " + title)
+        .help(title)
+    }
+
+    @ViewBuilder private var dot: some View {
+        switch filter {
+        case .space: RoundedRectangle(cornerRadius: 2).fill(PaperTheme.space(space?.colorKey ?? .lavender)).frame(width: 8, height: 8)
+        case .general: RoundedRectangle(cornerRadius: 2).strokeBorder(PaperTheme.ink3, lineWidth: 1).frame(width: 8, height: 8)
+        case .all:
+            HStack(spacing: 0) {
+                Rectangle().fill(PaperTheme.spacePink)
+                Rectangle().fill(PaperTheme.spaceSky)
+            }
+            .frame(width: 8, height: 8)
+            .clipShape(RoundedRectangle(cornerRadius: 2))
+        }
+    }
+
+    @MainActor private var items: [DrawerMenuItem] {
+        let pick = pick
+        var all = DrawerMenuItem.action(SpaceWords.allSpaces(language), symbol: nil, checked: filter == .all) { pick(.all) }
+        all.dot = .all
+        // #185, as in the note's menu: while it's open a plain 1–9 picks the space in that place and 0 모든 스페이스.
+        all.digit = "0"
+        var items: [DrawerMenuItem] = [all, .separator]
+        for (index, space) in spaces.visible.enumerated() {
+            var row = DrawerMenuItem.action(space.name, symbol: nil, checked: filter == .space(space.id)) { pick(.space(space.id)) }
+            row.dot = .color(space.colorKey)
+            row.digit = index < 9 ? "\(index + 1)" : nil
+            items.append(row)
+        }
+        var none = DrawerMenuItem.action(spaces.generalName(language), symbol: nil, checked: filter == .general) { pick(.general) }
+        none.dot = .empty
+        items.append(none)
+        return items
     }
 }
 

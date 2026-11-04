@@ -16,10 +16,14 @@ struct SpacesSettingsPanel: View {
     @State private var draft: String?
 
     static let rowHeight: CGFloat = 44
+    /// #196: a row with its 이 기기에서 line under the name.
+    static let tallRowHeight: CGFloat = 54
+    @MainActor static func height(_ model: AppModel, _ key: String) -> CGFloat { model.deviceRule(key) == nil ? rowHeight : tallRowHeight }
 
     var body: some View {
         let spaces = model.todoSpaces.visible
-        SettingsGroup(title: L("스페이스"), more: "spaces", footer: L("머리말에서 한 스페이스만 볼 수 있어요. 입력 줄에 #이름을 붙이면 그 스페이스로 들어가요.")) {
+        SettingsGroup(title: L("스페이스"), more: "spaces", footer: L("머리말에서 한 스페이스만 볼 수 있어요. 입력 줄에 #이름을 붙이면 그 스페이스로 들어가요.")
+                      + (spaces.isEmpty ? "" : "\n" + SpaceDevice.deskFooter(.current, device: "Mac"))) {
             let draft = draft ?? previewDraft
             if !spaces.isEmpty {
                 // #89: 일반 — the to-dos in no space — first, fixed: out of the list, so it can't be dragged or deleted.
@@ -42,7 +46,7 @@ struct SpacesSettingsPanel: View {
                 .scrollContentBackground(.hidden)
                 .scrollDisabled(true)
                 .environment(\.defaultMinListRowHeight, Self.rowHeight)
-                .frame(height: CGFloat(spaces.count) * Self.rowHeight)
+                .frame(height: spaces.reduce(0) { $0 + Self.height(model, $1.id) })
                 SettingsSeparator()
             }
             if let draft {
@@ -79,20 +83,26 @@ struct SpaceSettingsRow: View {
             RoundedRectangle(cornerRadius: 3, style: .continuous)
                 .fill(PaperTheme.space(space.colorKey))
                 .frame(width: 14, height: 14)
+                .overlay(alignment: .bottomTrailing) { SpaceDeviceMark(rule: model.deviceRule(space.id)) }
                 .frame(width: 22, height: 22)
                 .overlay { SpaceMenuArea(label: L("색"), items: { SpaceMenus.colors(model, space) }) }
             .help(L("색"))
             .accessibilityLabel(L("색") + " " + space.colorKey.title)
-            TextField(L("스페이스 이름"), text: $name)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(PaperTheme.ink)
-                .focused($editing)
-                .onSubmit(commit)
-                .onChange(of: editing) { _, now in if !now { commit() } }
-                .accessibilityLabel(L("스페이스 이름"))
+            VStack(alignment: .leading, spacing: 2) {
+                TextField(L("스페이스 이름"), text: $name)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(PaperTheme.ink)
+                    .focused($editing)
+                    .onSubmit(commit)
+                    .onChange(of: editing) { _, now in if !now { commit() } }
+                    .accessibilityLabel(L("스페이스 이름"))
+                // #196: this Mac's 이 기기에서, in words (none for 보이기).
+                SpaceDeviceStatus(model: model, key: space.id)
+            }
             Spacer(minLength: 8)
-            let open = model.openCount(.space(space.id))
+            // D13: the desk counts what this Mac hides too.
+            let open = model.openCount(.space(space.id), everything: true)
             if open > 0 {
                 Text(model.todoCountText(open))
                     .font(.system(size: 11.5).monospacedDigit())
@@ -100,10 +110,11 @@ struct SpaceSettingsRow: View {
                     .lineLimit(1)
                     .fixedSize()
             }
+            SpaceDevicePopup(model: model, key: space.id, name: space.name, color: space.colorKey)
             DeskRowTrash(shown: hovering, label: L("지우기") + " " + space.name) { model.deleteTodoSpace(space.id, toast: $toast) }
         }
         .padding(.horizontal, 14)
-        .frame(height: SpacesSettingsPanel.rowHeight)
+        .frame(height: SpacesSettingsPanel.height(model, space.id))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .deskRowMenu(edit: { editing = true }, delete: { model.deleteTodoSpace(space.id, toast: $toast) })
@@ -134,17 +145,22 @@ struct GeneralSettingsRow: View {
         HStack(spacing: 10) {
             // Where a space's grip and colour are: the names stay in one column.
             Color.clear.frame(width: 14)
-            Color.clear.frame(width: 22, height: 22)
-            TextField(TodoSpaces.defaultGeneralName(.current), text: $name)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(PaperTheme.ink)
-                .focused($editing)
-                .onSubmit(commit)
-                .onChange(of: editing) { _, now in if !now { commit() } }
-                .accessibilityLabel(L("스페이스 없는 할 일의 이름"))
+            Color.clear.frame(width: 14, height: 14)
+                .overlay(alignment: .bottomTrailing) { SpaceDeviceMark(rule: model.deviceRule(SpaceDevice.none)) }
+                .frame(width: 22, height: 22)
+            VStack(alignment: .leading, spacing: 2) {
+                TextField(TodoSpaces.defaultGeneralName(.current), text: $name)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(PaperTheme.ink)
+                    .focused($editing)
+                    .onSubmit(commit)
+                    .onChange(of: editing) { _, now in if !now { commit() } }
+                    .accessibilityLabel(L("스페이스 없는 할 일의 이름"))
+                SpaceDeviceStatus(model: model, key: SpaceDevice.none)
+            }
             Spacer(minLength: 8)
-            let open = model.openCount(.noSpace)
+            let open = model.openCount(.noSpace, everything: true)
             if open > 0 {
                 Text(model.todoCountText(open))
                     .font(.system(size: 11.5).monospacedDigit())
@@ -152,6 +168,7 @@ struct GeneralSettingsRow: View {
                     .lineLimit(1)
                     .fixedSize()
             }
+            SpaceDevicePopup(model: model, key: SpaceDevice.none, name: model.generalName, color: nil)
             // A space row's trash, never shown (no 지우기): its place keeps the counts in one column.
             DeskRowTrash(shown: false, label: "") {}.hidden().accessibilityHidden(true)
         }
@@ -159,7 +176,7 @@ struct GeneralSettingsRow: View {
         // In line with the rows below (the list draws them 8 pt in, and 9 pt from the right: the snapshots measured it).
         .padding(.leading, 8)
         .padding(.trailing, 9)
-        .frame(height: SpacesSettingsPanel.rowHeight)
+        .frame(height: SpacesSettingsPanel.height(model, SpaceDevice.none))
         .contentShape(Rectangle())
         .help(L("어느 스페이스에도 넣지 않은 할 일이에요. 이름을 바꿀 수 있어요."))
         .contextMenu {

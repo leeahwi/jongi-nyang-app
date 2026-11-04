@@ -25,11 +25,14 @@ struct HistoryView: View {
     @State private var range: HistoryRange = .recent
     @State private var selectedKey = Archive.dayKey(Date())
     @State private var font: NotebookFont
+    /// Spaces 2c (H1, H4): which space's lines show — every time from 모든 스페이스, not kept on this Mac.
+    @State private var spaceFilter: SpaceFilter = .all
 
-    init(archive: ArchiveStore, model: AppModel, now: @escaping () -> Date = Date.init) {
+    init(archive: ArchiveStore, model: AppModel, now: @escaping () -> Date = Date.init, previewSpace: SpaceFilter = .all) {
         self.archive = archive
         self.model = model
         self.now = now
+        _spaceFilter = State(initialValue: previewSpace)
         _font = State(initialValue: model.notebookFont)
     }
 
@@ -45,6 +48,8 @@ struct HistoryView: View {
         guard let day = model.historyDay else { return }
         model.historyDay = nil
         selectedKey = day
+        // H5: the line picked in search shows, whatever space it's in.
+        spaceFilter = .all
         if let date = Deadline.date(from: day), !range.bounds(today: now(), calendar: calendar).contains(date) {
             range = .year(calendar.component(.year, from: date))
         }
@@ -52,15 +57,20 @@ struct HistoryView: View {
 
     var body: some View {
         let _ = PerfProbe.count("historyBody")
-        let (entries, days) = archive.history()
+        let (every, everyDay) = archive.history()
+        // Spaces 2c (H1–H3): one space's lines only, and every number worked out again from them.
+        let spaces = model.todoSpaces
+        let filter = spaceFilter.live(in: spaces)
+        let entries = filter == .all ? every : spaces.kept(every, in: filter)
+        let days = filter == .all ? everyDay : Archive.groupByDay(entries)
         let today = now()
         let bounds = range.bounds(today: today, calendar: calendar)
         // 집중 (1.37): focus.jsonl beside the record — the minutes per day over the range.
-        let focus = model.focusLog.records()
+        let focus = spaces.kept(model.focusLog.records(), in: filter)
         let focusDays = Focus.totals(focus, from: bounds.lowerBound, to: bounds.upperBound)
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
-                header(entries: entries, days: days)
+                header(entries: entries, days: days, years: everyDay, filter: filter)
                 summary(days: days, bounds: bounds, today: today, focus: focus)
                 heatmap(days: days, bounds: bounds, today: today, focusDays: focusDays,
                         longest: Focus.byTask(focus, from: bounds.lowerBound, to: bounds.upperBound))
@@ -86,8 +96,11 @@ struct HistoryView: View {
 
     /// The pane's header: a word about the streak (or, before the first, how to start), and the range. (1.45: no
     /// "지금까지 564개를 끝냈어요" — the first tile says that number.)
-    private func header(entries: [ArchiveEntry], days: [String: [ArchiveEntry]]) -> some View {
-        let years = Set(days.keys.compactMap { Int($0.prefix(4)) }).sorted(by: >)
+    /// Spaces 2c (H1): `모든 스페이스 ▾` left of the range while there are spaces; the years come from every line, so a
+    /// filter never takes a year's choice away.
+    private func header(entries: [ArchiveEntry], days: [String: [ArchiveEntry]], years everyDay: [String: [ArchiveEntry]],
+                        filter: SpaceFilter) -> some View {
+        let years = Set(everyDay.keys.compactMap { Int($0.prefix(4)) }).sorted(by: >)
         let total = entries.filter { $0.completedAt != nil }.count
         let streak = Archive.currentStreak(Set(days.keys), today: now())
         let word = streak > 1 ? L("\(streak)일째 이어 가고 있어요. 오늘도 한 칸!")
@@ -95,6 +108,9 @@ struct HistoryView: View {
             : L("하나만 끝내도 오늘 칸이 초록으로 채워져요.")
         let line = total == 0 ? L("첫 칸을 채워 볼까요?") + " · " + word : word
         return DeskPaneHeader(title: L("완료 기록"), subtitle: line) {
+            if !model.todoSpaces.isEmpty {
+                SpaceFilterButton(spaces: model.todoSpaces, filter: filter, language: language, font: font) { spaceFilter = $0 }
+            }
             PaperSegmented(selection: $range, options: ([HistoryRange.recent] + years.map(HistoryRange.year)).map { ($0, $0.title, nil) },
                            label: L("기간"))
                 .frame(width: CGFloat(min(4, years.count + 1)) * (language == .ko ? 78 : 100))

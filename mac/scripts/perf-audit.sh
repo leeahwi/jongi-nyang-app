@@ -1,9 +1,9 @@
 #!/bin/bash
 # 성능 점검 2 (perf audit 2, docs/perf-audit-2.md): the same test copy and helpers as scripts/perf.sh, with the steps
 # the audit added — cold and warm start, idle with the note open and hidden, a check with 0 and 200 steps of undo
-# behind it, the tab switch, typing and the drawer — all with the note and drawer off every screen (nothing else is
-# opened; scripts/perf-idle.sh measures the cat and 완료 기록, off-screen too). The bundle id defaults to
-# com.noa.PaperTodo.Perf2. Before 1.45 the note, a titled window, was pulled back to the screen's left edge.
+# behind it, the tab switch and typing — all with the note off every screen (nothing else is opened; the drawer is
+# measured by scripts/perf-drawer.sh, #208, and scripts/perf-idle.sh measures the cat and 완료 기록, off-screen too).
+# The bundle id defaults to com.noa.PaperTodo.Perf2. Before 1.45 the note, a titled window, was pulled back to the screen's left edge.
 #
 #   scripts/perf-audit.sh [out-folder] [--no-build]      PERF_DATA_ARGS="--todos 2000 --spaces 9" for another size;
 #   PERF_SCRATCH="$PWD/.build/bench-release" reuses the release build of scripts/bench-app.sh.
@@ -85,7 +85,7 @@ fresh() {
     for key in quickEntry.enabled quickMemo.enabled noteHotKey.enabled pet.visible sweep.enabled chatter.enabled; do
         defaults write "$bundle_id" "$key" -bool false
     done
-    # 메모 서랍 (1.43): its shortcut off (the drawer opens from the 윈도우 menu here); no move notice.
+    # 메모 서랍 (1.43): its shortcut off (scripts/perf-drawer.sh measures the drawer); no move notice.
     defaults write "$bundle_id" drawer.shortcut -data ""
     defaults write "$bundle_id" memoDrawer.moveNoticeShown -bool true
     defaults write "$bundle_id" guide.seen -bool true
@@ -198,13 +198,8 @@ keys=$(vals typing typing-end key)
 echo "typing (app): first $(echo "$keys" | head -1) ms · rest median $(echo "$keys" | tail -n +2 | median) ms · p95-ish max $(echo "$keys" | tail -n +2 | max) ms ($(echo "$keys" | wc -l | tr -d ' ') keys)"
 "$probe" key "$pid" 53; sleep 0.4; "$probe" key "$pid" 53; sleep 0.4
 
-# 5. 메모 서랍 (off-screen) open, idle with it open, closed; then the note hidden (⌘W), idle.
-drawer_menu() { "$probe" menu "$pid" "윈도우" "메모 서랍" >/dev/null 2>&1 || true; }
-mark drawer1; drawer_menu; settle drawer1 "drawer " 1 15; mark drawer1-end
-echo "open drawer (first, app): $(first drawer1 drawer1-end "drawer ") ms"
-sleep 2
-echo "idle, drawer open (30 s): $("$probe" sample "$pid" 30)"
-drawer_menu; sleep 1
+# 5. The note hidden (⌘W), idle. 메모 서랍 is measured by scripts/perf-drawer.sh now (#208): opening it here went
+# through the 윈도우 menu by an accessibility press, and the drawer puts the cursor in its quick-write field.
 "$probe" key "$pid" 13 cmd; sleep 3
 echo "idle, note hidden (30 s): $("$probe" sample "$pid" 30)"
 mark reopen; "$probe" key "$pid" 29 cmd; settle reopen "key " 1; mark reopen-end
