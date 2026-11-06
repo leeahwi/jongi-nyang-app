@@ -1,6 +1,6 @@
 #!/bin/bash
 # 기기마다 보일 스페이스 (SpaceDevice.swift, #196): the shared cases S60–S72 from docs/plans/spaces-cases.json → device
-# (the Windows app reads the same file), then the Mac's own.
+# (the Windows app reads the same file), S73 from → aiDevice (what ai-link.json carries for Claude, N3-9), then the Mac's own.
 set -euo pipefail
 task_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$task_root"
@@ -40,6 +40,8 @@ swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/BubbleText.swift \
     Sources/PaperCore/PetAsk.swift \
     Sources/PaperCore/SpaceDevice.swift \
+    Sources/PaperCore/AIConnect.swift \
+    Sources/PaperCore/AIDeviceLink.swift \
     Tests/PaperCoreTests/SpaceDeviceTests.swift \
     -o .build/checks/SpaceDeviceTests
 .build/checks/SpaceDeviceTests ../docs/plans/spaces-cases.json

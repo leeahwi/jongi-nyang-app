@@ -1,7 +1,7 @@
 /* Sequential sage ramp, validated: monotone light→dark, lightest step 2.13:1 on paper. At night it runs
    the other way (dark → bright sage), so more still reads as stronger on the dark paper. */
 :root { --mint: var(--sage-2); --heat-0: #ebe9e0; --heat-1: #9db48f; --heat-2: #86a278; --heat-3: #627f55; --heat-4: #3e5a33; --cell: 10px; --gap: 3px; }
-:root[data-paper="night"] { --heat-0: #3a3832; --heat-1: #4f6a4a; --heat-2: #6a8c63; --heat-3: #87ab7f; --heat-4: #a8cc9f; }
+:root[data-scheme="dark"] { --heat-0: #3a3832; --heat-1: #4f6a4a; --heat-2: #6a8c63; --heat-3: #87ab7f; --heat-4: #a8cc9f; }
 
 #app {
   display: flex; flex-direction: column; height: 100vh;

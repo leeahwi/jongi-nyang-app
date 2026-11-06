@@ -105,7 +105,11 @@ const taskOut = z.object({
   date: text.optional(), dueDate: text.optional(), timeStart: text.optional(), timeEnd: text.optional(),
   remindAt: text.optional(), completedAt: text.optional(), repeat: text.optional().describe("A repeating task: its rule in the app's words."),
   space: text.optional().describe("Its space's name (일반's name for the tasks in no space)."), spaceId: text.optional().describe("Its space's id, or \"general\"."),
+  hidden: z.boolean().optional().describe("Its space is hidden on this device (shown because its space was picked or a word searched)."),
 });
+/** N3-9: the spaces this device hides that had tasks left out here, and how many. */
+const hiddenOut = z.array(z.object({ space: text, spaceId: text, open: z.number() })).optional()
+  .describe("Spaces hidden on this device whose open tasks were left out here, with how many; pick one with space to see them.");
 const eventOut = z.object({
   id: text, title: text, date: text, allDay: z.boolean(), days: z.number().optional(), start: text.optional(), end: text.optional(), endDate: text.optional(),
   location: text.optional(), repeat: z.enum(["none", "daily", "weekly", "monthly", "yearly"]), canChange: z.boolean(),
@@ -126,11 +130,11 @@ const more = { count: z.number().optional(), nextCursor: text.optional() };
 export const outputs = {
   get_today: {
     ...base, date: text.optional(), space: text.optional(), open: z.number().optional(), done: z.number().optional(), tasks: z.array(taskOut).optional(), nextCursor: text.optional(),
-    events: z.array(eventOut).optional(),
+    hiddenHere: hiddenOut, events: z.array(eventOut).optional(),
     alarms: z.array(z.object({ time: text, label: text.optional(), at: text })).optional(),
     focus: z.object({ minutes: z.number(), sessions: z.number() }).optional(),
   },
-  list_todos: { ...base, ...more, where: z.enum(["today", "later", "all"]).optional(), from: text.optional(), to: text.optional(), query: text.optional(), space: text.optional(), tasks: z.array(taskOut).optional() },
+  list_todos: { ...base, ...more, where: z.enum(["today", "later", "all"]).optional(), from: text.optional(), to: text.optional(), query: text.optional(), space: text.optional(), tasks: z.array(taskOut).optional(), hiddenHere: hiddenOut },
   list_events: { ...base, ...more, from: text.optional(), to: text.optional(), events: z.array(eventOut).optional() },
   list_memos: { ...base, ...more, folder: text.optional(), memos: z.array(z.object({ ...memoOut, preview: text })).optional() },
   get_memo: {
@@ -159,6 +163,8 @@ export const outputs = {
     spaces: z.array(z.object({
       id: text.describe("The space's id, or \"general\" for 일반."), name: text, color: text.optional(), general: z.boolean(),
       open: z.number().describe("Open tasks in it (today, ahead and someday)."), today: z.number().describe("Of those, on today's sheet."),
+      device: z.enum(["hide", "time"]).optional().describe("This device's setting for it: hidden always, or shown only at set times (none: shown)."),
+      hiddenNow: z.boolean().describe("Hidden on this device right now."), status: text.optional().describe("The setting in the app's words."),
     })).optional(),
   },
   add_todos: { ...base, added: z.array(taskOut).optional(), skipped: z.array(skipped).optional() },

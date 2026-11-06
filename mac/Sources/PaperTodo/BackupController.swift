@@ -18,7 +18,7 @@ enum BackupController {
         panel.nameFieldStringValue = Backup.fileName(Date(), language: .current)
         panel.allowedContentTypes = [fileType]
         panel.message = L("다른 컴퓨터의 종이냥에서 가져올 수 있는 백업 파일을 만들어요")
-        NSApp.activate(ignoringOtherApps: true)
+        TestHooks.activate()
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             try exportText(folder: model.storageFolderURL).write(to: url, atomically: true, encoding: .utf8)
@@ -35,7 +35,7 @@ enum BackupController {
         panel.allowedContentTypes = [fileType, .json]
         panel.prompt = L("가져오기")
         panel.message = L("종이냥에서 내보낸 백업 파일(.jongi)을 골라요")
-        NSApp.activate(ignoringOtherApps: true)
+        TestHooks.activate()
         guard panel.runModal() == .OK, let url = panel.url else { return }
         let backup: Backup.Contents
         do {
@@ -46,13 +46,13 @@ enum BackupController {
             return fail(L("가져오지 못했어요. 지금 목록은 그대로예요."), Backup.Problem.notBackup.message(.current))
         }
 
-        let ask = SlipAlert.run(symbol: "square.and.arrow.down", title: L("가져오기"), message: L("이 백업을 가져올까요?"),
+        let ask = SlipAlert.run(symbol: "square.and.arrow.down", title: L("가져오기"), message: L("이 백업을 가져올까요?"), replacesList: true,
                                 detail: importDetail(fileName: url.lastPathComponent, backup: backup), choices: importChoices, width: .medium)
         let replace: Bool
         switch ask {
         case 2: replace = false
         case 1:
-            let sure = SlipAlert.run(symbol: "arrow.triangle.2.circlepath", title: L("바꾸기"), message: L("지금 것을 이 백업으로 바꿀까요?"),
+            let sure = SlipAlert.run(symbol: "arrow.triangle.2.circlepath", title: L("바꾸기"), message: L("지금 것을 이 백업으로 바꿀까요?"), replacesList: true,
                                      detail: L("지금 있는 할 일 · 메모 · 일정 · 기록이 이 백업으로 바뀌어요. 바꾸기 전 상태는 자동으로 백업해 둘게요."),
                                      choices: [.init(title: L("취소"), isCancel: true), .init(title: L("바꾸기"), role: .destructive, isDefault: true)])
             guard sure == 1 else { return }
@@ -71,7 +71,7 @@ enum BackupController {
             return fail(L("가져오지 못했어요. 지금 목록은 그대로예요."), (error as? Backup.Problem)?.message(.current))
         }
 
-        let done = SlipAlert.run(symbol: "checkmark", title: L("가져오기"), message: L("가져왔어요."),
+        let done = SlipAlert.run(symbol: "checkmark", title: L("가져오기"), message: L("가져왔어요."), replacesList: true,
                                  detail: "\(Backup.summary(result).text(.current))\n" + L("종이냥이 다시 시작돼요. 가져오기 전 것도 ‘backups’ 폴더에 남겨 뒀어요."),
                                  choices: [.init(title: L("백업 폴더 열기")), .init(title: L("다시 시작"), role: .primary, isDefault: true, isCancel: true)],
                                  cat: .happy)
@@ -92,7 +92,7 @@ enum BackupController {
                                     detail: ((error as? Backup.Problem) ?? .notBackup).message(.current))
         }
         let when = Backup.savedWhen(entry.date, now: book.now(), language: .current, midSentence: true)
-        let answer = SlipAlert.run(symbol: "clock.arrow.circlepath", title: String(localized: "되돌리기", table: "Settings"), message: L("\(when) 백업으로 되돌릴까요?"),
+        let answer = SlipAlert.run(symbol: "clock.arrow.circlepath", title: String(localized: "되돌리기", table: "Settings"), message: L("\(when) 백업으로 되돌릴까요?"), replacesList: true,
                                    detail: restoreDetail(backup, shared: model.sharedFolder != nil), choices: importChoices, width: .medium)
         guard answer == 1 || answer == 2 else { return }
         model.saveEverything()
@@ -105,7 +105,7 @@ enum BackupController {
             return SlipAlert.inform(title: String(localized: "되돌리기", table: "Settings"), message: L("되돌리지 못했어요. 지금 목록은 그대로예요."),
                                     detail: (error as? Backup.Problem)?.message(.current))
         }
-        SlipAlert.run(symbol: "checkmark", title: String(localized: "되돌리기", table: "Settings"), message: L("되돌렸어요."),
+        SlipAlert.run(symbol: "checkmark", title: String(localized: "되돌리기", table: "Settings"), message: L("되돌렸어요."), replacesList: true,
                       detail: "\(Backup.summary(result).text(.current))\n" + L("종이냥이 다시 시작돼요. 되돌리기 전 것도 백업 목록에 남겨 뒀어요."),
                       choices: [.init(title: L("다시 시작"), role: .primary, isDefault: true, isCancel: true)], cat: .happy)
         restart()

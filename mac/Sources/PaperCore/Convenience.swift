@@ -569,9 +569,13 @@ public enum Search {
     }
 
     /// "‘보고서’에 맞는 게 없어요" · "Nothing matches ‘report’" · "Niets gevonden voor ‘rapport’".
-    public static func emptyText(_ query: String, language: AppLanguage = .ko) -> String {
+    /// #240 (점검 3의 20): an empty result ends in what to try next — another word (or, in Korean, the initial consonants).
+    /// `suggest: false` for a search by the drawer's chips alone (no words to change).
+    public static func emptyText(_ query: String, suggest: Bool = true, language: AppLanguage = .ko) -> String {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        return ["‘\(q)’에 맞는 게 없어요", "Nothing matches ‘\(q)’", "Niets gevonden voor ‘\(q)’"][language.index]
+        let head = ["‘\(q)’에 맞는 게 없어요", "Nothing matches ‘\(q)’", "Niets gevonden voor ‘\(q)’"][language.index]
+        guard suggest else { return head }
+        return head + [". 초성이나 다른 말로 찾아볼까요?", ". Try other words?", ". Andere woorden proberen?"][language.index]
     }
 }
 

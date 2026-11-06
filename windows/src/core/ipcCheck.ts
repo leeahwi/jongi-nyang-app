@@ -1,9 +1,11 @@
 import { readAlarm } from "./alarm";
 import type { CalendarWriteRequest } from "./calendar";
 import { deskPanes, paperSettings } from "./desk";
+import { nightChoices, paperKinds } from "./paper";
 import { drawerBackdrops, drawerFonts, drawerTextSizes, drawerThemes, folderSorts, folderViews, memoPapers } from "./memoDrawer";
 import { codeFonts, drawerPoints, lineSpacings, noteScales, paragraphSpacings } from "./textSteps";
 import { checkedDeviceRules } from "./spaceDevice";
+import { readWidgets, widgetKinds, widgetLevels, widgetStyles } from "./calendarWidget";
 import { timerSizes } from "./timerWidget";
 import { defaultPrefs, textSizes, type Action, type IntentRequest, type Prefs } from "./types";
 import { deskFramePages, ownPage } from "./webGuard";
@@ -19,7 +21,7 @@ import { deskFramePages, ownPage } from "./webGuard";
 /** The app's pages (renderer/<name>.html). The desk's four (settings · history · calendarWindow · help) live in its frames. */
 export const pageNames = [
   "note", "popup", "floating", "settings", "history", "calendarWindow", "pet", "timer", "help", "quick", "quickMemo", "timerSheet",
-  "ring", "confirm", "glance", "desk", "drawer", "handle", "ears",
+  "ring", "confirm", "glance", "desk", "drawer", "handle", "ears", "widget", "widgetSheet",
 ] as const;
 export type PageName = typeof pageNames[number];
 
@@ -41,6 +43,8 @@ const actions = <T extends ActionType>(...types: T[]): ReadonlySet<ActionType> =
  */
 export const pageActions: Partial<Record<PageName, ReadonlySet<ActionType>>> = {
   note: actions(
+    // #230: a key went down here (typingTap.ts).
+    "petTap",
     "aiUndo", "calendarEditEvent", "calendarNewEvent", "collapse", "copyList", "delete", "deleteSeries", "drawer", "dropAhead", "dropOnTab",
     "editingReminder", "exportList", "focus", "groupDrop", "memoRestore", "move", "moveTasks", "openCalendar", "openHelp", "openHistory",
     "openSettings", "openSpaces", "redo", "rename", "rowMenuPick", "saveSeries", "setDeadline", "setPref", "setRange", "setReminder",
@@ -50,24 +54,41 @@ export const pageActions: Partial<Record<PageName, ReadonlySet<ActionType>>> = {
     "spacePeek",
     // #168: several picked rows moved together, and put back by the toast's 되돌리기.
     "moveMany", "restoreOrder",
+    // #229: a press while a question waits (askGuard.ts).
+    "slipBlocked",
   ),
   settings: actions(
+    // #230: a key went down here (typingTap.ts).
+    "petTap",
     "aiClearLog", "aiConnectDesktop", "aiCopyCommand", "aiEnable", "aiUndo", "alarmDelete", "alarmSave", "backupNow", "chatterPreview",
     "chooseBackupFolder", "chooseStorage", "deleteBackup", "deleteSeries", "drawer", "exportBackup", "generalRename", "importBackup",
     "openArchiveFolder", "openBackupFolder", "openDataFolder", "openHelp", "openHistory", "previewReminder", "resetBackupFolder", "resetStorage",
     "restoreBackup", "restoreSeries", "saveSeries", "setBackupAuto", "setPref", "showBackup", "snoozePeriodic", "spaceAdd", "spaceColor",
     "spaceDelete", "spaceOrder", "spaceRename", "spaceRestore", "timerCommand",
+    // #229: a press while a question waits (askGuard.ts).
+    "slipBlocked",
+    // #234: 책상 → 일정 → 바탕화면 위젯 (더하기, the settings slip, 제거 and its 되돌리기).
+    "widgetAdd", "widgetChange", "widgetRemove", "widgetRestore",
   ),
-  history: actions("openArchiveFolder"),
-  calendarWindow: actions("calendarShowTask", "setPref", "showEventMenu"),
-  quick: actions("drawer"),
+  history: actions("openArchiveFolder", "slipBlocked"),
+  calendarWindow: actions("calendarShowTask", "petTap", "setPref", "showEventMenu", "slipBlocked"),
+  quick: actions("drawer", "petTap", "slipBlocked", "slipDrag"),
   // #200: a to-do's title opens the note on its row (`calendarShowTask`, read as `{ id }` like the calendar window's).
   glance: actions(
+    // #230: a key went down here (typingTap.ts).
+    "petTap",
     "calendarEditEvent", "calendarNewEvent", "calendarShowTask", "drawer", "openCalendar", "openNote", "openSettings", "setPref", "spaceLens",
     "timerCommand", "toggle",
+    // #229: a press while a question waits (askGuard.ts).
+    "slipBlocked",
   ),
-  desk: actions("deskPane", "openGuide", "openSearch"),
+  desk: actions("deskPane", "openGuide", "openSearch", "slipBlocked"),
+  // #234: a desktop calendar widget and its day sheet open the desk's calendar on a day, or the note on a to-do's row.
+  widget: actions("calendarShowTask", "openCalendar", "petTap", "slipBlocked", "widgetRestore"),
+  widgetSheet: actions("calendarShowTask", "drawer", "openCalendar", "petTap", "slipBlocked"),
   drawer: actions(
+    // #230: a key went down here (typingTap.ts).
+    "petTap",
     "copyText", "drawerPaste", "drawerView", "drawerWrite", "editCommand", "folderAdd", "folderColor", "folderDelete", "folderDuplicate",
     "folderOrder", "folderRename", "folderRestore", "folderSort", "memoCheck", "memoClose", "memoDelete", "memoDuplicate", "memoMove",
     "memoPaper", "memoPin", "memoPinMany", "memoRestore", "memoSetText", "memoUpdate", "openHelp", "openLink", "openSettings", "setPref", "window",
@@ -76,7 +97,23 @@ export const pageActions: Partial<Record<PageName, ReadonlySet<ActionType>>> = {
     // 2B (#118): Ctrl+/ — the drawer's keys on a slip. (⇧M's list, the link field, the tick key and a box ticked in place
     // go through memoMove · memoUpdate · memoSetText, already here.)
     "drawerShortcuts",
+    // #229: a press while a question waits (askGuard.ts).
+    "slipBlocked",
   ),
+  // #229: the pages without buttons for the main process still tell of a press a waiting question held up (askGuard.ts).
+  popup: actions("slipBlocked"),
+  floating: actions("slipBlocked"),
+  pet: actions("slipBlocked"),
+  timer: actions("slipBlocked"),
+  help: actions("slipBlocked"),
+  // #230: the quick note and 직접 정하기 also send only that a key went down.
+  // #246: their paper drags them.
+  quickMemo: actions("petTap", "slipBlocked", "slipDrag"),
+  timerSheet: actions("petTap", "slipBlocked"),
+  handle: actions("slipBlocked"),
+  ears: actions("slipBlocked"),
+  // #228: the question slip's paper dragged.
+  confirm: actions("slipDrag"),
 };
 
 type PrefKey = keyof Prefs;
@@ -86,17 +123,17 @@ const prefs = (...keys: PrefKey[]): ReadonlySet<PrefKey> => new Set(keys);
 export const pagePrefs: Partial<Record<PageName, ReadonlySet<PrefKey>>> = {
   note: prefs("alwaysOnTop", "dayOpen", "guideSeen", "hideCompleted", "openAtLogin", "spaceDevice", "spaceGroups", "spaceGroupsDoneOpen", "spaceGroupsFolded", "starredTask", "textStep"),
   settings: prefs(
-    "archiveAfterDays", "calendarAlertMinutes", "calendarStrip", "chatter", "chatterFrequency", "chatterQuestions", "displaySeconds", "drawerBackdrop",
-    "drawerCodeFont", "drawerDoneToBottom", "drawerFont", "drawerHandle", "drawerLineHeight", "drawerNightPaper", "drawerParagraph", "drawerPinned",
+    "archiveAfterDays", "calendarAlertMinutes", "calendarHolidays", "calendarLunar", "calendarStrip", "chatter", "chatterFrequency", "chatterQuestions", "displaySeconds", "drawerBackdrop",
+    "drawerCodeFont", "drawerDoneToBottom", "drawerFont", "drawerHandle", "drawerLineHeight", "drawerNight", "drawerParagraph", "drawerPinned", "drawerSameAsNote",
     "drawerShortcut", "drawerShortcutLast", "drawerShowMarks", "drawerSide", "drawerTextPt", "drawerTheme", "drawerWidth", "dueStyle", "eveningSweep",
-    "eveningSweepTime", "font", "intervalMinutes", "language", "morningPick", "noteHotkey", "noteShortcut", "openAtLogin", "paper", "petVisible",
-    "petWanders", "pomodoroAutoContinue", "pomodoroFocusMinutes", "pomodoroLongRestMinutes", "pomodoroRestMinutes", "pomodoroRounds", "quickEntry",
+    "eveningSweepTime", "font", "intervalMinutes", "language", "morningPick", "noteHotkey", "noteShortcut", "openAtLogin", "paper", "paperNight", "paperTheme", "petVisible",
+    "petTyping", "petWanders", "pomodoroAutoContinue", "pomodoroFocusMinutes", "pomodoroLongRestMinutes", "pomodoroRestMinutes", "pomodoroRounds", "quickEntry",
     "quickMemo", "quickMemoClipboard", "reminderEnabled", "reminderStyle", "spaceDevice", "spaceGroupStyle", "spaceGroups", "systemNotify", "taskbarBadge",
     "textStep", "timerSize", "timerSound",
   ),
   calendarWindow: prefs("calendarView"),
   glance: prefs("petVisible"),
-  drawer: prefs("drawerBackdrop", "drawerFont", "drawerPinned", "drawerShowMarks", "drawerSide", "drawerTextPt", "drawerTheme"),
+  drawer: prefs("drawerBackdrop", "drawerFont", "drawerPinned", "drawerSameAsNote", "drawerShowMarks", "drawerSide", "drawerTextPt", "drawerTheme"),
 };
 
 // ─── Readers ──────────────────────────────────────────────────────────────────
@@ -166,6 +203,8 @@ const alarm: Reader = (value) => readAlarm(value) ?? bad;
 /** Every action's fields (a new Action type without its reader here is a type error). */
 const actionFields: { [K in ActionType]: Record<string, Reader> } = {
   openDataFolder: {}, chatterPreview: {},
+  // #230: a key went down in a page — an empty message, read as one.
+  petTap: {},
   add: { title, reminderAt: optional(iso), dueDate: optional(str(10)) },
   rename: { id, title }, toggle: { id }, delete: { id },
   move: { id, targetID: id, after: optional(bool) },
@@ -206,7 +245,8 @@ const actionFields: { [K in ActionType]: Record<string, Reader> } = {
   calendarNewEvent: { at: optional(shape({ day, minutes: num(0, 24 * 60) })) },
   calendarEditEvent: { key: str(500) },
   showEventMenu: { key: str(500), x: optional(point), y: optional(point) },
-  openCalendar: { day: optional(day) },
+  // calendar-flows D3: an event pressed on a widget opens its sheet in the calendar too.
+  openCalendar: { day: optional(day), event: optional(str(500)) },
   openNote: {}, exportBackup: {}, importBackup: {},
   setBackupAuto: { on: bool }, backupNow: {}, chooseBackupFolder: {}, resetBackupFolder: {}, openBackupFolder: {},
   restoreBackup: { name: str(255, 1) }, showBackup: { name: str(255, 1) }, deleteBackup: { name: str(255, 1) },
@@ -238,6 +278,17 @@ const actionFields: { [K in ActionType]: Record<string, Reader> } = {
   spacePeek: { spaces: list(id, 64) },
   openSpaces: {},
   copyText: { text: longText },
+  slipDrag: { phase: oneOf("start", "move", "end", "reset"), x: point, y: point },
+  slipBlocked: {},
+  widgetAdd: { kind: oneOf(...widgetKinds), style: oneOf(...widgetStyles) },
+  widgetChange: {
+    id, changes: shape({
+      style: optional(oneOf(...widgetStyles)), opacity: optional(int(20, 100)), solidOnHover: optional(bool), clickThrough: optional(bool),
+      locked: optional(bool), level: optional(oneOf(...widgetLevels)), allSpaces: optional(bool),
+    }),
+  },
+  widgetRemove: { id },
+  widgetRestore: { widget: (value) => readWidgets([value])[0] ?? bad, index: int(0, 3) },
 };
 
 /** The settings a page may write, and how each value must look (the same rules `loadSettings` reads them with). */
@@ -248,7 +299,9 @@ const enumPrefs: Partial<Record<PrefKey, readonly unknown[]>> = {
   systemNotify: ["missed", "always", "off"], drawerSide: ["right", "left"], drawerTheme: drawerThemes, drawerBackdrop: drawerBackdrops,
   drawerPinnedSort: folderSorts, drawerPinnedView: folderViews, drawerFont: drawerFonts, drawerTextSize: drawerTextSizes, drawerLineHeight: lineSpacings,
   drawerParagraph: paragraphSpacings, drawerCodeFont: codeFonts, spaceGroupStyle: ["card", "bookmark"],
-  textStep: noteScales.map((_, index) => index), drawerTextPt: drawerPoints,
+  textStep: noteScales.map((_, index) => index), drawerTextPt: drawerPoints, petTyping: ["off", "app"],
+  // #244: 종이 and 밤에는 (a light paper under 밤에는 isn't one; loadSettings reads it as 밤 종이, a page may not send it).
+  paperTheme: paperKinds, paperNight: nightChoices, drawerNight: nightChoices,
 };
 const prefReaders: Partial<Record<PrefKey, Reader>> = {
   drawerShortcut: pattern(/^[A-Za-z0-9+`\-=[\]\\;',./]{0,64}$/), drawerShortcutLast: pattern(/^[A-Za-z0-9+`\-=[\]\\;',./]{0,64}$/),
@@ -260,6 +313,8 @@ const prefReaders: Partial<Record<PrefKey, Reader>> = {
   spaceDevice: (value) => checkedDeviceRules(value) ?? bad,
   // Not written by any page: the main process keeps these itself.
   spaceLens: () => bad, intentPrefer: () => bad, intentLearning: () => bad, spaceDeviceShown: () => bad,
+  // #234: the widgets are changed by their own actions (widgetAdd · widgetChange …), read the same way (calendarWidget.ts).
+  calendarWidgets: () => bad,
 };
 
 /** A setting's value as a page sent it, checked; `bad` when it isn't one this setting can hold. */
@@ -307,7 +362,7 @@ export const pageChannels: Record<string, ReadonlySet<PageName>> = {
   "state:get": new Set(pageNames),
   "history:get": new Set<PageName>(["history"]),
   "calendar:write": new Set<PageName>(["note", "calendarWindow"]),
-  intent: new Set<PageName>(["note", "quick", "glance"]),
+  intent: new Set<PageName>(["note", "quick", "glance", "widget", "widgetSheet"]),
   search: new Set<PageName>(["note"]),
 };
 
@@ -322,7 +377,7 @@ const wireCandidate = variants("kind", {
 const intentKind = oneOf("todo", "event", "timer", "alarm", "memo", "repeat");
 const intentRequest = variants("op", {
   commit: {
-    candidate: wireCandidate, page: oneOf("today", "ahead", "memos"), from: oneOf("note", "quick", "glance"),
+    candidate: wireCandidate, page: oneOf("today", "ahead", "memos"), from: oneOf("note", "quick", "glance", "widget"),
     candidates: optional(list(wireCandidate, 50)), text: optional(longText),
     space: optional(variants("kind", { space: { id }, new: { name }, none: {} })),
   },

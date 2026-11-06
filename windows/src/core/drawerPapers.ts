@@ -46,6 +46,35 @@ export const paperSamples: Record<DrawerLook, PaperSample> = {
     paper: "#1a2030", edge: "#3d4760", card: "#283146", cardEdge: "#46516b", ink: "#eef1f7", sub: "#a9c7e8", meta: "#b9c1d1",
     box: "#9aa4b8", check: "#a9c7e8", onCheck: "#1a2030", dark: true, tabs: ["#5e5888", "#74545a", "#4b6a55", "#716641", "#4a5d78", "#765b49"],
   },
+  memo: {
+    paper: "#eedc84", edge: "#ccbc70", card: "#fffadc", cardEdge: "#d5d0b4", ink: "#2f2914", sub: "#4c644a", meta: "#605630",
+    box: "#857844", check: "#577456", onCheck: "#fffadc", dark: false, tabs: ["#dcd8f3", "#f2d3d6", "#cfe6d6", "#f3e3a0", "#d6e5f4", "#f6dccb"],
+  },
+  manuscript: {
+    paper: "#e8e0cf", edge: "#c6bfb1", card: "#fffefb", cardEdge: "#d5d4d0", ink: "#2d2a26", sub: "#50694e", meta: "#686258",
+    box: "#8f877a", check: "#5c7a5a", onCheck: "#fffefb", dark: false, tabs: ["#dcd8f3", "#f2d3d6", "#cfe6d6", "#f3e3a0", "#d6e5f4", "#f6dccb"],
+  },
+  lined: {
+    paper: "#d0e1f1", edge: "#b0c0d0", card: "#f8fbff", cardEdge: "#ccd1d8", ink: "#1d2a3a", sub: "#50694e", meta: "#48586c",
+    box: "#6e8094", check: "#577456", onCheck: "#f8fbff", dark: false, tabs: ["#dcd8f3", "#f2d3d6", "#cfe6d6", "#f3e3a0", "#d6e5f4", "#f6dccb"],
+  },
+  lavender: {
+    paper: "#ddd4f0", edge: "#bdb5cf", card: "#fcfbff", cardEdge: "#d2d0d7", ink: "#2a2638", sub: "#4c644a", meta: "#5b5574",
+    box: "#857e9c", check: "#577456", onCheck: "#fcfbff", dark: false, tabs: ["#dcd8f3", "#f2d3d6", "#cfe6d6", "#f3e3a0", "#d6e5f4", "#f6dccb"],
+  },
+  recycled: {
+    paper: "#d6d5ce", edge: "#b6b6af", card: "#f8f8f5", cardEdge: "#cececb", ink: "#262624", sub: "#485f46", meta: "#55544e",
+    box: "#7a7972", check: "#536e51", onCheck: "#f8f8f5", dark: false, tabs: ["#dcd8f3", "#f2d3d6", "#cfe6d6", "#f3e3a0", "#d6e5f4", "#f6dccb"],
+  },
+  nightsky: {
+    paper: "#17142a", edge: "#3e3b4f", card: "#27233f", cardEdge: "#4f4b64", ink: "#efedf9", sub: "#a3c49c", meta: "#b0aacb",
+    box: "#8f89b0", check: "#a3c49c", onCheck: "#1f2a1e", dark: true, tabs: ["#5e5888", "#74545a", "#4b6a55", "#716641", "#4a5d78", "#765b49"],
+  },
+  chalk: {
+    paper: "#1b2722", edge: "#414c46", card: "#293832", cardEdge: "#505d57", ink: "#eef3ea", sub: "#a3c49c", meta: "#abb8a9",
+    box: "#8b9b8c", check: "#a3c49c", onCheck: "#1f2a1e", dark: true, tabs: ["#5e5888", "#74545a", "#4b6a55", "#716641", "#4a5d78", "#765b49"],
+  },
+
 };
 
 /** The fixed-width face of the drawer's code (drawer.css --d-mono), and with 코드 글꼴 D2Coding (#143). */

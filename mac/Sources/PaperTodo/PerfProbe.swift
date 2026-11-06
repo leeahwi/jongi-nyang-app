@@ -98,6 +98,12 @@ enum PerfProbe {
 
     static var now: TimeInterval { ProcessInfo.processInfo.systemUptime }
 
+    /// A line of its own in the log (PerfDrive's notes, #217).
+    static func line(_ text: String) {
+        guard isOn else { return }
+        write(text)
+    }
+
     private static func idle() {
         let uptime = ProcessInfo.processInfo.systemUptime
         if !noteShown, let note = NSApp.windows.first(where: { $0 is NoteWindow }), note.isVisible {

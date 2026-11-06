@@ -8,6 +8,7 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 
 | Phase | Milestone | Mac | Windows |
 | --- | --- | --- | --- |
+| Widen | [Desktop calendar widgets · fifteen papers](#desktop-calendar-widgets--fifteen-papers) | 1.48.0 | 1.33.0 |
 | Widen | [Spaces per device · a new Today window](#spaces-per-device--a-new-today-window) | 1.47.0 | 1.32.0 |
 | Widen | [Group by space · automatic backups](#group-by-space--automatic-backups) | 1.45.1 – 1.46.0 | 1.30.1 – 1.31.0 |
 | Widen | [To-do spaces · a clearer notes drawer](#to-do-spaces--a-clearer-notes-drawer) | 1.45.0 | 1.30.0 |
@@ -23,7 +24,7 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 | Redesign | [Stage 4 — Focus mode · Day-paper contrast](#stage-4--focus-mode--day-paper-contrast) | 1.37.0 | 1.22.0 |
 | Redesign | [Stage 3 — Desk window · Night paper](#stage-3--desk-window--night-paper) | 1.36.0 | 1.21.0 |
 | Redesign | [Stage 2 — Ahead tab · Today window](#stage-2--ahead-tab--today-window) | 1.35.0 | 1.20.0 |
-| Redesign | [Stage 1 — Input line · Day ribbon · Slip modals](#stage-1--input-line--day-ribbon--slip-modals) | 1.34.0 | 1.19.0 |
+| Redesign | [Stage 1 — Input line · Day ribbon · Floating slips](#stage-1--input-line--day-ribbon--floating-slips) | 1.34.0 | 1.19.0 |
 | Widen | [Custom timer · Quick note · Alarms](#custom-timer--quick-note--alarms) | 1.33.0 | 1.18.0 |
 | Widen | [English · Nederlands](#english--nederlands) | 1.32.0 | 1.17.0 |
 | Widen | [Local events · Backup (Google removed)](#local-events--backup-google-removed) | 1.31.0 | 1.16.0 |
@@ -39,6 +40,21 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 | Mac | [From a first notepad to the cat](#from-a-first-notepad-to-the-cat) | 1.0 – 1.10 | — |
 
 ---
+
+## Desktop calendar widgets · fifteen papers
+
+**Mac 1.48.0 · Windows 1.33.0** — a paper calendar on your desktop, and one of fifteen papers shared by the whole app. The shared case files in `docs/plans/` that both apps read are now twenty-one (new: widgets, the calendar, lunar dates and holidays, papers, dragging slips and the tapping cat).
+
+![A wall calendar widget for this month on the desktop: each day is a paper tile with its events and holiday names, and a cat's ears peek out at the top right](docs/screenshots/mac/en/widget-month-wall-100.png)
+
+- **Desktop calendar widgets** — put up to four on the desktop: Today, This week, This month, Wall calendar or Today list. Click a day and its day sheet shows everything on it; type there as in the input line to add right away. Each day sits on a paper tile, so a faint widget stays readable.
+- **Fifteen papers** — pick one in Desk → Appearance → Paper, and the notepad, calendar, widgets, slips, Desk and notes drawer change together. Seven new papers arrived, such as Sticky note, Manuscript paper and Chalkboard, and a light paper switches to your chosen night paper after dark.
+- **Lunar dates and holidays** — the calendar and widgets show lunar dates and Korean public holiday names. Events spanning several days run as one bar, and weeks start on the first day set in System Settings.
+- **Drag slips** — drag question slips and the quick slips out of the way. Even with a question open, you can turn months on a widget and open its day sheet.
+- **A cat that taps along** — type in Jongi-nyang and the cat taps with its paws. It never reads or keeps which keys you pressed.
+- **Four groups in Desk** — the list on the left of Desk is now View · Settings · Notes & data · Help, and Storage & backup starts with “Where should your to-dos live?”
+- **Fixed** — with a question open, clicking elsewhere made the Mac app look frozen, while on Windows the notepad, drawer and Desk still took the click. Now both apps bring the slip forward and give it a short shake.
+- **Lighter** — on the Mac, the app uses almost no CPU while idle even with the cat shown, and features you've turned off are no longer checked while idle.
 
 ## Spaces per device · a new Today window
 
@@ -126,7 +142,7 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 
 - A block dragged in the day timetable now follows the mouse exactly. The quarter hour it will land on shows as a dashed outline, the new time as a small tag on the block, and on release it slides into place in 0.12 s (at once with reduced motion).
 - To-dos and one-off events can be stretched by their top or bottom edge to change the start or end (nearest quarter hour, at least 15 minutes, within the day). On a selected block, `⇧⌥↑↓` (Windows `Shift+Alt+↑↓`) moves the end by 15 minutes. The old bottom handle became this edge band.
-- In 1.40 a dragged block on the Mac jittered between its place and one step below, and on Windows it jumped from one 15-minute slot to the next. I found it while using the app. The Mac measured the drag against the moving block, so the step it had just moved was cancelled by the next event; Windows drew the snapped position on every `pointermove`. [Postmortem](docs/postmortem-timetable-drag.md) (in Korean) · [Troubleshooting log](portfolio/troubleshooting.en.md#4-timetable-blocks-jittered-when-dragged-mac-140--1410-windows-125--1260)
+- In 1.40 a dragged block on the Mac jittered between its place and one step below, and on Windows it jumped from one 15-minute slot to the next. I found it while using the app. The Mac measured the drag against the moving block, so the step it had just moved was cancelled by the next event; on Windows it snapped to the nearest 15-minute slot on every mouse move. [Postmortem](docs/postmortem-timetable-drag.md) (in Korean) · [Troubleshooting log](portfolio/troubleshooting.en.md#4-timetable-blocks-jittered-when-dragged-mac-140--1410-windows-125--1260)
 - Largest gap between block and pointer while dragging: Mac 51.5 pt → 0.20 pt, Windows 6 px → 0 px. Other blocks aren't redrawn during a drag, and the change is saved once, on release.
 - Dragging past the top or bottom of the timetable scrolls it. On Windows, scrolling during a drag no longer shifts the block, and a block lands where the button is released rather than at the last move.
 - A to-do's end stops at 03:45. Before, an end at 04:00 wasn't saved, yet the app still said the block had moved (Windows).
@@ -203,7 +219,7 @@ After the four redesign stages I put both apps side by side, screen by screen, a
 ![Night paper](docs/screenshots/mac/night/note-today.png)
 
 - Desk: calendar, history, settings and help, previously separate windows, now in one window. Narrow widths collapse the sidebar to icons.
-- Night paper: the color of paper in a room with the lights off (#2a2924, #ece6d6). Follows the system's dark mode; every open window switches at once.
+- Night paper: the color of paper in a room with the lights off. Follows the system's dark mode; every open window switches at once.
 - Every night text/background pair is checked against WCAG AA; the two that fell short were raised.
 
 ## Stage 2 — Ahead tab · Today window
@@ -216,7 +232,7 @@ After the four redesign stages I put both apps side by side, screen by screen, a
 - Drag a to-do onto another day to move its due date (with an undo toast).
 - Today window: click the cat face in the menu bar (notification area) for the next event, timer, next alarm, today's to-dos and an input line.
 
-## Stage 1 — Input line · Day ribbon · Slip modals
+## Stage 1 — Input line · Day ribbon · Floating slips
 
 **Mac 1.34.0 · Windows 1.19.0** — shared input-line cases 1–66
 
@@ -224,7 +240,7 @@ After the four redesign stages I put both apps side by side, screen by screen, a
 
 - Input line: type anything on one line at the bottom; chips show whether it was read as a to-do, event, timer, alarm or memo, and `Tab` picks another reading. "Switch" after adding re-adds it cleanly as the other kind, and switching the same word twice makes that reading the default.
 - Day ribbon (first version): the day as one bar, now and next as one sentence. The "now" line pulsed.
-- Slip modals: every floating window, from the ringing alarm to the event slip and confirmations, becomes a paper slip held on with washi tape. The tape color tells you the kind.
+- Floating slips: every floating window, from the ringing alarm to the event slip and confirmations, becomes a paper slip held on with washi tape. The tape color tells you the kind.
 - Colors become named tokens (paper, ink, sage, clay, tab, tape). Night paper in stage 3 was added as a second set of these tokens.
 
 ## Custom timer · Quick note · Alarms

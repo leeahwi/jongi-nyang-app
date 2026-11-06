@@ -3,8 +3,8 @@
    shadow (it would fall on the note), so on a desktop of nearly the paper's colour the line keeps them from melting
    away. The window is clear; only the ears take the mouse. */
 :root { --ear-in: rgba(242, 201, 198, 0.8); --ear-edge: rgba(60, 50, 30, 0.2); }
-:root[data-paper="night"] { --ear-in: #7d555a; --ear-edge: rgba(255, 255, 255, 0.16); }
-@media (prefers-contrast: more) { :root, :root[data-paper="night"] { --ear-edge: var(--ink-3); } }
+:root[data-scheme="dark"] { --ear-in: #7d555a; --ear-edge: rgba(255, 255, 255, 0.16); }
+@media (prefers-contrast: more) { :root, :root[data-scheme="dark"] { --ear-edge: var(--ink-3); } }
 body.ears-window { margin: 0; background: transparent; overflow: hidden; }
 .note-ears { display: block; overflow: visible; pointer-events: none; }
 .note-ears .ear { fill: var(--paper); pointer-events: visiblePainted; cursor: default; }
@@ -24,10 +24,10 @@ body.ears-window { margin: 0; background: transparent; overflow: hidden; }
 /* Snapshots (#preview): the note as it stands on a desktop with its ears — the note's picture with a window's edge and
    shadow, the ears' box over its top edge at the right — and the ears alone on light and dark desktops. */
 body.ears-preview { margin: 0; background: linear-gradient(160deg, #dfe5ea, #cdd6de); }
-:root[data-paper="night"] body.ears-preview { background: linear-gradient(160deg, #3b4048, #2c3036); }
+:root[data-scheme="dark"] body.ears-preview { background: linear-gradient(160deg, #3b4048, #2c3036); }
 .ears-preview .stage { position: relative; }
 .ears-preview .shot { position: absolute; display: block; box-shadow: 0 8px 26px rgba(30, 40, 50, 0.22), 0 0 0 0.5px rgba(0, 0, 0, 0.12); }
-:root[data-paper="night"] .ears-preview .shot { box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(255, 255, 255, 0.16); }
+:root[data-scheme="dark"] .ears-preview .shot { box-shadow: 0 8px 26px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(255, 255, 255, 0.16); }
 .ears-preview .note-ears { position: absolute; }
 .ears-preview .strip { display: flex; }
 .ears-preview .strip > div { position: relative; width: 120px; height: 60px; }

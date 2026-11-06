@@ -740,6 +740,24 @@ export function addedText(candidate: Candidate, now = new Date(), lang: Lang = "
   }
 }
 
+/**
+ * The button that puts the picked reading in (#240, D3 B): it says what happens — "일정 넣기", "할 일 넣기", "타이머 시작",
+ * "집중 시작", "알람 맞추기", "메모 넣기", "반복 할 일 넣기"; "넣기" while nothing is read yet. Tab moves it with the chip.
+ * The same words on the Mac (Intent.actionText) and in docs/plans/quick-entry-button-cases.json.
+ */
+export function actionText(candidate: Candidate | undefined, lang: Lang = "ko"): string {
+  const i = index(lang);
+  if (!candidate) return ["넣기", "Add", "Toevoegen"][i];
+  switch (candidate.kind) {
+    case "todo": return ["할 일 넣기", "Add to-do", "Taak toevoegen"][i];
+    case "event": return ["일정 넣기", "Add event", "Afspraak toevoegen"][i];
+    case "timer": return candidate.title ? ["집중 시작", "Start focus", "Focus starten"][i] : ["타이머 시작", "Start timer", "Timer starten"][i];
+    case "alarm": return ["알람 맞추기", "Set alarm", "Wekker zetten"][i];
+    case "memo": return ["메모 넣기", "Add note", "Notitie toevoegen"][i];
+    case "repeat": return ["반복 할 일 넣기", "Add repeating to-do", "Herhalende taak toevoegen"][i];
+  }
+}
+
 const switchWords: Record<Lang, Record<IntentKind, string>> = {
   ko: { todo: "할 일로 바꾸기", event: "일정으로 바꾸기", timer: "타이머로 바꾸기", alarm: "알람으로 바꾸기", memo: "메모로 바꾸기", repeat: "반복 할 일로 바꾸기" },
   en: { todo: "Make it a to-do", event: "Make it an event", timer: "Make it a timer", alarm: "Make it an alarm", memo: "Make it a note", repeat: "Make it a repeating to-do" },

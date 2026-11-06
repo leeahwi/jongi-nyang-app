@@ -15,6 +15,8 @@ enum TimetableProbe {
     /// The timetable's scroll offset from the top, as the drag sees it.
     static var scroll: CGFloat = 0
     static var foundScrollView = false
+    /// The timetable's scroller, so the replay can put it back at the top between drags (#243).
+    static weak var scroller: TimetableScroller?
     /// Each block's top as drawn this frame, in the hours' points — animation frames included (TimetableSlotOffset; read
     /// while SwiftUI draws, so outside the main actor's bookkeeping).
     nonisolated(unsafe) static var drawn: [String: CGFloat] = [:]
@@ -55,6 +57,16 @@ extension View {
 /// line a tick — so the check can see whether the block follows the pointer.
 @MainActor
 enum TimetableReplay {
+    /// `--timetable-now HH:MM` with the replay (#243): the note's clock stopped at that time of today's day, so where the
+    /// timetable opens (an hour before now) and how far it can scroll don't depend on when the check runs. Without it, or
+    /// without the replay, nil: the real clock.
+    static func fixedNow(arguments: [String], calendar: Calendar = .paper) -> Date? {
+        guard arguments.contains("--timetable-replay"), let index = arguments.firstIndex(of: "--timetable-now"),
+              arguments.indices.contains(index + 1), let clock = TimeBlock.minutes(arguments[index + 1]) else { return nil }
+        let midnight = calendar.startOfDay(for: Archive.logicalDayStart(Date(), calendar: calendar))
+        return calendar.date(byAdding: .minute, value: TimeBlock.logical(clock), to: midnight)
+    }
+
     static func start(arguments: [String], window: NSWindow, model: AppModel) {
         guard let index = arguments.firstIndex(of: "--timetable-replay"), arguments.indices.contains(index + 1) else { return }
         TimetableProbe.isOn = true
@@ -62,8 +74,9 @@ enum TimetableReplay {
         let path = arguments[index + 1]
         FileManager.default.createFile(atPath: path, contents: nil)
         guard let handle = FileHandle(forWritingAtPath: path) else { return }
+        let now = fixedNow(arguments: arguments)
         Task { @MainActor in
-            await Runner(window: window, model: model, handle: handle).run()
+            await Runner(window: window, model: model, handle: handle, now: now).run()
         }
     }
 
@@ -71,12 +84,14 @@ enum TimetableReplay {
         let window: NSWindow
         let model: AppModel
         let handle: FileHandle
+        /// The note's clock (`--timetable-now`), or nil for the real one.
+        let now: Date?
         var tick = 0
         /// The pointer, in the window's content (top-left origin), like the frames.
         var pointer: CGFloat = 0
 
-        init(window: NSWindow, model: AppModel, handle: FileHandle) {
-            self.window = window; self.model = model; self.handle = handle
+        init(window: NSWindow, model: AppModel, handle: FileHandle, now: Date?) {
+            self.window = window; self.model = model; self.handle = handle; self.now = now
         }
 
         func log(_ record: [String: Any]) {
@@ -139,10 +154,10 @@ enum TimetableReplay {
         }
 
         func run() async {
-            log(["start": Date().timeIntervalSince1970])
-            NSApp.activate(ignoringOtherApps: true)
+            log(["start": Date().timeIntervalSince1970, "now": (now ?? Date()).timeIntervalSince1970, "fixedNow": now != nil])
+            TestHooks.activate()
             window.makeKeyAndOrderFront(nil)
-            model.calendar.setDayOpen(true, now: Date())
+            model.calendar.setDayOpen(true, now: now ?? Date())
             for _ in 0..<300 where block == nil || viewport == nil { await wait(2) }
             guard let first = block, let viewport else { log(["error": "no block drawn"]); return }
             await wait(30)
@@ -163,6 +178,14 @@ enum TimetableReplay {
             if let b = block, let viewport = self.viewport {
                 let distance = viewport.maxY + 8 - b.midY
                 await drag("scroll", edge: .whole, grab: b.midY, steps: Array(repeating: distance / 20, count: 20) + Array(repeating: 0, count: 24), escapeAfter: 44)
+            }
+            // 6. (#243) Held past the bottom until the day's end: the block stops at 24:00, the scrolling stops with it
+            // (the timetable's last hour in view), and let go there, it lands 22:30–24:00.
+            TimetableProbe.scroller?.scroll(to: 0)
+            await wait(10)
+            if let b = block, let viewport = self.viewport {
+                let distance = viewport.maxY + 30 - b.midY
+                await drag("dayend", edge: .whole, grab: b.midY, steps: Array(repeating: distance / 20, count: 20) + Array(repeating: 0, count: 150))
             }
             log(["done": true, "range": range()])
         }

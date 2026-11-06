@@ -4,20 +4,23 @@ import PaperCore
 import SwiftUI
 
 /// 책상 (Desk): what used to be five windows — 달력, 완료 기록, 설정 (its tabs), 도움말 — as panes of one
-/// window with a sidebar. 보기: 달력 · 완료 기록 · 시계; 설정: 꾸미기 · 알림 · 반복 · 종이냥 · 일정 ·
-/// 저장과 백업 · 메모 서랍 · 스페이스 · AI 연결; 도움: 도움말 (and 사용 안내, which opens the guide over the note).
+/// window with a sidebar. 보기: 달력 · 완료 기록; 설정: 꾸미기 · 알림 · 알람 · 타이머 · 반복 · 일정 · 종이냥;
+/// 메모와 데이터: 메모 서랍 · 스페이스 · 저장과 백업 · AI 연결; 도움: 도움말 (and 사용 안내, which opens the guide over
+/// the note). #240 (D4 B): every group six rows or fewer, 알람 · 타이머 (was 시계, under 보기) and 일정 next to 알림.
+/// The order is the shared one in docs/plans/desk-sidebar-cases.json (the Windows desk reads the same file).
 enum DeskPane: String, CaseIterable, Identifiable {
-    case calendar, history, clock, appearance, notifications, repeating, pet, events, storage, drawer, spaces, ai, help
+    case calendar, history, appearance, notifications, clock, repeating, events, pet, drawer, spaces, storage, ai, help
 
     var id: String { rawValue }
 
-    enum Section: CaseIterable {
-        case view, settings, help
+    enum Section: String, CaseIterable {
+        case view, settings, data, help
 
         var title: String {
             switch self {
             case .view: String(localized: "보기", table: "Desk")
             case .settings: String(localized: "설정", table: "Desk")
+            case .data: String(localized: "메모와 데이터", table: "Desk")
             case .help: String(localized: "도움", table: "Desk")
             }
         }
@@ -27,8 +30,9 @@ enum DeskPane: String, CaseIterable, Identifiable {
 
     var section: Section {
         switch self {
-        case .calendar, .history, .clock: .view
-        case .appearance, .notifications, .repeating, .pet, .events, .storage, .drawer, .spaces, .ai: .settings
+        case .calendar, .history: .view
+        case .appearance, .notifications, .clock, .repeating, .events, .pet: .settings
+        case .drawer, .spaces, .storage, .ai: .data
         case .help: .help
         }
     }
@@ -37,7 +41,7 @@ enum DeskPane: String, CaseIterable, Identifiable {
         switch self {
         case .calendar: L("달력")
         case .history: L("완료 기록")
-        case .clock: L("시계")
+        case .clock: L("알람 · 타이머")
         case .appearance: L("꾸미기")
         // "알림" alone is one reminder elsewhere; here it's the pane of reminders.
         case .notifications: String(localized: "알림", table: "Desk")
@@ -81,17 +85,22 @@ enum DeskPane: String, CaseIterable, Identifiable {
         switch self {
         case .calendar, .history: nil
         case .clock: L("알람을 맞추고, 뽀모도로 시간과 소리를 정해 바로 시작해요.")
-        case .appearance: L("언어와 낮 · 밤, 노트의 글꼴과 글자 크기를 정해요.")
-        case .notifications: L("주기 알림과 알림 모양을 정하고, 미리보기로 확인해요.")
+        case .appearance: L("언어와 낮 · 밤, 종이, 노트의 글꼴과 글자 크기를 정해요.")
+        case .notifications: L("주기 알림과 알림 모양을 정해요.")
         case .repeating: L("반복하는 날마다 목록에 한 줄씩 놓여요.")
         case .pet: L("종이냥을 보이거나 숨기고, 돌아다닐지, 말을 걸지 정해요.")
         case .events: L("일정을 적어 두면 오늘 할 일 위에 보이고, 시작 전에 알려 줘요.")
-        case .storage: L("할 일과 기록이 저장되는 곳, 자동 백업과 다른 컴퓨터로 옮기는 백업이에요.")
+        case .storage: L("공유 폴더에 두면 다른 기기에서도 같은 목록을 써요.")
         case .drawer: L("화면 끝에서 메모를 꺼내 보고, 바로 적고, 그 자리에서 고쳐요.")
         case .spaces: L("할 일을 회사 · 집처럼 나눠요. 오늘 한 장은 그대로예요.") // #53: the same words as Windows
         case .ai: L("Claude와 이야기하면서 할 일과 일정을 보고, 넣고, 고쳐요.")
-        case .help: L("궁금한 걸 찾아보세요")
+        case .help: L("궁금한 걸 찾아봐요")
         }
+    }
+
+    /// #240 (D2 C): a pane whose header is the question it answers (its name goes small above it).
+    var question: String? {
+        self == .storage ? L("할 일을 어디에 둘까요?") : nil
     }
 
     /// The tint behind the row icons of a settings pane, and (#30) behind the pane's icon in the sidebar, so the colour
@@ -109,7 +118,7 @@ enum DeskPane: String, CaseIterable, Identifiable {
         }
     }
 
-    /// ⌘1…⌘9 inside the desk: the first nine panes in sidebar order, 달력 to 저장과 백업 (메모 서랍, 스페이스 and AI 연결
+    /// ⌘1…⌘9 inside the desk: the first nine panes in sidebar order, 달력 to 메모 서랍 (스페이스, 저장과 백업 and AI 연결
     /// after it have none, as on Windows; 도움말 is ⌘?).
     var shortcut: Int? {
         let index = Self.allCases.firstIndex(of: self)!
@@ -183,7 +192,7 @@ final class DeskWindowController: NSObject, NSWindowDelegate {
         window.level = model.window?.level ?? .normal
         if window.isMiniaturized { window.deminiaturize(nil) }
         window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        TestHooks.activate()
     }
 
     /// ⌘1…⌘9 while the desk is in front.
@@ -215,6 +224,9 @@ final class DeskWindowController: NSObject, NSWindowDelegate {
         window.center()
         if remembersFrame { window.setFrameAutosaveName("PaperTodoDesk") }
         if offscreen {
+            // #217: no open or close animation — off every screen it gets no frames to finish, and a closed desk stayed
+            // shown in the window server.
+            window.animationBehavior = .none
             window.keepsOffscreen = true
             window.setFrameOrigin(NSPoint(x: -40_000, y: 200))
         }
@@ -234,6 +246,14 @@ final class DeskWindowController: NSObject, NSWindowDelegate {
 
 /// The desk's window: ⌘1…⌘9 pick a pane (before the menu's ⌘1–⌘3 for the note's tabs).
 final class DeskWindow: NSWindow {
+    /// Not in a check's run (#217), as the note.
+    override var canBecomeKey: Bool { !TestHooks.staysBehind && super.canBecomeKey }
+
+    /// A check's run (#217): this would be the key window now, though it never becomes one (PerfDrive's keys go here).
+    override func makeKeyAndOrderFront(_ sender: Any?) {
+        super.makeKeyAndOrderFront(sender)
+        PerfDrive.wouldBeKey(self)
+    }
     var onShortcut: (Int) -> Void = { _ in }
     /// `--offscreen`: kept where it was put (a titled window is pulled back onto a screen as it comes up).
     var keepsOffscreen = false
@@ -271,6 +291,8 @@ struct DeskView: View {
     var previewHelp: (topic: String, query: String)?
     /// Snapshots: the calendar on its week.
     var previewCalendarWeek = false
+    /// Design snapshots (#260): the calendar on this day's month (October 2026's holidays, February 2027's 설날).
+    var previewCalendarDay: String?
     /// Snapshots: 완료 기록 filtered by a space (spaces 2c, H1).
     var previewHistorySpace: SpaceFilter = .all
     @State private var width: CGFloat = DeskMetrics.size.width
@@ -314,7 +336,13 @@ struct DeskView: View {
     private var pane: some View {
         switch state.pane {
         case .calendar:
-            if previewCalendarWeek { CalendarWindowView(model: model, today: CalendarDraft.day(Date()), mode: .week) } else { CalendarWindowView(model: model) }
+            if let day = previewCalendarDay {
+                CalendarWindowView(model: model, today: day, mode: previewCalendarWeek ? .week : .month)
+            } else if previewCalendarWeek {
+                CalendarWindowView(model: model, today: CalendarDraft.day(Date()), mode: .week)
+            } else {
+                CalendarWindowView(model: model)
+            }
         case .history: HistoryView(archive: archive, model: model, previewSpace: previewHistorySpace)
         case .help:
             if let previewHelp { HelpView(topic: previewHelp.topic, query: previewHelp.query) } else { HelpView() }
@@ -449,12 +477,20 @@ private struct DeskSidebarRow: View {
 struct DeskPaneHeader<Trailing: View>: View {
     let title: String
     var subtitle: String?
+    /// The pane's name, small over a title that is its question (#240: 저장과 백업 → ‘할 일을 어디에 둘까요?’).
+    var eyebrow: String?
     var cat: PetArt.Pose?
     @ViewBuilder var trailing: Trailing
 
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
+                if let eyebrow {
+                    Text(eyebrow)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(PaperTheme.ink2)
+                        .lineLimit(1)
+                }
                 Text(title)
                     .font(.system(size: 22, weight: .semibold))
                     .lineLimit(1)
@@ -480,8 +516,8 @@ struct DeskPaneHeader<Trailing: View>: View {
 }
 
 extension DeskPaneHeader where Trailing == EmptyView {
-    init(title: String, subtitle: String? = nil, cat: PetArt.Pose? = nil) {
-        self.init(title: title, subtitle: subtitle, cat: cat) { EmptyView() }
+    init(title: String, subtitle: String? = nil, eyebrow: String? = nil, cat: PetArt.Pose? = nil) {
+        self.init(title: title, subtitle: subtitle, eyebrow: eyebrow, cat: cat) { EmptyView() }
     }
 }
 

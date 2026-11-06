@@ -3,6 +3,20 @@ import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { contrast, mix, parseHex, toHex, tokensIn } from "../src/core/contrast";
+import { isDarkPaper, paperKinds, type PaperKind } from "../src/core/paper";
+import { floorOf, rgbOf, weekendTint } from "../src/core/calendarWidget";
+
+/** The widget's floor per paper (calendar-widget-cases.json, O9: every paper of #244). */
+const widgetCases = JSON.parse(fs.readFileSync(path.join(process.cwd(), "../docs/plans/calendar-widget-cases.json"), "utf8")) as Record<string, unknown>;
+const floorCase: Record<string, number> = (() => {
+  const found: Record<string, number>[] = [];
+  const walk = (value: unknown): void => {
+    if (Array.isArray(value)) value.forEach(walk);
+    else if (value && typeof value === "object") { const record = value as Record<string, unknown>; if (record.floors) found.push(record.floors as Record<string, number>); Object.values(record).forEach(walk); }
+  };
+  walk(widgetCases);
+  return found[0] ?? {};
+})();
 
 /**
  * Every text colour on every surface it is drawn on, in 종이 (day) and 밤 종이 (night), against WCAG
@@ -109,32 +123,10 @@ test("contrast (1.30): the slips' tape is solid with a 1 px edge, no stripes (th
   assert.ok(!/repeating-linear-gradient|--tape-stripe/.test(slip), "no stripes on the tape");
 });
 
-test("contrast: event colours at night are the day's at 85 % brightness, still apart from the paper", () => {
-  for (const hex of ["#5b8bd0", "#6b8f71", "#d9765f", "#8e7cc3", "#d4a72c", "#8a8a8a"]) {
-    const dimmed = toHex(mix(parseHex(hex), [0, 0, 0], 0.85));
-    assert.ok(contrast(dimmed, night.paper) >= 2, `${hex} → ${dimmed} on night paper`);
-  }
-});
-
 test("contrast: the maths (black on white is 21:1, a colour on itself 1:1)", () => {
   assert.equal(Math.round(contrast("#000", "#fff")), 21);
   assert.equal(contrast("#2a2924", "#2a2924"), 1);
   assert.deepEqual(parseHex("#abc"), [170, 187, 204]);
-});
-
-test("contrast (1.25): the open day's event blocks — ink titles and ink-2 times on each colour's tint pass AA, day and night", () => {
-  // .tt-block.event: color-mix(the event colour 14 % (night 24 %), the paper); the bar beside it is a mark (3:1 on the tint not needed).
-  const failures: string[] = [];
-  for (const hex of ["#5b8bd0", "#6b8f71", "#d9765f", "#8e7cc3", "#d4a72c", "#8a8a8a"]) {
-    for (const [label, tokens, share] of [["day", day, 0.14], ["night", night, 0.24]] as const) {
-      const tint = toHex(mix(parseHex(hex), parseHex(tokens.paper), share));
-      for (const fg of ["ink", "ink-2"]) {
-        const ratio = contrast(tokens[fg], tint);
-        if (ratio < 4.5) failures.push(`${label} --${fg} on ${hex} tint ${tint} = ${ratio.toFixed(2)}`);
-      }
-    }
-  }
-  assert.deepEqual(failures, []);
 });
 
 test("contrast (1.30): 할 일 스페이스's eight bands are marks at 3:1 or more on paper, paper-2 and card, day and night (table printed)", () => {
@@ -151,5 +143,113 @@ test("contrast (1.30): 할 일 스페이스's eight bands are marks at 3:1 or mo
     }
   }
   console.log(lines.join("\n"));
+  assert.deepEqual(failures, []);
+});
+
+// ─── #244: all fifteen papers (base.css :root · [data-paper="night"], papers.css) ───────────────────────────────
+
+const papersCss = fs.readFileSync(path.join(process.cwd(), "src/renderer/papers.css"), "utf8");
+/** A paper's tokens as a page has them: :root's, then its own block. */
+function paperTokens(kind: PaperKind): Record<string, string> {
+  if (kind === "day") return { ...day, raised: day.raised ?? day.card };
+  if (kind === "night") return night;
+  const start = papersCss.indexOf(`:root[data-paper="${kind}"] {`);
+  assert.ok(start >= 0, `no block for ${kind}`);
+  return { ...day, ...tokensIn(papersCss.slice(start, papersCss.indexOf("}", start))) };
+}
+const marks = ["blue", "sage", "coral", "purple", "yellow", "gray"];
+
+for (const kind of paperKinds) {
+  test(`contrast (#244, C1 · C2 · C4): ${kind} — every text 4.5:1 and mark 3:1, the bands, the event marks and their tints, the widget at 85 %`, () => {
+    const tokens = paperTokens(kind);
+    const { lines, failures } = table(kind, tokens);
+    const dark = isDarkPaper(kind);
+    // The bands on the paper and a card (plan 4-1, the Mac's M11 rule; 낮 · 밤 종이 also on paper-2, the test above).
+    for (const color of ["lavender", "pink", "mint", "yellow", "sky", "peach", "sand", "gray"]) {
+      for (const bg of ["paper", "card"]) {
+        const ratio = contrast(tokens[`band-${color}`], tokens[bg]);
+        lines.push(`  ${ratio >= 3 ? "ok  " : "FAIL"} --band-${color} on --${bg} = ${ratio.toFixed(2)} (3)`);
+        if (ratio < 3) failures.push(`band-${color} on ${bg} ${ratio.toFixed(2)}`);
+      }
+    }
+    // C2 (Q6): an event's bar or dot on the paper and on a card, 3:1; its title and time on the block's tint, 4.5:1.
+    for (const color of marks) {
+      const mark = tokens[`ev-${color}`];
+      assert.ok(mark, `no --ev-${color}`);
+      for (const bg of ["paper", "card"]) {
+        const ratio = contrast(mark, tokens[bg]);
+        lines.push(`  ${ratio >= 3 ? "ok  " : "FAIL"} --ev-${color} on --${bg} = ${ratio.toFixed(2)} (3) · an event's bar or dot`);
+        if (ratio < 3) failures.push(`ev-${color} on ${bg} ${ratio.toFixed(2)}`);
+      }
+      const tint = toHex(mix(parseHex(mark), parseHex(tokens.paper), dark ? 0.24 : 0.14));
+      for (const fg of ["ink", "ink-2"]) {
+        const ratio = contrast(tokens[fg], tint);
+        if (ratio < 4.5) failures.push(`${fg} on the ${color} event's tint ${ratio.toFixed(2)}`);
+      }
+    }
+    // C4: the widget at 85 % over the worst desktop (black behind a light paper, white behind a dark one): ink 4.5:1.
+    const widget = toHex(mix(parseHex(tokens.paper), dark ? [255, 255, 255] : [0, 0, 0], 0.85));
+    const ink85 = contrast(tokens.ink, widget);
+    lines.push(`  ${ink85 >= 4.5 ? "ok  " : "FAIL"} --ink on the widget's 85 % paper ${widget} = ${ink85.toFixed(2)} (4.5)`);
+    if (ink85 < 4.5) failures.push(`ink on 85 % ${ink85.toFixed(2)}`);
+    console.log(lines.join("\n"));
+    assert.deepEqual(failures, []);
+  });
+}
+
+test("contrast (#234, #244): the desktop calendar widget reads on any wallpaper, on all fifteen papers (the Mac's widget rows)", () => {
+  // The paper fades to 20 %, so the wallpaper is unknown: the worst is black behind the day paper and white behind the
+  // night paper (a busy wallpaper is checked as both). Below 100 % the widget's text is ink, and below 85 % it sits on a
+  // backing of the paper at 85 %. The marks (event bars, dots, the today circle) keep a ring of solid paper below 100 %.
+  const failures: string[] = [];
+  // #244: every paper the widget can show (the calendar's paper), from base.css · papers.css.
+  for (const [label, tokens] of paperKinds.map((kind) => [kind, paperTokens(kind)] as const)) {
+    for (const wall of ["#000000", "#ffffff"]) {
+      const back = toHex(mix(parseHex(tokens.paper), parseHex(wall), 0.85));
+      const ratio = contrast(tokens.ink, back);
+      if (ratio < 4.5) failures.push(`${label} ink on the 85 % backing over ${wall} = ${ratio.toFixed(2)}`);
+    }
+    for (const mark of ["sage", "clay"]) {
+      const ratio = contrast(tokens[mark], tokens.paper);
+      if (ratio < 3) failures.push(`${label} --${mark} mark on its paper ring = ${ratio.toFixed(2)}`);
+    }
+    const today = contrast(tokens["on-sage"], tokens.sage);
+    if (today < 4.5) failures.push(`${label} today number on sage = ${today.toFixed(2)}`);
+  }
+  assert.deepEqual(failures, []);
+  // The same numbers as the Mac's check-contrast.py rows (day 9.16 · 13.03, night 12.62 · 7.23).
+  assert.equal(contrast(day.ink, toHex(mix(parseHex(day.paper), [0, 0, 0], 0.85))).toFixed(2), "9.16");
+  assert.equal(contrast(night.ink, toHex(mix(parseHex(night.paper), [255, 255, 255], 0.85))).toFixed(2), "7.23");
+});
+
+test("contrast (#234 4-6, #244): on all fifteen papers, the frosted paper tiles — ink on a tile at the paper's floor, plain and tinted, and a holiday's name", () => {
+  // A day's tile never fades below the paper's floor (calendarWidget.ts floorOf): ink on it keeps 4.5:1 over the worst
+  // wallpaper. Weekends and holidays are the paper with its clay-2 mixed in (55 %), at the same floor. A holiday's name is
+  // clay-text at 100 % (below, ink with a clay ⚑, as every widget text).
+  // The tinted tiles have their own floor (weekendTint), never below the paper's.
+  const failures: string[] = [];
+  // #244: every paper the widget can show (the calendar's paper), from base.css · papers.css.
+  for (const [label, tokens] of paperKinds.map((kind) => [kind, paperTokens(kind)] as const)) {
+    const dark = isDarkPaper(label);
+    const tintRgb = weekendTint(rgbOf(tokens["clay-2"]), rgbOf(tokens.paper));
+    const tinted = `#${tintRgb.map((c) => Math.round(c * 255).toString(16).padStart(2, "0")).join("")}`;
+    const paperFloor = floorOf(rgbOf(tokens.paper), rgbOf(tokens.ink), dark) / 100;
+    const tintFloor = Math.max(paperFloor, floorOf(tintRgb, rgbOf(tokens.ink), dark) / 100);
+    for (const [name, surface, floor] of [["tile", tokens.paper, paperFloor], ["weekend tile", tinted, tintFloor]] as const) {
+      for (const wall of ["#000000", "#ffffff"]) {
+        const ratio = contrast(tokens.ink, toHex(mix(parseHex(surface), parseHex(wall), floor)));
+        if (ratio < 4.5) failures.push(`${label} ink on the ${name} at ${floor * 100} % over ${wall} = ${ratio.toFixed(2)}`);
+      }
+      const holiday = contrast(tokens["clay-text"], surface);
+      if (holiday < 4.5) failures.push(`${label} holiday name (clay-text) on the ${name} = ${holiday.toFixed(2)}`);
+    }
+    // Today's outline has a ring of solid paper inside it below 100 % (as every mark).
+    const ring = contrast(tokens.sage, tokens.paper);
+    if (ring < 3) failures.push(`${label} today's sage outline on its paper ring = ${ring.toFixed(2)}`);
+    console.log(`${label}: tile floor ${paperFloor * 100} %, weekend tile floor ${tintFloor * 100} %`);
+    assert.equal(Object.keys(floorCase).length, paperKinds.length, "O9 names every paper");
+    // The shared case O9 (calendar-widget-cases.json): the floor the widget works out from this paper's colours.
+    if (floorCase[label] !== undefined && Math.round(paperFloor * 100) !== floorCase[label]) failures.push(`${label} floor ${paperFloor * 100} %, the case says ${floorCase[label]} %`);
+  }
   assert.deepEqual(failures, []);
 });

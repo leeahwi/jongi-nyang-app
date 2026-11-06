@@ -1,8 +1,8 @@
 import Foundation
 
 /// 달력: the month and week pages of the calendar window. Days are local calendar days
-/// ("yyyy-MM-dd", midnight to midnight — not the note's 4 a.m. day) and weeks start on Sunday
-/// (Monday in Dutch: AppLanguage.weekStartsMonday).
+/// ("yyyy-MM-dd", midnight to midnight — not the note's 4 a.m. day) and weeks start on the system's first day
+/// (Monday or Sunday; else Sunday, Monday in Dutch: AppLanguage.weekStartsMonday).
 /// Same rules and test cases as the Windows app (calendar.ts).
 public enum CalendarMonth {
     /// A to-do on a day: its alert time, or its deadline.
@@ -59,10 +59,129 @@ public enum CalendarMonth {
             }
             .sorted { a, b in
                 if a.allDay != b.allDay { return a.allDay }
-                if a.allDay { return a.title < b.title }
+                // calendar-flows D1: the all-day one begun first (then the longer) on top, so a trip keeps its place
+                // day after day and its band joins; one-day ones by title, as before.
+                if a.allDay {
+                    if a.start != b.start { return a.start < b.start }
+                    if a.end != b.end { return a.end > b.end }
+                    return a.title < b.title
+                }
                 if a.start != b.start { return a.start < b.start }
                 return a.title < b.title
             }
+    }
+
+    // MARK: 여러 날 일정과 긴 이름 (calendar-flows D1 · D2)
+
+    /// The event's key when it is drawn as a band on `day` (all day, or running through the whole day: begun the day
+    /// before and ending the day after), else nil. A band with the same key on the next day in the same place joins it.
+    public static func bandKey(_ event: CalendarEvent, on day: String, calendar: Calendar = .paper) -> String? {
+        let midnight = date(day, calendar: calendar)
+        let next = calendar.date(byAdding: .day, value: 1, to: midnight)!
+        if event.allDay { return event.start <= midnight && midnight < event.end ? event.key : nil }
+        return event.start < midnight && event.end > next ? event.key : nil
+    }
+
+    /// A line of a week row's cell as drawn: `run` ≥ 1 where its title is drawn — over how many days, its own and the
+    /// following ones where the same band sits in the same place; 0 where an earlier day's title runs over it (the band
+    /// only). `fromLeft` · `toRight`: it joins the day before · after in the row.
+    public struct Band: Equatable, Sendable {
+        public var run: Int
+        public var fromLeft: Bool
+        public var toRight: Bool
+        public init(run: Int, fromLeft: Bool, toRight: Bool) { self.run = run; self.fromLeft = fromLeft; self.toRight = toRight }
+        /// It lines up with another day (a title running on, or a band joined): it keeps one line.
+        public var joined: Bool { fromLeft || toRight || run > 1 }
+    }
+
+    /// A week row's bands: `rows[d]` are day d's lines as drawn, each its band key (`bandKey`) or nil. The title is
+    /// drawn once per run — on the band's first day in the row (a new row draws it again) — and runs over the days the
+    /// same band keeps the same place; a band that moves to another place starts again.
+    public static func bands(_ rows: [[String?]]) -> [[Band]] {
+        func key(_ day: Int, _ index: Int) -> String? {
+            guard rows.indices.contains(day), rows[day].indices.contains(index) else { return nil }
+            return rows[day][index]
+        }
+        return rows.enumerated().map { day, lines in
+            lines.enumerated().map { index, band in
+                guard let band else { return Band(run: 1, fromLeft: false, toRight: false) }
+                let fromLeft = key(day - 1, index) == band
+                let toRight = key(day + 1, index) == band
+                guard !fromLeft else { return Band(run: 0, fromLeft: true, toRight: toRight) }
+                var run = 1
+                while key(day + run, index) == band { run += 1 }
+                return Band(run: run, fromLeft: false, toRight: toRight)
+            }
+        }
+    }
+
+    /// How a month cell's line fits on one line: whole, cut (it may take a second line), or a band joined to another day.
+    public enum LineFit: String, Sendable { case fit, cut, band }
+
+    /// Audit 3 · 28 (D2): the lines that take a second line for a cut title. The cell's spare lines (`room` less the
+    /// lines drawn) go to the cut titles from the top, one each — never to a band joined to another day, nor to a line
+    /// above one (the band would leave its place beside the next day).
+    public static func twoLineTitles(room: Int, lines: [LineFit]) -> [Bool] {
+        var spare = room - lines.count
+        let lastBand = lines.lastIndex(of: .band) ?? -1
+        return lines.enumerated().map { index, fit in
+            guard spare > 0, fit == .cut, index > lastBand else { return false }
+            spare -= 1
+            return true
+        }
+    }
+
+    /// #260: as `twoLineTitles`, with the day's holiday name as the cell's first line (`holiday`, nil on other days) and
+    /// `room` counting it. The spare lines go from the top, so the name comes first; it takes two lines only when no band
+    /// passes through that day (a band below it would leave its place beside the next day).
+    public static func twoLineTitles(room: Int, holiday: LineFit?, lines: [LineFit]) -> (holiday: Bool, lines: [Bool]) {
+        guard let holiday else { return (false, twoLineTitles(room: room, lines: lines)) }
+        let two = twoLineTitles(room: room, lines: [holiday] + lines)
+        return (two[0], Array(two.dropFirst()))
+    }
+
+    /// #260: English and Dutch also break a long word onto the second line, by the language's hyphenation
+    /// ("Avond-/wandeling"); Korean breaks between words only.
+    public static func hyphenates(_ language: AppLanguage) -> Bool { language != .ko }
+
+    /// #260: how a title that may not fit sits on one line. `overflows`: wider than the line; `betweenWords`: it has a
+    /// space and its first word fits; `inWord`: its first word's first hyphenated piece fits.
+    public static func lineFit(overflows: Bool, betweenWords: Bool, inWord: Bool, language: AppLanguage) -> LineFit {
+        guard overflows else { return .fit }
+        return betweenWords || (inWord && hyphenates(language)) ? .cut : .fit
+    }
+
+    /// #260: `text` with soft hyphens (U+00AD) where the language may break its words (the system's hyphenation, as
+    /// `hyphens: auto` on Windows): drawn only where a line breaks there. Korean, and text without such places, as it is.
+    /// The system's dictionary decides the places, so they may differ from Windows' for an event's title.
+    public static func hyphenated(_ text: String, language: AppLanguage) -> String {
+        // Korean as it is; a text that already has its places (a holiday's name) too.
+        guard hyphenates(language), !text.contains("\u{00AD}") else { return text }
+        let locale = CFLocaleCreate(nil, CFLocaleIdentifier(rawValue: language.rawValue as CFString))
+        guard CFStringIsHyphenationAvailableForLocale(locale) else { return text }
+        return text.split(separator: " ", omittingEmptySubsequences: false).map { word -> String in
+            let piece = String(word) as CFString
+            let length = CFStringGetLength(piece)
+            guard length >= 5 else { return String(word) }
+            var cuts: [Int] = [], before = length
+            while before > 1 {
+                let at = CFStringGetHyphenationLocationBeforeIndex(piece, before, CFRange(location: 0, length: length), 0, locale, nil)
+                guard at != kCFNotFound, at > 0, at < before else { break }
+                cuts.append(at)
+                before = at
+            }
+            var units = Array(String(word).utf16)
+            for cut in cuts { units.insert(0xAD, at: cut) }
+            return String(utf16CodeUnits: units, count: units.count)
+        }.joined(separator: " ")
+    }
+
+    /// #260: the first piece of `text`'s first word that a hyphenated break leaves on the first line ("Avond" of
+    /// "Avondwandeling"), or nil where it has none.
+    public static func firstPiece(_ text: String, language: AppLanguage) -> String? {
+        let first = String(hyphenated(text, language: language).split(separator: " ").first ?? "")
+        guard let soft = first.firstIndex(of: "\u{00AD}") else { return nil }
+        return String(first[..<soft])
     }
 
     /// "종일", "10:00–11:00", "~01:00" (began the day before), "23:30~" (runs into the next), "12:00".
@@ -124,10 +243,27 @@ public enum CalendarMonth {
         return found
     }
 
-    /// What a month cell shows: the day's events, then its deadlines; the first `limit` and how many more.
+    /// What a month cell shows: the day's events, then its deadlines, then its reminders (#227); the first `limit` and how
+    /// many more.
     public static func cellItems(_ day: String, events: [CalendarEvent], tasks: [TodoItem], limit: Int = 3,
-                                 calendar: Calendar = .paper) -> (items: [CellItem], more: Int) {
-        Page(days: [day], events: events, tasks: tasks, ranges: false, calendar: calendar).cell(day, limit: limit)
+                                 calendar: Calendar = .paper, language: AppLanguage = .ko) -> (items: [CellItem], more: Int) {
+        Page(days: [day], events: events, tasks: tasks, ranges: false, calendar: calendar, language: language).cell(day, limit: limit)
+    }
+
+    /// A week row's to-dos (#227, as the month cell's order): the deadlines first, then the alerts and time ranges by time —
+    /// when the row is full, "+N개 더" takes the reminders first. The day panel keeps `dayTasks`' order.
+    public static func weekOrder(_ tasks: [DayTask]) -> [DayTask] {
+        tasks.filter { $0.kind == .deadline } + tasks.filter { $0.kind != .deadline }
+    }
+
+    /// A to-do line's tooltip in a month cell or a week row (#227): "알림 15:00 · 치과 예약", "마감 · 보고서 쓰기",
+    /// "14:00–15:30 · 운동" — en "Reminder 3:00 PM · …", "Due · …"; nl "Herinnering 15:00 · …", "Deadline · …".
+    public static func tooltip(_ task: DayTask, language: AppLanguage = .ko) -> String {
+        switch task.kind {
+        case .reminder: ["알림", "Reminder", "Herinnering"][language.index] + " \(task.time ?? "") · \(task.title)"
+        case .deadline: ["마감", "Due", "Deadline"][language.index] + " · \(task.title)"
+        case .range: "\(task.time ?? "") · \(task.title)"
+        }
     }
 
     /// A page of the calendar worked out once (#68): each day's events (`eventsOn`), to-dos (`dayTasks`) and month
@@ -138,6 +274,8 @@ public enum CalendarMonth {
         private var tasks: [String: [DayTask]] = [:]
         /// The cells' to-dos: unfinished ones due that day, by title (`dayTasks(ranges: false)`'s deadlines).
         private var deadlines: [String: [DayTask]] = [:]
+        /// #227: and the ones whose reminder is that day, by time (a to-do due the same day shows once, as its deadline).
+        private var reminders: [String: [DayTask]] = [:]
 
         /// `days`: every day asked about later (the page's, and the chosen one); another day has nothing.
         /// `ranges: false`: the cells only (no day's own to-dos).
@@ -146,19 +284,35 @@ public enum CalendarMonth {
             let wanted = Set(days)
             for day in wanted { self.events[day] = CalendarMonth.eventsOn(day, events, calendar: calendar) }
             if ranges { self.tasks = CalendarMonth.dayTasks(on: wanted, tasks, now: now, calendar: calendar, language: language) }
+            // One pass for the cells, as for the day's own to-dos (#68).
+            var alerts: [String: [(Date, DayTask)]] = [:]
             for task in tasks where !task.isCompleted {
-                guard let due = task.dueDate, wanted.contains(due) else { continue }
-                deadlines[due, default: []].append(DayTask(title: task.title, kind: .deadline, time: nil, taskId: task.id))
+                if let due = task.dueDate, wanted.contains(due) {
+                    deadlines[due, default: []].append(DayTask(title: task.title, kind: .deadline, time: nil, taskId: task.id))
+                }
+                if let at = task.reminderAt {
+                    let day = CalendarDraft.day(at, calendar: calendar)
+                    if day != task.dueDate, wanted.contains(day) {
+                        alerts[day, default: []].append((at, DayTask(title: task.title, kind: .reminder,
+                                                                     time: CalendarMonth.clock(at, calendar: calendar, language: language),
+                                                                     taskId: task.id)))
+                    }
+                }
             }
             deadlines = deadlines.mapValues { $0.sorted { $0.title < $1.title } }
+            reminders = alerts.mapValues { $0.sorted { $0.0 != $1.0 ? $0.0 < $1.0 : $0.1.title < $1.1.title }.map(\.1) }
         }
 
         public func events(on day: String) -> [CalendarEvent] { events[day] ?? [] }
         public func tasks(on day: String) -> [DayTask] { tasks[day] ?? [] }
 
-        /// What a month cell shows: the day's events, then its deadlines; the first `limit` and how many more.
+        /// A week row's to-dos: `weekOrder` of the day's.
+        public func weekTasks(on day: String) -> [DayTask] { CalendarMonth.weekOrder(tasks(on: day)) }
+
+        /// What a month cell shows: the day's events, then its deadlines, then its reminders (#227: the title only, the
+        /// time is in the tooltip); the first `limit` and how many more.
         public func cell(_ day: String, limit: Int = 3) -> (items: [CellItem], more: Int) {
-            let all = events(on: day).map(CellItem.event) + (deadlines[day] ?? []).map(CellItem.task)
+            let all = events(on: day).map(CellItem.event) + (deadlines[day] ?? []).map(CellItem.task) + (reminders[day] ?? []).map(CellItem.task)
             return (Array(all.prefix(limit)), max(0, all.count - limit))
         }
     }
@@ -209,7 +363,7 @@ public enum CalendarMonth {
         CalendarDraft.day(calendar.date(byAdding: .day, value: count, to: date(day, calendar: calendar))!, calendar: calendar)
     }
 
-    /// The Sunday (Dutch: Monday) on or before `date`.
+    /// The week's first day (AppLanguage.weekStartsMonday) on or before `date`.
     private static func weekStart(of date: Date, calendar: Calendar, language: AppLanguage) -> Date {
         let start = calendar.startOfDay(for: date)
         let weekday = calendar.component(.weekday, from: start) - 1 // 0 = Sunday
@@ -221,7 +375,7 @@ public enum CalendarMonth {
         (0..<count).map { CalendarDraft.day(calendar.date(byAdding: .day, value: $0, to: start)!, calendar: calendar) }
     }
 
-    private static func clock(_ date: Date, calendar: Calendar, language: AppLanguage) -> String {
+    fileprivate static func clock(_ date: Date, calendar: Calendar, language: AppLanguage) -> String {
         let p = calendar.dateComponents([.hour, .minute], from: date)
         return language.clock(hour: p.hour!, minute: p.minute!)
     }

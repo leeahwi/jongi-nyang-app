@@ -231,16 +231,17 @@ struct FocusCardView: View {
                 if !over {
                     // 1.38: ⏸ / ▶ under the time (Space), not only a click on the ring.
                     Button { model.petCommand(.focusStep(.togglePause)) } label: {
+                        // #240 (점검 3의 19): at least 32 × 28 pt, easy to hit (it was 26 × 22).
                         Image(systemName: timer.isPaused ? "play" : "pause")
-                            .font(.system(size: 10.5, weight: .bold))
+                            .font(.system(size: 11.5, weight: .bold))
                             .foregroundStyle(PaperTheme.ink2)
-                            .frame(width: 26, height: 22)
+                            .frame(width: size < 140 ? 32 : 36, height: 28)
                             .background(PaperTheme.paper2, in: Capsule())
                             .overlay { Capsule().strokeBorder(PaperTheme.rule, lineWidth: 0.8) }
                             .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
-                    .padding(.top, size < 140 ? 3 : 6)
+                    .padding(.top, size < 140 ? 2 : 5)
                     .help(timer.isPaused ? L("계속 (Space)") : L("일시정지 (Space)"))
                     .accessibilityLabel(timer.isPaused ? L("계속") : L("일시정지"))
                 }

@@ -1,6 +1,8 @@
 /* 도움말 on the desk: the pane's header with the search field, then the topics (four coloured groups) beside the page. */
 #app { display: flex; flex-direction: column; height: 100vh; word-break: keep-all; overflow-wrap: anywhere; }
 
+/* #240 (점검 3의 22): the header starts where the settings panes' does (their reading column), not 11px left of it. */
+.pane-head { width: 100%; max-width: 696px; margin-inline: auto; }
 .pane-head .search { width: clamp(170px, 32%, 260px); }
 .search {
   flex: none; display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 6px 0 10px; border-radius: 8px;

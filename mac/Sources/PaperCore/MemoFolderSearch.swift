@@ -127,7 +127,7 @@ extension MemoFolders {
 
     // MARK: Results by folder, scope and filters (#114, B1)
 
-    /// The kinds of memo the search can keep to (chips under the field): 체크 남음 (a checklist line not ticked yet), 링크
+    /// The kinds of memo the search can keep to (chips under the field): 안 한 체크 (a checklist line not ticked yet), 링크
     /// (a web address anywhere, written or as a markdown link), 고정. Several at once keep the memos that are all of them.
     public struct SearchFilters: OptionSet, Hashable, Sendable {
         public let rawValue: Int
@@ -190,7 +190,7 @@ extension MemoFolders {
         return groups
     }
 
-    /// 체크 남음: a checklist line not ticked yet.
+    /// 안 한 체크: a checklist line not ticked yet.
     public static func hasOpenBox(_ text: String) -> Bool { Checklist.lines(text).contains { !$0.checked } }
 
     /// The found line as a result shows it (#114): a match far into a long line is brought near the start — cut 8

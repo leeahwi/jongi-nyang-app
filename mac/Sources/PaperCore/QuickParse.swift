@@ -37,20 +37,11 @@ public struct QuickParse: Equatable, Sendable {
         var date: Date?
         var isDeadline = false
         var evening = false
-        if let words, let found = words.date(in: working, today: todayStart, calendar: calendar) {
+        if let found = findDate(in: working, todayStart: todayStart, calendar: calendar, language: language) {
             date = found.date
             isDeadline = found.by
             evening = found.evening
             working = replace(found.range, in: working)
-        }
-        for rule in dateRules where date == nil && !(rule.slash && language == .nl) {
-            guard let match = firstMatch(rule.pattern, in: working) else { continue }
-            guard let found = rule.resolve(match.groups, todayStart, calendar) else { continue }
-            if rule.needsUntil && !match.until { continue }
-            date = found
-            isDeadline = match.until
-            working = replace(match.range, in: working)
-            break
         }
 
         // Times: the language's own words, then Korean (and 15:30).
@@ -149,6 +140,35 @@ public struct QuickParse: Equatable, Sendable {
             }
         }
         return result
+    }
+
+    /// 바탕화면 위젯 (#234): whether the text names a day ("내일", "금요일까지", "11월 21일", "tomorrow") or a moment from now
+    /// ("30분 뒤", "in 2 hours") — the widget's quick entry puts a line without one on the day that was clicked.
+    public static func saysDay(_ text: String, now: Date = Date(), calendar: Calendar = .paper, language: AppLanguage = .ko) -> Bool {
+        var working = " " + text + " "
+        if let range = TimeRangeReader.find(in: working, language: language) { working = replace(range.range, in: working) }
+        let todayStart = calendar.startOfDay(for: Archive.logicalDayStart(now, calendar: calendar))
+        if findDate(in: working, todayStart: todayStart, calendar: calendar, language: language) != nil { return true }
+        if let words = WordRules.of(language), let found = words.time(in: working) {
+            if case .after = found.hit { return true }
+            return false
+        }
+        return firstMatch(koreanAfter, in: working) != nil
+    }
+
+    /// The day the text names: the language's own words, then Korean (the first rule that reads).
+    private static func findDate(in working: String, todayStart: Date, calendar: Calendar,
+                                 language: AppLanguage) -> (date: Date, by: Bool, evening: Bool, range: Range<String.Index>)? {
+        if let words = WordRules.of(language), let found = words.date(in: working, today: todayStart, calendar: calendar) {
+            return (found.date, found.by, found.evening, found.range)
+        }
+        for rule in dateRules where !(rule.slash && language == .nl) {
+            guard let match = firstMatch(rule.pattern, in: working) else { continue }
+            guard let found = rule.resolve(match.groups, todayStart, calendar) else { continue }
+            if rule.needsUntil && !match.until { continue }
+            return (found, match.until, false, match.range)
+        }
+        return nil
     }
 
     /// "내일 오후 3:00 알림" · "Reminder tomorrow at 3:00 PM" · "Herinnering morgen om 15:00" (today, tomorrow, else the date).

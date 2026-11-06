@@ -150,31 +150,7 @@ public enum TextSteps {
         return kinds.indices.map { endsParagraph(kinds[$0], next: $0 + 1 < kinds.count ? kinds[$0 + 1] : nil) }
     }
 
-    // MARK: Drawer paper (서랍 종이, #142)
-
-    /// 1.45's `drawer.theme` and the new switch: the paper picked for the day, and whether it gives way to 밤 종이 at
-    /// night. `auto` is 낮 종이 with the switch on; a paper picked by name stayed as it was at night (the switch off
-    /// until it is turned on).
-    public static func drawerPaper(theme: String?, nightPaper: Bool?) -> (paper: String, nightPaper: Bool) {
-        switch theme {
-        case nil, "auto": ("day", true)
-        case "day": ("day", false)
-        case let paper?: (paper, nightPaper ?? false)
-        }
-    }
-
-    /// What `drawer.theme` is written as: `auto` for 낮 종이 with the switch on, so 1.45 still follows day and night.
-    public static func drawerThemeValue(paper: String, nightPaper: Bool) -> String {
-        paper == "day" && nightPaper ? "auto" : paper
-    }
-
-    /// The papers that are dark already: 밤에는 밤 종이로 leaves them as they are.
-    public static let darkPapers: Set<String> = ["night", "ink"]
-
-    /// The paper drawn: a light paper turns to 밤 종이 at night when the switch is on; a dark paper stays.
-    public static func drawerShownPaper(paper: String, nightPaper: Bool, night: Bool) -> String {
-        night && nightPaper && !darkPapers.contains(paper) ? "night" : paper
-    }
+    // The drawer's paper (#142) moved to PaperLook.swift with the fifteen papers (#244).
 
     private static func nearest(_ value: Double, in table: [(String, Double)]) -> String {
         // Ties go to the smaller (the order is by value, so the first of two equally near).

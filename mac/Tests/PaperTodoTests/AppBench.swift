@@ -172,14 +172,41 @@ enum AppBench {
             let host = Host(HistoryView(archive: archive, model: model), size: NSSize(width: 860, height: 640))
             host.reportFirst("history")
             // #62: 0.38–0.40 s before 1.46 with 2,000 to-dos and three years, 0.3 s the aim (the chosen day, today, made a
-            // row for each of its 381 finished to-dos).
-            ceiling("history first open (\(archive.allEntries().count) finished)", host.firstOpen, at: 400)
+            // row for each of its 381 finished to-dos); 0.23–0.24 s in 1.48 (2026-11-06), so 0.3 s is the ceiling now.
+            ceiling("history first open (\(archive.allEntries().count) finished)", host.firstOpen, at: 300)
             host.step("history nothing changed") {}
             // #62: a change the pane doesn't show (it went through .id(revision) until 1.45), then one it does.
             let unrelated = host.step("history after an unrelated model change (selection)") { model.selectedTaskID = UUID() }
             ceiling("history after an unrelated model change", unrelated, at: 5)
             let open = model.items.filter { !$0.isCompleted }.map(\.id)
             host.step("history after a check (the record changes)") { model.toggle(open[5]) }
+            // #62: the mouse moving onto the next day's square: the outline leaves one square and comes to the next
+            // (the state is each square's own, so only those two are worked out again). The squares' hover state is
+            // set as the mouse sets it (HistoryBenchHooks): a window off every screen gets no hover, not even with
+            // the events handed to it. `changed` says the outline really drew.
+            HistoryBenchHooks.hover = [:]
+            let hovered = Host(HistoryView(archive: archive, model: model), size: NSSize(width: 860, height: 640))
+            let days = (HistoryBenchHooks.hover ?? [:]).sorted { $0.key < $1.key }.map(\.value)
+            if days.count > 40 {
+                hovered.frame()
+                let plain = hovered.bitmap.bitmapData.map { Array(UnsafeBufferPointer(start: $0, count: hovered.bitmap.bytesPerPlane)) } ?? []
+                days[0](true)
+                hovered.frame()
+                let outlined = hovered.bitmap.bitmapData.map { Array(UnsafeBufferPointer(start: $0, count: hovered.bitmap.bytesPerPlane)) } ?? []
+                let changed = zip(plain, outlined).filter { $0 != $1 }.count
+                print("  (\(days.count) squares; one outlined changed \(changed) bytes of the drawing, \(hovered.bitmap.bytesPerPlane) in all)")
+                var next = 0
+                let moves = hovered.step("history mouse onto the next day's square", runs: 30, gpu: true) {
+                    days[next](false)
+                    next += 1
+                    days[next](true)
+                }
+                ceiling("history mouse onto a day's square", moves, at: 16)
+            } else {
+                print("history hover: \(days.count) squares, not measured")
+            }
+            hovered.close()
+            HistoryBenchHooks.hover = nil
             // Not asked to lay out (as in a window that isn't on screen, e.g. the desk after ⌘W): does SwiftUI still
             // rebuild it? The process's CPU over 0.6 s after a change, against the same with no history view.
             let busy = { (label: String, change: () -> Void) in
@@ -212,21 +239,21 @@ enum AppBench {
             ceiling("history in a closed window: a check costs what it costs with no history view (+5 ms)",
                     closed, at: (none.sorted()[1]) + 5)
         }
-        // ── The cat (#64): one frame of a clip — what the app does 60 times a second while the cat moves ──
+        // ── The cat (#64): what the app does when a clip starts. Since 1.48 that is all: the window server plays the
+        // clip (PetSprite), where until then the app laid the cat out again for each of its 30–60 frames a second.
         if wanted("pet") {
             let state = PetState()
             state.homeX = 600
             let host = Host(DesktopPetView(state: state), size: NSSize(width: 1710, height: 250))
             report("pet first draw", host.firstDraw)
             var step = 0.0
-            let started = Date()
-            host.step("pet a walk frame", runs: 60) {
+            host.step("pet a walk starts", runs: 20) {
                 step += 1
-                state.activity = PetActivity(.walk(from: 500, to: 670), start: started.addingTimeInterval(-step / 60))
+                state.activity = PetActivity(.walk(from: 500 + step, to: 670))
             }
-            host.step("pet a tilt frame", runs: 60) {
+            host.step("pet a tilt starts", runs: 20) {
                 step += 1
-                state.activity = PetActivity(.tilt, start: Date().addingTimeInterval(-(step.truncatingRemainder(dividingBy: 80)) / 60))
+                state.activity = PetActivity(step.truncatingRemainder(dividingBy: 2) == 0 ? .tilt : .stretch)
             }
             state.activity = PetActivity(.sit)
             host.frame()

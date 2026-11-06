@@ -1,6 +1,7 @@
 import { dayKey } from "./archive";
 import { isoDate } from "./notebook";
 import type { Lang } from "./lang";
+import { checkedDeviceRules, type StoredRules } from "./spaceDevice";
 import { spaceOf, type TodoSpaces } from "./todoSpaces";
 
 /**
@@ -23,12 +24,13 @@ export const aiLockFileName = "ai-write.lock";
 /**
  * The extension's own small version (I1, docs/plans/mcp-plan.md): 1 before it had one, 2 since pages, memo
  * folders and prompts, 3 since the to-do spaces (N3-8: an app that writes 3 can undo a move between spaces, so the
- * extension moves to-dos only for it). The app writes the one it carries into ai-link.json and the extension writes its own
+ * extension moves to-dos only for it), 4 since 기기마다 보일 스페이스 (N3-9: an app that writes 4 puts this device's
+ * 이 기기에서 into ai-link.json, and the extension hides those spaces as the note does). The app writes the one it carries into ai-link.json and the extension writes its own
  * into each log line, so the extension can say when Claude Desktop's installed copy is older than the app,
  * and the app can say so in 설정 › AI 연결. The Mac's AIConnect.extVersion is the same number (the Mac ships
  * this extension).
  */
-export const aiExtVersion = 3;
+export const aiExtVersion = 4;
 
 export interface AiLink {
   v: 1;
@@ -42,6 +44,11 @@ export interface AiLink {
   updatedAt: string;
   /** The extension version the app carries (aiExtVersion); absent from apps before it (read as 1). */
   ext?: number;
+  /**
+   * N3-9 (#196): this device's 이 기기에서 as the app keeps it (`prefs.spaceDevice` · Mac `spaces.device`, D5's shape),
+   * so Claude on this device hides what the note hides. Absent when nothing is set, and from apps before ext 4.
+   */
+  spaceDevice?: StoredRules;
 }
 
 const isCount = (value: unknown): value is number => typeof value === "number" && Number.isInteger(value) && value > 0;
@@ -59,12 +66,16 @@ export function parseAiLink(text: string): AiLink | undefined {
     lang: isLang(value.lang) ? value.lang : "ko", app: typeof value.app === "string" ? value.app : "",
     updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : "",
     ...(isCount(value.ext) ? { ext: value.ext } : {}),
+    ...withRules(checkedDeviceRules(value.spaceDevice)),
   };
 }
 
+/** `{ spaceDevice }` when there is any rule, else nothing (S73: no key while every space shows). */
+const withRules = (rules: StoredRules | undefined): { spaceDevice?: StoredRules } => (rules && Object.keys(rules).length ? { spaceDevice: rules } : {});
+
 export function serializeAiLink(link: AiLink): string {
-  const { v, enabled, dataFolder, lang, app, updatedAt, ext } = link;
-  return JSON.stringify({ v, enabled, dataFolder, lang, app, updatedAt, ...(ext !== undefined ? { ext } : {}) }, null, 2) + "\n";
+  const { v, enabled, dataFolder, lang, app, updatedAt, ext, spaceDevice } = link;
+  return JSON.stringify({ v, enabled, dataFolder, lang, app, updatedAt, ...(ext !== undefined ? { ext } : {}), ...withRules(spaceDevice && checkedDeviceRules(spaceDevice)) }, null, 2) + "\n";
 }
 
 /** The words every tool answers with while AI 연결 is off (or was never turned on). */

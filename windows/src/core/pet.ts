@@ -1,4 +1,5 @@
 import { restPose, type MascotPose } from "./motion";
+import type { TypingPose } from "./typingCat";
 
 /**
  * The desktop pet (종이냥), ported from macOS `PetMotion` / `DesktopPet`. Actions are short
@@ -20,6 +21,10 @@ export interface PetPayload {
   message?: string;
   /** 종이냥 한마디 asking something: the bubble shows these answer buttons. */
   question?: { text: string; answers: string[] };
+  /** #230: on its cushion with this paw down (resting only); absent while it is its usual self. */
+  typing?: TypingPose;
+  /** #67: the floor's width (the window is only the cat's box now; its bubble still keeps to the screen). */
+  floorWidth: number;
 }
 
 /** What to draw for one moment of an activity. */
@@ -49,6 +54,52 @@ export const sleepAfterSeconds = 300;
 export const wakeWithinSeconds = 5;
 
 export const isResting = (action: PetAction): boolean => action.kind === "sit" || action.kind === "sleep";
+
+// ─── #67: a window the cat's size, and frames only as often as they show ─────
+
+/**
+ * The window: the cat's 252px box with room on both sides for its bubble (240px at most), which slides up to 56px
+ * inward near a screen edge (`bubbleShift`). The cat stays in its middle; the window moves along the floor with it.
+ */
+export const petWindowWidth = 360;
+
+/** Where the window's left edge goes (floor coordinates) for the cat's centre at `x`; near an edge it hangs past the floor. */
+export const petWindowLeft = (x: number): number => Math.round(x - petWindowWidth / 2);
+
+/**
+ * Where a walking cat's window is: the walk's place held for each of its eight pictures, so the window moves once a
+ * step with the picture (about 11 times a second, 2 px a time) and the paws drawn on the ground stay put between.
+ */
+export function walkStepX(action: Extract<PetAction, { kind: "walk" }>, start: number, now: number): number {
+  const u = Math.min(1, Math.max(0, now - start) / clipMs(action));
+  if (u >= 1) return action.to;
+  const distance = Math.abs(action.to - action.from);
+  const step = walkStride / walkCycleFrames;
+  const travelled = Math.floor((distance * (0.5 - 0.5 * Math.cos(Math.PI * u))) / step) * step;
+  return action.from + Math.sign(action.to - action.from) * travelled;
+}
+
+/**
+ * How often a clip is drawn (ms between frames). Every frame of an always-on-top window costs the GPU, so a clip is
+ * drawn only as often as it visibly changes: a walk's steps (about 11 pictures a second; the window itself moves with
+ * the cat) and a groom at 30, slow tilts, sips and yawns at 15, the short bouncy hops at every frame; a blink and a stretch
+ * only swap the picture.
+ */
+export function clipFrameMs(action: PetAction): number {
+  switch (action.kind) {
+    case "sit": case "sleep": case "blink": return Infinity;
+    case "stretch": return 100;
+    case "tilt": case "tea": case "yawn": return 66;
+    case "walk": case "groom": return 33;
+    case "hop": case "happy": case "cheer": return 0;
+  }
+}
+
+/**
+ * #67: the resting cat takes one breath (and a little sway) when it settles, then sits still until its next moment
+ * (5–14 s later). Breathing all the time kept the window drawing 8 times a second: 1–2 % CPU, mostly the GPU's.
+ */
+export const restBreathMs = { awake: 2600, asleep: 3400 } as const;
 
 export function clipMs(action: PetAction): number {
   switch (action.kind) {

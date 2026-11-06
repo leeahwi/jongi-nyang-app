@@ -14,6 +14,13 @@
 # --quick skips the 10-minute use loop (memory after use). The drawer is measured by scripts/perf-drawer.sh (#208).
 # Everything the test copy wrote (storage
 # folder, preferences, saved state) is removed at the end.
+#
+# #217: nothing of the test copy comes to the front or onto a screen. It starts behind the person's apps (`open -g`),
+# never makes itself active, has no Dock icon or menu bar item, and every window is far off the screens
+# (`--offscreen`, PAPERTODO_OFFSCREEN=1). The keys aren't posted to it any more: the script writes them to a file the
+# app reads (`--perf-drive`, Sources/PaperTodo/PerfDrive.swift) and the app hands them to its own window — so the
+# times are the app's own (no delivery by the system), and characters go into the field without an input method. A
+# window of the copy on a screen stops the run (`perf-probe offscreen`, and the app's own `onscreen` line).
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 out="${1:-$repo/.build/perf}"
@@ -27,9 +34,12 @@ done
 [ "$spaces" = 1 ] && PERF_DATA_ARGS="${PERF_DATA_ARGS:-} --todos 2000 --spaces 9"
 bundle_id=${PERF_BUNDLE_ID:-com.noa.PaperTodo.LiveTest}
 mkdir -p "$out"
+# The app opens the log and the commands by these paths from its own folder: absolute ones.
+out="$(cd "$out" && pwd)"
 app="$out/PerfTest.app"
 probe="$out/perf-probe"
 log="$out/perf.log"
+commands="$out/perf-drive.txt"
 storage="$HOME/Library/Application Support/$bundle_id"
 
 if [ "$build" = 1 ]; then
@@ -89,13 +99,26 @@ fresh() {
 }
 
 launch() {
-    : > "$log"
-    # Through Launch Services, like a click in Finder: the note comes up in front.
-    # --offscreen: the note, the drawer and its handle far off every screen, out of the user's way.
-    open -n "$app" --args --perf-log "$log" --offscreen
+    : > "$log"; : > "$commands"
+    # Through Launch Services, but behind (-g): nothing comes forward. --offscreen: every window far off the screens.
+    open -g -n --env PAPERTODO_OFFSCREEN=1 "$app" --args --perf-log "$log" --offscreen --perf-drive "$commands"
     for _ in $(seq 1 100); do pid=$(pgrep -f "$app/Contents/MacOS/PaperTodo" | head -1 || true); [ -n "$pid" ] && break; sleep 0.05; done
     for _ in $(seq 1 100); do grep -q '^noteVisible' "$log" 2>/dev/null && break; sleep 0.1; done
     sleep 1.5
+    offscreen_check
+}
+# drive <command>: the test copy's input (PerfDrive: key <code> [mods] · type <ms> <text>), done in order.
+drive() { echo "$*" >> "$commands"; }
+# Every shown window of the test copy off the screens, as the window server has it; nothing the app moved off.
+offscreen_check() {
+    if ! "$probe" offscreen "$pid"; then echo "a window of the test copy is on a screen: stopping"; exit 1; fi
+    if grep -q '^onscreen' "$log"; then grep '^onscreen' "$log"; echo "the test copy put a window on a screen: stopping"; exit 1; fi
+}
+# At the end: still off the screens, and the commands the copy couldn't do (a key with no window for it …).
+finish_check() {
+    offscreen_check
+    if grep -q '^drive ' "$log"; then echo "commands the test copy couldn't do:"; grep '^drive ' "$log" | sort | uniq -c; fi
+    return 0
 }
 
 last() { { grep "^$1" "$log" || true; } | tail -${2:-1} | awk '{print $NF}'; }
@@ -116,11 +139,10 @@ settle() {
 }
 between() { awk -v from="# $1" -v to="# $2" '$0==from{on=1;next} $0==to{on=0} on' "$log"; }
 # vals <from> <to> <prefix>: the app's own time (the line's last number) of the lines starting with prefix
-# between two marks; total: from the event's timestamp (with the system's delivery).
+# between two marks. (Until #217 the line's other number added the system's delivery of a posted key; now the keys come
+# from inside and both are the same.)
 vals() { between "$1" "$2" | awk -v p="$3" 'index($0, p) == 1 {print $NF}'; }
-totals() { between "$1" "$2" | awk -v p="$3" 'index($0, p) == 1 {print $(NF-1)}'; }
 first() { vals "$@" | head -1; }
-firsttotal() { totals "$@" | head -1; }
 
 echo "== 종이냥 성능 점검 · $(date '+%Y-%m-%d %H:%M') · $(sw_vers -productVersion) · $(sysctl -n machdep.cpu.brand_string)"
 
@@ -137,7 +159,7 @@ echo "memory after start: $("$probe" mem "$pid")"
 if [ "$spaces" = 1 ]; then
     # Drawing 오늘: the tab switch 앞으로 → 오늘 (⌘2 ⌘1), five rounds; the second key of each is 오늘's.
     mark tabs
-    for _ in 1 2 3 4 5; do for code in 19 18; do "$probe" key "$pid" "$code" cmd; sleep 0.8; done; done
+    for _ in 1 2 3 4 5; do for code in 19 18; do drive key "$code" cmd; sleep 0.8; done; done
     settle tabs "key " 10
     mark tabs-end
     today=$(between tabs tabs-end | awk 'index($0, "key 18") == 1 {print $NF}')
@@ -146,14 +168,14 @@ if [ "$spaces" = 1 ]; then
     # come, the list's room changes) and Esc (back to empty) are shown apart — with 2,000 rows they took
     # 4–14 s in 1.44 and before 1.45's fix (the list's height fed back into the sheet), so the next step waits.
     typed() {  # typed <name> <text> <keys>
-        mark "$1-open"; "$probe" key "$pid" 45 cmd; settle "$1-open" "key 45" 1 60
+        mark "$1-open"; drive key 45 cmd; settle "$1-open" "key 45" 1 60
         mark "$1"
-        "$probe" type "$pid" "$2" 150
+        drive type 150 "$2"
         settle "$1" "key 0 " "$3" 90
         mark "$1-end"
         local keys; keys=$(vals "$1" "$1-end" key)
         echo "typing ‘$2’ (app): first key $(echo "$keys" | head -1) ms · the rest median $(echo "$keys" | tail -n +2 | median) ms · max $(echo "$keys" | tail -n +2 | max) ms ($(echo "$keys" | wc -l | tr -d ' ') keys)"
-        mark "$1-esc"; "$probe" key "$pid" 53; "$probe" key "$pid" 53; settle "$1-esc" "key 53" 2 90
+        mark "$1-esc"; drive key 53; drive key 53; settle "$1-esc" "key 53" 2 90
         mark "$1-esc-end"
         echo "  Esc (clear the line, app): $(vals "$1-esc" "$1-esc-end" "key 53" | head -1) ms"
     }
@@ -161,7 +183,7 @@ if [ "$spaces" = 1 ]; then
     typed hash "보고서 쓰기 #ㅎㅅ" 10
     # One space shown and back (⌘⌥1 ⌘⌥2 ⌘⌥0; nothing happens in a build without spaces).
     mark lens
-    for _ in 1 2 3; do for code in 18 19 29; do "$probe" key "$pid" "$code" cmd+opt; sleep 0.8; done; done
+    for _ in 1 2 3; do for code in 18 19 29; do drive key "$code" cmd+opt; sleep 0.8; done; done
     settle lens "key " 9
     mark lens-end
     lens=$(vals lens lens-end key)
@@ -169,9 +191,10 @@ if [ "$spaces" = 1 ]; then
     sleep 3
     echo "idle, note open (30 s): $("$probe" sample "$pid" 30)"
     # The note with one space shown, drawn into the out folder (kill -USR1: PerfProbe's pictures) — to see the lens took.
-    "$probe" key "$pid" 18 cmd+opt; sleep 3; kill -USR1 "$pid" 2>/dev/null || true; sleep 3
+    drive key 18 cmd+opt; sleep 3; kill -USR1 "$pid" 2>/dev/null || true; sleep 3
     echo "files written in the whole run: $(grep -c '^io' "$log" || true)"
     cp "$log" "$out/perf-last.log"
+    finish_check
     exit 0
 fi
 
@@ -182,66 +205,63 @@ mark idle-open-end
 echo "  files written while idle: $(vals idle-open idle-open-end io | wc -l | tr -d ' ')"
 
 # 3. Typing in the input line: each key until the frame is on screen (chips update in the same frame).
-"$probe" key "$pid" 45 cmd; sleep 0.6   # ⌘N: the input line
+drive key 45 cmd; sleep 0.6   # ⌘N: the input line
 mark typing
-"$probe" type "$pid" "내일 3시 회의 준비하기" 150
+drive type 150 "내일 3시 회의 준비하기"
 settle typing "key 0 " 13
 mark typing-end
 keys=$(vals typing typing-end key)
-echo "typing (app): per key median $(echo "$keys" | median) ms · max $(echo "$keys" | max) ms ($(echo "$keys" | wc -l | tr -d ' ') keys) · with delivery median $(totals typing typing-end key | median) ms"
-"$probe" key "$pid" 53; sleep 0.4   # Esc clears the line
-"$probe" key "$pid" 53; sleep 0.4
+echo "typing (app): per key median $(echo "$keys" | median) ms · max $(echo "$keys" | max) ms ($(echo "$keys" | wc -l | tr -d ' ') keys)"
+drive key 53; sleep 0.4   # Esc clears the line
+drive key 53; sleep 0.4
 
 # 4. Tab switches ⌘2 ⌘1, three rounds (two tabs from 1.43: ⌘3 opens 메모 서랍, see 8b).
 mark tabs
-for _ in 1 2 3; do for code in 19 18; do "$probe" key "$pid" "$code" cmd; sleep 0.7; done; done
+for _ in 1 2 3; do for code in 19 18; do drive key "$code" cmd; sleep 0.7; done; done
 settle tabs "key " 6
 mark tabs-end
 tabs=$(vals tabs tabs-end key)
-echo "tab switch 오늘↔앞으로 (app): median $(echo "$tabs" | median) ms · max $(echo "$tabs" | max) ms · with delivery median $(totals tabs tabs-end key | median) ms"
+echo "tab switch 오늘↔앞으로 (app): median $(echo "$tabs" | median) ms · max $(echo "$tabs" | max) ms"
 
 # 5. Checking a task with the keyboard (↑ from the empty input line picks the last row, Space checks it), the
 # save after it; Space again puts it back.
-"$probe" key "$pid" 45 cmd; sleep 0.5
-"$probe" key "$pid" 126; sleep 0.6
+drive key 45 cmd; sleep 0.5
+drive key 126; sleep 0.6
 mark check
-"$probe" key "$pid" 49
+drive key 49
 settle check "io todos" 1 20
 mark check-end
-echo "check a task (app): Space → frame $(first check check-end "key 49") ms (with delivery $(firsttotal check check-end "key 49") ms) · save todos.json $(first check check-end "io todos") ms"
-"$probe" key "$pid" 49; sleep 0.8
-"$probe" key "$pid" 53; sleep 0.4
+echo "check a task (app): Space → frame $(first check check-end "key 49") ms · save todos.json $(first check check-end "io todos") ms"
+drive key 49; sleep 0.8
+drive key 53; sleep 0.4
 
 # 6. The desk (⌘D) and its month view; ⌘W closes it.
 mark desk
-"$probe" key "$pid" 2 cmd
+drive key 2 cmd
 settle desk "key " 1
 mark desk-end
-echo "open desk (⌘D, first time, app): $(first desk desk-end key) ms (with delivery $(firsttotal desk desk-end key) ms)"
-mark month
-"$probe" click "$pid" "=월" >/dev/null 2>&1 || "$probe" click "$pid" "=Month" >/dev/null 2>&1 || true
-settle month "click" 1 15
-mark month-end
-echo "달력 month view (app): $(first month month-end click) ms"
-"$probe" key "$pid" 13 cmd; sleep 0.8
+echo "open desk (⌘D, first time, app): $(first desk desk-end key) ms"
+# 달력's month view: the desk opens on it (calendar.view is month until it's changed), so the click on ‘월’ that was
+# timed here did nothing (#217). scripts/bench-app.sh times the month and the week (calendar month / week).
+drive key 13 cmd; sleep 0.8
 mark desk2
-"$probe" key "$pid" 2 cmd
+drive key 2 cmd
 settle desk2 "key " 1
 mark desk2-end
 echo "open desk again (app): $(first desk2 desk2-end key) ms"
-"$probe" key "$pid" 13 cmd; sleep 0.8
+drive key 13 cmd; sleep 0.8
 
 # 7. Search: ⌘F, three letters; the last letter's frame has the results.
 mark search
-"$probe" key "$pid" 3 cmd; sleep 0.8
-"$probe" type "$pid" "보고서" 300
+drive key 3 cmd; sleep 0.8
+drive type 300 "보고서"
 settle search "key 0 " 3
 mark search-end
-echo "search ⌘F (app): open $(first search search-end "key 3 ") ms · per letter $(vals search search-end "key 0 " | tr '\n' ' ')ms · with delivery: open $(firsttotal search search-end "key 3 ") ms"
-"$probe" key "$pid" 53; sleep 0.5
+echo "search ⌘F (app): open $(first search search-end "key 3 ") ms · per letter $(vals search search-end "key 0 " | tr '\n' ' ')ms"
+drive key 53; sleep 0.5
 
 # 8. Note hidden (⌘W), then reopened (⌘0).
-"$probe" key "$pid" 13 cmd; sleep 2
+drive key 13 cmd; sleep 2
 mark idle-hidden
 echo "idle, note hidden (60 s): $("$probe" sample "$pid" 60)"
 # 8b. 메모 서랍: measured by scripts/perf-drawer.sh now (#208), in one process with no window on any screen. Opening
@@ -249,20 +269,20 @@ echo "idle, note hidden (60 s): $("$probe" sample "$pid" 60)"
 # field as it opens.
 sleep 1
 mark reopen
-"$probe" key "$pid" 29 cmd
+drive key 29 cmd
 settle reopen "key " 1
 mark reopen-end
-echo "warm reopen (⌘0, app): $(first reopen reopen-end key) ms (with delivery $(firsttotal reopen reopen-end key) ms)"
+echo "warm reopen (⌘0, app): $(first reopen reopen-end key) ms"
 
 # 9. The pet walking (⇧⌘P shows it).
-"$probe" key "$pid" 35 cmd+shift; sleep 3
+drive key 35 cmd+shift; sleep 3
 echo "idle, pet walking (60 s): $("$probe" sample "$pid" 60)"
-"$probe" key "$pid" 35 cmd+shift; sleep 1
+drive key 35 cmd+shift; sleep 1
 
 # 10. A running timer (the line's ‘타이머 25’), the note open.
-"$probe" key "$pid" 45 cmd; sleep 0.5
-"$probe" type "$pid" "타이머 25" 60; sleep 0.3
-"$probe" key "$pid" 36; sleep 2
+drive key 45 cmd; sleep 0.5
+drive type 60 "타이머 25"; sleep 0.3
+drive key 36; sleep 2
 echo "running timer (60 s): $("$probe" sample "$pid" 60)"
 # The timer runs on through the use loop (it was stopped through the 보기 menu, an accessibility press: #208).
 sleep 1
@@ -271,16 +291,17 @@ sleep 1
 if [ "$quick" = 0 ]; then
     end=$((SECONDS + 600))
     while [ $SECONDS -lt $end ]; do
-        for code in 19 18; do "$probe" key "$pid" "$code" cmd; sleep 0.6; done
-        "$probe" key "$pid" 45 cmd; sleep 0.3
-        "$probe" type "$pid" "보고서 쓰기" 80; sleep 0.3
-        "$probe" key "$pid" 53; sleep 0.2; "$probe" key "$pid" 53; sleep 0.3
-        "$probe" key "$pid" 2 cmd; sleep 1; "$probe" key "$pid" 13 cmd; sleep 0.5
-        "$probe" key "$pid" 3 cmd; sleep 0.5; "$probe" type "$pid" "메모" 80; sleep 0.3; "$probe" key "$pid" 53; sleep 0.5
+        for code in 19 18; do drive key "$code" cmd; sleep 0.6; done
+        drive key 45 cmd; sleep 0.3
+        drive type 80 "보고서 쓰기"; sleep 0.3
+        drive key 53; sleep 0.2; drive key 53; sleep 0.3
+        drive key 2 cmd; sleep 1; drive key 13 cmd; sleep 0.5
+        drive key 3 cmd; sleep 0.5; drive type 80 "메모"; sleep 0.3; drive key 53; sleep 0.5
     done
     echo "memory after 10 min of use: $("$probe" mem "$pid")"
 fi
 echo "files written in the whole run: $(grep -c '^io' "$log" || true) (todos $(grep -c '^io todos' "$log" || true), memos $(grep -c '^io memos' "$log" || true))"
 cp "$log" "$out/perf-last.log"
+finish_check
 
 # 12. 메모 서랍 바탕 반투명 (1.44): the drawer is measured by scripts/perf-drawer.sh now (#208), see 8b.

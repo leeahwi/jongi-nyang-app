@@ -308,15 +308,15 @@ enum SpaceDot: Equatable {
 }
 
 extension PaperTheme {
-    /// 할 일 스페이스 (1.45): the band's colour — the space colour's deep side, ≥ 3:1 on day and night paper (M11).
-    static let spaceLavender = token("#897ccf", night: "#9a8fd6")
-    static let spacePink = token("#d16776", night: "#d9828f")
-    static let spaceMint = token("#54966a", night: "#6fae84")
-    static let spaceYellow = token("#a78527", night: "#d1a93a")
-    static let spaceSky = token("#578bcd", night: "#6f9bd4")
-    static let spacePeach = token("#d46b2b", night: "#e09466")
-    static let spaceSand = token("#9f8550", night: "#b9a274")
-    static let spaceGray = token("#8c887e", night: "#9a978e")
+    /// 할 일 스페이스 (1.45): the band's colour — the space colour's deep side, ≥ 3:1 on every paper (M11; #244: each paper's own, NotePalette.swift).
+    static var spaceLavender: Color { PaperLook.color(.spaceLavender) }
+    static var spacePink: Color { PaperLook.color(.spacePink) }
+    static var spaceMint: Color { PaperLook.color(.spaceMint) }
+    static var spaceYellow: Color { PaperLook.color(.spaceYellow) }
+    static var spaceSky: Color { PaperLook.color(.spaceSky) }
+    static var spacePeach: Color { PaperLook.color(.spacePeach) }
+    static var spaceSand: Color { PaperLook.color(.spaceSand) }
+    static var spaceGray: Color { PaperLook.color(.spaceGray) }
 
     static func space(_ color: TodoSpaces.Color) -> Color {
         switch color {

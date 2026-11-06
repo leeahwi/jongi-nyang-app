@@ -3,11 +3,11 @@ import PaperCore
 import SwiftUI
 
 // 메모 찾기 (#114, docs/plans/drawer-ux-plan.md B1 · mock ④): two rows of chips under the field — where to look (모든 폴더 ·
-// {지금 폴더}만) and what to keep to (체크 남음 · 링크 · 고정) — and the results by folder, each group under its colour, name
+// {지금 폴더}만) and what to keep to (안 한 체크 · 링크 · 고정) — and the results by folder, each group under its colour, name
 // and count; every result the list's card (its tape, the handwritten title, the date) with the found line in the preview's
 // place, the words looked for on a tint. The rules are PaperCore's (MemoFolders.find · snippet, MemoCards.foundTime).
 
-/// The chips under the search field: 모든 폴더 · {이름}만 (one of the two), then 체크 남음 · 링크 · 고정 (any of them).
+/// The chips under the search field: 모든 폴더 · {이름}만 (one of the two), then 안 한 체크 · 링크 · 고정 (any of them).
 struct SearchChips: View {
     @ObservedObject var drawer: MemoDrawer
     let palette: DrawerPalette
@@ -32,7 +32,7 @@ struct SearchChips: View {
     }
 
     static var filters: [(MemoFolders.SearchFilters, String)] {
-        [(.open, L("체크 남음")), (.link, L("링크")), (.pinned, L("고정"))]
+        [(.open, L("안 한 체크")), (.link, L("링크")), (.pinned, L("고정"))]
     }
 }
 
@@ -91,7 +91,7 @@ struct DrawerSearchResults: View {
                     }
                     if groups.isEmpty {
                         // One shape for every search that finds nothing (#39): the words looked for, then 없어요.
-                        Text(asked ? Search.emptyText(lookedFor, language: .current).keepingParticles : L("초성으로도 찾을 수 있어요 (예: ㅂㄱㅅ → 보고서)"))
+                        Text(asked ? Search.emptyText(lookedFor, suggest: !drawer.searchedQuery.trimmingCharacters(in: .whitespaces).isEmpty, language: .current).keepingParticles : L("초성으로도 찾을 수 있어요 (예: ㅂㄱㅅ → 보고서)"))
                             .font(.system(size: 12))
                             .foregroundStyle(palette.secondary)
                             .multilineTextAlignment(.center)
@@ -113,7 +113,7 @@ struct DrawerSearchResults: View {
         }
     }
 
-    /// The words looked for, or (no words) the filters' names: `‘체크 남음 · 링크’에 맞는 게 없어요`.
+    /// The words looked for, or (no words) the filters' names: `‘안 한 체크 · 링크’에 맞는 게 없어요`.
     private var lookedFor: String {
         let query = drawer.searchedQuery.trimmingCharacters(in: .whitespaces)
         if !query.isEmpty { return query }

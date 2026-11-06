@@ -32,7 +32,7 @@ final class SearchController {
             let screen = NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main
             if let area = screen?.visibleFrame { panel.placeSlip(topCenter: NSPoint(x: area.midX, y: area.maxY - area.height / 6)) }
         }
-        NSApp.activate(ignoringOtherApps: true)
+        TestHooks.activate()
         panel.makeKeyAndOrderFront(nil)
     }
 

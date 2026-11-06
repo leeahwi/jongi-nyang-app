@@ -53,7 +53,8 @@ enum ShortcutList {
             ]),
             Group(title: L("집중"), rows: [
                 Row(title: L("일시정지 · 계속"), caps: [L("Space")]),
-                Row(title: L("다 했어요"), caps: ["⌘", "↩"]),
+                // The focus card's button (en "Done", not the folded icon's "All done").
+                Row(title: String(localized: "다 했어요", table: "Focus"), caps: ["⌘", "↩"]),
                 Row(title: L("5분 더"), caps: ["⌘", "="]),
                 Row(title: L("그만두기"), caps: ["Esc"]),
             ]),

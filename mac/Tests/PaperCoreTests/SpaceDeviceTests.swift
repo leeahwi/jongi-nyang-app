@@ -37,7 +37,7 @@ private enum SpaceDeviceTests {
             return SpaceDevice.read(["x": rawRules[name]!])["x"]
         }
         func minute(_ text: String) -> Int { SpaceDevice.minutes(text)! }
-        func json(_ value: Any) -> Data { try! JSONSerialization.data(withJSONObject: value) }
+        func json(_ value: Any, sorted: Bool = false) -> Data { try! JSONSerialization.data(withJSONObject: value, options: sorted ? [.sortedKeys] : []) }
         let spaces = try TodoSpaces.decode(json(["version": 1, "items": [String: Any](), "spaces": cases["spaces"]!]))
         let noSpaces = TodoSpaces()
         func hideRules(_ keys: Any?) -> SpaceDevice.Rules {
@@ -211,6 +211,23 @@ private enum SpaceDeviceTests {
                 try equal(preset.times, { guard case .times(let t) = SpaceDevice.read(["x": ["show": "time", "times": entry["times"]!]])["x"]! else { return [] }; return t }(), "times")
                 for (code, language) in languages { try equal(preset.title(language), entry[code] as! String, code) }
             }
+        }
+
+        // MARK: S73 (#121 N3-9): what ai-link.json carries for Claude — the `aiDevice` block, read by the Windows app and
+        // the extension too.
+
+        let aiDevice = all["aiDevice"] as! [String: Any]
+        try test("S73 ai-link.json carries this Mac's 이 기기에서 as stored, none when nothing is set") {
+            let expected = (aiDevice["link"] as! [String: Any])
+            let rules = SpaceDevice.read(aiDevice["rules"])
+            let link = AIConnect.Link(enabled: true, dataFolder: "/x", lang: .ko, app: "mac 1.48.0", spaceDevice: SpaceDevice.linkRules(rules))
+            let written = try JSONSerialization.jsonObject(with: link.encoded()) as! [String: Any]
+            try equal(written["ext"] as? Int, expected["ext"] as? Int, "ext")
+            try equal(json(written["spaceDevice"]!, sorted: true), json(expected["spaceDevice"]!, sorted: true), "spaceDevice")
+            let none = try JSONSerialization.jsonObject(with: AIConnect.Link(enabled: true, dataFolder: "/x", lang: .ko, app: "mac 1.48.0").encoded()) as! [String: Any]
+            try expect(none["spaceDevice"] == nil, "no key without a setting: \(none)")
+            let decoded = try JSONDecoder().decode(AIConnect.Link.self, from: link.encoded())
+            try equal(decoded.spaceDevice, SpaceDevice.linkRules(rules), "reads back")
         }
 
         // MARK: The Mac's own

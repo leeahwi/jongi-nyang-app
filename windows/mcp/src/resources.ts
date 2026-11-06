@@ -6,7 +6,7 @@ import { weekTitle } from "../../src/core/lang";
 import { memoTitle } from "../../src/core/memo";
 import { rangeDay } from "../../src/core/timeRange";
 import { Ids } from "./ids";
-import { eventIndex, eventLine, getToday, pick, plusDays, readDay, taskWordsOf, type Ctx } from "./tools";
+import { eventIndex, eventLine, getToday, leaveHidden, pick, plusDays, readDay, taskWordsOf, type Ctx } from "./tools";
 import { dayText, say, taskLine } from "./words";
 
 /**
@@ -24,22 +24,31 @@ export const memoUri = (shortId: string): string => `jongi-nyang://memo/${encode
 /** Today's sheet: get_today's text. */
 export const todayText = (ctx: Ctx): string => getToday(ctx, {}).text;
 
+/** How many of each a day of the week resource shows (the rest: a line naming the tool, M46). */
+export const weekCaps = { events: 10, open: 15, done: 10 } as const;
+
 const noon = (day: string): Date => { const [y, m, d] = day.split("-").map(Number); return new Date(y, m - 1, d, 12); };
 
 /**
  * C2-1: the week holding `date` (this week without one) as the 앞으로 tab counts it (Sunday first in ko · en, Monday in
  * nl): day by day its events, the open tasks of that day and what was finished, then how many tasks have no day.
+ * The open tasks are as the note shows them on this device (N3-9: what it hides is left out, and the end says so);
+ * what was finished is all there, as in 완료 기록.
  */
 export function weekText(ctx: Ctx, date?: string): string {
   const { folder, now, lang } = ctx;
   const day = date ? readDay(date, lang) : dayKey(now);
   const { first, last } = aheadWeek(noon(day), lang);
   const from = dateKey(first), to = dateKey(last);
-  const items = folder.load("todos.json");
+  const all = folder.load("todos.json");
   const events = folder.load("events.json");
   const index = eventIndex(events);
   const shown = expand(events, localDate(from)!, localDate(plusDays(to, 1))!, lang);
-  const words = taskWordsOf(ctx, items);
+  const words = taskWordsOf(ctx, all);
+  // The end line counts only what this week would have shown: its days' open tasks and the ones with no day.
+  const thisWeek = all.filter((item) => { const on = rangeDay(item, now); return !item.isCompleted && (!on || (on >= from && on <= to)); });
+  const hiding = leaveHidden(thisWeek, true, words.spaces!, lang);
+  const items = [...hiding.sheet, ...all.filter((item) => item.isCompleted)];
   const done = new Map<string, ArchiveEntry>();
   for (const entry of folder.archive(folder.archiveMonths(from, to))) done.set(entry.id, entry);
   for (const item of items) if (item.isCompleted) done.set(item.id, toEntry(item));
@@ -51,10 +60,17 @@ export function weekText(ctx: Ctx, date?: string): string {
     const ended = finished.filter((entry) => dayKey(new Date(entry.completedAt!)) === key);
     lines.push("", `${dayText(key, lang)}${key === dayKey(now) ? ` · ${say(lang, "오늘", "today", "vandaag")}` : ""}`);
     if (!dayEvents.length && !open.length && !ended.length) { lines.push(say(lang, "- 없음", "- nothing", "- niets")); continue; }
-    lines.push(...dayEvents.map((event) => eventLine(event, lang, index.ids)), ...open.map((item) => taskLine(item, now, lang, words)), ...ended.map((entry) => `- [x] ${entry.title}`));
+    // M46: a resource isn't paged, so each day shows its first few of each and says where the rest are.
+    const rest = (count: number, tool: string) => say(lang, `- … ${count}개 더: ${tool}(from · to ${key})`, `- … ${count} more: ${tool} (from · to ${key})`, `- … nog ${count}: ${tool} (from · to ${key})`);
+    lines.push(
+      ...dayEvents.slice(0, weekCaps.events).map((event) => eventLine(event, lang, index.ids)), ...(dayEvents.length > weekCaps.events ? [rest(dayEvents.length - weekCaps.events, "list_events")] : []),
+      ...open.slice(0, weekCaps.open).map((item) => taskLine(item, now, lang, words)), ...(open.length > weekCaps.open ? [rest(open.length - weekCaps.open, "list_todos")] : []),
+      ...ended.slice(0, weekCaps.done).map((entry) => `- [x] ${entry.title}`), ...(ended.length > weekCaps.done ? [rest(ended.length - weekCaps.done, "search_history")] : []),
+    );
   }
   const someday = items.filter((item) => !item.isCompleted && !rangeDay(item, now)).length;
   if (someday) lines.push("", say(lang, `날짜 없는 할 일(언젠가) ${someday}개`, `${someday} ${someday === 1 ? "task" : "tasks"} with no day (someday)`, `${someday} ${someday === 1 ? "taak" : "taken"} zonder dag (ooit)`));
+  if (hiding.note.line) lines.push("", hiding.note.line);
   return lines.join("\n");
 }
 

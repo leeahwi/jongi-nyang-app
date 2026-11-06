@@ -7,7 +7,7 @@
 .ring .stage { position: relative; width: 132px; height: 132px; margin: 26px auto 4px; display: grid; place-items: center; }
 .ring .stage::before, .ring .stage::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--clay); opacity: 0; }
 .ring .disc { position: absolute; inset: 16px; border-radius: 50%; background: radial-gradient(circle at 50% 40%, var(--disc-light, #fff6ef), var(--clay-2)); }
-:root[data-paper="night"] .ring .disc { --disc-light: #5a4038; }
+:root[data-scheme="dark"] .ring .disc { --disc-light: #5a4038; }
 .ring .stage img { position: relative; width: 104px; height: 104px; object-fit: contain; transform-origin: 50% 90%; }
 .ring .ringing { display: inline-flex; align-items: center; gap: 6px; height: 20px; margin-top: 8px; padding: 0 10px; border-radius: 999px; background: var(--clay-2); color: var(--clay-text); font: 600 11px var(--ui); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .ring .ringing i { width: 6px; height: 6px; border-radius: 50%; background: var(--clay); }
@@ -15,6 +15,8 @@
 .ring .time small { margin-left: 4px; font-size: 18px; font-weight: 500; letter-spacing: 0; color: var(--ink-2); }
 /* The label (why it rings): up to two lines at 36px, then up to three a size smaller, then an ellipsis (ring.ts fitLabel). */
 .ring .label { margin: 6px 18px 0; padding: 0 var(--ink-over) 2px; font-family: var(--body-font); font-size: 36px; line-height: 1.15; color: var(--ink); overflow-wrap: anywhere;
+  /* Two even lines, words whole ("물도 한 / 잔" was a lopsided break). */
+  word-break: keep-all; text-wrap: balance;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .ring .label.smaller { font-size: 28px; -webkit-line-clamp: 3; }
 :root[data-font="clean"] .ring .label { font-size: 22px; font-weight: 600; line-height: 1.3; }

@@ -211,8 +211,8 @@ test("c2. the week of a day: Sunday to Saturday", () => {
   assert.deepEqual(weekDays("2027-01-01"), ["2026-12-27", "2026-12-28", "2026-12-29", "2026-12-30", "2026-12-31", "2027-01-01", "2027-01-02"]);
 });
 
-test("c3. a day's events: all-day by title, then by start; midnight tomorrow is not today", () => {
-  assert.deepEqual(titles(eventsOn("2026-10-07", Object.values(days3))), ["생일", "출장", "야간", "회의", "늦은"]);
+test("c3. a day's events: all-day first (begun earlier on top: calendar-flows D1), then by start; midnight tomorrow is not today", () => {
+  assert.deepEqual(titles(eventsOn("2026-10-07", Object.values(days3))), ["출장", "생일", "야간", "회의", "늦은"]);
   assert.deepEqual(titles(eventsOn("2026-10-08", Object.values(days3))), ["출장", "늦은", "내일"]);
 });
 
@@ -236,12 +236,14 @@ test("c5. a day's tasks: alerts by time, then deadlines by title; finished ones 
   assert.deepEqual(dayTasks("2026-10-08", tasks5), [{ title: "F", kind: "deadline", taskId: "F" }]);
 });
 
-test("c6. a month cell: the first three of events then deadlines, and how many more", () => {
+test("c6. a month cell: the first three of events, deadlines, then reminders (#227), and how many more", () => {
   const { items, more } = cellItems("2026-10-07", Object.values(days3), tasks5);
-  assert.deepEqual(items.map((item) => (item.kind === "event" ? item.event.title : item.task.title)), ["생일", "출장", "야간"]);
-  assert.equal(more, 4);
+  assert.deepEqual(items.map((item) => (item.kind === "event" ? item.event.title : item.task.title)), ["출장", "생일", "야간"]);
+  assert.equal(more, 6);
   const roomy = cellItems("2026-10-07", Object.values(days3), tasks5, 10);
-  assert.deepEqual(roomy.items.map((item) => (item.kind === "event" ? item.event.title : `⚑ ${item.task.title}`)), ["생일", "출장", "야간", "회의", "늦은", "⚑ A", "⚑ D"]);
+  // D is due that day: only its deadline.
+  assert.deepEqual(roomy.items.map((item) => (item.kind === "event" ? item.event.title : `${item.task.kind === "reminder" ? "🔔" : "⚑"} ${item.task.title}`)),
+    ["출장", "생일", "야간", "회의", "늦은", "⚑ A", "⚑ D", "🔔 C", "🔔 B"]);
   assert.equal(roomy.more, 0);
 });
 

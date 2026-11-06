@@ -1,8 +1,13 @@
 import { greetingMs, leaveMs, mascotPose, walkInMs, type MascotPhase } from "../core/motion";
 import type { PopupPayload, PopupTask, ReminderStyle } from "../core/types";
 import { clock, minutesAway, timeRange } from "../core/lang";
+import { awayText } from "../core/ribbon";
 import { h, icon, lang, paper, reduceMotion, t } from "./api";
+import { holdWhileAsked } from "./askGuard";
 import { slipButton, slipHead, tape } from "./slip";
+
+// #229: a question waiting holds this page up (askGuard.ts).
+holdWhileAsked();
 
 const api = paper();
 const stage = document.getElementById("stage")!;
@@ -274,7 +279,8 @@ function buildEvents(current: Session, context: HTMLElement, body: HTMLElement, 
     if (!start) { context.textContent = ""; return; }
     const minutes = Math.ceil((start.getTime() - Date.now()) / 60_000);
     const time = clock(start.getHours(), start.getMinutes(), lang());
-    context.textContent = minutes <= 0 ? `· ${t("지금")}` : `· ${minutesAway(minutes, lang())} ${time}`;
+    // An hour or more in hours and minutes, as on the Mac ("3시간 56분 뒤", not "236분 뒤").
+    context.textContent = minutes <= 0 ? `· ${t("지금")}` : `· ${awayText(minutes, lang())} ${time}`;
   };
   refresh();
   current.timers.push(window.setInterval(refresh, 30_000));
@@ -290,7 +296,8 @@ function buildEvents(current: Session, context: HTMLElement, body: HTMLElement, 
   const again = current.payload.eventAgain ? slipButton(t("5분 전에 다시"), "ghost", () => api.send("popup:event-again")) : null;
   again?.prepend(icon("snooze", 14));
   if (again) { again.title = t("5분 전에 다시"); again.setAttribute("aria-label", t("5분 전에 다시")); again.classList.add("optional"); }
-  foot.append(...(again ? [again] : []), h("span", { class: "spacer" }), slipButton(t("닫기"), "ghost", () => api.send("popup:closed")), open);
+  // As on the Mac (#240, 점검 3의 21): with 5분 전에 다시 the head's × closes — 닫기 only when it isn't there.
+  foot.append(...(again ? [again] : []), h("span", { class: "spacer" }), ...(again ? [] : [slipButton(t("닫기"), "ghost", () => api.send("popup:closed"))]), open);
 }
 
 /** ↻ 10분 뒤 다시 | ⌄ — the arrow opens 5 · 10 · 30분. */

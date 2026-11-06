@@ -1,0 +1,1402 @@
+{
+  "about": "바탕화면 달력 위젯 (#234)의 공유 사례예요. 기준 시각은 2026-11-06(금) 09:20, 이 기기의 벽시계예요(시간대와 무관). 달력의 하루는 자정부터 자정까지예요. 일정과 할 일은 calendar-reminders-cases.json의 모양을 따르고, 사례마다 events · todos가 없으면 base의 것을 써요. 이 기기에서 숨긴 스페이스(rules, 회사)의 할 일은 위젯이 받기 전에 빠져요(AppModel.hereItems · 오늘 창과 같아요). 줄은 ‘종류 시각 제목’이고 시각이 없으면 ‘종류 제목’이에요(종일 일정 · 마감). 점의 색은 일정의 색 이름, 마감 clay, 알림 · 시간 정하기 sage예요. 칩은 ‘종류 언제’예요(화면의 칩은 ‘할 일 · 14일(토) 마감’). Mac PaperCore/CalendarWidget.swift(scripts/test-calendar-widget.sh)와 Windows core/calendarWidget.ts(test/calendarWidget.test.ts)가 이 파일을 읽어요. 2026-11-06에 옅을 때의 규칙을 서리 종이 타일(docs/plans/calendar-widget/tiles-*.png)로 바꿨어요: 날짜 타일은 종이의 바닥값(O9) 아래로 옅어지지 않고, 칸 밖 글자는 바닥값보다 옅을 때 받침을 깔아요(O2). 예시는 모두 지어낸 것이에요.",
+  "status": "filled",
+  "now": "2026-11-06T09:20:00",
+  "spaces": {
+    "version": 1,
+    "spaces": [
+      {
+        "id": "s-a",
+        "name": "회사",
+        "color": "sky",
+        "order": 0,
+        "updatedAt": "2026-11-01T00:00:00Z"
+      },
+      {
+        "id": "s-b",
+        "name": "집",
+        "color": "peach",
+        "order": 1,
+        "updatedAt": "2026-11-01T00:00:00Z"
+      },
+      {
+        "id": "s-c",
+        "name": "공부",
+        "color": "lavender",
+        "order": 2,
+        "updatedAt": "2026-11-01T00:00:00Z"
+      }
+    ]
+  },
+  "rules": {
+    "s-a": {
+      "show": "hide"
+    }
+  },
+  "events": {
+    "E1": {
+      "title": "팀 회의",
+      "start": "2026-11-06T10:00:00",
+      "end": "2026-11-06T11:00:00",
+      "color": "sage"
+    },
+    "E2": {
+      "title": "운동",
+      "start": "2026-11-06T18:30:00",
+      "end": "2026-11-06T19:30:00",
+      "color": "blue"
+    },
+    "E3": {
+      "title": "가족 모임",
+      "start": "2026-11-14T18:00:00",
+      "end": "2026-11-14T20:00:00",
+      "color": "coral"
+    },
+    "E4": {
+      "title": "점심 약속",
+      "start": "2026-11-06T12:00:00",
+      "end": "2026-11-06T13:00:00",
+      "color": "purple"
+    },
+    "E5": {
+      "title": "생일",
+      "allDay": true,
+      "start": "2026-11-06T00:00:00",
+      "end": "2026-11-07T00:00:00",
+      "color": "yellow"
+    }
+  },
+  "todos": {
+    "T1": {
+      "id": "C2340000-0000-4000-8000-000000000001",
+      "title": "치과 예약",
+      "reminderAt": "2026-11-06T15:00:00",
+      "space": "s-b"
+    },
+    "T2": {
+      "id": "C2340000-0000-4000-8000-000000000002",
+      "title": "장보기",
+      "dueDate": "2026-11-06",
+      "space": "s-b"
+    },
+    "T3": {
+      "id": "C2340000-0000-4000-8000-000000000003",
+      "title": "보고서 초안",
+      "dueDate": "2026-11-06",
+      "space": "s-a"
+    },
+    "T4": {
+      "id": "C2340000-0000-4000-8000-000000000004",
+      "title": "도서관 책 반납",
+      "reminderAt": "2026-11-07T11:00:00",
+      "space": "s-c"
+    },
+    "T5": {
+      "id": "C2340000-0000-4000-8000-000000000005",
+      "title": "약 먹기",
+      "reminderAt": "2026-11-06T08:00:00",
+      "space": "s-b"
+    },
+    "T6": {
+      "id": "C2340000-0000-4000-8000-000000000006",
+      "title": "운동복 챙기기",
+      "dueDate": "2026-11-06",
+      "space": "s-b"
+    },
+    "T7": {
+      "id": "C2340000-0000-4000-8000-000000000007",
+      "title": "발표 연습",
+      "dueDate": "2026-11-06",
+      "time": [
+        "14:00",
+        "15:00"
+      ],
+      "space": "s-c"
+    },
+    "T8": {
+      "id": "C2340000-0000-4000-8000-000000000008",
+      "title": "빨래 개기",
+      "dueDate": "2026-11-06",
+      "space": "s-b",
+      "done": true
+    }
+  },
+  "base": {
+    "events": [
+      "E1",
+      "E2",
+      "E3"
+    ],
+    "todos": [
+      "T1",
+      "T2",
+      "T3",
+      "T4",
+      "T8"
+    ]
+  },
+  "busy": {
+    "events": [
+      "E1",
+      "E2",
+      "E4",
+      "E5"
+    ],
+    "todos": [
+      "T1",
+      "T2",
+      "T3",
+      "T5",
+      "T6",
+      "T7"
+    ]
+  },
+  "kinds": [
+    {
+      "case": "K1 오늘: 곧 있을 일 세 줄(시각 순, 시각 없는 마감은 뒤), 넘치면 +N",
+      "kind": "today",
+      "lines": [
+        "event 10:00 팀 회의",
+        "reminder 15:00 치과 예약",
+        "event 18:30 운동"
+      ],
+      "more": 1
+    },
+    {
+      "case": "K2 오늘: 끝난 일정과 지난 알림은 빠짐(now 11:30)",
+      "kind": "today",
+      "now": "2026-11-06T11:30:00",
+      "lines": [
+        "reminder 15:00 치과 예약",
+        "event 18:30 운동",
+        "deadline 장보기"
+      ],
+      "more": 0
+    },
+    {
+      "case": "K3 이번 주 간단히: 칸마다 점 셋까지(일정 → 마감 → 알림)와 +, 아래에 곧 있을 일 두 줄",
+      "kind": "week",
+      "style": "simple",
+      "dots": {
+        "2026-11-01": [],
+        "2026-11-02": [],
+        "2026-11-03": [],
+        "2026-11-04": [],
+        "2026-11-05": [],
+        "2026-11-06": [
+          "sage",
+          "blue",
+          "clay"
+        ],
+        "2026-11-07": [
+          "sage"
+        ]
+      },
+      "plus": [
+        "2026-11-06"
+      ],
+      "lines": [
+        "event 10:00 팀 회의",
+        "reminder 15:00 치과 예약"
+      ]
+    },
+    {
+      "case": "K4 이번 주 자세히: 하루 한 줄, 첫 일과 +N",
+      "kind": "week",
+      "style": "detail",
+      "rows": {
+        "2026-11-01": null,
+        "2026-11-05": null,
+        "2026-11-06": [
+          "event 10:00 팀 회의",
+          3
+        ],
+        "2026-11-07": [
+          "reminder 11:00 도서관 책 반납",
+          0
+        ]
+      }
+    },
+    {
+      "case": "K5 이번 달 간단히: 점의 색(일정 색 · 마감 clay · 알림 sage)과 차례(일정 → 마감 → 알림)",
+      "kind": "month",
+      "style": "simple",
+      "dots": {
+        "2026-11-06": [
+          "sage",
+          "blue",
+          "clay"
+        ],
+        "2026-11-07": [
+          "sage"
+        ],
+        "2026-11-14": [
+          "coral"
+        ],
+        "2026-11-20": []
+      },
+      "plus": [
+        "2026-11-06"
+      ]
+    },
+    {
+      "case": "K6 이번 달 자세히: 칸마다 제목 두 줄, 넘치면 숫자 옆 +N",
+      "kind": "month",
+      "style": "detail",
+      "cells": {
+        "2026-11-06": [
+          [
+            "event 10:00 팀 회의",
+            "event 18:30 운동"
+          ],
+          2
+        ],
+        "2026-11-07": [
+          [
+            "reminder 11:00 도서관 책 반납"
+          ],
+          0
+        ],
+        "2026-11-14": [
+          [
+            "event 18:00 가족 모임"
+          ],
+          0
+        ]
+      }
+    },
+    {
+      "case": "K7 오늘 목록: 오늘과 내일, 시각 순, 마감은 각 날의 끝(지난 일도 보여요)",
+      "kind": "agenda",
+      "now": "2026-11-06T11:30:00",
+      "days": [
+        [
+          "2026-11-06",
+          [
+            "event 10:00 팀 회의",
+            "reminder 15:00 치과 예약",
+            "event 18:30 운동",
+            "deadline 장보기"
+          ]
+        ],
+        [
+          "2026-11-07",
+          [
+            "reminder 11:00 도서관 책 반납"
+          ]
+        ]
+      ]
+    },
+    {
+      "case": "K8 숨긴 스페이스(회사)의 할 일은 어느 종류에도 없음(T3), 끝낸 할 일도 없음(T8)",
+      "kind": "today",
+      "absent": [
+        "T3",
+        "T8"
+      ]
+    },
+    {
+      "case": "K9 비었을 때: ‘오늘은 비어 있어요’",
+      "kind": "today",
+      "now": "2026-11-08T09:00:00",
+      "empty": true,
+      "text": {
+        "ko": "오늘은 비어 있어요",
+        "en": "Nothing today",
+        "nl": "Niets vandaag"
+      }
+    },
+    {
+      "case": "K10 크기와 귀(창은 종이에 귀 높이를 더함)",
+      "sizes": [
+        [
+          "today",
+          "simple",
+          170,
+          170,
+          0.6
+        ],
+        [
+          "week",
+          "simple",
+          344,
+          170,
+          0.75
+        ],
+        [
+          "week",
+          "detail",
+          344,
+          170,
+          0.75
+        ],
+        [
+          "month",
+          "simple",
+          344,
+          344,
+          0.9
+        ],
+        [
+          "month",
+          "detail",
+          560,
+          440,
+          1
+        ],
+        [
+          "agenda",
+          "simple",
+          200,
+          360,
+          1
+        ],
+        [
+          "month",
+          "wall",
+          880,
+          680,
+          1.15
+        ]
+      ]
+    },
+    {
+      "case": "K11 이름",
+      "names": [
+        [
+          "today",
+          "simple",
+          "오늘",
+          "Today",
+          "Vandaag"
+        ],
+        [
+          "week",
+          "detail",
+          "이번 주 · 자세히",
+          "This week · Detailed",
+          "Deze week · Uitgebreid"
+        ],
+        [
+          "month",
+          "simple",
+          "이번 달 · 간단히",
+          "This month · Simple",
+          "Deze maand · Eenvoudig"
+        ],
+        [
+          "agenda",
+          "simple",
+          "오늘 목록",
+          "Today list",
+          "Lijst van vandaag"
+        ],
+        [
+          "month",
+          "wall",
+          "이번 달 · 벽 달력",
+          "This month · Wall calendar",
+          "Deze maand · Wandkalender"
+        ]
+      ]
+    },
+    {
+      "case": "K12 벽 달력: 칸마다 제목 네 줄, 넘치면 +N",
+      "use": "busy",
+      "kind": "month",
+      "style": "wall",
+      "cells": {
+        "2026-11-06": [
+          [
+            "event 생일",
+            "event 10:00 팀 회의",
+            "event 12:00 점심 약속",
+            "event 18:30 운동"
+          ],
+          5
+        ]
+      }
+    }
+  ],
+  "sheet": [
+    {
+      "case": "D1 날짜 쪽지: 그날의 모든 일을 시각과 함께(종일 → 시각 순 → 마감), 지난 일도",
+      "use": "busy",
+      "day": "2026-11-06",
+      "lines": [
+        "event 생일",
+        "reminder 08:00 약 먹기",
+        "event 10:00 팀 회의",
+        "event 12:00 점심 약속",
+        "range 14:00–15:00 발표 연습",
+        "reminder 15:00 치과 예약",
+        "event 18:30 운동",
+        "deadline 운동복 챙기기",
+        "deadline 장보기"
+      ]
+    },
+    {
+      "case": "D2 달 자세히의 +N을 누르면: 보이는 두 줄과 +N을 더한 만큼이 쪽지에 다 있어요",
+      "use": "busy",
+      "day": "2026-11-06",
+      "shown": 2,
+      "more": 7,
+      "sheetCount": 9
+    },
+    {
+      "case": "D3 주 자세히의 바쁜 날: 첫 줄은 종일 일정, +8",
+      "use": "busy",
+      "day": "2026-11-06",
+      "first": "event 생일",
+      "more": 8
+    },
+    {
+      "case": "D4 쪽지에서 ⌥← · ⌥→(Alt+← · Alt+→): 하루 앞뒤",
+      "steps": [
+        [
+          "2026-11-30",
+          1,
+          "2026-12-01"
+        ],
+        [
+          "2026-11-01",
+          -1,
+          "2026-10-31"
+        ]
+      ]
+    },
+    {
+      "case": "D5 숨긴 스페이스의 할 일은 쪽지에도 없음",
+      "use": "busy",
+      "day": "2026-11-06",
+      "absent": [
+        "T3"
+      ]
+    },
+    {
+      "case": "D6 +N은 24pt 이상의 누를 곳이고, 읽어 주는 말이 있어요",
+      "target": 24,
+      "count": 7,
+      "labels": {
+        "ko": "7개 더 보기",
+        "en": "7 more",
+        "nl": "nog 7"
+      }
+    },
+    {
+      "case": "D7 쪽지 머리",
+      "day": "2026-11-14",
+      "titles": {
+        "ko": "11월 14일 토요일",
+        "en": "Saturday, November 14",
+        "nl": "zaterdag 14 november"
+      }
+    }
+  ],
+  "opacity": [
+    {
+      "case": "O1 범위: 20–100, 5 단위로 반올림",
+      "read": [
+        15,
+        22,
+        87,
+        88,
+        100,
+        140
+      ],
+      "want": [
+        20,
+        20,
+        85,
+        90,
+        100,
+        100
+      ]
+    },
+    {
+      "case": "O2 받침과 타일: 종이가 그 종이의 바닥값(낮 종이 60)보다 옅으면 칸 밖 글자에 바닥값의 받침, 날짜 타일은 바닥값 아래로 옅어지지 않음",
+      "paper": "day",
+      "opacity": [
+        100,
+        85,
+        60,
+        55,
+        40
+      ],
+      "backing": [
+        false,
+        false,
+        false,
+        true,
+        true
+      ],
+      "tile": [
+        100,
+        85,
+        60,
+        60,
+        60
+      ]
+    },
+    {
+      "case": "O3 100 미만이면 글자 색은 ink(ink2 · ink3 · sageText · clayText를 ink로)",
+      "opacity": [
+        100,
+        95,
+        85,
+        40
+      ],
+      "inkOnly": [
+        false,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "case": "O4 투명도 줄이기: 늘 100",
+      "opacity": 40,
+      "reduceTransparency": true,
+      "drawn": 100
+    },
+    {
+      "case": "O5 귀의 불투명도: 종이와 85 중 큰 값",
+      "opacity": [
+        100,
+        90,
+        85,
+        40,
+        20
+      ],
+      "ear": [
+        100,
+        90,
+        85,
+        85,
+        85
+      ]
+    },
+    {
+      "case": "O6 마우스를 올리면 100(선명하게가 켜져 있을 때만)",
+      "opacity": 40,
+      "hover": true,
+      "solidOnHover": [
+        true,
+        false
+      ],
+      "drawn": [
+        100,
+        40
+      ]
+    },
+    {
+      "case": "O7 85 미만이면 날짜 숫자가 한 단계 굵고, 100 미만이면 표시(막대 · 점 · 오늘 동그라미)에 종이 테두리",
+      "opacity": [
+        100,
+        90,
+        85,
+        80,
+        40
+      ],
+      "bolder": [
+        false,
+        false,
+        false,
+        true,
+        true
+      ],
+      "halo": [
+        false,
+        true,
+        true,
+        true,
+        true
+      ]
+    },
+    {
+      "case": "O8 테두리 선은 절반 밑으로 옅어지지 않음",
+      "opacity": [
+        100,
+        70,
+        40,
+        20
+      ],
+      "edge": [
+        1,
+        0.7,
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "case": "O9 종이마다 바닥값: ink가 검정 · 흰 바탕화면 위 그 종이에서 4.5:1이 되는 가장 옅은 값(5 단위). #244의 열다섯 종이",
+      "tokens": "paper-themes/tokens.json",
+      "floors": {
+        "day": 60,
+        "hanji": 60,
+        "kraft": 65,
+        "grid": 60,
+        "sage": 65,
+        "blossom": 60,
+        "memo": 65,
+        "manuscript": 60,
+        "lined": 60,
+        "lavender": 60,
+        "recycled": 60,
+        "night": 75,
+        "ink": 70,
+        "nightsky": 70,
+        "chalk": 70
+      }
+    },
+    {
+      "case": "O10 주말 · 공휴일 타일: 종이에 clay2를 55% 섞은 색의 바닥값(밝은 종이에서는 섞은 색이 어두워 조금 높아요)",
+      "tokens": "paper-themes/tokens.json",
+      "tint": 0.55,
+      "tintedFloors": {
+        "day": 65,
+        "hanji": 65,
+        "kraft": 70,
+        "grid": 60,
+        "sage": 65,
+        "blossom": 65,
+        "memo": 65,
+        "manuscript": 65,
+        "lined": 65,
+        "lavender": 65,
+        "recycled": 65,
+        "night": 75,
+        "ink": 70,
+        "nightsky": 70,
+        "chalk": 75
+      }
+    },
+    {
+      "case": "O11 오늘 타일의 sage 테두리는 100% 미만이면 안쪽에 종이 테두리(1.5pt)를 둘러요(표시 규칙 O7과 같아요)",
+      "opacity": [
+        100,
+        85,
+        40
+      ],
+      "todayRing": [
+        false,
+        true,
+        true
+      ]
+    }
+  ],
+  "place": {
+    "screens": {
+      "main": {
+        "id": "1",
+        "area": [
+          0,
+          25,
+          1440,
+          875
+        ]
+      },
+      "side": {
+        "id": "2",
+        "area": [
+          1440,
+          0,
+          1920,
+          1080
+        ]
+      }
+    },
+    "size": [
+      344,
+      358
+    ],
+    "cases": [
+      {
+        "case": "P1 비율로 기억: 왼쪽 위의 비율(0–1)을 쓸 수 있는 영역에서 위젯이 움직일 수 있는 폭으로 셈",
+        "screens": [
+          "main",
+          "side"
+        ],
+        "place": [
+          "2",
+          0.5,
+          0.25
+        ],
+        "frame": [
+          2228,
+          180.5,
+          344,
+          358
+        ]
+      },
+      {
+        "case": "P1b 프레임에서 비율로(소수 넷째 자리)",
+        "screens": [
+          "main",
+          "side"
+        ],
+        "of": [
+          2228,
+          180.5,
+          344,
+          358
+        ],
+        "place": [
+          "2",
+          0.5,
+          0.25
+        ]
+      },
+      {
+        "case": "P2 기억한 화면이 없으면 주 화면의 같은 비율",
+        "screens": [
+          "main"
+        ],
+        "place": [
+          "2",
+          0.5,
+          0.25
+        ],
+        "frame": [
+          548,
+          154.25,
+          344,
+          358
+        ]
+      },
+      {
+        "case": "P3 기억한 화면이 돌아오면 원래 자리(화면 id를 지우지 않음)",
+        "screens": [
+          "main",
+          "side"
+        ],
+        "place": [
+          "2",
+          0.5,
+          0.25
+        ],
+        "frame": [
+          2228,
+          180.5,
+          344,
+          358
+        ]
+      },
+      {
+        "case": "P4 영역 밖으로 나가면 안으로 밀기(위젯 전체와 귀가 들도록)",
+        "inside": [
+          [
+            1300,
+            800,
+            344,
+            358
+          ],
+          [
+            1096,
+            542,
+            344,
+            358
+          ]
+        ],
+        "inside2": [
+          [
+            -50,
+            -10,
+            344,
+            358
+          ],
+          [
+            0,
+            25,
+            344,
+            358
+          ]
+        ]
+      },
+      {
+        "case": "P5 놓을 때 8pt 안이면 화면 가장자리와 다른 위젯에 붙기",
+        "snaps": [
+          {
+            "frame": [
+              5,
+              30,
+              344,
+              358
+            ],
+            "others": [],
+            "want": [
+              0,
+              25,
+              344,
+              358
+            ]
+          },
+          {
+            "frame": [
+              450,
+              105,
+              344,
+              358
+            ],
+            "others": [
+              [
+                100,
+                100,
+                344,
+                358
+              ]
+            ],
+            "want": [
+              444,
+              100,
+              344,
+              358
+            ]
+          },
+          {
+            "frame": [
+              450,
+              120,
+              344,
+              358
+            ],
+            "others": [
+              [
+                100,
+                100,
+                344,
+                358
+              ]
+            ],
+            "want": [
+              444,
+              120,
+              344,
+              358
+            ]
+          },
+          {
+            "frame": [
+              600,
+              600,
+              344,
+              358
+            ],
+            "others": [
+              [
+                100,
+                100,
+                344,
+                358
+              ]
+            ],
+            "want": [
+              600,
+              542,
+              344,
+              358
+            ]
+          }
+        ]
+      },
+      {
+        "case": "P6 새 위젯: 주 화면 오른쪽 위의 빈자리(다른 위젯과 겹치지 않게, 차면 왼쪽 줄)",
+        "news": [
+          {
+            "others": [],
+            "place": [
+              "1",
+              0.9854,
+              0.0309
+            ]
+          },
+          {
+            "others": [
+              [
+                1080,
+                41,
+                344,
+                358
+              ]
+            ],
+            "place": [
+              "1",
+              0.9854,
+              0.7466
+            ]
+          },
+          {
+            "others": [
+              [
+                1080,
+                41,
+                344,
+                358
+              ],
+              [
+                1080,
+                411,
+                344,
+                358
+              ]
+            ],
+            "place": [
+              "1",
+              0.6606,
+              0.0309
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "quickAdd": [
+    {
+      "case": "Q1 날짜 없는 할 일은 누른 날의 마감, Tab으로 그날 9–10시 일정",
+      "day": "2026-11-14",
+      "text": "치과 예약 전화",
+      "chips": [
+        "todo 14일(토) 마감",
+        "event 14일(토) 09:00–10:00"
+      ],
+      "made": {
+        "title": "치과 예약 전화",
+        "dueDate": "2026-11-14"
+      }
+    },
+    {
+      "case": "Q2 시각만 적으면 누른 날의 그 시각(일정 말이 있으면 일정 먼저)",
+      "day": "2026-11-14",
+      "text": "3시 팀 회의",
+      "chips": [
+        "event 14일(토) 15:00–16:00",
+        "todo 알림 14일(토) 15:00"
+      ]
+    },
+    {
+      "case": "Q3 날짜를 적으면 적은 날(오늘 기준으로 읽음)",
+      "day": "2026-11-14",
+      "text": "내일 3시 팀 회의",
+      "chips": [
+        "event 7일(토) 15:00–16:00",
+        "todo 알림 7일(토) 15:00"
+      ],
+      "want": "2026-11-07T15:00:00"
+    },
+    {
+      "case": "Q4 알람으로 읽히는 글은 알림이 있는 할 일(칩 하나)",
+      "day": "2026-11-14",
+      "text": "알람 7시 약 먹기",
+      "chips": [
+        "todo 알림 14일(토) 07:00"
+      ],
+      "made": {
+        "title": "약 먹기",
+        "reminderAt": "2026-11-14T07:00:00"
+      }
+    },
+    {
+      "case": "Q5 타이머 · 메모로 읽히는 글도 할 일",
+      "day": "2026-11-14",
+      "texts": [
+        [
+          "25분 타이머",
+          [
+            "todo 14일(토) 마감",
+            "event 14일(토) 09:00–10:00"
+          ]
+        ],
+        [
+          "장보기 목록\n우유\n달걀",
+          [
+            "todo 14일(토) 마감",
+            "event 14일(토) 09:00–10:00"
+          ]
+        ]
+      ]
+    },
+    {
+      "case": "Q6 #스페이스는 입력 줄과 같음, 렌즈가 있으면 렌즈의 스페이스, 없으면 일반",
+      "reads": [
+        [
+          "#집 장보기",
+          null,
+          "s-b",
+          "장보기"
+        ],
+        [
+          "장보기",
+          "s-c",
+          "s-c",
+          "장보기"
+        ],
+        [
+          "장보기",
+          null,
+          null,
+          "장보기"
+        ]
+      ]
+    },
+    {
+      "case": "Q7 숨긴 스페이스에 넣으면 토스트 ‘회사에 넣었어요 · 이 기기에서는 숨겨져 있어요’",
+      "text": "#회사 회의록 정리",
+      "space": "s-a",
+      "hidden": true,
+      "toast": "회사에 넣었어요 · 이 기기에서는 숨겨져 있어요",
+      "undo": "되돌리기"
+    },
+    {
+      "case": "Q8 토스트의 말: {날} {할 일|일정}에 넣었어요. 날은 오늘 · 내일, 일주일 안이면 요일, 그 밖은 ‘11월 21일’",
+      "toasts": [
+        [
+          "2026-11-06",
+          "todo",
+          "오늘 할 일에 넣었어요",
+          "Added a to-do for today",
+          "Taak toegevoegd voor vandaag"
+        ],
+        [
+          "2026-11-07",
+          "event",
+          "내일 일정에 넣었어요",
+          "Added an event for tomorrow",
+          "Afspraak toegevoegd voor morgen"
+        ],
+        [
+          "2026-11-12",
+          "todo",
+          "목요일 할 일에 넣었어요",
+          "Added a to-do for Thursday",
+          "Taak toegevoegd voor donderdag"
+        ],
+        [
+          "2026-11-21",
+          "event",
+          "11월 21일 일정에 넣었어요",
+          "Added an event for Nov 21",
+          "Afspraak toegevoegd voor 21 nov"
+        ],
+        [
+          "2026-11-02",
+          "todo",
+          "11월 2일 할 일에 넣었어요",
+          "Added a to-do for Nov 2",
+          "Taak toegevoegd voor 2 nov"
+        ]
+      ]
+    },
+    {
+      "case": "Q9 반복으로 읽히는 글(‘매주 월 9시 주간 계획’)은 반복 할 일 그대로",
+      "day": "2026-11-14",
+      "text": "매주 월 9시 주간 계획",
+      "first": "repeat"
+    },
+    {
+      "case": "Q10 오늘을 눌러 지난 시각을 적으면: 알림 없이 오늘 마감(알림은 지난 때에 걸지 않아요), 일정은 그 시각",
+      "day": "2026-11-06",
+      "text": "8시 운동",
+      "chips": [
+        "todo 6일(금) 마감",
+        "event 6일(금) 08:00–09:00"
+      ]
+    },
+    {
+      "case": "Q11 시간 정하기도 누른 날",
+      "day": "2026-11-14",
+      "text": "2시부터 4시까지 발표 준비",
+      "chips": [
+        "todo 14일(토) 14:00–16:00",
+        "event 14일(토) 14:00–16:00"
+      ]
+    },
+    {
+      "case": "Q12 다른 달이면 칩에 달을 붙여요",
+      "day": "2026-12-02",
+      "text": "장보기",
+      "chips": [
+        "todo 12월 2일(수) 마감",
+        "event 12월 2일(수) 09:00–10:00"
+      ]
+    },
+    {
+      "case": "Q13 영어 · 네덜란드어 칩",
+      "day": "2026-11-14",
+      "langs": [
+        [
+          "en",
+          "dentist at 3pm",
+          [
+            "event Sat 14 3:00–4:00 PM",
+            "todo reminder Sat 14 3:00 PM"
+          ]
+        ],
+        [
+          "nl",
+          "boodschappen",
+          [
+            "todo deadline za 14",
+            "event za 14 09:00–10:00"
+          ]
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "case": "S1 모양이 틀린 항목은 버림(kind · style · level · place)",
+      "read": [
+        {
+          "kind": "year"
+        },
+        {
+          "id": "b",
+          "kind": "month",
+          "style": "huge"
+        },
+        {
+          "id": "c",
+          "kind": "week",
+          "place": "left"
+        },
+        {
+          "id": "d",
+          "kind": "week",
+          "level": "high"
+        },
+        "month",
+        {
+          "id": "a",
+          "kind": "month"
+        }
+      ],
+      "ids": [
+        "a"
+      ]
+    },
+    {
+      "case": "S2 4개까지만 읽음",
+      "read": [
+        {
+          "id": "1",
+          "kind": "today"
+        },
+        {
+          "id": "2",
+          "kind": "week"
+        },
+        {
+          "id": "3",
+          "kind": "month"
+        },
+        {
+          "id": "4",
+          "kind": "agenda"
+        },
+        {
+          "id": "5",
+          "kind": "today"
+        },
+        {
+          "id": "6",
+          "kind": "week"
+        }
+      ],
+      "ids": [
+        "1",
+        "2",
+        "3",
+        "4"
+      ]
+    },
+    {
+      "case": "S3 today · agenda의 style은 늘 simple",
+      "read": [
+        {
+          "id": "t",
+          "kind": "today",
+          "style": "detail"
+        },
+        {
+          "id": "g",
+          "kind": "agenda",
+          "style": "detail"
+        },
+        {
+          "id": "w",
+          "kind": "week",
+          "style": "detail"
+        }
+      ],
+      "styles": [
+        "simple",
+        "simple",
+        "detail"
+      ]
+    },
+    {
+      "case": "S4 없는 키는 기본값, 범위 밖은 가까운 값",
+      "read": [
+        {
+          "id": "m",
+          "kind": "month"
+        },
+        {
+          "id": "o",
+          "kind": "month",
+          "opacity": 140,
+          "place": {
+            "display": "1",
+            "x": 1.4,
+            "y": -2
+          }
+        },
+        {
+          "id": "p",
+          "kind": "month",
+          "opacity": 33
+        }
+      ],
+      "want": [
+        {
+          "id": "m",
+          "kind": "month",
+          "style": "simple",
+          "opacity": 85,
+          "solidOnHover": true,
+          "clickThrough": false,
+          "locked": false,
+          "level": "desktop",
+          "allSpaces": true
+        },
+        {
+          "id": "o",
+          "kind": "month",
+          "style": "simple",
+          "opacity": 100,
+          "solidOnHover": true,
+          "clickThrough": false,
+          "locked": false,
+          "level": "desktop",
+          "allSpaces": true,
+          "place": {
+            "display": "1",
+            "x": 1,
+            "y": 0
+          }
+        },
+        {
+          "id": "p",
+          "kind": "month",
+          "style": "simple",
+          "opacity": 35,
+          "solidOnHover": true,
+          "clickThrough": false,
+          "locked": false,
+          "level": "desktop",
+          "allSpaces": true
+        }
+      ]
+    },
+    {
+      "case": "S5 같은 id는 처음 것, id가 없으면 차례로 w-N",
+      "read": [
+        {
+          "id": "x",
+          "kind": "today"
+        },
+        {
+          "id": "x",
+          "kind": "week"
+        },
+        {
+          "kind": "month"
+        }
+      ],
+      "ids": [
+        "x",
+        "w-3"
+      ]
+    },
+    {
+      "case": "S6 벽 달력은 이번 달만: 이번 주의 wall은 자세히로 읽음",
+      "read": [
+        {
+          "id": "w",
+          "kind": "week",
+          "style": "wall"
+        },
+        {
+          "id": "m",
+          "kind": "month",
+          "style": "wall"
+        },
+        {
+          "id": "t",
+          "kind": "today",
+          "style": "wall"
+        }
+      ],
+      "styles": [
+        "detail",
+        "wall",
+        "simple"
+      ]
+    }
+  ],
+  "redraw": [
+    {
+      "case": "T1 다음에 다시 그릴 때: 자정",
+      "kind": "month",
+      "next": "2026-11-07T00:00:00"
+    },
+    {
+      "case": "T2 오늘: 곧 있을 일이 바뀌는 때(다음 일정의 시작 · 끝, 알림 시각)",
+      "kind": "today",
+      "next": "2026-11-06T10:00:00"
+    },
+    {
+      "case": "T2b 일정이 끝나는 때",
+      "kind": "today",
+      "now": "2026-11-06T10:30:00",
+      "next": "2026-11-06T11:00:00"
+    },
+    {
+      "case": "T2c 알림 시각",
+      "kind": "today",
+      "now": "2026-11-06T11:30:00",
+      "next": "2026-11-06T15:00:00"
+    },
+    {
+      "case": "T2d 마지막 일이 끝나면 자정",
+      "kind": "today",
+      "now": "2026-11-06T20:00:00",
+      "next": "2026-11-07T00:00:00"
+    },
+    {
+      "case": "T3 넘긴 뒤 2분 동안 손대지 않으면 이번 달로",
+      "touched": "2026-11-06T09:20:00",
+      "offsets": [
+        [
+          "2026-11-06T09:21:59",
+          2,
+          2
+        ],
+        [
+          "2026-11-06T09:22:00",
+          2,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "T4 잠에서 깰 때 · 시간대가 바뀔 때 다시 셈: 자정을 지나 깨면 새 날",
+      "now": "2026-11-07T00:00:05",
+      "today": "2026-11-07",
+      "month": {
+        "now": "2026-11-06T23:59:30",
+        "next": "2026-11-07T00:00:00"
+      }
+    }
+  ]
+}

@@ -6,7 +6,8 @@ import { offscreen, offscreenEnabled } from "./env";
 import type { Store } from "./store";
 
 /** What may come with a pane: the day to show on 달력, the topic or search on 도움말. */
-export interface DeskExtra { day?: string; topic?: string; query?: string }
+/** `event`: 달력 opens on `day` with that event's sheet (an event pressed on a widget or its day sheet, calendar-flows D3). */
+export interface DeskExtra { day?: string; event?: string; topic?: string; query?: string }
 
 /** The pages' file names, as the desk's frames load them. */
 const pageFile: Record<DeskPage, string> = { calendar: "calendarWindow.html", history: "history.html", settings: "settings.html", help: "help.html" };
@@ -94,6 +95,7 @@ export class Desk {
     const query: Record<string, string> = { pane };
     if (this.options.chrome) query.chrome = this.options.chrome;
     if (extra.day) query.day = extra.day;
+    if (extra.event) query.event = extra.event;
     if (extra.topic) query.topic = extra.topic;
     if (extra.query) query.q = extra.query;
     this.loaded = new Promise((resolve) => window.webContents.once("did-finish-load", () => resolve()));

@@ -56,7 +56,7 @@
       <p class="eyebrow">Privacy</p>
       <h1 id="page-title">Your lists stay<br><span class="hand">on your computer.</span></h1>
       <p class="lede">Jongi-nyang has no account and no server, so it collects nothing. Here is everything it keeps, where, and when anything can leave your computer.</p>
-      <p class="alt">As of Mac 1.45 and Windows 1.30 · 30 October 2026</p>
+      <p class="alt">As of Mac 1.48 and Windows 1.33 · 7 November 2026</p>
     </div>
   </section>
 
@@ -83,7 +83,7 @@
         <div>
           <dt>Settings</dt>
           <dd>
-            <p>Font, reminders, the folder you picked and other settings are kept per device and never go to the shared folder.</p>
+            <p>Font, reminders, the folder you picked, desktop widgets, lunar dates and holidays, and other settings are kept per device and never go to the shared folder.</p>
             <p>Mac <code>~/Library/Preferences/com.noa.PaperTodo.plist</code></p>
             <p>Windows <code>%APPDATA%\PaperTodo\settings.json</code>, <code>storage.json</code></p>
           </dd>
@@ -109,6 +109,17 @@
         <li>Reminders and alarms ring on this computer only.</li>
       </ul>
 
+      <h2 id="typing">The cat that taps along while you type</h2>
+      <p>When you type, the cat taps along with its paws. All it knows is that a key was pressed, and when.</p>
+      <ul>
+        <li>It never reads which key it was, what you typed, text you are still composing or the clipboard. Nothing of it is saved, logged or sent.</li>
+        <li>It only checks whether you’re holding a key down or using a shortcut (⌘ or ⌃, Ctrl on Windows), and doesn’t tap then.</li>
+        <li>At first it answers typing in Jongi-nyang’s own windows only. That needs no permission.</li>
+        <li>On the Mac, choosing ‘In all apps’ makes it tap along in other apps too. That needs macOS’s Input Monitoring permission, so macOS asks once when you choose it. Even then, all Jongi-nyang knows is that a key was pressed. It never changes or blocks what you type in other apps.</li>
+        <li>Turn the permission off, turn the setting off, hide the cat or quit the app, and it no longer hears other apps’ keys. You can turn the permission off any time in System Settings → Privacy &amp; Security → Input Monitoring.</li>
+        <li>The Windows app never hears other apps’ keys.</li>
+      </ul>
+
       <h2 id="ai">If you turn on the AI connection</h2>
       <p>Jongi-nyang for Claude lets you look at and add to your lists while talking with Claude Desktop or Claude Code. It's off at first; turn it on in Desk → AI connection.</p>
       <ul>
@@ -116,6 +127,7 @@
         <li><strong>What Claude reads goes to Claude as part of the conversation.</strong> That conversation is handled under your Claude account settings and Anthropic's privacy policy.</li>
         <li>Jongi-nyang for Claude never goes online by itself. It reads and writes only the files in Jongi-nyang's storage folder and app folder.</li>
         <li>Each thing Claude adds or changes is written to <code>ai-log.jsonl</code> as one line with the before and after. Undo and Recent AI work use it. It stays on this device; past 1 MB only the last 30 days are kept.</li>
+        <li>To-dos in spaces hidden on this device stay out of Claude’s Today and lists. Name the space and Claude shows them, marked as hidden. This only keeps them out of view; it doesn’t stop Claude from reading them.</li>
         <li>Turn the switch off and Claude can't read or write any of Jongi-nyang's files.</li>
       </ul>
 
@@ -204,7 +216,7 @@
     </div>
     <div class="legal">
       <span>© 2026 leeAhwi · Source code under the <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/LICENSE">Apache License 2.0</a> · <a href="privacy.html" aria-current="page">Privacy</a></span>
-      <span>Mac 1.47.0 · Windows 1.32.0</span>
+      <span>Mac 1.48.0 · Windows 1.33.0</span>
     </div>
   </div>
 </footer>

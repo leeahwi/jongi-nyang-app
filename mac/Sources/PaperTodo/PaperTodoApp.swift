@@ -12,7 +12,8 @@ enum PaperTodoApp {
         let app = NSApplication.shared
         let delegate = AppDelegate()
         app.delegate = delegate
-        app.setActivationPolicy(.regular)
+        // #217: a check's run has no Dock icon (and is never made the active app: TestHooks.activate).
+        app.setActivationPolicy(TestHooks.staysBehind ? .accessory : .regular)
         withExtendedLifetime(delegate) { app.run() }
     }
 }
@@ -34,6 +35,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     /// 메모 서랍 (1.43).
     private var memoDrawer: MemoDrawerController!
     private let drawerMenuItem = NSMenuItem(title: L("메모 서랍"), action: nil, keyEquivalent: "")
+    /// 윈도우 → 달력 위젯 숨기기 · 보이기 (#234), only while there are widgets.
+    private let widgetsMenuItem = NSMenuItem(title: L("달력 위젯 숨기기"), action: nil, keyEquivalent: "")
     private var alarms: AlarmController!
     /// 보기 → 다음 알람 오전 7:00 (hidden when no alarm is on).
     private let nextAlarmMenuItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
@@ -68,15 +71,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private let arguments = TestHooks.arguments
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // #250: a check's windows never show in Mission Control or App Exposé (nothing changes outside a check's run).
+        TestHooks.keepOutOfOverviews()
         PerfProbe.start(arguments: arguments)
         HandwritingFont.register()
         PerfProbe.mark("fonts")
         // Every time in the app on the system's clock (24-hour or not, System Settings → General → Date & Time), and
         // again when that changes; the views redraw on their next change (the note's clock ticks every minute).
         AppLanguage.hourCycle = .system()
+        // calendar-flows D4: and every week from the system's first day (General → Language & Region → First day of week).
+        AppLanguage.weekStart = AppLanguage.systemWeekStart()
         NotificationCenter.default.addObserver(forName: NSLocale.currentLocaleDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 AppLanguage.hourCycle = .system()
+                AppLanguage.weekStart = AppLanguage.systemWeekStart()
                 self?.model?.objectWillChange.send()
             }
         }
@@ -108,8 +116,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         model.backups = BackupBook(storageFolder: storage.deletingLastPathComponent(), defaultFolder: backupsFolder,
                                    preferences: preferences)
         if !isolated { model.backups?.start() }
-        // 종이 색 (자동 · 낮 · 밤) before the first window, so nothing opens in the wrong colours.
-        model.paperColor.apply()
+        // 낮 · 밤 and the paper (#244) before the first window, so nothing opens in the wrong colours.
+        model.applyPaper()
         if !isolated {
             let current = storage.deletingLastPathComponent()
             model.onChooseStorage = { [weak self] in
@@ -165,7 +173,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         model.onNoteWidthCap = { [weak self] in self?.applyNoteWidthCap() }
         window.delegate = self
         window.collectionBehavior = [.fullScreenAuxiliary]
-        let hosting = NSHostingView(rootView: PaperView(model: model).ignoresSafeArea())
+        #if DEBUG
+        // scripts/drag-check.sh (#243): the replay's note on a stopped clock.
+        let fixedNow = TimetableReplay.fixedNow(arguments: arguments)
+        #else
+        let fixedNow: Date? = nil
+        #endif
+        let hosting = NSHostingView(rootView: PaperView(model: model, previewNow: fixedNow).ignoresSafeArea())
         // The window keeps its own size limits (below): SwiftUI needn't measure the whole note for them on every
         // layout pass (1.39 — that doubled the work of each key press and tab switch).
         hosting.sizingOptions = []
@@ -204,8 +218,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         model.onShowNote = { [weak self] in self?.showWindow() }
         model.onCalendar = { [weak self] day in self?.showCalendar(on: day) }
         model.onRepeatSettings = { [weak self] in self?.desk.show(.repeating) }
-        pet = DesktopPetController(model: model, preferences: preferences, onOpenNote: { [weak self] in self?.showWindow() })
+        // #230: macOS's Input Monitoring is only ever asked for by the app itself (its own bundle), never by a preview, a
+        // test copy or an off-screen run.
+        let asksInputMonitoring = !isolated && !arguments.contains("--offscreen") && Bundle.main.bundleIdentifier == "com.noa.PaperTodo"
+        pet = DesktopPetController(model: model, preferences: preferences,
+                                   inputMonitoring: asksInputMonitoring ? InputMonitoring.System() : InputMonitoring.NeverAsks(),
+                                   onOpenNote: { [weak self] in self?.showWindow() })
         pet.offscreen = arguments.contains("--offscreen")
+        pet.typing.offscreen = arguments.contains("--offscreen")
+        model.onInputMonitoringSettings = { NSWorkspace.shared.open(InputMonitoring.settingsURL) }
         if PerfProbe.isOn { model.objectWillChange.sink { _ in PerfProbe.count("model") }.store(in: &subscriptions) }
         focusTimer = FocusTimerController(model: model, preferences: preferences)
         quickEntry = QuickEntryController(model: model)
@@ -302,25 +323,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         window.level = model.alwaysOnTop ? .floating : .normal
         // `--offscreen` (the performance check): the note far off every screen, out of the user's way.
         if arguments.contains("--offscreen") {
+            window.animationBehavior = .none // as the desk's (#217)
             window.keepsOffscreen = true
             window.setFrameOrigin(NSPoint(x: -40_000, y: 200))
         }
+        // 바탕화면 달력 위젯 (#234): this Mac's widgets (none until one is added in 책상 → 일정).
+        CalendarWidgets.shared.start(model: model, preferences: preferences, offscreen: arguments.contains("--offscreen"))
         // The ears follow the note from here on (off-screen with it in the checks).
         noteEars = NoteEarsController(note: window)
         model.onTaskFinished = { [weak self] in self?.noteEars.twitch(0) }
         window.makeKeyAndOrderFront(nil)
         noteEars.sync()
-        NSApp.activate(ignoringOtherApps: true)
+        TestHooks.activate()
         PerfProbe.mark("ordered front")
         buildTodayWindow()
         updateMascot()
         PerfProbe.mark("launched")
+        PerfDrive.start(arguments: arguments, model: model)
 
         if let path = argument(after: "--snapshot") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [self] in
                 captureSnapshot(at: path)
             }
         }
+    }
+
+    /// #217: a check's run never asks to be the active app, but the system can make it one (after a switch of Spaces,
+    /// with no other app's window there). It steps back at once, so the person's typing goes where it went.
+    func applicationDidBecomeActive(_ notification: Notification) {
+        if TestHooks.staysBehind { NSApp.deactivate() }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -346,6 +377,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                                    choices: [.init(title: L("저장하지 않고 종료"), role: .danger),
                                              .init(title: L("돌아가기"), role: .primary, isDefault: true, isCancel: true)])
         return answer == 0 ? .terminateNow : .terminateCancel
+    }
+
+    /// #230: no key is heard any more (the key tap goes with the app anyway; this lets it go first).
+    func applicationWillTerminate(_ notification: Notification) {
+        pet?.typing.shutDown()
     }
 
     private func buildMenu() {
@@ -443,7 +479,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // The desk (책상), on its panes.
         view.addItem(item(L("달력"), #selector(openCalendar), "d"))
         view.addItem(item(L("완료 기록"), #selector(showHistory), "y"))
-        view.addItem(item(L("시계"), #selector(showClock), ""))
+        view.addItem(item(L("알람 · 타이머"), #selector(showClock), ""))
         view.addItem(.separator())
         let petToggle = item(L("종이냥 펫 보이기"), #selector(togglePet), "p")
         petToggle.keyEquivalentModifierMask = [.command, .shift]
@@ -471,6 +507,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         drawerMenuItem.action = #selector(toggleMemoDrawer)
         drawerMenuItem.target = self
         windowMenu.addItem(drawerMenuItem)
+        widgetsMenuItem.action = #selector(toggleCalendarWidgets)
+        widgetsMenuItem.target = self
+        windowMenu.addItem(widgetsMenuItem)
         windowMenu.addItem(.separator())
         windowMenu.addItem(item(L("화면 오른쪽에 붙이기"), #selector(dockRight), ""))
         windowMenu.addItem(item(L("화면 왼쪽에 붙이기"), #selector(dockLeft), ""))
@@ -493,6 +532,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         todayWindow.onQuickEntry = { [weak self] in self?.quickEntry.show() }
         todayWindow.onSettings = { [weak self] in self?.desk.show(.appearance) }
         todayWindow.timerMenu = { [weak self] in self?.focusTimer.menu() ?? NSMenu() }
+        todayWindow.companionMenuItem = { [weak self] in self?.pet.companionMenuItem() }
         todayWindow.onUpdate = { [weak self] in self?.updateFoldedSummary() }
         updateFoldedSummary()
     }
@@ -538,7 +578,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         for item in focusTimer.menu().items { item.menu?.removeItem(item); menu.addItem(item) }
     }
 
+    /// 달력 위젯 숨기기 · 보이기: all of them away for now (back with the app).
+    @objc private func toggleCalendarWidgets() {
+        CalendarWidgets.shared.setAllHidden(!CalendarWidgets.shared.allHidden)
+    }
+
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(toggleCalendarWidgets) {
+            menuItem.isHidden = CalendarWidgets.shared.list.isEmpty
+            menuItem.title = CalendarWidgets.shared.allHidden ? L("달력 위젯 보이기") : L("달력 위젯 숨기기")
+        }
         if menuItem.action == #selector(togglePet) { menuItem.state = model.petVisible ? .on : .off }
         if menuItem.action == #selector(toggleSpaceGroups) { menuItem.state = model.groupBySpace ? .on : .off }
         if menuItem.action == #selector(dockRight) { menuItem.state = NoteDocking.side(of: window, preferences: model.preferences) == .right ? .on : .off }
@@ -637,7 +686,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         notices.onSnoozeTasks = { [weak self] ids, minutes in self?.taskReminders.snooze(ids, .minutes(minutes)) }
         notices.onStopAlarm = { [weak self] id in if self?.alarms.ringingID == id { self?.alarms.stop() } }
         notices.onSnoozeAlarm = { [weak self] id in if self?.alarms.ringingID == id { self?.alarms.snooze() } }
-        notices.onShowAlarm = { _ in NSApp.activate(ignoringOtherApps: true) }
+        notices.onShowAlarm = { _ in TestHooks.activate() }
         taskReminders.onShown = { [weak self] due in self?.notices.tasksDue(due) }
         alarms.onRingAlarm = { [weak self] alarm in self?.notices.alarmRings(alarm) }
         calendarAlerts.onShown = { [weak self] events in
@@ -744,7 +793,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         if window.isMiniaturized { window.deminiaturize(nil) }
         window.makeKeyAndOrderFront(nil)
         noteEars?.sync()
-        NSApp.activate(ignoringOtherApps: true)
+        TestHooks.activate()
     }
     private func installHeaderDoubleClick() {
         headerEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
@@ -888,13 +937,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
     @objc private func showQuickEntry() { quickEntry.show() }
     /// Sunday evening, once a week: the cat cheers for the week's finished tasks.
+    /// #64: the ten-minute check runs only while the cat is out (it is the cat that cheers).
     private func startWeeklyLookBack(preferences: UserDefaults) {
-        let timer = Timer(timeInterval: 10 * 60, repeats: true) { _ in
-            Task { @MainActor [weak self] in self?.checkWeeklyLookBack() }
-        }
-        timer.tolerance = 60
-        RunLoop.main.add(timer, forMode: .common)
-        weeklyTimer = timer
+        model.$petVisible.removeDuplicates().sink { [weak self] visible in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.weeklyTimer?.invalidate()
+                self.weeklyTimer = nil
+                guard visible else { return }
+                let timer = Timer(timeInterval: 10 * 60, repeats: true) { _ in
+                    Task { @MainActor [weak self] in self?.checkWeeklyLookBack() }
+                }
+                timer.tolerance = 60
+                RunLoop.main.add(timer, forMode: .common)
+                self.weeklyTimer = timer
+            }
+        }.store(in: &subscriptions)
         DispatchQueue.main.asyncAfter(deadline: .now() + 20) { [weak self] in self?.checkWeeklyLookBack() }
     }
 

@@ -36,21 +36,58 @@
 .cell.sun .num { color: var(--clay-text); }
 .cell.sat .num { color: var(--secondary); }
 .cell.today .num { background: var(--sage); color: var(--on-sage); font-weight: 700; }
+/* #234: a holiday's date is clay like a Sunday's, its name the cell's first line; the lunar date small at the right. */
+.cell.holiday .num { color: var(--clay-text); }
+.cell.holiday.today .num { color: var(--on-sage); }
+.cell .lunar { margin-left: auto; padding-right: 3px; font-size: 9.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cell .more + .lunar { margin-left: 4px; }
+.cell .more:has(+ .lunar) { margin-left: auto; }
+.holiday-name { flex: none; height: 16px; line-height: 16px; padding: 0 2px; font-size: 10.5px; font-weight: 600; color: var(--clay-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.day-row.holiday .label .n { color: var(--clay-text); }
+.day-row .label { flex-wrap: wrap; align-content: flex-start; row-gap: 2px; }
+.day-row .label .lunar { flex-basis: 100%; font-size: 10.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.line.holiday .t { font-weight: 600; color: var(--clay-text); }
 .cell .more { margin-left: auto; padding-right: 2px; font-size: 10px; font-weight: 600; color: var(--secondary); font-variant-numeric: tabular-nums; }
 .item { flex: none; height: 16px; display: flex; align-items: center; gap: 3px; min-width: 0; padding-right: 2px; border-radius: 3px; font-size: 10.5px; line-height: 16px; white-space: nowrap; overflow: hidden; color: var(--ink); }
 .item .bar { width: 2.5px; height: 11px; flex: none; border-radius: 1.5px; background: var(--color); }
 .item.all-day { background: color-mix(in srgb, var(--color) 20%, transparent); }
 .item.all-day .bar { height: 16px; border-radius: 3px 0 0 3px; }
 .item .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* calendar-flows D1: a trip's band joins along the week row — squared and reaching the cell's edge where it goes on, no
+   bar of its own where it comes from the day before, the tint only where an earlier day's title runs over it; that title
+   is laid over the following days (fitTitles sets its width), above their cells and letting their clicks through. */
+.cell { --padx: 3px; }
+.item.joins-left { margin-left: calc(-1 * var(--padx)); padding-left: var(--padx); border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.item.joins-right { margin-right: calc(-1 * var(--padx)); border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.item.cont .t { visibility: hidden; }
+.cell.runner { z-index: 1; overflow: visible; clip-path: inset(0 -200vw 0 0); }
+.item.runs { overflow: visible; }
+.item.runs .t { flex: none; pointer-events: none; }
+/* Audit 3 · 28 (D2): a cut title on two lines where the cell has a line to spare (twoLineTitles). */
+.item.two { height: auto; max-height: 30px; align-items: flex-start; white-space: normal; }
+.item.two .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; word-break: keep-all; overflow-wrap: normal; line-height: 14px; padding: 1px 0; }
+.item.two .bar { margin-top: 2px; }
+.item.two .icon { margin-top: 3px; }
+/* #260: a holiday's name on two lines by the same rule (its line first, never above a band); English and Dutch also break
+   a long word at a hyphenation point (the page's lang), Korean between words only. */
+.holiday-name.two { height: auto; max-height: 30px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; word-break: keep-all; overflow-wrap: normal; line-height: 14px; padding-top: 1px; padding-bottom: 1px; }
+html:not([lang="ko"]) .item.two .t, html:not([lang="ko"]) .holiday-name.two { hyphens: auto; }
+/* #260: one line, or two for a long holiday name, never cut short. */
+.panel-holiday { flex: none; margin-top: 1px; padding-left: 1px; font-size: 11.5px; font-weight: 600; color: var(--clay-text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.panel-holiday .panel-lunar { font-weight: 400; color: var(--ink-3); white-space: nowrap; }
 /* A deadline: a quiet ink flag and the title; clay only on its day or after (due or late). */
 .item.deadline { padding-left: 1px; }
 .item.deadline .icon { flex: none; color: var(--ink-3); }
 .item.deadline.late, .item.deadline.late .icon { color: var(--clay-text); }
-/* Very narrow cells: a dot per event, a small flag per deadline. */
+/* A reminder (#227): a sage bell and the title, no time (that's in the tooltip and the day panel). */
+.item.reminder { padding-left: 1px; }
+.item.reminder .icon { flex: none; color: var(--sage-text); }
+/* Very narrow cells: a dot per event, a small flag per deadline, a small bell per reminder. */
 .dots { display: flex; flex-wrap: wrap; gap: 4px; padding: 1px 2px 0; }
 .dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--color); }
 .dot.deadline { width: 9px; height: 9px; border-radius: 0; background: none; display: grid; place-items: center; color: var(--ink-3); }
 .dot.deadline.late { color: var(--clay-text); }
+.dot.reminder { width: 9px; height: 9px; border-radius: 0; background: none; display: grid; place-items: center; color: var(--sage-text); }
 
 /* The week: a row a day. */
 .week { display: grid; grid-template-rows: repeat(7, minmax(0, 1fr)); }

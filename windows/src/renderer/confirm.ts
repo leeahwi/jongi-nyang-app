@@ -1,5 +1,5 @@
 import { h, paper, t } from "./api";
-import { appear, fitWindow, keyCap, slipButton, slipHead, tape } from "./slip";
+import { appear, dragByPaper, fitWindow, keyCap, nudge, slipButton, slipHead, tape } from "./slip";
 
 /**
  * A question the app asks (language, import, storage folder…) on a slip instead of a system dialog:
@@ -14,6 +14,11 @@ export interface ConfirmQuestion {
   /** "danger" sits alone on the left in clay text; a `clay` primary is filled clay (a destructive answer). */
   buttons: { label: string; kind: "primary" | "ghost" | "danger"; clay?: boolean }[];
   cancelId: number;
+  /**
+   * #253 (docs/plans/widget-ask-cases.json `questions`): its answer replaces the whole list (a backup, a shared folder's
+   * list): while it waits, the day sheet's 넣기 and 되돌리기 wait too. Written on the line with the question's message.
+   */
+  replacesList?: boolean;
   cat?: boolean;
   /** "keys": the shortcut list's wide slip (#86). */
   size?: "s" | "m" | "keys";
@@ -105,6 +110,18 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+// #228: the paper (and the title row) drags the window; the main process keeps the slip's head on the display.
+dragByPaper(card, {
+  start: (x, y) => { void api.act({ type: "slipDrag", phase: "start", x, y }); },
+  move: (_dx, _dy, x, y) => { void api.act({ type: "slipDrag", phase: "move", x, y }); },
+  end: (x, y) => { void api.act({ type: "slipDrag", phase: "end", x, y }); },
+});
+
 api.on("confirm:show", (payload) => show(payload as ConfirmQuestion));
+// #229: a press elsewhere that this question held up (counted on the stage for the snapshot run's check).
+api.on("confirm:nudge", () => {
+  stage.dataset.nudges = String(Number(stage.dataset.nudges ?? "0") + 1);
+  nudge(card);
+});
 fitWindow(stage);
 api.send("confirm:ready");

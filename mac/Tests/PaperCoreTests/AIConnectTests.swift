@@ -323,16 +323,16 @@ private enum AIConnectTests {
         }
 
         try test("M41: the extension's version in ai-link.json and the log; Claude Desktop's copy older than the app's") {
-            try equal(AIConnect.extVersion, 3, "the same number as the Windows core's aiExtVersion (3 since spaces 2c, N3-8)")
+            try equal(AIConnect.extVersion, 4, "the same number as the Windows core's aiExtVersion (4 since 기기마다 보일 스페이스, N3-9)")
             let link = String(decoding: AIConnect.Link(enabled: true, dataFolder: "/x", lang: .ko, app: "mac 1.47.0", now: now).encoded(), as: UTF8.self)
-            try expect(link.contains("\"ext\" : 3"), "link: \(link)")
+            try expect(link.contains("\"ext\" : 4"), "link: \(link)")
             let old = line("old", now, changes: [(taskA, nil, todo(taskA, "보고서 쓰기"))])
-            let fresh = String(old.dropLast()) + ",\"ext\":3}"
+            let fresh = String(old.dropLast()) + ",\"ext\":4}"
             let parsed = AIConnect.parse(fresh)[0]
-            try equal(parsed.ext, 3, "read")
-            try expect(parsed.line().contains("\"ext\":3"), "written back: \(parsed.line())")
-            let two = String(old.dropLast()) + ",\"ext\":2}"
-            try expect(AIConnect.extOutdated(AIConnect.parse(two)), "a 1.46 extension (2) is older now")
+            try equal(parsed.ext, 4, "read")
+            try expect(parsed.line().contains("\"ext\":4"), "written back: \(parsed.line())")
+            let three = String(old.dropLast()) + ",\"ext\":3}"
+            try expect(AIConnect.extOutdated(AIConnect.parse(three)), "a 1.47 extension (3) is older now")
             try equal(AIConnect.parse(old)[0].ext, nil, "none before")
             try expect(!AIConnect.extOutdated([]), "nothing from Claude Desktop yet")
             try expect(AIConnect.extOutdated(AIConnect.parse(old)), "no version: the one before versions")
@@ -354,7 +354,7 @@ private enum AIConnectTests {
         try test("S57 the log line of a move: place changes kept, counted by to-do") {
             try equal(logged.changes.map(\.file), ["todo-spaces.json", "todos.json", "todo-spaces.json"], "files")
             try equal(logged.count, 2, "to-dos")
-            try equal(logged.ext, 3, "ext")
+            try equal(logged.ext, AIConnect.extVersion, "ext")
             try expect(logged.isAIWork, "Claude's work")
         }
         for entry in ai["undo"] as! [[String: Any]] {

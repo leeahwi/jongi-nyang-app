@@ -285,6 +285,34 @@ private enum IntentTests {
             CalendarEvent(key: "local/\(id)", calendarId: "local", title: id, allDay: allDay, start: from, end: to, color: "#5b8bd0")
         }
 
+        // 빠른 입력의 버튼 (#240, D3 B): the shared cases from docs/plans/quick-entry-button-cases.json (the Windows app's
+        // test/intent.test.ts reads the same file).
+        try test("quick entry: the button says what the picked chip makes (shared cases)") {
+            let path = CommandLine.arguments.dropFirst().first ?? "../docs/plans/quick-entry-button-cases.json"
+            let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
+            let sample: [String: Intent.Candidate?] = [
+                "none": nil, "todo": .todo(QuickParse(title: "우유")),
+                "event": .event(Intent.EventGuess(title: "회의", date: "2026-10-09", start: 900, end: 960)),
+                "timer": .timer(minutes: 40, title: nil), "focus": .timer(minutes: 25, title: "보고서"),
+                "alarm": .alarm(time: "07:00", days: [], label: ""), "memo": .memo("장보기"),
+                "repeat": .repeating(Intent.RepeatGuess(title: "물 마시기", rule: RepeatRule(kind: .daily))),
+            ]
+            for entry in file["kinds"] as! [[String: Any]] {
+                let kind = entry["kind"] as! String, words = entry["words"] as! [String]
+                for (index, language) in AppLanguage.allCases.enumerated() {
+                    let got = Intent.actionText(sample[kind]!, language: language)
+                    try expect(got == words[index], "\(kind) \(language.rawValue): \(got)")
+                }
+            }
+            let parts = (file["now"] as! [NSNumber]).map(\.intValue)
+            let at = seoul.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2], hour: parts[3], minute: parts[4]))!
+            for entry in file["lines"] as! [[String: Any]] {
+                let language = AppLanguage(rawValue: entry["lang"] as! String)!
+                let got = Intent.read(entry["text"] as! String, now: at, calendar: seoul, language: language).map { Intent.actionText($0, language: language) }
+                try expect(got == entry["buttons"] as! [String], "\(entry["case"]!): \(got)")
+            }
+        }
+
         try test("ribbon: 8–24 by default, labels every four hours, bars, rings, now and next") {
             let events = [event("study", at(9), at(10)), event("standup", at(14, 30), at(15, 15)), event("dentist", at(15, 30), at(16, 30)),
                           event("birthday", at(0), at(0, day: 9), allDay: true)]

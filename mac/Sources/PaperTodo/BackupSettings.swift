@@ -20,7 +20,11 @@ struct AutoBackupGroup: View {
                 if book.chosenFolder != nil {
                     Button(L("기본으로")) { book.resetFolder() }.buttonStyle(PaperActionButtonStyle())
                 }
-                Button(L("다른 폴더…")) { chooseFolder() }.buttonStyle(PaperActionButtonStyle(primary: true))
+                // Plain, with the folder, like the storage folder's (and Windows').
+                Button { chooseFolder() } label: {
+                    Label(L("다른 폴더…"), systemImage: "folder").labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(PaperActionButtonStyle())
             }
             .padding(.vertical, 8)
             .settingsRow()
@@ -87,7 +91,10 @@ struct AutoBackupGroup: View {
         return place + " " + L("모두 \(book.entries.count)개 · \(size).")
     }
 
-    private func backUpNow() {
+    private func backUpNow() { Self.backUpNow(book: book, model: model) }
+
+    /// 지금 백업하기 (here and on the pane's backup line, #240).
+    static func backUpNow(book: BackupBook, model: AppModel) {
         model.saveEverything()
         do {
             try book.copy(.manual)
@@ -104,7 +111,7 @@ struct AutoBackupGroup: View {
         panel.allowsMultipleSelection = false
         panel.prompt = L("이 폴더에 백업하기")
         panel.message = L("백업을 둘 폴더를 골라요. 저장 폴더 안은 고를 수 없어요.")
-        NSApp.activate(ignoringOtherApps: true)
+        TestHooks.activate()
         guard panel.runModal() == .OK, let folder = panel.url else { return }
         if !book.choose(folder) {
             SlipAlert.inform(title: L("백업 폴더"), message: L("저장 폴더 안에는 백업을 둘 수 없어요."), detail: L("다른 폴더를 골라 주세요."))

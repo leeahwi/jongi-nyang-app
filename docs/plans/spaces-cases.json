@@ -998,7 +998,7 @@
       { "kind": "todo", "id": "E0000000-0000-4000-8000-000000000002", "set": { "title": "장보기 목록", "space": "회사" } }
     ],
     "entry": {
-      "v": 1, "id": "AI-ENTRY-1", "at": "2026-10-28T01:00:00Z", "client": "Claude", "tool": "apply_changes", "kind": "change", "target": "todos", "count": 2, "title": "견적서 보내기", "ext": 3,
+      "v": 1, "id": "AI-ENTRY-1", "at": "2026-10-28T01:00:00Z", "client": "Claude", "tool": "apply_changes", "kind": "change", "target": "todos", "count": 2, "title": "견적서 보내기", "ext": 4,
       "changes": [
         { "file": "todo-spaces.json", "id": "E0000000-0000-4000-8000-000000000001", "before": { "id": "E0000000-0000-4000-8000-000000000001", "space": "s-a", "at": "2026-10-01T00:00:00Z" }, "after": { "id": "E0000000-0000-4000-8000-000000000001", "space": "s-b", "at": "2026-10-28T01:00:00Z" } },
         { "file": "todos.json", "id": "E0000000-0000-4000-8000-000000000002", "before": { "id": "E0000000-0000-4000-8000-000000000002", "title": "장보기", "isCompleted": false, "createdAt": "2026-10-20T00:00:00Z" }, "after": { "id": "E0000000-0000-4000-8000-000000000002", "title": "장보기 목록", "isCompleted": false, "createdAt": "2026-10-20T00:00:00Z" } },
@@ -1229,5 +1229,40 @@
       {"id": "evening", "ko": "평일 저녁 19–23", "en": "Weekday evenings 7–11", "nl": "Doordeweekse avonden 19–23", "times": [{"days": [1, 2, 3, 4, 5], "from": "19:00", "to": "23:00"}]},
       {"id": "weekend", "ko": "주말", "en": "Weekends", "nl": "Weekend", "times": [{"days": [6, 7], "from": "00:00", "to": "00:00"}]}
     ]
+  },
+  "aiDevice": {
+    "about": "S73–S76 (#121 N3-9, mcp-plan.md ‘N3-9’): 기기마다 보일 스페이스(#196)를 Claude도 따라요. 앱은 ai-link.json에 이 기기의 ‘이 기기에서’를 `spaceDevice`로 적어요(D5 모양 그대로, 읽을 때처럼 틀린 항목은 빼고 요일은 정렬해요. 설정이 하나도 없으면 키가 없어요). 확장 판(`ext`)은 4예요. 확장은 부를 때마다 이 값을 읽어 지금 숨은 스페이스를 S66과 같이 셈하고, 노트가 빼는 곳에서 빼요. `link`는 두 앱이 쓰는 것(S73)이고 나머지는 확장의 사례예요. 위의 `now`(수요일 10:00, 서울)와 `file`(회사 s-a · 집 s-b · 공부 s-c)을 써요. 회사는 숨기기, 집은 평일 18:00–23:00에만 보여서 지금은 둘 다 숨고, 공부와 일반은 보여요. `todos`의 `space`는 그 할 일의 자리예요(없으면 일반). `titles`는 답의 할 일 순서, `marked`는 그 가운데 ‘숨김’이 붙는 것, `hidden`은 빠진 남은 할 일의 수(데이터 `hiddenHere`), `line`은 끝 줄의 앞부분(ko)이에요.",
+    "rules": { "s-a": { "show": "hide" }, "s-b": { "show": "time", "times": [{ "days": [5, 1, 2, 3, 4, 3], "from": "18:00", "to": "23:00" }, { "days": [8], "from": "09:00", "to": "10:00" }] }, "s-x": { "show": "blink" } },
+    "link": { "case": "S73", "note": "읽을 수 있는 설정만, D5 모양으로. 설정이 없으면 키가 없어요", "ext": 4, "spaceDevice": { "s-a": { "show": "hide" }, "s-b": { "show": "time", "times": [{ "days": [1, 2, 3, 4, 5], "from": "18:00", "to": "23:00" }] } } },
+    "todos": [
+      { "id": "F0000000-0000-4000-8000-000000000001", "title": "주간 보고서", "space": "s-a" },
+      { "id": "F0000000-0000-4000-8000-000000000002", "title": "견적서 보내기", "space": "s-a", "dueDate": "2026-10-30" },
+      { "id": "F0000000-0000-4000-8000-000000000003", "title": "장보기", "space": "s-b" },
+      { "id": "F0000000-0000-4000-8000-000000000004", "title": "단어 외우기", "space": "s-c" },
+      { "id": "F0000000-0000-4000-8000-000000000005", "title": "물 마시기" },
+      { "id": "F0000000-0000-4000-8000-000000000006", "title": "보고서 초안", "space": "s-a", "isCompleted": true, "completedAt": "2026-10-28T00:30:00Z" }
+    ],
+    "reads": [
+      { "case": "S74", "note": "오늘: 숨은 회사 · 집의 할 일은 빠지고 수에도 들지 않아요. 끝에 한 줄", "tool": "get_today", "args": {}, "titles": ["단어 외우기", "물 마시기"], "marked": [], "open": 2, "hidden": { "s-a": 1, "s-b": 1 }, "line": "회사 · 집은 이 기기에서 숨겨 뒀어요 (할 일 2개)" },
+      { "case": "S74", "note": "모든 남은 할 일도 노트처럼", "tool": "list_todos", "args": { "where": "all" }, "titles": ["단어 외우기", "물 마시기"], "marked": [], "hidden": { "s-a": 2, "s-b": 1 }, "line": "회사 · 집은 이 기기에서 숨겨 뒀어요 (할 일 3개)" },
+      { "case": "S74", "note": "19:00(서울)이면 집이 보여요", "at": "2026-10-28T10:00:00Z", "tool": "get_today", "args": {}, "titles": ["장보기", "단어 외우기", "물 마시기"], "marked": [], "open": 3, "hidden": { "s-a": 1 }, "line": "회사는 이 기기에서 숨겨 뒀어요 (할 일 1개)" },
+      { "case": "S75", "note": "찾기는 숨은 것도 보여 주고 ‘숨김’을 붙여요", "tool": "list_todos", "args": { "query": "보고서" }, "titles": ["주간 보고서", "보고서 초안"], "marked": ["주간 보고서", "보고서 초안"], "hidden": {} },
+      { "case": "S75", "note": "숨은 스페이스를 골라 달라고 하면 보여 줘요", "tool": "get_today", "args": { "space": "집" }, "titles": ["장보기"], "marked": ["장보기"], "open": 1, "hidden": {} },
+      { "case": "S75", "note": "보이는 스페이스를 고르면 그 스페이스만", "tool": "list_todos", "args": { "space": "공부" }, "titles": ["단어 외우기"], "marked": [], "hidden": {} },
+      { "case": "S76", "note": "끝낸 일은 완료 기록처럼 모두", "tool": "search_history", "args": {}, "titles": ["보고서 초안"], "marked": [], "hidden": {} }
+    ],
+    "resources": [
+      { "case": "S74", "uri": "jongi-nyang://today", "present": ["단어 외우기", "물 마시기"], "absent": ["주간 보고서", "장보기"], "line": "회사 · 집은 이 기기에서 숨겨 뒀어요 (할 일 2개)" },
+      { "case": "S74", "uri": "jongi-nyang://week", "present": ["단어 외우기", "물 마시기", "보고서 초안"], "absent": ["주간 보고서", "견적서 보내기", "장보기"], "line": "회사 · 집은 이 기기에서 숨겨 뒀어요 (할 일 3개)" }
+    ],
+    "spaces": [
+      { "id": "s-a", "device": "hide", "hiddenNow": true, "status": "이 기기에서 숨겨 뒀어요", "open": 2, "today": 1 },
+      { "id": "s-b", "device": "time", "hiddenNow": true, "status": "평일 18:00–23:00에만 · 지금 숨어 있어요", "open": 1, "today": 1 },
+      { "id": "s-c", "hiddenNow": false, "open": 1, "today": 1 },
+      { "id": "general", "hiddenNow": false, "open": 1, "today": 1 }
+    ],
+    "add": { "case": "S76", "note": "숨은 스페이스에도 넣어요(D12). 답에 숨겨져 있다고 적어요", "items": [{ "title": "회의록 정리", "space": "회사" }], "line": "(회사에 넣었어요 · 이 기기에서는 숨겨져 있어요)" },
+    "move": { "case": "S76", "note": "숨은 스페이스로도 옮겨요. 미리보기에 숨겨져 있다고 적어요", "id": "F0000000-0000-4000-8000-000000000004", "space": "회사", "line": "스페이스: 공부 → 회사 (이 기기에서는 숨겨져 있어요)" },
+    "older": { "case": "S76", "note": "spaceDevice가 없는 앱(4보다 낮은 판): 확장은 숨긴 것을 알 수 없어서 모두 보여요(1.47처럼)", "ext": 3, "titles": ["주간 보고서", "장보기", "단어 외우기", "물 마시기"] }
   }
 }

@@ -5,7 +5,7 @@
 //   node tools/perf.mjs [--quick] [--long] [--out=file.json] [--dir=folder] [--trace]
 // --quick: shorter idle windows (20 s) and use loop (1 min); --long: the full 10-minute use loop.
 // --todos=2000 --spaces=9 (1.30): today's sheet that full and that many spaces; the `spaces` step times the lens.
-// --app=<folder>: another build (a 1.29 checkout) on the same data, to alternate with.
+// --app=<folder>: another build (a 1.29 checkout) on the same data, to alternate with. --paper=chalk: on that paper (#244).
 // --focus: the note as if focused (the caret blinking) for the idle steps; without --quick an idle window is 60 s and
 // so holds exactly one of the note's minute redraws.
 // Perf audit 2: --history=6000 --history-days=1095 --events=200 (the record and events that big); the steps `ipc`
@@ -37,13 +37,15 @@ if (typeof globalThis.WebSocket !== "function") {
 
 const quick = flag("quick");
 const only = option("only")?.split(",");
-/** `--only=cold,idle,io,typing,tabs,check,search,desk,hidden,drawer,pet,timer,alarm,use` runs just those steps. */
+/** `--only=cold,idle,io,typing,tabs,check,checkbusy,search,desk,hidden,drawer,pet,timer,alarm,use` runs just those steps. */
 const want = (name) => !only || only.includes(name);
 const idleSeconds = quick ? 20 : 60;
 const useMinutes = flag("long") ? 10 : quick ? 1 : 3;
 const dataOptions = { ...(option("todos") ? { todos: Number(option("todos")) } : {}), ...(option("spaces") ? { spaces: Number(option("spaces")) } : {}),
   ...(option("history") ? { history: Number(option("history")) } : {}), ...(option("history-days") ? { historyDays: Number(option("history-days")) } : {}),
-  ...(option("events") ? { events: Number(option("events")) } : {}) };
+  ...(option("events") ? { events: Number(option("events")) } : {}),
+  // #244: --paper=<key> runs on that paper (core/paper.ts paperKinds), to compare idle CPU with the default 낮 종이.
+  ...(option("paper") ? { prefs: { paperTheme: option("paper") } } : {}) };
 const base = option("dir") ?? fs.mkdtempSync(path.join(os.tmpdir(), "paper-perf-"));
 fs.mkdirSync(base, { recursive: true });
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -102,12 +104,12 @@ async function launch(name, extraData = {}) {
   const child = spawn(electronBinary, [option("app") ?? root, "--demo", `--remote-debugging-port=${debugPort}`, `--inspect=${inspectPort}`, `--user-data-dir=${path.join(folder, "user-data")}`,
     // Measured as if on top: a note under other windows would stop drawing (macOS occlusion) and look idle.
     "--disable-backgrounding-occluded-windows"], {
-    env: { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== "ELECTRON_RUN_AS_NODE")), PAPERTODO_NO_SHORTCUTS: "1", PAPERTODO_OFFSCREEN: "1", PAPERTODO_DEMO_DATA: data, PAPERTODO_LANG: process.env.PAPERTODO_LANG ?? "ko", TMPDIR: tmp },
+    env: { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== "ELECTRON_RUN_AS_NODE")), PAPERTODO_NO_SHORTCUTS: "1", PAPERTODO_OFFSCREEN: "1", PAPERTODO_DEMO_DATA: data, PAPERTODO_LANG: process.env.PAPERTODO_LANG ?? "ko", TMPDIR: tmp, PAPERTODO_WINDOW_LOG: path.join(folder, "windows.log") },
     stdio: ["ignore", "ignore", "pipe"],
   });
   children.add(child);
   // On a Mac a window on a screen stops the run at once (#92).
-  watchWindows(child, (why) => { console.error(`perf: ${why}`); process.exit(1); });
+  watchWindows(child, (why) => { console.error(`perf: ${why}`); process.exit(1); }, path.join(folder, "windows.log"));
   child.on("exit", () => children.delete(child));
   let stderr = "";
   child.stderr.on("data", (chunk) => { stderr += chunk; });
@@ -675,6 +677,21 @@ async function windowsStep(run) {
   return { processes: metrics.length, windows: await evaluate(run.main, `__e.BrowserWindow.getAllWindows().length`), mbByProcess: byPage };
 }
 
+/**
+ * #65: the note's busy time for one check, eight times (a trace each: the state, the redraw and the check's animation,
+ * 1.5 s in all), with only the note open — the `panes` step's `checkNoteOnly` takes one, which a busy machine shakes.
+ */
+async function checkBusyStep(run) {
+  const busy = [];
+  for (let index = 0; index < 8; index += 1) {
+    const traced = await busyDuring(run, () => toggleRow(run, "open"), "check");
+    busy.push(traced.check["note.html"]?.busyMs ?? NaN);
+    await toggleRow(run, "done"); await sleep(800);
+  }
+  const blocks = await evaluate(run.note, `document.querySelectorAll(".lines > .row-block").length`);
+  return { noteBusyMedian: round(median(busy)), min: round(Math.min(...busy)), max: round(Math.max(...busy)), each: busy.map((value) => round(value)), rowBlocks: blocks };
+}
+
 /** The note's JavaScript by function (self time, ms) while `work` runs: a CPU profile from the page. */
 async function profileNote(run, work, seconds = 0) {
   const { note } = run;
@@ -917,6 +934,7 @@ try {
   await step("ipc", { key: "ipc", text: "IPC (messages · kB)" }, () => ipcStep(run));
   await step("depth", { key: "depth", text: "check at undo depth" }, () => depthStep(run));
   await step("panes", { key: "panes", text: "desk panes" }, () => panesStep(run));
+  await step("checkbusy", { key: "checkBusy", text: "note busy per check (ms)" }, () => checkBusyStep(run));
   await step("hiddennote", { key: "hiddenNote", text: "note hidden: 8 checks" }, () => hiddenNoteStep(run));
   await step("historyhidden", { key: "historyHidden", text: "완료 기록 behind 달력 · hidden" }, () => historyHiddenStep(run));
   await step("deskstate", { key: "deskState", text: "desk pages' state per check" }, () => deskStateStep(run));
@@ -968,9 +986,19 @@ try {
     await sleep(2000);
     return cpuOver(run, idleSeconds);
   });
-  await step("pet", { key: "idlePet", text: "idle CPU pet out (%)" }, async () => {
+  // #67: the cat as if someone were at the PC (awake: its moments every 5–14 s), then as if they had left (asleep). The
+  // app asks the system how long it has been idle; that is the person's real idle time unless pinned here.
+  const idleFor = (seconds) => evaluate(run.main, `(() => { __e.powerMonitor.getSystemIdleTime = () => ${seconds}; return true; })()`);
+  await step("pet", { key: "idlePet", text: "idle CPU pet out, awake (%)" }, async () => {
+    await idleFor(0);
     await setPref(run, "petVisible", true);
     await sleep(2000);
+    return cpuOver(run, idleSeconds);
+  });
+  await step("pet", { key: "idlePetAsleep", text: "idle CPU pet out, asleep (%)" }, async () => {
+    // Asleep on its next moment (5–14 s), the yawn played.
+    await idleFor(36_000);
+    await sleep(17_000);
     const cpu = await cpuOver(run, idleSeconds);
     await setPref(run, "petVisible", false);
     return cpu;
@@ -997,6 +1025,25 @@ try {
     page.close();
     await sleep(2000);
     return cpuOver(run, idleSeconds);
+  });
+  // 바탕화면 달력 위젯 (#234): idle CPU and memory with none, one and four widgets (off-screen; each is a window and a page).
+  await step("widgets", { key: "widgets", text: "calendar widgets (idle %, MB)" }, async () => {
+    const widgetMemory = async () => {
+      const metrics = await evaluate(run.main, metricsExpression);
+      const pages = metrics.filter((entry) => entry.pages.includes("widget.html"));
+      return { count: pages.length, rendererMB: round(pages.reduce((sum, entry) => sum + entry.memory, 0) / 1024, 1), totalMB: round(metrics.reduce((sum, entry) => sum + entry.memory, 0) / 1024, 0) };
+    };
+    const none = { cpu: await cpuOver(run, idleSeconds), memory: await widgetMemory() };
+    await act(run.note, { type: "widgetAdd", kind: "month", style: "simple" });
+    await sleep(4000);
+    const one = { cpu: await cpuOver(run, idleSeconds), memory: await widgetMemory() };
+    await act(run.note, { type: "widgetAdd", kind: "today", style: "simple" });
+    await act(run.note, { type: "widgetAdd", kind: "week", style: "detail" });
+    await act(run.note, { type: "widgetAdd", kind: "agenda", style: "simple" });
+    await sleep(5000);
+    const four = { cpu: await cpuOver(run, idleSeconds), memory: await widgetMemory() };
+    const where = await evaluate(run.main, `__e.BrowserWindow.getAllWindows().filter((w) => w.webContents.getURL().endsWith("widget.html")).map((w) => w.getBounds())`);
+    return { none, one, four, perWidgetMB: round((four.memory.rendererMB) / Math.max(1, four.memory.count), 1), bounds: where, load: os.loadavg().map((value) => round(value, 2)) };
   });
   await showNote(true);
   await sleep(1000);

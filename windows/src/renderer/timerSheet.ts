@@ -1,7 +1,12 @@
 import { durationText, parseDuration, timerPresets } from "../core/duration";
 import { bodyFontSize, type PrefsState } from "../core/types";
 import { h, lang, paper, t } from "./api";
+import { listenForTyping } from "./typingTap";
+import { holdWhileAsked } from "./askGuard";
 import { appear, chip, fitWindow, slipButton, slipHead, tape } from "./slip";
+
+// #229: a question waiting holds this page up (askGuard.ts).
+holdWhileAsked();
 
 /**
  * 직접 정하기…: an S slip with one handwriting field for the timer's length (what it understood
@@ -73,3 +78,6 @@ api.on("timerSheet:open", (payload) => {
 });
 void api.getState().then(applyState);
 refresh();
+
+// #230: keys typed here make the desktop cat tap along (only that a key went down).
+listenForTyping();

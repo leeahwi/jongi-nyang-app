@@ -5,11 +5,14 @@ import {
 import {
   bookmarkLetters, checklistLine, checklistProgress, drawerFooter, folderColors, folderName, hasCheckedLines, inboxID, isCodeLine, memosIn, paperOf, pinnedView,
   placementOf, removeCheckedLines, resolveView, sheetCount, shortcutLabel, shownColor, slipTime, sortOf, viewForDigit, viewOf, visibleFolders, folderViews,
-  drawerPaper, drawerThemeValue, memoPapers, type DrawerBackdrop, type DrawerHit, type FolderSort, type FolderView, type MemoFolder, type MemoFolders, type MemoPaper,
+  memoPapers, type DrawerBackdrop, type DrawerHit, type FolderSort, type FolderView, type MemoFolder, type MemoFolders, type MemoPaper,
 } from "../core/memoDrawer";
 import { fontTitles, type MemosState } from "../core/types";
+import { drawerKindOf } from "../core/paper";
 import { cardFaceKey, drawerFaceMetrics, drawerMetrics, drawerPoints, endsParagraph } from "../core/textSteps";
 import { h, icon, lang, paper, scrollFade, t, motion, reduceMotion } from "./api";
+import { listenForTyping } from "./typingTap";
+import { holdWhileAsked } from "./askGuard";
 import { toaster } from "./slip";
 import { placeChildren } from "../core/placeChildren";
 import { drawerCat } from "./drawerCat";
@@ -19,6 +22,9 @@ import { toggleDone } from "../core/memoEdits";
 import { drawerFind, hitSnippet, searchFilters, searchFooterWords, type SearchFilter } from "../core/drawerFind";
 import { emptyQuestion, restoredWords, trashAgo, trashMenuLabel, type TrashEntry } from "../core/memoTrash";
 import { markdownNodes, memoBodyEditor, memoTitleEditor, nearBox, showTitleCaret, type BodyEditor, type LinkRequest, type MemoFormat, type TitleEditor } from "./memoEditor";
+
+// #229: a question waiting holds this page up (askGuard.ts).
+holdWhileAsked();
 
 /**
  * 메모 서랍 (1.28; 1.29 as the user chose it from the mocks): one folder at a time beside its bookmarks — the
@@ -83,7 +89,7 @@ const folderButton = h("button", { class: "fname", "aria-haspopup": "menu", "ari
 const findInput = h("input", { type: "search", placeholder: t("모든 폴더에서 찾기"), "aria-label": t("메모 찾기"), spellcheck: "false" });
 const find = h("div", { class: "find", hidden: "" }, findInput);
 const searchButton = h("button", { class: "ib", title: t("검색 (Ctrl+F)"), "aria-label": t("검색") }, icon("search", 15));
-/** #114: where to look (모든 폴더 · {지금 폴더}만) and what to keep to (체크 남음 · 링크 · 고정), under the field. */
+/** #114: where to look (모든 폴더 · {지금 폴더}만) and what to keep to (안 한 체크 · 링크 · 고정), under the field. */
 const chips = h("div", { class: "chips", hidden: "" });
 // #83: no × in the header any more; the small bar on the paper's inner edge closes the drawer (and Esc, the shortcut).
 const header = h("div", { class: "hd" }, sub, h("div", { class: "ttl" }, folderButton, find, h("span", { class: "ic" }, searchButton)), chips);
@@ -395,11 +401,16 @@ function openLink(url: string): void {
 
 const square = (color: string) => h("span", { class: `sq ${colorClass(color)}` });
 const cnt = (text: string) => h("span", { class: "cnt" }, text);
+/** The papers' names (#244: fifteen, core/paper.ts paperKinds), whole and short (the chips and the ⚙ menu). */
 const sheetWords = (): Record<MemoPaper, string> => ({
-  day: t("낮 종이"), night: t("밤 종이"), kraft: t("크라프트지"), grid: t("모눈 노트"), hanji: t("한지"), sage: t("쑥색 종이"), blossom: t("벚꽃 종이"), ink: t("먹색 종이"),
+  day: t("낮 종이"), hanji: t("한지"), kraft: t("크라프트지"), grid: t("모눈 노트"), sage: t("쑥색 종이"), blossom: t("벚꽃 종이"), memo: t("노란 메모지"),
+  manuscript: t("원고지"), lined: t("하늘색 줄노트"), lavender: t("라벤더 종이"), recycled: t("재생지"),
+  night: t("밤 종이"), ink: t("먹색 종이"), nightsky: t("밤하늘 종이"), chalk: t("칠판"),
 });
 const shortPaperWords = (): Record<MemoPaper, string> => ({
-  day: t("낮"), night: t("밤"), kraft: t("크라프트"), grid: t("모눈"), hanji: t("한지"), sage: t("쑥색"), blossom: t("벚꽃"), ink: t("먹색"),
+  day: t("낮"), hanji: t("한지"), kraft: t("크라프트"), grid: t("모눈"), sage: t("쑥색"), blossom: t("벚꽃"), memo: t("메모지", {}, "paper"),
+  manuscript: t("원고지"), lined: t("줄노트"), lavender: t("라벤더"), recycled: t("재생지"),
+  night: t("밤"), ink: t("먹색"), nightsky: t("밤하늘"), chalk: t("칠판"),
 });
 
 /** 이 메모의 종이: 서랍 따라 · 낮 · 밤 · 크라프트 · 모눈, as swatches. */
@@ -586,15 +597,24 @@ function deleteFolder(folder: MemoFolder): void {
 /** The ⚙ menu (the footer's ⚙, a right-click on the paper): 새 메모 · 종이 · 바탕 · 쪽 · 설정 · 도움말 · 끝내기. */
 function gearMenu(at: DOMRect | { x: number; y: number }, keyboard = false): void {
   const prefs = state!.prefs;
-  // #142: the paper picked for the day (밤에는 밤 종이로 is in 설정 → 메모 서랍).
-  const picked = drawerPaper(prefs.drawerTheme, prefs.drawerNightPaper);
-  const backdropWords: Record<DrawerBackdrop, string> = { solid: t("불투명"), frost: t("반투명"), strong: t("강하게"), none: t("바탕 없음") };
+  // #244: 노트와 같은 종이, or the drawer's own paper (밤에는 is in 설정 → 메모 서랍).
+  const own = drawerKindOf(prefs.drawerTheme);
+  const pickPaper = (paper: MemoPaper): void => {
+    if (prefs.drawerSameAsNote) act({ type: "setPref", key: "drawerSameAsNote", value: false });
+    act({ type: "setPref", key: "drawerTheme", value: paper });
+  };
+  const paperEntries = (): MenuEntry[] => [
+    { kind: "item", label: t("노트와 같은 종이"), icon: null, checked: prefs.drawerSameAsNote, run: () => act({ type: "setPref", key: "drawerSameAsNote", value: !prefs.drawerSameAsNote }) },
+    { kind: "sep" },
+    ...memoPapers.map((value): MenuEntry => ({ kind: "item", label: shortPaperWords()[value], icon: null, extra: [h("i", { class: `sq-paper s-${value}` })], checked: !prefs.drawerSameAsNote && own === value, run: () => pickPaper(value) })),
+  ];
+  const backdropWords: Record<DrawerBackdrop, string> = { solid: t("불투명"), frost: t("반투명"), strong: t("투명"), none: t("바탕 없음") };
   const entries: MenuEntry[] = [
     { kind: "item", label: t("새 메모"), icon: "plus", key: "Ctrl+N", run: () => { closeOpen(); render(); quick.focus(); } },
     { kind: "item", label: t("복사한 글로 새 메모"), icon: "paste", run: pasteMemo },
     ...trashRow().filter((entry) => entry.kind === "item"),
     { kind: "sep" },
-    { kind: "chips", label: t("종이"), options: memoPapers.map((value) => ({ value, label: shortPaperWords()[value], swatch: `s-${value} s-drawer`, checked: picked.paper === value })), pick: (value) => act({ type: "setPref", key: "drawerTheme", value: drawerThemeValue(value as MemoPaper, picked.nightPaper) }) },
+    { kind: "sub", label: t("종이"), icon: "palette", entries: paperEntries },
     { kind: "chips", label: t("바탕"), options: (["solid", "frost", "strong", "none"] as DrawerBackdrop[]).map((value) => ({ value, label: backdropWords[value], swatch: `s-${value}`, checked: prefs.drawerBackdrop === value })), pick: (value) => act({ type: "setPref", key: "drawerBackdrop", value }) },
     { kind: "sep" },
     { kind: "item", label: prefs.drawerSide === "right" ? t("왼쪽에 두기") : t("오른쪽에 두기"), icon: "panel", run: () => act({ type: "setPref", key: "drawerSide", value: prefs.drawerSide === "right" ? "left" : "right" }) },
@@ -821,9 +841,14 @@ function kindRow(memo: Memo, time: string, kind = memoKind(memo.text)): HTMLElem
     chip.addEventListener("click", (event) => { event.stopPropagation(); act({ type: "copyText", text: kind.number }); toast.show({ icon: "check", text: t("복사했어요"), ms: 1600 }); });
     row.append(chip);
   } else {
-    const bar = h("span", { class: "bar" }, h("i", {}));
-    (bar.firstElementChild as HTMLElement).style.width = `${Math.round((kind.done / kind.total) * 100)}%`;
-    row.append(h("span", { class: "kchip", "aria-label": t("{done}/{total} 완료", { done: kind.done, total: kind.total }) }, icon("checkBox", 11, 1.8), h("span", {}, `${kind.done}/${kind.total}`)), bar);
+    // #240: the progress sits inside the chip (it stood apart in the row and read as a stray line); all done: no bar,
+    // a ✓ in the check colour and ‘4/4’ in ink. Same as the Mac's ChecklistChip.
+    const finished = kind.total > 0 && kind.done >= kind.total;
+    const said = t("체크 {total}개 중 {done}개 했어요", { done: kind.done, total: kind.total });
+    const bar = finished ? null : h("span", { class: "bar", "aria-hidden": "true" }, h("i", {}));
+    if (bar) (bar.firstElementChild as HTMLElement).style.width = kind.done === 0 ? "0" : `max(5px, ${Math.round((kind.done / kind.total) * 100)}%)`;
+    row.append(h("span", { class: `kchip check${finished ? " done" : ""}`, role: "img", title: said, "aria-label": said },
+      icon(finished ? "check" : "checkBox", 11, finished ? 2.4 : 1.8), h("span", {}, `${kind.done}/${kind.total}`), bar));
   }
   row.append(h("span", { class: "m" }, time));
   return row;
@@ -1351,7 +1376,8 @@ function renderList(): void {
     const asked = query.trim() || [...searchOn].map(filterWord).join(" · ");
     // One shape for every search that finds nothing (#39): the words looked for (or the chips), then 없어요; before
     // anything is asked, the 초성 hint.
-    if (total === 0) list.append(h("div", { class: "empty" }, h("p", {}, asked ? t("‘{query}’에 맞는 게 없어요", { query: asked }) : t("초성으로도 찾을 수 있어요 (예: ㅂㄱㅅ → 보고서)"))));
+    // #240: words that found nothing end in what to try next; the chips alone keep the short line.
+    if (total === 0) list.append(h("div", { class: "empty" }, h("p", {}, asked ? (query.trim() ? t("‘{query}’에 맞는 게 없어요. 초성이나 다른 말로 찾아볼까요?", { query: asked }) : t("‘{query}’에 맞는 게 없어요", { query: asked })) : t("초성으로도 찾을 수 있어요 (예: ㅂㄱㅅ → 보고서)"))));
     count.textContent = searchFooterWords(total, groups.length, lang());
     return;
   }
@@ -1554,7 +1580,7 @@ function revealHit(memo: Memo): void {
   openMemo(memo.id, !checklistProgress(memo.text));
 }
 
-const filterWord = (filter: SearchFilter): string => ({ open: t("체크 남음"), link: t("링크"), pinned: t("고정") }[filter]);
+const filterWord = (filter: SearchFilter): string => ({ open: t("안 한 체크"), link: t("링크"), pinned: t("고정") }[filter]);
 
 /** A folder's group in the results: its colour as a small square, its name and count, a hairline (#114). */
 function findHeader(id: string, count: number): HTMLElement {
@@ -1564,7 +1590,7 @@ function findHeader(id: string, count: number): HTMLElement {
     h("span", { class: "n" }, String(count)));
 }
 
-/** The chips under the field (#114): 모든 폴더 · {이름}만 (one of the two), then 체크 남음 · 링크 · 고정 (any of them). */
+/** The chips under the field (#114): 모든 폴더 · {이름}만 (one of the two), then 안 한 체크 · 링크 · 고정 (any of them). */
 function renderChips(): void {
   chips.hidden = !searching;
   if (!searching) return;
@@ -1879,7 +1905,7 @@ closeBar.addEventListener("click", () => {
   close();
 });
 
-// ─── 반투명 · 강하게 on Windows 11: the window cut to the paper, the bookmarks and the ears ──
+// ─── 반투명 · 투명 on Windows 11: the window cut to the paper, the bookmarks and the ears ──
 
 let shapeQueued = false;
 function queueShape(): void {
@@ -2064,3 +2090,6 @@ const cardRect = (id: string) => list.querySelector<HTMLElement>(`.it[data-id="$
   edgeHover: () => stage.classList.add("edge-hover"),
   reset: () => { stage.classList.remove("edge-hover"); formatOpen = false; closeLink(); showTitleCaret(false); closeMenus(); hideTip(); closeOpen(); if (searching) leaveSearch(false); big = false; selectedID = undefined; quick.value = ""; fitQuick(); toast.hide(); slips.clear(); headers.clear(); render(); list.scrollTop = 0; },
 };
+
+// #230: keys typed here make the desktop cat tap along (only that a key went down).
+listenForTyping();

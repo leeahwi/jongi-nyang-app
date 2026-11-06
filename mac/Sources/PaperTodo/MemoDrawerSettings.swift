@@ -90,10 +90,10 @@ struct MemoDrawerSettingsGroup: View {
     }
 
     private var appearanceFooter: String {
-        let base = L("바탕은 서랍 종이를 비쳐 보이게 하거나(반투명 · 강하게) 걷어 내요(바탕 없음). 메모지는 늘 불투명해요.")
+        let base = L("바탕은 서랍 종이를 비쳐 보이게 하거나(반투명 · 투명) 걷어 내요(바탕 없음). 메모지는 늘 불투명해요.")
             + " " + L("굵게 · 목록 같은 서식 기호는 커서가 있는 줄에서만 보여요. ⇧⌘R로 늘 보이게 할 수 있어요.")
         guard drawer.reduceTransparency else { return base }
-        return base + " " + L("손쉬운 사용의 ‘투명도 줄이기’가 켜져 있어서 반투명 · 강하게는 불투명으로 보여요.")
+        return base + " " + L("손쉬운 사용의 ‘투명도 줄이기’가 켜져 있어서 반투명 · 투명은 불투명으로 보여요.")
     }
 
     private var shortcutFooter: String {
@@ -115,7 +115,7 @@ struct OpenDrawerButton: View {
         Button { model.openMemoDrawer() } label: {
             Label(L("서랍 열기"), systemImage: "pawprint").labelStyle(.titleAndIcon)
         }
-        .buttonStyle(PaperActionButtonStyle(primary: true))
+        .buttonStyle(PaperActionButtonStyle())
         .fixedSize()
     }
 }

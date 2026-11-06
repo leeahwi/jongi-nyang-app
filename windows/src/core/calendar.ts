@@ -316,7 +316,8 @@ export function calendarRows(events: readonly CalendarEvent[], now: Date, lang: 
 // ─── 달력 (3단계): the month and week window ──────────────────────────────────
 //
 // The calendar window counts days from midnight (the note's "today" still turns at 4 a.m.),
-// weeks start on Sunday (Monday in Dutch: weekStartsMonday), and every day is a local "yyyy-MM-dd".
+// weeks start on the system's first day (Monday or Sunday; else Sunday, Monday in Dutch: weekStartsMonday), and every
+// day is a local "yyyy-MM-dd".
 
 const dayStart = (day: string) => localDate(day) ?? startOfDay(new Date());
 const nextMidnight = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
@@ -361,9 +362,93 @@ export function eventsOn(day: string, events: readonly CalendarEvent[]): Calenda
     })
     .sort((a, b) => {
       if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
-      if (a.allDay) return before(a.title, b.title);
+      // calendar-flows D1: the all-day one begun first (then the longer) on top, so a trip keeps its place day after
+      // day and its band joins; one-day ones by title, as before.
+      if (a.allDay) return a.start.getTime() - b.start.getTime() || b.end.getTime() - a.end.getTime() || before(a.title, b.title);
       return a.start.getTime() - b.start.getTime() || before(a.title, b.title);
     });
+}
+
+// ─── 여러 날 일정과 긴 이름 (calendar-flows D1 · D2) ─────────────────────────────
+
+/**
+ * The event's key when it is drawn as a band on `day` (all day, or running through the whole day: begun the day before
+ * and ending the day after), else undefined. A band with the same key on the next day in the same place joins it.
+ */
+export function bandKey(event: CalendarEvent, day: string): string | undefined {
+  const S = dayStart(day);
+  const E = nextMidnight(S);
+  if (event.allDay) return event.start <= S && S < event.end ? event.key : undefined;
+  return event.start < S && event.end > E ? event.key : undefined;
+}
+
+/**
+ * A line of a week row's cell as drawn: `run` ≥ 1 where its title is drawn — over how many days, its own and the following
+ * ones where the same band sits in the same place; 0 where an earlier day's title runs over it (the band only).
+ * `fromLeft` · `toRight`: it joins the day before · after in the row.
+ */
+export interface Band { run: number; fromLeft: boolean; toRight: boolean }
+
+/** It lines up with another day (a title running on, or a band joined): it keeps one line. */
+export const bandJoined = (band: Band): boolean => band.fromLeft || band.toRight || band.run > 1;
+
+/**
+ * A week row's bands: `rows[d]` are day d's lines as drawn, each its band key (`bandKey`) or null. The title is drawn
+ * once per run — on the band's first day in the row (a new row draws it again) — and runs over the days the same band
+ * keeps the same place; a band that moves to another place starts again. Same as CalendarMonth.bands.
+ */
+export function bands(rows: readonly (readonly (string | null | undefined)[])[]): Band[][] {
+  const keyAt = (day: number, index: number) => rows[day]?.[index] ?? undefined;
+  return rows.map((lines, day) => lines.map((band, index) => {
+    if (band == null) return { run: 1, fromLeft: false, toRight: false };
+    const fromLeft = keyAt(day - 1, index) === band;
+    const toRight = keyAt(day + 1, index) === band;
+    if (fromLeft) return { run: 0, fromLeft: true, toRight };
+    let run = 1;
+    while (keyAt(day + run, index) === band) run += 1;
+    return { run, fromLeft: false, toRight };
+  }));
+}
+
+/** How a month cell's line fits on one line: whole, cut, or a band joined to another day. */
+export type LineFit = "fit" | "cut" | "band";
+
+/**
+ * Audit 3 · 28 (D2): the lines that take a second line for a cut title. The cell's spare lines (`room` less the lines
+ * drawn) go to the cut titles from the top, one each — never to a band joined to another day, nor to a line above one
+ * (the band would leave its place beside the next day). Same as CalendarMonth.twoLineTitles.
+ */
+export function twoLineTitles(room: number, lines: readonly LineFit[]): boolean[] {
+  let spare = room - lines.length;
+  const lastBand = lines.lastIndexOf("band");
+  return lines.map((fit, index) => {
+    if (spare <= 0 || fit !== "cut" || index <= lastBand) return false;
+    spare -= 1;
+    return true;
+  });
+}
+
+/**
+ * #260: as `twoLineTitles`, with the day's holiday name as the cell's first line (`holiday`, undefined on other days) and
+ * `room` counting it. The spare lines go from the top, so the name comes first; it takes two lines only when no band
+ * passes through that day (a band below it would leave its place beside the next day). Same as CalendarMonth's.
+ */
+export function cellTwoLines(room: number, holiday: LineFit | undefined, lines: readonly LineFit[]): { holiday: boolean; lines: boolean[] } {
+  if (!holiday) return { holiday: false, lines: twoLineTitles(room, lines) };
+  const two = twoLineTitles(room, [holiday, ...lines]);
+  return { holiday: two[0], lines: two.slice(1) };
+}
+
+/** #260: English and Dutch also break a long word onto the second line, by the language's hyphenation; Korean between words only. */
+export const hyphenates = (lang: Lang): boolean => lang !== "ko";
+
+/**
+ * #260: how a title that may not fit sits on one line. `overflows`: wider than the line; `betweenWords`: it may break
+ * between words; `inWord`: a long word of it may break at a hyphenation point. Same as CalendarMonth.lineFit.
+ */
+export function lineFit(overflows: boolean, betweenWords: boolean, inWord: boolean, lang: Lang): LineFit {
+  if (!overflows) return "fit";
+  return betweenWords || (inWord && hyphenates(lang)) ? "cut" : "fit";
 }
 
 /**
@@ -418,14 +503,38 @@ export function dayTasks(day: string, tasks: readonly TaskLike[], lang: Lang = "
 
 export type CellItem = { kind: "event"; event: CalendarEvent } | { kind: "task"; task: DayTask };
 
-/** What a month cell shows: the day's events, then its deadlines (alerts stay in the day panel); the first `limit` and how many more. */
-export function cellItems(day: string, events: readonly CalendarEvent[], tasks: readonly TaskLike[], limit = 3): { items: CellItem[]; more: number } {
+/**
+ * What a month cell shows: the day's events, then its deadlines, then its reminders (#227: the title only, the time is in
+ * the tooltip and the day panel; a to-do due the same day shows once, as its deadline); the first `limit` and how many more.
+ */
+export function cellItems(day: string, events: readonly CalendarEvent[], tasks: readonly TaskLike[], limit = 3, lang: Lang = "ko"): { items: CellItem[]; more: number } {
+  const onDay = dayTasks(day, tasks, lang);
   const all: CellItem[] = [
     ...eventsOn(day, events).map((event): CellItem => ({ kind: "event", event })),
     // (A deadline with hours on it is still the day's deadline here: cells keep their flag.)
-    ...dayTasks(day, tasks).filter((task) => task.kind === "deadline" || task.due).map((task): CellItem => ({ kind: "task", task: { title: task.title, kind: "deadline", taskId: task.taskId } })),
+    ...onDay.filter((task) => task.kind === "deadline" || task.due).map((task): CellItem => ({ kind: "task", task: { title: task.title, kind: "deadline", taskId: task.taskId } })),
+    ...onDay.filter((task) => task.kind === "reminder").map((task): CellItem => ({ kind: "task", task })),
   ];
   return { items: all.slice(0, limit), more: Math.max(0, all.length - limit) };
+}
+
+/**
+ * A week row's tasks (#227, as the month cell's order): the deadlines first, then the alerts and hours by time — when the
+ * row is full, "+N개 더" takes the reminders first. The day panel keeps `dayTasks`' order.
+ */
+export function weekOrder(tasks: readonly DayTask[]): DayTask[] {
+  return [...tasks.filter((task) => task.kind === "deadline"), ...tasks.filter((task) => task.kind !== "deadline")];
+}
+
+/**
+ * A task line's tooltip in a month cell or a week row (#227): "알림 15:00 · 치과 예약", "마감 · 보고서 쓰기", "14:00–15:30 · 운동"
+ * — en "Reminder 3:00 PM · …", "Due · …"; nl "Herinnering 15:00 · …", "Deadline · …".
+ */
+export function taskTooltip(task: DayTask, lang: Lang = "ko"): string {
+  const index = langIndex(lang);
+  if (task.kind === "reminder") return `${["알림", "Reminder", "Herinnering"][index]} ${task.time ?? ""} · ${task.title}`;
+  if (task.kind === "deadline") return `${["마감", "Due", "Deadline"][index]} · ${task.title}`;
+  return `${task.time ?? ""} · ${task.title}`;
 }
 
 /** "2026년 10월", "October 2026", "oktober 2026" (`month` 1–12). */

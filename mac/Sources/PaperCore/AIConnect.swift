@@ -16,7 +16,9 @@ public enum AIConnect {
     /// `aiExtVersion` (this app ships that extension): written into ai-link.json, and the extension writes its
     /// own into each log line, so an older Claude Desktop copy can be told apart.
     /// 3 (spaces 2c, N3-8): the extension moves to-dos between spaces, and an app that writes 3 can undo that.
-    public static let extVersion = 3
+    /// 4 (N3-9, #196): the app puts this Mac's 이 기기에서 into ai-link.json, and the extension hides those spaces as the
+    /// note does.
+    public static let extVersion = 4
 
     /// Spaces 2c (N3-6): a to-do's place, logged by its to-do id as `{id, space, at}` (`{id, space: null}` when it had none).
     public static let placesFile = "todo-spaces.json"
@@ -34,8 +36,11 @@ public enum AIConnect {
         public var updatedAt: String
         /// The extension version this app carries (absent from apps before it).
         public var ext: Int?
+        /// N3-9 (#196): this Mac's 이 기기에서 (`spaces.device`, D5's shape), so Claude here hides what the note hides.
+        /// Absent while every space shows (S73).
+        public var spaceDevice: [String: DeviceRule]?
 
-        public init(enabled: Bool, dataFolder: String, lang: AppLanguage, app: String, now: Date = Date()) {
+        public init(enabled: Bool, dataFolder: String, lang: AppLanguage, app: String, spaceDevice: [String: DeviceRule] = [:], now: Date = Date()) {
             v = 1
             self.enabled = enabled
             self.dataFolder = dataFolder
@@ -43,6 +48,7 @@ public enum AIConnect {
             self.app = app
             updatedAt = AIConnect.isoText(now)
             ext = AIConnect.extVersion
+            self.spaceDevice = spaceDevice.isEmpty ? nil : spaceDevice
         }
 
         public func encoded() -> Data {
@@ -50,6 +56,20 @@ public enum AIConnect {
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
             return (try? encoder.encode(self)) ?? Data()
         }
+    }
+
+    /// One space's 이 기기에서 as ai-link.json carries it (D5): `{"show": "hide"}` or `{"show": "time", "times": [...]}`
+    /// with days 1 Monday … 7 Sunday and `HH:mm` times — the app's own setting, made by SpaceDevice.plain.
+    public struct DeviceRule: Codable, Equatable, Sendable {
+        public struct Times: Codable, Equatable, Sendable {
+            public var days: [Int]
+            public var from: String
+            public var to: String
+            public init(days: [Int], from: String, to: String) { self.days = days; self.from = from; self.to = to }
+        }
+        public var show: String
+        public var times: [Times]?
+        public init(show: String, times: [Times]? = nil) { self.show = show; self.times = times }
     }
 
     /// "2026-10-27T05:12:03Z": UTC, whole seconds (the log's and the link's format).

@@ -2,7 +2,8 @@ import { BrowserWindow, globalShortcut, ipcMain, nativeTheme, screen, type Recta
 import os from "node:os";
 import path from "node:path";
 import { bigDrawerWidth } from "../core/memoCards";
-import { backdropClashes, changedToday, clampDrawerWidth, drawerLook, shortcutLabel, type DrawerBackdrop } from "../core/memoDrawer";
+import { backdropClashes, changedToday, clampDrawerWidth, shortcutLabel, type DrawerBackdrop } from "../core/memoDrawer";
+import type { PaperKind } from "../core/paper";
 import { t } from "../i18n";
 import { offscreen, offscreenEnabled, shortcutsDisabled } from "./env";
 import type { Store } from "./store";
@@ -15,8 +16,8 @@ const handleSize = { width: 30, height: 50 };
 const snapshotHeight = 780;
 
 export interface DrawerHooks {
-  /** Night paper now (자동 follows it). */
-  night: () => boolean;
+  /** The drawer's paper shown now (#244: the notepad's with 노트와 같은 종이, else its own; core/paper.ts drawerShown). */
+  look: () => PaperKind;
   /** Whether the system asks for less motion (the slide is then skipped). */
   reduceMotion: () => boolean;
 }
@@ -70,12 +71,14 @@ export class MemoDrawer {
       if (key === "drawerPinned") this.applyPinned();
       if (key === "drawerSide" || key === "drawerWidth") { if (this.open) this.place(); this.placeHandle(); }
       if (key === "drawerSide" && this.open && this.loaded && this.window && !this.window.isDestroyed()) this.window.webContents.send("drawer:open", { slide: false, side: this.store.prefs.drawerSide, look: this.look() });
-      if (key === "drawerHandle" || key === "drawerSide" || key === "drawerTheme" || key === "drawerNightPaper") this.updateHandle();
-      if (key === "drawerTheme" || key === "drawerNightPaper") this.sendLook();
-      // The paper picks whether 반투명 · 강하게 can be drawn over this app's acrylic (#184).
-      if (key === "drawerBackdrop" || key === "drawerTheme" || key === "drawerNightPaper") this.applyBackdrop();
+      // #244: the drawer's paper follows its own settings, or the notepad's (노트와 같은 종이).
+      const paperKey = key === "drawerTheme" || key === "drawerNight" || key === "drawerNightPaper" || key === "drawerSameAsNote" || key === "paperTheme" || key === "paperNight";
+      if (key === "drawerHandle" || key === "drawerSide" || paperKey) this.updateHandle();
+      if (paperKey) this.sendLook();
+      // The paper picks whether 반투명 · 투명 can be drawn over this app's acrylic (#184).
+      if (key === "drawerBackdrop" || paperKey) this.applyBackdrop();
     });
-    // Windows' "transparency effects" switched, or the app's 낮 · 밤 (the acrylic's light or dark, #184): 반투명 · 강하게 follow.
+    // Windows' "transparency effects" switched, or the app's 낮 · 밤 (the acrylic's light or dark, #184): 반투명 · 투명 follow.
     nativeTheme.on("updated", () => this.applyBackdrop());
     this.noteBackdrop();
     store.on("change", () => this.sendHandle());
@@ -169,7 +172,7 @@ export class MemoDrawer {
 
   // ─── Where it goes ─────────────────────────────────────────────────────────
 
-  private look() { return drawerLook(this.store.prefs.drawerTheme, this.hooks.night(), this.store.prefs.drawerNightPaper); }
+  private look() { return this.hooks.look(); }
 
   /** 자동 follows the note's paper: the page hears the look again when the paper changes. */
   sendLook(): void {
@@ -181,7 +184,7 @@ export class MemoDrawer {
   // ─── 바탕 (1.29) ────────────────────────────────────────────────────────────
 
   /**
-   * Why 반투명 · 강하게 can't be drawn here, or undefined when they can: no acrylic before Windows 11 22H2 (build 22621;
+   * Why 반투명 · 투명 can't be drawn here, or undefined when they can: no acrylic before Windows 11 22H2 (build 22621;
    * 21H2, build 22000, is Windows 11 too, #184), Windows' transparency effects off, or a drawer paper of the other kind
    * than the app's 낮 · 밤 (the acrylic follows the app, `backdropClashes`). Away from Windows (snapshots, perf on a Mac)
    * the page draws them itself.
@@ -189,19 +192,19 @@ export class MemoDrawer {
   private backdropProblem(): string | undefined {
     if (process.platform !== "win32") return undefined;
     const build = Number(os.release().split(".")[2] ?? 0);
-    if (build < 22621) return t("이 Windows에서는 반투명 · 강하게가 불투명으로 보여요(Windows 11 22H2 이상에서 돼요).");
-    if (nativeTheme.prefersReducedTransparency) return t("Windows의 투명 효과가 꺼져 있어 반투명 · 강하게가 불투명으로 보여요.");
-    if (backdropClashes(this.look(), nativeTheme.shouldUseDarkColors)) return t("서랍 종이의 밝기가 앱의 낮 · 밤과 달라서, 글씨가 잘 보이게 반투명 · 강하게를 불투명으로 보여 줘요.");
+    if (build < 22621) return t("이 Windows에서는 반투명 · 투명이 불투명으로 보여요(Windows 11 22H2 이상에서 돼요).");
+    if (nativeTheme.prefersReducedTransparency) return t("Windows의 투명 효과가 꺼져 있어 반투명 · 투명이 불투명으로 보여요.");
+    if (backdropClashes(this.look(), nativeTheme.shouldUseDarkColors)) return t("서랍 종이의 밝기가 앱의 낮 · 밤과 달라서, 글씨가 잘 보이게 반투명 · 투명을 불투명으로 보여 줘요.");
     return undefined;
   }
 
-  /** 바탕 as drawn: the setting, with 반투명 · 강하게 as 불투명 where they can't be drawn. */
+  /** 바탕 as drawn: the setting, with 반투명 · 투명 as 불투명 where they can't be drawn. */
   backdrop(): DrawerBackdrop {
     const wanted = this.store.prefs.drawerBackdrop;
     return (wanted === "frost" || wanted === "strong") && this.backdropProblem() ? "solid" : wanted;
   }
 
-  /** 설정 › 메모 서랍 says why 반투명 · 강하게 look solid here. */
+  /** 설정 › 메모 서랍 says why 반투명 · 투명 look solid here. */
   private noteBackdrop(): void {
     const note = this.backdropProblem();
     if (note !== this.store.drawerBackdropNote) {
@@ -212,7 +215,7 @@ export class MemoDrawer {
 
   private acrylic = false;
   /**
-   * Windows 11's acrylic under 반투명 · 강하게 (the page tints it with the paper at 82 % / 62 %). The window is cut to
+   * Windows 11's acrylic under 반투명 · 투명 (the page tints it with the paper at 82 % / 62 %). The window is cut to
    * the paper, the bookmarks and the ears (`drawer:shape`), so the blur doesn't show around them.
    */
   private applyBackdrop(): void {
@@ -373,6 +376,8 @@ export class MemoDrawer {
   /** The handle's display: the primary one (the drawer itself opens where the mouse is). */
   private handleArea(): Rectangle {
     if (this.snapshotArea) return this.snapshotArea;
+    // Off-screen runs (#250): the drawer's own area, far off every display — not the primary display's.
+    if (offscreenEnabled) return this.workArea();
     return screen.getPrimaryDisplay().workArea;
   }
 

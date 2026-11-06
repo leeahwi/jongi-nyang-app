@@ -1,12 +1,19 @@
 #!/bin/bash
 # 하루 일정표 끌기 점검 (1.41): builds a separate debug test copy (bundle id com.noa.PaperTodo.LiveTest, never dist/),
-# gives it one to-do at this hour (90 minutes), opens it with --timetable-replay (TimetableReplay.swift), which replays
-# mouse drags through the app's real event path — move, stretch the bottom, stretch the top, Esc, past the viewport's
-# bottom — and logs, every tick, the pointer and where the block was drawn. Then drag-check.py checks that the block
-# followed the pointer. The installed app and its data are never touched; the copy is stopped by its pid and everything
-# it wrote is removed.
+# gives it one to-do at 09:00 (90 minutes) on a note whose clock is stopped at 09:00 (`--timetable-now`, #243: the
+# timetable opens at 08:00 and the drags have the same room whenever the check runs — at this hour, an afternoon run had
+# no room left before 24:00), opens it with --timetable-replay (TimetableReplay.swift), which replays mouse drags through
+# the app's real event path — move, stretch the bottom, stretch the top, Esc, past the viewport's bottom, and held there
+# to the day's end — and logs, every tick, the pointer and where the block was drawn. Then drag-check.py checks that the
+# block followed the pointer and stopped at 24:00 with the scrolling. The installed app and its data are never touched;
+# the copy is stopped by its pid and everything it wrote is removed.
 #
-#   scripts/drag-check.sh [out-folder] [--no-build]      (DRAG_CHECK_ARGS: more launch arguments)
+#   scripts/drag-check.sh [out-folder] [--no-build]      (DRAG_CHECK_ARGS: more launch arguments;
+#                                                         DRAG_CHECK_AT=HH:MM: the block and the clock at another hour,
+#                                                         04:00–21:59)
+#
+# #217: the copy starts behind (`open -g`), never comes forward, and its note is far off every screen (`--offscreen`):
+# the replay needs no screen, it calls the drag's own closures and sends Esc to the window itself.
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 out="${1:-$repo/.build/drag-check}"
@@ -15,8 +22,11 @@ build=1
 for arg in "$@"; do [ "$arg" = "--no-build" ] && build=0; done
 bundle_id=com.noa.PaperTodo.LiveTest
 mkdir -p "$out"
+# The copy writes its log by this path from its own folder: an absolute one.
+out="$(cd "$out" && pwd)"
 app="$out/DragCheck.app"
 log="$out/drag.jsonl"
+probe="$out/perf-probe"
 storage="$HOME/Library/Application Support/$bundle_id"
 
 if [ "$build" = 1 ]; then
@@ -35,6 +45,7 @@ if [ "$build" = 1 ]; then
     rm -f "$app"/Contents/Resources/*.lproj/InfoPlist.strings
     [ -d "$bin/PaperTodo_PaperTodo.bundle" ] && cp -R "$bin/PaperTodo_PaperTodo.bundle" "$app/Contents/Resources/" || true
     codesign --force --deep --sign - "$app" 2>/dev/null
+    swiftc -O "$repo/scripts/perf-probe.swift" -o "$probe" 2>&1 | grep -v warning || true
 fi
 
 pid=""
@@ -49,18 +60,20 @@ cleanup() {
 }
 trap cleanup EXIT
 
+at="${DRAG_CHECK_AT:-09:00}"
+[[ "$at" =~ ^(0[4-9]|1[0-9]|2[01]):[0-5][0-9]$ ]] || { echo "DRAG_CHECK_AT is HH:MM from 04:00 to 21:59: $at" >&2; exit 2; }
 rm -rf "$storage"; mkdir -p "$storage"
-python3 -I - "$storage" <<'PY'
+python3 -I - "$storage" "$at" <<'PY'
 import json, os, sys, uuid
 from datetime import datetime, timedelta, timezone
-folder = sys.argv[1]
+folder, at = sys.argv[1], sys.argv[2]
 now = datetime.now().astimezone()
 day = (now - timedelta(hours=4)).strftime("%Y-%m-%d")
-hour = now.hour
-end = (now.replace(minute=0) + timedelta(minutes=90))
+start = datetime.strptime(at, "%H:%M")
+end = start + timedelta(minutes=90)
 utc = now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 items = [{"id": str(uuid.uuid4()).upper(), "title": "끌기 시험", "isCompleted": False, "createdAt": utc, "todaySince": day,
-          "timeStart": f"{hour:02d}:00", "timeEnd": end.strftime("%H:%M")}]
+          "timeStart": start.strftime("%H:%M"), "timeEnd": end.strftime("%H:%M")}]
 json.dump({"items": items}, open(os.path.join(folder, "todos.json"), "w"), ensure_ascii=False)
 json.dump({"events": []}, open(os.path.join(folder, "events.json"), "w"))
 PY
@@ -74,7 +87,10 @@ defaults write "$bundle_id" systemNotices off
 defaults write "$bundle_id" AppleLanguages -array ko
 
 : > "$log"
-open -n "$app" --args --timetable-replay "$log" ${DRAG_CHECK_ARGS:-}
+# (TZ set: the copy runs in the script's time zone too.)
+open -g -n --env PAPERTODO_OFFSCREEN=1 ${TZ:+--env "TZ=$TZ"} "$app" --args --timetable-replay "$log" --timetable-now "$at" --offscreen ${DRAG_CHECK_ARGS:-}
 for _ in $(seq 1 100); do pid=$(pgrep -f "$app/Contents/MacOS/PaperTodo" | head -1 || true); [ -n "$pid" ] && break; sleep 0.05; done
+sleep 1
+if ! "$probe" offscreen "$pid"; then echo "a window of the test copy is on a screen: stopping"; exit 1; fi
 for _ in $(seq 1 300); do grep -q '"done"\|"error"' "$log" 2>/dev/null && break; sleep 0.1; done
 python3 -I "$repo/scripts/drag-check.py" "$log"

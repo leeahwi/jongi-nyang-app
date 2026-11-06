@@ -593,12 +593,12 @@ private enum MemoDrawerTests {
         }
 
         try test("footer and bookmark words (1.44, the Windows app's)") {
-            try equal(MemoFolders.footerShort(folder: "회사", count: 5), "회사 · 다섯 장", "footer")
+            try equal(MemoFolders.footerShort(folder: "회사", count: 5), "회사 · 5장", "footer (#240: digits, like the groups' counts)")
             try equal(MemoFolders.footerShort(folder: "Work", count: 5, language: .en), "Work · 5 notes", "footer en")
             try equal(MemoFolders.footerShort(folder: "Werk", count: 0, language: .nl), "Leeg", "empty: only that (#39)")
             try equal(MemoFolders.pinnedFooterShort(count: 0), "비어 있어요", "pinned empty")
             try equal([AppLanguage.ko, .en, .nl].map { MemoFolders.searchFooter(count: 0, language: $0) }, ["찾은 메모 0장", "0 notes found", "0 notities gevonden"], "search none")
-            try equal(MemoFolders.pinnedFooterShort(count: 3), "고정 · 세 장", "pinned")
+            try equal(MemoFolders.pinnedFooterShort(count: 3), "고정 · 3장", "pinned")
             try equal(MemoFolders.pinnedFooterShort(count: 3, language: .nl), "Vastgezet · 3 notities", "pinned nl")
             try equal(MemoFolders.bookmarkLabel("장보기", count: 3, key: "⌘3"), "장보기 · 세 장 · ⌘3", "bookmark")
             try equal(MemoFolders.bookmarkLabel("Study", count: 0, key: nil, language: .en), "Study · empty", "empty, past the ninth")

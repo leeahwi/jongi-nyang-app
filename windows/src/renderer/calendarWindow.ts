@@ -1,14 +1,21 @@
 import {
-  agendaTime, allDayText, cellItems, dayTasks, dayTitle, draftForDay, eventsOn, fetchRange, monthGrid, monthTitle, weekDays, weekTitle,
-  type CalendarEvent, type CalendarSheetRequest, type CellItem, type DayTask,
+  agendaTime, cellItems, dayTasks, dayTitle, draftForDay, eventsOn, fetchRange, monthGrid, monthTitle, weekDays, weekOrder, weekTitle,
+  type CalendarEvent, type CalendarSheetRequest,
 } from "../core/calendar";
-import { draftFromEvent, expand, parseOccurrenceKey } from "../core/events";
+import { draftFromEvent, eventMark, expand, parseOccurrenceKey } from "../core/events";
 import { fromKey, key as dayKey } from "../core/deadline";
+import type { TodoItem } from "../core/notebook";
 import type { TodosState } from "../core/types";
 import { weekdayLetter, weekdayOrder, weekdayShort } from "../core/lang";
 import { h, icon, lang, paper, t } from "./api";
+import { listenForTyping } from "./typingTap";
+import { holdWhileAsked } from "./askGuard";
 import { openEventSheet, type EventSheet } from "./eventSheet";
+import { cellDot, cellLine, dayMarks, fitTitles, hereTasks, lateOn, taskLine, weekBands } from "./calendarCells";
 import { paneSight } from "./paneSight";
+
+// #229: a question waiting holds this page up (askGuard.ts).
+holdWhileAsked();
 
 /**
  * 달력: a month of six weeks, or a week of seven rows, with the events (events.json, spread over the
@@ -31,6 +38,8 @@ let state: TodosState | undefined;
 let view: "month" | "week" = "month";
 /** Opened on a day (an alert's title: ?day=2026-10-08), else today. */
 const requestedDay = new URLSearchParams(location.search).get("day");
+/** calendar-flows D3: an event pressed on a widget (?event=local/…@2026-10-08): its sheet opens with the first month. */
+let requestedEvent = new URLSearchParams(location.search).get("event") ?? undefined;
 let selected = requestedDay && fromKey(requestedDay) ? requestedDay : dayKey(new Date());
 /** The month on screen in the month view (1–12); the week view shows the selected day's week. */
 let shown = { year: new Date().getFullYear(), month: new Date().getMonth() + 1 };
@@ -90,10 +99,20 @@ function newEvent(day = selected, anchor?: () => HTMLElement | undefined): void 
 
 /** A day panel row: the event to change (a repeating one as a whole; deleting asks about that day). */
 function openEvent(event: CalendarEvent, row: HTMLElement): void {
-  const parsed = parseOccurrenceKey(event.key);
+  openEventKey(event.key, () => (row.isConnected ? row : undefined));
+}
+
+/**
+ * The sheet of an event by its occurrence's key ("local/<id>@<day>"), beside its row in the day panel (calendar-flows D3:
+ * also when a widget or its day sheet asked for it). False when there is no such event any more.
+ */
+function openEventKey(key: string, anchor?: () => HTMLElement | undefined): boolean {
+  const parsed = parseOccurrenceKey(key);
   const stored = parsed && state?.events.find((entry) => entry.id === parsed.id);
-  if (!parsed || !stored) return;
-  showSheet({ mode: "edit", key: event.key, id: stored.id, day: parsed.day, recurring: stored.repeat !== "none", draft: draftFromEvent(stored) }, () => (row.isConnected ? row : undefined));
+  if (!parsed || !stored) return false;
+  const row = () => [...app.querySelectorAll<HTMLElement>(".panel .ev")].find((element) => element.dataset.key === key) ?? app.querySelector<HTMLElement>(".panel") ?? undefined;
+  showSheet({ mode: "edit", key, id: stored.id, day: parsed.day, recurring: stored.repeat !== "none", draft: draftFromEvent(stored) }, anchor ?? row);
+  return true;
 }
 
 function showSheet(request: CalendarSheetRequest, anchor: () => HTMLElement | undefined = () => undefined): void {
@@ -138,37 +157,21 @@ function topBar(): HTMLElement {
 
 // ─── The month ────────────────────────────────────────────────────────────────
 
-const items = () => state?.items ?? [];
-
-/** A deadline on this day or before it is due or late (clay); a later one is a quiet ink flag. */
-const lateOn = (day: string) => day <= today();
-
 /**
- * One line in a month cell: an event (its colour bar and its title; the time is in the tooltip and the
- * day panel, so the title keeps the room) or a deadline (a flag and the title).
+ * The to-dos the calendar shows: #227, without the ones this PC hides now (as the 오늘 창 — a peek on the note doesn't
+ * reach here). Worked out again only when the state changes or the minute turns (a time rule).
  */
-function cellLine(item: CellItem, day: string): HTMLElement {
-  if (item.kind === "task") {
-    return h("div", { class: `item deadline${lateOn(day) ? " late" : ""}`, title: t("마감 · {title}", { title: item.task.title }) }, icon("flag", 10, 2), h("span", { class: "t" }, item.task.title));
-  }
-  const event = item.event;
-  const when = agendaTime(event, day, lang());
-  // All day (or across the whole day): a tint of its colour.
-  const spansDay = when === allDayText(lang());
-  const line = h("div", { class: `item${spansDay ? " all-day" : ""}`, title: `${when} · ${event.title}` },
-    h("span", { class: "bar evc", "aria-hidden": "true" }),
-    h("span", { class: "t" }, event.title));
-  line.style.setProperty("--color", event.color);
-  return line;
+let shownItems: { from?: TodosState; minute: number; items: readonly TodoItem[] } = { minute: -1, items: [] };
+function items(): readonly TodoItem[] {
+  if (!state) return [];
+  const now = new Date();
+  const minute = Math.floor(now.getTime() / 60_000);
+  if (shownItems.from === state && shownItems.minute === minute) return shownItems.items;
+  const list = hereTasks(state, now);
+  shownItems = { from: state, minute, items: list };
+  return list;
 }
 
-/** A very narrow cell: each item a dot of its colour (a deadline a small flag), the title in the tooltip. */
-function cellDot(item: CellItem, day: string): HTMLElement {
-  if (item.kind === "task") return h("span", { class: `dot deadline${lateOn(day) ? " late" : ""}`, title: t("마감 · {title}", { title: item.task.title }) }, icon("flag", 9, 2));
-  const dot = h("span", { class: "dot evc", title: `${agendaTime(item.event, day, lang())} · ${item.event.title}` });
-  dot.style.setProperty("--color", item.event.color);
-  return dot;
-}
 function monthView(): HTMLElement {
   const days = monthGrid(shown.year, shown.month, lang());
   const now = today();
@@ -177,18 +180,29 @@ function monthView(): HTMLElement {
   const grid = h("div", { class: `month${room.dots ? " dotted" : ""}`, role: "grid", "aria-label": monthTitle(shown.year, shown.month, lang()) }, head);
   for (let week = 0; week < 6; week += 1) {
     const row = h("div", { class: "grid-row", role: "row" });
-    for (const day of days.slice(week * 7, week * 7 + 7)) {
+    // #234: the lunar date beside the number, and a holiday's name as the cell's first line (it takes a line's room).
+    const cells = days.slice(week * 7, week * 7 + 7).map((day) => {
+      const marks = dayMarks(day, state!.prefs);
+      return { day, marks, holiday: Boolean(marks.holiday) && !room.dots, ...cellItems(day, events, items(), room.dots || Math.max(1, room.cell - (marks.holiday ? 1 : 0)), lang()) };
+    });
+    // calendar-flows D1: a trip's band joins along the row, its title once.
+    const rowBands = room.dots ? [] : weekBands(cells);
+    cells.forEach(({ day, marks, items: lines, more }, column) => {
       const date = fromKey(day)!;
-      const { items: lines, more } = cellItems(day, events, items(), room.dots || room.cell);
+      const lead = marks.holiday ? 1 : 0;
       const cell = h("div", {
-        class: ["cell", date.getDay() === 0 ? "sun" : date.getDay() === 6 ? "sat" : "", date.getMonth() + 1 !== shown.month ? "outside" : "", day === now ? "today" : "", day === selected ? "selected" : ""].filter(Boolean).join(" "),
-        role: "gridcell", "data-day": day, "aria-selected": String(day === selected), "aria-label": `${dayTitle(day, lang())}${lines.length + more ? `, ${t("{n}개", { n: lines.length + more })}` : ""}`,
+        class: ["cell", date.getDay() === 0 ? "sun" : date.getDay() === 6 ? "sat" : "", marks.holiday ? "holiday" : "", date.getMonth() + 1 !== shown.month ? "outside" : "", day === now ? "today" : "", day === selected ? "selected" : ""].filter(Boolean).join(" "),
+        role: "gridcell", "data-day": day, "aria-selected": String(day === selected),
+        "aria-label": [dayTitle(day, lang()), marks.holiday, marks.lunarSpoken, lines.length + more ? t("{n}개", { n: lines.length + more }) : ""].filter(Boolean).join(", "),
       },
-      h("div", { class: "cell-head" }, h("span", { class: "num" }, String(date.getDate())), more > 0 ? h("span", { class: "more" }, `+${more}`) : null),
-      ...(room.dots ? [h("div", { class: "dots" }, ...lines.map((item) => cellDot(item, day)))] : lines.map((item) => cellLine(item, day))));
+      h("div", { class: "cell-head" }, h("span", { class: "num" }, String(date.getDate())), more > 0 ? h("span", { class: "more" }, `+${more}`) : null,
+        marks.lunar ? h("span", { class: "lunar", title: marks.lunarSpoken, "data-lunar-day": String(marks.lunarDay ?? 0) }, marks.lunar) : null),
+      ...(marks.holiday && !room.dots ? [h("div", { class: "holiday-name", title: marks.holiday, "aria-hidden": "true" }, marks.holidayShown ?? marks.holiday)] : []),
+      ...(room.dots ? [h("div", { class: "dots" }, ...lines.map((item) => cellDot(item, day)))] : lines.map((item, index) => cellLine(item, day, rowBands[column]?.[index], index + lead))));
+      if (marks.holiday && room.dots) cell.title = marks.holiday;
       cell.addEventListener("click", () => clickDay(day, cell));
       row.append(cell);
-    }
+    });
     grid.append(row);
   }
   return grid;
@@ -196,43 +210,35 @@ function monthView(): HTMLElement {
 
 // ─── The week ─────────────────────────────────────────────────────────────────
 
-/** A task in a week row: the alert's bell and time, or ⚑ 마감, in the time column (clay when it is due or late). */
-function taskLine(task: DayTask, day: string): HTMLElement {
-  const late = task.kind === "deadline" && lateOn(day);
-  // 시간 정하기: a task's hours as an outlined line (a card with a sage edge, like its block on the ribbon).
-  if (task.kind === "range") {
-    return h("div", { class: "line task range", title: `${task.time ?? ""} · ${task.title}` },
-      h("span", { class: "time" }, icon("clock", 11, 2), task.start ?? ""), h("span", { class: "t" }, task.title));
-  }
-  return h("div", { class: `line task ${task.kind}${late ? " late" : ""}`, title: task.kind === "reminder" ? t("알림 {time} · {title}", { time: task.time ?? "", title: task.title }) : t("마감 · {title}", { title: task.title }) },
-    h("span", { class: "time" }, icon(task.kind === "reminder" ? "bell" : "flag", 11, 2), task.kind === "reminder" ? task.time ?? "" : t("마감")),
-    h("span", { class: "t" }, task.title));
-}
-
 function weekView(): HTMLElement {
   const now = today();
   const list = h("div", { class: "week", role: "grid", "aria-label": weekTitle(weekDays(selected, lang()), lang()) });
   for (const day of weekDays(selected, lang())) {
     const date = fromKey(day)!;
     const dayEvents = eventsOn(day, events);
-    const tasks = dayTasks(day, items(), lang(), now);
+    // #227: as the month cells — events, deadlines, then reminders (with their time here: the row has the column).
+    const tasks = weekOrder(dayTasks(day, items(), lang(), now));
     const lines: HTMLElement[] = [
       ...dayEvents.map((event) => {
         const bar = h("span", { class: "bar evc", "aria-hidden": "true" });
-        bar.style.background = event.color;
+        bar.style.background = eventMark(event.color);
         return h("div", { class: "line", title: `${agendaTime(event, day, lang())} · ${event.title}` }, h("span", { class: "time" }, agendaTime(event, day, lang())), bar, h("span", { class: "t" }, event.title));
       }),
       ...tasks.map((task) => taskLine(task, day)),
     ];
+    // #234: a holiday's name first (it takes a line's room); the lunar date under the weekday.
+    const marks = dayMarks(day, state!.prefs);
+    if (marks.holiday) lines.unshift(h("div", { class: "line holiday", title: marks.holiday }, h("span", { class: "time" }), h("span", { class: "t" }, marks.holiday)));
     const fit = lines.length > room.week ? room.week - 1 : room.week;
     const shownLines = lines.slice(0, fit);
     const hidden = lines.length - shownLines.length;
     const more = hidden > 0 ? h("button", { class: "line more-line" }, t("+{n}개 더", { n: hidden })) : null;
     const row = h("div", {
-      class: ["day-row", date.getDay() === 0 ? "sun" : date.getDay() === 6 ? "sat" : "", day === now ? "today" : "", day === selected ? "selected" : ""].filter(Boolean).join(" "),
+      class: ["day-row", date.getDay() === 0 ? "sun" : date.getDay() === 6 ? "sat" : "", marks.holiday ? "holiday" : "", day === now ? "today" : "", day === selected ? "selected" : ""].filter(Boolean).join(" "),
       role: "row", "data-day": day, "aria-selected": String(day === selected), "aria-label": dayTitle(day, lang()),
     },
-    h("div", { class: "label" }, h("span", { class: "n" }, String(date.getDate())), h("span", { class: "w" }, weekdayShort(date.getDay(), lang()))),
+    h("div", { class: "label" }, h("span", { class: "n" }, String(date.getDate())), h("span", { class: "w" }, weekdayShort(date.getDay(), lang())),
+      marks.lunar ? h("span", { class: "lunar", title: marks.lunarSpoken }, marks.lunar) : null),
     h("div", { class: "lines" }, ...shownLines, more, lines.length === 0 ? h("div", { class: "line none" }, "") : null));
     row.addEventListener("click", () => clickDay(day, row));
     list.append(row);
@@ -245,13 +251,16 @@ function weekView(): HTMLElement {
 function dayPanel(): HTMLElement {
   const isToday = selected === today();
   const head = h("div", { class: "panel-head" }, h("span", { class: "date" }, dayTitle(selected, lang())), isToday ? h("span", { class: "badge" }, t("오늘")) : null);
+  // calendar-flows: the holiday's name under the date.
+  const marks = dayMarks(selected, state!.prefs);
+  const holiday = marks.holiday;
   const scroll = h("div", { class: "panel-scroll" });
   const dayEvents = eventsOn(selected, events);
   scroll.append(h("div", { class: "section" }, t("일정")));
   if (dayEvents.length === 0) scroll.append(h("div", { class: "nothing" }, t("일정 없음")));
   for (const event of dayEvents) {
     const bar = h("span", { class: "bar evc", "aria-hidden": "true" });
-    bar.style.background = event.color;
+    bar.style.background = eventMark(event.color);
     const row = h("button", { class: "ev", "data-key": event.key, title: t("고치기") },
       bar,
       h("span", { class: "main" },
@@ -280,7 +289,11 @@ function dayPanel(): HTMLElement {
       scroll.append(row);
     }
   }
-  return h("aside", { class: "panel", "aria-label": dayTitle(selected, lang()) }, head, scroll);
+  // …and the lunar date's spoken form beside it (holiday first), one line.
+  const note = holiday || marks.lunarSpoken
+    ? h("div", { class: "panel-holiday" }, holiday ?? null, holiday && marks.lunarSpoken ? " · " : null, marks.lunarSpoken ? h("span", { class: "panel-lunar" }, marks.lunarSpoken) : null)
+    : null;
+  return h("aside", { class: "panel", "aria-label": [dayTitle(selected, lang()), holiday, marks.lunarSpoken].filter(Boolean).join(", ") }, head, note, scroll);
 }
 
 // ─── Drawing ──────────────────────────────────────────────────────────────────
@@ -292,6 +305,15 @@ function render(): void {
   const scroll = app.querySelector(".panel-scroll");
   if (scroll) scroll.scrollTop = scrollTop;
   if (measureRoom()) render();
+  else fitMonth();
+}
+
+/** calendar-flows D1 · D2: titles laid over their bands, and cut ones on two lines where a cell has a line to spare. */
+function fitMonth(): void {
+  if (view !== "month") return;
+  // Dots in very narrow cells: no lunar date in the head (narrower than 72 anyway).
+  if (room.dots) { for (const lunar of app.querySelectorAll<HTMLElement>(".month [data-lunar-day]")) lunar.hidden = true; return; }
+  fitTitles(app, ".month .cell", () => room.cell, ".holiday-name");
 }
 
 /** How many lines the drawn cells (or week rows) hold; true when that changed. */
@@ -311,7 +333,7 @@ function measureRoom(): boolean {
   room = next;
   return changed;
 }
-window.addEventListener("resize", () => { if (state && measureRoom()) render(); });
+window.addEventListener("resize", () => { if (!state) return; if (measureRoom()) render(); else fitMonth(); });
 
 // ─── Keyboard ─────────────────────────────────────────────────────────────────
 
@@ -346,6 +368,8 @@ function apply(next: TodosState): void {
     view = next.prefs.calendarView === "week" ? "week" : "month";
     shown = monthOf(selected);
     redraw();
+    if (requestedEvent) openEventKey(requestedEvent);
+    requestedEvent = undefined;
     // `npm run perf` reads when the first month was drawn.
     performance.mark("paper:first-render");
   }
@@ -364,10 +388,15 @@ const sight = paneSight("calendar", redraw);
 api.on("state", (next) => apply(next as TodosState));
 // An alert's title (or 달력에서 열기), with the desk already open: that day.
 api.on("desk:pane", (payload) => {
-  const { pane, day } = (payload ?? {}) as { pane?: unknown; day?: unknown };
+  const { pane, day, event } = (payload ?? {}) as { pane?: unknown; day?: unknown; event?: unknown };
   if (pane !== "calendar" || typeof day !== "string" || !fromKey(day)) return;
   sheet?.close();
+  // Before the first state (the pane still loading): the sheet opens with the first month.
+  if (!state) { selected = day; if (typeof event === "string") requestedEvent = event; return; }
+  sight.flush();
   choose(day);
+  // calendar-flows D3: an event pressed on a widget — its sheet, beside its row.
+  if (typeof event === "string") openEventKey(event);
 });
 api.on("calendar:event-sheet", (payload) => {
   sight.flush();
@@ -383,3 +412,6 @@ setInterval(() => {
   render();
 }, 60_000);
 void api.getState().then(apply);
+
+// #230: keys typed here make the desktop cat tap along (only that a key went down).
+listenForTyping();

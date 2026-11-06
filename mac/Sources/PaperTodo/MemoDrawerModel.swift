@@ -269,24 +269,8 @@ extension GlobalShortcut {
 final class MemoDrawer: ObservableObject {
     enum Side: String, CaseIterable { case right, left }
 
-    /// 서랍 종이 (#142): the paper picked for the day — the four of 1.45, then 한지 · 쑥색 · 벚꽃 · 먹색. Whether it gives
-    /// way to 밤 종이 at night is `nightPaper` (1.45's ‘자동’ is 낮 종이 with it on).
-    enum Theme: String, CaseIterable, Identifiable {
-        case day, night, kraft, grid, hanji, sage, blossom, ink
-        var id: String { rawValue }
-        var title: String {
-            switch self {
-            case .day: L("낮 종이")
-            case .night: L("밤 종이")
-            case .kraft: L("크라프트지")
-            case .grid: L("모눈 노트")
-            case .hanji: L("한지")
-            case .sage: L("쑥색 종이")
-            case .blossom: L("벚꽃 종이")
-            case .ink: L("먹색 종이")
-            }
-        }
-    }
+    /// 서랍 종이 (#142, #244): the drawer's own paper — one of the note's fifteen — used when 노트와 같은 종이 is off.
+    typealias Theme = PaperKind
 
     static let widths: ClosedRange<CGFloat> = 260...480
     static let defaultWidth: CGFloat = 300
@@ -299,13 +283,25 @@ final class MemoDrawer: ObservableObject {
     @Published var side: Side { didSet { preferences.set(side.rawValue, forKey: "drawer.side") } }
     @Published var width: CGFloat { didSet { preferences.set(Double(width), forKey: "drawer.width") } }
     @Published var handleOn: Bool { didSet { preferences.set(handleOn, forKey: "drawer.handle") } }
+    /// 노트와 같은 종이 (#244): the drawer is the note's paper (on by default; 1.47's ‘자동’ moves to on).
+    @Published var sameAsNote: Bool { didSet { saveTheme() } }
+    /// The drawer's own paper and its own 밤에는, while 노트와 같은 종이 is off.
     @Published var theme: Theme { didSet { saveTheme() } }
-    /// 밤에는 밤 종이로 (#142): at night a light paper gives way to 밤 종이 (a dark one stays).
-    @Published var nightPaper: Bool { didSet { saveTheme() } }
-    /// `drawer.theme` keeps 1.45's values (`auto` for 낮 종이 with the switch on), `drawer.nightPaper` the switch.
+    @Published var night: NightChoice { didSet { saveTheme() } }
+    /// 1.47's 밤에는 밤 종이로: 밤에는 밤 종이 (on) or 그대로 (off).
+    var nightPaper: Bool {
+        get { night == .night }
+        set { night = newValue ? .night : .keep }
+    }
+    var own: PaperLook.Drawer { PaperLook.Drawer(sameAsNote: sameAsNote, paper: theme, night: night) }
+    /// `drawer.theme` and `drawer.nightPaper` keep 1.45–1.47's values (`auto` for 낮 종이 with 밤 종이 at night) so an
+    /// older version on this Mac still shows the drawer's own paper; `drawer.sameAsNote` and `drawer.night` are 1.48's.
     private func saveTheme() {
-        preferences.set(TextSteps.drawerThemeValue(paper: theme.rawValue, nightPaper: nightPaper), forKey: "drawer.theme")
-        preferences.set(nightPaper, forKey: "drawer.nightPaper")
+        let stored = PaperLook.storedDrawer(own)
+        preferences.set(stored.theme, forKey: "drawer.theme")
+        preferences.set(stored.nightPaper, forKey: "drawer.nightPaper")
+        preferences.set(night.rawValue, forKey: "drawer.night")
+        preferences.set(sameAsNote, forKey: "drawer.sameAsNote")
     }
     /// 위에 고정: floating above other windows (default on).
     @Published var pinned: Bool { didSet { preferences.set(pinned, forKey: "drawer.pinned") } }
@@ -346,7 +342,7 @@ final class MemoDrawer: ObservableObject {
             switch self {
             case .opaque: L("불투명")
             case .translucent: L("반투명")
-            case .strong: L("강하게")
+            case .strong: L("투명")
             case .none: L("바탕 없음")
             }
         }
@@ -416,9 +412,9 @@ final class MemoDrawer: ObservableObject {
     }
     /// The titles' handwriting: the body's when it is a handwriting face (title and words alike), else the notebook's.
     var titleFont: NotebookFont { bodyFace.notebook ?? model.notebookFont }
-    /// System Settings › Accessibility › Display › Reduce transparency: 반투명 and 강하게 draw as 불투명.
+    /// System Settings › Accessibility › Display › Reduce transparency: 반투명 and 투명 draw as 불투명.
     @Published var reduceTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
-    /// What's drawn: 반투명/강하게 fall back to 불투명 under Reduce transparency (바탕 없음 still works).
+    /// What's drawn: 반투명/투명 fall back to 불투명 under Reduce transparency (바탕 없음 still works).
     var shownBackdrop: Backdrop {
         reduceTransparency && (backdrop == .translucent || backdrop == .strong) ? .opaque : backdrop
     }
@@ -550,15 +546,17 @@ final class MemoDrawer: ObservableObject {
         var moving: String?
     }
 
-    /// The paper drawn now (밤에는 밤 종이로 follows the app's day or night).
+    /// The paper drawn now (the app's appearance: 낮 · 밤 with the note's paper).
     var palette: DrawerPalette {
         palette(NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .dark : .light)
     }
 
-    /// The paper drawn under `scheme`: the picked one, or 밤 종이 at night when the switch says so.
+    /// The paper drawn under `scheme`: the note's paper drawn then (노트와 같은 종이), or its own — the one picked, or at night
+    /// the one its 밤에는 picked (the app's 낮 · 밤 decides night).
     func palette(_ scheme: ColorScheme) -> DrawerPalette {
-        let shown = TextSteps.drawerShownPaper(paper: theme.rawValue, nightPaper: nightPaper, night: scheme == .dark)
-        return DrawerPalette.of(DrawerPalette.Kind(rawValue: shown) ?? .day)
+        let store = PaperLook.shared
+        let shown = sameAsNote ? store.paper(dark: scheme == .dark) : store.look.drawerShown(own, systemDark: store.systemDark)
+        return DrawerPalette.of(DrawerPalette.Kind(shown))
     }
 
     struct DrawerToast: Equatable {
@@ -576,10 +574,18 @@ final class MemoDrawer: ObservableObject {
         let saved = store.double(forKey: "drawer.width")
         width = saved > 0 ? min(max(CGFloat(saved), Self.widths.lowerBound), Self.widths.upperBound) : Self.defaultWidth
         handleOn = store.object(forKey: "drawer.handle") == nil ? true : store.bool(forKey: "drawer.handle")
-        // #142: 1.45's ‘자동’ is 낮 종이 with 밤에는 밤 종이로 on; a paper picked by name had it off.
-        let picked = TextSteps.drawerPaper(theme: store.string(forKey: "drawer.theme"), nightPaper: store.object(forKey: "drawer.nightPaper") as? Bool)
-        theme = Theme(rawValue: picked.paper) ?? .day
-        nightPaper = picked.nightPaper
+        // #142: 1.45's ‘자동’ is 낮 종이 with 밤에는 밤 종이로 on; a paper picked by name had it off. #244: the first time
+        // 1.48 opens, ‘자동’ becomes 노트와 같은 종이 (the note starts as 낮 종이 + 밤 종이 too) and any other paper the drawer's own.
+        let savedSame = store.object(forKey: "drawer.sameAsNote") as? Bool
+        let picked = PaperLook.readDrawer(sameAsNote: savedSame, theme: store.string(forKey: "drawer.theme"),
+                                          nightPaper: store.object(forKey: "drawer.nightPaper") as? Bool, night: store.string(forKey: "drawer.night"))
+        sameAsNote = picked.sameAsNote
+        theme = picked.paper
+        night = picked.night
+        if savedSame == nil {
+            store.set(picked.sameAsNote, forKey: "drawer.sameAsNote")
+            store.set(picked.night.rawValue, forKey: "drawer.night")
+        }
         pinned = store.object(forKey: "drawer.pinned") == nil ? true : store.bool(forKey: "drawer.pinned")
         backdrop = Backdrop(rawValue: store.string(forKey: "drawer.backdrop") ?? "") ?? .opaque
         bodyFace = MemoText.Face(rawValue: store.string(forKey: "drawer.font") ?? "") ?? .clean

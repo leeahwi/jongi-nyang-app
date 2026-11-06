@@ -113,6 +113,8 @@ final class TimetableScroller: NSObject {
     }
     var onScroll: (() -> Void)?
     private var link: CADisplayLink?
+    /// A check's run (#217): its window is off every screen and gets no display frames, so a timer steps instead.
+    private var timer: Timer?
     private var speed: CGFloat = 0
     private var last: CFTimeInterval = 0
     static let zone: CGFloat = 24
@@ -124,7 +126,8 @@ final class TimetableScroller: NSObject {
         return document.isFlipped ? clip.minY : document.frame.height - clip.maxY
     }
 
-    private func scroll(to value: CGFloat) {
+    /// Scrolled to `value` points from the top of the hours (kept inside the hours). Internal for the debug replay.
+    func scroll(to value: CGFloat) {
         guard let view, let document = view.documentView else { return }
         let clip = view.contentView
         let most = max(0, document.frame.height - clip.bounds.height)
@@ -138,6 +141,7 @@ final class TimetableScroller: NSObject {
         #if DEBUG
         TimetableProbe.scroll = top
         TimetableProbe.foundScrollView = view != nil
+        TimetableProbe.scroller = self
         #endif
     }
 
@@ -151,8 +155,16 @@ final class TimetableScroller: NSObject {
     func follow(pointer y: CGFloat, height: CGFloat) {
         speed = Self.speed(pointer: y, height: height)
         if speed == 0 { stop(); return }
-        guard link == nil, let view else { return }
+        guard link == nil, timer == nil, let view else { return }
         last = 0
+        if TestHooks.staysBehind, view.window?.screen == nil {
+            let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { _ in
+                MainActor.assumeIsolated { [weak self] in self?.advance(now: CACurrentMediaTime()) }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            self.timer = timer
+            return
+        }
         let link = view.displayLink(target: self, selector: #selector(step(_:)))
         link.add(to: .main, forMode: .common)
         self.link = link
@@ -161,11 +173,14 @@ final class TimetableScroller: NSObject {
     func stop() {
         link?.invalidate()
         link = nil
+        timer?.invalidate()
+        timer = nil
         speed = 0
     }
 
-    @objc private func step(_ link: CADisplayLink) {
-        let now = link.timestamp
+    @objc private func step(_ link: CADisplayLink) { advance(now: link.timestamp) }
+
+    private func advance(now: CFTimeInterval) {
         let elapsed = last == 0 ? 1.0 / 60 : min(0.05, now - last)
         last = now
         let before = top

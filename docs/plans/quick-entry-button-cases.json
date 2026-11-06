@@ -1,0 +1,26 @@
+{
+  "about": "빠른 입력의 진한 버튼과 노트 입력 줄의 ‘↩ …’이 하는 말 (#240, UI/UX 점검 3의 D3 B). 버튼은 고른 칩을 따라가요: 칩이 일정이면 ‘일정 넣기’, Tab으로 할 일 칩을 고르면 ‘할 일 넣기’. kinds: 칩 종류마다 ko · en · nl(none은 아직 읽은 게 없을 때, 버튼은 흐려요). lines: now(서울, 2026-10-08 14:50)에 그 줄을 적었을 때 칩 차례대로의 버튼. Mac PaperCore Intent.actionText(scripts/test-intent.sh)와 Windows core/intent.ts actionText(test/intent.test.ts)가 이 파일을 읽어요.",
+  "now": [2026, 10, 8, 14, 50],
+  "kinds": [
+    { "kind": "none", "words": ["넣기", "Add", "Toevoegen"] },
+    { "kind": "todo", "words": ["할 일 넣기", "Add to-do", "Taak toevoegen"] },
+    { "kind": "event", "words": ["일정 넣기", "Add event", "Afspraak toevoegen"] },
+    { "kind": "timer", "words": ["타이머 시작", "Start timer", "Timer starten"] },
+    { "kind": "focus", "words": ["집중 시작", "Start focus", "Focus starten"] },
+    { "kind": "alarm", "words": ["알람 맞추기", "Set alarm", "Wekker zetten"] },
+    { "kind": "memo", "words": ["메모 넣기", "Add note", "Notitie toevoegen"] },
+    { "kind": "repeat", "words": ["반복 할 일 넣기", "Add repeating to-do", "Herhalende taak toevoegen"] }
+  ],
+  "lines": [
+    { "case": "Q1 일정이 먼저, Tab이면 할 일", "lang": "ko", "text": "내일 3시 회의", "buttons": ["일정 넣기", "할 일 넣기"] },
+    { "case": "Q2 그냥 할 일", "lang": "ko", "text": "우유 사기", "buttons": ["할 일 넣기", "메모 넣기"] },
+    { "case": "Q3 타이머", "lang": "ko", "text": "타이머 40", "buttons": ["타이머 시작", "할 일 넣기"] },
+    { "case": "Q4 이름이 있는 타이머는 집중", "lang": "ko", "text": "보고서 25분 집중", "buttons": ["집중 시작", "할 일 넣기"] },
+    { "case": "Q5 알람", "lang": "ko", "text": "알람 7시", "buttons": ["알람 맞추기", "할 일 넣기"] },
+    { "case": "Q6 /메모", "lang": "ko", "text": "/메모 장보기 목록", "buttons": ["메모 넣기"] },
+    { "case": "Q7 반복 할 일", "lang": "ko", "text": "매일 물 마시기", "buttons": ["반복 할 일 넣기", "할 일 넣기"] },
+    { "case": "Q8 en 일정", "lang": "en", "text": "meeting tomorrow 3pm", "buttons": ["Add event", "Add to-do"] },
+    { "case": "Q9 en 타이머", "lang": "en", "text": "timer 25", "buttons": ["Start timer", "Add to-do"] },
+    { "case": "Q10 nl 알람", "lang": "nl", "text": "wekker 7:00", "buttons": ["Wekker zetten", "Taak toevoegen"] }
+  ]
+}

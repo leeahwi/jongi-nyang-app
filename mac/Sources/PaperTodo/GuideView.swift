@@ -86,12 +86,22 @@ struct GuideView: View {
                         HStack(spacing: 8) {
                             Text(label).foregroundStyle(PaperTheme.secondary)
                             Spacer(minLength: 8)
-                            Text(key)
-                                .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                            if key == L("네모 칸 누르기") {
+                                // Not a key (#240, 점검 3의 25): what to click, beside a small box — no keycap.
+                                HStack(spacing: 5) {
+                                    Image(systemName: "square").font(.system(size: 10.5, weight: .medium))
+                                    Text(key).font(.system(size: 11, weight: .semibold))
+                                }
                                 .foregroundStyle(PaperTheme.sageText)
-                                .padding(.horizontal, 7)
                                 .frame(height: 20)
-                                .background(PaperTheme.sage.opacity(0.1), in: RoundedRectangle(cornerRadius: 5))
+                            } else {
+                                Text(key)
+                                    .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                                    .foregroundStyle(PaperTheme.sageText)
+                                    .padding(.horizontal, 7)
+                                    .frame(height: 20)
+                                    .background(PaperTheme.sage.opacity(0.1), in: RoundedRectangle(cornerRadius: 5))
+                            }
                         }
                         .font(.system(size: 11.5))
                     }

@@ -7,7 +7,7 @@ export function paneTitle(pane: DeskPane): string {
   switch (pane) {
     case "calendar": return t("달력");
     case "history": return t("완료 기록");
-    case "clock": return t("시계");
+    case "clock": return t("알람 · 타이머");
     case "appearance": return t("꾸미기");
     case "notifications": return t("알림");
     case "repeat": return t("반복");
@@ -25,6 +25,7 @@ export function sectionTitle(section: DeskSection): string {
   switch (section) {
     case "view": return t("보기", undefined, "desk");
     case "settings": return t("설정");
+    case "data": return t("메모와 데이터");
     case "help": return t("도움");
   }
 }

@@ -41,6 +41,16 @@ export const eventRepeatTitle = (repeat: EventRepeat, lang: Lang = "ko"): string
 /** A colour's name: en "Blue", "Green", "Orange", "Purple", "Yellow", "Gray"; nl "Blauw", "Groen", "Oranje", "Paars", "Geel", "Grijs". */
 export const eventColorTitle = (color: EventColor, lang: Lang = "ko"): string => colorTitles[lang][color];
 
+/**
+ * An event's colour as its bar or dot is drawn (#244, Q6): one of the six as the paper's own mark colour (`--ev-blue` …,
+ * a step deeper on a light paper, lighter on a dark one, until it is 3:1 on the paper and its cards; base.css ·
+ * papers.css), any other colour as it is. The colour kept in events.json doesn't change.
+ */
+export function eventMark(hex: string): string {
+  const entry = eventColors.find((color) => color.hex === hex.trim().toLowerCase());
+  return entry ? `var(--ev-${entry.value}, ${entry.hex})` : hex;
+}
+
 export const colorHex = (color: EventColor): string => (eventColors.find((entry) => entry.value === color) ?? eventColors[0]).hex;
 /** Unknown values read as "none" and "blue". */
 export const toRepeat = (value: unknown): EventRepeat => (eventRepeats.some((entry) => entry.value === value) ? value as EventRepeat : "none");

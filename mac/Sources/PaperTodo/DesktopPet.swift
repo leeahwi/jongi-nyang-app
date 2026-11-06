@@ -40,11 +40,14 @@ final class DesktopPetController {
     private var chatterTimer: Timer?
     private var nextChatter = Date().addingTimeInterval(Double.random(in: 300...600))
     private var questionTask: Task<Void, Never>?
+    /// 치면 두드리는 고양이 (#230): the paws for typing, and the small cat over full-screen apps.
+    let typing: PetTyping
 
-    init(model: AppModel, preferences: UserDefaults, onOpenNote: @escaping () -> Void) {
+    init(model: AppModel, preferences: UserDefaults, inputMonitoring: InputMonitoringAccess, onOpenNote: @escaping () -> Void) {
         self.model = model
         self.preferences = preferences
         self.onOpenNote = onOpenNote
+        typing = PetTyping(model: model, preferences: preferences, access: inputMonitoring)
         lastCompleted = model.totalCompletedCount
         model.$petVisible.removeDuplicates().sink { [weak self] visible in
             DispatchQueue.main.async { self?.setVisible(visible) }
@@ -55,12 +58,18 @@ final class DesktopPetController {
         }.store(in: &subscriptions)
         NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)
             .receive(on: RunLoop.main).sink { [weak self] _ in self?.layout() }.store(in: &subscriptions)
-        let timer = Timer(timeInterval: 30, repeats: true) { _ in
-            Task { @MainActor [weak self] in self?.checkChatter() }
-        }
-        timer.tolerance = 5
-        RunLoop.main.add(timer, forMode: .common)
-        chatterTimer = timer
+        // #64: the half-minute check runs only while there is someone to speak (the cat out, 한마디 on).
+        model.$chatterEnabled.removeDuplicates().sink { [weak self] _ in
+            DispatchQueue.main.async { self?.updateChatterTimer() }
+        }.store(in: &subscriptions)
+        typing.attach(PetTyping.Host(
+            isVisible: { [weak self] in self?.isVisible == true },
+            isCovered: { [weak self] in guard let self else { return false }; return self.isVisible && !self.onScreen },
+            doing: { [weak self] in self?.typingDoing() ?? .hidden },
+            prepare: { [weak self] reply in self?.prepareForTyping(reply) },
+            show: { [weak self] pose in self?.showTyping(pose) },
+            screen: { [weak self] in self?.savedScreen() ?? NSScreen.main }
+        ))
     }
 
     var isVisible: Bool { panel?.isVisible == true }
@@ -80,6 +89,7 @@ final class DesktopPetController {
             let panel = panel ?? makePanel()
             layout()
             panel.orderFrontRegardless()
+            updateChatterTimer()
             settle()
             if onScreen {
                 installMouseMonitors()
@@ -88,10 +98,13 @@ final class DesktopPetController {
         } else {
             panel?.orderOut(nil)
             removeMouseMonitors()
+            updateChatterTimer()
             idleTask?.cancel(); idleTask = nil
             clipTask?.cancel(); clipTask = nil
             dragOrigin = nil
+            leaveCushion()
         }
+        typing.refresh()
     }
 
     private func makePanel() -> NSPanel {
@@ -140,6 +153,7 @@ final class DesktopPetController {
 
     private func occlusionChanged() {
         guard isVisible else { return }
+        defer { typing.refresh() }
         if onScreen {
             installMouseMonitors()
             if idleTask == nil && clipTask == nil { scheduleIdle() }
@@ -148,6 +162,7 @@ final class DesktopPetController {
             idleTask?.cancel(); idleTask = nil
             clipTask?.cancel(); clipTask = nil
             dragOrigin = nil
+            leaveCushion()
             settle()
         }
     }
@@ -207,7 +222,9 @@ final class DesktopPetController {
     /// Plays a short clip, then returns to resting and plans the next thing to do.
     func play(_ action: PetAction) {
         guard isVisible else { return }
+        leaveCushion()
         clipTask?.cancel()
+        stopWalking()
         let activity = PetActivity(action)
         state.activity = activity
         clipTask = Task { @MainActor [weak self] in
@@ -224,6 +241,11 @@ final class DesktopPetController {
         state.activity = PetActivity(restingAction)
     }
 
+    /// A walk cut short (a tap, a drag, a line, another clip) leaves the cat where it got to, not back where it set off.
+    private func stopWalking() {
+        if case .walk = state.activity.action { state.homeX = PetMotion.frame(state.activity, homeX: state.homeX, at: Date()).x }
+    }
+
     private func scheduleIdle() {
         idleTask?.cancel()
         guard onScreen else { idleTask = nil; return }
@@ -238,6 +260,11 @@ final class DesktopPetController {
     /// Picks what to do next. Resting between clips means no redraws most of the time.
     private func idle() {
         guard isVisible else { return }
+        // On its cushion, the cat waits until the typing has stopped a while, then is its usual self again.
+        if state.typing != nil {
+            if typing.typedLately { scheduleIdle(); return }
+            leaveCushion()
+        }
         // `--offscreen`: someone is always at the Mac, so the check measures a cat at work even while nobody is (#64).
         let away = offscreen ? 0 : systemIdleSeconds()
         if asleep {
@@ -253,7 +280,9 @@ final class DesktopPetController {
         if !reduceMotion { choices += [(.hop, 5)] }
         if PetArt.has(.groom) { choices.append((.groom, 7)) }
         if PetArt.has(.tea) { choices.append((.tea, 5)) }
-        if model.petWanders && !reduceMotion {
+        // Not while it says something: the bubble stays over where the cat sits (the cat is drawn by the window server
+        // during a walk, the bubble by SwiftUI, which isn't redrawn per frame, #64).
+        if model.petWanders && !reduceMotion && state.message == nil && state.question == nil {
             let target = clampX(anchorX + CGFloat.random(in: -170...170))
             if abs(target - state.homeX) > 40 { choices.append((.walk(from: state.homeX, to: target), 22)) }
         }
@@ -266,6 +295,42 @@ final class DesktopPetController {
             }
             pick -= weight
         }
+    }
+
+    // MARK: Typing (#230)
+
+    /// What the cat is doing, for a key (TypingCat.reply).
+    private func typingDoing() -> TypingCat.Doing {
+        guard isVisible, onScreen else { return .hidden }
+        if dragOrigin != nil { return .dragging }
+        switch state.activity.action {
+        case .sit: return .resting
+        case .sleep: return .sleeping
+        case .walk: return .walking
+        case .cheer, .happy, .hop: return .answering
+        case .blink, .tilt, .stretch, .groom, .yawn, .tea: return .moment
+        }
+    }
+
+    /// A key came: stop walking where it is, wake up, put a small moment away, and sit on the cushion.
+    private func prepareForTyping(_ reply: TypingCat.Reply) {
+        stopWalking()
+        clipTask?.cancel(); clipTask = nil
+        asleep = false
+        if state.activity.action != .sit { state.activity = PetActivity(.sit) }
+        typing.onCushion = true
+        if idleTask == nil { scheduleIdle() }
+    }
+
+    private func showTyping(_ pose: TypingCat.Pose?) {
+        typing.onCushion = pose != nil
+        if state.typing != pose { state.typing = pose }
+    }
+
+    /// Off the cushion: its usual self again, the paws at rest.
+    private func leaveCushion() {
+        typing.stopPaws()
+        showTyping(nil)
     }
 
     private func systemIdleSeconds() -> TimeInterval {
@@ -305,10 +370,12 @@ final class DesktopPetController {
 
     private func drag(by dx: CGFloat) {
         if dragOrigin == nil {
+            stopWalking()
             dragOrigin = state.homeX
             clipTask?.cancel(); clipTask = nil
             idleTask?.cancel(); idleTask = nil
             asleep = false
+            leaveCushion()
             settle()
         }
         state.homeX = clampX(dragOrigin! + dx)
@@ -338,6 +405,7 @@ final class DesktopPetController {
     func say(_ text: String, for seconds: TimeInterval = 6) {
         messageTask?.cancel()
         dropQuestion()
+        sitDownToSpeak()
         withAnimation(Motion.animation(.bounce, reduce: reduceMotion)) { state.message = text }
         messageTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(seconds))
@@ -348,10 +416,26 @@ final class DesktopPetController {
 
     // MARK: 종이냥 한마디
 
+    private func updateChatterTimer() {
+        let wanted = model.chatterEnabled && isVisible
+        guard wanted != (chatterTimer != nil) else { return }
+        chatterTimer?.invalidate()
+        chatterTimer = nil
+        guard wanted else { return }
+        let timer = Timer(timeInterval: 30, repeats: true) { _ in
+            Task { @MainActor [weak self] in self?.checkChatter() }
+        }
+        timer.tolerance = 5
+        RunLoop.main.add(timer, forMode: .common)
+        chatterTimer = timer
+    }
+
     /// Every half minute: time for a line, if the cat is out, awake, the person is here, and
     /// nothing else is going on. Otherwise it tries again a little later.
     private func checkChatter() {
         guard model.chatterEnabled, isVisible, Date() >= nextChatter else { return }
+        // Typing: not mid-sentence. Tried again at the next check, 5 s after the last key at the earliest.
+        if typing.chatterWaits { return }
         let now = Date()
         guard !asleep, dragOrigin == nil, !isBusy(), state.message == nil, state.question == nil,
               !PetChatter.isQuietHour(Calendar.paper.component(.hour, from: now)), systemIdleSeconds() < 120 else {
@@ -383,6 +467,7 @@ final class DesktopPetController {
     private func ask(_ line: PetChatter.Line) {
         messageTask?.cancel()
         state.message = nil
+        sitDownToSpeak()
         withAnimation(Motion.animation(.bounce, reduce: reduceMotion)) { state.question = line }
         play(reduceMotion ? .tilt : .hop)
         questionTask?.cancel()
@@ -414,6 +499,15 @@ final class DesktopPetController {
         play(action(for: answer.pose))
         if answer.action == .rest5 { onRest() }
         if answer.action == .focus25 { onFocus() }
+    }
+
+    /// A walking cat stops where it is to say something, so its bubble is over it.
+    private func sitDownToSpeak() {
+        guard case .walk = state.activity.action else { return }
+        stopWalking()
+        clipTask?.cancel(); clipTask = nil
+        settle()
+        scheduleIdle()
     }
 
     private func dropQuestion() {
@@ -462,8 +556,20 @@ final class DesktopPetController {
         let wander = PetMenuItem(L("돌아다니기")) { [weak self] in self?.model.petWanders.toggle() }
         wander.state = model.petWanders ? .on : .off
         menu.addItem(wander)
+        if let companion = companionMenuItem() { menu.addItem(companion) }
         menu.addItem(PetMenuItem(L("펫 숨기기")) { [weak self] in self?.model.petVisible = false })
         return menu
+    }
+}
+
+extension DesktopPetController {
+    /// In all apps: the small cat over full-screen apps, on or off (also in the menu bar's menu, reachable from a
+    /// full-screen app).
+    func companionMenuItem() -> NSMenuItem? {
+        guard model.petTyping == .everywhere else { return nil }
+        let item = PetMenuItem(L("전체 화면에서 보이기")) { [weak self] in self?.model.petCompanion.toggle() }
+        item.state = model.petCompanion ? .on : .off
+        return item
     }
 }
 

@@ -1,3 +1,7 @@
 /* 메모 서랍 (1.44): words that read differently as a menu action or a swatch than elsewhere. */
 "고정" = "Pin";
 "자동" = "Auto";
+/* #244: the ⚙ menu's short paper names whose Korean means something else elsewhere. */
+"메모지" = "Sticky";
+"원고지" = "Manuscript";
+"재생지" = "Recycled";

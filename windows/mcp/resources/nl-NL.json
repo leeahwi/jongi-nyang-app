@@ -1,6 +1,6 @@
 {
   "description": "Claude kan je taken, afspraken en notities in Jongi-nyang bekijken, nieuwe toevoegen en ze wijzigen nadat je ja hebt gezegd.",
-  "long_description": "**Zet het eerst aan in Jongi-nyang**\n\nJongi-nyang › Bureau › AI-koppeling › ‘Claude Jongi-nyang laten lezen en schrijven’\n\n**Wat Claude kan**\n\n- **Bekijken** — taken en afspraken van vandaag, herhalende taken, takenruimtes, notities en notitiemappen, focustijd, afgeronde taken\n- **Toevoegen** — taken (ook in een bestaande ruimte), afspraken en notities (ook in een bestaande map)\n- **Wijzigen** — ook een taak naar een andere ruimte; eerst toont het voor en na, en het wijzigt pas als je ja zegt\n- **Het verwijdert nooit iets**\n- **Prompts** — vandaag, weekoverzicht, morgen voorbereiden, notitie naar taken\n- **Bijvoegen** — vandaag, een week of één notitie aan het gesprek\n\n\n**Wat je in Jongi-nyang ziet**\n\n- Als Claude iets toevoegt of wijzigt, verschijnt er een melding en kun je het meteen ongedaan maken.\n- Bureau › AI-koppeling › Recent AI-werk laat zien wat Claude deed.\n\n**Licht en stil**\n\n- Er draait geen aparte server. Claude start het wanneer nodig en het stopt als je Claude afsluit.\n- Het leest en schrijft alleen de opslagmap van Jongi-nyang op deze computer en stuurt nergens bestanden heen.\n- Zet AI-koppeling uit in Jongi-nyang en het kan niets lezen.",
+  "long_description": "**Zet het eerst aan in Jongi-nyang**\n\nJongi-nyang › Bureau › AI-koppeling › ‘Claude Jongi-nyang laten lezen en schrijven’\n\n**Wat Claude kan**\n\n- **Bekijken** — taken en afspraken van vandaag, herhalende taken, takenruimtes, notities en notitiemappen, focustijd, afgeronde taken\n- **Toevoegen** — taken (ook in een bestaande ruimte), afspraken en notities (ook in een bestaande map)\n- **Wijzigen** — ook een taak naar een andere ruimte; eerst toont het voor en na, en het wijzigt pas als je ja zegt\n- **Het verwijdert nooit iets**\n- **Prompts** — vandaag, weekoverzicht, morgen voorbereiden, notitie naar taken\n- **Bijvoegen** — vandaag, een week of één notitie aan het gesprek\n- **Op dit apparaat verborgen ruimtes** — taken in een ruimte die je in Jongi-nyang op dit apparaat verbergt, laat Claude ook weg uit vandaag en lijsten; noem de ruimte en Claude toont ze\n\n\n**Wat je in Jongi-nyang ziet**\n\n- Als Claude iets toevoegt of wijzigt, verschijnt er een melding en kun je het meteen ongedaan maken.\n- Bureau › AI-koppeling › Recent AI-werk laat zien wat Claude deed.\n\n**Licht en stil**\n\n- Er draait geen aparte server. Claude start het wanneer nodig en het stopt als je Claude afsluit.\n- Het leest en schrijft alleen de opslagmap van Jongi-nyang op deze computer en stuurt nergens bestanden heen.\n- Zet AI-koppeling uit in Jongi-nyang en het kan niets lezen.",
   "tools": [
     {
       "name": "get_today",
@@ -40,7 +40,7 @@
     },
     {
       "name": "list_spaces",
-      "description": "Takenruimtes en Algemeen"
+      "description": "Takenruimtes en Algemeen, en welke op dit apparaat verborgen zijn"
     },
     {
       "name": "add_todos",

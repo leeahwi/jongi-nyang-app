@@ -1,9 +1,17 @@
 import { clock, isPaused, isRestPhase, phaseName, pomodoroRounds, remainingMs, timerCaption, timerFraction } from "../core/focusTimer";
 import type { TimerPayload } from "../core/timerWidget";
 import { h, lang, paper, t } from "./api";
+import { holdWhileAsked } from "./askGuard";
 import { chime } from "./chime";
 import { TabularClock } from "./tabularClock";
 import { sampled } from "./sampled";
+import { restBreathMs } from "../core/pet";
+
+/** How often the timer's cat takes a breath while the time runs. */
+const breathEveryMs = 20_000;
+
+// #229: a question waiting holds this page up (askGuard.ts).
+holdWhileAsked();
 
 const api = paper();
 const bubbleSlot = document.querySelector<HTMLElement>(".bubble-slot")!;
@@ -69,7 +77,10 @@ function wedgePath(fraction: number): string {
 const pausePath = '<svg viewBox="0 0 8 8" aria-hidden="true"><rect x="1" y="0.5" width="2.2" height="7" rx="0.6"/><rect x="4.8" y="0.5" width="2.2" height="7" rx="0.6"/></svg>';
 const playPath = '<svg viewBox="0 0 8 8" aria-hidden="true"><path d="M1.5 0.6v6.8L7.4 4z"/></svg>';
 
-/** The timer's own cat: breathing while time runs, eyes closed while paused, cheering when done. */
+/**
+ * The timer's own cat: a breath every 20 seconds while time runs (#67: breathing all the time kept the window drawing
+ * 8 times a second for the whole 25 minutes), eyes closed while paused, cheering when done.
+ */
 function renderCat(): void {
   const timer = state?.timer;
   const paused = timer !== undefined && isPaused(timer);
@@ -78,7 +89,8 @@ function renderCat(): void {
   if (!cat.src.endsWith(source.replace("../..", ""))) cat.src = source;
   cat.classList.toggle("awake", !paused);
   cat.classList.toggle("asleep", paused);
-  sampled(cat, cat.hidden ? undefined : paused ? "asleep" : "awake");
+  const kind = paused ? "asleep" : "awake";
+  sampled(cat, cat.hidden ? undefined : kind, { forMs: restBreathMs[kind], key: Math.floor(Date.now() / breathEveryMs) });
 }
 
 function renderBoard(): void {

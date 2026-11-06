@@ -330,6 +330,25 @@ private enum BackupTests {
             try expectEqual(try titles(String(contentsOf: destination.appendingPathComponent("todos.json"), encoding: .utf8)), ["이 Mac"], "the rest moves")
         }
 
+        // 저장과 백업의 백업 한 줄 (#240, D2 C): the shared cases from docs/plans/storage-summary-cases.json (the Windows
+        // app's test/backup.test.ts reads the same file).
+        try test("backup status: when the last copy was, or what is wrong, in ko · en · nl (shared cases)") {
+            let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/storage-summary-cases.json"))) as! [String: Any]
+            let date = { (parts: [NSNumber]) in
+                Calendar.paper.date(from: DateComponents(year: parts[0].intValue, month: parts[1].intValue, day: parts[2].intValue,
+                                                         hour: parts[3].intValue, minute: parts[4].intValue))!
+            }
+            let now = date(file["now"] as! [NSNumber])
+            for entry in file["cases"] as! [[String: Any]] {
+                for language in AppLanguage.allCases {
+                    let got = Backup.status(auto: entry["auto"] as! Bool, failed: entry["failed"] as! Bool, missing: entry["missing"] as! Bool,
+                                            newest: (entry["newest"] as? [NSNumber]).map(date), now: now, language: language)
+                    try expectEqual([got.title, got.detail], entry[language.rawValue] as! [String], "\(entry["case"]!) \(language.rawValue)")
+                    try expectEqual(got.tone.rawValue, entry["tone"] as! String, "\(entry["case"]!) tone")
+                }
+            }
+        }
+
         print("\(count) backup tests passed")
     }
 }

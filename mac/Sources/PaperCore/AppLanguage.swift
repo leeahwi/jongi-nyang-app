@@ -27,8 +27,36 @@ public enum AppLanguage: String, CaseIterable, Sendable {
         }
     }
 
-    /// Korean and English weeks start on Sunday, Dutch weeks on Monday (the month grid, the week view).
-    public var weekStartsMonday: Bool { self == .nl }
+    /// The week's first day (calendar-flows D4): the system's, when it is Monday or Sunday (`weekStart`); else Korean and
+    /// English weeks start on Sunday, Dutch weeks on Monday — the month grid, the week view, 앞으로's weeks, the alarms'
+    /// days.
+    public var weekStartsMonday: Bool { Self.weekStartsMonday(system: Self.weekStart, language: self) }
+
+    /// The system's first day of the week ("monday", "sunday", "saturday" …), set at launch from the system
+    /// (`systemWeekStart`) and again when the system's locale changes. nil: each language's own, which the shared test
+    /// cases are written in (tests that check another set it, and set it back). Same as lang.ts `setWeekStart`.
+    nonisolated(unsafe) public static var weekStart: String?
+
+    /// Monday first when the system says Monday, Sunday first when it says Sunday, else the language's own (a Saturday
+    /// start isn't followed: the month's weekend would split).
+    public static func weekStartsMonday(system: String?, language: AppLanguage) -> Bool {
+        switch system {
+        case "monday": true
+        case "sunday": false
+        default: language == .nl
+        }
+    }
+
+    /// The Mac's first weekday (`Calendar.firstWeekday`: 1 Sunday … 7 Saturday) as a day's name.
+    public static func weekdayName(firstWeekday: Int) -> String? {
+        guard (1...7).contains(firstWeekday) else { return nil }
+        return ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][firstWeekday - 1]
+    }
+
+    /// The system's first day of the week: System Settings → General → Language & Region → First day of week.
+    public static func systemWeekStart(calendar: Calendar = .autoupdatingCurrent) -> String? {
+        weekdayName(firstWeekday: calendar.firstWeekday)
+    }
 
     /// The days of a week row in order, 0 = Sunday … 6 = Saturday.
     public var weekdayOrder: [Int] { weekStartsMonday ? [1, 2, 3, 4, 5, 6, 0] : [0, 1, 2, 3, 4, 5, 6] }

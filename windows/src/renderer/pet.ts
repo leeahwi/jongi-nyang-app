@@ -1,7 +1,12 @@
-import { bubblePointer, bubbleShift, clampFloorX, clipMs, isResting, petFrame, petSize, walkCycleFrames, type PetFrame, type PetImage, type PetPayload } from "../core/pet";
+import { bubblePointer, bubbleShift, clampFloorX, clipFrameMs, clipMs, isResting, petFrame, petSize, petWindowWidth, restBreathMs, walkCycleFrames, type PetFrame, type PetImage, type PetPayload } from "../core/pet";
+import type { TypingPose } from "../core/typingCat";
 import { wrapBubble } from "../core/bubbleText";
 import { lang, paper, reduceMotion, t } from "./api";
+import { holdWhileAsked } from "./askGuard";
 import { sampled } from "./sampled";
+
+// #229: a question waiting holds this page up (askGuard.ts).
+holdWhileAsked();
 
 const api = paper();
 const pet = document.getElementById("pet")!;
@@ -19,10 +24,12 @@ const petWidth = 252;
 
 const imageURL = (image: PetImage) => image === "idle" ? "../../assets/cat.png" : `../../assets/pet/256/${image}.png`;
 const walkURL = (index: number) => `../../assets/pet/256/walk-cycle-0${index + 1}.png`;
+/** #230: the cat on its cushion — its own three pictures, one canvas and baseline, swapped with nothing trimmed or fitted. */
+const typingURL = (pose: TypingPose) => `../../assets/pet/256/typing-${pose}.png`;
 // Decoded up front so switching poses mid-clip never flickers.
 const preloaded: HTMLImageElement[] = [];
 for (const url of [...(["idle", "blink", "happy", "sleep", "yawn", "stretch", "cheer", "curious", "groom", "tea"] as PetImage[]).map(imageURL),
-  ...Array.from({ length: walkCycleFrames }, (_, index) => walkURL(index))]) {
+  ...Array.from({ length: walkCycleFrames }, (_, index) => walkURL(index)), ...(["idle", "left", "right"] as TypingPose[]).map(typingURL)]) {
   const image = new Image();
   image.src = url;
   preloaded.push(image);
@@ -34,7 +41,9 @@ let state: PetPayload | undefined;
 let activityID = -1;
 let activityStart = 0;
 let frameRequest: number | undefined;
-/** While dragging along the floor the renderer moves the cat itself; main hears where it landed. */
+/** The next frame of a clip drawn below 60 a second (core/pet.ts clipFrameMs). */
+let frameTimer: number | undefined;
+/** While dragging along the floor: where the cat is (the window follows the cursor; the bubble keeps to the screen). */
 let dragX: number | undefined;
 let press: { pointerId: number; x: number; y: number; originX: number; dragging: boolean } | undefined;
 let suppressClick = false;
@@ -86,6 +95,10 @@ function receive(next: PetPayload): void {
   if (next.activity.id !== activityID) {
     activityID = next.activity.id;
     activityStart = performance.now();
+    // A new clip keeps its own pace.
+    if (frameRequest !== undefined) cancelAnimationFrame(frameRequest);
+    clearTimeout(frameTimer);
+    frameRequest = frameTimer = undefined;
   }
   if (!press?.dragging) dragX = undefined;
   interactive = undefined;
@@ -98,13 +111,20 @@ function receive(next: PetPayload): void {
 const clipRunning = (now: number) => state !== undefined && !isResting(state.activity.action) && !reduceMotion()
   && now - activityStart < clipMs(state.activity.action) + 50;
 
-/** Frames are drawn only while a clip plays; resting poses draw once and breathe in CSS. */
+/**
+ * Frames are drawn only while a clip plays, and only as often as the clip shows a change (#67: a walk's steps at 30 a
+ * second, a blink not at all — the main process's next state ends it); resting poses draw once and take a breath in CSS.
+ */
 function startLoop(): void {
-  if (frameRequest !== undefined) return;
+  if (frameRequest !== undefined || frameTimer !== undefined || !state) return;
+  const every = clipFrameMs(state.activity.action);
+  if (!Number.isFinite(every)) return;
   const tick = (now: number) => {
-    frameRequest = undefined;
+    frameRequest = frameTimer = undefined;
     draw(now);
-    if (clipRunning(now)) frameRequest = requestAnimationFrame(tick);
+    if (!clipRunning(now)) return;
+    if (every <= 16) frameRequest = requestAnimationFrame(tick);
+    else frameTimer = window.setTimeout(() => tick(performance.now()), every);
   };
   frameRequest = requestAnimationFrame(tick);
 }
@@ -113,28 +133,31 @@ function draw(now: number): void {
   if (!state) return;
   const action = state.activity.action;
   const frame = petFrame(action, activityStart, dragX ?? state.homeX, reduceMotion() ? activityStart : now);
-  pet.style.left = `${frame.x - petWidth / 2}px`;
+  // #67: the window moves along the floor with the cat (main/pet.ts), so the cat always sits in its middle.
+  pet.style.left = `${petWindowWidth / 2 - petWidth / 2}px`;
   if (!bubble.hidden) {
     // Near the screen's edges the bubble slides inward; its pointer still finds the cat. Its width is read once per
     // text (#67: reading it forced a layout on every frame of a clip).
     const width = bubbleWidth ??= bubble.offsetWidth;
-    const shift = bubbleShift(frame.x, width, window.innerWidth);
+    const shift = bubbleShift(frame.x, width, state.floorWidth);
     bubble.style.setProperty("--shift", `${shift}px`);
     bubble.style.setProperty("--pointer", `${bubblePointer(shift, width)}px`);
   }
   zs.hidden = !frame.sleepy;
-  sampled(zs, frame.sleepy ? "zs" : undefined);
-  const url = frame.walkFrame !== undefined ? walkURL(frame.walkFrame) : imageURL(frame.image);
+  // On its cushion (resting only) the cat holds still between keys: no breathing, no sway, only the picture changes.
+  const typing = state.typing !== undefined && isResting(action) ? state.typing : undefined;
+  const url = typing !== undefined ? typingURL(typing) : frame.walkFrame !== undefined ? walkURL(frame.walkFrame) : imageURL(frame.image);
   if (art.getAttribute("src") !== url) art.setAttribute("src", url);
   const { pose } = frame;
   const flip = frame.facingRight && frame.walkFrame !== undefined ? " scaleX(-1)" : "";
   cat.style.transformOrigin = `${pose.pivotX * 100}% ${pose.pivotY * 100}%`;
   cat.style.transform = `translateY(${-pose.lift}px) rotate(${pose.rotation}deg) scale(${pose.scaleX}, ${pose.scaleY})${flip}`;
   // Breathing and swaying only while resting (walking frames and clips carry their own motion).
-  const breathing = frame.walkFrame !== undefined || !isResting(action) ? "" : frame.sleepy ? "asleep" : "awake";
+  const breathing = typing !== undefined || frame.walkFrame !== undefined || !isResting(action) ? "" : frame.sleepy ? "asleep" : "awake";
   art.classList.toggle("awake", breathing === "awake");
   art.classList.toggle("asleep", breathing === "asleep");
-  sampled(art, breathing || undefined);
+  // #67: one breath each time it settles (a new activity), then still.
+  sampled(art, breathing || undefined, breathing ? { forMs: restBreathMs[breathing], key: activityID } : undefined);
   shadow.style.width = `${size * 0.58 * (1 - 0.02 * pose.lift)}px`;
   shadow.style.background = `rgba(0, 0, 0, ${Math.max(0, 0.1 - 0.006 * pose.lift)})`;
   drawEffects(frame);
@@ -209,8 +232,9 @@ function movePress(event: PointerEvent): void {
     api.send("pet:drag-start");
   }
   if (!press.dragging) return;
-  dragX = clampFloorX(press.originX + event.screenX - press.x, window.innerWidth);
-  draw(performance.now());
+  dragX = clampFloorX(press.originX + event.screenX - press.x, state.floorWidth);
+  api.send("pet:drag");
+  if (!bubble.hidden) draw(performance.now());
 }
 
 function endPress(event: PointerEvent): void {

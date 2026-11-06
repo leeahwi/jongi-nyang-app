@@ -319,6 +319,29 @@ export function savedWhen(date: Date, now: Date, lang: Lang = "ko", midSentence 
   return `${day}${lang === "en" ? ", " : " "}${time}`;
 }
 
+/**
+ * 저장과 백업's one line about the backups (#240, D2 C): what the user wants to know first — when the last copy was, or
+ * what is wrong — then how they are made. The same words as the Mac's (Backup.status) and docs/plans/storage-summary-cases.json.
+ */
+export interface BackupStatus { title: string; detail: string; tone: "ok" | "off" | "warn" }
+export function backupStatus(state: { auto: boolean; failed: boolean; missing: boolean; newest?: Date }, now: Date, lang: Lang = "ko"): BackupStatus {
+  const i = langIndex(lang);
+  const { auto, failed, missing, newest } = state;
+  let title: string;
+  if (failed) title = ["마지막 백업을 하지 못했어요", "The last backup didn’t work", "De laatste back-up is niet gelukt"][i];
+  else if (!auto) title = ["자동 백업이 꺼져 있어요", "Automatic backups are off", "Automatische back-ups staan uit"][i];
+  else if (newest) {
+    const when = savedWhen(newest, now, lang, true);
+    title = [`${when}에 백업했어요`, `Backed up ${when}`, `Back-up gemaakt ${when}`][i];
+  } else title = ["아직 백업이 없어요", "No backups yet", "Nog geen back-ups"][i];
+  const detail = failed ? ["백업 폴더를 확인해 주세요.", "Please check the backup folder.", "Controleer de back-upmap."][i]
+    : missing ? ["고른 백업 폴더를 찾지 못해 기본 폴더에 백업해요.", "Couldn’t find the chosen backup folder, so backups go to the default one.",
+      "De gekozen back-upmap is niet gevonden, dus back-ups gaan naar de standaardmap."][i]
+    : !auto ? ["덮어쓰기 전에는 그래도 백업해 둬요.", "Anything about to be overwritten is still backed up first.", "Wat overschreven wordt, wordt eerst toch bewaard."][i]
+    : ["하루 한 번, 덮어쓰기 전에도 저절로 남겨요.", "Once a day, and before anything is overwritten.", "Eén keer per dag, en voordat iets wordt overschreven."][i];
+  return { title, detail, tone: failed || missing ? "warn" : auto ? "ok" : "off" };
+}
+
 /** A copy's size: "220KB" · "2.9MB" (KB = 1024 bytes, rounded up below 1000 KB) — en "220 KB" · "2.9 MB", nl "220 kB" · "2,9 MB". */
 export function sizeText(bytes: number, lang: Lang = "ko"): string {
   const kilobytes = Math.max(1, Math.ceil(bytes / 1024));

@@ -4,7 +4,7 @@ import {
   awayText, clockText, columns, dayEndMinutes, dayMinutes, draggedSpan, edgeBand, followedSpan, hourHeight, isSoon, kicker, leftText, minutesUntil, newCandidates,
   nothingLeftText, nudged, rangeText, ringText, rowLimit, scrollTop, slot, stretched, stripItems, stripSentence, stripSpans, stripState, wholeDayLink,
   stripMarks, type DragEdge, type Span, type StripItem, type StripState } from "../core/dayStrip";
-import { draftFromEvent } from "../core/events";
+import { draftFromEvent, eventMark } from "../core/events";
 import { timerLeftText } from "../core/glance";
 import { hasEventWord } from "../core/intent";
 import { dayRibbon, hourLabel, type Ribbon } from "../core/ribbon";
@@ -194,7 +194,7 @@ export class DayStripView {
     const more = ribbon.more + ribbon.allDay.length - shown.length;
     const pills = h("div", { class: "strip-allday" }, ...shown.map((pill) => {
       const element = h("button", { class: "ad-pill", title: `${t("종일")} · ${pill.title}` }, h("i", { class: "evc", "aria-hidden": "true" }), h("span", {}, `${t("종일")} · ${pill.title}`));
-      (element.firstChild as HTMLElement).style.background = pill.color;
+      (element.firstChild as HTMLElement).style.background = eventMark(pill.color);
       element.addEventListener("click", (event) => { event.stopPropagation(); void api.act({ type: "calendarEditEvent", key: pill.key }); });
       return element;
     }), more > 0 ? h("span", { class: "ad-more" }, `+${more}`) : null);
@@ -236,7 +236,7 @@ export class DayStripView {
     for (const bar of ribbon.bars) {
       const element = segment(bar.from, bar.to);
       element.className = `evc${bar.past ? " past" : ""}`;
-      element.style.background = bar.color;
+      element.style.background = eventMark(bar.color);
       track.append(element);
     }
     for (const block of ribbon.blocks) {
@@ -361,7 +361,7 @@ export class DayStripView {
   /** A row's kind: an event's dot in its colour, a to-do's sage square, a reminder's ink3 ring. */
   private mark(item: StripItem): HTMLElement {
     const mark = h("i", { class: `sr-mark ${item.kind}${item.kind === "event" ? " evc" : ""}`, "aria-hidden": "true" });
-    if (item.event) mark.style.background = item.event.color;
+    if (item.event) mark.style.background = eventMark(item.event.color);
     return mark;
   }
 
@@ -504,10 +504,13 @@ export class DayStripView {
       const detail = [rangeText(item.start, item.end ?? item.start, lang()), event.location].filter(Boolean).join(" · ");
       const time = h("span", { class: "tb-time" }, said(rangeText(item.start, item.end ?? item.start, lang())));
       if (over) element.classList.add("over");
-      element.style.setProperty("--ev", event.color);
+      element.style.setProperty("--ev", eventMark(event.color));
       element.classList.toggle("tall", tall);
       element.append(h("span", { class: "tb-title" }, item.title), time);
       time.dataset.place = tall ? event.location ?? "" : "";
+      // #240 (점검 3의 18): a block sharing its hours with another is narrow — when its range doesn't fit, it says only when
+      // it starts (the whole range stays in its tooltip and its spoken name), as the Mac's narrow day does.
+      if (count > 1) requestAnimationFrame(() => { if (time.scrollWidth > time.clientWidth + 1) time.textContent = said(clockText(item.start, lang())); });
       element.title = this.tooltip(item);
       element.setAttribute("aria-label", `${item.title}, ${detail}`);
       const movable = this.movable(item);
@@ -538,6 +541,8 @@ export class DayStripView {
       if (height < 40) element.append(time);
       // A one-line block shows its time only when there's room (wider than 150 px).
       if (height < 40) requestAnimationFrame(() => time.classList.toggle("hidden", element.clientWidth <= 150));
+      // #240 (점검 3의 18): sharing its hours with another, a range that doesn't fit says only when it starts.
+      if (count > 1) requestAnimationFrame(() => { if (time.scrollWidth > time.clientWidth + 1) time.textContent = clockText(item.start, lang()); });
       element.title = `${item.title} · ${time.textContent}`;
       element.setAttribute("aria-label", `${item.title}, ${time.textContent}${item.done ? `, ${t("완료됨")}` : overdue ? `, ${t("시간 지남")}` : ""}`);
       if (!item.done) {
@@ -643,7 +648,7 @@ export class DayStripView {
         const ghost = h("div", { class: `tt-ghost ${item.kind}`, "aria-hidden": "true" });
         ghost.style.left = element.style.left;
         ghost.style.width = element.style.width;
-        if (item.event) ghost.style.setProperty("--ev", item.event.color);
+        if (item.event) ghost.style.setProperty("--ev", eventMark(item.event.color));
         const tag = h("span", { class: `tb-drag${edge === "end" ? " low" : ""}`, "aria-hidden": "true" });
         element.append(tag);
         element.before(ghost);

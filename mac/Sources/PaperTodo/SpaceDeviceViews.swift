@@ -97,18 +97,22 @@ struct SpaceTimesSlip: View {
 
     static let width = SlipWidth.large.rawValue
 
-    /// Opens the slip for a space (`none`: 일반) over the window in front; 저장 sets its times.
+    /// Opens the slip for a space (`none`: 일반) over the window in front; 저장 sets its times. #229: it doesn't hold the app
+    /// up (the desk, the note and the drawer go on working), and a space has one: asked again, that one comes forward.
     static func present(model: AppModel, key: String, name: String, color: TodoSpaces.Color?) {
         let start: [SpaceDevice.Times]
         if case .times(let times) = model.deviceRule(key), !times.isEmpty { start = times } else { start = SpaceDevice.Preset.workday.times }
         let title = SpaceDevice.slipTitle(name, .current)
-        SlipAlert.present(title: title) { done in
+        SlipAlert.open(id: slipID(key), title: title) { done in
             SpaceTimesSlip(title: title, color: color, rows: start) { picked in
                 if let picked { model.setDeviceRule(key, .times(picked)) }
                 done()
             }
         }
     }
+
+    /// The open slip's id for a space (`SlipAlert.open`).
+    static func slipID(_ key: String) -> String { "space-times:" + key }
 
     private var language: AppLanguage { .current }
     private var valid: Bool { !rows.isEmpty && rows.allSatisfy { !$0.days.isEmpty } }
@@ -122,6 +126,7 @@ struct SpaceTimesSlip: View {
                         .font(.system(size: 12))
                         .foregroundStyle(PaperTheme.ink2)
                         .fixedSize(horizontal: false, vertical: true)
+                        .allowsHitTesting(false)
                     presets
                     VStack(spacing: 0) {
                         ForEach(Array(rows.indices), id: \.self) { index in

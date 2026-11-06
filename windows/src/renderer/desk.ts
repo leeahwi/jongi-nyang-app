@@ -1,6 +1,10 @@
 import { deskSections, pageOfPane, readPane, shortcutForPane, stepPane, type DeskPage, type DeskPane } from "../core/desk";
 import { h, icon, paper, t } from "./api";
+import { holdWhileAsked } from "./askGuard";
 import { deskTitle, paneIcon, paneTitle, sectionTitle } from "./deskPanes";
+
+// #229: a question waiting holds this page up (askGuard.ts).
+holdWhileAsked();
 
 /**
  * 책상's own page: the sidebar (보기 · 설정 · 도움) and a frame per page — 달력, 완료 기록, the
@@ -18,7 +22,7 @@ const files: Record<DeskPage, string> = { calendar: "calendarWindow.html", histo
 const frames = new Map<DeskPage, HTMLIFrameElement>();
 const rows = new Map<DeskPane, HTMLButtonElement>();
 
-interface Extra { day?: string; topic?: string; query?: string }
+interface Extra { day?: string; event?: string; topic?: string; query?: string }
 
 function frameFor(page: DeskPage, pane: DeskPane, extra: Extra): HTMLIFrameElement {
   const existing = frames.get(page);
@@ -26,6 +30,7 @@ function frameFor(page: DeskPage, pane: DeskPane, extra: Extra): HTMLIFrameEleme
   const query = new URLSearchParams();
   if (page === "settings") query.set("tab", pane);
   if ((page === "calendar" || page === "history") && extra.day) query.set("day", extra.day);
+  if (page === "calendar" && extra.event) query.set("event", extra.event);
   if (page === "help" && extra.topic) query.set("topic", extra.topic);
   if (page === "help" && extra.query) query.set("q", extra.query);
   const frame = h("iframe", { class: "pane-frame loading", src: `${files[page]}${query.size ? `?${query}` : ""}`, "data-page": page, title: paneTitle(pane) });
@@ -81,7 +86,9 @@ function buildSidebar(): void {
     }
   }
   // 사용 안내: the first-launch cards, shown again on the note.
-  const guide = h("button", { class: "drow guide", title: t("사용 안내"), "aria-label": t("사용 안내") }, icon("sparkles", 16), h("span", { class: "dlabel" }, t("사용 안내")));
+  // In a tile like the panes' rows, so its name starts where theirs do.
+  const guide = h("button", { class: "drow guide", title: t("사용 안내"), "aria-label": t("사용 안내") },
+    h("span", { class: "tile", "aria-hidden": "true" }, icon("sparkles", 13)), h("span", { class: "dlabel" }, t("사용 안내")));
   guide.addEventListener("click", () => api.act({ type: "openGuide" }));
   sidebar.append(guide);
 }
@@ -120,4 +127,4 @@ if (chrome === "overlay" || chrome === "preview") {
 }
 
 buildSidebar();
-show(current, { day: params.get("day") ?? undefined, topic: params.get("topic") ?? undefined, query: params.get("q") ?? undefined });
+show(current, { day: params.get("day") ?? undefined, event: params.get("event") ?? undefined, topic: params.get("topic") ?? undefined, query: params.get("q") ?? undefined });

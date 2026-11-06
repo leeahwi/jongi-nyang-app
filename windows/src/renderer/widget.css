@@ -1,0 +1,181 @@
+/* 바탕화면 달력 위젯 (#234): a calendar on paper on the desktop, two small cat ears at its top right. Only the paper fades
+   (--op, 20–100 %); the text never does. Each day of the week and the month is a paper tile (--tile) that never fades below
+   the paper's floor (--floor: ink keeps 4.5:1 on it over any wallpaper; 4-6 서리 종이 타일), weekends and holidays tinted with
+   the paper's clay, today outlined in sage. Below 100 % the secondary inks are ink (--t2 …); text off the tiles sits on a
+   backing at the floor once the paper is fainter than that (.pl .bk); the marks keep a ring of solid paper and the day
+   numbers are a step bolder. The edge line never fades below half and a soft shadow lifts the paper off any wallpaper. The window is clear
+   around the paper (room for the shadow); the page decides where it takes the mouse (widget.ts). */
+:root { --widget-edge: 47, 46, 42; --widget-edge-a: 0.26; --widget-shadow: rgba(40, 35, 25, 0.22); --backing-more: 0%; }
+:root[data-scheme="dark"] { --widget-edge: 236, 230, 214; --widget-edge-a: 0.24; --widget-shadow: rgba(0, 0, 0, 0.42); }
+@media (prefers-contrast: more) { :root { --backing-more: 20%; } }
+/* #244 (paper themes): every colour of the widget comes from this one set, so a paper theme can be plugged in here
+   (the calendar's paper) without touching the rules below. Today they are the app's day and night tokens. */
+:root {
+  --w-paper: var(--paper); --w-paper-2: var(--paper-2);
+  --w-ink: var(--ink); --w-ink-2: var(--ink-2); --w-ink-3: var(--ink-3);
+  --w-sage: var(--sage); --w-sage-2: var(--sage-2); --w-sage-text: var(--sage-text); --w-on-sage: var(--on-sage);
+  --w-clay: var(--clay); --w-clay-2: var(--clay-2); --w-clay-text: var(--clay-text); --w-toast-action: var(--toast-action);
+  --w-edge: var(--widget-edge); --w-edge-a: var(--widget-edge-a); --w-shadow: var(--widget-shadow);
+  /* The ears read --ear-in and --ear-edge (ears.css, the note's ears): a theme sets those here too. */
+}
+html, body.widget-window { margin: 0; background: transparent; overflow: hidden; font-family: var(--ui); }
+body.widget-window * { box-sizing: border-box; }
+/* Snapshots: a fictional wallpaper behind (light, dark or busy). */
+body.wall-light { background: radial-gradient(circle at 80% 20%, #fffbe9 0 8%, transparent 30%), linear-gradient(180deg, #cfe2ee 0%, #eef1ea 55%, #e7dcc4 100%); }
+body.wall-dark { background: radial-gradient(circle at 78% 22%, #3a4766 0 10%, transparent 34%), linear-gradient(180deg, #0f1522 0%, #1b2536 55%, #2b3142 100%); }
+body.wall-busy { background: repeating-linear-gradient(118deg, rgba(255,255,255,0) 0 22px, rgba(255,255,255,.85) 22px 27px), repeating-linear-gradient(28deg, rgba(0,0,0,0) 0 34px, rgba(0,0,0,.7) 34px 40px), radial-gradient(circle at 20% 30%, #e8453c 0 18%, transparent 19%), radial-gradient(circle at 70% 70%, #2a62d6 0 22%, transparent 23%), radial-gradient(circle at 85% 20%, #f3c623 0 14%, transparent 15%), linear-gradient(135deg, #1d8a4e, #f08a24 50%, #6b2bb8); }
+
+.wg { position: absolute; color: var(--w-ink); font-size: 11.5px; line-height: 1.25; --tile: 1; --tile-we: 1; --floor: 0.6; --t2: var(--w-ink-2); --t3: var(--w-ink-3); --ts: var(--w-sage-text); --tc: var(--w-clay-text); }
+.wg.fd { --t2: var(--w-ink); --t3: var(--w-ink); --ts: var(--w-ink); --tc: var(--w-ink); }
+.wg .note-ears { position: absolute; left: 0; overflow: visible; }
+.wg .note-ears .ear { pointer-events: visiblePainted; cursor: grab; }
+.wg.locked .note-ears .ear { cursor: pointer; }
+.wg .paper { position: absolute; inset: 0; border-radius: 13px; background: color-mix(in srgb, var(--w-paper) calc(var(--op) * 100%), transparent);
+  box-shadow: 0 0 0 0.75px rgba(var(--w-edge), calc(var(--w-edge-a) * var(--edge))), 0 0 0 1.75px color-mix(in srgb, var(--w-paper) calc(35% * var(--edge)), transparent), 0 4px 14px var(--w-shadow);
+  transition: background-color var(--motion-change) var(--ease-out); }
+.wg .in { position: absolute; inset: 0; padding: 12px 13px 11px; overflow: hidden; }
+/* Fainter than the floor: one backing per line off the tiles, at the floor (대비 증가: 20 % more). */
+.wg.pl .bk { --bk: min(100%, calc(var(--floor) * 100% + var(--backing-more))); background: color-mix(in srgb, var(--w-paper) var(--bk), transparent); border-radius: 6px; box-shadow: 0 0 0 2px color-mix(in srgb, var(--w-paper) var(--bk), transparent); }
+/* The day tiles: the paper at --tile; weekends and holidays with the paper's clay mixed in; today a sage outline. Text on a
+   tile needs no backing of its own. */
+.mgrid .cl, .wkcols .c, .wkrows .r { background: color-mix(in srgb, var(--w-paper) calc(var(--tile) * 100%), transparent); }
+.mgrid .cl.we, .wkcols .c.we, .wkrows .r.we { background: color-mix(in srgb, color-mix(in srgb, var(--w-clay-2) 55%, var(--w-paper)) calc(var(--tile-we) * 100%), transparent); }
+/* Today: a sage outline; below 100 % with a ring of solid paper inside it (as every mark), so it shows on a faint tile. */
+.mgrid .cl.today, .wkcols .c.today, .wkrows .r.today { box-shadow: inset 0 0 0 1.5px var(--w-sage); }
+.wg.ha .mgrid .cl.today, .wg.ha .wkcols .c.today, .wg.ha .wkrows .r.today { box-shadow: inset 0 0 0 1.5px var(--w-sage), inset 0 0 0 3px var(--w-paper); }
+.wg.pl .mgrid .cl .bk, .wg.pl .wkrows .r .bk { background: none; box-shadow: none; }
+.wg.pl .wkcols .c.bk { box-shadow: none; }
+.wg.pl .wkcols .c.today.bk { box-shadow: inset 0 0 0 1.5px var(--w-sage), inset 0 0 0 3px var(--w-paper); }
+/* The lunar date (small, at a tile's right) and a holiday's name: clay at 100 %, ink with a clay ⚑ below. */
+.lu { margin-left: auto; padding: 0 2px; font-size: 9.5px; color: var(--t3); font-variant-numeric: tabular-nums; white-space: nowrap; flex: none; }
+.hol { height: 14px; line-height: 14px; padding: 0 2px; font-size: 10px; font-weight: 600; color: var(--tc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hflag { display: none; color: var(--w-clay); margin-right: 3px; font-size: 9px; }
+.wg.fd .hflag { display: inline; }
+.hol-in { color: var(--tc); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lu-in { color: var(--t2); font-weight: 500; }
+.wg.bo .num, .wg.bo .hd .t, .wg.bo .big .d { font-weight: 800; }
+.wg.ha .mark, .wg.ha .dots i, .wg.ha .item .bar { box-shadow: 0 0 0 1.5px var(--w-paper); }
+.wg.ha .todaydot { box-shadow: 0 0 0 2px var(--w-paper), 0 0 0 3px var(--w-sage); }
+@media (prefers-reduced-motion: reduce) { .wg .paper { transition: none; } }
+
+.hd { display: flex; align-items: center; gap: 6px; height: 24px; margin-bottom: 4px; }
+.k-week.s-detail .hd { margin-bottom: 2px; }
+.hd .t { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 3px; cursor: pointer; }
+.hd .nav { margin-left: auto; display: flex; gap: 2px; align-items: center; visibility: hidden; }
+.wg.hover .hd .nav, .wg.paged .hd .nav { visibility: visible; }
+.hd .nav button { min-width: 24px; height: 24px; border: 0; border-radius: 7px; display: grid; place-items: center; font: inherit; font-size: 12px; color: var(--w-ink); background: var(--w-paper-2); padding: 0 6px; cursor: pointer; }
+.hd .nav button.td { font-size: 10.5px; font-weight: 600; color: var(--ts); background: var(--w-sage-2); }
+.num { font-variant-numeric: tabular-nums; }
+.sun { color: var(--tc); }
+.dim { opacity: 0.42; }
+.todaydot { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--w-sage); color: var(--w-on-sage) !important; font-weight: 700; }
+.mark { flex: none; width: 3px; height: 12px; margin: 0 1.5px; border-radius: 2px; background: var(--color, var(--w-sage)); }
+.mark.deadline, .mark.reminder, .mark.range { width: 6px; height: 6px; border-radius: 50%; margin: 0; }
+.mark.deadline { background: var(--w-clay); }
+.mark.reminder, .mark.range { background: var(--w-sage); }
+.ln { display: flex; align-items: center; height: 19px; min-width: 0; }
+.ln .bk { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; padding-right: 4px; cursor: pointer; }
+.ln .tm { color: var(--t2); font-size: 11px; min-width: 34px; flex: none; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ln .tt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.more { color: var(--t2); font-size: 10.5px; font-weight: 700; }
+/* +N: small to see, 24 px to click. */
+button.more { position: relative; border: 0; background: none; font: inherit; font-size: 10.5px; font-weight: 700; color: var(--t2); padding: 0 3px; cursor: pointer; border-radius: 5px; }
+button.more::after { content: ""; position: absolute; inset: 50% auto auto 50%; width: 24px; height: 24px; transform: translate(-50%, -50%); }
+button.more:hover { background: var(--w-sage-2); color: var(--ts); }
+.empty { color: var(--t2); padding: 4px 3px; }
+.dots { display: flex; gap: 3px; justify-content: center; height: 6px; align-items: center; }
+.dots i { width: 5px; height: 5px; border-radius: 50%; display: block; background: var(--color); }
+.dots em { font-size: 8.5px; font-style: normal; color: var(--t2); font-weight: 700; line-height: 6px; }
+.plusbtn { position: absolute; width: 24px; height: 24px; border: 0; border-radius: 7px; background: var(--w-sage-2); color: var(--ts); font: inherit; font-size: 15px; font-weight: 600; display: grid; place-items: center; cursor: pointer; }
+
+/* 오늘 (170 × 170) */
+.k-today .big { display: flex; align-items: flex-end; gap: 7px; margin-bottom: 7px; }
+.k-today .big .bk { display: inline-flex; align-items: flex-end; gap: 7px; padding: 0 3px; }
+.k-today .big .d { font-size: 38px; font-weight: 700; line-height: 0.9; color: var(--w-sage); font-variant-numeric: tabular-nums; }
+.wg.fd.k-today .big .d { color: var(--w-ink); }
+.k-today .big .m { font-size: 11.5px; color: var(--t2); font-weight: 600; line-height: 1.3; padding-bottom: 1px; }
+.k-today .plusbtn { right: 9px; bottom: 9px; }
+/* 이번 주 간단히 (344 × 170) */
+.wkcols { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; text-align: center; margin-bottom: 6px; }
+.wkcols .c { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 3px 0 4px; border-radius: 7px; cursor: pointer; }
+.wkcols .w { font-size: 10.5px; color: var(--t2); }
+.wkcols .n { font-size: 14px; font-weight: 700; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+/* 이번 주 자세히 */
+.wkrows { display: flex; flex-direction: column; gap: 1.5px; }
+.wkrows .r { display: grid; grid-template-columns: 22px 24px 1fr auto auto; align-items: center; gap: 4px; height: 15.5px; border-radius: 5px; padding: 0 3px; white-space: nowrap; cursor: pointer; }
+.wkrows .r .hol-in { font-size: 10px; flex: none; max-width: 40%; }
+.wkrows .r .bk { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 100%; padding: 0 2px; }
+.wkrows .r .x .item { height: 16px; }
+.wkrows .r .w { font-size: 10.5px; color: var(--t2); }
+.wkrows .r .n { font-size: 12.5px; font-weight: 700; }
+.wkrows .r .x { display: flex; align-items: center; gap: 5px; overflow: hidden; min-width: 0; }
+.wkrows .r .x .tm { color: var(--t2); font-size: 10.5px; flex: none; font-variant-numeric: tabular-nums; }
+.wkrows .r .x .tt { overflow: hidden; text-overflow: ellipsis; }
+.wkrows .r .lu { font-size: 9px; }
+/* 이번 달 */
+.mgrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: 16px repeat(6, minmax(0, 1fr)); gap: 3px; height: calc(100% - 28px); }
+.mgrid .wd { text-align: center; font-size: 10px; color: var(--t2); height: 16px; }
+.mgrid .cl { border-radius: 7px; padding: 3px 3px 2px; position: relative; cursor: pointer; min-width: 0; min-height: 0; overflow: hidden; }
+.k-month.s-simple .cl { text-align: center; }
+.k-month.s-simple .cl .bk { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; padding: 0 2px 2px; }
+.k-month.s-simple .cl .n { font-size: 12px; font-weight: 700; display: inline-flex; width: 21px; height: 21px; align-items: center; justify-content: center; }
+.k-month:not(.s-simple) .cl .head { display: flex; align-items: center; gap: 4px; height: 19px; }
+.k-month:not(.s-simple) .cl .head .bk { display: inline-flex; align-items: center; gap: 3px; padding-right: 2px; }
+.k-month:not(.s-simple) .cl .n { font-size: 11.5px; font-weight: 700; display: inline-flex; min-width: 19px; height: 19px; align-items: center; justify-content: center; }
+.k-month:not(.s-simple) .cl .lines { display: flex; flex-direction: column; gap: 1px; }
+.k-month:not(.s-simple) .cl .lines .bk { display: block; padding: 0 1px; }
+/* 벽 달력 (880 × 680): bigger type, four lines a day; a cut title takes two lines when a line is to spare. */
+.k-month.s-wall { font-size: 12.5px; }
+.k-month.s-wall .hd .t { font-size: 16px; }
+.k-month.s-wall .mgrid .wd { font-size: 11px; }
+.k-month.s-wall .cl { padding: 5px 6px 3px; }
+.k-month.s-wall .cl .head { height: 22px; }
+.k-month.s-wall .cl .n { font-size: 13.5px; min-width: 22px; height: 22px; }
+.k-month.s-wall .lu { font-size: 10.5px; }
+.k-month.s-wall .hol { font-size: 11.5px; height: 17px; line-height: 17px; }
+.k-month.s-wall .item { height: 18px; line-height: 18px; font-size: 12px; }
+/* Audit 3 · 28 (D2): a cut title on two lines where the cell has a line to spare (twoLineTitles; 벽 달력's old ‘few’ rule). */
+.k-month .cl .item.two { height: auto; max-height: 28px; line-height: 13px; white-space: normal; align-items: flex-start; }
+.k-month.s-wall .cl .item.two { max-height: 34px; line-height: 16px; }
+.k-month .cl .item.two .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; word-break: keep-all; overflow-wrap: normal; }
+.k-month .cl .item.two .bar { margin-top: 2px; }
+.k-month .cl .item.two .icon { margin-top: 2px; }
+.k-month.s-wall .cl .item.two .bar { margin-top: 3px; }
+/* #260: a holiday's name on two lines by the same rule (its line first, never above a band); English and Dutch also break
+   a long word at a hyphenation point (the page's lang), Korean between words only. */
+.k-month .cl .hol.two { height: auto; max-height: 28px; line-height: 13px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; white-space: normal; word-break: keep-all; overflow-wrap: normal; }
+.k-month.s-wall .cl .hol.two { height: auto; max-height: 34px; line-height: 16px; }
+html:not([lang="ko"]) .k-month .cl .item.two .t, html:not([lang="ko"]) .k-month .cl .hol.two { hyphens: auto; }
+/* calendar-flows D1: a trip's band joins along the week row (as on the desk's calendar): squared and reaching the tile's
+   edge where it goes on, no bar of its own where it comes from the day before, the tint only under an earlier day's title,
+   which is laid over the following tiles (fitTitles) and lets their clicks through. */
+.k-month .cl { --padx: 4px; }
+.k-month.s-wall .cl { --padx: 7px; }
+.k-month .cl .item.joins-left { margin-left: calc(-1 * var(--padx)); padding-left: var(--padx); border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.k-month .cl .item.joins-right { margin-right: calc(-1 * var(--padx)); border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.k-month .cl .item.cont .t { visibility: hidden; }
+.k-month .mgrid .cl.runner { z-index: 1; overflow: visible; clip-path: inset(0 -200vw 0 0); }
+.k-month .cl .item.runs { overflow: visible; }
+.k-month .cl .item.runs .t { flex: none; pointer-events: none; }
+.cl:hover, .wkcols .c:hover, .wkrows .r:hover { background-image: linear-gradient(color-mix(in srgb, var(--w-sage) 12%, transparent), color-mix(in srgb, var(--w-sage) 12%, transparent)); }
+/* The desk calendar's lines (calendarCells.ts), drawn smaller. */
+.item { height: 15px; display: flex; align-items: center; gap: 3px; min-width: 0; padding-right: 2px; border-radius: 3px; font-size: 10.5px; line-height: 15px; white-space: nowrap; overflow: hidden; color: var(--w-ink); text-align: left; }
+.item .bar { width: 2.5px; height: 10px; flex: none; border-radius: 1.5px; background: var(--color); }
+.item.all-day { background: color-mix(in srgb, var(--color) 20%, transparent); }
+.item .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.item .icon { flex: none; }
+.item.deadline .icon { color: var(--w-clay); }
+.item.reminder .icon { color: var(--w-sage); }
+/* 오늘 목록 (200 × 360) */
+.k-agenda .sh { font-size: 10.5px; font-weight: 700; color: var(--t2); margin: 6px 0 2px; display: flex; align-items: center; min-width: 0; }
+.k-agenda .sh .bk { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k-agenda .sh .bk { padding: 0 3px; }
+.k-agenda .sh .badge { font-size: 9.5px; font-weight: 700; color: var(--w-on-sage); background: var(--w-sage); border-radius: 6px; padding: 1px 6px; margin-left: 4px; }
+.k-agenda .ln { height: 21px; }
+.k-agenda .addbtn { position: absolute; left: 13px; right: 13px; bottom: 10px; height: 26px; border: 0; border-radius: 8px; background: var(--w-sage-2); color: var(--ts); font: inherit; font-size: 11.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer; }
+
+/* The toast over the paper's foot: what was put in (되돌리기), or that the widget was removed. */
+.wtoast { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); max-width: calc(100% - 16px); display: flex; align-items: center; gap: 10px; background: var(--w-ink); color: var(--w-paper); border-radius: 999px; font-size: 12px; padding: 6px 8px 6px 14px; white-space: nowrap; box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2); z-index: 5; }
+.wtoast .tx { overflow: hidden; text-overflow: ellipsis; }
+.wtoast button { border: 0; background: none; color: var(--w-toast-action); font: inherit; font-weight: 700; cursor: pointer; padding: 2px 6px; border-radius: 6px; flex: none; }
+.wg.removed .paper, .wg.removed .in, .wg.removed .note-ears { visibility: hidden; }

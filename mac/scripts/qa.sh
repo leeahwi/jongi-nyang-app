@@ -1,4 +1,6 @@
 #!/bin/bash
+# For a person trying the QA copy by hand: it opens the copy in front, on the screen, on purpose. Checks and agents use
+# the off-screen scripts instead (#217); `--build-only` builds it without opening it.
 set -euo pipefail
 task_root="$(cd "$(dirname "$0")/.." && pwd)"
 "$task_root/scripts/build.sh"

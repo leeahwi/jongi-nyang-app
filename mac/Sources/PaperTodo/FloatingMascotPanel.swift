@@ -396,7 +396,9 @@ private final class FloatingMascotView: NSView {
         PaperPaw.drawResting(in: CGRect(x: 63, y: note.maxY - 7, width: 14, height: 13))
     }
 
-    /// Up to three open tasks in tiny handwriting on ruled lines; empty rules when there are none.
+    /// Up to three open tasks in tiny handwriting on ruled lines; empty rules when there are none. #240 (점검 3의 29): the
+    /// lines reach nearer the note's right edge, and a title too long for its line steps down a size or two before it is
+    /// cut (the tooltip has every title whole).
     private func drawTaskLines(in note: NSRect, night: Bool) {
         let ink = night ? NSColor(paperHex: "#f1e9d2")! : NSColor(red: 0.30, green: 0.26, blue: 0.17, alpha: 0.88)
         let rule = night ? NSColor.white.withAlphaComponent(0.14) : NSColor(red: 0.57, green: 0.48, blue: 0.26, alpha: 0.24)
@@ -413,7 +415,7 @@ private final class FloatingMascotView: NSView {
             rule.setStroke()
             let line = NSBezierPath()
             line.move(to: NSPoint(x: 22, y: baseline - 2))
-            line.line(to: NSPoint(x: note.maxX - 10, y: baseline - 2.4))
+            line.line(to: NSPoint(x: note.maxX - 5, y: baseline - 2.4))
             line.lineWidth = 0.6
             line.stroke()
             guard let title else { continue }
@@ -426,9 +428,12 @@ private final class FloatingMascotView: NSView {
                 box.stroke()
                 x += 9
             }
+            let room = note.maxX - 5 - x
+            let fitted = isMore ? font : [11.5, 10.5, 9.5].lazy.map { HandwritingFont.native(face: .pen, size: $0) }
+                .first { (title as NSString).size(withAttributes: [.font: $0]).width <= room } ?? HandwritingFont.native(face: .pen, size: 9.5)
             (title as NSString).draw(
-                in: NSRect(x: x, y: baseline - 3, width: note.maxX - 10 - x, height: 14),
-                withAttributes: [.font: isMore ? NSFont.systemFont(ofSize: 7.5, weight: .medium) : font,
+                in: NSRect(x: x, y: baseline - 3, width: room, height: 14),
+                withAttributes: [.font: isMore ? NSFont.systemFont(ofSize: 7.5, weight: .medium) : fitted,
                                  .foregroundColor: isMore ? ink.withAlphaComponent(night ? 1 : 0.8) : ink,
                                  .paragraphStyle: style]
             )
@@ -498,7 +503,9 @@ private final class FloatingMascotView: NSView {
         setAccessibilityRole(.button)
         setAccessibilityLabel(L("노트 열기, \(summary.caption)"))
         setAccessibilityHelp(L("포스트잇을 클릭하면 노트를 열고, 드래그하면 옮깁니다"))
-        toolTip = "\(summary.caption) · " + L("클릭해서 열기 · 드래그해서 이동")
+        // The titles whole (the note's lines cut long ones, #240).
+        let titles = summary.titles.prefix(5).map { "· " + $0 }
+        toolTip = ([summary.caption] + titles + [L("클릭해서 열기 · 드래그해서 이동")]).joined(separator: "\n")
     }
 
     private func makeContextMenu() -> NSMenu {

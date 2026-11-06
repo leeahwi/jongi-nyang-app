@@ -1,7 +1,12 @@
 import { folderName, lastFolderOf, shownColor, visibleFolders } from "../core/memoDrawer";
 import { bodyFontSize, type AppState, type PrefsState } from "../core/types";
 import { h, icon, lang, paper, t } from "./api";
-import { appear, fitWindow, keyHint, slipButton, slipHead, tape } from "./slip";
+import { listenForTyping } from "./typingTap";
+import { holdWhileAsked } from "./askGuard";
+import { appear, dragByPaper, fitWindow, keyHint, slipButton, slipHead, startsSlipDrag, tape } from "./slip";
+
+// #229: a question waiting holds this page up (askGuard.ts).
+holdWhileAsked();
 
 /**
  * 빠른 메모: a few lines written anywhere, on a lavender-taped slip with ruled lines. Ctrl+Enter
@@ -31,6 +36,7 @@ function save(keep = false): void {
   const text = editor.value;
   if (keep && !text.trim()) return;
   if (text.trim()) editor.value = "";
+  fitButton();
   api.send("quickMemo:save", text, currentFolder(), keep);
   if (keep) editor.focus();
 }
@@ -116,11 +122,14 @@ addButton.title = t("Ctrl+Enter 넣기 · Ctrl+Alt+Enter 넣고 계속 적기");
 // #119: its name without the key cap's text run into it (`넣기Ctrl+↩`); the keys are its description.
 addButton.setAttribute("aria-label", t("넣기"));
 addButton.setAttribute("aria-description", addButton.title);
+/** 넣기 waits for some words, as on the Mac (an empty slip has nothing to put in). */
+const fitButton = () => { addButton.disabled = !editor.value.trim(); };
 card.append(tape("memo"), head.element, h("div", { class: "memo-body" }, editor, list),
   h("div", { class: "slip-foot" }, chipButton, h("span", { class: "keys" }, keyHint("Esc", t("닫기"))), h("span", { class: "spacer" }), addButton));
 fitWindow(stage);
 
 editor.addEventListener("input", () => {
+  fitButton();
   // Kept as the draft as it is written, so nothing is lost if the app is closed meanwhile.
   window.clearTimeout(draftTimer);
   draftTimer = window.setTimeout(() => api.send("quickMemo:draft", editor.value), 600);
@@ -152,6 +161,7 @@ api.on("quickMemo:blur", close);
 api.on("quickMemo:open", (payload) => {
   const { text, copied } = (payload ?? {}) as { text?: string; copied?: boolean };
   editor.value = text ?? "";
+  fitButton();
   // Each time it opens: the drawer's last folder again (and the folders as they are now).
   void api.getState().then(takeState);
   folder = undefined;
@@ -170,3 +180,21 @@ void api.getState().then(takeState);
   folders: () => openList(),
   pick: (id: string) => { folder = id; renderChip(); },
 };
+
+// #230: keys typed here make the desktop cat tap along (only that a key went down).
+listenForTyping();
+
+// #246: the paper and the title row drag the slip (not the field, the chips or the buttons — the text and its caret stay as
+// they are); the main process keeps its head on the display and remembers the place per display. A double-click on the
+// paper puts it back where it usually opens.
+dragByPaper(card, {
+  start: (x, y) => { void api.act({ type: "slipDrag", phase: "start", x, y }); },
+  move: (_dx, _dy, x, y) => { void api.act({ type: "slipDrag", phase: "move", x, y }); },
+  end: (x, y) => { void api.act({ type: "slipDrag", phase: "end", x, y }); },
+});
+// A press on the paper doesn't take the focus from the field: what is typed and the caret stay.
+card.addEventListener("mousedown", (event) => { if (startsSlipDrag(event as unknown as PointerEvent)) event.preventDefault(); });
+card.addEventListener("dblclick", (event) => {
+  if (!startsSlipDrag(event as unknown as PointerEvent)) return;
+  void api.act({ type: "slipDrag", phase: "reset", x: event.screenX, y: event.screenY });
+});

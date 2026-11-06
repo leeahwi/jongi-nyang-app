@@ -73,7 +73,8 @@ export function openSearch(host: SearchHost, initial = ""): SearchSlip {
     results.replaceChildren(...blocks);
     results.hidden = blocks.length === 0;
     empty.hidden = blocks.length > 0;
-    if (query.trim()) empty.textContent = t("‘{query}’에 맞는 게 없어요", { query: query.trim() });
+    // #240: an empty result ends in what to try next.
+    if (query.trim()) empty.textContent = t("‘{query}’에 맞는 게 없어요. 초성이나 다른 말로 찾아볼까요?", { query: query.trim() });
     else empty.replaceChildren(h("span", {}, t("초성으로도 찾을 수 있어요 (예: ㅂㄱㅅ → 보고서)")), ...(host.spaceHint ? [h("span", { class: "search-hint" }, host.spaceHint)] : []));
     highlight(0, false);
     results.scrollTop = 0;

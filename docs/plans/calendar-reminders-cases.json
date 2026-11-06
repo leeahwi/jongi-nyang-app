@@ -1,0 +1,82 @@
+{
+  "about": "달력의 달 칸과 주 보기에 알림 할 일 (#227). 날짜와 시각은 이 기기의 벽시계예요(시간대와 무관). 달력의 하루는 자정부터 자정까지예요(노트의 새벽 4시 규칙이 아니에요). cells: 달 칸에 보이는 줄(일정 → 마감 → 알림, 알림은 시각 순, 마감은 제목 순)과 limit을 넘는 수(more). 알림 줄은 제목만이고 시각은 tooltips의 말이에요. 끝낸 할 일은 빠지고, 같은 날 마감과 알림이 함께인 할 일은 마감으로 한 번 보여요. 다시 알림으로 미룬 알림은 미룬 날에 보여요(알림 시각이 그날로 바뀌어서). 반복 할 일은 그날 만들어진 할 일만 보여요(앞날의 반복은 아직 할 일이 아니라서 보이지 않아요). hidden: 이 기기에서 숨긴 스페이스(rules, 그 시각 now)의 할 일은 빠져요(오늘 창처럼 잠깐 보기와 상관없어요). limit 4는 아주 좁은 칸의 점(넷까지와 +N)이에요. week: 주 보기 한 줄의 할 일 차례(마감 → 알림 · 시간 정하기, 시각 순; 주 보기는 시각 칸이 있어 시각이 보여요). day: 하루 칸은 그대로예요(알림 · 시간 정하기 시각 순 → 마감). Mac CalendarMonth(Page.cell · weekOrder · dayTasks · tooltip)과 Windows core/calendar.ts(cellItems · weekOrder · dayTasks · taskTooltip)가 이 파일을 읽어요.",
+  "spaces": {
+    "version": 1,
+    "spaces": [
+      { "id": "s-a", "name": "회사", "color": "pink", "order": 0, "updatedAt": "2026-11-01T00:00:00Z" },
+      { "id": "s-b", "name": "집", "color": "mint", "order": 1, "updatedAt": "2026-11-01T00:00:00Z" },
+      { "id": "s-c", "name": "공부", "color": "yellow", "order": 2, "updatedAt": "2026-11-01T00:00:00Z" }
+    ]
+  },
+  "rules": {
+    "hideWork": { "s-a": { "show": "hide" } },
+    "hideGeneral": { "none": { "show": "hide" } },
+    "workHours": { "s-a": { "show": "time", "times": [{ "days": [1, 2, 3, 4, 5], "from": "09:00", "to": "18:00" }] } }
+  },
+  "events": {
+    "E1": { "title": "생일", "allDay": true, "start": "2026-11-10 00:00", "end": "2026-11-11 00:00" },
+    "E2": { "title": "팀 회의", "start": "2026-11-10 10:00", "end": "2026-11-10 11:00" },
+    "E3": { "title": "점심 약속", "start": "2026-11-10 12:00", "end": "2026-11-10 13:00" }
+  },
+  "todos": {
+    "T1": { "id": "C2270000-0000-4000-8000-000000000001", "title": "보고서 쓰기", "due": "2026-11-10", "space": "s-a" },
+    "T2": { "id": "C2270000-0000-4000-8000-000000000002", "title": "치과 예약", "reminder": "2026-11-10 15:00" },
+    "T3": { "id": "C2270000-0000-4000-8000-000000000003", "title": "약 먹기", "reminder": "2026-11-10 09:00", "space": "s-b" },
+    "T4": { "id": "C2270000-0000-4000-8000-000000000004", "title": "회의 자료 보내기", "reminder": "2026-11-10 11:00", "space": "s-a" },
+    "T5": { "id": "C2270000-0000-4000-8000-000000000005", "title": "빨래 개기", "reminder": "2026-11-10 18:00", "space": "s-b", "done": true },
+    "T6": { "id": "C2270000-0000-4000-8000-000000000006", "title": "세금 내기", "due": "2026-11-10", "reminder": "2026-11-10 08:00" },
+    "T7": { "id": "C2270000-0000-4000-8000-000000000007", "title": "책 반납", "due": "2026-11-12", "reminder": "2026-11-10 20:00", "space": "s-c" },
+    "T8": { "id": "C2270000-0000-4000-8000-000000000008", "title": "운동", "due": "2026-11-10", "time": ["14:00", "15:30"], "reminder": "2026-11-10 14:00", "space": "s-b" },
+    "T9": { "id": "C2270000-0000-4000-8000-000000000009", "title": "장보기", "reminder": "2026-11-11 10:00" },
+    "T10": { "id": "C2270000-0000-4000-8000-000000000010", "title": "화분에 물 주기", "reminder": "2026-11-11 00:30" }
+  },
+  "now": "2026-11-10 10:00",
+  "cells": [
+    { "case": "M1 알림이 있는 날: 일정 → 마감 → 알림(시각 순)", "day": "2026-11-10", "events": ["E1", "E2"], "todos": ["T1", "T2", "T3"], "limit": 99,
+      "lines": ["event 생일", "event 팀 회의", "deadline 보고서 쓰기", "reminder 약 먹기", "reminder 치과 예약"], "more": 0 },
+    { "case": "M2 칸이 넘치는 날: 앞의 셋과 +2(알림부터 줄여요)", "day": "2026-11-10", "events": ["E1", "E2"], "todos": ["T1", "T2", "T3"], "limit": 3,
+      "lines": ["event 생일", "event 팀 회의", "deadline 보고서 쓰기"], "more": 2 },
+    { "case": "M3 알림만 있는 날, 자정 지난 00:30은 그날", "day": "2026-11-11", "events": [], "todos": ["T9", "T10"], "limit": 3,
+      "lines": ["reminder 화분에 물 주기", "reminder 장보기"], "more": 0 },
+    { "case": "M4 끝낸 할 일은 빠져요", "day": "2026-11-10", "events": [], "todos": ["T2", "T5"], "limit": 3,
+      "lines": ["reminder 치과 예약"], "more": 0 },
+    { "case": "M5 같은 날 마감과 알림: 마감으로 한 번", "day": "2026-11-10", "events": [], "todos": ["T6", "T2"], "limit": 3,
+      "lines": ["deadline 세금 내기", "reminder 치과 예약"], "more": 0 },
+    { "case": "M6 알림은 이날, 마감은 다른 날: 이날은 알림", "day": "2026-11-10", "events": [], "todos": ["T7"], "limit": 3,
+      "lines": ["reminder 책 반납"], "more": 0 },
+    { "case": "M7 그 마감 날에는 마감", "day": "2026-11-12", "events": [], "todos": ["T7"], "limit": 3,
+      "lines": ["deadline 책 반납"], "more": 0 },
+    { "case": "M8 시간을 정한 할 일: 그 마감 날 칸은 마감 하나", "day": "2026-11-10", "events": [], "todos": ["T8"], "limit": 3,
+      "lines": ["deadline 운동"], "more": 0 },
+    { "case": "M9 다른 날의 알림은 보이지 않아요", "day": "2026-11-10", "events": [], "todos": ["T9", "T10"], "limit": 3,
+      "lines": [], "more": 0 },
+    { "case": "M10 숨긴 스페이스(회사 숨기기): 회사의 마감과 알림이 빠져요", "day": "2026-11-10", "events": [], "todos": ["T1", "T2", "T3", "T4"], "limit": 99, "hidden": "hideWork",
+      "lines": ["reminder 약 먹기", "reminder 치과 예약"], "more": 0 },
+    { "case": "M11 일반을 숨기면 스페이스 없는 할 일이 빠져요", "day": "2026-11-10", "events": [], "todos": ["T1", "T2", "T3", "T4"], "limit": 99, "hidden": "hideGeneral",
+      "lines": ["deadline 보고서 쓰기", "reminder 약 먹기", "reminder 회의 자료 보내기"], "more": 0 },
+    { "case": "M12 시간 정하기(평일 9–18): 화요일 20:00에는 회사가 숨어요", "day": "2026-11-10", "events": [], "todos": ["T1", "T2", "T3", "T4"], "limit": 99, "hidden": "workHours", "at": "2026-11-10 20:00",
+      "lines": ["reminder 약 먹기", "reminder 치과 예약"], "more": 0 },
+    { "case": "M13 시간 정하기(평일 9–18): 화요일 10:00에는 모두 보여요", "day": "2026-11-10", "events": [], "todos": ["T1", "T2", "T3", "T4"], "limit": 99, "hidden": "workHours", "at": "2026-11-10 10:00",
+      "lines": ["deadline 보고서 쓰기", "reminder 약 먹기", "reminder 회의 자료 보내기", "reminder 치과 예약"], "more": 0 },
+    { "case": "M14 아주 좁은 칸(점 넷): 일정 셋, 마감 하나, +2", "day": "2026-11-10", "events": ["E1", "E2", "E3"], "todos": ["T1", "T2", "T3"], "limit": 4,
+      "lines": ["event 생일", "event 팀 회의", "event 점심 약속", "deadline 보고서 쓰기"], "more": 2 }
+  ],
+  "week": [
+    { "case": "W1 주 보기: 마감 → 알림 · 시간 정하기(시각 순), 끝낸 할 일은 빠져요", "day": "2026-11-10", "todos": ["T1", "T2", "T3", "T5", "T8"],
+      "lines": ["deadline - 보고서 쓰기", "reminder 09:00 약 먹기", "range 14:00–15:30 운동", "reminder 15:00 치과 예약"] },
+    { "case": "W2 주 보기도 숨긴 스페이스의 할 일은 빠져요", "day": "2026-11-10", "todos": ["T1", "T2", "T3", "T4"], "hidden": "hideWork",
+      "lines": ["reminder 09:00 약 먹기", "reminder 15:00 치과 예약"] }
+  ],
+  "day": [
+    { "case": "P1 하루 칸은 그대로: 알림 · 시간 정하기(시각 순) → 마감", "day": "2026-11-10", "todos": ["T1", "T2", "T3", "T5", "T8"],
+      "lines": ["reminder 09:00 약 먹기", "range 14:00–15:30 운동", "reminder 15:00 치과 예약", "deadline - 보고서 쓰기"] }
+  ],
+  "tooltips": [
+    { "case": "X1 알림의 툴팁에는 시각", "day": "2026-11-10", "todo": "T2", "kind": "reminder",
+      "ko": "알림 15:00 · 치과 예약", "en": "Reminder 3:00 PM · 치과 예약", "nl": "Herinnering 15:00 · 치과 예약" },
+    { "case": "X2 마감의 툴팁", "day": "2026-11-10", "todo": "T1", "kind": "deadline",
+      "ko": "마감 · 보고서 쓰기", "en": "Due · 보고서 쓰기", "nl": "Deadline · 보고서 쓰기" },
+    { "case": "X3 시간 정하기의 툴팁(주 보기)", "day": "2026-11-10", "todo": "T8", "kind": "range",
+      "ko": "14:00–15:30 · 운동", "en": "2:00–3:30 PM · 운동", "nl": "14:00–15:30 · 운동" }
+  ]
+}

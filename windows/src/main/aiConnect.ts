@@ -60,6 +60,8 @@ export class AiConnection {
   /** At launch: the link written, the log's old lines dropped (on or off), and while on, the log read and what came meanwhile said once (M15). */
   start(): void {
     this.writeLink();
+    // N3-9: 이 기기에서 goes into ai-link.json too, so Claude on this PC hides what the note hides.
+    this.store.on("prefs", (key: string) => { if (key === "spaceDevice") this.writeLink(); });
     this.apply();
     this.trimOld();
     if (!this.enabled) return;
@@ -78,9 +80,9 @@ export class AiConnection {
     this.hooks.changed();
   }
 
-  /** ai-link.json, written whole (temporary file, then renamed). Also after the storage folder moved. */
+  /** ai-link.json, written whole (temporary file, then renamed). Also after the storage folder moved, and when 이 기기에서 changes (N3-9). */
   writeLink(): void {
-    const text = serializeAiLink({ v: 1, enabled: this.enabled, dataFolder: this.store.dataDirectory, lang: lang(), app: this.appLabel, updatedAt: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"), ext: aiExtVersion });
+    const text = serializeAiLink({ v: 1, enabled: this.enabled, dataFolder: this.store.dataDirectory, lang: lang(), app: this.appLabel, updatedAt: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"), ext: aiExtVersion, spaceDevice: this.store.prefs.spaceDevice });
     const file = path.join(this.settings, aiLinkFileName);
     try {
       if (fs.existsSync(file) && fs.readFileSync(file, "utf8").replace(/"updatedAt": "[^"]*"/, "") === text.replace(/"updatedAt": "[^"]*"/, "")) return;

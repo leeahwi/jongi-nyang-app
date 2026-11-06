@@ -1,0 +1,151 @@
+{
+  "about": "달력을 실제로 쓰는 흐름(docs/plans/calendar-flows.md)에서 정한 규칙의 공유 사례예요. Mac은 scripts/test-calendar-flows.sh(Tests/PaperCoreTests/CalendarFlowsTests.swift), Windows는 test/calendarFlows.test.ts가 같은 파일을 읽어요. 기준 시각은 2026-11-06(금) 15:00, 이 기기의 벽시계예요. 예시는 모두 지어낸 것이에요.",
+  "status": "2026-11-06, 두 앱에 넣었어요.",
+  "now": "2026-11-06T15:00:00",
+  "events": {
+    "trip": { "title": "제주 여행", "allDay": true, "start": "2026-11-08T00:00:00", "end": "2026-11-11T00:00:00", "color": "sage" },
+    "mom": { "title": "엄마 생신", "allDay": true, "start": "2026-11-09T00:00:00", "end": "2026-11-10T00:00:00", "color": "coral" },
+    "book": { "title": "독서 모임", "allDay": true, "start": "2026-11-09T00:00:00", "end": "2026-11-10T00:00:00", "color": "purple" },
+    "standup": { "title": "아침 회의", "start": "2026-11-09T09:00:00", "end": "2026-11-09T09:30:00", "color": "blue" },
+    "camp": { "title": "가족 캠핑", "start": "2026-11-13T18:00:00", "end": "2026-11-15T20:00:00", "color": "yellow" },
+    "conf": { "title": "디자인 학회", "allDay": true, "start": "2026-11-09T00:00:00", "end": "2026-11-12T00:00:00", "color": "blue" },
+    "photo": { "title": "가족 사진", "allDay": true, "start": "2026-11-09T00:00:00", "end": "2026-11-10T00:00:00", "color": "yellow" },
+    "late": { "title": "야간 작업", "start": "2026-11-09T23:00:00", "end": "2026-11-10T01:00:00", "color": "gray" }
+  },
+  "order": {
+    "about": "여러 날 종일 일정은 먼저 시작한 것, 같으면 더 긴 것이 위예요. 그래야 이어지는 날마다 같은 자리에 와서 막대가 이어져요. 하루짜리 종일 일정끼리는 전처럼 이름 순이에요(D1).",
+    "cases": [
+      { "case": "O1 먼저 시작한 여행이 맨 위, 하루짜리 종일은 이름 순, 시각 있는 일정은 그 뒤", "day": "2026-11-09", "events": ["standup", "mom", "trip", "book"], "titles": ["제주 여행", "독서 모임", "엄마 생신", "아침 회의"] },
+      { "case": "O2 같은 날 시작하면 긴 것이 위", "day": "2026-11-09", "events": ["photo", "conf"], "titles": ["디자인 학회", "가족 사진"] }
+    ]
+  },
+  "bands": {
+    "about": "막대(band): 그날 종일로 그려지는 일정이에요. 종일 일정이거나, 그날 하루를 통째로 덮는 일정(전날 시작해 다음 날 끝나요)이에요. 막대의 열쇠는 일정의 열쇠이고, 막대가 아닌 날은 없음(null)이에요.",
+    "cases": [
+      { "case": "B1 종일 여행은 사흘 모두 막대", "event": "trip", "days": { "2026-11-07": false, "2026-11-08": true, "2026-11-10": true, "2026-11-11": false } },
+      { "case": "B2 금요일 저녁부터 일요일 저녁까지인 캠핑은 토요일만 막대(금 · 일은 시각 있는 줄)", "event": "camp", "days": { "2026-11-13": false, "2026-11-14": true, "2026-11-15": false } },
+      { "case": "B3 밤을 넘기는 두 시간짜리 일은 막대가 아니에요", "event": "late", "days": { "2026-11-09": false, "2026-11-10": false } }
+    ]
+  },
+  "runs": {
+    "about": "한 주(한 줄)의 이레 동안, 날마다 칸에 그린 줄의 막대 열쇠예요(막대가 아니면 null). 같은 막대가 다음 날에도 같은 자리에 있으면 이어져요. 줄의 표기: 숫자는 이름을 그리는 칸에서 이름이 오른쪽으로 덮는 날 수(자기 칸 포함)이고, 0은 앞 칸의 이름이 덮어서 막대만 그리는 칸이에요. ‘<’는 앞날에서 이어 오고 ‘>’는 다음 날로 이어져요(D1).",
+    "cases": [
+      { "case": "R1 한 주 안의 사흘 여행: 첫날에만 이름, 이름이 사흘을 덮어요", "rows": [[], ["trip"], ["trip"], ["trip"], [], [], []], "runs": [[], ["3>"], ["0<>"], ["0<"], [], [], []] },
+      { "case": "R2 주를 넘는 여행: 다음 줄의 첫 칸에서 이름을 다시 그려요", "rows": [[], [], [], [], [], ["trip"], ["trip"]], "runs": [[], [], [], [], [], ["2>"], ["0<"]], "next": { "rows": [["trip"], ["trip"], [], [], [], [], []], "runs": [["2>"], ["0<"], [], [], [], [], []] } },
+      { "case": "R3 자리가 바뀐 날부터는 따로 그려요(이름이 다른 줄 위로 가지 않게)", "rows": [["conf"], ["conf", "trip"], ["trip"], [], [], [], []], "runs": [["2>"], ["0<", "1"], ["1"], [], [], [], []] },
+      { "case": "R4 막대가 아닌 줄과 하루짜리 종일 일정은 그대로", "rows": [[null, "mom"], [null], [], [], [], [], []], "runs": [["1", "1"], ["1"], [], [], [], [], []] },
+      { "case": "R5 가운데 날에 칸이 넘쳐 막대가 +N에 들어가면 거기서 끊겨요", "rows": [["trip"], [null], ["trip"], [], [], [], []], "runs": [["1"], ["1"], ["1"], [], [], [], []] }
+    ]
+  },
+  "twoLines": {
+    "about": "달 칸의 긴 이름(점검 3의 28, D2): 칸에 남는 줄(room에서 그린 줄을 뺀 것)을 위에서부터 잘린 이름에 하나씩 줘서 두 줄로 보여요. 막대(이어지는 줄)와, 이어지는 막대보다 위에 있는 줄은 두 줄이 되지 않아요(막대가 옆 칸과 어긋나요). 줄의 표기: cut 잘림, fit 다 들어감, band 이어지는 막대.",
+    "cases": [
+      { "case": "W1 하나뿐인 잘린 이름은 두 줄", "room": 3, "lines": ["cut"], "two": [true] },
+      { "case": "W2 남는 줄 하나는 잘린 이름에게(다 들어가는 줄은 그대로)", "room": 3, "lines": ["fit", "cut"], "two": [false, true] },
+      { "case": "W3 잘린 이름이 둘이고 남는 줄이 하나면 위의 것만", "room": 3, "lines": ["cut", "cut"], "two": [true, false] },
+      { "case": "W4 칸이 꽉 차면 모두 한 줄", "room": 3, "lines": ["cut", "cut", "cut"], "two": [false, false, false] },
+      { "case": "W5 벽 달력(네 줄)에 둘이면 둘 다 두 줄", "room": 4, "lines": ["cut", "cut"], "two": [true, true] },
+      { "case": "W6 이어지는 막대 위의 줄은 한 줄", "room": 3, "lines": ["cut", "band"], "two": [false, false] },
+      { "case": "W7 막대 아래의 줄은 두 줄이 될 수 있어요", "room": 3, "lines": ["band", "cut"], "two": [false, true] },
+      { "case": "W8 한 줄짜리 칸(공휴일이 한 줄을 차지)은 그대로", "room": 1, "lines": ["cut"], "two": [false] }
+    ],
+    "holiday": {
+      "about": "공휴일 이름도 같은 규칙이에요(#260): 공휴일 줄은 칸의 첫 줄이고 room에 들어가요. 남는 줄은 위에서부터 주니 공휴일 이름이 먼저 받아요. 그날을 지나는 막대가 있으면 공휴일 이름은 한 줄이에요(막대가 한 줄 내려가 옆 칸과 어긋나요). 그래서 주의 막대 자리는 바뀌지 않아요. holiday가 없음(null)이면 공휴일이 아닌 날이에요.",
+      "cases": [
+        { "case": "WH1 빈 칸의 긴 공휴일 이름(National Foundation Day)은 두 줄", "room": 3, "holiday": "cut", "lines": [], "two": { "holiday": true, "lines": [] } },
+        { "case": "WH2 남는 줄 하나는 위의 공휴일 이름에게", "room": 3, "holiday": "cut", "lines": ["cut"], "two": { "holiday": true, "lines": [false] } },
+        { "case": "WH3 벽 달력(네 줄)이면 공휴일 이름과 일정 이름 모두 두 줄", "room": 4, "holiday": "cut", "lines": ["cut"], "two": { "holiday": true, "lines": [true] } },
+        { "case": "WH4 그날을 지나는 막대가 있으면 공휴일 이름은 한 줄", "room": 4, "holiday": "cut", "lines": ["band"], "two": { "holiday": false, "lines": [false] } },
+        { "case": "WH5 막대 아래 일정은 남는 줄을 받을 수 있어요", "room": 4, "holiday": "cut", "lines": ["band", "cut"], "two": { "holiday": false, "lines": [false, true] } },
+        { "case": "WH6 칸이 꽉 차면 한 줄", "room": 3, "holiday": "cut", "lines": ["fit", "fit"], "two": { "holiday": false, "lines": [false, false] } },
+        { "case": "WH7 다 들어가는 이름(한글날)은 그대로, 남는 줄은 일정에게", "room": 3, "holiday": "fit", "lines": ["cut"], "two": { "holiday": false, "lines": [true] } },
+        { "case": "WH8 가장 작은 책상(두 줄짜리 칸)에 일정이 있으면 한 줄", "room": 2, "holiday": "cut", "lines": ["fit"], "two": { "holiday": false, "lines": [false] } },
+        { "case": "WH9 공휴일이 아닌 날은 전과 같아요", "room": 3, "holiday": null, "lines": ["cut"], "two": { "holiday": false, "lines": [true] } }
+      ]
+    },
+    "breaks": {
+      "about": "어디서 두 줄로 나누나요(#260): 한국어는 낱말 사이에서만 나눠요. 영어 · 네덜란드어는 낱말 사이에서, 또 긴 낱말 안에서도 그 언어의 하이픈 규칙으로 나눠요(‘Avond-/wandeling’, Mac은 시스템의 하이픈 규칙, Windows는 hyphens: auto). 나눌 자리가 없거나 첫 조각도 줄보다 넓으면 한 줄로 두고 ‘…’로 끝내요(마우스를 올리면 전체 이름). overflows: 한 줄에 다 안 들어가요. betweenWords: 낱말 사이에서 나눌 수 있어요(띄어쓰기가 있고 첫 낱말이 줄에 들어가요). inWord: 긴 낱말을 하이픈 자리에서 나눌 수 있어요.",
+      "hyphenates": { "ko": false, "en": true, "nl": true },
+      "cases": [
+        { "case": "K1 다 들어가면 그대로", "lang": "nl", "overflows": false, "betweenWords": false, "inWord": true, "fit": "fit" },
+        { "case": "K2 한국어는 낱말 사이에서 나눠요", "lang": "ko", "overflows": true, "betweenWords": true, "inWord": false, "fit": "cut" },
+        { "case": "K3 한국어 긴 낱말 하나는 한 줄(…)", "lang": "ko", "overflows": true, "betweenWords": false, "inWord": true, "fit": "fit" },
+        { "case": "K4 네덜란드어 긴 낱말(Avondwandeling)은 하이픈 자리에서 두 줄", "lang": "nl", "overflows": true, "betweenWords": false, "inWord": true, "fit": "cut" },
+        { "case": "K5 영어 긴 낱말도 하이픈 자리에서 두 줄", "lang": "en", "overflows": true, "betweenWords": false, "inWord": true, "fit": "cut" },
+        { "case": "K6 나눌 자리가 없으면 한 줄(…)", "lang": "nl", "overflows": true, "betweenWords": false, "inWord": false, "fit": "fit" },
+        { "case": "K7 영어 낱말 사이", "lang": "en", "overflows": true, "betweenWords": true, "inWord": false, "fit": "cut" }
+      ],
+      "holidays": {
+        "about": "공휴일 이름은 정해진 글이라 나눌 자리를 미리 적어 둬요(‘|’, 앱에서는 보이지 않는 하이픈 U+00AD). 그래서 두 앱이 같은 자리에서 나눠요. 한국어 이름은 나누지 않아요. 차례는 [en, nl]이에요.",
+        "newYear": ["New Year’s Day", "Nieuw|jaars|dag"],
+        "seollal": ["Seol|lal", "Seol|lal"],
+        "independence": ["In|de|pen|dence Move|ment Day", "On|af|han|ke|lijk|heids|dag"],
+        "children": ["Chil|dren’s Day", "Kin|der|dag"],
+        "buddha": ["Bud|dha’s Birth|day", "Boed|dha’s ver|jaar|dag"],
+        "memorial": ["Me|mo|ri|al Day", "Her|den|kings|dag"],
+        "liberation": ["Lib|er|a|tion Day", "Be|vrij|dings|dag"],
+        "chuseok": ["Chu|seok", "Chu|seok"],
+        "foundation": ["Na|tion|al Foun|da|tion Day", "Stich|tings|dag"],
+        "hangul": ["Han|gul Day", "Han|geul|dag"],
+        "christmas": ["Christ|mas Day", "Eer|ste kerst|dag"],
+        "substitute": ["Sub|sti|tute hol|i|day", "Ver|van|gen|de vrije dag"],
+        "election": ["Elec|tion Day", "Ver|kie|zings|dag"],
+        "temporary": ["Ex|tra hol|i|day", "Ex|tra vrije dag"]
+      }
+    }
+  },
+  "weekStart": {
+    "about": "한 주의 시작은 시스템 설정을 따라요(Mac: 시스템 설정 → 일반 → 언어 및 지역 → 한 주의 첫 요일, Windows: 설정 → 시간 및 언어 → 언어 및 지역 → 지역 형식 → 한 주의 첫날). 월요일이나 일요일이면 그대로, 다른 요일이거나 알 수 없으면 언어의 것(ko · en 일요일, nl 월요일)이에요. 달력 · 위젯 · 앞으로의 ‘이번 주’ · 알람의 요일 순서가 모두 따라요(D4).",
+    "cases": [
+      { "case": "F1 시스템이 월요일이면 한국어도 월요일부터", "system": "monday", "lang": "ko", "monday": true },
+      { "case": "F2 시스템이 일요일이면 네덜란드어도 일요일부터", "system": "sunday", "lang": "nl", "monday": false },
+      { "case": "F3 토요일 시작은 따르지 않고 언어의 것(ko 일요일)", "system": "saturday", "lang": "ko", "monday": false },
+      { "case": "F4 토요일 시작은 따르지 않고 언어의 것(nl 월요일)", "system": "saturday", "lang": "nl", "monday": true },
+      { "case": "F5 알 수 없으면 언어의 것", "system": null, "lang": "en", "monday": false }
+    ],
+    "grid": [
+      { "case": "F6 월요일부터면 2026년 11월의 첫 칸은 10월 26일(월), 머리는 월…일", "monday": true, "lang": "ko", "year": 2026, "month": 11, "first": "2026-10-26", "labels": ["월", "화", "수", "목", "금", "토", "일"] },
+      { "case": "F7 일요일부터면 첫 칸은 11월 1일(일)", "monday": false, "lang": "nl", "year": 2026, "month": 11, "first": "2026-11-01", "labels": ["zo", "ma", "di", "wo", "do", "vr", "za"] },
+      { "case": "F8 월요일부터면 ‘이번 주’는 월요일부터 일요일까지(2026-11-06 금)", "monday": true, "lang": "ko", "week": "2026-11-06", "days": ["2026-11-02", "2026-11-08"] }
+    ],
+    "readers": {
+      "about": "앱마다 시스템 값을 요일 이름으로 읽는 법이에요. Mac은 Calendar.firstWeekday(1 일요일 … 7 토요일), Windows는 레지스트리 iFirstDayOfWeek(0 월요일 … 6 일요일)와, 없을 때 Intl의 weekInfo.firstDay(1 월요일 … 7 일요일)예요.",
+      "mac": [{ "value": 1, "day": "sunday" }, { "value": 2, "day": "monday" }, { "value": 7, "day": "saturday" }],
+      "registry": [{ "value": "0", "day": "monday" }, { "value": "6", "day": "sunday" }, { "value": "5", "day": "saturday" }, { "value": "x", "day": null }],
+      "intl": [{ "value": 1, "day": "monday" }, { "value": 7, "day": "sunday" }, { "value": 6, "day": "saturday" }]
+    }
+  },
+  "lunar": {
+    "about": "칸의 날짜 옆 음력(문제 11): 60pt(Windows 60px)보다 좁은 칸은 날짜만 보여요. 가장 작은 책상의 칸은 57쯤이라 음력이 줄을 밀어 칸이 어긋났고, 보통 크기의 책상은 63쯤이라 보여요. 날짜 줄에 +N이 함께 있으면 음력 초하루만 보여요. 음력은 그날의 목록 머리와 툴팁에도 있어요.",
+    "cases": [
+      { "case": "L1 넉넉한 칸은 음력을 보여요", "lunarDay": 27, "width": 120, "moreInHead": false, "shows": true },
+      { "case": "L2 좁은 칸(가장 작은 책상)은 날짜만", "lunarDay": 27, "width": 58, "moreInHead": false, "shows": false },
+      { "case": "L3 좁은 칸은 초하루도 날짜만", "lunarDay": 1, "width": 58, "moreInHead": false, "shows": false },
+      { "case": "L4 +N이 있으면 초하루만", "lunarDay": 27, "width": 120, "moreInHead": true, "shows": false },
+      { "case": "L5 +N이 있어도 초하루는 보여요", "lunarDay": 1, "width": 120, "moreInHead": true, "shows": true },
+      { "case": "L6 60은 넉넉한 칸이에요(보통 크기의 책상)", "lunarDay": 5, "width": 60, "moreInHead": false, "shows": true }
+    ]
+  },
+  "sheet": {
+    "about": "날짜 쪽지(위젯의 날짜를 누르면 뜨는 쪽지)의 첫 줄은 그날의 공휴일 이름이에요. 시각 칸에 ‘공휴일’, 이름 칸에 공휴일 이름이에요(달 칸에서 공휴일 이름이 첫 줄인 것과 같아요). 지난 일은 흐리게 그려요(기준 시각에 끝났거나 지난 것, 종일 · 마감은 그날 내내 흐리지 않아요).",
+    "holiday": [
+      { "case": "H1 한글날", "day": "2026-10-09", "word": ["공휴일", "Holiday", "Feestdag"], "name": ["한글날", "Hangul Day", "Hangeuldag"] },
+      { "case": "H2 공휴일이 아닌 날은 줄이 없어요", "day": "2026-11-06", "word": ["공휴일", "Holiday", "Feestdag"], "name": [null, null, null] }
+    ],
+    "over": {
+      "case": "S1 오늘 15:00의 쪽지: 끝난 회의와 지난 알림은 흐리게, 곧 할 일과 마감은 그대로",
+      "day": "2026-11-06",
+      "events": {
+        "E1": { "title": "팀 회의", "start": "2026-11-06T10:00:00", "end": "2026-11-06T11:00:00", "color": "sage" },
+        "E2": { "title": "치과", "start": "2026-11-06T15:30:00", "end": "2026-11-06T16:30:00", "color": "blue" },
+        "E3": { "title": "생일", "allDay": true, "start": "2026-11-06T00:00:00", "end": "2026-11-07T00:00:00", "color": "yellow" }
+      },
+      "todos": {
+        "T1": { "id": "6B1F7C2E-0D7A-4C1B-9B9E-1F0A7E2C3D41", "title": "약 먹기", "reminderAt": "2026-11-06T09:00:00" },
+        "T2": { "id": "6B1F7C2E-0D7A-4C1B-9B9E-1F0A7E2C3D42", "title": "보고서 보내기", "dueDate": "2026-11-06" }
+      },
+      "lines": ["생일", "약 먹기", "팀 회의", "치과", "보고서 보내기"],
+      "over": [false, true, true, false, false]
+    }
+  }
+}

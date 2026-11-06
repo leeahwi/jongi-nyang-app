@@ -1,0 +1,255 @@
+/*
+ * 종이 테마 열다섯 가지 (#244, docs/plans/paper-themes.md): the colours of the thirteen papers beside 낮 종이 (base.css
+ * `:root`) and 밤 종이 (base.css `[data-paper="night"]`) — the same names, the values of docs/plans/paper-themes/tokens.json
+ * (test/paperThemes.test.ts keeps them the same, test/contrast.test.ts measures every pair on every paper).
+ * `<html data-paper>` is the paper shown (core/paper.ts shownPaper; the preload sets it); what every dark paper shares
+ * (shadows, the system's controls) is under `data-scheme="dark"` in base.css. `--ev-*` are the event marks (Q6: a step
+ * deeper, or lighter on a dark paper, until 3:1), `--margin-rule` the 하늘색 줄노트's red margin. Imported by base.css.
+ */
+
+/* ─── 한지 · Hanji ─── */
+:root[data-paper="hanji"] {
+  --paper: #f7f2e7; --paper-2: #eee7d8; --card: #fffcf5; --ink: #2b2925; --ink-2: #5a564d; --ink-3: #5f5b52;
+  --faint: #a39d8e; --rule: #e4dccb; --sage: #577456; --sage-2: #e0e4d4; --clay: #b06a4f; --clay-2: #f2dccf;
+  --sage-text: #50694e; --clay-text: #8e543f; --tab-1: #f6dc7c; --tab-2: #d6ccf6; --tab-1-edge: #dcc062;
+  --tab-2-edge: #bdb0ea; --tab-3: #efd4cb; --tint-1: #f1e0a6; --tint-2: #dfd6e6; --tape-todo: #e9cf7a;
+  --tape-memo: #cfc6ea; --tape-event: #bcd0ea; --tape-timer: #c9dcc4; --tape-alarm: #ecc4bc; --tape-confirm: #d9d3c4;
+  --tape-todo-edge: #c8b269; --tape-memo-edge: #b2aac9; --tape-event-edge: #a2b3c9; --tape-timer-edge: #adbda9;
+  --tape-alarm-edge: #cba9a2; --tape-confirm-edge: #bbb5a9; --event-blue: #517ec2; --event-blue-2: #dee3ea;
+  --memo-ink: #7a6aae; --memo-2: #e7dfea; --toast-action: #f6d9c7; --toast-strong: #cfe3c9; --stamp: #4d5b86;
+  --lavender-text: #62559a; --honey-text: #755e12; --honey-2: #f1e4ba; --band-lavender: #897ccf; --band-pink: #d16776;
+  --band-mint: #54966a; --band-yellow: #a78527; --band-sky: #578bcd; --band-peach: #d46b2b; --band-sand: #9f8550;
+  --band-gray: #8c887e; --on-sage: #fffcf5; --check-border: #8a8374; --tab-ink: #2b2925; --raised: #fffcf5;
+  --margin-rule: #ead6c9; --rule-strong: #d5cebe; --ev-blue: #5b8bd0; --ev-sage: #6b8f71; --ev-coral: #ce705a;
+  --ev-purple: #8e7cc3; --ev-yellow: #aa8623; --ev-gray: #8a8a8a;
+  --grain: linear-gradient(rgba(247, 242, 231, 0.564), rgba(247, 242, 231, 0.564)), url("../../assets/texture.png");
+}
+/* ─── 크라프트지 · Kraft paper ─── */
+:root[data-paper="kraft"] {
+  --paper: #e9dbc2; --paper-2: #dfceb0; --card: #faf4e7; --ink: #2e241a; --ink-2: #4f4130; --ink-3: #54452f;
+  --faint: #9a8564; --rule: #d3bf9c; --sage: #47653a; --sage-2: #d2cdaf; --clay: #9e5f47; --clay-2: #e4c5aa;
+  --sage-text: #445a43; --clay-text: #794735; --tab-1: #f6dc7c; --tab-2: #d6ccf6; --tab-1-edge: #dcc062;
+  --tab-2-edge: #bdb0ea; --tab-3: #e1bda6; --tint-1: #e3c981; --tint-2: #d1bfc1; --tape-todo: #e9cf7a;
+  --tape-memo: #cfc6ea; --tape-event: #bcd0ea; --tape-timer: #c9dcc4; --tape-alarm: #ecc4bc; --tape-confirm: #d9d3c4;
+  --tape-todo-edge: #c8b269; --tape-memo-edge: #b2aac9; --tape-event-edge: #a2b3c9; --tape-timer-edge: #adbda9;
+  --tape-alarm-edge: #cba9a2; --tape-confirm-edge: #bbb5a9; --event-blue: #4871ad; --event-blue-2: #d0ccc5;
+  --memo-ink: #7465a5; --memo-2: #d9c8c5; --toast-action: #f6d9c7; --toast-strong: #cfe3c9; --stamp: #49567f;
+  --lavender-text: #584c8b; --honey-text: #695510; --honey-2: #e3cd95; --band-lavender: #7b70ba; --band-pink: #bc5d6a;
+  --band-mint: #4c875f; --band-yellow: #967823; --band-sky: #4e7db8; --band-peach: #bf6027; --band-sand: #8f7848;
+  --band-gray: #7e7a71; --on-sage: #faf4e7; --check-border: #77644a; --tab-ink: #2e241a; --raised: #faf4e7;
+  --margin-rule: #d6a98f; --rule-strong: #c6b392; --ev-blue: #527dbb; --ev-sage: #608166; --ev-coral: #b86451;
+  --ev-purple: #8070b0; --ev-yellow: #94751f; --ev-gray: #7c7c7c;
+  --grain: linear-gradient(rgba(233, 219, 194, 0.564), rgba(233, 219, 194, 0.564)), url("../../assets/texture.png");
+}
+/* ─── 모눈 노트 · Grid notebook ─── */
+:root[data-paper="grid"] {
+  --paper: #fbfcfe; --paper-2: #eef2f7; --card: #ffffff; --ink: #1f2a35; --ink-2: #4b5865; --ink-3: #57636f;
+  --faint: #9aa7b5; --rule: #d5dfeb; --sage: #5c7a5a; --sage-2: #e4eeeb; --clay: #b06a4f; --clay-2: #f6e6e6;
+  --sage-text: #546f52; --clay-text: #955842; --tab-1: #f6dc7c; --tab-2: #d6ccf6; --tab-1-edge: #dcc062;
+  --tab-2-edge: #bdb0ea; --tab-3: #f3dee2; --tint-1: #f5eabd; --tint-2: #e3e0fd; --tape-todo: #e9cf7a;
+  --tape-memo: #cfc6ea; --tape-event: #bcd0ea; --tape-timer: #c9dcc4; --tape-alarm: #ecc4bc; --tape-confirm: #d9d3c4;
+  --tape-todo-edge: #c8b269; --tape-memo-edge: #b2aac9; --tape-event-edge: #a2b3c9; --tape-timer-edge: #adbda9;
+  --tape-alarm-edge: #cba9a2; --tape-confirm-edge: #bbb5a9; --event-blue: #5585cc; --event-blue-2: #e2edff;
+  --memo-ink: #7a6aae; --memo-2: #ebe9ff; --toast-action: #f6d9c7; --toast-strong: #cfe3c9; --stamp: #4d5b86;
+  --lavender-text: #62559a; --honey-text: #755e12; --honey-2: #f5eed1; --band-lavender: #897ccf; --band-pink: #d16776;
+  --band-mint: #54966a; --band-yellow: #a78527; --band-sky: #578bcd; --band-peach: #d46b2b; --band-sand: #9f8550;
+  --band-gray: #8c887e; --on-sage: #ffffff; --check-border: #7d8a98; --tab-ink: #1f2a35; --raised: #ffffff;
+  --margin-rule: #f0d0cc; --rule-strong: #c6d1dc; --ev-blue: #5b8bd0; --ev-sage: #6b8f71; --ev-coral: #d9765f;
+  --ev-purple: #8e7cc3; --ev-yellow: #aa8623; --ev-gray: #8a8a8a; --grain: none;
+}
+/* ─── 쑥색 종이 · Sage ─── */
+:root[data-paper="sage"] {
+  --paper: #eff4e9; --paper-2: #e3eadb; --card: #fbfdf7; --ink: #223020; --ink-2: #465243; --ink-3: #4b5847;
+  --faint: #95a28c; --rule: #d6e0cb; --sage: #4b7446; --sage-2: #d8e6d6; --clay: #b06a4f; --clay-2: #eaded1;
+  --sage-text: #50694e; --clay-text: #8e543f; --tab-1: #f6dc7c; --tab-2: #d6ccf6; --tab-1-edge: #dcc062;
+  --tab-2-edge: #bdb0ea; --tab-3: #e7d6cd; --tint-1: #e9e2a8; --tint-2: #d7d8e8; --tape-todo: #e9cf7a;
+  --tape-memo: #cfc6ea; --tape-event: #bcd0ea; --tape-timer: #c9dcc4; --tape-alarm: #ecc4bc; --tape-confirm: #d9d3c4;
+  --tape-todo-edge: #c8b269; --tape-memo-edge: #b2aac9; --tape-event-edge: #a2b3c9; --tape-timer-edge: #adbda9;
+  --tape-alarm-edge: #cba9a2; --tape-confirm-edge: #bbb5a9; --event-blue: #517ec2; --event-blue-2: #d6e5ec;
+  --memo-ink: #7a6aae; --memo-2: #dfe1ec; --toast-action: #f6d9c7; --toast-strong: #cfe3c9; --stamp: #4d5b86;
+  --lavender-text: #62559a; --honey-text: #755e12; --honey-2: #e9e6bc; --band-lavender: #897ccf; --band-pink: #d16776;
+  --band-mint: #54966a; --band-yellow: #a78527; --band-sky: #578bcd; --band-peach: #d46b2b; --band-sand: #9f8550;
+  --band-gray: #8c887e; --on-sage: #fbfdf7; --check-border: #77836e; --tab-ink: #223020; --raised: #fbfdf7;
+  --margin-rule: #e6d3c8; --rule-strong: #c8d2bd; --ev-blue: #5b8bd0; --ev-sage: #6b8f71; --ev-coral: #ce705a;
+  --ev-purple: #8e7cc3; --ev-yellow: #aa8623; --ev-gray: #8a8a8a;
+  --grain: linear-gradient(rgba(239, 244, 233, 0.738), rgba(239, 244, 233, 0.738)), url("../../assets/texture.png");
+}
+/* ─── 벚꽃 종이 · Blossom ─── */
+:root[data-paper="blossom"] {
+  --paper: #fcf3f1; --paper-2: #f4e5e2; --card: #fffaf8; --ink: #33262a; --ink-2: #61494e; --ink-3: #67525a;
+  --faint: #b29ea2; --rule: #eedad6; --sage: #577456; --sage-2: #e5e5de; --clay: #b06a4f; --clay-2: #f7ddd9;
+  --sage-text: #50694e; --clay-text: #8e543f; --tab-1: #f6dc7c; --tab-2: #d6ccf6; --tab-1-edge: #dcc062;
+  --tab-2-edge: #bdb0ea; --tab-3: #f4d5d5; --tint-1: #f6e1b0; --tint-2: #e4d7f0; --tape-todo: #e9cf7a;
+  --tape-memo: #cfc6ea; --tape-event: #bcd0ea; --tape-timer: #c9dcc4; --tape-alarm: #ecc4bc; --tape-confirm: #d9d3c4;
+  --tape-todo-edge: #c8b269; --tape-memo-edge: #b2aac9; --tape-event-edge: #a2b3c9; --tape-timer-edge: #adbda9;
+  --tape-alarm-edge: #cba9a2; --tape-confirm-edge: #bbb5a9; --event-blue: #517ec2; --event-blue-2: #e3e4f4;
+  --memo-ink: #7a6aae; --memo-2: #ece0f4; --toast-action: #f6d9c7; --toast-strong: #cfe3c9; --stamp: #4d5b86;
+  --lavender-text: #62559a; --honey-text: #755e12; --honey-2: #f6e5c4; --band-lavender: #897ccf; --band-pink: #d16776;
+  --band-mint: #54966a; --band-yellow: #a78527; --band-sky: #578bcd; --band-peach: #d46b2b; --band-sand: #9f8550;
+  --band-gray: #8c887e; --on-sage: #fffaf8; --check-border: #8f7c80; --tab-ink: #33262a; --raised: #fffaf8;
+  --margin-rule: #e9c3c3; --rule-strong: #dfccc8; --ev-blue: #5b8bd0; --ev-sage: #6b8f71; --ev-coral: #ce705a;
+  --ev-purple: #8e7cc3; --ev-yellow: #aa8623; --ev-gray: #8a8a8a;
+  --grain: linear-gradient(rgba(252, 243, 241, 0.738), rgba(252, 243, 241, 0.738)), url("../../assets/texture.png");
+}
+/* ─── 노란 메모지 · Sticky note ─── */
+:root[data-paper="memo"] {
+  --paper: #fcf0b0; --paper-2: #f3e597; --card: #fffadc; --ink: #2f2914; --ink-2: #5c522c; --ink-3: #605630;
+  --faint: #b3a46a; --rule: #ead889; --sage: #577456; --sage-2: #e5e29d; --clay: #b06a4f; --clay-2: #f7da98;
+  --sage-text: #50694e; --clay-text: #87503c; --tab-1: #f2c35a; --tab-2: #d6ccf6; --tab-1-edge: #d39f2c;
+  --tab-2-edge: #bdb0ea; --tab-3: #f4d294; --tint-1: #f6de6f; --tint-2: #e4d4af; --tape-todo: #e8b85a;
+  --tape-memo: #cfc6ea; --tape-event: #bcd0ea; --tape-timer: #c9dcc4; --tape-alarm: #ecc4bc; --tape-confirm: #d9d3c4;
+  --tape-todo-edge: #c99a3c; --tape-memo-edge: #b2aac9; --tape-event-edge: #a2b3c9; --tape-timer-edge: #adbda9;
+  --tape-alarm-edge: #cba9a2; --tape-confirm-edge: #bbb5a9; --event-blue: #517ec2; --event-blue-2: #e3e1b3;
+  --memo-ink: #7a6aae; --memo-2: #ecddb3; --toast-action: #f6d9c7; --toast-strong: #cfe3c9; --stamp: #4d5b86;
+  --lavender-text: #62559a; --honey-text: #755e12; --honey-2: #f6e283; --band-lavender: #897ccf; --band-pink: #d16776;
+  --band-mint: #54966a; --band-yellow: #a78527; --band-sky: #578bcd; --band-peach: #d46b2b; --band-sand: #9f8550;
+  --band-gray: #8c887e; --on-sage: #fffadc; --check-border: #857844; --tab-ink: #2f2914; --raised: #fffadc;
+  --margin-rule: #efc39a; --rule-strong: #dbca80; --ev-blue: #5b8bd0; --ev-sage: #6b8f71; --ev-coral: #c36a56;
+  --ev-purple: #8e7cc3; --ev-yellow: #9f7d21; --ev-gray: #838383; --grain: none;
+}
+/* ─── 원고지 · Manuscript paper ─── */
+:root[data-paper="manuscript"] {
+  --paper: #fcfaf5; --paper-2: #f3eee3; --card: #fffefb; --ink: #2d2a26; --ink-2: #605a51; --ink-3: #686258;
+  --faint: #b0a898; --rule: #eab4a6; --sage: #5c7a5a; --sage-2: #e5ece2; --clay: #b06a4f; --clay-2: #f7e4dd;
+  --sage-text: #546f52; --clay-text: #955842; --tab-1: #f6dc7c; --tab-2: #d6ccf6; --tab-1-edge: #dcc062;
+  --tab-2-edge: #bdb0ea; --tab-3: #f4dcd9; --tint-1: #f6e8b4; --tint-2: #e4def4; --tape-todo: #e9cf7a;
+  --tape-memo: #cfc6ea; --tape-event: #bcd0ea; --tape-timer: #c9dcc4; --tape-alarm: #ecc4bc; --tape-confirm: #d9d3c4;
+  --tape-todo-edge: #c8b269; --tape-memo-edge: #b2aac9; --tape-event-edge: #a2b3c9; --tape-timer-edge: #adbda9;
+  --tape-alarm-edge: #cba9a2; --tape-confirm-edge: #bbb5a9; --event-blue: #5585cc; --event-blue-2: #e3ebf8;
+  --memo-ink: #7a6aae; --memo-2: #ece7f8; --toast-action: #f6d9c7; --toast-strong: #cfe3c9; --stamp: #4d5b86;
+  --lavender-text: #62559a; --honey-text: #755e12; --honey-2: #f6ecc8; --band-lavender: #897ccf; --band-pink: #d16776;
+  --band-mint: #54966a; --band-yellow: #a78527; --band-sky: #578bcd; --band-peach: #d46b2b; --band-sand: #9f8550;
+  --band-gray: #8c887e; --on-sage: #fffefb; --check-border: #8f877a; --tab-ink: #2d2a26; --raised: #fffefb;
+  --margin-rule: #e39b8a; --rule-strong: #dba99c; --ev-blue: #5b8bd0; --ev-sage: #6b8f71; --ev-coral: #d9765f;
+  --ev-purple: #8e7cc3; --ev-yellow: #aa8623; --ev-gray: #8a8a8a;
+  --grain: linear-gradient(rgba(252, 250, 245, 0.825), rgba(252, 250, 245, 0.825)), url("../../assets/texture.png");
+}
+/* ─── 하늘색 줄노트 · Blue lined notebook ─── */
+:root[data-paper="lined"] {
+  --paper: #eaf3fb; --paper-2: #dce8f4; --card: #f8fbff; --ink: #1d2a3a; --ink-2: #435367; --ink-3: #48586c;
+  --faint: #93a6bb; --rule: #b8cfe6; --sage: #577456; --sage-2: #d3e5e8; --clay: #b06a4f; --clay-2: #e5dde3;
+  --sage-text: #50694e; --clay-text: #8e543f; --tab-1: #f6dc7c; --tab-2: #d6ccf6; --tab-1-edge: #dcc062;
+  --tab-2-edge: #bdb0ea; --tab-3: #e2d5df; --tint-1: #e4e1ba; --tint-2: #d2d7fa; --tape-todo: #e9cf7a;
+  --tape-memo: #cfc6ea; --tape-event: #bcd0ea; --tape-timer: #c9dcc4; --tape-alarm: #ecc4bc; --tape-confirm: #d9d3c4;
+  --tape-todo-edge: #c8b269; --tape-memo-edge: #b2aac9; --tape-event-edge: #a2b3c9; --tape-timer-edge: #adbda9;
+  --tape-alarm-edge: #cba9a2; --tape-confirm-edge: #bbb5a9; --event-blue: #517ec2; --event-blue-2: #d1e4fe;
+  --memo-ink: #7a6aae; --memo-2: #dae0fe; --toast-action: #f6d9c7; --toast-strong: #cfe3c9; --stamp: #4d5b86;
+  --lavender-text: #62559a; --honey-text: #755e12; --honey-2: #e4e5ce; --band-lavender: #897ccf; --band-pink: #d16776;
+  --band-mint: #54966a; --band-yellow: #a78527; --band-sky: #578bcd; --band-peach: #d46b2b; --band-sand: #9f8550;
+  --band-gray: #8c887e; --on-sage: #f8fbff; --check-border: #6e8094; --tab-ink: #1d2a3a; --raised: #f8fbff;
+  --margin-rule: #e8a9a9; --rule-strong: #acc2d8; --ev-blue: #5b8bd0; --ev-sage: #6b8f71; --ev-coral: #ce705a;
+  --ev-purple: #8e7cc3; --ev-yellow: #aa8623; --ev-gray: #8a8a8a; --grain: none;
+}
+/* ─── 라벤더 종이 · Lavender ─── */
+:root[data-paper="lavender"] {
+  --paper: #f2eefa; --paper-2: #e7e1f4; --card: #fcfbff; --ink: #2a2638; --ink-2: #565070; --ink-3: #5b5574;
+  --faint: #a69fbe; --rule: #ddd5ef; --sage: #577456; --sage-2: #dbe0e7; --clay: #b06a4f; --clay-2: #edd8e2;
+  --sage-text: #50694e; --clay-text: #87503c; --tab-1: #f6dc7c; --tab-2: #c2b3f0; --tab-1-edge: #dcc062;
+  --tab-2-edge: #a594e0; --tab-3: #ead0de; --tint-1: #ecdcb9; --tint-2: #dad2f9; --tape-todo: #e9cf7a;
+  --tape-memo: #bdb0e6; --tape-event: #bcd0ea; --tape-timer: #c9dcc4; --tape-alarm: #ecc4bc; --tape-confirm: #d9d3c4;
+  --tape-todo-edge: #c8b269; --tape-memo-edge: #a093cf; --tape-event-edge: #a2b3c9; --tape-timer-edge: #adbda9;
+  --tape-alarm-edge: #cba9a2; --tape-confirm-edge: #bbb5a9; --event-blue: #517ec2; --event-blue-2: #d9dffd;
+  --memo-ink: #7a6aae; --memo-2: #e2dbfd; --toast-action: #f6d9c7; --toast-strong: #cfe3c9; --stamp: #4d5b86;
+  --lavender-text: #62559a; --honey-text: #755e12; --honey-2: #ece0cd; --band-lavender: #897ccf; --band-pink: #d16776;
+  --band-mint: #54966a; --band-yellow: #a78527; --band-sky: #578bcd; --band-peach: #d46b2b; --band-sand: #9f8550;
+  --band-gray: #8c887e; --on-sage: #fcfbff; --check-border: #857e9c; --tab-ink: #2a2638; --raised: #fcfbff;
+  --margin-rule: #e9cfd8; --rule-strong: #cfc7e0; --ev-blue: #5b8bd0; --ev-sage: #6b8f71; --ev-coral: #ce705a;
+  --ev-purple: #8e7cc3; --ev-yellow: #9f7d21; --ev-gray: #8a8a8a;
+  --grain: linear-gradient(rgba(242, 238, 250, 0.738), rgba(242, 238, 250, 0.738)), url("../../assets/texture.png");
+}
+/* ─── 재생지 · Recycled paper ─── */
+:root[data-paper="recycled"] {
+  --paper: #ecebe6; --paper-2: #e2e1db; --card: #f8f8f5; --ink: #262624; --ink-2: #4f4e49; --ink-3: #55544e;
+  --faint: #9e9d95; --rule: #d5d3cb; --sage: #536e51; --sage-2: #d5ddd3; --clay: #a7654b; --clay-2: #e7d5ce;
+  --sage-text: #4c644a; --clay-text: #87503c; --tab-1: #f6dc7c; --tab-2: #d6ccf6; --tab-1-edge: #dcc062;
+  --tab-2-edge: #bdb0ea; --tab-3: #e4cdca; --tint-1: #e6d9a5; --tint-2: #d4cfe5; --tape-todo: #e9cf7a;
+  --tape-memo: #cfc6ea; --tape-event: #bcd0ea; --tape-timer: #c9dcc4; --tape-alarm: #ecc4bc; --tape-confirm: #d9d3c4;
+  --tape-todo-edge: #c8b269; --tape-memo-edge: #b2aac9; --tape-event-edge: #a2b3c9; --tape-timer-edge: #adbda9;
+  --tape-alarm-edge: #cba9a2; --tape-confirm-edge: #bbb5a9; --event-blue: #4c78b8; --event-blue-2: #d3dce9;
+  --memo-ink: #7a6aae; --memo-2: #dcd8e9; --toast-action: #f6d9c7; --toast-strong: #cfe3c9; --stamp: #4d5b86;
+  --lavender-text: #62559a; --honey-text: #755e12; --honey-2: #e6ddb9; --band-lavender: #897ccf; --band-pink: #c76270;
+  --band-mint: #508e65; --band-yellow: #9f7e25; --band-sky: #5384c3; --band-peach: #c96629; --band-sand: #977e4c;
+  --band-gray: #858178; --on-sage: #f8f8f5; --check-border: #7a7972; --tab-ink: #262624; --raised: #f8f8f5;
+  --margin-rule: #dbc8c1; --rule-strong: #c7c5be; --ev-blue: #5684c6; --ev-sage: #6b8f71; --ev-coral: #c36a56;
+  --ev-purple: #8e7cc3; --ev-yellow: #9f7d21; --ev-gray: #838383;
+  --grain: linear-gradient(rgba(236, 235, 230, 0.491), rgba(236, 235, 230, 0.491)), url("../../assets/texture.png");
+}
+/* ─── 먹색 종이 · Ink ─── */
+:root[data-paper="ink"] {
+  --paper: #1f2636; --paper-2: #283146; --card: #263045; --ink: #eef1f7; --ink-2: #cdd4e2; --ink-3: #aeb7c9;
+  --faint: #7f8aa0; --rule: #343e56; --sage: #a3c49c; --sage-2: #2e414c; --clay: #e29a7c; --clay-2: #3f3342;
+  --sage-text: #a3c49c; --clay-text: #e29a7c; --tab-1: #c4a245; --tab-2: #9d92dc; --tab-1-edge: #d6b65a;
+  --tab-2-edge: #b2a8ea; --tab-3: #584151; --tint-1: #5f5b47; --tint-2: #44457a; --tape-todo: #8a7a3f;
+  --tape-memo: #5d5578; --tape-event: #4d5f7a; --tape-timer: #4f6650; --tape-alarm: #7a4f4a; --tape-confirm: #55524a;
+  --tape-todo-edge: #a19565; --tape-memo-edge: #7d7793; --tape-event-edge: #717f95; --tape-timer-edge: #728573;
+  --tape-alarm-edge: #95726e; --tape-confirm-edge: #77756e; --event-blue: #8fb1e3; --event-blue-2: #26385c;
+  --memo-ink: #bcb0e2; --memo-2: #2f325a; --toast-action: #8f4a30; --toast-strong: #3d6639; --stamp: #a9b6dc;
+  --lavender-text: #c6bcf0; --honey-text: #e4c86e; --honey-2: #3b3a34; --band-lavender: #9a8fd6; --band-pink: #d9828f;
+  --band-mint: #6fae84; --band-yellow: #d1a93a; --band-sky: #6f9bd4; --band-peach: #e09466; --band-sand: #b9a274;
+  --band-gray: #9a978e; --on-sage: #1f2a1e; --check-border: #8d97ab; --tab-ink: #1f1d18; --raised: #36415a;
+  --margin-rule: #4a3a44; --rule-strong: #434c63; --ev-blue: #567db5; --ev-sage: #638168; --ev-coral: #b86451;
+  --ev-purple: #8070aa; --ev-yellow: #b48e25; --ev-gray: #7c7c7c; --grain: none;
+}
+/* ─── 밤하늘 종이 · Night sky ─── */
+:root[data-paper="nightsky"] {
+  --paper: #1f1c33; --paper-2: #292542; --card: #27233f; --ink: #efedf9; --ink-2: #cdc8e4; --ink-3: #b0aacb;
+  --faint: #7d779d; --rule: #332e50; --sage: #a3c49c; --sage-2: #2e3749; --clay: #e29a7c; --clay-2: #3f293f;
+  --sage-text: #a3c49c; --clay-text: #e29a7c; --tab-1: #c4a245; --tab-2: #9d92dc; --tab-1-edge: #d6b65a;
+  --tab-2-edge: #b2a8ea; --tab-3: #58374e; --tint-1: #5f5144; --tint-2: #443b77; --tape-todo: #8a7a3f;
+  --tape-memo: #5d5578; --tape-event: #4d5f7a; --tape-timer: #4f6650; --tape-alarm: #7a4f4a; --tape-confirm: #55524a;
+  --tape-todo-edge: #a19565; --tape-memo-edge: #7d7793; --tape-event-edge: #717f95; --tape-timer-edge: #728573;
+  --tape-alarm-edge: #95726e; --tape-confirm-edge: #77756e; --event-blue: #8fb1e3; --event-blue-2: #262e59;
+  --memo-ink: #bcb0e2; --memo-2: #2f2857; --toast-action: #8f4a30; --toast-strong: #3d6639; --stamp: #a9b6dc;
+  --lavender-text: #c6bcf0; --honey-text: #e4c86e; --honey-2: #3b3031; --band-lavender: #9a8fd6; --band-pink: #d9828f;
+  --band-mint: #6fae84; --band-yellow: #d1a93a; --band-sky: #6f9bd4; --band-peach: #e09466; --band-sand: #b9a274;
+  --band-gray: #9a978e; --on-sage: #1f2a1e; --check-border: #8f89b0; --tab-ink: #1f1d18; --raised: #3a345e;
+  --margin-rule: #4c3650; --rule-strong: #423d5e; --ev-blue: #4d76b1; --ev-sage: #5b7a60; --ev-coral: #b86451;
+  --ev-purple: #7969a6; --ev-yellow: #b48e25; --ev-gray: #757575; --grain: none;
+}
+/* ─── 칠판 · Chalkboard ─── */
+:root[data-paper="chalk"] {
+  --paper: #23312b; --paper-2: #2b3b35; --card: #293832; --ink: #eef3ea; --ink-2: #cad4c7; --ink-3: #abb8a9;
+  --faint: #7c8b7d; --rule: #34463e; --sage: #a3c49c; --sage-2: #324c41; --clay: #e29a7c; --clay-2: #433e37;
+  --sage-text: #a3c49c; --clay-text: #e29a7c; --tab-1: #c4a245; --tab-2: #9d92dc; --tab-1-edge: #d6b65a;
+  --tab-2-edge: #b2a8ea; --tab-3: #5c4c46; --tint-1: #63663c; --tint-2: #48506f; --tape-todo: #8a7a3f;
+  --tape-memo: #5d5578; --tape-event: #4d5f7a; --tape-timer: #4f6650; --tape-alarm: #7a4f4a; --tape-confirm: #55524a;
+  --tape-todo-edge: #a19565; --tape-memo-edge: #7d7793; --tape-event-edge: #717f95; --tape-timer-edge: #728573;
+  --tape-alarm-edge: #95726e; --tape-confirm-edge: #77756e; --event-blue: #8fb1e3; --event-blue-2: #2a4351;
+  --memo-ink: #bcb0e2; --memo-2: #333d4f; --toast-action: #8f4a30; --toast-strong: #3d6639; --stamp: #a9b6dc;
+  --lavender-text: #c6bcf0; --honey-text: #e4c86e; --honey-2: #3f4529; --band-lavender: #9a8fd6; --band-pink: #d9828f;
+  --band-mint: #6fae84; --band-yellow: #d1a93a; --band-sky: #6f9bd4; --band-peach: #e09466; --band-sand: #b9a274;
+  --band-gray: #9a978e; --on-sage: #1f2a1e; --check-border: #8b9b8c; --tab-ink: #1f1d18; --raised: #3b4c45;
+  --margin-rule: #4e3e37; --rule-strong: #43544c; --ev-blue: #5e84b9; --ev-sage: #6b8770; --ev-coral: #bc6c5a;
+  --ev-purple: #8677ae; --ev-yellow: #b48e25; --ev-gray: #838383; --grain: none;
+}
+
+/* ─── 줄 모양 (4-1): 모눈 노트 (11 px squares, four to a row), 원고지 (two rules a row, 22 px columns), 하늘색 줄노트
+   (blue lines and a 2 px red margin). The rows keep their 44 px; only the picture under them changes. ─── */
+:root[data-paper="grid"] .lines:not(.grouped), :root[data-paper="grid"] .lines-fill {
+  background-image:
+    repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--row) - 1px), var(--rule) calc(var(--row) - 1px), var(--rule) var(--row)),
+    repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--row) / 4 - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(var(--row) / 4 - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(var(--row) / 4)),
+    repeating-linear-gradient(to right, transparent 0, transparent calc(var(--row) / 4 - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(var(--row) / 4 - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(var(--row) / 4));
+}
+/* 원고지: a band of squares in every row — a rule 6 px under the row's top and one at its foot, columns between them
+   (a tile per row: the colour is the paper's --rule, written out because a picture can't read a variable). */
+:root[data-paper="manuscript"] .lines:not(.grouped), :root[data-paper="manuscript"] .lines-fill {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='44'%3E%3Cpath d='M0 6.5H22M0 43.5H22M21.5 6V44' stroke='%23eab4a6' stroke-width='1' fill='none'/%3E%3C/svg%3E");
+  background-size: 22px var(--row); background-repeat: repeat;
+}
+/* The list in parts (다음 · 그 밖에, or by space): each row carries its own piece of the ruling (an unpicked row; a picked
+   one keeps its sage bar and line). */
+:root[data-paper="grid"] .lines.grouped > .row:not(.selected), :root[data-paper="grid"] .lines.grouped > .all-done {
+  background-image:
+    linear-gradient(var(--rule), var(--rule)),
+    repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--row) / 4 - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(var(--row) / 4 - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(var(--row) / 4)),
+    repeating-linear-gradient(to right, transparent 0, transparent calc(var(--row) / 4 - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(var(--row) / 4 - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(var(--row) / 4));
+  background-size: calc(100% - 38px) 1px, calc(100% - 38px) 100%, calc(100% - 38px) 100%;
+  background-position: 18px 100%, 18px 0, 18px 0;
+  background-repeat: no-repeat;
+}
+:root[data-paper="manuscript"] .lines.grouped > .row:not(.selected), :root[data-paper="manuscript"] .lines.grouped > .all-done {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='44'%3E%3Cpath d='M0 6.5H22M0 43.5H22M21.5 6V44' stroke='%23eab4a6' stroke-width='1' fill='none'/%3E%3C/svg%3E");
+  background-size: 22px var(--row); background-repeat: repeat-x; background-position: 18px 0;
+}
+:root[data-paper="lined"] .lines::before { width: 2px; background: var(--margin-rule); }

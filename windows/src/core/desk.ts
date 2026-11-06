@@ -1,27 +1,30 @@
 /**
  * 책상 (the desk): one window whose sidebar holds what used to be five windows — 달력, 완료 기록,
  * 설정 (its tabs as panes of their own) and 도움말. The same order and shortcuts as the Mac's desk:
- * Ctrl+1 … Ctrl+9 go down the sidebar from 달력 to 저장과 백업 (메모 서랍, 스페이스 and AI 연결 after it have none); 도움말
+ * Ctrl+1 … Ctrl+9 go down the sidebar from 달력 to 메모 서랍 (스페이스, 저장과 백업 and AI 연결 after it have none); 도움말
  * is F1; 사용 안내 (the first-launch guide, shown on the note) sits under 도움말 and is an action, not a pane.
+ * #240 (D4 B): four groups of six rows or fewer — 알람 · 타이머 (was 시계, under 보기) sits with the settings, 일정 next
+ * to 알림, and 메모와 데이터 is a group of its own. The order is the shared one in docs/plans/desk-sidebar-cases.json.
  */
 
 export type DeskPane = "calendar" | "history" | "clock" | "appearance" | "notifications" | "repeat" | "pet" | "events" | "storage" | "drawer" | "spaces" | "ai" | "help";
 
-/** The panes drawn by the settings page (settings.html): Settings' old tabs, 시계, 저장과 백업, 메모 서랍 (1.28), 스페이스 (1.30) and AI 연결 (1.27). */
+/** The panes drawn by the settings page (settings.html): Settings' old tabs, 알람 · 타이머, 저장과 백업, 메모 서랍 (1.28), 스페이스 (1.30) and AI 연결 (1.27). */
 export type SettingsTab = "clock" | "appearance" | "notifications" | "repeat" | "pet" | "events" | "storage" | "drawer" | "spaces" | "ai";
 
-export type DeskSection = "view" | "settings" | "help";
+export type DeskSection = "view" | "settings" | "data" | "help";
 
-/** The sidebar, top to bottom: 보기 · 설정 · 도움. */
+/** The sidebar, top to bottom: 보기 · 설정 · 메모와 데이터 · 도움. */
 export const deskSections: { section: DeskSection; panes: DeskPane[] }[] = [
-  { section: "view", panes: ["calendar", "history", "clock"] },
-  { section: "settings", panes: ["appearance", "notifications", "repeat", "pet", "events", "storage", "drawer", "spaces", "ai"] },
+  { section: "view", panes: ["calendar", "history"] },
+  { section: "settings", panes: ["appearance", "notifications", "clock", "repeat", "events", "pet"] },
+  { section: "data", panes: ["drawer", "spaces", "storage", "ai"] },
   { section: "help", panes: ["help"] },
 ];
 
 export const deskPanes: DeskPane[] = deskSections.flatMap((entry) => entry.panes);
 
-export const settingsTabs: SettingsTab[] = ["clock", "appearance", "notifications", "repeat", "pet", "events", "storage", "drawer", "spaces", "ai"];
+export const settingsTabs: SettingsTab[] = ["appearance", "notifications", "clock", "repeat", "events", "pet", "drawer", "spaces", "storage", "ai"];
 
 export const isSettingsTab = (pane: DeskPane): pane is SettingsTab => (settingsTabs as DeskPane[]).includes(pane);
 

@@ -143,6 +143,29 @@ export function reminderSummary(at: Date, now: Date, lang: Lang = "ko"): string 
 }
 
 /** `lang`: the app's language — its own words are understood first, and Korean always; the summary is written in it. */
+/** The day the text names: the language's own words, then Korean (the first rule that reads). */
+function dateIn(text: string, today: Date, lang: Lang): (Found & { date: Date; by: boolean; evening?: boolean }) | undefined {
+  const rules = lang === "ko" ? undefined : wordRules[lang];
+  return (rules ? findWordDate(rules, text, today) : undefined) ?? findDate(text, today, lang);
+}
+
+/**
+ * 바탕화면 위젯 (#234): whether the text names a day ("내일", "금요일까지", "11월 21일", "tomorrow") or a moment from now
+ * ("30분 뒤", "in 2 hours") — the widget's quick entry puts a line without one on the day that was clicked. The same as
+ * the Mac's QuickParse.saysDay.
+ */
+export function saysDay(text: string, now = new Date(), lang: Lang = "ko"): boolean {
+  const start = logicalDayStart(now);
+  const today = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const range = findRange(text, lang);
+  const working = range ? `${text.slice(0, range.start)} ${text.slice(range.end)}` : text;
+  if (dateIn(working, today, lang)) return true;
+  const rules = lang === "ko" ? undefined : wordRules[lang];
+  const wordTime = rules ? findWordTime(rules, working) : undefined;
+  if (wordTime) return wordTime.hit.kind === "after";
+  return findRelative(working) !== undefined;
+}
+
 export function parseQuick(text: string, now = new Date(), lang: Lang = "ko"): QuickParse {
   const start = logicalDayStart(now);
   const today = new Date(start.getFullYear(), start.getMonth(), start.getDate());
@@ -152,8 +175,7 @@ export function parseQuick(text: string, now = new Date(), lang: Lang = "ko"): Q
     const ranged = rangeParse(text, range, today, now, lang);
     if (ranged) return ranged;
   }
-  const words = rules ? findWordDate(rules, text, today) : undefined;
-  const date: (Found & { date: Date; by: boolean; evening?: boolean }) | undefined = words ?? findDate(text, today, lang);
+  const date = dateIn(text, today, lang);
   const wordTime = rules ? findWordTime(rules, text, date) : undefined;
   const relative = wordTime ? undefined : findRelative(text);
   const korean = wordTime || relative ? undefined : findTime(text, date);

@@ -4,8 +4,12 @@ import type { PrefsState } from "../core/types";
 import { focusByTask, focusDay, focusTime, focusTotal, focusTotals, sessionsText, type FocusRecord } from "../core/focus";
 import { inHistory, lensNone, spaceColor } from "../core/todoSpaces";
 import { edgeFade, h, icon, lang, paper, t } from "./api";
+import { holdWhileAsked } from "./askGuard";
 import { closeMenus, menuOpen, openMenu, type MenuEntry } from "./drawerMenu";
 import { paneSight } from "./paneSight";
+
+// #229: a question waiting holds this page up (askGuard.ts).
+holdWhileAsked();
 
 const api = paper();
 const app = document.getElementById("app")!;

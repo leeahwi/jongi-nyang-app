@@ -30,9 +30,10 @@ export class FloatingNote {
       if (!fromIcon(event) || !this.window) return;
       this.dragStart = undefined;
       const [x, y] = this.window.getPosition();
-      const center = { x: x + size.width / 2, y: y + size.height / 2 };
+      // (Off-screen runs, #250: worked out on the displays, then put back off them like `show`.)
+      const center = { x: x - offscreen.x + size.width / 2, y: y - offscreen.y + size.height / 2 };
       const origin = iconOrigin(center, size, screen.getAllDisplays().map((display) => display.workArea), padding);
-      this.window.setPosition(Math.round(origin.x), Math.round(origin.y));
+      this.window.setPosition(Math.round(origin.x + offscreen.x), Math.round(origin.y + offscreen.y));
       store.remember({ floatingOrigin: origin });
     });
     ipcMain.on("floating:click", (event) => { if (fromIcon(event)) this.onRestore(); });

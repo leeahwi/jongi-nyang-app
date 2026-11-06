@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
 import {
   advanceSeen, aiCatLine, aiChangeKind, aiExtOutdated, aiExtVersion, aiLogLine, aiMarks, aiShortTitle, aiToastText, aiAwayText, aiUndoText, awayCount, parseAiLink, parseAiLog,
   recentAi, sameSaved, serializeAiLink, trimAiLog, undoEntry, undoneIds, unseenAi, type AiChange, type AiItem, type AiLogEntry,
 } from "../src/core/ai";
+import { readDeviceRules, storedDeviceRules } from "../src/core/spaceDevice";
 
 /** 종이냥 for Claude: the shared files and the app's side of them (the shared AI connection spec §2–3, §7; M13–M15). */
 
@@ -37,12 +40,12 @@ test("ai-log.jsonl: lines read back, a torn line and unknown kinds left out", ()
 
 test("M41: the extension's version in ai-link.json and on each log line; Claude Desktop's extension older than the app's", () => {
   const link = serializeAiLink({ v: 1, enabled: true, dataFolder: "/x", lang: "ko", app: "windows 1.31.0", updatedAt: "", ext: aiExtVersion });
-  assert.match(link, /"updatedAt": "",\n  "ext": 3\n\}\n$/);
+  assert.match(link, /"updatedAt": "",\n  "ext": 4\n\}\n$/, "no spaceDevice key while nothing is set (S73)");
   assert.equal(parseAiLink(link)?.ext, aiExtVersion);
   assert.equal(parseAiLink('{"enabled":true,"ext":"2"}')?.ext, undefined, "only a whole number");
   assert.equal(parseAiLink('{"app":"mac 1.46.0","ext":2,"enabled":true}')?.ext, 2, "the Mac's sorted keys");
   const one = { ...entry({ changes: [added(item({ id: "A" }))] }), ext: aiExtVersion };
-  assert.match(aiLogLine(one), /"title":"보고서 쓰기","ext":3,"changes":\[/);
+  assert.match(aiLogLine(one), /"title":"보고서 쓰기","ext":4,"changes":\[/);
   assert.deepEqual(parseAiLog(aiLogLine(one))[0], one);
   const old = entry({ changes: [added(item({ id: "B" }))] });
   assert.equal(aiExtOutdated([]), false);
@@ -50,7 +53,7 @@ test("M41: the extension's version in ai-link.json and on each log line; Claude 
   assert.equal(aiExtOutdated([old, one]), false, "the newest line counts");
   assert.equal(aiExtOutdated([one, { ...old, client: "Claude Code" }]), false, "Claude Code runs the app's own copy");
   assert.equal(aiExtOutdated([one, { ...old, client: "app", kind: "undo" }]), false, "the app's undo lines don't count");
-  assert.equal(aiExtVersion, 3, "3 since the to-do spaces (N3-8)");
+  assert.equal(aiExtVersion, 4, "4 since 기기마다 보일 스페이스 (N3-9)");
 });
 
 test("toasts, as on the Mac (AIText.toast)", () => {
@@ -158,4 +161,20 @@ test("#174: the app keeps 30 days of the log whatever its size", () => {
   assert.equal(trimAiLog(`${old}\n${recent}\n`, local(27, 10), 0), `${recent}\n`, "small, but older than 30 days");
   assert.equal(trimAiLog(`${old}\n`, local(27, 10), 0), "");
   assert.equal(trimAiLog(`${recent}\n`, local(27, 10), 0), undefined);
+});
+
+// S73 (#121 N3-9): what ai-link.json carries for Claude — the `aiDevice` block of docs/plans/spaces-cases.json, read by
+// the Mac's test-space-device.sh and the extension too.
+const aiDevice = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "spaces-cases.json"), "utf8")).aiDevice;
+
+test("S73: ai-link.json carries this PC's 이 기기에서 as stored (bad entries left out), no key when nothing is set", () => {
+  const rules = storedDeviceRules(readDeviceRules(aiDevice.rules));
+  const link = serializeAiLink({ v: 1, enabled: true, dataFolder: "/x", lang: "ko", app: "windows 1.33.0", updatedAt: "", ext: aiExtVersion, spaceDevice: rules });
+  const written = JSON.parse(link);
+  assert.equal(written.ext, aiDevice.link.ext);
+  assert.deepEqual(written.spaceDevice, aiDevice.link.spaceDevice);
+  assert.deepEqual(parseAiLink(link)?.spaceDevice, aiDevice.link.spaceDevice, "read back");
+  assert.deepEqual(parseAiLink(JSON.stringify({ enabled: true, spaceDevice: aiDevice.rules }))?.spaceDevice, aiDevice.link.spaceDevice, "the extension reads only what reads");
+  assert.equal("spaceDevice" in JSON.parse(serializeAiLink({ v: 1, enabled: true, dataFolder: "/x", lang: "ko", app: "", updatedAt: "", spaceDevice: {} })), false);
+  assert.equal(parseAiLink('{"enabled":true,"spaceDevice":[1]}')?.spaceDevice, undefined, "not an object: none");
 });

@@ -548,6 +548,13 @@ enum HistoryRange: Hashable {
     }
 }
 
+/// AppBench (#62): each day's square hands over its hover outline, so the bench sets it as the mouse would (a window
+/// off every screen gets no hover). nil in the app: nothing is kept.
+@MainActor
+enum HistoryBenchHooks {
+    static var hover: [String: (Bool) -> Void]?
+}
+
 /// A day's square. The hover outline is its own (#62: a hover on the pane's state redrew the whole pane).
 private struct HeatCell: View {
     let count: Int
@@ -574,6 +581,7 @@ private struct HeatCell: View {
             }
             .contentShape(Rectangle().inset(by: -HistoryView.gap / 2))
             .onHover { hovering = $0 }
+            .onAppear { if HistoryBenchHooks.hover != nil { let outline = $hovering; HistoryBenchHooks.hover?[label] = { outline.wrappedValue = $0 } } }
             .onTapGesture(perform: select)
             .help(help)
             .accessibilityElement()

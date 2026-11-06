@@ -1,3 +1,6 @@
+/* 종이 테마 열다섯 가지 (#244): the other thirteen papers' colours and their rulings. */
+@import "papers.css";
+
 @font-face { font-family: "HanJang Pen"; src: url("../../assets/fonts/HanJangPen-Regular.ttf") format("truetype"); font-display: block; }
 @font-face { font-family: "HanJang Brush"; src: url("../../assets/fonts/HanJangBrush-Regular.ttf") format("truetype"); font-display: block; }
 /* 코드 글꼴 D2Coding (#143, NAVER, SIL OFL 1.1, unchanged): Hangul two Latin columns wide, for the drawer's code. */
@@ -74,6 +77,10 @@
   --band-peach: #d46b2b;
   --band-sand: #9f8550;
   --band-gray: #8c887e;
+  /* #244 (Q6): the event marks (a bar, a dot) per paper — the six colours, a step deeper where one was under 3:1
+     (core/events.ts eventMark); the 하늘색 줄노트's red margin uses --margin-rule. */
+  --ev-blue: #5b8bd0; --ev-sage: #6b8f71; --ev-coral: #ce705a; --ev-purple: #8e7cc3; --ev-yellow: #aa8623; --ev-gray: #8a8a8a;
+  --margin-rule: #e7d8ce;
   --shadow-float: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 18px 40px -18px rgba(70, 58, 30, 0.35), 0 2px 6px rgba(70, 58, 30, 0.08);
   --shadow-slip: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 16px 30px -16px rgba(70, 58, 30, 0.45), 0 2px 6px rgba(70, 58, 30, 0.1);
   /* Text and marks on a sage fill (the primary button, a checked box, today's date). */
@@ -177,20 +184,24 @@
   --band-peach: #e09466;
   --band-sand: #b9a274;
   --band-gray: #9a978e;
-  /* A faint light edge too: dark paper on a dark screen would otherwise lose its outline. */
-  --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 18px 40px -18px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.3);
-  --shadow-slip: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 16px 30px -16px rgba(0, 0, 0, 0.75), 0 2px 6px rgba(0, 0, 0, 0.35);
   --on-sage: #1f2a1e;
   --check-border: #837e69;
   --tab-ink: #1f1d18;
-  --lift: 0 1px 2px rgba(0, 0, 0, 0.45);
   /* At night a card is darker than paper-2, so a chosen segment or row gets its own lighter surface. */
   --raised: #46433b;
+  /* Event marks: the six at 85 % brightness so they don't glare, lifted to 3:1 on the cards where they fell short (#244). */
+  --ev-blue: #567db5; --ev-sage: #638168; --ev-coral: #b86451; --ev-purple: #8070aa; --ev-yellow: #b48e25; --ev-gray: #7c7c7c;
+  --margin-rule: #4a3630;
   --grain: none;
+}
+/* Every dark paper (밤 종이, 먹색, 밤하늘, 칠판; #244 `data-scheme`): a faint light edge too — dark paper on a dark screen
+   would otherwise lose its outline —, deeper shadows, and the system's controls dark. */
+:root[data-scheme="dark"] {
+  --shadow-float: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 18px 40px -18px rgba(0, 0, 0, 0.7), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-slip: 0 0 0 1px rgba(255, 255, 255, 0.07), 0 16px 30px -16px rgba(0, 0, 0, 0.75), 0 2px 6px rgba(0, 0, 0, 0.35);
+  --lift: 0 1px 2px rgba(0, 0, 0, 0.45);
   color-scheme: dark;
 }
-/* Event colours keep their hue at 85 % brightness at night, so they don't glare. */
-:root[data-paper="night"] .evc { filter: brightness(0.85); }
 :root:lang(en), :root:lang(nl) { --pen-font: "Caveat", "HanJang Pen", var(--ui); --brush-font: "Kalam", "HanJang Brush", var(--ui); }
 :root[data-font="brush"] { --body-font: var(--brush-font); --title-font: var(--brush-font); }
 :root[data-font="clean"] { --body-font: var(--ui); --title-font: var(--ui); }
@@ -242,6 +253,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .action:hover { filter: brightness(0.97); }
 .action:disabled { opacity: 0.45; filter: none; }
 
+/* #66: a caret left alone stays lit instead of blinking (renderer/caretRest.ts): each blink is a frame of the whole page. */
+.caret-still { caret-animation: manual; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; }
 }
@@ -275,7 +288,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 /* The paper switch (as on the Mac): off a rule track with a check-border edge, on sage; the knob card-white by day, ink at night. */
 .switch { width: 40px; height: 22px; border-radius: 11px; background: var(--rule); box-shadow: inset 0 0 0 1px var(--check-border); position: relative; flex: none; transition: background var(--motion-change) var(--ease-out); }
 .switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fffdf8; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); transition: transform var(--motion-change) var(--ease-out); }
-:root[data-paper="night"] .switch::after { background: #ece6d6; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
+:root[data-scheme="dark"] .switch::after { background: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
 .switch[aria-checked="true"] { background: var(--sage); box-shadow: none; }
 .switch[aria-checked="true"]::after { transform: translateX(18px); }
 .switch.small { width: 34px; height: 20px; }
@@ -296,8 +309,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .pane-head .ph-text { flex: 1; min-width: 0; }
 .pane-head h1 { margin: 0; font: 600 22px/1.4 var(--ui); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pane-head .ph-sub { margin: 3px 0 0; font: 12px/1.45 var(--ui); color: var(--ink-2); }
+/* A pane whose title is its question (#240, 저장과 백업): its name small above it. */
+.pane-head .ph-eyebrow { font: 500 11.5px/1.4 var(--ui); color: var(--ink-2); }
 .pane-head .ph-cat { width: 58px; height: 58px; object-fit: contain; flex: none; margin: -6px 0 -8px; }
-:root[data-paper="night"] .ph-cat { opacity: 0.92; }
+:root[data-scheme="dark"] .ph-cat { opacity: 0.92; }
 
 /* A running time sized by an invisible copy of its widest text (tabularClock.ts): it never changes width as it ticks. */
 .tclock { display: inline-grid; justify-items: start; font-variant-numeric: tabular-nums; }

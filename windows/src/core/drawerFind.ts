@@ -6,19 +6,19 @@ import { checklistLine, drawerFooter, drawerSearch, placementOf, pinnedView, typ
 
 /**
  * 메모 찾기's results (#114, docs/plans/drawer-ux-plan.md B1): where to look (모든 폴더 · this folder or 고정 only), what
- * kind of memo to keep to (체크 남음 · 링크 · 고정), the results in groups by folder, the found line brought near the start,
+ * kind of memo to keep to (안 한 체크 · 링크 · 고정), the results in groups by folder, the found line brought near the start,
  * the results' dates and the footer. The same rules and shared cases (docs/plans/drawer-search-cases.json) as the Mac
  * (PaperCore MemoFolderSearch.swift `find` · `snippet`, MemoCards.foundTime, MemoFolders.searchFooter).
  */
 
-/** 체크 남음 (a checklist line not ticked yet) · 링크 (a web address) · 고정. */
+/** 안 한 체크 (a checklist line not ticked yet) · 링크 (a web address) · 고정. */
 export type SearchFilter = "open" | "link" | "pinned";
 export const searchFilters: SearchFilter[] = ["open", "link", "pinned"];
 
 /** One folder's results, its hits in the memos' order. */
 export interface HitGroup { folder: string; hits: DrawerHit[] }
 
-/** 체크 남음: a checklist line not ticked yet. */
+/** 안 한 체크: a checklist line not ticked yet. */
 export const hasOpenBox = (text: string): boolean => text.split("\n").some((line) => checklistLine(line)?.checked === false);
 
 /** What the filters read of a memo, worked out once per text (a search runs on every pause of the keys). */

@@ -9,6 +9,11 @@
 # its data and the real Claude are never touched; the copy is stopped by its pid and everything it wrote is removed.
 #
 #   scripts/ai-check.sh [out-folder] [--no-build]
+#
+# #217: the copy never comes to the front or onto a screen. It starts behind (`open -g`), every window far off the
+# screens (`--offscreen`, PAPERTODO_OFFSCREEN=1): the note, Settings (책상) and the slips. Its input — ⌘Z, the input
+# line, Settings › AI 연결 and its button — comes from a file it reads (`--perf-drive`, Sources/PaperTodo/PerfDrive.swift),
+# not through the system. A window on a screen stops the run.
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 out="${1:-$repo/.build/ai-check}"
@@ -23,6 +28,8 @@ out="$(cd "$out" && pwd)"
 app="$out/AICheck.app"
 probe="$out/perf-probe"
 check="$out/ai-check.log"
+perflog="$out/perf.log"
+commands="$out/perf-drive.txt"
 opened="$out/ai-open.log"
 coded="$out/ai-code.log"
 storage="$HOME/Library/Application Support/$bundle_id"
@@ -92,10 +99,21 @@ defaults write "$bundle_id" AppleLanguages -array ko
 defaults write "$bundle_id" ai.enabled -bool true
 
 launch() {
-    open -n "$app" --args --ai-check-log "$check" --ai-open-log "$opened" --ai-code-log "$coded" "$@"
+    : > "$commands"; : > "$perflog"
+    open -g -n --env PAPERTODO_OFFSCREEN=1 "$app" --args --ai-check-log "$check" --ai-open-log "$opened" --ai-code-log "$coded" \
+        --offscreen --perf-log "$perflog" --perf-drive "$commands" "$@"
     for _ in $(seq 1 100); do pid=$(pgrep -f "$app/Contents/MacOS/PaperTodo" | head -1 || true); [ -n "$pid" ] && break; sleep 0.05; done
     for _ in $(seq 1 100); do [ -f "$storage/ai-link.json" ] && break; sleep 0.1; done
     sleep 1.5
+    offscreen_check
+}
+# drive <command>: the test copy's input (PerfDrive: key <code> [mods] · type <ms> <text> · desk <pane> · ai-connect).
+drive() { echo "$*" >> "$commands"; }
+# Every shown window of the test copy off the screens, as the window server has it; nothing the app moved off.
+offscreen_check() {
+    if ! "$probe" offscreen "$pid"; then fail "a window of the test copy is on a screen"; fi
+    if grep -q '^onscreen' "$perflog"; then grep '^onscreen' "$perflog"; fail "the test copy put a window on a screen"; fi
+    if grep -q '^drive ' "$perflog"; then grep '^drive ' "$perflog"; fail "the test copy couldn't do a command"; fi
 }
 call() { node "$repo/scripts/ai-check.mjs" "$sdk" "$server" "$storage" "$@"; }
 field() { python3 -I -c "import json,sys; d=json.loads(sys.argv[1]); print(eval(sys.argv[2], {}, {'d': d}))" "$1" "$2"; }
@@ -129,7 +147,7 @@ grep -q '"보고서 쓰기"' "$storage/todos.json" || fail "not in todos.json"
 
 # 2. ⌘Z in the app undoes Claude's work (the toast is up, nothing changed here since).
 mark=$(python3 -I -c "import time; print(int(time.time()*1000))")
-"$probe" key "$pid" 6 cmd
+drive key 6 cmd
 line=$(wait_line "$mark" undo) || fail "no undo"
 echo "  ⌘Z: ${line#* undo }"
 sleep 0.3
@@ -150,11 +168,11 @@ python3 -I -c "import json,sys; items=json.load(open(sys.argv[1]))['items']; sys
 
 # 3b. Both writing at once (M9 from the app's side): the app adds 20 tasks from its input line while the extension
 # adds 20 in separate calls; all 40 must be in todos.json.
-"$probe" key "$pid" 53; sleep 0.2
-"$probe" key "$pid" 45 cmd; sleep 0.5
+drive key 53; sleep 0.2
+drive key 45 cmd; sleep 0.5
 ( for n in $(seq 1 20); do call add_todos "{\"items\":[{\"title\":\"claude-$n\",\"remindAt\":null}]}" >/dev/null; done ) &
 writer=$!
-for n in $(seq 1 20); do "$probe" type "$pid" "app-$n" 8; "$probe" key "$pid" 36; sleep 0.15; done
+for n in $(seq 1 20); do drive type 8 "app-$n"; drive key 36; sleep 0.15; done
 wait "$writer"
 sleep 2.5
 # What the app saved (its check log) against what the file has: a title the app saved that the file lacks is a lost
@@ -174,20 +192,22 @@ PY
 read -r typed lost claude <<< "$counts"
 echo "both writing: the app added $typed (from typed keys) and Claude 20 at the same time · in todos.json: Claude $claude/20, the app's lost $lost"
 [ "$lost" = 0 ] && [ "$claude" = 20 ] && [ "$typed" -ge 15 ] || fail "lost a write"
-"$probe" key "$pid" 53; sleep 0.3
+drive key 53; sleep 0.3
 
 # 4. 연결: the .mcpb is opened with its default app (recorded only — nothing is installed into Claude).
-# The tab and the button are clicked (a click posted to the test copy's pid), not pressed through accessibility, and
-# nothing is brought forward (#208).
-"$probe" key "$pid" 43 cmd; sleep 1
-"$probe" click "$pid" "=AI 연결" >/dev/null 2>&1 || true; sleep 0.8
-"$probe" click "$pid" "=Claude 데스크톱에 연결" >/dev/null 2>&1 || true; sleep 0.8
+# Settings (⌘,) opens off the screens; its AI 연결 pane and the button are done from inside (#217: `desk ai`,
+# `ai-connect`), not clicked or pressed, and nothing is brought forward.
+drive key 43 cmd; sleep 1
+drive desk ai; sleep 0.8
+offscreen_check
+drive ai-connect; sleep 0.8
 echo "연결 (stubbed opener): $(tr '\n' ' ' < "$opened")"
 grep -q "open .*jongi-nyang.mcpb" "$opened" || fail "the .mcpb wasn't opened"
 sleep 0.5
 echo "Claude Code too (stubbed claude): $(cut -c1-90 "$coded" | tr '\n' ' ')"
 grep -q "^/stub/claude mcp remove -s user jongi-nyang$" "$coded" || fail "no earlier entry taken out"
-grep -q "^/stub/claude mcp add-json -s user jongi-nyang {.*\"command\":\"/stub/node\".*index.js" "$coded" || fail "Claude Code wasn't told"
+# The JSON's keys are sorted (AIConnect.codeServerJSON): "args" with the program comes before "command".
+grep -q "^/stub/claude mcp add-json -s user jongi-nyang {.*index.js.*\"command\":\"/stub/node\"" "$coded" || fail "Claude Code wasn't told"
 
 # 5. Away (M15): closed, Claude adds one; at launch one notice.
 stop
@@ -200,14 +220,18 @@ echo "away notice: ${line#* away }"
 # 6. No Claude Desktop: the slip (닫기 closes it).
 stop; : > "$opened"
 launch --ai-no-handler
-"$probe" key "$pid" 43 cmd; sleep 1
-"$probe" click "$pid" "=AI 연결" >/dev/null 2>&1 || true; sleep 0.8
-"$probe" click "$pid" "=Claude 데스크톱에 연결" >/dev/null 2>&1 &
+drive key 43 cmd; sleep 1
+drive desk ai; sleep 0.8
+drive ai-connect
 sleep 1.5
+offscreen_check
 slip=$("$probe" windows "$pid" 2>/dev/null | grep -c "Claude 데스크톱이 필요해요" || true)
-echo "no Claude Desktop: $(tr '\n' ' ' < "$opened")· slip windows $slip"
-"$probe" click "$pid" "=닫기" >/dev/null 2>&1 || true
-sleep 0.5
+# 닫기 is the slip's Esc (its cancel button).
+drive key 53; sleep 0.8
+left=$("$probe" windows "$pid" 2>/dev/null | grep -c "Claude 데스크톱이 필요해요" || true)
+echo "no Claude Desktop: $(tr '\n' ' ' < "$opened")· slip windows $slip, after 닫기 (Esc) $left"
+[ "$slip" = 1 ] || fail "no slip"
+[ "$left" = 0 ] || fail "the slip didn't close"
 
 # 7. Off: every tool only says "turn it on".
 stop
@@ -216,4 +240,5 @@ launch
 result=$(call get_today '{}')
 echo "turned off: ai-link enabled=$(field "$(cat "$storage/ai-link.json")" "d['enabled']") · get_today: $(field "$result" "d['text']")"
 [ "$(field "$result" "d['data']['enabled']")" = "False" ] || fail "tools still work when off"
+offscreen_check
 echo "PASS"

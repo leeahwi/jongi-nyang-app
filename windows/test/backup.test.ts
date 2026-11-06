@@ -3,7 +3,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { countsText, isDue, makeBackup, mergeFiles, notBackup, parseBackup, parseSavedName, pruneSaved, replaceFiles, savedName, savedWhen, sizeText, summary, summaryText, tooNew, unreadable, type BackupFiles } from "../src/core/backup";
+import { backupStatus, countsText, isDue, makeBackup, mergeFiles, notBackup, parseBackup, parseSavedName, pruneSaved, replaceFiles, savedName, savedWhen, sizeText, summary, summaryText, tooNew, unreadable, type BackupFiles } from "../src/core/backup";
 import { serializeAlarms, type Alarm } from "../src/core/alarm";
 import { serializeEvents, type LocalEvent } from "../src/core/events";
 import { serializeMemos } from "../src/core/memo";
@@ -362,4 +362,21 @@ test("the daily copy: once a day from 4 a.m., only when something changed (TZ=As
   assert.equal(isDue(new Date(2026, 9, 31, 4, 0), undefined, true), true);
   assert.equal(isDue(new Date(2026, 9, 31, 4, 0), undefined, false), false);
   assert.equal(isDue(new Date(2026, 9, 30, 5, 0), new Date(2026, 9, 30, 2, 0), true), true);
+});
+
+// 저장과 백업의 백업 한 줄 (#240, D2 C): the shared cases from docs/plans/storage-summary-cases.json (the Mac's
+// test-backups.sh reads the same file).
+test("backup summary: when the last copy was, or what is wrong, in ko · en · nl (shared cases)", () => {
+  const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "storage-summary-cases.json"), "utf8")) as {
+    now: number[];
+    cases: { case: string; auto: boolean; failed: boolean; missing: boolean; newest: number[] | null; tone: string; ko: string[]; en: string[]; nl: string[] }[];
+  };
+  const at = (parts: number[]) => new Date(parts[0], parts[1] - 1, parts[2], parts[3], parts[4]);
+  for (const entry of file.cases) {
+    for (const language of ["ko", "en", "nl"] as const) {
+      const got = backupStatus({ auto: entry.auto, failed: entry.failed, missing: entry.missing, newest: entry.newest ? at(entry.newest) : undefined }, at(file.now), language);
+      assert.deepEqual([got.title, got.detail], entry[language], `${entry.case} ${language}`);
+      assert.equal(got.tone, entry.tone, entry.case);
+    }
+  }
 });

@@ -37,6 +37,8 @@ swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/BubbleText.swift \
     Sources/PaperCore/PetAsk.swift \
     Sources/PaperCore/TextSteps.swift \
+    Sources/PaperCore/PaperKind.swift \
+    Sources/PaperCore/PaperLook.swift \
     Tests/PaperCoreTests/SettingsTests.swift \
     -o .build/checks/SettingsTests
 .build/checks/SettingsTests ../docs/plans/settings-cases.json

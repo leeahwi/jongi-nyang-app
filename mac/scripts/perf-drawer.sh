@@ -11,11 +11,13 @@
 # build of the app's views, to run by turns with this one. KEYS=20 keys per memo. RUNS=1 runs per tier (each a fresh
 # process; with more, every number is listed per run).
 # PROFILE=1: sample(1) from just before ↩ through Esc, into <out>/sample-<tier>-<run>.txt; SAMPLE_MEMO=STRESS-LONG-100K
-# (or STRESS-CHECK-2000) picks the long tier's memo, the 1 MB one otherwise.
+# (or STRESS-CHECK-2000) picks the long tier's memo, the 1 MB one otherwise. PROFILE_OPEN=1: sample(1) of the drawer's
+# first open and reopens, into <out>/sample-open-<tier>-<run>.txt.
 # The windows have no slip motion (SlipMotion.enabled = false, as AppBench): a window off every screen gets no frames
 # to run an animation on.
-# OPEN_CEILING ms (default 200, #132): the first open or an ↩ over it fails the run — only when the
-# 1-minute load is at most CEILING_LOAD (default 6); over that the run prints it without failing.
+# OPEN_CEILING ms (default 150 since #3, 200 before, #132): an ↩ over it fails the run; FIRST_CEILING (150) the drawer's
+# first open at 50–2,000 memos, FIRST_CEILING_BIG (200) at 5,000 and with the long memos — only when the 1-minute load
+# is at most CEILING_LOAD (default 6); over that the run prints it without failing.
 #
 # Nothing of the app's own data is read or written: each tier is a temporary folder made by scripts/memo-stress-data.py.
 set -euo pipefail
@@ -37,7 +39,7 @@ fi
 data="$(mktemp -d)"
 trap 'rm -rf "$data"' EXIT
 tiers=("$@"); [ ${#tiers[@]} -eq 0 ] && tiers=(500 2000 5000 long)
-ceiling="${OPEN_CEILING:-200}"
+ceiling="${OPEN_CEILING:-150}"
 status=0
 echo "== 메모 서랍 in one process · $(date '+%Y-%m-%d %H:%M') · $(sw_vers -productVersion) · $(sysctl -n machdep.cpu.brand_string)"
 for tier in "${tiers[@]}"; do
@@ -49,10 +51,14 @@ for tier in "${tiers[@]}"; do
         cp -R "$data/$tier" "$data/$tier-run"
         load=$(sysctl -n vm.loadavg | awk '{print $2}')
         echo "-- tier $tier · run $run · load $(sysctl -n vm.loadavg)"
-        args=("$data/$tier-run" --keys "${KEYS:-20}" --ceiling "$ceiling")
+        # #3: the first open within 150 ms at 50 to 2,000 memos; 5,000 memos and the long memos (a 1 MB memo's card
+        # words alone are 56 ms) within 200.
+        case "$tier" in 5000|long) first="${FIRST_CEILING_BIG:-200}" ;; *) first="${FIRST_CEILING:-150}" ;; esac
+        args=("$data/$tier-run" --keys "${KEYS:-20}" --ceiling "$ceiling" --open-ceiling "$first")
         [ "$tier" = long ] && args+=(--long)
         [ "${PROFILE:-0}" = 1 ] && args+=(--sample "$out/sample-$tier-$run.txt")
         [ -n "${SAMPLE_MEMO:-}" ] && args+=(--sample-memo "$SAMPLE_MEMO")
+        [ "${PROFILE_OPEN:-0}" = 1 ] && args+=(--sample-open "$out/sample-open-$tier-$run.txt")
         if ! "$bench" "${args[@]}"; then
             if awk -v l="$load" -v m="${CEILING_LOAD:-6}" 'BEGIN {exit !(l <= m)}'; then status=1; else echo "  (over the ceiling at load $load: not counted)"; fi
         fi

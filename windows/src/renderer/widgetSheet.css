@@ -1,0 +1,30 @@
+/* 바탕화면 위젯의 날짜 쪽지 (#234): an S slip with event tape — the day's title with ‹ ›, every thing of that day with its
+   time (it scrolls when there are many), then the input line, read on that day. Always solid paper. */
+.slip-stage { padding: 14px 14px 22px; }
+.wsheet .slip-head { padding-top: 14px; }
+.wsheet .day-nav { display: flex; gap: 2px; flex: none; }
+.wsheet .day-nav button { width: 24px; height: 24px; border: 0; border-radius: 7px; background: var(--paper-2); color: var(--ink-2); display: grid; place-items: center; cursor: pointer; }
+.wsheet .day-nav button:hover { color: var(--ink); background: var(--sage-2); }
+.wsheet .dlist { max-height: 208px; overflow-y: auto; margin: 8px 0 2px; padding: 0 2px; display: flex; flex-direction: column; gap: 1px; }
+.wsheet .dlist .none { font-size: 12px; color: var(--ink-3); padding: 4px 2px 6px; }
+.wsheet .dl { display: flex; align-items: center; gap: 7px; min-height: 24px; padding: 2px 6px; border: 0; border-radius: 7px; background: none; font: inherit; font-size: 12.5px; color: var(--ink); text-align: left; cursor: pointer; }
+.wsheet .dl:hover, .wsheet .dl:focus-visible { background: var(--sage-2); }
+.wsheet .dl .mark { flex: none; width: 3px; height: 13px; margin: 0 2px; border-radius: 2px; background: var(--color, var(--sage)); }
+.wsheet .dl .mark.deadline, .wsheet .dl .mark.reminder, .wsheet .dl .mark.range { width: 7px; height: 7px; border-radius: 50%; margin: 0; }
+.wsheet .dl .mark.deadline { background: var(--clay); }
+.wsheet .dl .mark.reminder, .wsheet .dl .mark.range { background: var(--sage); }
+.wsheet .dl .tm { flex: none; min-width: 42px; color: var(--ink-2); font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wsheet .dl .tt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wsheet .slip-inp .typed { font-size: 22px; }
+:root[data-font="clean"] .wsheet .slip-inp .typed { font-size: 17px; }
+.wsheet .slip-foot .keys { flex-wrap: wrap; row-gap: 4px; white-space: normal; }
+.slip.s.wsheet { width: 360px; }
+/* calendar-flows: the holiday's name first (not a button), and what is over by now quieter. */
+.wsheet .dl.holiday { cursor: default; color: var(--clay-text); font-weight: 600; }
+.wsheet .dl.holiday:hover { background: none; }
+.wsheet .dl.holiday .tm { color: var(--clay-text); }
+.wsheet .dl .hflag { flex: none; width: 7px; margin: 0 0 0 1px; font-size: 10px; line-height: 1; color: var(--clay); }
+.wsheet .dl.over .tm, .wsheet .dl.over .tt { color: var(--ink-3); }
+.wsheet .dl.over .mark { opacity: 0.45; }
+/* #253: ↩ 넣기 waits while a question replaces the whole list (its title says why). */
+.wsheet .slip-foot .keys .waiting { opacity: 0.4; }

@@ -1,4 +1,8 @@
 import { icon, paper } from "./api";
+import { holdWhileAsked } from "./askGuard";
+
+// #229: a question waiting holds this page up (askGuard.ts).
+holdWhileAsked();
 
 /**
  * 메모 서랍's handle: a paw bookmark at the screen's edge, one pale cream on every paper (1.30). The number of memos

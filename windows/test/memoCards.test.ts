@@ -255,7 +255,7 @@ test("D27–D29: 체크한 줄 지우기, 고정 모두 풀기, a deleted folder
 });
 
 test("cards: the footer, a bookmark's label, the tape's place", () => {
-  assert.equal(footerWords("회사", 5), "회사 · 다섯 장");
+  assert.equal(footerWords("회사", 5), "회사 · 5장"); // #240: digits, like the groups' counts
   assert.equal(footerWords("Work", 1, "en"), "Work · 1 note");
   assert.equal(footerWords("Werk", 5, "nl"), "Werk · 5 notities");
   assert.equal(bookmarkTip("장보기", 3, "Ctrl+3"), "장보기 · 세 장 · Ctrl+3");

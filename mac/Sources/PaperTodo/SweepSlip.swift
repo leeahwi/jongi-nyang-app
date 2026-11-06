@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import PaperCore
 import SwiftUI
 
@@ -20,6 +21,17 @@ final class SweepController {
 
     init(model: AppModel) {
         self.model = model
+        // #64: the minute check runs only while 저녁 정리 is on.
+        model.$sweepEnabled.removeDuplicates().sink { [weak self] on in
+            DispatchQueue.main.async { self?.watch(on) }
+        }.store(in: &subscriptions)
+    }
+
+    private var subscriptions = Set<AnyCancellable>()
+
+    private func watch(_ on: Bool) {
+        guard on else { timer?.invalidate(); timer = nil; return }
+        guard timer == nil else { return }
         let timer = Timer(timeInterval: 60, repeats: true) { _ in
             Task { @MainActor [weak self] in self?.check(opening: false) }
         }

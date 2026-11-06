@@ -1,5 +1,9 @@
 import { h, paper, reduceMotion, t } from "./api";
+import { holdWhileAsked } from "./askGuard";
 import { earPaths, earsHeight, earsWidth, mayTwitch } from "../core/noteEars";
+
+// #229: a question waiting holds this page up (askGuard.ts).
+holdWhileAsked();
 
 /**
  * 노트 창 위의 고양이 귀 (#151): the drawer's two ears standing on the note's top edge, in their own clear window that

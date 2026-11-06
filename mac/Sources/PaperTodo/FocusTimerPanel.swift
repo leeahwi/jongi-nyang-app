@@ -394,7 +394,9 @@ final class FocusTimerController {
             let area = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame ?? .zero
             origin = NSPoint(x: area.maxX - currentSize.width - 24, y: area.minY + 150)
         }
-        panel.setFrame(clamped(NSRect(origin: origin, size: currentSize)), display: true)
+        // #217: in a check's run (perf.sh's ‘타이머 25’), the tag far off every screen.
+        let shift: CGFloat = TestHooks.staysBehind ? -40_000 : 0
+        panel.setFrame(clamped(NSRect(origin: origin, size: currentSize)).offsetBy(dx: shift, dy: 0), display: true)
     }
 
     /// A new size: it grows or shrinks around the middle of its bottom edge (where the tag is),
@@ -413,6 +415,7 @@ final class FocusTimerController {
 
     /// Keeps the tag itself (the lower part of the window) on a screen.
     private func clamped(_ frame: NSRect) -> NSRect {
+        if TestHooks.staysBehind, !NSScreen.screens.contains(where: { $0.frame.intersects(frame) }) { return frame }
         let center = NSPoint(x: frame.midX, y: frame.minY + 40)
         guard let area = (NSScreen.screens.first { $0.frame.contains(center) } ?? NSScreen.main)?.visibleFrame else { return frame }
         var result = frame

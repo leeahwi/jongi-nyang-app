@@ -2,7 +2,7 @@ import { BrowserWindow, clipboard, globalShortcut, ipcMain, screen } from "elect
 import { clipboardPrefill } from "../core/memo";
 import { visibleFolders } from "../core/memoDrawer";
 import path from "node:path";
-import { followSlip, slipWindowOptions } from "./slipWindow";
+import { followSlip, KeptSlip, slipWindowOptions } from "./slipWindow";
 import { t } from "../i18n";
 import { offscreen, shortcutsDisabled } from "./env";
 import type { Store } from "./store";
@@ -20,6 +20,8 @@ const size = { width: 420 + 48, height: 300 };
  * restart). `live` is false in tests and snapshots, so no real shortcut is taken there.
  */
 export class QuickMemo {
+  /** #246: its paper drags it, and the place is kept per display. */
+  private readonly kept: KeptSlip;
   private window?: BrowserWindow;
   private registered = false;
   private loaded = false;
@@ -29,6 +31,7 @@ export class QuickMemo {
 
   /** `saved`: a memo was put in (the note says so, with 열기 for the 메모 서랍). */
   constructor(private readonly store: Store, private readonly rendererDirectory: string, private readonly live: boolean, private readonly saved: (id: string) => void = () => undefined) {
+    this.kept = new KeptSlip(store, "quickMemo", 420);
     const fromCard = (event: Electron.IpcMainEvent) => this.window !== undefined && !this.window.isDestroyed() && event.sender === this.window.webContents;
     ipcMain.on("quickMemo:draft", (event, text: unknown) => { if (fromCard(event) && typeof text === "string") this.keepDraft(text); });
     ipcMain.on("quickMemo:close", (event, text: unknown) => {
@@ -96,13 +99,11 @@ export class QuickMemo {
 
   private async openWith(): Promise<void> {
     const window = this.ensureWindow();
-    const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+    // #246: where it was dragged to on this display, else the usual spot (centred, a quarter of the way down).
+    const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
     const [width, height] = window.getSize();
-    window.setBounds({
-      x: Math.round(area.x + (area.width - width) / 2 + offscreen.x),
-      y: Math.round(area.y + area.height / 4 - shadowRoom + offscreen.y),
-      width, height,
-    });
+    const at = this.kept.origin(display, this.usual(display, width));
+    window.setBounds({ x: at.x + offscreen.x, y: at.y + offscreen.y, width, height });
     // 복사한 글 넣기: an empty draft takes what was copied since the last time (selected, so typing replaces it).
     let text = this.store.prefs.quickMemoDraft;
     let copied = false;
@@ -118,6 +119,20 @@ export class QuickMemo {
     window.moveTop();
     window.focus();
     window.webContents.focus();
+  }
+
+  /** The usual spot on `display`: centred, a quarter of the way down (the window's top left). */
+  private usual(display: Electron.Display, width = this.window?.getSize()[0] ?? size.width): { x: number; y: number } {
+    const area = display.workArea;
+    return { x: Math.round(area.x + (area.width - width) / 2), y: Math.round(area.y + area.height / 4 - shadowRoom) };
+  }
+
+  /** #246: the paper dragged from this slip's own page (false: another page's). */
+  dragSlip(sender: Electron.WebContents, phase: "start" | "move" | "end" | "reset", x: number, y: number): boolean {
+    const window = this.window;
+    if (!window || window.isDestroyed() || sender !== window.webContents) return false;
+    this.kept.dragged(window, phase, x, y, (display) => this.usual(display));
+    return true;
   }
 
   hide(): void {

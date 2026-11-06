@@ -19,6 +19,7 @@ struct PaperStepSlider: View {
 
     private static let knob: CGFloat = 16
     @FocusState private var focused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 8) {
@@ -68,7 +69,8 @@ struct PaperStepSlider: View {
         .focusEffectDisabled()
         .onKeyPress(keys: [.leftArrow, .downArrow]) { _ in move(-1); return .handled }
         .onKeyPress(keys: [.rightArrow, .upArrow]) { _ in move(1); return .handled }
-        .animation(.easeOut(duration: 0.12), value: index)
+        // The knob moves a step with 살짝 (#166); at once under Reduce Motion.
+        .animation(Motion.animation(.quick, reduce: reduceMotion), value: index)
     }
 
     private func move(_ by: Int) {
@@ -83,7 +85,7 @@ struct NoteFontGroup: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
-        SettingsGroup(title: L("노트 글꼴"), footer: L("⌘ = 와 ⌘ − 로 한 칸씩 바꿔요. 줄 간격은 노트 줄(44pt)에 맞춰져 있어요.")) {
+        SettingsGroup(title: L("노트 글꼴"), footer: L("⌘ = 와 ⌘ − 로 한 칸씩 바꿔요. 줄 간격은 노트의 줄에 맞춰져 있어요.")) {
             HStack(spacing: 12) {
                 SettingsLabel(L("글꼴"), systemImage: "textformat")
                 Spacer(minLength: 8)
@@ -210,6 +212,7 @@ struct DrawerFontGroup: View {
 struct DrawerFontPreview: View {
     @ObservedObject var drawer: MemoDrawer
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let text = drawer.text
@@ -255,7 +258,8 @@ struct DrawerFontPreview: View {
         .background(palette.paper, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay { RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(palette.edge, lineWidth: 1) }
         .environment(\.colorScheme, palette.scheme)
-        .animation(.easeOut(duration: 0.15), value: drawer.text)
+        // 바뀜 (#166), as the note's preview; at once under Reduce Motion.
+        .animation(Motion.animation(.change, reduce: reduceMotion), value: drawer.text)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(L("메모 글꼴 미리보기"))
     }

@@ -33,6 +33,7 @@
     <nav class="nav" aria-label="Main">
       <a href="#tour">Tour</a>
       <a href="#features">Features</a>
+      <a href="#widget">Widgets</a>
       <a href="#spaces">Spaces</a>
       <a href="#drawer">Notes drawer</a>
       <a href="#built">How it's built</a>
@@ -54,13 +55,13 @@
 <main id="main">
   <section class="hero" aria-labelledby="hero-title">
     <div class="wrap">
-      <a class="badge" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.47.0"><span class="dot" aria-hidden="true"></span>New · spaces per device and a new Today window<span class="go" aria-hidden="true">→</span></a>
+      <a class="badge" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.48.0"><span class="dot" aria-hidden="true"></span>New · desktop calendar widgets and fifteen papers<span class="go" aria-hidden="true">→</span></a>
       <h1 id="hero-title">Today's to-dos,<br>on <span class="hand">one sheet of paper.</span></h1>
       <p class="lede">A notepad for writing down to-dos and ticking them off. The top shows what's on now and how long is left, and a paper cat brings your reminders. There's no account; everything is saved as files on your computer.</p>
       <div class="cta">
-        <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.47.0">
+        <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.48.0">
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
-          Download for Mac <small>1.47.0</small>
+          Download for Mac <small>1.48.0</small>
         </a>
         <div class="line" role="img" aria-label="Input line example: ‘meeting tomorrow 3pm’ is read as ‘Event · tomorrow 3:00 PM’" data-line='[["meeting tomorrow 3pm","Event · tomorrow 3:00 PM"],["report by Friday","To-do · due Friday"],["timer 40","40-minute timer"],["alarm 7am weekdays","Alarm · weekdays 7:00 AM","clay"]]'>
           <span class="pen" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg></span>
@@ -68,7 +69,7 @@
           <span class="chip" aria-hidden="true">Event · tomorrow 3:00 PM</span>
         </div>
       </div>
-      <p class="alt">Also for Windows 10/11: <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.32.0">Download for Windows 1.32.0</a> · <span lang="ko">종이냥</span> (<i>jongi-nyang</i>) means ‘paper cat’.</p>
+      <p class="alt">Also for Windows 10/11: <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.33.0">Download for Windows 1.33.0</a> · <span lang="ko">종이냥</span> (<i>jongi-nyang</i>) means ‘paper cat’.</p>
     </div>
   </section>
 
@@ -113,7 +114,7 @@
               <h3>Focus on one thing</h3>
               <p>Type ‘report 25 min focus’ and the notepad turns into a single card. When time is up, pick Done, 5 more min or Not now. It can run Pomodoro rounds too.</p>
             </div>
-            <figure class="shot" style="margin:0"><img src="../assets/focus-en.webp" width="640" height="854" alt="The focus card: a ring of time left around one to-do" loading="lazy"></figure>
+            <figure class="shot" style="margin:0"><img src="../assets/focus-en.webp" width="640" height="853" alt="The focus card: 12:30 left in the ring, with the pause button inside it, above the to-do ‘Sort out what has to happen today’" loading="lazy"></figure>
           </article>
           <article class="slide" id="s-alarm" role="tabpanel" aria-labelledby="t-alarm" hidden>
             <div>
@@ -135,9 +136,9 @@
             <div>
               <p class="kicker">06 · Desk</p>
               <h3>Calendar and settings on the Desk</h3>
-              <p>Calendar, history, settings and help live in the Desk window. Keep the notepad small on screen, and open the Desk when you need to look further ahead.</p>
+              <p>Calendar, history, settings and help live in the Desk window. Keep the notepad small on screen, and open the Desk when you need to look further ahead. The calendar also shows lunar dates and holiday names.</p>
             </div>
-            <figure class="shot" style="margin:0"><img src="../assets/desk-en.webp" width="1200" height="835" alt="The Desk window's calendar: a month view with the selected day's events on the right" loading="lazy"></figure>
+            <figure class="shot" style="margin:0"><img src="../assets/desk-en.webp" width="1200" height="835" alt="The Desk window’s calendar: on the left, the list in four groups (View, Settings, Notes &amp; data, Help); in the middle, October with a lunar date on each day and National Foundation Day, a substitute holiday and Hangul Day; on the right, the selected day’s events" loading="lazy"></figure>
           </article>
         </div>
       </div>
@@ -192,7 +193,7 @@
           <h3>Tidy up in the evening</h3>
           <p>In the evening (8 pm at first) it asks whether to move what's left to tomorrow. If you miss it, it asks again the next morning.</p>
           <div class="mini" aria-hidden="true">
-            <div class="ask">3 left today. Move them to tomorrow?</div>
+            <div class="ask">Good work today. Move 3 to-dos to tomorrow?</div>
             <div class="ask-btns"><span>To tomorrow</span><span>To Someday</span><span>Leave as is</span></div>
           </div>
         </article>
@@ -250,23 +251,61 @@
         </article>
         <article class="tile reveal" style="--t: var(--tape-event)">
           <div class="art"><img src="../assets/pet-ko.webp" width="600" height="500" alt="The cat asking a question in a speech bubble with answer buttons (Korean interface)" loading="lazy"></div>
-          <div class="copy"><h3>A cat for company</h3><p>It breathes and wanders above the Dock, and walks over with a to-do when its reminder is due. Finish one and it celebrates. Now and then it asks ‘A 5-minute break?’; answer with a button and a 5-minute timer starts.</p></div>
+          <div class="copy"><h3>A cat for company</h3><p>It breathes and wanders above the Dock (the taskbar on Windows), and walks over with a to-do when its reminder is due. Finish one and it celebrates. Now and then it asks ‘A 5-minute break?’; answer with a button and a 5-minute timer starts.</p></div>
         </article>
         <article class="tile reveal" style="--t: var(--tape-timer)">
           <div class="art" aria-hidden="true">
             <div class="sync">
               <div class="device"><div class="screen"><i></i><i></i><i></i></div>Mac</div>
-              <div class="folder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2h9A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/><path d="M8 13.5h8M12 11v5" stroke-linecap="round"/></svg>iCloud Drive · OneDrive · Dropbox</div>
+              <div class="folder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2h9A1.5 1.5 0 0 1 21 9.5v8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/><path d="M8 13.5h8M12 11v5" stroke-linecap="round"/></svg><span>iCloud Drive</span><span>OneDrive</span><span>Dropbox</span></div>
               <div class="device"><div class="screen"><i></i><i></i><i></i></div>Windows</div>
             </div>
           </div>
-          <div class="copy"><h3>Mac and Windows, one list</h3><p>Choose the same cloud folder as the storage location on both computers and they share one list. To-dos and events edited at nearly the same time keep both changes, and a memo edited on both is merged line by line and character by character.</p></div>
+          <div class="copy"><h3>Mac and Windows, one list</h3><p>Choose the same shared folder as the storage location on both computers and they share one list. Edits made at almost the same time are all kept, and a note changed on both is merged. Your cloud service moves the files.</p></div>
         </article>
         <article class="tile reveal" style="--t: var(--tape-memo)">
           <div class="art top"><img src="../assets/note-night.webp" width="640" height="975" alt="The same notepad on night paper (Korean interface)" loading="lazy"></div>
-          <div class="copy"><h3>Night paper</h3><p>Put the system in dark mode and every window switches to night paper: the color of paper in a room with the lights off. Day or night, text stays easy to read (WCAG AA).</p></div>
+          <div class="copy"><h3>Night paper</h3><p>When the system is in dark mode, every window turns the color of paper in a room with the lights off. You can also fix it to day or night under Desk → Appearance → Day &amp; night. Text contrast meets the web accessibility standard (WCAG AA) by day and by night.</p></div>
         </article>
       </div>
+    </div>
+  </section>
+
+  <section id="widget" aria-labelledby="widget-title">
+    <div class="wrap">
+      <div class="head reveal">
+        <p class="eyebrow">Calendar widgets</p>
+        <h2 id="widget-title">A paper calendar on your desktop</h2>
+        <p>Pick from seven widgets, from Today to a wall calendar for the month, and keep up to four. Add them in Desk → Events → Desktop widgets.</p>
+      </div>
+      <div class="stage reveal">
+        <div class="film-frame"><img src="../assets/widget-en.webp" width="1200" height="700" alt="A wall calendar widget for October on the desktop. Each day is a paper tile with its events, a lunar date and holiday names such as Hangul Day, and a cat’s ears peek out at the top right. In front, the day slip for October 16 shows an event chip for ‘team meeting at 3pm’" loading="lazy" style="display:block;width:100%;height:auto"></div>
+      </div>
+      <ul class="points">
+        <li class="reveal"><strong>Click a day for its slip</strong><span>Click a day on a widget to see everything on it. Type there as you would in the notepad’s input line, and it goes straight in.</span></li>
+        <li class="reveal"><strong>Lunar dates and holidays</strong><span>Lunar dates and Korean public holidays show from the start. They’re worked out on your computer without the internet, and the Desk calendar shows them too.</span></li>
+        <li class="reveal"><strong>Readable when faded</strong><span>Pick an opacity from 20 to 100%. Each day sits on a paper tile, so the text stays readable when the widget is faint. How it looks on your own wallpaper hasn’t been checked on a real screen yet.</span></li>
+        <li class="reveal"><strong>Drag it by the ears</strong><span>Drag the cat’s ears at the top right to move a widget, or click them for its menu. Widgets sit below other windows at first, and each can be set to Keep on top.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="themes" aria-labelledby="themes-title">
+    <div class="wrap">
+      <div class="head reveal">
+        <p class="eyebrow">Fifteen papers</p>
+        <h2 id="themes-title">Pick a paper, and every window follows</h2>
+        <p>Choose one in Desk → Appearance → Paper, and the notepad, calendar, widgets, slips, Desk and notes drawer all change to it. There are eleven light papers and four dark ones.</p>
+      </div>
+      <div class="stage reveal">
+        <div class="film-frame"><img src="../assets/themes-en.webp" width="1200" height="700" alt="Desk → Appearance → Paper with eleven light papers, four dark papers and the At night menu below. Sticky note is picked, so the notepad and the Today widget on the right are on Sticky note too" loading="lazy" style="display:block;width:100%;height:auto"></div>
+      </div>
+      <ul class="points">
+        <li class="reveal"><strong>Seven new papers</strong><span>Sticky note, Manuscript paper, Blue lined notebook, Lavender, Recycled paper, Night sky and Chalkboard. Whether Sticky note and Chalkboard are easy on the eyes over time hasn’t been checked yet.</span></li>
+        <li class="reveal"><strong>At night</strong><span>A light paper changes at night to the one you pick under At night: Night paper, Ink, Night sky, Chalkboard, or no change.</span></li>
+        <li class="reveal"><strong>A paper of its own for the drawer</strong><span>The notes drawer starts on the notepad’s paper. Turn off Same as the notepad in Desk → Notes drawer to pick one just for the drawer.</span></li>
+        <li class="reveal"><strong>Nothing changes when you update</strong><span>You start with Day paper, and Night paper at night. A paper you already picked for the notes drawer stays.</span></li>
+      </ul>
     </div>
   </section>
 
@@ -275,16 +314,16 @@
       <div class="head reveal">
         <p class="eyebrow">To-do spaces</p>
         <h2 id="spaces-title">Sorted, still one sheet</h2>
-        <p>From 1.45 (Windows 1.30) you can sort to-dos into spaces such as Work, Home and Study. Today still shows them all on one sheet, with only the space’s colour band at the left of each row.</p>
+        <p>Sort your to-dos into spaces such as Work, Home and Study. Today still shows them all on one sheet, with only the space’s color band at the left of each row.</p>
       </div>
       <div class="stage reveal">
-        <div class="film-frame"><img src="../assets/spaces-en.webp" width="1200" height="700" alt="Two Today sheets. On the left, to-do rows carry a space’s colour band at their edge; on the right, the same sheet shows Work only, with ‘4 more in other spaces · Show all’ under the list" loading="lazy" style="display:block;width:100%;height:auto"></div>
+        <div class="film-frame"><img src="../assets/spaces-en.webp" width="1200" height="700" alt="Two Today sheets. On the left, to-do rows carry a space’s color band at their edge; on the right, the same sheet shows Work only, with ‘4 more in other spaces · Show all’ under the list" loading="lazy" style="display:block;width:100%;height:auto"></div>
       </div>
       <ul class="points">
         <li class="reveal"><strong>Show one space</strong><span>Pick it from ‘All spaces ▾’ in the header, or press <kbd>⌥⌘1</kbd>–<kbd>9</kbd> (<kbd>Ctrl+Shift+1</kbd>–<kbd>9</kbd> on Windows). Everything shows again at 4 a.m. the next day.</span></li>
         <li class="reveal"><strong># as you type</strong><span>Write ‘send the quote by Friday #work’ and it goes into Work. The start of the name, like ‘#wo’, is enough.</span></li>
-        <li class="reveal"><strong>Move and manage</strong><span>Right-click a to-do to move it to another space. Set names, colours and order under Desk → Spaces.</span></li>
-        <li class="reveal"><strong>Nothing changes until you make one</strong><span>With no spaces, the notepad looks just as before. Reminders and the cat still count the to-dos you’ve hidden.</span></li>
+        <li class="reveal"><strong>Move and manage</strong><span>Right-click a to-do to move it to another space. Set names, colors and order under Desk → Spaces.</span></li>
+        <li class="reveal"><strong>Nothing changes until you make one</strong><span>With no spaces, the notepad looks just as before. While you look at one space, reminders from the others still come.</span></li>
       </ul>
     </div>
   </section>
@@ -294,7 +333,7 @@
       <div class="head reveal">
         <p class="eyebrow">Group by space</p>
         <h2 id="group-title">Work, home and study at a glance</h2>
-        <p>From 1.46 (Windows 1.31) you can gather today’s to-dos by space. Turn it on from ‘All spaces ▾’ in the header, or press <kbd>⌥⌘G</kbd> (<kbd>Ctrl+Shift+G</kbd> on Windows).</p>
+        <p>Gather today’s to-dos by space. Turn it on from ‘All spaces ▾’ in the header, or press <kbd>⌥⌘G</kbd> (<kbd>Ctrl+Shift+G</kbd> on Windows).</p>
       </div>
       <div class="stage reveal">
         <div class="film-frame"><img src="../assets/group-en.webp" width="1200" height="700" alt="A wide notepad showing today’s to-dos in four columns: Work, Home, Study and General, each with a line such as ‘+ Add to Work’ at the bottom" loading="lazy" style="display:block;width:100%;height:auto"></div>
@@ -316,10 +355,10 @@
         <p>The storage folder is saved as a backup file (.jongi) once a day, and once more before anything overwrites your list, such as an import or a restore.</p>
       </div>
       <div class="stage reveal">
-        <div class="film-frame"><img src="../assets/backup-en.webp" width="1200" height="700" alt="Automatic backups and the backup list in Desk → Storage & backup, and the ‘Restore the backup from Oct 28, 8:55 AM?’ slip with Replace and Merge buttons" loading="lazy" style="display:block;width:100%;height:auto"></div>
+        <div class="film-frame"><img src="../assets/backup-en.webp" width="1200" height="700" alt="‘Where should your to-dos live?’ and ‘Backed up today 9:12 AM’ in Desk → Storage &amp; backup, and the ‘Restore the backup from Oct 28, 8:55 AM?’ slip with Replace and Merge buttons" loading="lazy" style="display:block;width:100%;height:auto"></div>
       </div>
       <ul class="points">
-        <li class="reveal"><strong>Storage and backups in one place</strong><span>Desk → Storage & backup holds the storage folder, automatic backups, the backup list, and exporting and importing a backup file.</span></li>
+        <li class="reveal"><strong>Storage and backups in one place</strong><span>Desk → Storage &amp; backup starts with ‘Where should your to-dos live?’ and tells you in one line when the last backup was. The backup list, export and import are under Show details.</span></li>
         <li class="reveal"><strong>Pick one to restore</strong><span>Choose a backup, then Merge or Replace. Merge keeps what’s here and brings back only what was deleted since. Either way, what’s here now is backed up first.</span></li>
         <li class="reveal"><strong>Only on this computer</strong><span>Backups go to this computer’s backups folder, not the storage folder, so they don’t travel to other devices even with a shared folder. Up to 14 daily backups are kept.</span></li>
         <li class="reveal"><strong>When you move the folder</strong><span>Picking another storage folder tells you first that your current list moves there. Overwriting backs up the list from before.</span></li>
@@ -332,7 +371,7 @@
       <div class="head reveal">
         <p class="eyebrow">Notes drawer</p>
         <h2 id="drawer-title">Notes live in a drawer at the screen’s edge</h2>
-        <p>Since 1.43, the notebook’s Memo tab is a drawer at the edge of the screen. Pull it out from any app to read a note, jot one down, or edit it in place. Every note you already had is in the drawer’s Notes folder.</p>
+        <p>Pull the drawer out from the edge of the screen in any app to read a note, jot one down, or edit it in place. Notes from the notepad’s old Notes tab are in the drawer’s Notes folder.</p>
       </div>
       <div class="stage reveal">
         <div class="film-frame">
@@ -344,7 +383,7 @@
         <li class="reveal"><strong>Out from any app</strong><span>Press <kbd>⇧⌘D</kbd> (<kbd>Ctrl+Shift+D</kbd> on Windows) or click the cat-paw handle at the edge. Clicking another app doesn’t close it.</span></li>
         <li class="reveal"><strong>Folders are bookmarks</strong><span>Each bookmark beside the drawer is a folder. Notes are grouped into Pinned, Today, Yesterday, Last week and then by month, and a link or phone number shows as a small label on the card.</span></li>
         <li class="reveal"><strong>Right-click to sort</strong><span>A note, a bookmark and empty drawer space each have a menu. Move to a folder, duplicate and sort from there, or give a single note its own paper.</span></li>
-        <li class="reveal"><strong>Paper and backdrop</strong><span>There are eight papers. The backdrop is Solid by default, with Frosted, Strong and None to choose from. Frosted on Windows hasn’t been seen on a real PC yet.</span></li>
+        <li class="reveal"><strong>Paper and backdrop</strong><span>The fifteen papers are the same as the notepad’s. The backdrop is Solid by default, with Frosted, Clear and None to choose from. Frosted on Windows hasn’t been seen on a real PC yet.</span></li>
       </ul>
     </div>
   </section>
@@ -371,18 +410,34 @@
   <section id="papers" aria-labelledby="papers-title">
     <div class="wrap">
       <div class="head reveal">
-        <p class="eyebrow">Paper and fonts</p>
-        <h2 id="papers-title">Eight drawer papers</h2>
-        <p>Hanji, Sage, Blossom and Ink are new. Pick one from small drawer pictures in Desk → Notes drawer.</p>
+        <p class="eyebrow">Note font</p>
+        <h2 id="papers-title">Choose the note font and spacing</h2>
+        <p>Under Note font in Desk → Notes drawer, pick the font, code font, text size, line spacing and paragraph spacing. They apply to every note in the drawer and on its cards.</p>
       </div>
       <div class="stage reveal">
-        <div class="film-frame"><img src="../assets/papers-en.webp" width="1200" height="700" alt="The eight drawer papers and the note font settings (font, code font, text size, line spacing, paragraph spacing) in Desk → Notes drawer, and on the right the notes drawer on Hanji paper" loading="lazy" style="display:block;width:100%;height:auto"></div>
+        <div class="film-frame"><img src="../assets/papers-en.webp" width="1200" height="700" alt="The preview and the Note font settings (font, code font, text size, line spacing, paragraph spacing) in Desk → Notes drawer, and on the right the notes drawer on Kraft paper, where the Groceries note’s ‘1/3’ chip has a bar filling inside it" loading="lazy" style="display:block;width:100%;height:auto"></div>
       </div>
       <ul class="points">
-        <li class="reveal"><strong>Pick from pictures</strong><span>Each paper has a small drawer picture, so you see it before you pick. It looks the same whether the app is on day or night.</span></li>
-        <li class="reveal"><strong>Note font</strong><span>Set the note font, text size, line spacing and paragraph spacing. The notepad and notes drawer font settings now look the same.</span></li>
+        <li class="reveal"><strong>Same as the notepad</strong><span>The notepad and the notes drawer lay out their font settings the same way, so once you know one, you know the other.</span></li>
         <li class="reveal"><strong>Code font</strong><span>D2Coding can be the code font. A Korean letter is two Latin letters wide in it, so code lines keep their columns.</span></li>
         <li class="reveal"><strong>Looks the way you write</strong><span>Bold, headings, lists, checkboxes and code look that way as you type. Change them with the format (Aa) button on an open note or keys such as <kbd>⌘B</kbd>.</span></li>
+        <li class="reveal"><strong>Checklist chip</strong><span>On a note card, a bar inside the ‘2/4’ chip shows how much of the checklist is done.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="more" aria-labelledby="more-title">
+    <div class="wrap">
+      <div class="head reveal">
+        <p class="eyebrow">Also new</p>
+        <h2 id="more-title">What else changed</h2>
+        <p>Mac 1.48 and Windows 1.33 also touch slips, the Desk, the cat and the Claude connection.</p>
+      </div>
+      <ul class="points">
+        <li class="reveal"><strong>Drag slips around</strong><span>Drag question slips and the Quick add and Quick note slips by their paper or title bar. Quick slips remember where you put them.</span></li>
+        <li class="reveal"><strong>The Desk list in four groups</strong><span>View, Settings, Notes &amp; data and Help. Clock is now Alarms &amp; timers in the Settings group, and <kbd>⌘1</kbd>–<kbd>9</kbd> (<kbd>Ctrl+1</kbd>–<kbd>9</kbd> on Windows) follow the new order.</span></li>
+        <li class="reveal"><strong>A cat that taps along</strong><span>Type in a Jongi-nyang window and the cat taps with its paws. It never reads or keeps which keys you pressed. The <a href="privacy.html#typing">privacy page</a> has the details.</span></li>
+        <li class="reveal"><strong>Claude skips hidden spaces</strong><span>To-dos in spaces hidden on this device stay out of Today and the lists in Jongi-nyang for&nbsp;Claude too. Name the space and Claude shows them.</span></li>
       </ul>
     </div>
   </section>
@@ -413,8 +468,8 @@
       <div class="stats reveal">
         <div class="stat"><b>136 rows</b><span>of input-line cases both apps pass character for character</span></div>
         <div class="stat"><b>582 + 420</b><span>Windows tests, plus about 420 Mac checks (Windows 1.30, Mac 1.45)</span></div>
-        <div class="stat"><b>61% → 0.7%</b><span>Mac idle CPU with the notepad open</span></div>
-        <div class="stat"><b>WCAG AA</b><span>for the app's text colours, day and night (except deliberately faint hints). Anything below it fails the check</span></div>
+        <div class="stat"><b>61% → 0.7%</b><span>Mac idle CPU with the notepad&nbsp;open</span></div>
+        <div class="stat"><b>WCAG AA</b><span>for the app's text colors, day and night (except deliberately faint hints). Anything below it fails the check</span></div>
       </div>
       <ul class="points">
         <li class="reveal"><strong>Case tables come first</strong><span>How ‘meeting tomorrow 3pm’ is read, down to the words on the chip, is one row. The Swift and TypeScript tests must both produce that exact string.</span></li>
@@ -439,10 +494,10 @@
       </div>
       <div class="faq reveal">
         <details><summary>Is it really free?</summary><p>Yes. No payments and no locked features. The source code is on GitHub under the Apache License 2.0.</p></details>
-        <details><summary>Do I need an account? Where are my notes kept?</summary><p>No account and no server. Everything is saved as files in the app's folder on your computer, or in a folder you choose. The <a href="privacy.html">privacy page</a> has the details. Change it under Desk → Storage &amp; backup.</p></details>
-        <details><summary>Can I use it on a Mac and a Windows PC together?</summary><p>Yes. Choose a folder both computers can see (iCloud Drive, OneDrive, Dropbox and so on) as the storage location.</p></details>
+        <details><summary>Do I need an account? Where are my notes kept?</summary><p>No account and no server. Everything is saved as files in Jongi-nyang’s folder on your computer, or in a folder you choose. The <a href="privacy.html">privacy page</a> has the details. Change it under Desk → Storage &amp; backup.</p></details>
+        <details><summary>Can I use it on a Mac and a Windows PC together?</summary><p>Yes. Choose the same shared folder (iCloud Drive, OneDrive, Dropbox and so on) as the storage location on both. Each device can also decide which spaces it shows.</p></details>
         <details><summary>Does it connect to Google Calendar?</summary><p>No. I built it over five releases and it worked, but I took it out. I didn't want work plans mixing into my personal space, and the people testing it said the same. The full reasoning is in the <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/decisions.md">decision log</a> (Korean).</p></details>
-        <details><summary>Why is it blocked the first time I open it?</summary><p>The builds aren't code-signed. On the Mac, right-click the app in Applications and choose Open. On Windows, choose More info → Run anyway in SmartScreen.</p></details>
+        <details><summary>Why is it blocked the first time I open it?</summary><p>The builds aren't code-signed. On the Mac, right-click the app in Applications and choose Open; if it’s still blocked, click Open Anyway in System Settings → Privacy &amp; Security. On Windows, choose More info → Run anyway in SmartScreen.</p></details>
         <details><summary>Which languages and systems?</summary><p>Korean, English and Dutch. It runs on macOS 14 or later on Apple Silicon, and on Windows 10/11 x64. The Windows version has only been checked in Electron on macOS, not yet on a real Windows PC.</p></details>
       </div>
     </div>
@@ -457,30 +512,30 @@
       <div class="downloads">
         <div class="dl reveal">
           <h3>Mac</h3>
-          <p class="meta">1.47.0 · macOS 14 or later · Apple Silicon · DMG</p>
+          <p class="meta">1.48.0 · macOS 14 or later · Apple Silicon&nbsp;·&nbsp;DMG</p>
           <ol>
             <li>Open the DMG and drag <strong>Jongi-nyang</strong> into Applications.</li>
             <li>In Applications, <strong>right-click → Open</strong>. If it's blocked: System Settings → Privacy &amp; Security → <strong>Open Anyway</strong>.</li>
           </ol>
-          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.47.0/JongiNyang-1.47.0.dmg">Download for Mac</a>
-          <p class="files"><a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.47.0/jongi-nyang.mcpb">Claude Desktop extension</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.47.0/SHA256SUMS-1.47.0.txt">Checksums</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.47.0">Release notes</a></p>
+          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.48.0/JongiNyang-1.48.0.dmg">Download for Mac</a>
+          <p class="files"><a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.48.0/jongi-nyang.mcpb">Claude Desktop extension</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.48.0/SHA256SUMS-1.48.0.txt">Checksums</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.48.0">Release notes</a></p>
         </div>
         <div class="dl reveal">
           <h3>Windows</h3>
-          <p class="meta">1.32.0 · Windows 10/11 x64 · installer or portable zip</p>
+          <p class="meta">1.33.0 · Windows 10/11 x64 · installer or portable zip</p>
           <ol>
-            <li>Run <code>JongiNyang-1.32.0-x64.exe</code>.</li>
+            <li>Run <code>JongiNyang-1.33.0-x64.exe</code>.</li>
             <li>If SmartScreen appears: <strong>More info → Run anyway</strong>.</li>
           </ol>
-          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.32.0/JongiNyang-1.32.0-x64.exe">Download for Windows</a>
-          <p class="files"><a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.32.0/JongiNyang-1.32.0-x64.zip">Portable zip</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.32.0/jongi-nyang.mcpb">Claude Desktop extension</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.32.0/SHA256SUMS.txt">Checksums</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.32.0">Release notes</a></p>
+          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.33.0/JongiNyang-1.33.0-x64.exe">Download for Windows</a>
+          <p class="files"><a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.33.0/JongiNyang-1.33.0-x64.zip">Portable zip</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.33.0/jongi-nyang.mcpb">Claude Desktop extension</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.33.0/SHA256SUMS.txt">Checksums</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.33.0">Release notes</a></p>
         </div>
         <div class="dl check reveal" id="check">
           <h3>Check what you downloaded</h3>
           <p>Each release lists the SHA-256 value of every file, in the checksums file (SHA256SUMS) and in the release notes. If your file gives the same value, it’s the one we uploaded. If it differs, don’t open it; delete it.</p>
           <ul>
-            <li>Mac Terminal: <code>shasum -a 256 ~/Downloads/JongiNyang-1.47.0.dmg</code></li>
-            <li>Windows PowerShell: <code>Get-FileHash "$HOME\Downloads\JongiNyang-1.32.0-x64.exe" -Algorithm SHA256</code></li>
+            <li>Mac Terminal: <code>shasum -a 256 ~/Downloads/JongiNyang-1.48.0.dmg</code></li>
+            <li>Windows PowerShell: <code>Get-FileHash "$HOME\Downloads\JongiNyang-1.33.0-x64.exe" -Algorithm SHA256</code></li>
           </ul>
         </div>
       </div>
@@ -500,6 +555,8 @@
         <ul>
           <li><a href="#tour">Tour</a></li>
           <li><a href="#features">Features</a></li>
+          <li><a href="#widget">Calendar widgets</a></li>
+          <li><a href="#themes">Fifteen papers</a></li>
           <li><a href="#spaces">Spaces</a></li>
           <li><a href="#group">Group by space</a></li>
           <li><a href="#backup">Automatic backups</a></li>
@@ -527,7 +584,7 @@
     </div>
     <div class="legal">
       <span>© 2026 leeAhwi · Source code under the <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/LICENSE">Apache License 2.0</a> · <a href="privacy.html">Privacy</a></span>
-      <span>Mac 1.47.0 · Windows 1.32.0</span>
+      <span>Mac 1.48.0 · Windows 1.33.0</span>
     </div>
   </div>
 </footer>

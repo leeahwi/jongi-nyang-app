@@ -11,11 +11,13 @@ import { aheadCount, aheadEyebrow, aheadLens, aheadSectionTitle, aheadSections, 
 import { compactTime, rowLabel, scheduledTime } from "../core/timeText";
 import { bodyFontSize, type TodosState, type IntentPage, type IntentToast, type NoteNotice } from "../core/types";
 import { noteScales } from "../core/textSteps";
-import { expand } from "../core/events";
+import { eventMark, expand } from "../core/events";
 import { dayRibbon, todayGroups as splitToday } from "../core/ribbon";
 import { DayStripView } from "./dayStrip";
 import { markWord } from "../core/dayStrip";
 import { h, holdMs, icon, lang, motion, paper, reduceMotion, scrollFade, t } from "./api";
+import { listenForTyping } from "./typingTap";
+import { holdWhileAsked } from "./askGuard";
 import { paperCalendar } from "./calendar";
 import { openEventSheet, type EventSheet } from "./eventSheet";
 import type { CalendarSheetRequest } from "../core/calendar";
@@ -42,6 +44,9 @@ import { closeMenus, menuOpen, openMenu, type MenuEntry, type MenuHost } from ".
 import { badgeWords, extendSelection, oneSelected, rangeSelection, toggleSelection, type ListSelection } from "../core/selection";
 import { addToWords, boardFits, doneWords, dropHereWords, groupItems, groupOpen, groupSpace, leftWords, neighborGroup, nextWords, spaceGroups, type SpaceGroup } from "../core/spaceGroups";
 import { snoozeTitle } from "../core/snooze";
+
+// #229: a question waiting holds this page up (askGuard.ts).
+holdWhileAsked();
 
 /** 오늘 · 앞으로 (1.28: the memo tab became the 메모 서랍). */
 type Page = Exclude<NoteTab, "memos">;
@@ -684,6 +689,37 @@ function reconcile(container: Element, children: readonly Element[]): void {
   while (container.children.length > children.length) container.lastElementChild!.remove();
 }
 
+/**
+ * #65: a long 오늘 (200 rows or more) goes in blocks of rows, and each block — not each row — skips style, layout and
+ * paint while it is out of view (`content-visibility`). The page checks every such element on every frame of an
+ * animation (a check's pop and strike: 2,000 rows made each frame several times dearer); 2,000 rows are about 30
+ * blocks. A block keeps its rows while it can (it is known by its first row), so a check, a new row or a drag moves
+ * one row, not every row after it.
+ */
+const blockFrom = 200;
+const blockMost = 64;
+let blockByHead = new Map<Element, HTMLElement>();
+function inBlocks(rows: readonly HTMLElement[]): HTMLElement[] {
+  if (rows.length < blockFrom) { blockByHead = new Map(); return [...rows]; }
+  // A new block where one starts now (when the one before is not too small), or when the one before is full.
+  const parts: HTMLElement[][] = [];
+  for (const row of rows) {
+    const last = parts.at(-1);
+    if (!last || (blockByHead.has(row) && last.length >= blockMost / 4) || last.length >= blockMost) parts.push([row]);
+    else last.push(row);
+  }
+  const next = new Map<Element, HTMLElement>();
+  const blocks = parts.map((part) => {
+    const block = blockByHead.get(part[0]) ?? h("div", { class: "row-block", role: "none" });
+    reconcile(block, part);
+    block.style.setProperty("--rows", String(part.length));
+    next.set(part[0], block);
+    return block;
+  });
+  blockByHead = next;
+  return blocks;
+}
+
 // One lasting heading per group (new nodes would shift the rows after them).
 const nextHead = h("div", { class: "group-head", role: "heading", "aria-level": "3" }, h("span", { class: "group-name" }, t("다음")), h("span", { class: "group-count" }));
 const restHead = h("div", { class: "group-mark", role: "heading", "aria-level": "3" }, h("span", { class: "group-name" }, t("그 밖에")), h("span", { class: "group-count" }));
@@ -747,7 +783,7 @@ function renderToday(): void {
   // #196 (D9): everything hidden here — the end line says so, not the empty sheet's cat.
   const device = deviceLines(todayAll());
   reconcile(lines, [
-    ...(grouped ? [nextHead] : []), ...nextRows, ...(grouped ? [restHead] : []), ...restRows,
+    ...(grouped ? [nextHead] : []), ...nextRows, ...(grouped ? [restHead] : []), ...inBlocks(restRows),
     ...(allFinished ? [allDone] : []), ...(today.length === 0 && !device.length ? [emptyToday] : []), ...(more ? [lensMore] : []), ...device, ...(grouped ? [linesFill] : []),
   ]);
   reconcile(sheet, [...(shown ? [strip.element] : []), lines]);
@@ -1079,7 +1115,7 @@ function eventLine(day: string, event: { key: string; title: string; color: stri
   const kept = eventLines.get(id);
   if (kept) return kept;
   const bar = h("i", { class: "evc", "aria-hidden": "true" });
-  bar.style.background = event.color;
+  bar.style.background = eventMark(event.color);
   const line = h("button", { class: `aev${event.allDay ? " all-day" : ""}`, "data-key": event.key, title: `${event.time} · ${event.title}`, "aria-label": `${event.time} ${event.title}` },
     bar, h("span", { class: "aev-time" }, event.time), h("span", { class: "aev-title" }, event.title));
   line.addEventListener("click", () => api.act({ type: "calendarEditEvent", key: event.key }));
@@ -2346,7 +2382,9 @@ function openGuide(): void {
     art.src = `../../assets/pet/256/${current.pose}.png`;
     heading.textContent = current.title;
     text.textContent = current.body;
-    keys.replaceChildren(...current.keys.map(([label, key]) => h("div", { class: "guide-key" }, h("span", {}, label), h("kbd", {}, key))));
+    // ‘네모 칸 누르기’ is not a key (#240, 점검 3의 25): what to click, beside a small box — no keycap.
+    keys.replaceChildren(...current.keys.map(([label, key]) => h("div", { class: "guide-key" }, h("span", {}, label),
+      key === t("네모 칸 누르기") ? h("span", { class: "guide-act" }, h("span", { class: "guide-box", "aria-hidden": "true" }), key) : h("kbd", {}, key))));
     loginRow.hidden = !current.login;
     if (current.login && loginChoice === undefined) loginChoice = state.prefs.guideSeen ? state.prefs.openAtLogin : true;
     loginSwitch.setAttribute("aria-checked", String(Boolean(loginChoice)));
@@ -2755,3 +2793,6 @@ void api.getState().then((initial) => {
   line.refresh();
   if (page === "today" && todayItems().length === 0) focusNew();
 });
+
+// #230: keys typed here make the desktop cat tap along (only that a key went down).
+listenForTyping();

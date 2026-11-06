@@ -10,6 +10,8 @@ import SwiftUI
 @MainActor
 final class QuickEntryController {
     private let model: AppModel
+    /// #246: where it was dragged, per display (the app's own preferences; an isolated test copy's own).
+    private var places: SlipPlaces { SlipPlaces(key: "quickEntry.places", preferences: model.preferences) }
     private var panel: SlipPanel?
     private var hotKey: GlobalHotKey?
     /// Whether ⌃⌥N could be claimed (another app may own it).
@@ -38,11 +40,8 @@ final class QuickEntryController {
     func show() {
         let panel = panel ?? makePanel()
         panel.show(QuickEntryView(model: model, onClose: { [weak self] in self?.close() }, noteVisible: { [weak self] in self?.noteVisible() ?? false }))
-        let mouse = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main
-        if let area = screen?.visibleFrame {
-            panel.placeSlip(topCenter: NSPoint(x: area.midX, y: area.maxY - area.height / 5))
-        }
+        // #246: where it was dragged to on this display, else the usual spot.
+        places.place(panel)
         panel.makeKeyAndOrderFront(nil)
     }
 
@@ -56,12 +55,17 @@ final class QuickEntryController {
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.onResignKey = { [weak self] in self?.close() }
+        // #246: its paper and title row drag it (not its field, chips or buttons); the place is kept per display.
+        panel.movesByPaper = true
+        panel.onMoved = { [weak self, weak panel] in if let panel { self?.places.keep(panel) } }
+        panel.onDoubleClick = { [weak self, weak panel] in if let panel { self?.places.reset(panel) } }
         self.panel = panel
         return panel
     }
 }
 
-/// 빠른 입력: header, the chips over a handwritten line, `tab 다른 뜻 · esc 닫기` and 넣기 ↩.
+/// 빠른 입력: header, the chips over a handwritten line, `tab 다른 뜻 · esc 닫기` and the button for the picked chip
+/// (일정 넣기 ↩, 타이머 시작 ↩ …).
 struct QuickEntryView: View {
     @ObservedObject var model: AppModel
     var onClose: () -> Void = {}
@@ -144,7 +148,8 @@ struct QuickEntryView: View {
                         KeyHint(key: "Esc", label: L("닫기"))
                     }
                 } trailing: {
-                    Button(L("넣기")) { submit(literal: false, asEvent: false) }
+                    // #240 (D3 B): the button says what Return makes, and follows the picked chip (Tab).
+                    Button(Intent.actionText(candidates.isEmpty ? nil : candidates[index], language: .current)) { submit(literal: false, asEvent: false) }
                         .buttonStyle(SlipButtonStyle(role: .primary, key: "↩"))
                         .disabled(candidates.isEmpty)
                 }

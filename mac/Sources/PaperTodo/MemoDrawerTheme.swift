@@ -2,12 +2,19 @@ import AppKit
 import PaperCore
 import SwiftUI
 
-/// 메모 서랍's papers (design F, docs/design/memo-drawer-themes.png): 낮 종이, 밤 종이, 크라프트지, 모눈 노트, and since #142
-/// 한지, 쑥색 종이, 벚꽃 종이, 먹색 종이 (docs/plans/settings-plan.md P4; the same colours as the Windows app's drawer.css).
-/// Each is a fixed set of colours (the drawer follows the app's day and night only through 밤에는 밤 종이로).
+/// 메모 서랍's papers (design F, docs/design/memo-drawer-themes.png): 낮 종이, 밤 종이, 크라프트지, 모눈 노트, since #142
+/// 한지, 쑥색 종이, 벚꽃 종이, 먹색 종이 (docs/plans/settings-plan.md P4), and since #244 the seven new papers of the note
+/// (docs/plans/paper-themes.md: tokens.json's `drawer`; the same colours as the Windows app's drawer.css). Each is a fixed
+/// set of colours: the drawer follows the note's paper (노트와 같은 종이), or its own with its own 밤에는.
 /// `scripts/check-contrast.py` reads the `pair(` lines below and checks them against WCAG AA.
 struct DrawerPalette: Equatable {
-    enum Kind: String, CaseIterable { case day, night, kraft, grid, hanji, sage, blossom, ink }
+    enum Kind: String, CaseIterable {
+        case day, night, kraft, grid, hanji, sage, blossom, ink
+        case memo, manuscript, lined, lavender, recycled, nightsky, chalk
+
+        init(_ paper: PaperKind) { self.init(rawValue: paper.rawValue)! }
+        var paper: PaperKind { PaperKind(rawValue: rawValue)! }
+    }
     /// The drawer's paper: plain (#111: no ruled lines, as the memo sheets since 1.45), or 모눈's squares.
     enum Background { case plain, grid }
 
@@ -72,14 +79,17 @@ struct DrawerPalette: Equatable {
     static func == (a: DrawerPalette, b: DrawerPalette) -> Bool { a.kind == b.kind }
 
     /// The sheet's foot (a 1 pt lip under it). Sheet D (#14): no rules and no margin line any more.
-    var sheetBottom: Color { Color(drawerHex: ["day": "#e0d7c4", "night": "#1d1c19", "kraft": "#c9b08a", "grid": "#d8e0e8", "hanji": "#e3dbc9", "sage": "#cad4bf", "blossom": "#e5ccc7", "ink": "#141926"][kind.rawValue]!) }
+    var sheetBottom: Color { Color(drawerHex: ["day": "#e0d7c4", "night": "#1d1c19", "kraft": "#c9b08a", "grid": "#d8e0e8", "hanji": "#e3dbc9", "sage": "#cad4bf", "blossom": "#e5ccc7", "ink": "#141926",
+                                                "memo": "#e7d57c", "manuscript": "#e2dac9", "lined": "#c9dbec", "lavender": "#d6cdea", "recycled": "#cfcec7", "nightsky": "#110f20", "chalk": "#141d19"][kind.rawValue]!) }
     /// A sheet's 1 pt edge (1.44).
     var sheetEdge: Color { slipEdge }
     /// An open or picked sheet (#14): its shadow a little deeper instead of a box round it.
     var deepShadow: Color {
         switch kind {
-        case .day, .kraft, .hanji: Color(red: 60 / 255, green: 50 / 255, blue: 30 / 255).opacity(0.24)
-        case .night, .ink: Color.black.opacity(0.62)
+        case .day, .kraft, .hanji, .manuscript, .memo, .recycled: Color(red: 60 / 255, green: 50 / 255, blue: 30 / 255).opacity(0.24)
+        case .night, .ink, .nightsky, .chalk: Color.black.opacity(0.62)
+        case .lined: Color(red: 30 / 255, green: 50 / 255, blue: 80 / 255).opacity(0.24)
+        case .lavender: Color(red: 45 / 255, green: 35 / 255, blue: 70 / 255).opacity(0.24)
         case .grid: Color(red: 30 / 255, green: 50 / 255, blue: 80 / 255).opacity(0.24)
         case .sage: Color(red: 40 / 255, green: 55 / 255, blue: 30 / 255).opacity(0.24)
         case .blossom: Color(red: 70 / 255, green: 40 / 255, blue: 40 / 255).opacity(0.24)
@@ -91,9 +101,9 @@ struct DrawerPalette: Equatable {
 
     var innerEar: Color {
         switch kind {
-        case .day, .hanji, .sage: Color(drawerHex: "#f2c9c6").opacity(0.8)
+        case .day, .hanji, .sage, .memo, .manuscript, .lined, .lavender, .recycled: Color(drawerHex: "#f2c9c6").opacity(0.8)
         case .blossom: Color(drawerHex: "#e8a3aa").opacity(0.7)
-        case .night, .ink: Color(drawerHex: "#7d555a")
+        case .night, .ink, .nightsky, .chalk: Color(drawerHex: "#7d555a")
         case .kraft: Color(drawerHex: "#e3a08e").opacity(0.7)
         case .grid: Color(drawerHex: "#f6d6d2")
         }
@@ -112,8 +122,14 @@ struct DrawerPalette: Equatable {
     }
 
     func tab(_ color: MemoFolders.Color) -> TabColors {
-        let row = Self.folderColors[kind]![color]!
+        let row = Self.folders(kind)[color]!
         return TabColors(a: Color(drawerHex: row.0), b: Color(drawerHex: row.1), ink: Color(drawerHex: row.2), edge: Color(drawerHex: row.3), tape: Color(drawerHex: row.4))
+    }
+
+    /// The folder colours on a paper: its own table, or (the seven papers of #244) 한지's on a light paper and 먹색 종이's on a
+    /// dark one — as #142 made 한지 · 먹색's from 낮 · 밤 종이's.
+    static func folders(_ kind: Kind) -> [MemoFolders.Color: (String, String, String, String, String)] {
+        folderColors[kind] ?? folderColors[kind.paper.isDark ? .ink : .hanji]!
     }
 
     /// (fill, old second stripe, ink on it, edge, tape) per paper and colour key.
@@ -205,7 +221,8 @@ struct DrawerPalette: Equatable {
     // MARK: The open memo's line (1.44)
 
     /// The sheet's colour as written, for working out contrast.
-    static let sheetHex: [Kind: String] = [.day: "#fffdf7", .night: "#3d3a34", .kraft: "#fbf6ea", .grid: "#ffffff", .hanji: "#fffcf5", .sage: "#fbfdf7", .blossom: "#fffaf8", .ink: "#283146"]
+    static let sheetHex: [Kind: String] = [.day: "#fffdf7", .night: "#3d3a34", .kraft: "#fbf6ea", .grid: "#ffffff", .hanji: "#fffcf5", .sage: "#fbfdf7", .blossom: "#fffaf8", .ink: "#283146",
+                                           .memo: "#fffadc", .manuscript: "#fffefb", .lined: "#f8fbff", .lavender: "#fcfbff", .recycled: "#f8f8f5", .nightsky: "#27233f", .chalk: "#293832"]
 
     /// The open / picked memo's margin line (3 pt) and outline: the folder's edge colour on this paper, scaled toward
     /// black (toward white on a dark sheet) in 5 % steps until it stands 3:1 against the memo's sheet — the same rule as
@@ -213,7 +230,7 @@ struct DrawerPalette: Equatable {
     @MainActor static func openLine(_ folder: MemoFolders.Color, drawer: DrawerPalette, sheet: DrawerPalette) -> Color {
         let key = "\(folder.rawValue)-\(drawer.kind.rawValue)-\(sheet.kind.rawValue)"
         if let known = openLines[key] { return known }
-        let made = Color(drawerHex: openLineHex(folderColors[drawer.kind]![folder]!.3, on: sheetHex[sheet.kind]!) ?? "")
+        let made = Color(drawerHex: openLineHex(folders(drawer.kind)[folder]!.3, on: sheetHex[sheet.kind]!) ?? "")
         openLines[key] = made
         return made
     }
@@ -344,6 +361,84 @@ struct DrawerPalette: Equatable {
         pinTab: Color(drawerHex: "#c4a245"), pinTabEdge: Color(drawerHex: "#d6b65a"), pinTabInk: pair("#1f1d18"), pinTape: Color(drawerHex: "#6a603c"), pickedTab: nil,
         openLine: pair("#9d95d6"), danger: pair("#eaa58a"), shadow: Color.black.opacity(0.45), groupHeader: pair("#cdd4e2"), closeBar: pair("#757c8c"), scheme: .dark)
 
+    /// 노란 메모지 (#244): a light paper (the folder colours from 한지's), the colours of tokens.json's `drawer`.
+    static let memo = DrawerPalette(
+        kind: .memo, paper: pair("#eedc84"), edge: pair("#ccbc70"), rule: .clear,
+        background: .plain, texture: 0,
+        ink: pair("#2f2914"), title: pair("#2f2914"), label: pair("#4c644a"), secondary: pair("#5c522c"), preview: pair("#544f38"), faint: pair("#605630"),
+        icon: pair("#5c522c"), slip: pair("#fffadc"), slipEdge: pair("#d5d0b4"), slipRadius: 10, sheet: pair("#fffadc"), placeholder: pair("#605630"),
+        dogEar: pair("#f3e597"), check: pair("#577456"), checkOn: pair("#fffadc"), box: pair("#857844"), track: pair("#f3e597"), paw: pair("#c4797e"),
+        selection: pair("#b5a662"), toast: pair("#2f2914"), toastText: pair("#fcf0b0"),
+        pinTab: Color(drawerHex: "#f6dc7c"), pinTabEdge: Color(drawerHex: "#dcc062"), pinTabInk: pair("#6b5520"), pinTape: Color(drawerHex: "#efdc90"), pickedTab: nil,
+        openLine: pair("#577456"), danger: pair("#a4472f"), shadow: Color(red: 70 / 255, green: 60 / 255, blue: 20 / 255).opacity(0.12), groupHeader: pair("#5c522c"), closeBar: pair("#847845"), scheme: .light)
+
+    /// 원고지 (#244): a light paper (the folder colours from 한지's), the colours of tokens.json's `drawer`.
+    static let manuscript = DrawerPalette(
+        kind: .manuscript, paper: pair("#e8e0cf"), edge: pair("#c6bfb1"), rule: .clear,
+        background: .plain, texture: 0.12,
+        ink: pair("#2d2a26"), title: pair("#2d2a26"), label: pair("#50694e"), secondary: pair("#605a51"), preview: pair("#5b5955"), faint: pair("#686258"),
+        icon: pair("#605a51"), slip: pair("#fffefb"), slipEdge: pair("#d5d4d0"), slipRadius: 10, sheet: pair("#fffefb"), placeholder: pair("#686258"),
+        dogEar: pair("#f3eee3"), check: pair("#5c7a5a"), checkOn: pair("#fffefb"), box: pair("#8f877a"), track: pair("#f3eee3"), paw: pair("#c4797e"),
+        selection: pair("#b0a99c"), toast: pair("#2d2a26"), toastText: pair("#fcfaf5"),
+        pinTab: Color(drawerHex: "#f6dc7c"), pinTabEdge: Color(drawerHex: "#dcc062"), pinTabInk: pair("#6b5520"), pinTape: Color(drawerHex: "#efdc90"), pickedTab: nil,
+        openLine: pair("#5c7a5a"), danger: pair("#a4472f"), shadow: Color(red: 60 / 255, green: 50 / 255, blue: 30 / 255).opacity(0.12), groupHeader: pair("#605a51"), closeBar: pair("#817c70"), scheme: .light)
+
+    /// 하늘색 줄노트 (#244): a light paper (the folder colours from 한지's), the colours of tokens.json's `drawer`.
+    static let lined = DrawerPalette(
+        kind: .lined, paper: pair("#d0e1f1"), edge: pair("#b0c0d0"), rule: .clear,
+        background: .plain, texture: 0,
+        ink: pair("#1d2a3a"), title: pair("#1d2a3a"), label: pair("#50694e"), secondary: pair("#435367"), preview: pair("#44505d"), faint: pair("#48586c"),
+        icon: pair("#435367"), slip: pair("#f8fbff"), slipEdge: pair("#ccd1d8"), slipRadius: 10, sheet: pair("#f8fbff"), placeholder: pair("#48586c"),
+        dogEar: pair("#dce8f4"), check: pair("#577456"), checkOn: pair("#f8fbff"), box: pair("#6e8094"), track: pair("#dce8f4"), paw: pair("#c4797e"),
+        selection: pair("#9aaaba"), toast: pair("#1d2a3a"), toastText: pair("#eaf3fb"),
+        pinTab: Color(drawerHex: "#f6dc7c"), pinTabEdge: Color(drawerHex: "#dcc062"), pinTabInk: pair("#6b5520"), pinTape: Color(drawerHex: "#efdc90"), pickedTab: nil,
+        openLine: pair("#577456"), danger: pair("#a4472f"), shadow: Color(red: 30 / 255, green: 50 / 255, blue: 80 / 255).opacity(0.12), groupHeader: pair("#435367"), closeBar: pair("#6a7a8d"), scheme: .light)
+
+    /// 라벤더 종이 (#244): a light paper (the folder colours from 한지's), the colours of tokens.json's `drawer`.
+    static let lavender = DrawerPalette(
+        kind: .lavender, paper: pair("#ddd4f0"), edge: pair("#bdb5cf"), rule: .clear,
+        background: .plain, texture: 0.18,
+        ink: pair("#2a2638"), title: pair("#2a2638"), label: pair("#4c644a"), secondary: pair("#565070"), preview: pair("#545160"), faint: pair("#5b5574"),
+        icon: pair("#565070"), slip: pair("#fcfbff"), slipEdge: pair("#d2d0d7"), slipRadius: 10, sheet: pair("#fcfbff"), placeholder: pair("#5b5574"),
+        dogEar: pair("#e7e1f4"), check: pair("#577456"), checkOn: pair("#fcfbff"), box: pair("#857e9c"), track: pair("#e7e1f4"), paw: pair("#c4797e"),
+        selection: pair("#a7a0b9"), toast: pair("#2a2638"), toastText: pair("#f2eefa"),
+        pinTab: Color(drawerHex: "#f6dc7c"), pinTabEdge: Color(drawerHex: "#dcc062"), pinTabInk: pair("#6b5520"), pinTape: Color(drawerHex: "#efdc90"), pickedTab: nil,
+        openLine: pair("#577456"), danger: pair("#a4472f"), shadow: Color(red: 45 / 255, green: 35 / 255, blue: 70 / 255).opacity(0.12), groupHeader: pair("#565070"), closeBar: pair("#7c7593"), scheme: .light)
+
+    /// 재생지 (#244): a light paper (the folder colours from 한지's), the colours of tokens.json's `drawer`.
+    static let recycled = DrawerPalette(
+        kind: .recycled, paper: pair("#d6d5ce"), edge: pair("#b6b6af"), rule: .clear,
+        background: .plain, texture: 0.3,
+        ink: pair("#262624"), title: pair("#262624"), label: pair("#485f46"), secondary: pair("#4f4e49"), preview: pair("#4c4c4a"), faint: pair("#55544e"),
+        icon: pair("#4f4e49"), slip: pair("#f8f8f5"), slipEdge: pair("#cececb"), slipRadius: 10, sheet: pair("#f8f8f5"), placeholder: pair("#55544e"),
+        dogEar: pair("#e2e1db"), check: pair("#536e51"), checkOn: pair("#f8f8f5"), box: pair("#7a7972"), track: pair("#e2e1db"), paw: pair("#c4797e"),
+        selection: pair("#a1a09b"), toast: pair("#262624"), toastText: pair("#ecebe6"),
+        pinTab: Color(drawerHex: "#f6dc7c"), pinTabEdge: Color(drawerHex: "#dcc062"), pinTabInk: pair("#6b5520"), pinTape: Color(drawerHex: "#efdc90"), pickedTab: nil,
+        openLine: pair("#536e51"), danger: pair("#a4472f"), shadow: Color(red: 40 / 255, green: 40 / 255, blue: 36 / 255).opacity(0.12), groupHeader: pair("#4f4e49"), closeBar: pair("#75746e"), scheme: .light)
+
+    /// 밤하늘 종이 (#244): a dark paper (the folder colours from 먹색 종이's), the colours of tokens.json's `drawer`.
+    static let nightsky = DrawerPalette(
+        kind: .nightsky, paper: pair("#17142a"), edge: pair("#3e3b4f"), rule: Color.white.opacity(0.04),
+        background: .plain, texture: 0,
+        ink: pair("#efedf9"), title: pair("#efedf9"), label: pair("#a3c49c"), secondary: pair("#cdc8e4"), preview: pair("#cfcddb"), faint: pair("#b0aacb"),
+        icon: pair("#cdc8e4"), slip: pair("#27233f"), slipEdge: pair("#4f4b64"), slipRadius: 10, sheet: pair("#27233f"), placeholder: pair("#b0aacb"),
+        dogEar: pair("#292542"), check: pair("#a3c49c"), checkOn: pair("#1f2a1e"), box: pair("#8f89b0"), track: pair("#292542"), paw: pair("#d39a9e"),
+        selection: pair("#585568"), toast: pair("#efedf9"), toastText: pair("#1f1c33"),
+        pinTab: Color(drawerHex: "#c4a245"), pinTabEdge: Color(drawerHex: "#d6b65a"), pinTabInk: pair("#1f1d18"), pinTape: Color(drawerHex: "#6a603c"), pickedTab: nil,
+        openLine: pair("#a3c49c"), danger: pair("#eaa58a"), shadow: Color.black.opacity(0.45), groupHeader: pair("#cdc8e4"), closeBar: pair("#8a84a3"), scheme: .dark)
+
+    /// 칠판 (#244): a dark paper (the folder colours from 먹색 종이's), the colours of tokens.json's `drawer`.
+    static let chalk = DrawerPalette(
+        kind: .chalk, paper: pair("#1b2722"), edge: pair("#414c46"), rule: Color.white.opacity(0.04),
+        background: .plain, texture: 0,
+        ink: pair("#eef3ea"), title: pair("#eef3ea"), label: pair("#a3c49c"), secondary: pair("#cad4c7"), preview: pair("#ced5cd"), faint: pair("#abb8a9"),
+        icon: pair("#cad4c7"), slip: pair("#293832"), slipEdge: pair("#505d57"), slipRadius: 10, sheet: pair("#293832"), placeholder: pair("#abb8a9"),
+        dogEar: pair("#2b3b35"), check: pair("#a3c49c"), checkOn: pair("#1f2a1e"), box: pair("#8b9b8c"), track: pair("#2b3b35"), paw: pair("#d39a9e"),
+        selection: pair("#5a645e"), toast: pair("#eef3ea"), toastText: pair("#23312b"),
+        pinTab: Color(drawerHex: "#c4a245"), pinTabEdge: Color(drawerHex: "#d6b65a"), pinTabInk: pair("#1f1d18"), pinTape: Color(drawerHex: "#6a603c"), pickedTab: nil,
+        openLine: pair("#a3c49c"), danger: pair("#eaa58a"), shadow: Color.black.opacity(0.45), groupHeader: pair("#cad4c7"), closeBar: pair("#879487"), scheme: .dark)
+
+
     static func of(_ kind: Kind) -> DrawerPalette {
         switch kind {
         case .day: day
@@ -354,6 +449,13 @@ struct DrawerPalette: Equatable {
         case .sage: sage
         case .blossom: blossom
         case .ink: ink
+        case .memo: memo
+        case .manuscript: manuscript
+        case .lined: lined
+        case .lavender: lavender
+        case .recycled: recycled
+        case .nightsky: nightsky
+        case .chalk: chalk
         }
     }
 

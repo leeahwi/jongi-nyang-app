@@ -1,0 +1,30 @@
+{
+  "about": "저장과 백업 칸 맨 위의 백업 한 줄 (#240, UI/UX 점검 3의 D2 C). 먼저 마지막 백업이 언제였는지, 문제가 있으면 그것부터 말하고, 아랫줄은 어떻게 남기는지예요. now와 newest는 서울 시각 [년, 월, 일, 시, 분]이고, newest가 null이면 아직 백업이 없어요. tone: ok(체크) · off(꺼짐) · warn(점토색). ko · en · nl은 [윗줄, 아랫줄]. Mac PaperCore Backup.status(scripts/test-backups.sh)와 Windows core/backup.ts backupStatus(test/backup.test.ts)가 이 파일을 읽어요.",
+  "now": [2026, 11, 6, 14, 0],
+  "cases": [
+    { "case": "B1 오늘 백업했어요", "auto": true, "failed": false, "missing": false, "newest": [2026, 11, 6, 9, 12], "tone": "ok",
+      "ko": ["오늘 09:12에 백업했어요", "하루 한 번, 덮어쓰기 전에도 저절로 남겨요."],
+      "en": ["Backed up today 9:12 AM", "Once a day, and before anything is overwritten."],
+      "nl": ["Back-up gemaakt vandaag 09:12", "Eén keer per dag, en voordat iets wordt overschreven."] },
+    { "case": "B2 어제", "auto": true, "failed": false, "missing": false, "newest": [2026, 11, 5, 21, 40], "tone": "ok",
+      "ko": ["어제 21:40에 백업했어요", "하루 한 번, 덮어쓰기 전에도 저절로 남겨요."],
+      "en": ["Backed up yesterday 9:40 PM", "Once a day, and before anything is overwritten."],
+      "nl": ["Back-up gemaakt gisteren 21:40", "Eén keer per dag, en voordat iets wordt overschreven."] },
+    { "case": "B3 아직 없어요", "auto": true, "failed": false, "missing": false, "newest": null, "tone": "ok",
+      "ko": ["아직 백업이 없어요", "하루 한 번, 덮어쓰기 전에도 저절로 남겨요."],
+      "en": ["No backups yet", "Once a day, and before anything is overwritten."],
+      "nl": ["Nog geen back-ups", "Eén keer per dag, en voordat iets wordt overschreven."] },
+    { "case": "B4 꺼져 있어도 덮어쓰기 전에는 남겨요", "auto": false, "failed": false, "missing": false, "newest": [2026, 11, 6, 9, 12], "tone": "off",
+      "ko": ["자동 백업이 꺼져 있어요", "덮어쓰기 전에는 그래도 백업해 둬요."],
+      "en": ["Automatic backups are off", "Anything about to be overwritten is still backed up first."],
+      "nl": ["Automatische back-ups staan uit", "Wat overschreven wordt, wordt eerst toch bewaard."] },
+    { "case": "B5 하지 못했으면 그것부터", "auto": true, "failed": true, "missing": false, "newest": [2026, 11, 6, 9, 12], "tone": "warn",
+      "ko": ["마지막 백업을 하지 못했어요", "백업 폴더를 확인해 주세요."],
+      "en": ["The last backup didn’t work", "Please check the backup folder."],
+      "nl": ["De laatste back-up is niet gelukt", "Controleer de back-upmap."] },
+    { "case": "B6 고른 폴더가 없으면 기본 폴더에", "auto": true, "failed": false, "missing": true, "newest": [2026, 10, 28, 8, 55], "tone": "warn",
+      "ko": ["10월 28일 08:55에 백업했어요", "고른 백업 폴더를 찾지 못해 기본 폴더에 백업해요."],
+      "en": ["Backed up Oct 28, 8:55 AM", "Couldn’t find the chosen backup folder, so backups go to the default one."],
+      "nl": ["Back-up gemaakt 28 okt 08:55", "De gekozen back-upmap is niet gevonden, dus back-ups gaan naar de standaardmap."] }
+  ]
+}

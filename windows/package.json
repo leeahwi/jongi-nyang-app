@@ -1,7 +1,7 @@
 {
   "name": "paper-todo-windows",
   "productName": "종이냥",
-  "version": "1.32.0",
+  "version": "1.33.0",
   "description": "종이 한 장처럼 작게 꺼내 쓰는 Windows 할 일 앱",
   "author": "leeAhwi",
   "main": "out/main.js",
@@ -17,7 +17,7 @@
     "mcp:test": "node mcp/build.mjs --tests && node --test out-test-mcp/",
     "pet-art": "electron tools/pet-art.cjs",
     "tray-icon": "electron tools/tray-icon.cjs",
-    "dist": "npm run typecheck && npm test && npm run mcp:test && node tools/build.mjs --production && electron-builder --win --x64 && node tools/checksums.mjs"
+    "dist": "npm run typecheck && npm test && npm run mcp:test && node tools/build.mjs --production && electron-builder --win --x64 && node tools/check-release.mjs && node tools/checksums.mjs"
   },
   "build": {
     "appId": "com.noa.PaperTodo",

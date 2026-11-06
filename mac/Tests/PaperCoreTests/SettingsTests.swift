@@ -76,10 +76,10 @@ private enum SettingsTests {
 
         for entry in file["drawerPapers"] as! [[String: Any]] {
             try test("\(entry["case"]!)") {
-                let picked = TextSteps.drawerPaper(theme: entry["theme"] as? String, nightPaper: entry["saved"] as? Bool)
+                let picked = PaperLook.drawerPaper(theme: entry["theme"] as? String, nightPaper: entry["saved"] as? Bool)
                 try equal([picked.paper, "\(picked.nightPaper)"], [entry["paper"] as! String, "\(entry["nightPaper"] as! Bool)"], "picked")
-                try equal(TextSteps.drawerThemeValue(paper: picked.paper, nightPaper: picked.nightPaper), entry["writes"] as! String, "written")
-                try equal([false, true].map { TextSteps.drawerShownPaper(paper: picked.paper, nightPaper: picked.nightPaper, night: $0) },
+                try equal(PaperLook.drawerThemeValue(paper: picked.paper, nightPaper: picked.nightPaper), entry["writes"] as! String, "written")
+                try equal([false, true].map { PaperLook.drawerShownPaper(paper: picked.paper, nightPaper: picked.nightPaper, night: $0) },
                           entry["shown"] as! [String], "shown by day, at night")
             }
         }

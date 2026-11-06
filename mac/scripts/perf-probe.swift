@@ -1,11 +1,11 @@
-// The performance check's helper (scripts/perf.sh). It only ever reads or drives the one process
-// whose pid it is given: CPU time, wakeups and memory from proc_pid_rusage, and keys or clicks
-// posted to that pid alone (never to the frontmost app or the whole session).
-// #208: it never brings the app forward and never presses anything through accessibility (no `front`, `press` or
-// `menu` any more): a press could put the cursor in a text field, and the system could show the input-source indicator.
-import AppKit
-import ApplicationServices
+// The performance check's helper (scripts/perf.sh and the other checks of a test copy). It only ever reads the one
+// process whose pid it is given: CPU time, wakeups and memory from proc_pid_rusage, and where its windows are.
+// #208: it never brings the app forward and never presses anything through accessibility.
+// #217: it sends nothing at all any more — no key, no click. The test copy takes its input from inside
+// (`--perf-drive`, Sources/PaperTodo/PerfDrive.swift), so no event goes through the system.
+import CoreGraphics
 import Darwin
+import Foundation
 
 func usage(_ pid: pid_t) -> rusage_info_v4 {
     var info = rusage_info_v4()
@@ -19,37 +19,16 @@ var timebase = mach_timebase_info_data_t()
 mach_timebase_info(&timebase)
 func seconds(_ ticks: UInt64) -> Double { Double(ticks) * Double(timebase.numer) / Double(timebase.denom) / 1e9 }
 
-func attr(_ e: AXUIElement, _ n: String) -> AnyObject? { var v: AnyObject?; AXUIElementCopyAttributeValue(e, n as CFString, &v); return v }
-func str(_ e: AXUIElement, _ n: String) -> String { (attr(e, n) as? String) ?? ((attr(e, n) as? NSNumber)?.stringValue ?? "") }
-func kids(_ e: AXUIElement) -> [AXUIElement] { (attr(e, "AXChildren") as? [AXUIElement]) ?? [] }
-func label(_ e: AXUIElement) -> String { [str(e, "AXTitle"), str(e, "AXDescription"), str(e, "AXValue"), str(e, "AXHelp")].filter { !$0.isEmpty }.joined(separator: " | ") }
-func frame(_ e: AXUIElement) -> CGRect {
-    var p = CGPoint.zero, s = CGSize.zero
-    if let v = attr(e, "AXPosition") { AXValueGetValue(v as! AXValue, .cgPoint, &p) }
-    if let v = attr(e, "AXSize") { AXValueGetValue(v as! AXValue, .cgSize, &s) }
-    return CGRect(origin: p, size: s)
-}
-func all(_ e: AXUIElement, _ o: inout [AXUIElement], _ d: Int = 0) { o.append(e); if d < 120 { kids(e).forEach { all($0, &o, d + 1) } } }
-
 let a = CommandLine.arguments
-guard a.count > 2, let pid = pid_t(a[2]) else { print("usage: perf-probe <command> <pid> …"); exit(2) }
-let app = AXUIElementCreateApplication(pid)
+guard a.count > 2, let pid = pid_t(a[2]) else { print("usage: perf-probe <sample|mem|windows|offscreen> <pid> …"); exit(2) }
 
-func post(_ event: CGEvent) { event.postToPid(pid) }
-func click(at point: CGPoint, right: Bool = false) {
+/// The pid's shown windows: number, layer, title and bounds as the window server has them.
+func shownWindows() -> [(number: Int, layer: Int, title: String, bounds: CGRect)] {
     let info = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]) ?? []
-    let window = info.first { w in
-        guard (w[kCGWindowOwnerPID as String] as? Int32) == pid, let b = w[kCGWindowBounds as String] as? [String: Double] else { return false }
-        return CGRect(x: b["X"]!, y: b["Y"]!, width: b["Width"]!, height: b["Height"]!).contains(point)
-    }?[kCGWindowNumber as String] as? Int64
-    for type in right ? [CGEventType.rightMouseDown, .rightMouseUp] : [CGEventType.leftMouseDown, .leftMouseUp] {
-        let event = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: right ? .right : .left)!
-        if let window {
-            event.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: window)
-            event.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: window)
-        }
-        event.setIntegerValueField(.mouseEventClickState, value: 1)
-        post(event); usleep(40_000)
+    return info.compactMap { w in
+        guard (w[kCGWindowOwnerPID as String] as? Int32) == pid, let raw = w[kCGWindowBounds as String] as? NSDictionary,
+              let bounds = CGRect(dictionaryRepresentation: raw as CFDictionary) else { return nil }
+        return (w[kCGWindowNumber as String] as? Int ?? 0, w[kCGWindowLayer as String] as? Int ?? 0, w[kCGWindowName as String] as? String ?? "-", bounds)
     }
 }
 
@@ -69,85 +48,17 @@ case "sample": // sample <pid> <seconds>: CPU %, wakeups per second, memory over
 case "mem": // mem <pid>
     let now = usage(pid)
     print(String(format: "footprint %.1f MB resident %.1f MB", Double(now.ri_phys_footprint) / 1_048_576, Double(now.ri_resident_size) / 1_048_576))
-case "key": // key <pid> <keycode> [cmd+shift+opt+ctrl]
-    var flags: CGEventFlags = []
-    if a.count > 4 {
-        for part in a[4].split(separator: "+") {
-            switch part { case "cmd": flags.insert(.maskCommand); case "opt": flags.insert(.maskAlternate)
-            case "ctrl": flags.insert(.maskControl); case "shift": flags.insert(.maskShift); default: break }
-        }
+case "windows": // windows <pid>: its shown windows (anywhere, off the screens too)
+    for w in shownWindows() {
+        print(w.number, w.layer, w.title, "x \(Int(w.bounds.minX)) y \(Int(w.bounds.minY)) w \(Int(w.bounds.width)) h \(Int(w.bounds.height))")
     }
-    for down in [true, false] {
-        let event = CGEvent(keyboardEventSource: nil, virtualKey: CGKeyCode(a[3])!, keyDown: down)!
-        event.flags = flags
-        post(event); usleep(30_000)
-    }
-case "type": // type <pid> <text> [ms between keys]
-    let gap = UInt32((a.count > 4 ? Double(a[4])! : 120) * 1000)
-    for scalar in a[3].unicodeScalars {
-        let chars = Array(String(scalar).utf16)
-        for down in [true, false] {
-            let event = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: down)!
-            event.keyboardSetUnicodeString(stringLength: chars.count, unicodeString: chars)
-            post(event)
-            usleep(down ? 8_000 : gap)
-        }
-    }
-case "click": // click <pid> <label> [role]: the element's centre, clicked
-    let windows = (attr(app, "AXWindows") as? [AXUIElement]) ?? []
-    var list: [AXUIElement] = []
-    for w in windows { all(w, &list) }
-    let exact = a[3].hasPrefix("=") ? String(a[3].dropFirst()) : nil
-    guard let hit = list.first(where: { el in
-        (exact.map { str(el, "AXTitle") == $0 || str(el, "AXDescription") == $0 } ?? label(el).contains(a[3]))
-            && (a.count < 5 || str(el, "AXRole") == a[4]) && frame(el).width > 0
-    }) else { print("NOT FOUND", a[3]); exit(1) }
-    let f = frame(hit)
-    click(at: CGPoint(x: f.midX, y: f.midY))
-case "drag": // drag <pid> <x> <y> <dx>: press, move by dx in steps, release (screen points, top-left origin)
-    let start = CGPoint(x: Double(a[3])!, y: Double(a[4])!), dx = Double(a[5])!
-    let info = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]) ?? []
-    let window = info.first { w in
-        guard (w[kCGWindowOwnerPID as String] as? Int32) == pid, let b = w[kCGWindowBounds as String] as? [String: Double] else { return false }
-        return CGRect(x: b["X"]!, y: b["Y"]!, width: b["Width"]!, height: b["Height"]!).contains(start)
-    }?[kCGWindowNumber as String] as? Int64
-    func send(_ type: CGEventType, _ point: CGPoint) {
-        let event = CGEvent(mouseEventSource: nil, mouseType: type, mouseCursorPosition: point, mouseButton: .left)!
-        if let window {
-            event.setIntegerValueField(.mouseEventWindowUnderMousePointer, value: window)
-            event.setIntegerValueField(.mouseEventWindowUnderMousePointerThatCanHandleThisEvent, value: window)
-        }
-        event.setIntegerValueField(.mouseEventClickState, value: 1)
-        post(event)
-    }
-    send(.leftMouseDown, start); usleep(120_000)
-    for step in 1...10 { send(.leftMouseDragged, CGPoint(x: start.x + dx * Double(step) / 10, y: start.y)); usleep(40_000) }
-    send(.leftMouseUp, CGPoint(x: start.x + dx, y: start.y))
-case "rightclick": // rightclick <pid> <label>: the element's centre, right-clicked (its context menu opens)
-    let windows = (attr(app, "AXWindows") as? [AXUIElement]) ?? []
-    var list: [AXUIElement] = []
-    for w in windows { all(w, &list) }
-    guard let hit = list.first(where: { label($0).contains(a[3]) && frame($0).width > 0 }) else { print("NOT FOUND", a[3]); exit(1) }
-    let f = frame(hit)
-    click(at: CGPoint(x: f.midX, y: f.midY), right: true)
-case "clickxy": // clickxy <pid> <x> <y> (screen points, top-left origin)
-    click(at: CGPoint(x: Double(a[3])!, y: Double(a[4])!))
-case "find": // find <pid> <label>: the element's frame
-    let windows = (attr(app, "AXWindows") as? [AXUIElement]) ?? []
-    var list: [AXUIElement] = []
-    for w in windows { all(w, &list) }
-    for el in list where label(el).contains(a[3]) { print(str(el, "AXRole"), label(el).prefix(60), frame(el)) }
-case "windows": // windows <pid>: on-screen windows
-    let info = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]) ?? []
-    for w in info where (w[kCGWindowOwnerPID as String] as? Int32) == pid {
-        print(w[kCGWindowNumber as String] ?? "", w[kCGWindowLayer as String] ?? "", w[kCGWindowName as String] ?? "-", w[kCGWindowBounds as String] ?? "")
-    }
-case "shot": // shot <pid> <out.png> [title contains]
-    let info = (CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]]) ?? []
-    let mine = info.filter { ($0[kCGWindowOwnerPID as String] as? Int32) == pid && ($0[kCGWindowLayer as String] as? Int) == 0
-        && (a.count < 5 || (($0[kCGWindowName as String] as? String) ?? "").contains(a[4])) }
-    guard let number = mine.first?[kCGWindowNumber as String] as? Int else { print("NO WINDOW"); exit(1) }
-    let task = Process(); task.launchPath = "/usr/sbin/screencapture"; task.arguments = ["-x", "-o", "-l", "\(number)", a[3]]
-    try! task.run(); task.waitUntilExit()
+case "offscreen": // offscreen <pid>: exit 1 (and the windows) when a shown window of it touches a display
+    var count: UInt32 = 0
+    var ids = [CGDirectDisplayID](repeating: 0, count: 32)
+    guard CGGetOnlineDisplayList(32, &ids, &count) == .success, count > 0 else { print("the displays could not be listed"); exit(1) }
+    let screens = ids.prefix(Int(count)).map { CGDisplayBounds($0) }
+    let on = shownWindows().filter { w in w.bounds.width > 1 && w.bounds.height > 1 && screens.contains { $0.intersects(w.bounds) } }
+    for w in on { print("on a screen:", w.title, "x \(Int(w.bounds.minX)) y \(Int(w.bounds.minY)) w \(Int(w.bounds.width)) h \(Int(w.bounds.height))") }
+    exit(on.isEmpty ? 0 : 1)
 default: print("?"); exit(2)
 }

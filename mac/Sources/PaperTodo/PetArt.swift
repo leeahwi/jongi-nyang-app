@@ -1,4 +1,5 @@
 import AppKit
+import PaperCore
 
 /// Optional hand-drawn poses for the desktop pet (see art/pet/PROMPTS.md). Any pose whose
 /// image isn't bundled falls back to the sitting cat with drawn-on details, so the pet works
@@ -8,6 +9,19 @@ enum PetArt {
     enum Pose: String, CaseIterable {
         case idle, blink, happy, sleep, yawn, stretch, cheer, curious, groom, tea
         case walk1 = "walk-1", walk2 = "walk-2", walk3 = "walk-3", walk4 = "walk-4"
+        /// 치면 두드리는 고양이 (#230): the cat on its cushion, its own three pictures (never the sitting cat's `idle`).
+        /// The three share one canvas and baseline, so they swap in the same frame with nothing trimmed or fitted.
+        case typingIdle = "typing-idle", typingLeft = "typing-left", typingRight = "typing-right"
+    }
+
+    /// The cushion cat's picture for a pose. Decoded once (384 px, enough for 128 pt on a Retina screen), then cached:
+    /// a key never decodes a picture.
+    static func typing(_ pose: TypingCat.Pose) -> NSImage? {
+        switch pose {
+        case .idle: image(.typingIdle)
+        case .left: image(.typingLeft)
+        case .right: image(.typingRight)
+        }
     }
 
     private static var cache: [Pose: NSImage] = [:]

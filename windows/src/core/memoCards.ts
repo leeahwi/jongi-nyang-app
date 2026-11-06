@@ -271,9 +271,10 @@ export function tapePlace(id: string): { left: number; turn: number } {
   return { left: 20 + (hash % 4501) / 100, turn: ((hash >>> 16) % 401) / 100 - 2 };
 }
 
-/** The footer: `회사 · 다섯 장` · `Work · 5 notes` · `Werk · 5 notities` (고정 likewise); none: the folder's empty words. */
+/** The footer: `회사 · 5장` · `Work · 5 notes` · `Werk · 5 notities` (고정 likewise); none: the folder's empty words. */
 export function footerWords(name: string, count: number, lang: Lang = "ko"): string {
-  return `${name} · ${sheetCount(count, lang)}`;
+  // In digits like the counts on the groups above it (‘어제 2’) — #240, it was "다섯 장".
+  return `${name} · ${lang === "ko" ? `${count}장` : sheetCount(count, lang)}`;
 }
 
 /** A bookmark's small label: `장보기 · 세 장 · Ctrl+3` (no key past the ninth; an empty one says so). */

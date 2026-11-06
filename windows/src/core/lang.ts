@@ -28,8 +28,50 @@ export function resolveLang(setting: string | undefined, preferred: readonly str
 /** The language's own name, for the setting: "한국어", "English", "Nederlands". */
 export const nativeName: Record<Lang, string> = { ko: "한국어", en: "English", nl: "Nederlands" };
 
-/** Korean and English weeks start on Sunday, Dutch weeks on Monday (the month grid, the week view). */
-export const weekStartsMonday = (lang: Lang): boolean => lang === "nl";
+/**
+ * The system's first day of the week ("monday", "sunday", "saturday" …), set by the main process at launch from the
+ * system (main.ts `systemWeekStart`) and handed to each window by the preload (`paper.weekStart`). Unset: each language's
+ * own, which the shared test cases are written in (tests that check another set it, and set it back). Same as
+ * AppLanguage.weekStart (calendar-flows D4).
+ */
+let weekStartSetting: string | undefined = weekStartFromPreload();
+
+function weekStartFromPreload(): string | undefined {
+  const value = (globalThis as { paper?: { weekStart?: unknown } }).paper?.weekStart;
+  return typeof value === "string" && value ? value : undefined;
+}
+
+export function setWeekStart(day: string | undefined): void {
+  weekStartSetting = day;
+}
+
+/** The system's first day as set (undefined: each language's own). */
+export const weekStartSet = (): string | undefined => weekStartSetting;
+
+/**
+ * Monday first when the system says Monday, Sunday first when it says Sunday, else the language's own — Korean and
+ * English on Sunday, Dutch on Monday (a Saturday start isn't followed: the month's weekend would split).
+ */
+export function weekStartFrom(system: string | null | undefined, lang: Lang): boolean {
+  if (system === "monday") return true;
+  if (system === "sunday") return false;
+  return lang === "nl";
+}
+
+/** The week's first day: the system's (Monday or Sunday), else the language's — the month grid, the week view, 앞으로's weeks, the alarms' days. */
+export const weekStartsMonday = (lang: Lang): boolean => weekStartFrom(weekStartSetting, lang);
+
+const dayNamesFromMonday = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+
+/** Windows' `iFirstDayOfWeek` (HKCU\Control Panel\International): "0" Monday … "6" Sunday. */
+export function firstDayFromRegistry(value: string | undefined): string | undefined {
+  return value !== undefined && /^[0-6]$/.test(value.trim()) ? dayNamesFromMonday[Number(value.trim())] : undefined;
+}
+
+/** Intl's `weekInfo.firstDay`: 1 Monday … 7 Sunday. */
+export function firstDayFromIntl(firstDay: number | undefined): string | undefined {
+  return firstDay !== undefined && Number.isInteger(firstDay) && firstDay >= 1 && firstDay <= 7 ? dayNamesFromMonday[firstDay - 1] : undefined;
+}
 
 /** The days of a week row in order, 0 = Sunday … 6 = Saturday. */
 export const weekdayOrder = (lang: Lang): number[] => (weekStartsMonday(lang) ? [1, 2, 3, 4, 5, 6, 0] : [0, 1, 2, 3, 4, 5, 6]);

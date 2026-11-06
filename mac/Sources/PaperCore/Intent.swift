@@ -225,6 +225,24 @@ public enum Intent {
         return names[kind]![language.index]
     }
 
+    /// The button that puts the picked reading in (#240, D3 B): it says what happens — "일정 넣기", "할 일 넣기",
+    /// "타이머 시작", "집중 시작", "알람 맞추기", "메모 넣기", "반복 할 일 넣기"; "넣기" while nothing is read yet. Tab moves it
+    /// with the chip. The same words on Windows (intent.ts: actionText) and in docs/plans/quick-entry-button-cases.json.
+    public static func actionText(_ candidate: Candidate?, language: AppLanguage = .ko) -> String {
+        let words: [String]
+        switch candidate {
+        case nil: words = ["넣기", "Add", "Toevoegen"]
+        case .todo: words = ["할 일 넣기", "Add to-do", "Taak toevoegen"]
+        case .event: words = ["일정 넣기", "Add event", "Afspraak toevoegen"]
+        case .timer(_, let title?) where !title.isEmpty: words = ["집중 시작", "Start focus", "Focus starten"]
+        case .timer: words = ["타이머 시작", "Start timer", "Timer starten"]
+        case .alarm: words = ["알람 맞추기", "Set alarm", "Wekker zetten"]
+        case .memo: words = ["메모 넣기", "Add note", "Notitie toevoegen"]
+        case .repeating: words = ["반복 할 일 넣기", "Add repeating to-do", "Herhalende taak toevoegen"]
+        }
+        return words[language.index]
+    }
+
     /// The toast's switch to another kind: "할 일로 바꾸기", "Make it a to-do", "Maak er een taak van".
     public static func switchText(_ kind: Kind, language: AppLanguage = .ko) -> String {
         let words: [Kind: [String]] = [

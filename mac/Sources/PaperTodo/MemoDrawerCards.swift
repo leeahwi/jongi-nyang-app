@@ -284,10 +284,7 @@ struct KindRow: View {
         HStack(spacing: 7) {
             switch kind {
             case .checklist(let done, let total):
-                Chip(symbol: "checklist.checked", text: "\(done)/\(total)", palette: palette)
-                    .accessibilityLabel(L("체크 목록 \(done)/\(total)"))
-                ProgressTrack(done: done, total: total, palette: palette)
-                    .frame(width: 46)
+                ChecklistChip(done: done, total: total, palette: palette)
             case .link(let url, let label):
                 Button {
                     if let target = URL(string: url) ?? URL(string: url.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "") {
@@ -339,6 +336,37 @@ struct Chip: View {
     }
 }
 
+/// A checklist's chip (#240): the count with its progress inside the chip — a rounded track and a fill in the paper's
+/// check colour — so the bar reads as the count's (it stood apart in the row and looked like a stray line). All done: no
+/// bar, a ✓ in the check colour and the count in ink (the check colour is under 4.5:1 as small text on some papers). Read and hovered as ‘체크 4개 중 3개 했어요’. Same as the Windows drawer (kindRow).
+struct ChecklistChip: View {
+    let done: Int
+    let total: Int
+    let palette: DrawerPalette
+
+    private var finished: Bool { total > 0 && done >= total }
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Image(systemName: finished ? "checkmark" : "checklist.checked")
+                .font(.system(size: 9.5, weight: finished ? .bold : .medium))
+                .foregroundStyle(finished ? palette.check : palette.secondary)
+            Text(verbatim: "\(done)/\(total)")
+                .font(.system(size: 11, weight: finished ? .semibold : .regular).monospacedDigit())
+                .foregroundStyle(finished ? palette.ink : palette.secondary)
+                .lineLimit(1)
+            if !finished { ProgressTrack(done: done, total: total, palette: palette).frame(width: 26) }
+        }
+        .padding(.horizontal, 7)
+        .frame(height: 18)
+        .background(palette.pill, in: Capsule())
+        .fixedSize()
+        .help(L("체크 \(total)개 중 \(done)개 했어요"))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L("체크 \(total)개 중 \(done)개 했어요"))
+    }
+}
+
 struct ProgressTrack: View {
     let done: Int
     let total: Int
@@ -347,11 +375,12 @@ struct ProgressTrack: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
-                Capsule().fill(palette.pillEdge)
-                Capsule().fill(palette.check).frame(width: total == 0 ? 0 : geometry.size.width * CGFloat(done) / CGFloat(total))
+                Capsule().fill(palette.check.opacity(0.22))
+                Capsule().fill(palette.check).frame(width: total == 0 ? 0 : max(5, geometry.size.width * CGFloat(done) / CGFloat(total)))
+                    .opacity(done == 0 ? 0 : 1)
             }
         }
-        .frame(height: 4)
+        .frame(height: 5)
         .accessibilityHidden(true)
     }
 }
@@ -924,8 +953,6 @@ struct CheckMark: Shape {
     }
 }
 
-/// An open memo being typed: its raw text (boxes as `- [ ]`), the title in handwriting; its right-click is the
-/// system's text menu with `이 메모` added.
 /// M4 (#166): the memo that just came in rises into its place once with 등장 (8 pt, −0.6° straightened, as a slip
 /// comes in); only that card, only as it is first drawn. Reduce Motion and snapshots: there at once.
 struct MemoArrive: ViewModifier {
@@ -946,6 +973,8 @@ struct MemoArrive: ViewModifier {
     }
 }
 
+/// An open memo being typed: its raw text (boxes as `- [ ]`), the title in handwriting; its right-click is the
+/// system's text menu with `이 메모` added.
 struct SlipEditor: View {
     @ObservedObject var drawer: MemoDrawer
     let memo: Memo

@@ -1,6 +1,6 @@
 import { BrowserWindow, globalShortcut, ipcMain, screen } from "electron";
 import path from "node:path";
-import { followSlip, slipWindowOptions } from "./slipWindow";
+import { followSlip, KeptSlip, slipWindowOptions } from "./slipWindow";
 import { t } from "../i18n";
 import { offscreen, shortcutsDisabled } from "./env";
 import type { Store } from "./store";
@@ -17,6 +17,8 @@ const size = { width: 420 + 48, height: 190 };
  * system-wide shortcut is taken there.
  */
 export class QuickEntry {
+  /** #246: its paper drags it, and the place is kept per display. */
+  private readonly kept: KeptSlip;
   private window?: BrowserWindow;
   private registered = false;
   /** The page has loaded; until then the latest "open" waits (a message sent earlier would be lost). */
@@ -24,6 +26,7 @@ export class QuickEntry {
   private waiting?: { text?: string };
 
   constructor(private readonly store: Store, private readonly rendererDirectory: string, private readonly live: boolean) {
+    this.kept = new KeptSlip(store, "quick", 420);
     const fromCard = (event: Electron.IpcMainEvent) => this.window !== undefined && !this.window.isDestroyed() && event.sender === this.window.webContents;
     ipcMain.on("quick:close", (event) => { if (fromCard(event)) this.hide(); });
     store.on("prefs", (key: string) => { if (key === "quickEntry") this.updateShortcut(); });
@@ -56,19 +59,31 @@ export class QuickEntry {
     // Pressed again while it is up: put it away, like a toggle.
     if (this.window && !this.window.isDestroyed() && this.window.isVisible()) return this.hide();
     const window = this.ensureWindow();
-    const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+    // #246: where it was dragged to on this display, else the usual spot (centred, a quarter of the way down).
+    const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
     const [width, height] = window.getSize();
-    window.setBounds({
-      x: Math.round(area.x + (area.width - width) / 2 + offscreen.x),
-      y: Math.round(area.y + area.height / 4 - shadowRoom + offscreen.y),
-      width, height,
-    });
+    const at = this.kept.origin(display, this.usual(display, width));
+    window.setBounds({ x: at.x + offscreen.x, y: at.y + offscreen.y, width, height });
     this.send({});
     window.show();
     window.setAlwaysOnTop(true, "pop-up-menu");
     window.moveTop();
     window.focus();
     window.webContents.focus();
+  }
+
+  /** The usual spot on `display`: centred, a quarter of the way down (the window's top left). */
+  private usual(display: Electron.Display, width = this.window?.getSize()[0] ?? size.width): { x: number; y: number } {
+    const area = display.workArea;
+    return { x: Math.round(area.x + (area.width - width) / 2), y: Math.round(area.y + area.height / 4 - shadowRoom) };
+  }
+
+  /** #246: the paper dragged from this slip's own page (false: another page's). */
+  dragSlip(sender: Electron.WebContents, phase: "start" | "move" | "end" | "reset", x: number, y: number): boolean {
+    const window = this.window;
+    if (!window || window.isDestroyed() || sender !== window.webContents) return false;
+    this.kept.dragged(window, phase, x, y, (display) => this.usual(display));
+    return true;
   }
 
   hide(): void {

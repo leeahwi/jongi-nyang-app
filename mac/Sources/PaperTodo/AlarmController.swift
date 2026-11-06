@@ -94,7 +94,8 @@ final class AlarmController {
         current = ring
         state.alarm = ring.alarm
         state.startedAt = Date()
-        sound.loop(ring.alarm.sound)
+        // #217: a check's run rings without a sound, its card off every screen (an alarm of the demo data can come due).
+        if !TestHooks.staysBehind { sound.loop(ring.alarm.sound) }
         show()
         onRing()
         onRingAlarm(ring.alarm)
@@ -165,7 +166,7 @@ final class AlarmController {
     private func show() {
         let panel = panel ?? makePanel()
         panel.show(AlarmRingView(state: state))
-        panel.setFrame(frame(size: panel.frame.size), display: true)
+        panel.setFrame(frame(size: panel.frame.size).offsetBy(dx: OffscreenRendering.offset.x, dy: OffscreenRendering.offset.y), display: true)
         // Keys typed in another app just then don't stop it (clicks always work).
         panel.keysFrom = Date().addingTimeInterval(AlarmRingPanel.keyDelay)
         panel.makeKeyAndOrderFront(nil)
@@ -192,6 +193,8 @@ final class AlarmController {
         panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isMovableByWindowBackground = true
+        // #229: a ringing alarm can be stopped while a question waits for its answer (slip-move-cases.json C8).
+        panel.worksWhenModal = true
         panel.onStop = { [weak self] in self?.stop() }
         panel.onSnooze = { [weak self] minutes in self?.snooze(minutes: minutes) }
         self.panel = panel

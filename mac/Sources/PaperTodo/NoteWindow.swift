@@ -91,6 +91,16 @@ final class NoteWindow: NSWindow {
     /// is pulled back onto a screen as it comes up — the check's note came up at the screen's left edge.
     var keepsOffscreen = false
 
+    /// Not in a check's run (#217): if the system makes the app active anyway (a switch of Spaces can), no window of it
+    /// may take the person's typing.
+    override var canBecomeKey: Bool { !TestHooks.staysBehind && super.canBecomeKey }
+
+    /// A check's run (#217): this would be the key window now, though it never becomes one (PerfDrive's keys go here).
+    override func makeKeyAndOrderFront(_ sender: Any?) {
+        super.makeKeyAndOrderFront(sender)
+        PerfDrive.wouldBeKey(self)
+    }
+
     /// The level changed (항상 위에 두기): the ears above the note (NoteEars.swift) take the same one.
     var onLevelChange: (() -> Void)?
     override var level: NSWindow.Level {
@@ -161,12 +171,18 @@ final class NoteWindow: NSWindow {
         else { super.miniaturize(sender) }
     }
 
-    override func sendEvent(_ event: NSEvent) {
-        if event.type == .keyDown, !(firstResponder is NSText), onTimetableKey?(event) == true { return }
+    /// The note's own keys, before AppKit's: the open day's, then the list's. Whether one was used (also for PerfDrive).
+    func handleOwnKey(_ event: NSEvent) -> Bool {
+        if event.type == .keyDown, !(firstResponder is NSText), onTimetableKey?(event) == true { return true }
         if event.type == .keyDown, let key = listKey(for: event), onListKey?(key) == true {
             if firstResponder is NSText { makeFirstResponder(nil) }
-            return
+            return true
         }
+        return false
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        if handleOwnKey(event) { return }
         recordInteraction(event, phase: "before")
         if event.type == .leftMouseDown, event.clickCount == 1,
            canStartHeaderDrag(at: event.locationInWindow) {

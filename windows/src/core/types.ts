@@ -1,4 +1,5 @@
 import type { TimerSize } from "./timerWidget";
+import type { TypingScope } from "./typingCat";
 import type { ChatterFrequency } from "./chatter";
 import type { ArchiveAfterDays } from "./archive";
 import type { TodoItem } from "./notebook";
@@ -10,11 +11,13 @@ import type { NoteTab } from "./shelf";
 import type { CalendarView } from "./calendar";
 import type { StoredRules } from "./spaceDevice";
 import type { LocalEvent } from "./events";
+import type { WidgetKind, WidgetSettings, WidgetStyle } from "./calendarWidget";
 import type { Lang, LanguageSetting } from "./lang";
 import type { Alarm } from "./alarm";
 import type { IntentKind, IntentPrefer } from "./intent";
 import type { AheadTarget } from "./ahead";
 import type { DeskPane, PaperSetting } from "./desk";
+import type { NightChoice, PaperKind } from "./paper";
 import type { DrawerBackdrop, DrawerSide, DrawerTheme, FolderSort, FolderView, MemoFolders, MemoPaper } from "./memoDrawer";
 import type { SpaceChoice, SpaceLens, TodoSpaces } from "./todoSpaces";
 import type { MemoTrash } from "./memoTrash";
@@ -32,6 +35,10 @@ export interface Prefs {
   language: LanguageSetting;
   /** 종이 색: 자동 (the system's light or dark) · 낮 · 밤 — every window follows it at once. */
   paper: PaperSetting;
+  /** 종이 (#244): the paper of the notepad, calendar, widget, slips and desk — one of fifteen (core/paper.ts). */
+  paperTheme: PaperKind;
+  /** 밤에는 (#244): what a light paper turns into at night — 그대로 or one of the dark papers (밤 종이 by default). */
+  paperNight: NightChoice;
   font: NotebookFont;
   /** 노트 글꼴 (#141): seven steps (0–6, textSteps.ts); `textSize` keeps the nearest of 1.30's four for an older version. */
   textStep: number;
@@ -48,6 +55,8 @@ export interface Prefs {
   /** 종이냥 on the floor above the taskbar. The focus timer has its own board and does not depend on it. */
   petVisible: boolean;
   petWanders: boolean;
+  /** 글자 칠 때 두드리기 (#230): the cat taps along with keys typed in the app's windows, or not. A device setting. */
+  petTyping: TypingScope;
   pomodoroFocusMinutes: number;
   pomodoroRestMinutes: number;
   pomodoroLongRestMinutes: number;
@@ -86,6 +95,9 @@ export interface Prefs {
   calendarAlertMinutes: CalendarAlertMinutes;
   /** Event alerts this device has shown ("local/<id>@<day>@seconds"), kept for two days. */
   calendarAlertsShown: string[];
+  /** 음력과 공휴일 (#234), this PC's: the lunar date and Korea's public holidays in the desk's 달력 and the widgets. */
+  calendarLunar: boolean;
+  calendarHolidays: boolean;
   /** The 달력 window shows a month or a week. */
   calendarView: "month" | "week";
   /** The colour the last new event took ("" for none yet: blue). */
@@ -138,11 +150,15 @@ export interface Prefs {
   drawerTheme: DrawerTheme;
   /** 밤에는 밤 종이로 (#142): undefined before 1.31 — read from drawerTheme (`auto` on, a paper by name off). */
   drawerNightPaper?: boolean;
+  /** 노트와 같은 종이 (#244, on by default): the drawer takes the notepad's shown paper; off, `drawerTheme` and `drawerNight`.
+   *  Moved over once from `drawerTheme` · `drawerNightPaper` (core/paper.ts readDrawerChoice), which are still written. */
+  drawerSameAsNote: boolean;
+  drawerNight: NightChoice;
   drawerLastFolder: string;
   drawerPinned: boolean;
   /** 1.28: the one-time slip saying the memo tab's memos are in the drawer was dealt with on this device (M1–M3). */
   drawerMoveNoticeShown: boolean;
-  /** 1.29: the drawer's 바탕 (불투명 · 반투명 · 강하게 · 바탕 없음), the 고정 bookmark's 정렬 (고정 isn't a folder), and the
+  /** 1.29: the drawer's 바탕 (불투명 · 반투명 · 투명 · 바탕 없음), the 고정 bookmark's 정렬 (고정 isn't a folder), and the
    *  last two folders a memo was moved to (폴더로 옮기기 ▸ 최근), newest first. */
   drawerBackdrop: DrawerBackdrop;
   drawerPinnedSort: FolderSort;
@@ -175,6 +191,9 @@ export interface Prefs {
   /** D10: when a space was last made visible here by a change of `spaceDevice` (ISO time): reminders from before stay
    *  quiet. Kept by the main process. */
   spaceDeviceShown: Record<string, string>;
+  /** 바탕화면 달력 위젯 (#234), this PC's: up to four widgets and where each is (core/calendarWidget.ts). Kept by the
+   *  main process; never in the storage folder. */
+  calendarWidgets: WidgetSettings[];
 }
 
 /** 2b: how 오늘's groups look — F 묶음 메모지 (the default) or E 책갈피 머리말. */
@@ -197,6 +216,8 @@ export function calendarAlertChoicesIn(lang: Lang = "ko"): { value: CalendarAler
 export const defaultPrefs: Prefs = {
   language: "auto",
   paper: "auto",
+  paperTheme: "day",
+  paperNight: "night",
   font: "pen",
   textStep: 2,
   textSize: "regular",
@@ -211,6 +232,7 @@ export const defaultPrefs: Prefs = {
   dueStyle: "dday",
   petVisible: true,
   petWanders: true,
+  petTyping: "app",
   pomodoroFocusMinutes: 25,
   pomodoroRestMinutes: 5,
   pomodoroLongRestMinutes: 15,
@@ -232,6 +254,8 @@ export const defaultPrefs: Prefs = {
   chatterRecent: [],
   chatterMilestoneDay: "",
   calendarStrip: true,
+  calendarLunar: true,
+  calendarHolidays: true,
   calendarAlertMinutes: 10,
   calendarAlertsShown: [],
   calendarView: "month",
@@ -263,6 +287,8 @@ export const defaultPrefs: Prefs = {
   drawerHandle: true,
   drawerHandleY: 0.42,
   drawerTheme: "auto",
+  drawerSameAsNote: true,
+  drawerNight: "night",
   drawerLastFolder: "",
   drawerPinned: true,
   drawerMoveNoticeShown: false,
@@ -285,6 +311,7 @@ export const defaultPrefs: Prefs = {
   spaceGroupsDoneOpen: [],
   spaceDevice: {},
   spaceDeviceShown: {},
+  calendarWidgets: [],
 }
 
 export function pomodoroSettings(prefs: Prefs): PomodoroSettings {
@@ -393,7 +420,7 @@ export interface AppState {
   noteShortcutProblem?: string;
   /** The same for 메모 서랍's shortcut. */
   drawerShortcutProblem?: string;
-  /** 반투명 · 강하게 drawn as 불투명 on this PC, and why (Windows 10, transparency effects off); none when they work. */
+  /** 반투명 · 투명 drawn as 불투명 on this PC, and why (Windows 10, transparency effects off); none when they work. */
   drawerBackdropNote?: string;
   /** 메모 서랍: the folders and each memo's place (memo-folders.json). */
   memoFolders: MemoFolders;
@@ -545,7 +572,7 @@ export type WireCandidate =
 /** What putting a reading in made: its kind and the id of what was made (none for a timer). */
 export interface IntentMade { kind: IntentKind; id?: string; /** A space made with it (`#세탁`): taken back with it. */ space?: string }
 export type IntentRequest =
-  | { op: "commit"; candidate: WireCandidate; page: IntentPage; from: "note" | "quick" | "glance"; candidates?: WireCandidate[]; text?: string; /** A to-do's space (`#회사`, the lens). */ space?: SpaceChoice }
+  | { op: "commit"; candidate: WireCandidate; page: IntentPage; from: "note" | "quick" | "glance" | "widget"; candidates?: WireCandidate[]; text?: string; /** A to-do's space (`#회사`, the lens). */ space?: SpaceChoice }
   | { op: "undo"; made: IntentMade }
   | { op: "learn"; key?: string; from: IntentKind; to: IntentKind };
 export interface IntentResult {
@@ -578,9 +605,14 @@ export interface PopupPayload {
   sweep?: { variant: "evening" | "morning"; message: string; /** The cat beside the question (#51); not over the desktop cat. */ cat?: boolean };
 }
 
+/** What the settings slip and the widget's menu change. */
+export type WidgetChanges = Partial<Pick<WidgetSettings, "style" | "opacity" | "solidOnHover" | "clickThrough" | "locked" | "level" | "allSpaces">>;
+
 export type Action =
   | { type: "openDataFolder" }
   | { type: "chatterPreview" }
+  /** #230: a key went down in this window (nothing else: no key, no text). */
+  | { type: "petTap" }
   | ({ type: "add"; title: string } & ParsedWhen)
   | { type: "rename"; id: string; title: string }
   | { type: "toggle"; id: string }
@@ -655,7 +687,7 @@ export type Action =
   /** A strip row: its event in the sheet (고치기). */
   | { type: "calendarEditEvent"; key: string }
   | { type: "showEventMenu"; key: string; x?: number; y?: number }
-  | { type: "openCalendar"; day?: string }
+  | { type: "openCalendar"; day?: string; event?: string }
   /** The 오늘 창's 노트 열기 (and 외 N개). */
   | { type: "openNote" }
   /** 백업 · 옮기기: 내보내기… and 가져오기… (Settings → 꾸미기, the ⋯ menu, the tray). */
@@ -737,4 +769,15 @@ export type Action =
   /** The desk's 스페이스 pane (스페이스 관리…). */
   | { type: "openSpaces" }
   /** Text to the clipboard (a memo's 복사). */
-  | { type: "copyText"; text: string };
+  | { type: "copyText"; text: string }
+  /** #228: the question slip's paper dragged — where the pointer is on the screen as it starts, moves and ends. */
+  | { type: "slipDrag"; phase: "start" | "move" | "end" | "reset"; x: number; y: number }
+  /** #229: a press on a page while a question waits (renderer/askGuard.ts): the question comes forward and shakes. */
+  | { type: "slipBlocked" }
+  /** 바탕화면 위젯 (#234): 책상 → 일정 → + 위젯 더하기 (a gallery pick). */
+  | { type: "widgetAdd"; kind: WidgetKind; style: WidgetStyle }
+  /** The settings slip (shown at once on the widget) and the widget's menu. */
+  | { type: "widgetChange"; id: string; changes: WidgetChanges }
+  | { type: "widgetRemove"; id: string }
+  /** 되돌리기 after 위젯 제거: it comes back where it was, in its place in the list. */
+  | { type: "widgetRestore"; widget: WidgetSettings; index: number };

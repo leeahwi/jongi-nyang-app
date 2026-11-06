@@ -27,10 +27,41 @@ function buildWatcher() {
 export const watcher = process.platform === "darwin" ? buildWatcher() : undefined;
 
 /**
- * Watches `child`'s windows until it exits: the first one on a screen kills it at once and calls `stopped` with the
- * window's title and bounds. Returns a function that tells whether it stopped the run.
+ * #250: a fresh window log for one run (node_modules/.cache), to pass to Electron as PAPERTODO_WINDOW_LOG: the app
+ * (main/offscreenGuard.ts) notes each window it makes with the system's number for it.
  */
-export function watchWindows(child, stopped) {
+export function windowLog(name) {
+  const file = path.join(root, "node_modules", ".cache", `offscreen-windows-${name}-${process.pid}.log`);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.rmSync(file, { force: true });
+  return file;
+}
+
+/** What the window log says about the window the watch caught (its number is in the watch's line). */
+export function whose(seen, log) {
+  const number = /· window (\d+) /.exec(seen)?.[1];
+  if (!number || !log) return "";
+  let lines = [];
+  try { lines = fs.readFileSync(log, "utf8").split("\n").filter((line) => line.split(" ")[1] === number || line.startsWith(`put back ${number} `)); } catch { /* no log */ }
+  return lines.length ? `\nthe app's window log for window ${number}:\n${lines.join("\n")}`
+    : `\nwindow ${number} is not in the app's window log: not a window the app made (a menu, a popup or a panel of the system's)`;
+}
+
+/**
+ * The windows the app's guard had to put back during the run (`put back …` lines of the window log). A window the guard
+ * finds near a display was already there for a moment, so a run passes only with none (#250).
+ */
+export function putBacks(log) {
+  try { return fs.readFileSync(log, "utf8").split("\n").filter((line) => line.startsWith("put back ")); } catch { return []; }
+}
+
+/**
+ * Watches `child`'s windows until it exits: the first one on a screen kills it at once and calls `stopped` with the
+ * window's title and bounds, its owner (pid, program, working folder: which run it was, #250), every window the pid had
+ * then, and what the window log (`log`, from windowLog) says about it. Returns a function that tells whether it
+ * stopped the run.
+ */
+export function watchWindows(child, stopped, log) {
   if (!watcher) return () => false;
   const watch = spawn(watcher, [String(child.pid)], { stdio: ["ignore", "inherit", "pipe"] });
   let seen = "";
@@ -41,7 +72,7 @@ export function watchWindows(child, stopped) {
     if (code === 0 || signal) return;
     fired = true;
     try { child.kill("SIGKILL"); } catch { /* gone */ }
-    stopped(`a window was on a screen, stopped (#92). ${seen.trim() || `the watch exited ${code}`}`);
+    stopped(`a window was on a screen, stopped (#92). ${seen.trim() || `the watch exited ${code}`}${whose(seen, log)}`);
   });
   child.on("exit", () => setTimeout(() => { if (watch.exitCode === null) watch.kill(); }, 100));
   return () => fired;

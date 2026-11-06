@@ -1,0 +1,42 @@
+{
+  "about": "질문이 떠 있을 때 바탕화면 달력 위젯과 날짜 쪽지에서 되는 일의 공유 사례예요 (#253). #229 뒤로 질문 창이 떠 있으면 앱의 다른 창은 답을 기다리는데, 위젯과 날짜 쪽지는 그 규칙에서 빠져요. 질문에 답하려면 오히려 달력을 봐야 할 때가 많아서예요. questions: 앱의 질문 가운데 목록 전체를 바꾸는 질문(replacesList)이에요. 답이 목록을 통째로 바꾸거나, 목록을 막 바꾸고 앱이 다시 시작되기 전에 뜨는 질문이에요. 그런 질문이 떠 있는 동안 넣은 것은 바뀐 목록에 묻혀 사라질 수 있어요. message는 그 질문의 글(ko)이고, 앱마다 다르면 mac · windows로 나눠요. apps가 있으면 그 앱에만 있는 규칙이에요(Mac은 가져오기 · 되돌리기 뒤에 다시 시작해서 ‘가져왔어요’ · ‘되돌렸어요’가 떠 있는 동안 저장을 멈춰요. Windows는 다시 시작하지 않아요). 질문마다 그 질문을 만드는 자리에 replacesList 표시를 달고(Mac SlipAlert.run(replacesList:) · Windows ConfirmQuestion.replacesList), 두 앱의 시험이 이 목록과 표시가 같은지 봐요. 여기 없는 질문은 모두 replacesList가 아니에요. presses: 질문(up: none은 질문 없음, question은 대부분의 질문, replacesList는 목록 전체를 바꾸는 질문)이 떠 있을 때 위젯이나 쪽지에서 한 일(press)과 그 결과(then)예요. page는 달 · 주 넘기기(‹ ›), hover는 마우스 올리기, openSheet는 날짜를 눌러 날짜 쪽지 열기, sheetDay는 쪽지의 하루 앞뒤, add는 쪽지에서 넣기, undo는 넣은 것 되돌리기(쪽지의 ⌘Z · Ctrl+Z와 위젯 알림의 되돌리기), open은 할 일이나 일정을 눌러 노트 · 책상 달력 열기예요. over는 그 창이 질문이 떠 있는 바로 그 창(질문이 붙든 창)인지예요. works는 그대로 돼요. waits는 답을 기다려요: 넣기 버튼이 흐려지고, 누르면 질문 창이 앞으로 와서 한 번 흔들리고, 적던 글은 그대로 남아요. front는 그 창을 앞으로 가져오고 질문은 그 위에 그대로 있어요. nudge는 #229처럼 질문 창이 앞으로 와서 흔들려요. levels: 위에서 아래로 쌓이는 차례예요. 질문은 날짜 쪽지와 ‘항상 위에 두기’ 위젯보다 위에 있고, 항상 위의 위젯은 질문이 떠 있어도 다른 창 위에 보여요. typing: 메모 서랍 · 빠른 입력 · 빠른 메모에 쓰는 동안 위젯을 누르면(달 넘기기, 마우스 올리기) 쓰던 글과 커서가 그대로예요(위젯은 키보드를 받지 않아요). Mac PaperCore/SlipMove.swift(scripts/test-slip-move.sh)와 test-presentation.sh, Windows core/slipMove.ts(test/slipMove.test.ts)와 스냅숏 검사(widgets)가 이 파일을 읽어요. 예시는 모두 지어낸 것이에요.",
+  "questions": [
+    { "case": "R1 백업 가져오기는 목록 전체를 바꿀 수 있어요", "question": "import", "message": "이 백업을 가져올까요?", "replacesList": true },
+    { "case": "R2 가져오기의 바꾸기 확인도", "question": "importReplace", "message": { "mac": "지금 것을 이 백업으로 바꿀까요?", "windows": "지금 있는 할 일 · 메모 · 일정 · 기록이 이 백업으로 바뀌어요. 바꾸기 전 상태는 자동으로 백업해 둘게요." }, "replacesList": true },
+    { "case": "R3 백업으로 되돌리기도", "question": "restore", "message": "백업으로 되돌릴까요?", "replacesList": true },
+    { "case": "R4 공유 폴더로 옮기며 덮어쓰기도", "question": "storageOverwrite", "message": "이 폴더에 이미 종이냥 목록이 있어요.", "replacesList": true },
+    { "case": "R5 Mac: 가져온 뒤 다시 시작하기 전에도", "question": "importDone", "message": "가져왔어요.", "replacesList": true, "apps": ["mac"] },
+    { "case": "R6 Mac: 되돌린 뒤 다시 시작하기 전에도", "question": "restoreDone", "message": "되돌렸어요.", "replacesList": true, "apps": ["mac"] },
+    { "case": "R7 Windows: 가져온 뒤에는 다시 시작하지 않아서 넣을 수 있어요", "question": "importDone", "message": "가져왔어요.", "replacesList": false, "apps": ["windows"] },
+    { "case": "R8 Windows: 되돌린 뒤에도", "question": "restoreDone", "message": "되돌렸어요.", "replacesList": false, "apps": ["windows"] },
+    { "case": "Q1 집중 그만두기는 목록을 바꾸지 않아요", "question": "focusStop", "message": "집중을 그만둘까요?", "replacesList": false },
+    { "case": "Q2 Claude 기록 지우기도", "question": "aiLogClear", "message": "Claude가 한 일의 기록을 지울까요?", "replacesList": false },
+    { "case": "Q3 목록을 이 기기로 옮기기는 지금 목록을 그대로 옮겨요", "question": "storageMoveHere", "message": { "mac": "목록을 이 Mac으로 옮길까요?", "windows": "목록을 이 PC로 옮길까요?" }, "replacesList": false }
+  ],
+  "presses": [
+    { "case": "W1 질문이 떠 있어도 위젯의 달과 주를 넘겨요", "up": "question", "press": "page", "then": "works" },
+    { "case": "W2 마우스를 올리면 선명해져요", "up": "question", "press": "hover", "then": "works" },
+    { "case": "W3 날짜를 누르면 날짜 쪽지가 열려요", "up": "question", "press": "openSheet", "then": "works" },
+    { "case": "W4 쪽지에서 하루 앞뒤로 넘겨요", "up": "question", "press": "sheetDay", "then": "works" },
+    { "case": "W5 대부분의 질문에서는 쪽지에서 넣어요", "up": "question", "press": "add", "then": "works" },
+    { "case": "W6 넣은 것을 되돌려요", "up": "question", "press": "undo", "then": "works" },
+    { "case": "L1 목록 전체를 바꾸는 질문에서도 달과 주를 넘겨요", "up": "replacesList", "press": "page", "then": "works" },
+    { "case": "L2 마우스를 올리면 선명해져요", "up": "replacesList", "press": "hover", "then": "works" },
+    { "case": "L3 날짜 쪽지를 열어 봐요", "up": "replacesList", "press": "openSheet", "then": "works" },
+    { "case": "L4 쪽지에서 하루 앞뒤로 넘겨요", "up": "replacesList", "press": "sheetDay", "then": "works" },
+    { "case": "L5 넣기는 답을 기다려요", "up": "replacesList", "press": "add", "then": "waits" },
+    { "case": "L6 되돌리기도 답을 기다려요", "up": "replacesList", "press": "undo", "then": "waits" },
+    { "case": "O1 할 일을 누르면 노트가 앞으로 오고 질문은 그 위에 있어요", "up": "question", "press": "open", "over": false, "then": "front" },
+    { "case": "O2 질문이 떠 있는 바로 그 창이면 지금처럼 흔들려요", "up": "question", "press": "open", "over": true, "then": "nudge" },
+    { "case": "O3 목록 전체를 바꾸는 질문에서도 창을 앞으로 가져와요", "up": "replacesList", "press": "open", "over": false, "then": "front" },
+    { "case": "O4 그 질문이 떠 있는 창이면 흔들려요", "up": "replacesList", "press": "open", "over": true, "then": "nudge" },
+    { "case": "N1 질문이 없으면 넣기가 돼요", "up": "none", "press": "add", "then": "works" },
+    { "case": "N2 질문이 없으면 창을 그냥 열어요", "up": "none", "press": "open", "over": false, "then": "works" }
+  ],
+  "levels": { "case": "Z1 질문이 날짜 쪽지와 항상 위의 위젯보다 위에 있어요", "top": ["question", "sheet", "widgetOnTop", "window"] },
+  "typing": [
+    { "case": "T1 메모 서랍에 쓰는 동안 위젯을 눌러도 글과 커서가 그대로예요", "typing": "drawer", "then": "kept" },
+    { "case": "T2 빠른 입력도", "typing": "quick", "then": "kept" },
+    { "case": "T3 빠른 메모도", "typing": "quickMemo", "then": "kept" }
+  ]
+}

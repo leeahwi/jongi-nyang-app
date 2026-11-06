@@ -4,6 +4,8 @@
 # behind it, the tab switch and typing — all with the note off every screen (nothing else is opened; the drawer is
 # measured by scripts/perf-drawer.sh, #208, and scripts/perf-idle.sh measures the cat and 완료 기록, off-screen too).
 # The bundle id defaults to com.noa.PaperTodo.Perf2. Before 1.45 the note, a titled window, was pulled back to the screen's left edge.
+# #217: as in scripts/perf.sh, the copy starts behind (`open -g`), never comes forward and takes its keys from a file it
+# reads (`--perf-drive`): nothing is posted through the system, and a window on a screen stops the run.
 #
 #   scripts/perf-audit.sh [out-folder] [--no-build]      PERF_DATA_ARGS="--todos 2000 --spaces 9" for another size;
 #   PERF_SCRATCH="$PWD/.build/bench-release" reuses the release build of scripts/bench-app.sh.
@@ -36,9 +38,12 @@ done
 [ "$spaces" = 1 ] && PERF_DATA_ARGS="${PERF_DATA_ARGS:-} --todos 2000 --spaces 9"
 bundle_id=${PERF_BUNDLE_ID:-com.noa.PaperTodo.Perf2}
 mkdir -p "$out"
+# The app opens the log and the commands by these paths from its own folder: absolute ones.
+out="$(cd "$out" && pwd)"
 app="$out/PerfTest.app"
 probe="$out/perf-probe"
 log="$out/perf.log"
+commands="$out/perf-drive.txt"
 storage="$HOME/Library/Application Support/$bundle_id"
 
 if [ "$build" = 1 ]; then
@@ -98,13 +103,20 @@ fresh() {
 }
 
 launch() {
-    : > "$log"
-    # Through Launch Services, like a click in Finder: the note comes up in front.
-    # --offscreen: the note, the drawer and its handle far off every screen, out of the user's way.
-    open -n "$app" --args --perf-log "$log" --offscreen
+    : > "$log"; : > "$commands"
+    # Through Launch Services, but behind (-g): nothing comes forward. --offscreen: every window far off the screens.
+    open -g -n --env PAPERTODO_OFFSCREEN=1 "$app" --args --perf-log "$log" --offscreen --perf-drive "$commands"
     for _ in $(seq 1 100); do pid=$(pgrep -f "$app/Contents/MacOS/PaperTodo" | head -1 || true); [ -n "$pid" ] && break; sleep 0.05; done
     for _ in $(seq 1 100); do grep -q '^noteVisible' "$log" 2>/dev/null && break; sleep 0.1; done
     sleep 1.5
+    offscreen_check
+}
+# drive <command>: the test copy's input (PerfDrive: key <code> [mods] · type <ms> <text>), done in order.
+drive() { echo "$*" >> "$commands"; }
+# Every shown window of the test copy off the screens, as the window server has it; nothing the app moved off.
+offscreen_check() {
+    if ! "$probe" offscreen "$pid"; then echo "a window of the test copy is on a screen: stopping"; exit 1; fi
+    if grep -q '^onscreen' "$log"; then grep '^onscreen' "$log"; echo "the test copy put a window on a screen: stopping"; exit 1; fi
 }
 
 last() { { grep "^$1" "$log" || true; } | tail -${2:-1} | awk '{print $NF}'; }
@@ -125,11 +137,9 @@ settle() {
 }
 between() { awk -v from="# $1" -v to="# $2" '$0==from{on=1;next} $0==to{on=0} on' "$log"; }
 # vals <from> <to> <prefix>: the app's own time (the line's last number) of the lines starting with prefix
-# between two marks; total: from the event's timestamp (with the system's delivery).
+# between two marks.
 vals() { between "$1" "$2" | awk -v p="$3" 'index($0, p) == 1 {print $NF}'; }
-totals() { between "$1" "$2" | awk -v p="$3" 'index($0, p) == 1 {print $(NF-1)}'; }
 first() { vals "$@" | head -1; }
-firsttotal() { totals "$@" | head -1; }
 
 echo "== 종이냥 성능 점검 2 · $(date '+%Y-%m-%d %H:%M') · $(sw_vers -productVersion) · load $(sysctl -n vm.loadavg | awk '{print $2}') · data ${PERF_DATA_ARGS:-demo}"
 
@@ -149,22 +159,22 @@ echo "idle, note open (30 s): $("$probe" sample "$pid" 30)"
 check_times() {  # check_times <name> <rounds>: each Space timed to its frame (a mark of its own per round)
     local all="" n
     for n in $(seq 1 "$2"); do
-        mark "$1-$n"; "$probe" key "$pid" 49; settle "$1-$n" "key 49" 1 60; mark "$1-$n-end"
+        mark "$1-$n"; drive key 49; settle "$1-$n" "key 49" 1 60; mark "$1-$n-end"
         all="$all $(first "$1-$n" "$1-$n-end" "key 49")"; sleep 0.8
     done
     echo "$all" | tr ' ' '\n' | grep -v '^$'
 }
-"$probe" key "$pid" 45 cmd; sleep 0.5
-mark up; "$probe" key "$pid" 126; settle up "key 126" 1 90; mark up-end
+drive key 45 cmd; sleep 0.5
+mark up; drive key 126; settle up "key 126" 1 90; mark up-end
 echo "↑ from the input line, the last row picked (app): $(first up up-end "key 126") ms"
 # PERF_SAMPLE=1: the main thread sampled (macOS `sample`, this test copy only) through one check.
 if [ "${PERF_SAMPLE:-0}" = 1 ]; then
     sample "$pid" 6 -file "$out/sample-check.txt" >/dev/null 2>&1 &
     sampler=$!; sleep 0.5
-    mark sampled; "$probe" key "$pid" 49; settle sampled "key 49" 1 60; mark sampled-end
+    mark sampled; drive key 49; settle sampled "key 49" 1 60; mark sampled-end
     echo "  (sampled) check: $(first sampled sampled-end "key 49") ms → $out/sample-check.txt"
     wait "$sampler" || true
-    "$probe" key "$pid" 49; sleep 3
+    drive key 49; sleep 3
 fi
 c0=$(check_times check0 6)
 echo "check / uncheck, undo depth ~0 (app, ms): $(echo $c0) · median $(echo "$c0" | median)"
@@ -173,37 +183,39 @@ echo "check / uncheck, undo depth ~0 (app, ms): $(echo $c0) · median $(echo "$c
 fill_count=${PERF_FILL:-200}
 if [ "$fill_count" -gt 0 ]; then
     mark fill
-    for n in $(seq 1 "$fill_count"); do mark "fill-$n"; "$probe" key "$pid" 49; settle "fill-$n" "key 49" 1 60; done
+    for n in $(seq 1 "$fill_count"); do mark "fill-$n"; drive key 49; settle "fill-$n" "key 49" 1 60; done
     mark fill-end
     fill=$(vals fill fill-end "key 49")
     echo "  filling $fill_count steps (app, per check): median $(echo "$fill" | median) ms · max $(echo "$fill" | max) ms · last 20 median $(echo "$fill" | tail -20 | median) ms"
     c200=$(check_times check200 6)
     echo "check / uncheck, undo depth $fill_count (app, ms): $(echo $c200) · median $(echo "$c200" | median)"
 fi
-"$probe" key "$pid" 53; sleep 0.4
+drive key 53; sleep 0.4
 
 # 4. Tab switch ⌘2 ⌘1 (three rounds) and typing, now with the undo stack full.
 mark tabs
-for _ in 1 2 3; do for code in 19 18; do "$probe" key "$pid" "$code" cmd; sleep 0.8; done; done
+for _ in 1 2 3; do for code in 19 18; do drive key "$code" cmd; sleep 0.8; done; done
 settle tabs "key " 6 60
 mark tabs-end
 tabs=$(vals tabs tabs-end key)
 echo "tab switch 오늘↔앞으로 (app): median $(echo "$tabs" | median) ms · max $(echo "$tabs" | max) ms"
-"$probe" key "$pid" 45 cmd; sleep 0.6
+drive key 45 cmd; sleep 0.6
 mark typing
-"$probe" type "$pid" "내일 3시 회의 준비하기 #회사" 150
+drive type 150 "내일 3시 회의 준비하기 #회사"
 settle typing "key 0 " 15 90
 mark typing-end
 keys=$(vals typing typing-end key)
 echo "typing (app): first $(echo "$keys" | head -1) ms · rest median $(echo "$keys" | tail -n +2 | median) ms · p95-ish max $(echo "$keys" | tail -n +2 | max) ms ($(echo "$keys" | wc -l | tr -d ' ') keys)"
-"$probe" key "$pid" 53; sleep 0.4; "$probe" key "$pid" 53; sleep 0.4
+drive key 53; sleep 0.4; drive key 53; sleep 0.4
 
 # 5. The note hidden (⌘W), idle. 메모 서랍 is measured by scripts/perf-drawer.sh now (#208): opening it here went
 # through the 윈도우 menu by an accessibility press, and the drawer puts the cursor in its quick-write field.
-"$probe" key "$pid" 13 cmd; sleep 3
+drive key 13 cmd; sleep 3
 echo "idle, note hidden (30 s): $("$probe" sample "$pid" 30)"
-mark reopen; "$probe" key "$pid" 29 cmd; settle reopen "key " 1; mark reopen-end
+mark reopen; drive key 29 cmd; settle reopen "key " 1; mark reopen-end
 echo "warm reopen (⌘0, app): $(first reopen reopen-end key) ms"
 echo "memory at the end: $("$probe" mem "$pid")"
 echo "files written in the whole run: $(grep -c '^io' "$log" || true) (todos $(grep -c '^io todos' "$log" || true))"
 cp "$log" "$out/perf-audit-last.log"
+offscreen_check
+if grep -q '^drive ' "$log"; then echo "commands the test copy couldn't do:"; grep '^drive ' "$log" | sort | uniq -c; fi

@@ -7,6 +7,7 @@ extension Notification.Name {
 }
 
 struct PaperView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @ObservedObject var model: AppModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var rowDrop: TaskRowDrop?
@@ -58,12 +59,14 @@ struct PaperView: View {
         }
     }
 
-    /// The paper's red margin line, down the whole list.
+    /// The paper's red margin line, down the whole list: 2 pt on 하늘색 줄노트, none on 원고지's cells (#244).
     private var marginLine: some View {
-        Rectangle()
+        let ruling = PaperLook.shared.paper(dark: colorScheme == .dark).ruling
+        return Rectangle()
             .fill(PaperTheme.marginRule)
-            .frame(width: 0.6)
-            .padding(.leading, PaperTheme.margin)
+            .frame(width: ruling == .margin ? 2 : 0.6)
+            .padding(.leading, PaperTheme.margin - (ruling == .margin ? 0.7 : 0))
+            .opacity(ruling == .manuscript ? 0 : 1)
             .allowsHitTesting(false)
     }
 
@@ -275,7 +278,7 @@ struct PaperView: View {
                     Image(systemName: "sidebar.left").font(.system(size: 12.5, weight: .regular))
                 }
                 .buttonStyle(QuietButtonStyle(size: 26))
-                .help("책상 — 달력 · 기록 · 시계 · 설정 (⌘ D)")
+                .help("책상 — 달력 · 기록 · 설정 (⌘ D)")
                 .accessibilityLabel("책상 열기")
                 }
 
@@ -592,6 +595,7 @@ struct TaskRow: View {
     /// them once ↑ had scrolled to the last), 2.8–13.9 s with 2,000 to-dos.
     let model: AppModel
     let look: TaskRowLook
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hovering = false
     @State private var editing = false
@@ -728,6 +732,12 @@ struct TaskRow: View {
                 Rectangle().fill(PaperTheme.rule).frame(height: 0.6)
                     .padding(.leading, 18).padding(.trailing, 20)
                     .allowsHitTesting(false)
+            }
+        }
+        .background {
+            // 모눈's squares and 원고지's cells run under the rows too (#244); lines are the row's own line above.
+            if ruled, PaperLook.shared.paper(dark: colorScheme == .dark).ruling.fillsRows {
+                PaperRules(row: showsMetaBelow ? style.height + 16 : style.height)
             }
         }
         .opacity(rowDrop?.source == item.id ? 0.55 : 1)

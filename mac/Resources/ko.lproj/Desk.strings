@@ -1,6 +1,7 @@
 /* Korean: the key is the text. Here so the table isn’t looked up in another language. */
 "보기" = "보기";
 "설정" = "설정";
+"메모와 데이터" = "메모와 데이터";
 "도움" = "도움";
 "알림" = "알림";
 "종이냥" = "종이냥";

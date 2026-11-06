@@ -16,7 +16,8 @@ import { Folder } from "./files";
 import { Ids } from "./ids";
 import { page, pageNote, type PageArgs } from "./pages";
 import { Problem } from "./problem";
-import { generalKey, movesFromExt, oldAppProblem, readSpace, spaceName, spacesNow, taskSpace, type SpaceWords } from "./spaces";
+import type { DeviceRules } from "../../src/core/spaceDevice";
+import { addedHiddenLine, generalKey, hiddenHere, hiddenNote, movesFromExt, oldAppProblem, readSpace, spaceName, spacesNow, taskSpace, type SpaceWords } from "./spaces";
 import { dayText, localStamp, reminderText, say, taskData, taskLine, words, type TaskWords } from "./words";
 
 export { Problem } from "./problem";
@@ -31,6 +32,8 @@ export interface Ctx {
   folder: Folder; lang: Lang; now: Date; client: string;
   /** The extension version the app carries (ai-link.json's ext; 1 for apps before it). */
   appExt: number;
+  /** N3-9: this device's 이 기기에서 (ai-link.json's spaceDevice; none from apps before ext 4: nothing hidden). */
+  device: DeviceRules;
 }
 /** A link to a resource put after the text (C2-2: each memo shown, as jongi-nyang://memo/<id>). */
 export interface ResourceLink { uri: string; name: string; mimeType: string }
@@ -153,6 +156,18 @@ function inSpace<T extends { id: string }>(items: readonly T[], given: string | 
   return { items: items.filter((item) => (of(item) ?? null) === wanted), space: wanted ?? generalKey };
 }
 
+/**
+ * N3-9 (#196): the to-dos as the note shows them on this device — with `leave` (no space picked, no word searched) the
+ * ones whose space this device hides now are left out, and `note` is the end line's words and counts of the open ones
+ * left out (D9). Picked by space or found by a word they stay, marked hidden (as 찾기 shows them).
+ */
+export function leaveHidden<T extends TodoItem>(items: readonly T[], leave: boolean, spaces: SpaceWords, lang: Lang): { sheet: T[]; note: ReturnType<typeof hiddenNote> } {
+  if (!leave || spaces.hidden.size === 0) return { sheet: [...items], note: { data: [] } };
+  const sheet: T[] = [], left: T[] = [];
+  for (const item of items) (hiddenHere(spaces, item.id) ? left : sheet).push(item);
+  return { sheet, note: hiddenNote(left.filter((item) => !item.isCompleted), spaces, lang) };
+}
+
 // ─── Reading tools ────────────────────────────────────────────────────────────
 
 /** Open tasks of today's sheet first by their time, then the others in the list's order. */
@@ -193,7 +208,8 @@ export function getToday(ctx: Ctx, args: { limit?: number; detail?: boolean; spa
   const words = taskWordsOf(ctx, items, spaces);
   // N3-2: a space filters the tasks and their counts only (events, alarms and focus have no space).
   const filtered = inSpace(items.filter((item) => pageOf(item, now) === "today"), args.space, spaces, lang);
-  const sheet = filtered.items;
+  // N3-9: without a space, what this device hides is left out as on the note (counts too), and the end says so.
+  const { sheet, note } = leaveHidden(filtered.items, filtered.space === undefined, spaces, lang);
   const open = byTime(sheet.filter((item) => !item.isCompleted), now);
   const done = byTime(sheet.filter((item) => item.isCompleted && item.completedAt !== undefined && dayKey(new Date(item.completedAt)) === today), now);
   // Today's sheet isn't cut by default; a very long one gives its first tasks and the cursor list_todos goes on with (P1).
@@ -212,6 +228,7 @@ export function getToday(ctx: Ctx, args: { limit?: number; detail?: boolean; spa
     ...(open.length || (args.detail && done.length) ? shown.shown.map((item) => taskLine(item, now, lang, words)) : [none(lang)]),
     ...(shown.next ? [say(lang, `… ${more}개 더: list_todos(where today) cursor ‘${shown.next}’`, `… ${more} more: list_todos (where today) with cursor ‘${shown.next}’`, `… nog ${more}: list_todos (where today) met cursor ‘${shown.next}’`)] : []),
     ...(args.detail ? done.slice(0, pages.today[1]).map((item) => taskLine(item, now, lang, words)) : []),
+    ...(note.line ? [note.line] : []),
     "",
     `${say(lang, "일정", "Events", "Afspraken")} (${happening.length})`,
     ...(happening.length ? happening.map((event) => eventLine(event, lang, index.ids)) : [none(lang)]),
@@ -225,6 +242,7 @@ export function getToday(ctx: Ctx, args: { limit?: number; detail?: boolean; spa
       date: today, ...(filtered.space ? { space: filtered.space } : {}), open: open.length, done: done.length,
       tasks: [...shown.shown, ...(args.detail ? done.slice(0, pages.today[1]) : [])].map((item) => taskData(item, now, words)),
       ...(shown.next ? { nextCursor: shown.next } : {}),
+      ...(note.data.length ? { hiddenHere: note.data } : {}),
       events: happening.map((event) => eventData(event, index.byId.get(event.eventId), index.ids)),
       alarms: alarms.map(({ alarm, at }) => ({ time: alarm.time, ...(alarm.label ? { label: alarm.label } : {}), at: localStamp(at!) })),
       focus: { minutes: focus.minutes, sessions: focus.sessions },
@@ -254,14 +272,19 @@ export function listTodos(ctx: Ctx, args: { where?: TodoWhere; from?: string; to
   });
   const spaces = spacesNow(ctx);
   const filtered = inSpace(items, args.space, spaces, lang);
-  const sorted = byTime(filtered.items, now);
+  // N3-9: as the note, unless a space was picked or a word searched (then as 찾기: shown, marked hidden).
+  const { sheet, note: hidden } = leaveHidden(filtered.items, filtered.space === undefined && !query, spaces, lang);
+  const sorted = byTime(sheet, now);
   const shown = page(sorted, args, pages.todos[0], pages.todos[1], lang);
   const words = taskWordsOf(ctx, all, spaces);
   const heading = say(lang, `할 일 ${sorted.length}개`, `${sorted.length} ${sorted.length === 1 ? "task" : "tasks"}`, `${sorted.length} ${sorted.length === 1 ? "taak" : "taken"}`);
   const note = pageNote(shown, lang);
   return {
-    text: [heading, ...shown.shown.map((item) => taskLine(item, now, lang, words)), ...(note ? [note] : [])].join("\n"),
-    data: { where, ...(period ?? {}), ...(query ? { query: args.query!.trim() } : {}), ...(filtered.space ? { space: filtered.space } : {}), count: sorted.length, tasks: shown.shown.map((item) => taskData(item, now, words)), ...(shown.next ? { nextCursor: shown.next } : {}) },
+    text: [heading, ...shown.shown.map((item) => taskLine(item, now, lang, words)), ...(note ? [note] : []), ...(hidden.line ? [hidden.line] : [])].join("\n"),
+    data: {
+      where, ...(period ?? {}), ...(query ? { query: args.query!.trim() } : {}), ...(filtered.space ? { space: filtered.space } : {}), count: sorted.length,
+      tasks: shown.shown.map((item) => taskData(item, now, words)), ...(shown.next ? { nextCursor: shown.next } : {}), ...(hidden.data.length ? { hiddenHere: hidden.data } : {}),
+    },
   };
 }
 
@@ -491,6 +514,9 @@ export function addTodos(ctx: Ctx, args: { items: TodoInput[] }): Reply {
   const words = taskWordsOf(ctx, all);
   const lines: string[] = [];
   if (added.length) lines.push(say(lang, `할 일 ${added.length}개를 넣었어요.`, `Added ${added.length} ${added.length === 1 ? "task" : "tasks"}.`, `${added.length} ${added.length === 1 ? "taak" : "taken"} toegevoegd.`), ...added.map((item) => taskLine(item, now, lang, words)));
+  // N3-9 (D12): put where this device hides it — it goes in, and the reply says it won't show here.
+  const hiddenWords = [...new Set(added.flatMap((item) => (hiddenHere(words.spaces, item.id) ? [addedHiddenLine(spaceOf(words.spaces!.data, item.id) ?? null, words.spaces!, lang)!] : [])))];
+  lines.push(...hiddenWords.map((line) => `(${line})`));
   if (skipped.length) lines.push(say(lang, "이미 있어서 넣지 않았어요:", "Already there, so not added:", "Staat er al, dus niet toegevoegd:"), ...skipped.map(({ existing }) => taskLine(existing, now, lang, words)));
   return {
     text: lines.join("\n"),
@@ -731,7 +757,9 @@ export function previewChanges(ctx: Ctx, args: { changes: ChangeInput[] }): Repl
           if (space !== from) {
             if (ctx.appExt < movesFromExt) throw oldAppProblem(lang);
             move = { space, from };
-            changes.push(`   ${say(lang, "스페이스", "Space", "Ruimte")}: ${spaceName(spaces, from)} → ${spaceName(spaces, space)}`);
+            // N3-9: a move to where this device hides it is fine (as in the app); the preview says it won't show here.
+            const hidden = addedHiddenLine(space, spaces, lang) ? ` (${say(lang, "이 기기에서는 숨겨져 있어요", "hidden on this device", "verborgen op dit apparaat")})` : "";
+            changes.push(`   ${say(lang, "스페이스", "Space", "Ruimte")}: ${spaceName(spaces, from)} → ${spaceName(spaces, space)}${hidden}`);
           }
         }
         if (!changes.length) throw new Problem(say(lang, `바뀌는 게 없어요: ‘${item.title}’.`, `Nothing changes for ‘${item.title}’.`, `Er verandert niets aan ‘${item.title}’.`));

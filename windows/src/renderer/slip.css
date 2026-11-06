@@ -99,15 +99,15 @@ button.chip:hover { background: color-mix(in srgb, var(--sage) 9%, var(--paper-2
 .sbtn.primary:hover { background: color-mix(in srgb, var(--sage) 90%, black); color: var(--on-sage); }
 .sbtn.primary .keycap { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.28); color: #f3f6ef; }
 /* At night the sage is light and its words dark: the keycap inside the button turns round too. */
-:root[data-paper="night"] .sbtn.primary { box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.6); }
-:root[data-paper="night"] .sbtn.primary:hover { background: color-mix(in srgb, var(--sage) 88%, white); }
-:root[data-paper="night"] .sbtn.primary .keycap { background: rgba(31, 42, 30, 0.1); border-color: rgba(31, 42, 30, 0.3); color: var(--on-sage); }
+:root[data-scheme="dark"] .sbtn.primary { box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.6); }
+:root[data-scheme="dark"] .sbtn.primary:hover { background: color-mix(in srgb, var(--sage) 88%, white); }
+:root[data-scheme="dark"] .sbtn.primary .keycap { background: rgba(31, 42, 30, 0.1); border-color: rgba(31, 42, 30, 0.3); color: var(--on-sage); }
 .sbtn.primary.waiting { opacity: 0.5; box-shadow: none; }
 /* A destructive primary (지우기, 모두 지우기, 바꾸기): clay instead of sage. */
 .sbtn.primary.clay { background: var(--clay); box-shadow: 0 2px 6px -2px rgba(150, 80, 50, 0.5); }
 .sbtn.primary.clay:hover { background: color-mix(in srgb, var(--clay) 90%, black); }
-:root[data-paper="night"] .sbtn.primary.clay { box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.6); }
-:root[data-paper="night"] .sbtn.primary.clay:hover { background: color-mix(in srgb, var(--clay) 88%, white); }
+:root[data-scheme="dark"] .sbtn.primary.clay { box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.6); }
+:root[data-scheme="dark"] .sbtn.primary.clay:hover { background: color-mix(in srgb, var(--clay) 88%, white); }
 .sbtn.danger { color: var(--clay-text); padding-inline: 6px; }
 .sbtn.danger:hover { background: var(--clay-2); color: var(--clay-text); }
 .sbtn:disabled { opacity: 0.45; pointer-events: none; }

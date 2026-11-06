@@ -1,3 +1,4 @@
+import { readWidgets } from "../core/calendarWidget";
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import path from "node:path";
@@ -7,7 +8,7 @@ import { alertOn, isValidRule, occursOn, parseSeries, planToday, serializeSeries
 import { isBlank, mergeMemos, newMemo, parseMemos, serializeMemos, type Memo } from "../core/memo";
 import {
   clampDrawerWidth, duplicateFolder, emptyMemoFolders, inboxID, lastFolderOf, memosIn, placementOf, readMemoPaper, setMemoPaper, visibleFolders, memoFoldersFileName, mergeMemoFolders, parseMemoFolders, placeNew, pruneMemoFolders, readDrawerShortcut,
-  readDrawerBackdrop, readDrawerFont, readDrawerTextSize, readDrawerTheme, readSort, readView, serializeMemoFolders, type MemoFolders, type MemoPlacement, drawerPaper, drawerThemeValue,
+  readDrawerBackdrop, readDrawerFont, readDrawerTextSize, readSort, readView, serializeMemoFolders, type MemoFolders, type MemoPlacement,
 } from "../core/memoDrawer";
 import { mergeText } from "../core/textMerge";
 import { drawerLegacyName, drawerPoint, noteLegacyName, noteStep, readCodeFont, readLineSpacing, readParagraphSpacing } from "../core/textSteps";
@@ -23,6 +24,7 @@ import { sharedFiles, type SharedFile } from "../core/storage";
 import { defaultPrefs, type AiView, type AppState, type BackupsView, type FocusView, type Prefs, type TimerView } from "../core/types";
 import type { CalendarView } from "../core/calendar";
 import { readPaper } from "../core/desk";
+import { drawerWrite, readDrawerChoice, readNightChoice, readPaperKind } from "../core/paper";
 import { readNoteShortcut } from "../core/shortcuts";
 import { parseEvents, serializeEvents, type LocalEvent } from "../core/events";
 import { parseAlarms, serializeAlarms, type Alarm } from "../core/alarm";
@@ -32,6 +34,8 @@ import { takeLock } from "./aiLock";
 import { RefusedFile, readTextSafely, writeFileAtomically } from "./safeFiles";
 import { megabytes } from "../core/fileLimits";
 import { checkedDeviceRules, cleanedDeviceRules, deviceKey, deviceRings, hiddenSpaces, readDeviceRules, storedDeviceRules, type StoredRules } from "../core/spaceDevice";
+
+import type { SlipPlace } from "../core/slipMove";
 
 export interface WindowMemory {
   bounds?: { x: number; y: number; width: number; height: number };
@@ -44,6 +48,8 @@ export interface WindowMemory {
   desk?: { x: number; y: number; width: number; height: number; pane?: string };
   /** 화면 오른쪽에 붙이기 / 왼쪽에 붙이기: the side the note is docked to, and where it was before (restored by the second click). */
   docked?: { side: "left" | "right"; previous: { x: number; y: number; width: number; height: number } };
+  /** #246: where 빠른 입력 · 빠른 메모 were dragged, per display id (core/slipMove.ts SlipPlace; read back with readSlipPlace). */
+  slipPlaces?: { quick?: Record<string, SlipPlace>; quickMemo?: Record<string, SlipPlace> };
 }
 
 /** Where 종이냥 sits, kept across launches. */
@@ -1080,8 +1086,8 @@ export class Store extends EventEmitter {
     // #141: a step is written with the nearest of 1.30's four sizes beside it, for an older version.
     const legacy: Partial<Prefs> = key === "textStep" ? { textSize: noteLegacyName(value as number) }
       : key === "drawerTextPt" ? { drawerTextSize: drawerLegacyName(value as number) }
-      // #142: the switch rewrites drawerTheme too (낮 종이 with it on is written `auto`, as 1.30 reads it).
-      : key === "drawerNightPaper" ? { drawerTheme: drawerThemeValue(drawerPaper(this.prefs.drawerTheme, this.prefs.drawerNightPaper).paper, value as boolean) } : {};
+      // #244: the drawer's own paper and 밤에는, with 1.32's keys (drawerTheme `auto`, drawerNightPaper) beside them.
+      : key === "drawerTheme" || key === "drawerNight" || key === "drawerNightPaper" ? drawerWrite(this.prefs, key, value) : {};
     this.prefs = { ...this.prefs, [key]: value, ...legacy };
     this.saveSettingsSoon();
     this.emit("prefs", key);
@@ -1408,11 +1414,14 @@ export class Store extends EventEmitter {
       this.prefs = {
         ...defaultPrefs, ...known, paper: readPaper(known.paper),
         // 메모 서랍's device settings, kept within what the drawer can take.
-        drawerShortcut: readDrawerShortcut(known.drawerShortcut), drawerShortcutLast: readDrawerShortcut(known.drawerShortcutLast) || defaultPrefs.drawerShortcutLast, drawerWidth: clampDrawerWidth(known.drawerWidth), drawerTheme: readDrawerTheme(known.drawerTheme),
-        drawerNightPaper: drawerPaper(readDrawerTheme(known.drawerTheme), typeof known.drawerNightPaper === "boolean" ? known.drawerNightPaper : undefined).nightPaper,
+        drawerShortcut: readDrawerShortcut(known.drawerShortcut), drawerShortcutLast: readDrawerShortcut(known.drawerShortcutLast) || defaultPrefs.drawerShortcutLast, drawerWidth: clampDrawerWidth(known.drawerWidth), 
+        // #244: 종이 · 밤에는, and the drawer's (노트와 같은 종이 moved over once from 1.32's drawerTheme · drawerNightPaper).
+        paperTheme: readPaperKind(known.paperTheme), paperNight: readNightChoice(known.paperNight), ...readDrawerChoice(saved.prefs ?? {}),
         // The note's key (#85): before 1.30.1 there was none saved (Ctrl+Alt+J); the switch, noteHotkey, is read as it was.
         noteShortcut: readNoteShortcut(known.noteShortcut, readDrawerShortcut(known.drawerShortcut)),
         drawerSide: known.drawerSide === "left" ? "left" : "right",
+        // #230: 글자 칠 때 두드리기 (anything else: on, in the app's windows).
+        petTyping: known.petTyping === "off" ? "off" : "app",
         drawerBackdrop: readDrawerBackdrop(known.drawerBackdrop), drawerPinnedSort: readSort(known.drawerPinnedSort), drawerPinnedView: readView(known.drawerPinnedView),
         drawerFont: readDrawerFont(known.drawerFont), drawerTextSize: readDrawerTextSize(known.drawerTextSize),
         // #141: the steps (from 1.30's four names when this version hasn't written them yet), 줄 간격 · 문단 간격.
@@ -1429,6 +1438,8 @@ export class Store extends EventEmitter {
         // #196: 이 기기에서 (anything that doesn't read: shown), and when each space was made visible here.
         spaceDevice: checkedDeviceRules(known.spaceDevice) ?? {},
         spaceDeviceShown: readShown(known.spaceDeviceShown),
+        // #234: this PC's desktop calendar widgets, as read (an entry of the wrong shape dropped, four at most).
+        calendarWidgets: readWidgets(known.calendarWidgets),
         drawerHandleY: typeof known.drawerHandleY === "number" && known.drawerHandleY >= 0 && known.drawerHandleY <= 1 ? known.drawerHandleY : defaultPrefs.drawerHandleY,
       };
       this.memory = saved.memory ?? {};

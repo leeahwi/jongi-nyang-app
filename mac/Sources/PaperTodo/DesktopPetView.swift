@@ -3,11 +3,12 @@ import SwiftUI
 
 /// The timer board's colours: the focus card's — clay for focus, sage for rest (marks), and their
 /// text tokens for words, so a session looks the same on the card and on the board.
+/// The ring keeps to day and night only, whatever the paper (#244, 4-4).
 enum FocusColor {
-    static let focus = PaperTheme.clay
-    static let rest = PaperTheme.sage
-    static let focusText = PaperTheme.clayText
-    static let restText = PaperTheme.sageText
+    static let focus = PaperTheme.dayNight(.clay)
+    static let rest = PaperTheme.dayNight(.sage)
+    static let focusText = PaperTheme.dayNight(.clayText)
+    static let restText = PaperTheme.dayNight(.sageText)
 }
 
 @MainActor
@@ -20,11 +21,13 @@ final class PetState: ObservableObject {
     @Published var question: PetChatter.Line?
     /// How wide the bubble above the cat is (for keeping it on screen and for its clickable area).
     var bubbleWidth: CGFloat = 0
-    @Published var hovering = false
+    /// 치면 두드리는 고양이 (#230): on its cushion, which paw is down; nil while it is its usual self.
+    @Published var typing: TypingCat.Pose?
     let size: CGFloat = 92
 }
 
-/// The pet and its effects, drawn inside the transparent floor strip.
+/// The pet and its effects, drawn inside the transparent floor strip. The cat itself is `PetSprite` (Core Animation,
+/// #64): this view is laid out again only when the cat starts or ends something, never per frame of a clip.
 struct DesktopPetView: View {
     @ObservedObject var state: PetState
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -36,25 +39,29 @@ struct DesktopPetView: View {
     @State private var bubbleWidth: CGFloat = 0
 
     var body: some View {
+        let _ = PerfProbe.count("petLayout")
         GeometryReader { geometry in
-            // Only moving clips need frames, each as often as it moves (PetMotion.frameInterval); resting poses and a blink
-            // draw once.
-            let every = PetMotion.frameInterval(of: state.activity.action)
-            TimelineView(.animation(minimumInterval: every ?? 1.0 / 60, paused: every == nil || reduceMotion)) { context in
-                let _ = PerfProbe.count("petFrame")
-                let _ = PerfProbe.count("petFrame." + state.activity.action.name)
-                let frame = PetMotion.frame(state.activity, homeX: state.homeX, at: reduceMotion ? state.activity.start : context.date)
-                pet(frame: frame, shift: PetBubble.shift(centerX: frame.x, width: bubbleWidth, stripWidth: geometry.size.width))
-                    .position(x: frame.x, y: geometry.size.height - petHeight / 2 - 2)
+            ZStack {
+                PetSprite(activity: state.activity, homeX: state.homeX, typing: state.typing, size: state.size, reduceMotion: reduceMotion)
+                // No bubble comes up while the cat walks (DesktopPetController), so it stays over where the cat sits.
+                pet(shift: PetBubble.shift(centerX: state.homeX, width: bubbleWidth, stripWidth: geometry.size.width))
+                    .position(x: path.middle, y: geometry.size.height - petHeight / 2 - 2)
             }
         }
+    }
+
+    /// Where the cat can be during the activity: where it sits, or along the whole of a walk (so a tap or a drag finds
+    /// it anywhere on the way — the panel takes the mouse only right over the cat, DesktopPetController).
+    private var path: (middle: CGFloat, width: CGFloat) {
+        if case .walk(let from, let to) = state.activity.action { return ((from + to) / 2, abs(to - from)) }
+        return (state.homeX, 0)
     }
 
     /// Taller while a question with answer buttons is up (still inside the 250-point strip).
     private var petHeight: CGFloat { state.size + (state.question == nil ? 70 : 150) }
 
     /// `shift` moves the bubble sideways so it stays on screen when the cat sits near an edge.
-    private func pet(frame: PetFrame, shift: CGFloat) -> some View {
+    private func pet(shift: CGFloat) -> some View {
         let size = state.size
         return VStack(spacing: 4) {
             Spacer(minLength: 0)
@@ -73,48 +80,46 @@ struct DesktopPetView: View {
             }
             .offset(x: shift)
             .transition(.scale(scale: 0.6, anchor: .bottom).combined(with: .opacity))
-            ZStack(alignment: .bottom) {
-                Ellipse()
-                    .fill(.black.opacity(0.10 - 0.006 * Double(frame.pose.lift)))
-                    .frame(width: size * 0.58 * (1 - 0.02 * frame.pose.lift), height: size * 0.07)
-                    .offset(y: -size * 0.03)
-                cat(frame: frame, size: size)
-                    .offset(y: -frame.pose.lift)
-                effects(frame: frame, size: size)
-            }
-            .frame(width: size + 40, height: size + 8, alignment: .bottom)
-            // Only the cat takes taps and drags; the bubble's buttons are its own.
-            .contentShape(Rectangle().inset(by: 10).offset(y: 6))
-            .onTapGesture(count: 2, perform: onDoubleTap)
-            .onTapGesture(perform: onTap)
-            .gesture(DragGesture(minimumDistance: 4, coordinateSpace: .global)
-                .onChanged { onDrag($0.translation.width) }
-                .onEnded { _ in onDragEnd() })
-            .onHover { state.hovering = $0 }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("종이냥")
-            .accessibilityValue(state.message ?? "")
-            .accessibilityAddTraits(.isButton)
-            .accessibilityAction { onTap() }
+            PetEffects(activity: state.activity, size: size, reduceMotion: reduceMotion)
+                .frame(width: size + 40 + path.width, height: size + 8, alignment: .bottom)
+                // Only the cat takes taps and drags; the bubble's buttons are its own.
+                .contentShape(Rectangle().inset(by: 10).offset(y: 6))
+                .onTapGesture(count: 2, perform: onDoubleTap)
+                .onTapGesture(perform: onTap)
+                .gesture(DragGesture(minimumDistance: 4, coordinateSpace: .global)
+                    .onChanged { onDrag($0.translation.width) }
+                    .onEnded { _ in onDragEnd() })
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("종이냥")
+                .accessibilityValue(state.message ?? "")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityAction { onTap() }
         }
-        .frame(width: size + 120, height: petHeight)
+        .frame(width: size + 120 + path.width, height: petHeight)
+    }
+}
+
+/// What floats around the cat: hearts when it is petted, sparkles when it cheers, Z's while it sleeps. Only the hearts
+/// and the sparkles need frames, and only during those two clips (a tap, a finished to-do), never at rest.
+private struct PetEffects: View {
+    let activity: PetActivity
+    let size: CGFloat
+    let reduceMotion: Bool
+
+    var body: some View {
+        let moving = !reduceMotion && (activity.action == .happy || activity.action == .cheer)
+        TimelineView(.animation(minimumInterval: 1.0 / 60, paused: !moving)) { context in
+            let _ = moving ? PerfProbe.count("petFrame." + activity.action.name) : ()
+            let frame = PetMotion.frame(activity, homeX: 0, at: moving ? context.date : activity.start)
+            ZStack(alignment: .bottom) {
+                Color.clear
+                effects(frame: frame)
+            }
+        }
     }
 
     @ViewBuilder
-    private func cat(frame: PetFrame, size: CGFloat) -> some View {
-        let image: NSImage = frame.walkFrame.flatMap { PetArt.walkCycle?[$0] }
-            ?? (frame.eyesClosed ? PetArt.closedEyes : PetArt.image(frame.image) ?? PaperTheme.mascot)
-        let breathing: BreathingImage.Style = frame.walkFrame != nil || !state.activity.action.isResting ? .still
-            : frame.sleepy ? .asleep : .awake
-        BreathingImage(image: image, style: breathing)
-        .frame(width: size, height: size)
-        .scaleEffect(x: frame.facingRight && frame.walkFrame != nil ? -1 : 1, y: 1)
-        .scaleEffect(x: frame.pose.scaleX, y: frame.pose.scaleY, anchor: UnitPoint(x: 0.5, y: 0.93))
-        .rotationEffect(.degrees(frame.pose.rotation), anchor: frame.pose.pivot)
-    }
-
-    @ViewBuilder
-    private func effects(frame: PetFrame, size: CGFloat) -> some View {
+    private func effects(frame: PetFrame) -> some View {
         if let hearts = frame.hearts {
             ForEach(0..<3, id: \.self) { index in
                 let delay = Double(index) * 0.18

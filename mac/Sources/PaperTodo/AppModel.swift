@@ -37,6 +37,18 @@ final class AppModel: ObservableObject {
     }
     @Published var petVisible: Bool { didSet { preferences.set(petVisible, forKey: "pet.visible") } }
     @Published var petWanders: Bool { didSet { preferences.set(petWanders, forKey: "pet.wanders") } }
+    /// 글자 칠 때 두드리기 (#230): off · in this app (the default) · in all apps (Input Monitoring). A device setting.
+    @Published var petTyping: TypingCat.Scope { didSet { preferences.set(petTyping.rawValue, forKey: "pet.typing") } }
+    /// In all apps: the small cat over full-screen apps (on unless turned off) and its corner.
+    @Published var petCompanion: Bool { didSet { preferences.set(petCompanion, forKey: "pet.companion") } }
+    @Published var petCompanionCorner: TypingCompanion.Corner {
+        didSet { preferences.set(petCompanionCorner.rawValue, forKey: "pet.companion.corner") }
+    }
+    /// Set by the pet: in all apps is chosen but macOS's Input Monitoring doesn't allow it (Settings says so).
+    @Published var typingNoPermission = false
+    /// Set by the app: System Settings → Input Monitoring.
+    var onInputMonitoringSettings: (() -> Void)?
+    func openInputMonitoringSettings() { onInputMonitoringSettings?() }
     /// 종이냥 한마디: now and then the cat says something (see PetChatter).
     @Published var chatterEnabled: Bool { didSet { preferences.set(chatterEnabled, forKey: "chatter.enabled") } }
     @Published var chatterFrequency: PetChatter.Frequency { didSet { preferences.set(chatterFrequency.rawValue, forKey: "chatter.frequency") } }
@@ -45,12 +57,31 @@ final class AppModel: ObservableObject {
     func previewChatter() { onChatterPreview?() }
     /// The menu bar item's words next to the cat face: automatic or hidden.
     @Published var menuBarText: MenuBarTextMode { didSet { preferences.set(menuBarText.rawValue, forKey: "menuBar.text") } }
-    /// 꾸미기 → 종이 색: 자동 (follows macOS) · 낮 · 밤. Every open window follows at once.
+    /// 꾸미기 → 낮 · 밤: 자동 (follows macOS) · 낮 · 밤. Every open window follows at once.
     @Published var paperColor: PaperColor {
         didSet {
             preferences.set(paperColor.rawValue, forKey: PaperColor.key)
             paperColor.apply()
         }
+    }
+    /// 꾸미기 → 종이 (#244): one of the fifteen papers for the note, the calendar, the widgets, the slips and the desk (and the
+    /// drawer while it is the same as the note's). This Mac only, like 낮 · 밤.
+    @Published var paperTheme: PaperKind {
+        didSet {
+            preferences.set(paperTheme.rawValue, forKey: "paper.theme")
+            applyPaper()
+        }
+    }
+    /// 꾸미기 → 밤에는: what a light paper turns into at night (밤 종이 by default; 그대로 keeps it).
+    @Published var paperNight: NightChoice {
+        didSet {
+            preferences.set(paperNight.rawValue, forKey: "paper.night")
+            applyPaper()
+        }
+    }
+    /// The paper drawn, 낮 · 밤 and the system controls' lightness follow these three settings.
+    func applyPaper() {
+        PaperLook.shared.apply(PaperLook(dayNight: paperColor.dayNight, paper: paperTheme, night: paperNight))
     }
     /// ⌃⌥N from any app opens the quick-entry slip.
     @Published var quickEntryEnabled: Bool { didSet { preferences.set(quickEntryEnabled, forKey: "quickEntry.enabled") } }
@@ -238,6 +269,8 @@ final class AppModel: ObservableObject {
             guard deviceRules != oldValue else { return }
             preferences.set(SpaceDevice.encode(deviceRules), forKey: "spaces.device")
             refreshDeviceHidden()
+            // N3-9: Claude on this Mac hides what the note hides.
+            ai?.writeLink()
         }
     }
     /// D10: when a space was last made visible by a change here (`spaces.deviceShown`): reminders from before stay quiet.
@@ -612,12 +645,18 @@ final class AppModel: ObservableObject {
         petVisible = flag("pet.visible", !isolated)
         showsGuide = !isolated && !store.bool(forKey: "guide.seen")
         petWanders = flag("pet.wanders", true)
+        petTyping = TypingCat.Scope(saved: store.string(forKey: "pet.typing"))
+        petCompanion = flag("pet.companion", true)
+        petCompanionCorner = TypingCompanion.Corner(saved: store.string(forKey: "pet.companion.corner"))
         chatterEnabled = flag("chatter.enabled", true)
         chatterFrequency = PetChatter.Frequency(rawValue: store.string(forKey: "chatter.frequency") ?? "") ?? .normal
         chatterQuestions = flag("chatter.questions", true)
         quickEntryEnabled = flag("quickEntry.enabled", true)
         menuBarText = MenuBarTextMode(rawValue: store.string(forKey: "menuBar.text") ?? "") ?? .auto
         paperColor = PaperColor(rawValue: store.string(forKey: PaperColor.key) ?? "") ?? .auto
+        // #244: not saved before 1.48 — 낮 종이 with 밤 종이 at night, the screen 1.47 drew.
+        paperTheme = PaperLook.readPaper(store.object(forKey: "paper.theme"))
+        paperNight = PaperLook.readNight(store.object(forKey: "paper.night"))
         quickMemoEnabled = flag("quickMemo.enabled", true)
         timerRecent = TimerLength.cleaned((store.array(forKey: "timer.recent") as? [Int]) ?? [])
         pomodoroAutoContinue = flag("pet.autoContinue", true)

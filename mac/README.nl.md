@@ -12,7 +12,7 @@
 - **macOS 14 of nieuwer** — deze map (`mac/`). SwiftUI + AppKit, zonder externe bibliotheken.
 - **Windows 10/11** — de [map `windows/`](../windows). Hetzelfde ontwerp en dezelfde functies in Electron + TypeScript.
 - Beide apps gebruiken **hetzelfde bestandsformaat**, dus een Mac en een Windows-pc kunnen via een gedeelde map één lijst gebruiken.
-- Geen internet, account of server: alles blijft op je eigen computer (of in een synchronisatiemap die je zelf kiest).
+- Geen internet, account of server: alles blijft op je eigen computer (of in een gedeelde map die je zelf kiest).
 - In het Koreaans, Engels en Nederlands (Bureau → Weergave → Taal).
 
 ---
@@ -34,7 +34,7 @@
 ### 📝 Eén blad voor vandaag
 - Schrijf alles op de ene **invoerregel** onderaan. Klik op het vakje en het kleurt salie terwijl er een potloodstreep door de taak gaat. Een dag eindigt om **4 uur ’s nachts**.
 - Onder de titel de **dagbalk**: groot in handschrift wat er nu is, de resterende tijd in de ring ernaast (‘40 min over’), daaronder de volgende twee dingen (‘14:00 Rapport afmaken · over 40 min’) en bovenaan een dunne balk van de hele dag. ‘Hele dag ›’ klapt hem op zijn plek open tot het **dagschema**. Taken met een herinnering die vandaag nog komt staan bovenaan onder **Volgende**.
-- Pen, Stift of Strak, in vier tekstgroottes. Sleep regels aan hun handvat; haal verwijderde terug met `⌘Z`.
+- Pen, Stift of Strak, in zeven tekstgroottes. Sleep regels aan hun handvat; haal verwijderde terug met `⌘Z`.
 - Tabbladen bovenaan: **Vandaag · Vooruit**. Notities staan in de [notitielade](#-notitielade-143--144) aan de rand van het scherm. **Vooruit** toont vanaf morgen elke dag van deze en volgende week, met de afspraken en de taken die die dag af moeten; latere deadlines staan per maand en taken zonder datum bij **Ooit**. Sleep een taak naar een andere dag om de deadline te verzetten.
 - In de menubalk een klein **kattengezichtje**: ‘12:30’ terwijl een timer loopt, ‘Tandarts 40 min’ als er binnen het uur iets begint. Klik erop voor het **Vandaag-venster** (volgende afspraak · timer · volgende wekker, een paar taken van vandaag, de invoerregel).
 - Dubbelklik bovenaan of druk op `⌘M` en het notitieblok klapt in tot een **klein briefje** waar Jongi-nyang overheen gluurt.
@@ -94,14 +94,25 @@
 - Bureau → Opslag & back-up → **Back-up & verhuizen** (of Archief → Alles exporteren `⇧⌘E` / Importeren `⇧⌘I`): je taken, notities, herhalingen, afspraken, wekkers, geschiedenis en focusgeschiedenis in één `.jongi`-bestand, om te importeren in Jongi-nyang op een andere computer (ook Mac ↔ Windows). Zie [Back-up & verhuizen](#back-up--verhuizen).
 
 ### 🗂 Bureau
-- Kalender, Geschiedenis, Klok, Instellingen en Help delen nu één **Bureau**-venster. Open het met de bureauknop rechtsboven op het notitieblok of `⌘D`, en kies een onderdeel in de lijst links (Bekijken · Instellingen · Help) of met `⌘1`–`⌘9`. In een smal venster blijven alleen de pictogrammen over.
+- Kalender, Geschiedenis, Wekkers & timers, Instellingen en Help delen nu één **Bureau**-venster. Open het met de bureauknop rechtsboven op het notitieblok of `⌘D`, en kies een onderdeel in de lijst links (Bekijken · Instellingen · Notities & gegevens · Help) of met `⌘1`–`⌘9`. In een smal venster blijven alleen de pictogrammen over.
 
 ### 🌙 Nachtpapier
-- Bureau → Weergave → **Papier: Automatisch · Dag · Nacht**. Op Automatisch worden notitieblok, briefjes, bureau en Vandaag-venster **nachtpapier** — als papier in een kamer met het licht uit — als je Mac in de donkere modus staat. Elke dag- en nachtkleur haalt WCAG AA-contrast (`scripts/check-contrast.py`).
+- Bureau → Weergave → **Dag & nacht** (Automatisch · Dag · Nacht). Op Automatisch worden notitieblok, briefjes, bureau en Vandaag-venster **nachtpapier** — als papier in een kamer met het licht uit — als je Mac in de donkere modus staat. Elke dag- en nachtkleur haalt WCAG AA-contrast (`scripts/check-contrast.py`).
 
 ### 🌐 한국어 · English · Nederlands
 - Bureau → Weergave → **Taal**: Automatisch · 한국어 · English · Nederlands. Automatisch volgt de taalvolgorde van je Mac (Engels als geen van de drie erin staat); na een wijziging start Jongi-nyang opnieuw.
 - Menu’s, instellingen, help, herinneringen, kattenpraat, datums en tijden: alles in die taal. Engels en Nederlands handschrift gebruikt Caveat (pen) en Kalam (stift); titels die je in het Koreaans schrijft, blijven in Koreaans handschrift.
+
+### 🗓 Kalenderwidgets op het bureaublad · vijftien papiersoorten (1.48)
+![Een wandkalenderwidget van deze maand op het bureaublad: elke dag is een papieren tegel met afspraken en namen van feestdagen, en rechtsboven steken de oren van een kat uit](../docs/screenshots/mac/en/widget-month-wall-100.png)
+
+- **Kalenderwidgets op het bureaublad**: in Bureau → Afspraken → Bureaubladwidgets kies je Vandaag, Deze week, Deze maand, de wandkalender of Lijst van vandaag, tot vier tegelijk. Kies een dekking van 20 tot 100%; elke dag staat op een papieren tegel, zodat de tekst ook licht leesbaar blijft. De widgetinstellingen blijven op deze Mac.
+- **Dagbriefje**: klik op een dag in een widget en je ziet alles van die dag; typ erin zoals in de invoerregel van het notitieblok en het staat er meteen in.
+- **Maankalender en feestdagen**: de bureaukalender en de widgets tonen maandatums en de namen van Koreaanse feestdagen, berekend op deze Mac zonder internet.
+- **Vijftien papiersoorten**: kies er een in Bureau → Weergave → Papier, en het notitieblok, de kalender, de widgets, de briefjes, het bureau en de Notitielade krijgen allemaal dat papier. Nieuw zijn Plakbriefje, Manuscriptpapier, Blauw lijntjesschrift, Lavendel, Kringlooppapier, Nachthemel en Schoolbord, en licht papier wordt ’s nachts het papier dat je kiest bij ’s Nachts.
+- **Briefjes verslepen**: sleep vraagbriefjes en de briefjes voor snel toevoegen en snelle notitie aan hun papier of titelbalk. De snelle briefjes onthouden waar je ze liet.
+- **Een kat die meetikt**: typ je in Jongi-nyang, dan tikt de kat mee met zijn pootjes. Welke toetsen je indrukt, leest of bewaart hij nooit. Kies Uit, In deze app of In alle apps bij `Meetikken tijdens typen` in Bureau → Jongi-nyang; bij In alle apps vraagt macOS om toestemming voor Invoermonitoring.
+- **Vier groepen in het bureau**: de lijst links is nu Bekijken · Instellingen · Notities & gegevens · Help. Klok heet nu Wekkers & timers, onder Instellingen.
 
 ### 🖥 Ruimtes per apparaat · een nieuw Vandaag-venster (1.47)
 ![Bureau → Ruimtes met Werk verborgen op dit apparaat en Studie alleen zichtbaar op gekozen doordeweekse tijden](../docs/screenshots/mac/spaces-device-desk.png)
@@ -160,7 +171,7 @@
 - Maar één keer per minuut opnieuw getekend (het CPU-gebruik met het notitieblok open blijft onder 1%). Het timerbriefje verandert niet meer van breedte als de seconden tikken.
 
 ### 🕑 Een tijd voor een taak (1.39)
-- Geef een taak een **tijd** op zijn dag (begin–eind; alleen een begin telt als 30 min): rechtsklik → **Tijd instellen…**, het tabblad **Tijd** in het herinneringsbriefje (een lijst per kwartier of een getypte tijd, en 30 min · 1 u · 2 u), of typ `verslag 14:00-15:30`, `verslag van 2 tot 4 uur` → chip `Taak · vandaag 14:00–16:00` (met Tab wordt het een afspraak op dezelfde tijd).
+- Geef een taak een **tijd** op zijn dag (begin–eind; alleen een begin telt als 30 min): rechtsklik → **Tijd instellen…**, het onderdeel **Tijd** in het herinneringsbriefje (een lijst per kwartier of een getypte tijd, en 30 min · 1 u · 2 u), of typ `verslag 14:00-15:30`, `verslag van 2 tot 4 uur` → chip `Taak · vandaag 14:00–16:00` (met Tab wordt het een afspraak op dezelfde tijd).
 - De balk van de **dagbalk** toont hem in groen, het opengeklapte **dagschema** als groen omrand blok: vaag en doorgestreept als hij af is, rood omrand als de tijd voorbij is en hij niet af is. Sleep het blok om het te verplaatsen, of de boven- of onderrand voor het begin of het einde, per kwartier. Hij staat ook in de regels nu · volgende.
 - Regels tonen `🕑 14:00–16:00`; **Volgende** zet taken met een tijd op begintijd. Vooruit, de bureaukalender (week en daglijst), het Vandaag-venster en zoeken tonen de tijd ook. Een taak zonder herinnering krijgt er een bij het begin, en een herinnering op het begin schuift mee. Focussen biedt eerst de resterende tijd aan.
 - Bewaard als optionele `timeStart` · `timeEnd` (`"HH:mm"`) in het takenbestand (hetzelfde op Windows); blijft in de geschiedenis, back-ups en tekstexport.
@@ -170,7 +181,7 @@
 - **Morgen · datum wijzigen**: ‘→ Morgen’ op een regel, rechtsklik → Datum wijzigen (Morgen · Deze vrijdag · Volgende maandag · Ooit · Datum kiezen…), en op een gekozen regel `⌥→` / `⌥←` een dag later · eerder, `⌥↓` naar Ooit. Na het verplaatsen: ‘Verplaatst naar morgen · Herstel’.
 - **Sinds gisteren · 3 dagen**: een klein teken bij taken zonder datum die op Vandaag blijven staan (een optionele `todaySince` in het takenbestand, hetzelfde op Windows).
 - **Avondopruiming**: ’s avonds (standaard 20:00) ‘Nog 3 taken voor vandaag. Naar morgen schuiven?’ — Naar morgen · Naar Ooit · Zo laten; gemist, dan komt hij als ochtendopruiming. Met **Het ene ding van vandaag** aan vraagt de eerste regel van de dag naar dat ene ding en zet het met een ster bovenaan.
-- **Sluimeren**: 5 · 10 · 30 min · 1 uur · vanavond om 19:00 · morgen om 09:00 · naar morgen; afspraken krijgen ‘5 min van tevoren opnieuw’. Gemiste herinneringen kunnen ook naar **macOS-meldingen** (Klaar · Over 10 min).
+- **Sluimeren**: 5 · 10 · 30 min · 1 uur · vanavond om 19:00 · morgen om 09:00 · Morgen doen; afspraken krijgen ‘5 min van tevoren opnieuw’. Gemiste herinneringen kunnen ook naar **macOS-meldingen** (Klaar · Over 10 min).
 - **Zoeken `⌘F`**: Vandaag · Vooruit · de notitielade · Geschiedenis · Afspraken tegelijk (notities ook op mapnaam), zonder op hoofdletters en accenten te letten (en Koreaanse beginmedeklinkers).
 - De invoerregel: `elke dag water drinken` · `elke maandag 9 uur overleg` → **herhalingen**, `over 30 min was ophalen` → een herinnering over 30 minuten. Klik op een lege plek in het dagschema voor een nieuwe taak of afspraak op die tijd; `F` op een regel start een focus.
 - **`⌃⌥J`** toont of verbergt het notitieblok vanuit elke app; ⋯ → **aan de rand van het scherm zetten**; het menu van het Dock-symbool (Snel toevoegen · Snelle notitie · Bureau · 25 min focussen · Timer van 5 min) met het aantal; een timerring rond het gezichtje in de menubalk; **gekopieerde tekst** in een snelle notitie; **Herstel**-meldingen bij verwijderen · alles klaar · opruimen; focuskaart `Spatie` · `⌘↩` · `⌘=`.

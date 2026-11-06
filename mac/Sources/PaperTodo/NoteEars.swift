@@ -33,9 +33,10 @@ enum NoteEarsPlacement {
     }
 }
 
-/// The ears' colours: the note's paper, and the drawer's pink inside (`DrawerPalette.innerEar` of 낮 · 밤 종이).
+/// The ears' colours: the note's paper (the paper drawn, #244), and the drawer's pink inside (`DrawerPalette.innerEar` of a
+/// light paper, of a dark one at night).
 enum NoteEarsColors {
-    static let paper = PaperTheme.paper
+    static var paper: Color { PaperTheme.paper }
     static let inner = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.isNight ? NSColor(paperHex: "#7d555a")! : NSColor(paperHex: "#f2c9c6")!.withAlphaComponent(0.8)
     })
@@ -95,7 +96,8 @@ struct NoteEarsView: View {
 }
 
 /// An ear's twitch: a shear that moves its tip `tip` points sideways and leaves its foot (on `edge`) where it is.
-private struct EarFlick: GeometryEffect {
+/// (The desktop calendar widgets' ears twitch the same way, #234.)
+struct EarFlick: GeometryEffect {
     var tip: CGFloat
     let edge: CGFloat
     var animatableData: CGFloat {
@@ -110,18 +112,22 @@ private struct EarFlick: GeometryEffect {
     }
 }
 
-/// One ear: the paper, its hairline sides, the pink inside.
-private struct NoteEar: View {
+/// One ear: the paper, its hairline sides, the pink inside. (#234: the widgets' ears too, their paper at `fill` — at
+/// least 85 % — while the hairline and the pink stay as they are.)
+struct NoteEar: View {
     let a: CGFloat
     let b: CGFloat
     let edge: CGFloat
     let strongEdge: Bool
+    var fill: Double = 1
+    /// The paper, the pink inside and the hairline (the widgets pass their palette's, #244).
+    var colors: (paper: Color, inner: Color, edge: Color) = (NoteEarsColors.paper, NoteEarsColors.inner, NoteEarsColors.edge)
 
     var body: some View {
         ZStack {
-            EarShape(a: a, b: b, edge: edge, below: NoteEarsPlacement.overlap).fill(NoteEarsColors.paper)
-            EarSides(a: a, b: b, edge: edge).stroke(strongEdge ? PaperTheme.ink3 : NoteEarsColors.edge, lineWidth: strongEdge ? 1 : 0.6)
-            EarInner(a: a, b: b, edge: edge).fill(NoteEarsColors.inner)
+            EarShape(a: a, b: b, edge: edge, below: NoteEarsPlacement.overlap).fill(colors.paper.opacity(fill))
+            EarSides(a: a, b: b, edge: edge).stroke(strongEdge ? PaperTheme.ink3 : colors.edge, lineWidth: strongEdge ? 1 : 0.6)
+            EarInner(a: a, b: b, edge: edge).fill(colors.inner)
         }
     }
 }

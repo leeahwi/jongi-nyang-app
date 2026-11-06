@@ -1,0 +1,65 @@
+{
+  "about": "종이 테마 열다섯 가지(#244)의 공유 사례 뼈대예요. Mac PaperCore/PaperLook.swift(scripts/test-paper-themes.sh)와 Windows core/paper.ts(test/paper.test.ts)가 이 파일을 읽어요. 색 값은 paper-themes/tokens.json에 있고, 대비는 scripts/check-contrast.py · test/contrast.test.ts가 그 파일과 앱의 값이 같은지까지 봐요. 예시는 모두 지어낸 것이에요.",
+  "status": "filled",
+  "papers": {
+    "order": ["day", "hanji", "kraft", "grid", "sage", "blossom", "memo", "manuscript", "lined", "lavender", "recycled", "night", "ink", "nightsky", "chalk"],
+    "dark": ["night", "ink", "nightsky", "chalk"],
+    "nightChoices": ["keep", "night", "ink", "nightsky", "chalk"],
+    "names": {
+      "memo": { "ko": "노란 메모지", "short": "메모지", "en": "Sticky note", "nl": "Plakbriefje" },
+      "manuscript": { "ko": "원고지", "short": "원고지", "en": "Manuscript paper", "nl": "Manuscriptpapier" },
+      "lined": { "ko": "하늘색 줄노트", "short": "줄노트", "en": "Blue lined notebook", "nl": "Blauw lijntjesschrift" },
+      "lavender": { "ko": "라벤더 종이", "short": "라벤더", "en": "Lavender", "nl": "Lavendel" },
+      "recycled": { "ko": "재생지", "short": "재생지", "en": "Recycled paper", "nl": "Kringlooppapier" },
+      "nightsky": { "ko": "밤하늘 종이", "short": "밤하늘", "en": "Night sky", "nl": "Nachthemel" },
+      "chalk": { "ko": "칠판", "short": "칠판", "en": "Chalkboard", "nl": "Schoolbord" }
+    }
+  },
+  "shown": [
+    { "case": "R1 처음 쓰는 사람, 낮: 지금 화면 그대로", "dayNight": "auto", "systemDark": false, "paper": "day", "night": "night", "shown": "day", "scheme": "light", "appearance": "system" },
+    { "case": "R2 처음 쓰는 사람, Mac이 어두운 모드: 밤 종이", "dayNight": "auto", "systemDark": true, "paper": "day", "night": "night", "shown": "night", "scheme": "dark", "appearance": "system" },
+    { "case": "R3 크라프트지, 밤: 밤에는에서 고른 종이", "dayNight": "auto", "systemDark": true, "paper": "kraft", "night": "nightsky", "shown": "nightsky", "scheme": "dark", "appearance": "system" },
+    { "case": "R4 크라프트지, 밤에는 그대로: 밤에도 크라프트지, 시스템 조작도 밝게", "dayNight": "auto", "systemDark": true, "paper": "kraft", "night": "keep", "shown": "kraft", "scheme": "light", "appearance": "light" },
+    { "case": "R5 어두운 종이는 낮에도 그대로, 시스템 조작도 어둡게", "dayNight": "day", "systemDark": false, "paper": "chalk", "night": "night", "shown": "chalk", "scheme": "dark", "appearance": "dark" },
+    { "case": "R6 낮 · 밤이 밤이면 시스템과 상관없이 밤", "dayNight": "night", "systemDark": false, "paper": "memo", "night": "ink", "shown": "ink", "scheme": "dark", "appearance": "dark" },
+    { "case": "R7 낮 · 밤이 낮이면 밤에는을 쓰지 않아요", "dayNight": "day", "systemDark": true, "paper": "lavender", "night": "night", "shown": "lavender", "scheme": "light", "appearance": "light" },
+    { "case": "R8 밤 종이를 고르면 낮에도 밤 종이", "dayNight": "auto", "systemDark": false, "paper": "night", "night": "night", "shown": "night", "scheme": "dark", "appearance": "dark" }
+  ],
+  "drawer": [
+    { "case": "D1 노트와 같은 종이(기본): 서랍은 노트가 보이는 종이", "sameAsNote": true, "note": { "paper": "kraft", "night": "chalk" }, "systemDark": true, "shown": "chalk" },
+    { "case": "D2 따로: 서랍의 종이와 서랍의 밤에는", "sameAsNote": false, "drawerPaper": "grid", "drawerNight": "keep", "systemDark": true, "shown": "grid" },
+    { "case": "D3 따로, 밤에는 밤 종이", "sameAsNote": false, "drawerPaper": "memo", "drawerNight": "night", "systemDark": true, "shown": "night" },
+    { "case": "D4 서랍에서도 새 종이 일곱을 고를 수 있어요", "sameAsNote": false, "drawerPaper": "recycled", "drawerNight": "night", "systemDark": false, "shown": "recycled" }
+  ],
+  "migrate": [
+    { "case": "M1 1.47의 기본(서랍 auto): 노트와 같은 종이 켬, 화면 그대로", "old": { "paper.color": "auto", "drawer.theme": "auto" }, "new": { "paper.theme": "day", "paper.night": "night", "drawer.sameAsNote": true } },
+    { "case": "M2 서랍 크라프트지(스위치 끔): 따로, 그대로", "old": { "drawer.theme": "kraft", "drawer.nightPaper": false }, "new": { "paper.theme": "day", "paper.night": "night", "drawer.sameAsNote": false, "drawer.theme": "kraft", "drawer.night": "keep" } },
+    { "case": "M3 서랍 한지 + 밤에는 밤 종이로 켬", "old": { "drawer.theme": "hanji", "drawer.nightPaper": true }, "new": { "drawer.sameAsNote": false, "drawer.theme": "hanji", "drawer.night": "night" } },
+    { "case": "M4 서랍 낮 종이(스위치 끔, 1.45의 ‘낮 종이’): 밤에도 낮 종이라 노트와 달라요 → 따로", "old": { "drawer.theme": "day", "drawer.nightPaper": false }, "new": { "drawer.sameAsNote": false, "drawer.theme": "day", "drawer.night": "keep" } },
+    { "case": "M5 서랍 밤 종이: 따로, 밤 종이", "old": { "drawer.theme": "night" }, "new": { "drawer.sameAsNote": false, "drawer.theme": "night", "drawer.night": "keep" } },
+    { "case": "M6 낮 · 밤(paper.color)은 이름도 값도 그대로", "old": { "paper.color": "night" }, "new": { "paper.color": "night", "paper.theme": "day", "paper.night": "night" } },
+    { "case": "M7 옛 버전과 함께 쓰기: 서랍이 낮 종이 + 밤 종이면 drawer.theme에 auto를 계속 써요", "write": { "drawer.sameAsNote": false, "drawer.theme": "day", "drawer.night": "night" }, "stored": { "drawer.theme": "auto", "drawer.nightPaper": true } }
+  ],
+  "read": [
+    { "case": "S1 모르는 종이는 낮 종이", "stored": { "paper.theme": "cork" }, "paper": "day" },
+    { "case": "S2 밤에는에 밝은 종이가 적혀 있으면 밤 종이", "stored": { "paper.night": "kraft" }, "night": "night" },
+    { "case": "S3 Windows: 페이지에서 받은 값도 같은 규칙(ipcCheck.ts prefReaders)", "stored": { "paperTheme": 3 }, "paper": "day" }
+  ],
+  "widget": [
+    { "case": "W1 위젯은 노트 · 달력이 보이는 종이를 따라요", "note": { "paper": "lined", "night": "night" }, "systemDark": false, "widget": "lined" },
+    { "case": "W2 불투명도 100%보다 옅으면 글은 ink만(위젯 계획 4-2), 어느 종이든", "paper": "memo", "opacity": 85, "textColours": ["ink"] },
+    { "case": "W3 종이가 바뀌면 위젯도 한 번만 다시 그려요(쉬는 동안 타이머 없음)", "paper": "kraft", "changeTo": "chalk", "redraws": 1 }
+  ],
+  "keyboard": [
+    { "case": "K1 종이 그림은 라디오 묶음 하나: ← → ↑ ↓가 위 order 차례로 다음 · 이전, 끝에서 처음으로", "from": "recycled", "key": "ArrowRight", "to": "night" },
+    { "case": "K2 VoiceOver · 내레이터가 읽는 말", "paper": "memo", "label": { "ko": "노란 메모지, 밝은 종이", "en": "Sticky note, light paper", "nl": "Plakbriefje, licht papier" } },
+    { "case": "K3 어두운 종이를 고르면 밤에는 줄은 흐려지고 이유 한 줄", "paper": "ink", "nightRowEnabled": false, "hint": "어두운 종이는 밤에도 그대로예요." }
+  ],
+  "contrast": [
+    { "case": "C1 열다섯 종이 × 노트 · 달력의 모든 쌍(check-contrast.py PAIRS, 일정 칠, 스페이스 칠, 안 고른 탭)이 AA", "source": "paper-themes/tokens.json" },
+    { "case": "C2 일정 표시(막대 · 점) 여섯 색이 paper · card 위에서 3:1(종이마다 진한 쪽)", "paper": "kraft", "eventMarks": { "blue": "#527dbb", "sage": "#608166", "coral": "#b86451", "purple": "#8070b0", "yellow": "#94751f", "gray": "#7c7c7c" } },
+    { "case": "C3 서랍 열다섯 종이의 DRAWER_PAIRS · 비치는 바탕 · 책갈피", "source": "paper-themes/tokens.json drawer" },
+    { "case": "C4 위젯 85%(밝은 종이 뒤 검정, 어두운 종이 뒤 흰색)에서 ink 4.5:1", "min": 4.5 },
+    { "case": "C5 낮 종이 · 밤 종이의 노트 색은 일정 표시 말고 1.47과 같아요", "papers": ["day", "night"], "sameAs": "PaperTheme.swift 1.47" }
+  ]
+}

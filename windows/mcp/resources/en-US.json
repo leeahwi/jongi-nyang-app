@@ -1,6 +1,6 @@
 {
   "description": "Claude can read your Jongi-nyang tasks, events and notes, add new ones, and change them after you say yes.",
-  "long_description": "**Turn it on in Jongi-nyang first**\n\nJongi-nyang › Desk › AI connection › ‘Let Claude see and write in Jongi-nyang’\n\n**What Claude can do**\n\n- **Read** — today's tasks and events, repeating tasks, to-do spaces, notes and note folders, focus time, finished tasks\n- **Add** — tasks (into an existing space too), events and notes (into an existing folder too)\n- **Change** — moving a task to another space too; it shows before and after first, and changes it only after you say yes\n- **It never deletes anything**\n- **Prompts** — today, weekly review, plan tomorrow, memo to tasks\n- **Attach** — today's sheet, a week or one memo to the conversation\n\n\n**What you see in Jongi-nyang**\n\n- When Claude adds or changes something, a notice appears and you can undo it right away.\n- Desk › AI connection › Recent AI work shows what Claude did.\n\n**Light and quiet**\n\n- No server keeps running. Claude starts it when needed, and it stops when you quit Claude.\n- It only reads and writes Jongi-nyang's storage folder on this computer and sends no files anywhere.\n- Turn off AI connection in Jongi-nyang and it can't read anything.",
+  "long_description": "**Turn it on in Jongi-nyang first**\n\nJongi-nyang › Desk › AI connection › ‘Let Claude see and write in Jongi-nyang’\n\n**What Claude can do**\n\n- **Read** — today's tasks and events, repeating tasks, to-do spaces, notes and note folders, focus time, finished tasks\n- **Add** — tasks (into an existing space too), events and notes (into an existing folder too)\n- **Change** — moving a task to another space too; it shows before and after first, and changes it only after you say yes\n- **It never deletes anything**\n- **Prompts** — today, weekly review, plan tomorrow, memo to tasks\n- **Attach** — today's sheet, a week or one memo to the conversation\n- **Spaces hidden on this device** — tasks in a space you hid on this device in Jongi-nyang stay out of Claude's today and lists too; name the space and Claude shows them\n\n\n**What you see in Jongi-nyang**\n\n- When Claude adds or changes something, a notice appears and you can undo it right away.\n- Desk › AI connection › Recent AI work shows what Claude did.\n\n**Light and quiet**\n\n- No server keeps running. Claude starts it when needed, and it stops when you quit Claude.\n- It only reads and writes Jongi-nyang's storage folder on this computer and sends no files anywhere.\n- Turn off AI connection in Jongi-nyang and it can't read anything.",
   "tools": [
     {
       "name": "get_today",
@@ -40,7 +40,7 @@
     },
     {
       "name": "list_spaces",
-      "description": "To-do spaces and General"
+      "description": "To-do spaces and General, and which are hidden on this device"
     },
     {
       "name": "add_todos",

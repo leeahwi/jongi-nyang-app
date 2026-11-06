@@ -9,9 +9,49 @@ below. The sections after it are the first measurements, on 1.44.0 / 1.29.0, kep
 
 **Update 2 — Mac 1.47.0, Windows 1.32.0:** see [The long memos and the 5,000 cards](#the-long-memos-and-the-5000-cards-mac-1470-windows-1320).
 
+**Update 3 — Mac 1.48.0:** [서랍 처음 열기와 더 엄격해진 점검](#서랍-처음-열기와-더-엄격해진-점검-mac-1480)을 보세요.
+
 **Machine:** Apple M4, macOS 26.5.1, release build. The Windows app was run in Electron 44 on the same Mac, not on a
 Windows PC. The Mac was busy with other work (load average 3–7), so treat single numbers as ±30 %. UI runs that
 overlapped someone else's snapshot renders were thrown away and run again.
+
+## 서랍 처음 열기와 더 엄격해진 점검 (Mac 1.48.0)
+
+**결론:** 메모 500개에서 서랍을 처음 여는 데 메인 스레드 101–108ms가 들어요. 목표 150ms 안이에요. 이번 판은 서랍 코드를 바꾸지 않았고, 이 숫자를 지키도록 반복 점검의 기준을 낮췄어요.
+
+그때의 main과 `perf/mac-idle`을 같은 데이터로 번갈아 쟀어요(`scripts/perf-drawer.sh`, `APP_SOURCES`로 main의 뷰를 따로 빌드). 2026-11-06, Apple M4, 부하 3–4.5예요. 같은 Mac에서 다른 시험도 돌고 있었어요.
+
+| 서랍 처음 열기(메인 스레드, ms) | main 1 | 브랜치 1 | main 2 | 브랜치 2 |
+| --- | --- | --- | --- | --- |
+| 메모 500개 | 108 · 104 | 105 · 101 | 101 · 102 | 105 · 95 |
+| 메모 2,000개 | 118 · 112 | 119 · 121 | 119 · 126 | 111 · 112 |
+
+한 번씩 더 잰 것(부하 3.3–4.3, `OPEN_CEILING=150`)이에요.
+
+- 5,000개: 처음 열기 146ms예요.
+- 긴 메모 단계(메모 500개에 10KB · 100KB · 1MB 메모와 2,000줄 체크 목록): 처음 열기 173ms예요. 1MB 메모 하나의 카드 글(제목 · 미리보기 · 종류)을 셈하는 데만 56ms가 들어요(`MemoCards.kind`가 체크 목록 · 링크 · 전화번호를 찾으려고 글 전체를 훑어요).
+- ↩로 열기: 맨 위 메모 36–42ms, 10KB 50ms, 100KB 86ms, 1MB 122ms, 2,000줄 체크 목록 36ms예요. 모두 150ms 안이에요.
+
+**1.47의 185–223ms와 다른 까닭:** 그때는 부하 8–16에서 쟀어요. 바쁜 Mac에서는 같은 일도 효율 코어에서 돌면 메인 스레드 시간이 늘 수 있어요. 이번에는 부하가 6 아래일 때만 쟀어요.
+
+**프로파일(`PROFILE_OPEN=1`, 새로 넣음):** 처음 열기의 큰 몫은 SwiftUI가 서랍 뷰를 처음 만드는 일이에요. 빠른 쪽지의 빈 글 칸에 글을 넣을 때 시스템이 글쓰기 도구 라이브러리를 처음 읽어요(`updateWritingToolsSelection` → `dlopen`). 빈 글은 넣지 않게 해 봤더니 처음 열기는 15–20ms 줄었지만, 그만큼 첫 ↩ 열기가 37–38ms → 46–59ms로 늘었어요. 시간이 옮겨 갈 뿐이라 되돌렸어요.
+
+**더 엄격해진 점검:**
+
+| 점검 | 전 | 후 |
+| --- | --- | --- |
+| `perf-drawer.sh` 처음 열기, 메모 50–2,000개 | 200ms | 150ms(`FIRST_CEILING`) |
+| `perf-drawer.sh` 처음 열기, 5,000개 · 긴 메모 | 200ms | 200ms(`FIRST_CEILING_BIG`) |
+| `perf-drawer.sh` ↩로 열기 | 200ms | 150ms(`OPEN_CEILING`) |
+| `test-memo-stress.sh` 파일 읽기 · 쓰기 | 400 · 150ms | 100 · 50ms |
+| `test-memo-stress.sh` 한 글자의 목록 일 | 50ms | 25ms |
+| `test-memo-stress.sh` 찾기 · 다시 찾기 | 250–300 · 60ms | 150–200 · 15ms |
+| `test-memo-stress.sh` 100KB 합치기 | 500 · 1,500ms | 25 · 25ms |
+| `test-memo-stress.sh` 체크 하나 | 50ms | 15ms |
+
+`test-memo-stress.sh`의 새 기준은 지금 값의 3–10배예요(2,000개: 파일 4–11ms, 목록 일 6ms, 찾기 36–52ms, 다시 찾기 2–3ms, 합치기 1.5ms, 체크 2ms). 진짜로 느려지면 걸리고, 바쁜 Mac에서는 걸리지 않게 잡았어요. 처음 열기와 ↩ 점검은 지금처럼 부하가 6 이하일 때만 실패로 쳐요.
+
+**남은 것:** 긴 메모가 있을 때의 처음 열기(173ms)와 5,000개(146ms)는 150ms 경계예요. 1MB 메모의 카드 글을 백그라운드에서 미리 셈하거나, 종류를 찾을 때 글 앞부분만 보면 줄일 수 있어요.
 
 ## The long memos and the 5,000 cards (Mac 1.47.0, Windows 1.32.0)
 
@@ -41,8 +81,8 @@ as it can, so the card being typed stays where it is (as the old range cut did) 
 | memory, all processes (MB) | 539–563 | 581–808 (no clear direction; it swings by hundreds of MB between runs) |
 
 The `long` tier (500 memos and 10 KB · 100 KB · 1 MB memos) is unchanged within the noise: a key 1.7–2.8 ms (p95 5–60)
-in every memo, the 1 MB memo opening in 15–17 ms (22–27 ms to its frame). CodeMirror (1.31) is what made the 1 MB memo fast; the 0.2–0.4 s a
-key of 1.30's textarea is gone.
+in every memo, the 1 MB memo opening in 15–17 ms (22–27 ms to its frame). CodeMirror (1.31) is what made the 1 MB memo fast; the 0.2–0.4 s per
+key that 1.30's textarea took is gone.
 
 `tools/perf-memo.mjs` measured the reopen by `visibilitychange`, which an off-screen run never fires (the page stays
 "visible" while the window is hidden): it now takes the page's first change after the open, then the frame after it.
@@ -53,7 +93,10 @@ key of 1.30's textarea is gone.
 **Why a new tool:** the old `scripts/perf-memo.sh` brought its test copy to the front (`perf-probe front`), opened the marker memo
 with an accessibility press (which gives a text field the keyboard: the input-source indicator came on screen once) and
 posted keys to it. Since 1.47 `perf-memo.sh` runs `perf-drawer.sh` for the same tiers, and no script under
-`mac/scripts` brings anything forward or presses anything through accessibility. `perf-drawer.sh` builds the app's views with `Tests/PaperTodoTests/DrawerBench.swift` (optimised, like
+`mac/scripts` brings anything forward or presses anything through accessibility. Since 1.48 it also starts a test copy
+again for what needs the app itself, with no keys at all: behind the person's apps (`open -g`), never active, every
+window off the screens, the drawer opened by the app (`--open-drawer`) — start → note visible per memo count, the
+drawer's first open and idle with it open. The quick-write slip's ↩ and its saves are in `DrawerBench` (last step). `perf-drawer.sh` builds the app's views with `Tests/PaperTodoTests/DrawerBench.swift` (optimised, like
 `bench-app.sh`) and draws the drawer and the note in borderless windows 40,000 points off every screen, never key, in
 an accessory process; keys go to the open memo's text view directly (`insertText`). Each step is the main thread's CPU
 for it and for what it set off within 60 ms (a key) or 300 ms (an open, Esc), less an idle window's own, so another
@@ -230,7 +273,7 @@ direction (it swings by hundreds of MB between runs of the same build).
 | | Mac | Windows |
 | --- | --- | --- |
 | Command | `mac/scripts/perf-memo.sh` | `node tools/perf-memo.mjs` |
-| App copy | separate test copy (`com.noa.PaperTodo.MemoStress`), off-screen, driven by pid | `--demo` runs, DevTools protocol |
+| App copy | separate test copy (`com.noa.PaperTodo.MemoStress`), off-screen; since 1.47 the keys in one process (`perf-drawer.sh`), since 1.48 start and idle in the copy again, started behind | `--demo` runs, DevTools protocol |
 | Keystroke measured | key → main thread idle after the frame (the app's `--perf-log`) | input event → next frame |
 
 **Mac keystroke caveat:** when one key's work is longer than the 120 ms between keys, the keys queue and each

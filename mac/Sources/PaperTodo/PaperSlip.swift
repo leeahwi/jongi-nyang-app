@@ -60,6 +60,28 @@ enum SlipMotion {
     static var enabled = true
 }
 
+private struct SlipMovableKey: EnvironmentKey { static let defaultValue = false }
+private struct SlipNudgesKey: EnvironmentKey { static let defaultValue = 0 }
+
+extension EnvironmentValues {
+    /// #228: the slip's window moves when its paper is dragged (`SlipPanel.movesByPaper`, the questions and the times slip).
+    var slipMovable: Bool {
+        get { self[SlipMovableKey.self] }
+        set { self[SlipMovableKey.self] = newValue }
+    }
+    /// #229: how many times a blocked click has nudged the slip (each one shakes it, or blinks its tape).
+    var slipNudges: Int {
+        get { self[SlipNudgesKey.self] }
+        set { self[SlipNudgesKey.self] = newValue }
+    }
+}
+
+/// A slip window's nudges, told to its slip (`slipNudges`).
+@MainActor
+final class SlipNudges: ObservableObject {
+    @Published var count = 0
+}
+
 /// The container: paper, radius 16, one floating shadow, the washi tape on its top edge.
 struct PaperSlip<Content: View>: View {
     let kind: SlipKind
@@ -71,11 +93,15 @@ struct PaperSlip<Content: View>: View {
     @ViewBuilder let content: Content
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.slipMovable) private var movable
+    @Environment(\.slipNudges) private var nudges
     @State private var settled = false
 
     var body: some View {
         content
             .frame(width: width)
+            // #228: the paper itself (where nothing on it takes the click) drags the window; above the paper, under the rest.
+            .background { if movable { SlipDragArea() } }
             .background(PaperTheme.paper, in: RoundedRectangle(cornerRadius: SlipMetrics.radius, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: SlipMetrics.radius, style: .continuous)
@@ -93,6 +119,8 @@ struct PaperSlip<Content: View>: View {
                 GeometryReader { geometry in
                     if taped { WashiTape(kind: kind)
                         .frame(width: 74, height: 20)
+                        // #229 under Reduce Motion: the tape blinks instead of the slip shaking.
+                        .modifier(TapeBlink(trigger: reduceMotion ? nudges : 0))
                         .position(x: geometry.size.width * tapeAt, y: 1) }
                 }
                 .allowsHitTesting(false)
@@ -100,6 +128,65 @@ struct PaperSlip<Content: View>: View {
             }
             .foregroundStyle(PaperTheme.ink)
             .modifier(SlipAppear(active: SlipMotion.enabled && !reduceMotion))
+            // #229: a click the question didn't let past shakes it once (톡's 0.3 s, evenly split).
+            .modifier(SlipShake(trigger: reduceMotion ? 0 : nudges))
+    }
+}
+
+/// #229: the shake of a nudged question, each time `trigger` goes up (`Motion.shake`, 톡's 0.3 s split evenly).
+private struct SlipShake: ViewModifier {
+    let trigger: Int
+
+    func body(content: Content) -> some View {
+        content.keyframeAnimator(initialValue: CGFloat(0), trigger: trigger) { view, x in
+            view.offset(x: x)
+        } keyframes: { _ in
+            KeyframeTrack {
+                for x in Motion.shake {
+                    LinearKeyframe(x, duration: Motion.bounce.duration / Double(Motion.shake.count))
+                }
+            }
+        }
+    }
+}
+
+/// #229 under Reduce Motion: the tape's blink each time `trigger` goes up — dim, back, dim, back (`Motion.blink`), each
+/// 살짝 (0.12 s), changed at once rather than faded.
+private struct TapeBlink: ViewModifier {
+    let trigger: Int
+
+    func body(content: Content) -> some View {
+        content.keyframeAnimator(initialValue: 1.0, trigger: trigger) { view, opacity in
+            view.opacity(opacity)
+        } keyframes: { _ in
+            KeyframeTrack {
+                // Each step jumps (a thousandth of a second) and holds.
+                for (opacity, duration) in Motion.blink.flatMap({ [($0, 0.001), ($0, Motion.quick.duration)] }) {
+                    LinearKeyframe(opacity, duration: duration)
+                }
+            }
+        }
+    }
+}
+
+/// #228: the paper of a slip that moves. A drag that starts here (not on a button, chip, field or time) takes the window
+/// along (`SlipPanel.dragSlip`); SwiftUI hands it only the clicks nothing in front of it takes.
+private struct SlipDragArea: NSViewRepresentable {
+    func makeNSView(context: Context) -> SlipDragView { SlipDragView() }
+    func updateNSView(_ view: SlipDragView, context: Context) {}
+}
+
+final class SlipDragView: NSView {
+    override var mouseDownCanMoveWindow: Bool { false }
+    // The first click on a slip that isn't key (the times slip beside the desk) drags it too.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func isAccessibilityElement() -> Bool { false }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let panel = window as? SlipPanel, panel.movesByPaper else { return super.mouseDown(with: event) }
+        // #246: a double-click on the paper or the title row puts a slip that keeps its place back where it usually opens.
+        if event.clickCount >= 2, let reset = panel.onDoubleClick { return reset() }
+        panel.dragSlip(from: event)
     }
 }
 
@@ -180,7 +267,9 @@ struct SlipHeader: View {
 
     var body: some View {
         HStack(spacing: 10) {
+            // (#228: the badge and the title let a drag through to the paper, so the title row moves a slip.)
             SlipBadge(kind: kind, symbol: symbol)
+                .allowsHitTesting(false)
             HStack(spacing: 4) {
                 Text(title)
                     .font(.system(size: 13, weight: .semibold))
@@ -197,6 +286,7 @@ struct SlipHeader: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
+            .allowsHitTesting(false)
             Spacer(minLength: 4)
             if let onClose {
                 Button(action: onClose) {
@@ -469,7 +559,25 @@ extension NotebookFont {
 /// takes typing (`canBecomeKey`) without needing a title bar.
 class SlipPanel: NSPanel {
     var onResignKey: () -> Void = {}
-    override var canBecomeKey: Bool { true }
+    /// Not in a check's run (#217): a non-activating slip takes the keyboard even while the app is behind.
+    override var canBecomeKey: Bool { !TestHooks.staysBehind }
+
+    /// A check's run (#217): this would be the key window now, though it never becomes one (PerfDrive's keys go here).
+    override func makeKeyAndOrderFront(_ sender: Any?) {
+        super.makeKeyAndOrderFront(sender)
+        PerfDrive.wouldBeKey(self)
+    }
+
+    /// #228: dragging the slip's paper moves the window (the questions and the times slip; set before `show`). #246: 빠른
+    /// 입력 and 빠른 메모 too. The slips that hang from something (the 오늘 창, the reminders) stay where they are put.
+    var movesByPaper = false
+    /// #246: told when a drag put the slip somewhere (빠른 입력 · 빠른 메모 keep the place), and of a double-click on its paper.
+    var onMoved: (() -> Void)?
+    var onDoubleClick: (() -> Void)?
+    /// Moved by a drag while it is up: it grows from where it was put, its head kept on the screen (not pulled back whole).
+    private(set) var movedByUser = false
+    /// #229: the nudges its slip shows.
+    let nudges = SlipNudges()
 
     convenience init(nonactivating: Bool) {
         self.init(contentRect: NSRect(x: 0, y: 0, width: 100, height: 100),
@@ -502,7 +610,7 @@ class SlipPanel: NSPanel {
     /// and the bottom of its paper. (The hosting view's own fitting size is always 0 × 0 here: it is
     /// told not to size itself.)
     func show<V: View>(_ view: V) {
-        let root = view
+        let root = SlipStage(nudges: nudges, movable: movesByPaper, content: view)
             .padding(SlipMetrics.margin)
             .fixedSize()
             .onGeometryChange(for: CGSize.self) { $0.size } action: { [weak self] size in self?.fit(size) }
@@ -525,9 +633,60 @@ class SlipPanel: NSPanel {
     private func fit(_ size: CGSize) {
         guard size.width > 1, size.height > 1, abs(size.height - frame.height) > 0.5 || abs(size.width - frame.width) > 0.5 else { return }
         var next = NSRect(x: frame.midX - size.width / 2, y: frame.maxY - size.height, width: size.width, height: size.height)
-        if isVisible, let area = screen?.visibleFrame { next.origin = Self.kept(next, in: area) }
+        if isVisible, let area = screen?.visibleFrame {
+            next.origin = movedByUser ? Self.dragged(next, by: .zero, in: area) : Self.kept(next, in: area)
+        }
         setFrame(next, display: true)
         contentView?.frame = NSRect(origin: .zero, size: size)
+    }
+
+    /// #228: follows the pointer from `down` (a press on the paper) until the button comes up, the slip's head kept on
+    /// the screen with the pointer. A press that doesn't move 3 pt is only a click.
+    /// (`next`: the events that follow, the window's own queue but in a check.)
+    func dragSlip(from down: NSEvent, next: (() -> NSEvent?)? = nil) {
+        let start = Self.screenPoint(down)
+        let origin = frame.origin
+        var moved = false
+        let following = next ?? { [weak self] in self?.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) }
+        while let event = following(), event.type == .leftMouseDragged {
+            let point = Self.screenPoint(event)
+            let by = CGVector(dx: point.x - start.x, dy: point.y - start.y)
+            if !moved, hypot(by.dx, by.dy) < 3 { continue }
+            moved = true
+            let area = NSScreen.screens.first { $0.frame.contains(point) }?.visibleFrame
+            setFrameOrigin(Self.dragged(NSRect(origin: origin, size: frame.size), by: by, in: area))
+        }
+        if moved {
+            movedByUser = true
+            onMoved?()
+        }
+    }
+
+    /// Where an event happened on the screen: the pointer now for the window's own events (their place in the window may
+    /// be from before the last move), an event without a window is already in screen points.
+    private static func screenPoint(_ event: NSEvent) -> NSPoint {
+        event.window == nil ? event.locationInWindow : NSEvent.mouseLocation
+    }
+
+    /// A slip window's frame `window` dragged by `by` (screen points, y up), its slip's head kept inside `area`
+    /// (SlipMove, in the screen's top-down terms: the y axis turned over).
+    static func dragged(_ window: NSRect, by: CGVector, in area: NSRect?) -> NSPoint {
+        let m = SlipMetrics.margin
+        let slip = NSRect(x: window.minX + m.leading, y: window.minY + m.bottom,
+                          width: window.width - m.leading - m.trailing, height: window.height - m.top - m.bottom)
+        let flipped = { (rect: NSRect) in CGRect(x: rect.minX, y: -rect.maxY, width: rect.width, height: rect.height) }
+        let point = SlipMove.dragged(flipped(slip), by: CGVector(dx: by.dx, dy: -by.dy), in: area.map(flipped))
+        return NSPoint(x: point.x - m.leading, y: -point.y - slip.height - m.bottom)
+    }
+
+    /// #229: a click somewhere the question doesn't let through — the slip comes to the front, shakes once (or its tape
+    /// blinks under Reduce Motion) and the system beeps once. #253: `takingKey` false — a press on the day sheet, which
+    /// goes away when it loses the keys — leaves the keys where they are.
+    func nudge(takingKey: Bool = true) {
+        orderFrontRegardless()
+        if takingKey { makeKey() }
+        nudges.count += 1
+        SlipModal.beep()
     }
 
     /// The slip's own frame on screen (the window less its margins).
@@ -542,6 +701,13 @@ class SlipPanel: NSPanel {
         let m = SlipMetrics.margin
         let slipWidth = frame.width - m.leading - m.trailing
         var origin = NSPoint(x: point.x - slipWidth / 2 - m.leading, y: point.y - frame.height + m.top)
+        // #217: in a check's run, off every screen — an anchor off the screens (the note at x −40,000) was kept on the
+        // main screen below.
+        if TestHooks.staysBehind {
+            if NSScreen.screens.contains(where: { $0.frame.intersects(NSRect(origin: origin, size: frame.size)) }) { origin.x -= 40_000 }
+            setFrameOrigin(origin)
+            return
+        }
         if let area = (NSScreen.screens.first { $0.frame.contains(point) } ?? NSScreen.main)?.visibleFrame {
             origin = Self.kept(NSRect(origin: origin, size: frame.size), in: area)
         }
@@ -554,6 +720,69 @@ class SlipPanel: NSPanel {
         let m = SlipMetrics.margin
         return NSPoint(x: min(max(window.minX, area.minX - m.leading + 8), area.maxX - window.width + m.trailing - 8),
                        y: min(max(window.minY, area.minY - m.bottom + 8), area.maxY - window.height + m.top - 8))
+    }
+}
+
+/// #246: where 빠른 입력 and 빠른 메모 were dragged, kept per display (SlipMove.Place, docs/plans/slip-move-cases.json `place`)
+/// in the app's preferences: the next time the slip opens on that display it opens there. A display whose usable area
+/// changed size since (another resolution, the Dock moved) opens it at the usual spot again, and so does a double-click
+/// on its paper or title row (which also forgets the place). Windows: main/quick.ts · quickMemo.ts.
+@MainActor
+struct SlipPlaces {
+    let key: String
+    let preferences: UserDefaults
+    var width: CGFloat = SlipWidth.medium.rawValue
+
+    private static func flipped(_ rect: NSRect) -> CGRect { CGRect(x: rect.minX, y: -rect.maxY, width: rect.width, height: rect.height) }
+    private static func id(_ screen: NSScreen) -> String {
+        (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.stringValue ?? "main"
+    }
+    private var saved: [String: [Double]] { preferences.dictionary(forKey: key) as? [String: [Double]] ?? [:] }
+
+    /// Opens `panel` at its kept place on the screen with the pointer, else at the usual spot (a fifth down, centred).
+    func place(_ panel: SlipPanel) {
+        let mouse = NSEvent.mouseLocation
+        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main else { return }
+        let area = screen.visibleFrame
+        let kept = saved[Self.id(screen)].flatMap { $0.count == 4 ? SlipMove.Place(dx: $0[0], dy: $0[1], areaWidth: $0[2], areaHeight: $0[3]) : nil }
+        if let point = SlipMove.placed(kept, size: CGSize(width: width, height: SlipMove.head), in: Self.flipped(area)) {
+            // The slip's top left (top-down) → its window: the window's middle over the slip's, its top the margin above.
+            panel.setFrameOrigin(NSPoint(x: point.x + width / 2 - panel.frame.width / 2, y: -point.y + SlipMetrics.margin.top - panel.frame.height))
+        } else {
+            panel.placeSlip(topCenter: NSPoint(x: area.midX, y: area.maxY - area.height / 5))
+        }
+    }
+
+    /// The slip was dragged: keep where it is, on the display it is on.
+    func keep(_ panel: SlipPanel) {
+        guard let screen = panel.screen else { return }
+        let place = SlipMove.place(of: Self.flipped(panel.slipFrame), in: Self.flipped(screen.visibleFrame))
+        var all = saved
+        all[Self.id(screen)] = [place.dx, place.dy, place.areaWidth, place.areaHeight].map(Double.init)
+        preferences.set(all, forKey: key)
+    }
+
+    /// A double-click on the paper: back to the usual spot on its display, the place forgotten.
+    func reset(_ panel: SlipPanel) {
+        guard let screen = panel.screen else { return }
+        var all = saved
+        all[Self.id(screen)] = nil
+        preferences.set(all, forKey: key)
+        let area = screen.visibleFrame
+        panel.placeSlip(topCenter: NSPoint(x: area.midX, y: area.maxY - area.height / 5))
+    }
+}
+
+/// The slip as its window holds it: told whether its paper drags the window and how often it was nudged.
+private struct SlipStage<Content: View>: View {
+    @ObservedObject var nudges: SlipNudges
+    let movable: Bool
+    let content: Content
+
+    var body: some View {
+        content
+            .environment(\.slipMovable, movable)
+            .environment(\.slipNudges, nudges.count)
     }
 }
 

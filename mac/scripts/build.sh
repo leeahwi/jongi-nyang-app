@@ -12,6 +12,12 @@ for file in server/index.js jongi-nyang.mcpb; do
         exit 1
     fi
 done
+# #225: the release path check (tools/check-release-paths.mjs, shared with Windows) runs on Node.
+if ! command -v node >/dev/null; then
+    echo "Node is needed for the release path check (tools/check-release-paths.mjs)." >&2
+    exit 1
+fi
+check_paths=(node "$task_root/../tools/check-release-paths.mjs")
 # Source paths end up in the binary (#file in assertions and logs); write them relative to the
 # package so the app doesn't carry this machine's home folder.
 prefix_map=(-Xswiftc -file-prefix-map -Xswiftc "$task_root=.")
@@ -32,13 +38,9 @@ cp "$binary_directory/PaperTodo" "$bundle/Contents/MacOS/PaperTodo"
 # #220: the linker lists each object file's absolute path (N_OSO debug-map entries) for later symbol lookup, and the
 # prefix map doesn't reach it. Drop the debug symbols before signing; the app keeps its global symbols.
 strip -S "$bundle/Contents/MacOS/PaperTodo"
-# Stop before packing if a build path (with this Mac's home folder name) is in the binary again. Counts only. Searched
-# in the bytes: `strings` missed the debug-map paths (#220).
-home_paths="$({ LC_ALL=C grep -a -o -F -e '/Users/' -e "$HOME" "$bundle/Contents/MacOS/PaperTodo" || true; } | wc -l | tr -d ' ')"
-if [ "$home_paths" != "0" ]; then
-    echo "The binary holds $home_paths absolute home path(s) — see #182." >&2
-    exit 1
-fi
+# Stop before packing if a build path (with this Mac's home folder name) is in the binary again (#182). Counts only.
+# Searched in the bytes: `strings` missed the debug-map paths (#220). The whole app is checked again at the end (#225).
+"${check_paths[@]}" "$bundle/Contents/MacOS/PaperTodo"
 cp Resources/Info.plist "$bundle/Contents/Info.plist"
 rm -rf "$bundle/Contents/Resources/Assets"
 cp -R Sources/PaperTodo/Assets "$bundle/Contents/Resources/"
@@ -59,4 +61,7 @@ swift scripts/make-icon.swift "$bundle/Contents/Resources" "$task_root/Sources/P
 # `claude mcp add` (zsh) still runs. No entitlements are needed.
 codesign --force --deep --options runtime --sign - "$bundle"
 codesign --verify --deep --strict "$bundle"
+# #225: every file the app ships — the extension's program, the .mcpb and what's in it, the resources — not only the
+# binary. In 1.42.1 the extension held 298 paths of the Mac that built it.
+"${check_paths[@]}" "$bundle"
 printf 'Built: %s\n' "$bundle"

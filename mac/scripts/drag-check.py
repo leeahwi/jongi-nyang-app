@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Reads the replay log of scripts/drag-check.sh (one JSON line a tick) and checks that the dragged block followed the
 pointer: per tick, the block's edge minus the pointer stays where it was grabbed (within 1 pt), the block never moves
-against the pointer, and no tick jumps more than 2 pt beyond the pointer's own move. Prints a line per scenario and
+against the pointer, and no tick jumps more than 2 pt beyond the pointer's own move; held past the bottom to the day's
+end, the block and the scrolling stop at 24:00 (#243). Prints a line per scenario and
 writes every tick to <log>.ticks.csv. Exit 1 when a check fails.
 Usage: drag-check.py <log.jsonl>"""
 import json, sys
@@ -11,11 +12,16 @@ lines = [json.loads(l) for l in open(path) if l.strip()]
 for l in lines:
     if "error" in l:
         print("replay failed:", l["error"]); sys.exit(1)
+start = next((l for l in lines if "start" in l), {})
 info = next((l for l in lines if "block" in l), None)
 done = next((l for l in lines if "done" in l), None)
 ticks = [l for l in lines if "scenario" in l]
 if not info or not ticks:
     print("no ticks logged"); sys.exit(1)
+if "now" in start:
+    from datetime import datetime
+    clock = datetime.fromtimestamp(start["now"]).strftime("%H:%M")
+    print(f"the note's clock {clock} ({'stopped, --timetable-now' if start.get('fixedNow') else 'the real one'})")
 print(f"block at start {info['block']} · range {info['range']} · viewport {info.get('viewport')} · NSScrollView found {info.get('scrollView')} · scroll {info.get('scroll')}")
 
 with open(path + ".ticks.csv", "w") as f:
@@ -84,6 +90,27 @@ if rows:
     check("scroll: past the bottom it scrolls and the block keeps following", scrolled > 20 and worst <= 1 and forward,
           f"scrolled {scrolled:.1f} pt over {len(held)} ticks held · block under the pointer within {worst:.2f} pt · "
           f"later in the day each tick: {forward} · after Esc range {rows[-1]['range']}")
+
+# #243: held past the bottom long enough to reach the day's end, the block stops at 24:00 and the scrolling stops with it,
+# the day's last hour in view; let go there, it lands at 24:00.
+rows = [t for t in ticks if t["scenario"] == "dayend"]
+if rows:
+    down = next(t for t in rows if t["phase"] == "down")
+    drags = [t for t in rows if t["phase"] == "drag"]
+    held = drags[-40:]
+    viewport = info.get("viewport") or [0, 0, 0, 0]
+    bottom = viewport[1] + viewport[3]
+    scrolls = [t["scroll"] for t in held]
+    stopped = max(scrolls) - min(scrolls) <= 0.01 and scrolls[-1] > down["scroll"] + 20
+    still = max(t["bottom"] for t in held) - min(t["bottom"] for t in held) <= 0.5
+    in_view = bottom - 40 <= held[-1]["bottom"] <= bottom + 0.5
+    landed = rows[-1]["range"].split("-")[-1] == "1440"
+    check("dayend: at 24:00 the block and the scrolling stop", stopped and still and in_view and landed,
+          f"scroll {down['scroll']:.1f} → {scrolls[-1]:.1f}, the last {len(held)} ticks held: scroll moved {max(scrolls) - min(scrolls):.2f} pt, "
+          f"block bottom moved {max(t['bottom'] for t in held) - min(t['bottom'] for t in held):.2f} pt · block bottom {held[-1]['bottom']:.1f} "
+          f"(viewport bottom {bottom:.1f}) · range {down['range']} → {rows[-1]['range']}")
+else:
+    check("dayend: at 24:00 the block and the scrolling stop", False, "no ticks for it")
 
 print("range at the end:", done["range"] if done else "?")
 sys.exit(1 if failed else 0)

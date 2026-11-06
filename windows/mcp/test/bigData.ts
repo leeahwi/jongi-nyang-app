@@ -5,12 +5,14 @@ import { serializeMemos, type Memo } from "../../src/core/memo";
 import { serializeMemoFolders, type MemoFolders } from "../../src/core/memoDrawer";
 import { serializeNotebook, type TodoItem } from "../../src/core/notebook";
 import { serializeSeries, type Series } from "../../src/core/repeat";
+import { parseTodoSpaces, serializeTodoSpaces, type TodoSpaces } from "../../src/core/todoSpaces";
 
 /**
  * The large example of docs/plans/mcp-plan.md §1.4, made up from scratch (P2, M39): 3,000 tasks (most of the
  * open ones on today's sheet), 2,000 memos of about 500 characters in five folders, 1,500 events, six years of
- * finished tasks (21,600 lines), 5,000 focus sessions and 30 repeating tasks. Every name and word is invented
- * here — nothing is copied from a real list or screen.
+ * finished tasks (21,600 lines), 5,000 focus sessions and 30 repeating tasks — and six to-do spaces (N3, M46), six
+ * tasks in seven in one of them (the seventh in 일반). Every name and word is invented here — nothing is copied from a
+ * real list or screen.
  */
 
 const words = ["보고서", "회의", "장보기", "운동", "정리", "메일", "독서", "청소", "계획", "발표", "공부", "산책", "전화", "예약", "빨래", "Report", "Review", "Draft", "Plan", "Notes"];
@@ -27,7 +29,10 @@ const day = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-$
 const iso = (date: Date) => date.toISOString().replace(/\.\d{3}Z$/, "Z");
 const id = () => crypto.randomUUID().toUpperCase();
 
-export interface BigData { todos: TodoItem[]; memos: Memo[]; events: LocalEvent[]; folders: MemoFolders; series: Series[]; archiveLines: number }
+export interface BigData { todos: TodoItem[]; memos: Memo[]; events: LocalEvent[]; folders: MemoFolders; series: Series[]; spaces: TodoSpaces; archiveLines: number }
+
+/** The example's spaces: s-big-0 회사 … s-big-5 가족. */
+export const bigSpaces = ["회사", "집", "공부", "운동", "여행", "가족"].map((name, index) => ({ id: `s-big-${index}`, name }));
 
 /** Writes the example into `folder` for the day of `now` ("2026-10-27T10:00:00+09:00"). */
 export function writeBigData(folder: string, now = new Date("2026-10-27T10:00:00+09:00")): BigData {
@@ -88,6 +93,13 @@ export function writeBigData(folder: string, now = new Date("2026-10-27T10:00:00
   fs.writeFileSync(path.join(folder, "memos.json"), serializeMemos(memos));
   fs.writeFileSync(path.join(folder, "memo-folders.json"), serializeMemoFolders(folders));
   fs.writeFileSync(path.join(folder, "repeats.json"), serializeSeries(series));
+  const colors = ["pink", "mint", "yellow", "blue", "lavender", "peach"];
+  const spaces = parseTodoSpaces(JSON.stringify({
+    version: 1,
+    spaces: bigSpaces.map((space, index) => ({ ...space, color: colors[index], order: index, updatedAt: iso(at(-60)) })),
+    items: Object.fromEntries(todos.flatMap((item, index) => (index % 7 === 6 ? [] : [[item.id, { space: bigSpaces[index % 7].id, at: iso(at(-30)) }]]))),
+  }));
+  fs.writeFileSync(path.join(folder, "todo-spaces.json"), serializeTodoSpaces(spaces));
 
   // Six years of finished tasks: 72 months of 300 lines.
   fs.mkdirSync(path.join(folder, "archive"), { recursive: true });
@@ -109,5 +121,5 @@ export function writeBigData(folder: string, now = new Date("2026-10-27T10:00:00
   });
   fs.writeFileSync(path.join(folder, "focus.jsonl"), `${focus.join("\n")}\n`);
 
-  return { todos, memos, events, folders, series, archiveLines };
+  return { todos, memos, events, folders, series, spaces, archiveLines };
 }

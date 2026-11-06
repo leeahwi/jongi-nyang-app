@@ -63,7 +63,7 @@ enum CatFaceIcon {
 
 /// What the menu bar item says right now.
 @MainActor
-struct MenuBarState {
+struct MenuBarState: Equatable {
     var text: String
     var accessibility: String
     /// A running (or paused) timer's part gone by, for the ring around the face.
@@ -111,6 +111,7 @@ final class TodayWindowController: NSObject {
     private var monitors: [Any] = []
     private var ticker: Timer?
     private var tickEverySecond = false
+    private var shown: MenuBarState?
     private var subscriptions = Set<AnyCancellable>()
     private var focus = 0
     var onOpenNote: () -> Void = {}
@@ -118,6 +119,8 @@ final class TodayWindowController: NSObject {
     var onQuickEntry: () -> Void = {}
     var onSettings: () -> Void = {}
     var timerMenu: () -> NSMenu = { NSMenu() }
+    /// #230: 전체 화면에서 보이기 (in all apps), so the small cat can be put away from a full-screen app.
+    var companionMenuItem: () -> NSMenuItem? = { nil }
     /// Told whenever the item is brought up to date (the folded icon's summary follows it).
     var onUpdate: () -> Void = {}
 
@@ -127,6 +130,8 @@ final class TodayWindowController: NSObject {
         self.model = model
         self.timer = timer
         super.init()
+        // #217: a check's run puts nothing in the person's menu bar.
+        if TestHooks.staysBehind { statusItem.isVisible = false }
         if let button = statusItem.button {
             button.target = self
             button.action = #selector(clicked)
@@ -147,7 +152,11 @@ final class TodayWindowController: NSObject {
     /// The words and the label; ticks every second while a timer runs, else twice a minute.
     func update() {
         let state = MenuBarState.current(model: model, timer: timer.timer, focusing: timer.isFocusing)
-        if let button = statusItem.button { state.apply(to: button) }
+        // #64: the half-minute tick (and every model change) mostly finds the same words: no new face, no redraw then.
+        if state != shown, let button = statusItem.button {
+            state.apply(to: button)
+            shown = state
+        }
         let everySecond = timer.timer.map { !$0.isPaused } ?? false
         if ticker == nil || everySecond != tickEverySecond {
             ticker?.invalidate()
@@ -248,6 +257,7 @@ final class TodayWindowController: NSObject {
         timers.submenu = timerMenu()
         menu.addItem(timers)
         add(L("설정…")) { [weak self] in self?.onSettings() }
+        if let companion = companionMenuItem() { menu.addItem(companion) }
         menu.addItem(.separator())
         let quit = NSMenuItem(title: L("종이냥 종료"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         quit.target = NSApp
@@ -614,6 +624,7 @@ private struct GlanceCard: View {
     let accessibility: String
     var action: (() -> Void)? = nil
     @Environment(\.colorSchemeContrast) private var contrast
+    @State private var lineWidth: CGFloat = 0
 
     private var accent: Color? { hot ? PaperTheme.clayText : running ? PaperTheme.sageText : nil }
 
@@ -664,11 +675,23 @@ private struct GlanceCard: View {
     }
 
     private var lineText: some View {
-        Text(line)
+        Text(shownLine)
             .font(.system(size: 10.5).monospacedDigit())
             .foregroundStyle(PaperTheme.ink2)
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { lineWidth = $0 }
+    }
+
+    /// The line's first part is kept whole with its ‘ ·’ (#136). When the line doesn't fit on one line of the card, it
+    /// would break inside that part or after the dot (nl ‘over 1 u 46 min ·’ / ‘Teamoverleg’, ‘· Teamoverleg’ on a line of
+    /// its own) — then the two parts go on two lines from the start, without the dot (#240, 점검 3의 23).
+    private var shownLine: String {
+        guard lineWidth > 0, let cut = line.range(of: "\u{00A0}· ") else { return line }
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .regular)
+        let needed = (line as NSString).size(withAttributes: [.font: font]).width
+        return needed <= lineWidth ? line : String(line[..<cut.lowerBound]) + "\n" + String(line[cut.upperBound...])
     }
 
     private func valueLine(unit: String?) -> some View {

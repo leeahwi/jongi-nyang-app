@@ -16,7 +16,12 @@ import SwiftUI
 //
 // --long: the folder has the 10 KB, 100 KB and 1 MB memos and the 2,000-line checklist (memo-stress-data.py --long).
 // --sample <file>: sample(1) of this process while the keys go into the biggest memo (or the top one).
-// --ceiling: an open (↩) or the drawer's first open over it is listed and the run exits 1.
+// --ceiling: an open (↩) or the drawer's first open over it is listed and the run exits 1. --open-ceiling: the first
+// open's own.
+// --sample-open <file>: sample(1) of the drawer's first open and reopens (1 ms apart).
+//
+// Last (#217, measured in the app until #208): ↩ in the quick-write slip — a new memo — and the saves it sets off,
+// memos.json and memo-folders.json, as the app's own timing lines tell them (PerfProbe, into a temporary log).
 
 private func cpuMs() -> Double {
     var time = timespec()
@@ -52,6 +57,8 @@ private enum DrawerBench {
         /// --sample-seconds 12: how long sample(1) runs from just before ↩ (the open, the keys, the catch-up and Esc).
         let sampleSeconds = args.firstIndex(of: "--sample-seconds").map { Double(args[$0 + 1])! } ?? Double(keys) * 0.13 + 8
         let ceiling = args.firstIndex(of: "--ceiling").map { Double(args[$0 + 1])! }
+        /// --open-ceiling: the drawer's first open has its own (#3: 150 ms at 500 and 2,000 memos), else `--ceiling`.
+        let openCeiling = args.firstIndex(of: "--open-ceiling").map { Double(args[$0 + 1])! } ?? ceiling
         var over: [String] = []
         _ = NSApplication.shared
         NSApp.setActivationPolicy(.accessory)
@@ -104,13 +111,25 @@ private enum DrawerBench {
             return name.padding(toLength: 30, withPad: " ", startingAt: 0)
                 + (sorted.count == 1 ? String(format: "%7.1f ms", sorted[0]) : String(format: "median %6.1f · p95 %6.1f · max %6.1f ms (%d)", median, p95, sorted.last!, sorted.count))
         }
-        func check(_ name: String, _ value: Double) {
-            guard let ceiling, value > ceiling else { return }
-            over.append(String(format: "%@: %.1f ms", name, value))
+        func check(_ name: String, _ value: Double, first: Bool = false) {
+            guard let ceiling = first ? openCeiling : ceiling, value > ceiling else { return }
+            over.append(String(format: "%@: %.1f ms (over %.0f)", name, value, ceiling))
         }
 
         print("memos \(model.memos.count) · idle 60 ms costs \(String(format: "%.2f", idle60)) ms CPU, 300 ms \(String(format: "%.2f", idle300))")
 
+        // --sample-open <file>: sample(1) of the first open (and the reopens after it), to see where its time goes.
+        var openProfile: Process?
+        if let index = args.firstIndex(of: "--sample-open") {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/sample")
+            process.arguments = ["\(getpid())", "3", "1", "-file", args[index + 1]]
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            try? process.run()
+            pump(500)
+            openProfile = process
+        }
         // The drawer's first open: its view made (as the app's panel makes it), the list worked out and drawn.
         let first = step(within: 300) {
             drawer.willOpen()
@@ -120,13 +139,14 @@ private enum DrawerBench {
             window.orderFrontRegardless()
         } - idle300
         print(line("drawer first open", [first]))
-        check("drawer first open", first)
+        check("drawer first open", first, first: true)
         var reopen: [Double] = []
         for _ in 0..<3 {
             _ = step(within: 200) { drawer.didClose(); window.orderOut(nil) }
             reopen.append(step(within: 300) { drawer.willOpen(); window.orderFrontRegardless() } - idle300)
         }
         print(line("drawer reopen", reopen))
+        openProfile?.waitUntilExit()
 
         /// The open memo's text view (a card still sliding shut may have one too: the one with this memo's words).
         func editor(_ id: String) -> DrawerTextView.KeyTextView? {
@@ -215,12 +235,41 @@ private enum DrawerBench {
         print(String(format: "memory: footprint %.1f MB", footprintMB()))
         let saved = (try? String(contentsOf: data.appendingPathComponent("memos.json"), encoding: .utf8)) ?? ""
         print("saved after the keys: \(saved.contains("가나다라마바사아자차") ? "yes" : "no")")
+
+        // ↩ in the quick-write slip, on a folder's tab (the new memo's place goes into memo-folders.json; the inbox's
+        // memos have none): the words in the slip, then ↩ — a new memo, saved.
+        if let folder = model.memos.lazy.map({ model.memoFolders.folderID(of: $0.id) }).first(where: { $0 != MemoFolders.inbox }) {
+            drawer.show(.folder(folder))
+        }
+        let probeLog = FileManager.default.temporaryDirectory.appendingPathComponent("DrawerBench-\(UUID()).log")
+        defer { try? FileManager.default.removeItem(at: probeLog) }
+        PerfProbe.start(arguments: ["DrawerBench", "--perf-log", probeLog.path])
+        drawer.quickText = "빠른 메모 하나"
+        pump(200)
+        let quick = step(within: 300) { drawer.quickWrite() } - idle300
+        // The saves come after it (memo-folders.json off the main thread): up to 5 s for both lines.
+        func saves() -> [String: String] {
+            let lines = ((try? String(contentsOf: probeLog, encoding: .utf8)) ?? "").split(separator: "\n")
+            var found: [String: String] = [:]
+            for line in lines where line.hasPrefix("io ") {
+                let parts = line.split(separator: " ")
+                if parts.count == 3, found[String(parts[1])] == nil { found[String(parts[1])] = String(parts[2]) }
+            }
+            return found
+        }
+        let give = Date().addingTimeInterval(5)
+        while Date() < give, saves()["memos"] == nil || saves()["memo-folders"] == nil { pump(100) }
+        model.finishMemoFolderWrites()
+        let written = saves()
+        let added = ((try? String(contentsOf: data.appendingPathComponent("memos.json"), encoding: .utf8)) ?? "").contains("빠른 메모 하나")
+        print(line("quick write ↩ (new memo)", [quick]))
+        print("  saves: memos.json \(written["memos"] ?? "-") ms · memo-folders.json \(written["memo-folders"] ?? "-") ms · in memos.json: \(added ? "yes" : "no")")
         drawer.didClose()
         model.finishMemoFolderWrites()
         window.close()
         note.close()
         if !over.isEmpty {
-            print("over the \(Int(ceiling ?? 0)) ms ceiling: " + over.joined(separator: " · "))
+            print("over the ceiling: " + over.joined(separator: " · "))
             forgetPreferences()
             exit(1)
         }

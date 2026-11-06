@@ -9,9 +9,14 @@ import { bodyFontSize, type TodosState } from "../core/types";
 import { activeLens, findSpace, generalName, groupedCount, inLens, lensNone, lensTasks, spaceColor, spaceIndexOf, type TodoSpace } from "../core/todoSpaces";
 import { deviceKey, deviceLens, hiddenSpaces, readDeviceRules } from "../core/spaceDevice";
 import { h, holdMs, icon, lang, motion, paper, reduceMotion, t } from "./api";
+import { listenForTyping } from "./typingTap";
+import { holdWhileAsked } from "./askGuard";
 import { InputLine } from "./inputLine";
 import { commitReading, type FlowHost } from "./intentFlow";
 import { appear, toaster } from "./slip";
+
+// #229: a question waiting holds this page up (askGuard.ts).
+holdWhileAsked();
 
 /**
  * 오늘 창 (the tray's window; the Mac's menu bar popover): the date and today's progress; the next event, the timer
@@ -101,8 +106,17 @@ function timerNow(): GlanceTimer | undefined {
  */
 function keepTogether(text: string): string {
   const at = text.indexOf(" · ");
-  const head = at < 0 ? text : text.slice(0, at);
-  return head.replace(/ /g, "\u00a0").replace(/(\d)(?=\p{L})/gu, "$1\u2060") + (at < 0 ? "" : text.slice(at));
+  // A line with no " · " (a timer's ‘Ends at 12:46 PM’) is not one part to keep whole: only a time stays with its AM · PM
+  // and a number with its unit, and it breaks at its other spaces (#240, 점검 3의 34 — it broke as ‘P’ / ‘M’).
+  if (at < 0) return text.replace(/(\d) (?=\p{L})/gu, "$1\u00a0").replace(/(\d)(?=\p{L})/gu, "$1\u2060");
+  const head = text.slice(0, at);
+  return head.replace(/ /g, "\u00a0").replace(/(\d)(?=\p{L})/gu, "$1\u2060") + " · " + keepTail(text.slice(at + 3));
+}
+
+/** The name's last word stays with the one before it when it is short, so "점심 약속" goes down whole, not "점심" / "약속". */
+function keepTail(name: string): string {
+  const k = name.lastIndexOf(" ");
+  return k > 0 && name.length - k - 1 <= 6 ? `${name.slice(0, k)}\u00a0${name.slice(k + 1)}` : name;
 }
 
 /**
@@ -345,3 +359,6 @@ api.on("glance:open", () => {
   });
 });
 void api.getState().then((initial) => { state = initial; render(); report(); });
+
+// #230: keys typed here make the desktop cat tap along (only that a key went down).
+listenForTyping();

@@ -62,6 +62,21 @@ test("ai-link.json: written at launch, off by default; on, with the data folder 
   ai.stop();
 });
 
+test("N3-9: 이 기기에서 goes into ai-link.json as it changes, and leaves it when every space shows again", () => {
+  const { folder, store, ai } = setup();
+  ai.start();
+  const link = () => parseAiLink(fs.readFileSync(path.join(folder, "ai-link.json"), "utf8"))!;
+  assert.equal(link().ext, aiExtVersion);
+  assert.equal(link().spaceDevice, undefined, "nothing set: no key");
+  store.setDeviceRules({ none: { show: "hide" } });
+  assert.deepEqual(link().spaceDevice, { none: { show: "hide" } });
+  store.setDeviceRules({ none: { show: "time", times: [{ days: [6, 7], from: "00:00", to: "00:00" }] } });
+  assert.deepEqual(link().spaceDevice, { none: { show: "time", times: [{ days: [6, 7], from: "00:00", to: "00:00" }] } });
+  store.setDeviceRules({});
+  assert.equal(link().spaceDevice, undefined, "every space shows again");
+  ai.stop();
+});
+
 test("M15: what Claude did while the app was closed: one notice at launch with the count, then nothing again", () => {
   const { folder, store, ai, toasts } = setup();
   ai.setEnabled(true);

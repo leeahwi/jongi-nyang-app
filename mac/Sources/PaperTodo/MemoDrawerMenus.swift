@@ -136,9 +136,13 @@ enum DrawerMenus {
 
     /// The footer's ⚙ = a right-click on the drawer's empty area or header.
     static func drawer(_ drawer: MemoDrawer) -> [DrawerMenuItem] {
-        // #142: the paper picked for the day (밤에는 밤 종이로 is in 책상 → 메모 서랍).
+        // #142: the paper picked for the day (its 밤에는 is in 책상 → 메모 서랍). #244: the fifteen, under 노트와 같은 종이; a
+        // paper picked here is the drawer's own (the switch goes off).
         let papers: [DrawerSwatch] = MemoDrawer.Theme.allCases.map { theme in
-            DrawerSwatch(id: theme.rawValue, label: theme.short, look: .paper(theme.paperPalette.kind), picked: drawer.theme == theme) { drawer.theme = theme }
+            DrawerSwatch(id: theme.rawValue, label: theme.short, look: .paper(DrawerPalette.Kind(theme)), picked: !drawer.sameAsNote && drawer.theme == theme) {
+                drawer.theme = theme
+                drawer.sameAsNote = false
+            }
         }
         let kind = drawer.palette.kind
         let backdrops = MemoDrawer.Backdrop.allCases.map { backdrop in
@@ -150,6 +154,7 @@ enum DrawerMenus {
         ] + (trashRow(drawer).map { [$0] } ?? []) + [
             .separator,
             .section(L("종이")),
+            .action(L("노트와 같은 종이"), symbol: "rectangle.on.rectangle", checked: drawer.sameAsNote) { drawer.sameAsNote.toggle() },
             .swatches(papers),
             .section(L("바탕")),
             .swatches(backdrops),
@@ -197,7 +202,7 @@ enum DrawerMenus {
         return items
     }
 
-    /// 이 메모의 종이: 서랍 따라 · 낮 · 밤 · 크라프트 · 모눈.
+    /// 이 메모의 종이: 서랍과 같게, then the fifteen papers (#244).
     static func paperSwatches(_ drawer: MemoDrawer, _ id: String) -> [DrawerSwatch] {
         let current = drawer.folders.paper(of: id)
         var out = [DrawerSwatch(id: "follow", label: L("서랍과 같게"), look: .split, picked: current == nil) { drawer.setPaper(id, nil) }]
@@ -326,24 +331,8 @@ extension MemoFolders.Sort {
 }
 
 extension MemoFolders.Paper {
-    /// The swatch's word: 낮 · 밤 · 크라프트 · 모눈 · 한지 · 쑥색 · 벚꽃 · 먹색.
-    var short: String { MemoDrawer.Theme(rawValue: rawValue)!.short }
-}
-
-extension MemoDrawer.Theme {
-    /// The swatch's word: 낮 · 밤 · 크라프트 · 모눈 · 한지 · 쑥색 · 벚꽃 · 먹색.
-    var short: String {
-        switch self {
-        case .day: L("낮")
-        case .night: L("밤")
-        case .kraft: L("크라프트")
-        case .grid: L("모눈")
-        case .hanji: L("한지")
-        case .sage: L("쑥색")
-        case .blossom: L("벚꽃")
-        case .ink: L("먹색")
-        }
-    }
+    /// The swatch's word: 낮 · 한지 · 크라프트 · … · 칠판.
+    var short: String { PaperKind(rawValue: rawValue)!.short }
 }
 
 // MARK: - As an NSMenu

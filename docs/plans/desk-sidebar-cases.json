@@ -1,0 +1,15 @@
+{
+  "about": "책상 왼쪽 목록의 묶음과 차례 (#240, UI/UX 점검 3의 D4 B). sections: 위에서부터 묶음과 그 안의 칸. 묶음마다 maxRows 줄 안이에요. shortcuts: 책상 안에서 ⌘1–⌘9 · Ctrl+1–9가 여는 칸(목록 차례 그대로, 열째부터는 없어요). titles: 이름이 바뀐 칸과 새 묶음의 ko · en · nl. 칸 이름은 Windows의 것을 써요(Mac의 반복은 repeating). Mac DeskPane(DeskWindow.swift, scripts/test-localization.sh)과 Windows core/desk.ts(test/desk.test.ts)가 이 파일을 읽어요.",
+  "maxRows": 6,
+  "sections": [
+    { "section": "view", "panes": ["calendar", "history"] },
+    { "section": "settings", "panes": ["appearance", "notifications", "clock", "repeat", "events", "pet"] },
+    { "section": "data", "panes": ["drawer", "spaces", "storage", "ai"] },
+    { "section": "help", "panes": ["help"] }
+  ],
+  "shortcuts": ["calendar", "history", "appearance", "notifications", "clock", "repeat", "events", "pet", "drawer"],
+  "titles": {
+    "clock": ["알람 · 타이머", "Alarms & timers", "Wekkers & timers"],
+    "data": ["메모와 데이터", "Notes & data", "Notities & gegevens"]
+  }
+}

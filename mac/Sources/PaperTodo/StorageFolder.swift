@@ -24,13 +24,15 @@ enum StorageFolder {
         guard destination.standardizedFileURL != current.standardizedFileURL else { return }
         var copyCurrent = true
         if FileManager.default.fileExists(atPath: destination.appendingPathComponent("todos.json").path) {
-            let message = target == nil ? L("이 Mac에 전에 쓰던 목록이 있어요.") : L("이 폴더에 이미 종이냥 목록이 있어요.")
             let detail = target == nil
-                ? L("공유 폴더로 옮기기 전의 목록으로 돌아가려면 ‘전에 쓰던 목록 쓰기’를 고르세요. 덮어써도 바꾸기 전 상태를 백업해 둬요.")
-                : L("다른 기기에서 쓰던 목록이면 ‘폴더 목록 쓰기’를 고르세요. 덮어써도 바꾸기 전 상태를 이 Mac에 백업해 둬요.")
+                ? L("공유 폴더로 옮기기 전의 목록으로 돌아가려면 ‘전에 쓰던 목록 쓰기’를 고르면 돼요. 덮어써도 바꾸기 전 상태를 백업해 둬요.")
+                : L("다른 기기에서 쓰던 목록이면 ‘폴더 목록 쓰기’를 고르면 돼요. 덮어써도 바꾸기 전 상태를 이 Mac에 백업해 둬요.")
             // An overwrite backs the overwritten list up first (#137, see move); the record is merged either way.
             let after = L("어느 쪽이든 완료 기록은 합쳐지고, 종이냥이 다시 시작돼요.")
-            let answer = SlipAlert.run(symbol: "folder", title: L("저장 폴더"), message: message, detail: detail + "\n" + after,
+            // #253: either answer may put another list in place of this one (an overwrite, or the folder's list).
+            let answer = SlipAlert.run(symbol: "folder", title: L("저장 폴더"),
+                                       message: target == nil ? L("이 Mac에 전에 쓰던 목록이 있어요.") : L("이 폴더에 이미 종이냥 목록이 있어요."), replacesList: true,
+                                       detail: detail + "\n" + after,
                                        choices: [.init(title: L("취소"), isCancel: true),
                                                  .init(title: target == nil ? L("공유 폴더 목록으로 덮어쓰기") : L("이 Mac 목록으로 덮어쓰기"), role: .quiet),
                                                  .init(title: target == nil ? L("전에 쓰던 목록 쓰기") : L("폴더 목록 쓰기"), role: .primary, isDefault: true)],
@@ -40,6 +42,14 @@ enum StorageFolder {
             case 1: copyCurrent = true
             default: return
             }
+        } else if target == nil {
+            // #240: ‘이 Mac에만’ is one click on the storage pane now — say what it does before the list moves and the app restarts.
+            let answer = SlipAlert.run(symbol: "folder", title: L("저장 폴더"), message: L("목록을 이 Mac으로 옮길까요?"),
+                                       detail: L("지금 목록이 이 Mac의 기본 폴더로 옮겨지고 종이냥이 다시 시작돼요. 공유 폴더의 파일은 그대로 남아요."),
+                                       choices: [.init(title: L("취소"), isCancel: true),
+                                                 .init(title: L("이 Mac으로 옮기기"), role: .primary, isDefault: true)],
+                                       width: .medium)
+            guard answer == 1 else { return }
         }
         model.saveMemosNow()
         do {
@@ -148,7 +158,7 @@ enum StorageFolder {
         // #195: the button and the line above say what picking does — the list moves there, then the app restarts.
         panel.prompt = L("이 폴더로 옮기기")
         panel.message = L("다른 기기와 함께 쓸 폴더를 골라요(iCloud Drive, Dropbox, OneDrive …). 지금 목록이 그 폴더로 옮겨지고 종이냥이 다시 시작돼요.")
-        NSApp.activate(ignoringOtherApps: true)
+        TestHooks.activate()
         guard panel.runModal() == .OK, let folder = panel.url else { return }
         switchTo(folder, defaultFolder: defaultFolder, current: current, model: model, preferences: preferences)
     }

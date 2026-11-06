@@ -307,6 +307,9 @@ h3 { font-size: 18px; line-height: 1.35; font-weight: 650; letter-spacing: -.015
 .folder svg { width: 42px; height: 42px; color: var(--sage-text); }
 .sync .link { display: none; }
 @media (max-width: 420px) { .device .screen { width: 84px; height: 60px; } .sync { gap: 8px; } }
+/* Two tiles side by side leave the folder little room between 761 and 980px: smaller screens, and names that never break mid-word */
+@media (min-width: 761px) and (max-width: 980px) { .device .screen { width: 84px; height: 60px; } .sync { gap: 10px; } }
+.folder span { white-space: nowrap; }
 
 /* ---------- Design rounds ---------- */
 .rounds { display: grid; gap: 0; max-width: 960px; margin: 0 auto; border-top: 1px solid var(--rule); }

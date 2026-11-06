@@ -1,3 +1,4 @@
+import { nudgeBlink, nudgeShake } from "../core/slipMove";
 import { h, icon, motion, paper, reduceMotion, t } from "./api";
 
 /**
@@ -55,6 +56,47 @@ export function appear(element: HTMLElement): void {
   if (reduceMotion()) return;
   void element.offsetWidth;
   element.classList.add("appear");
+}
+
+/** #228: a press on the slip that moves it: on its paper or its title row, not on a button, chip, field, link, the
+ * selectable detail line or a scroll bar. */
+export function startsSlipDrag(event: PointerEvent): boolean {
+  if (event.button !== 0 || !(event.target instanceof Element)) return false;
+  if (event.target.closest("button, input, select, textarea, a, [contenteditable], [role=button], [role=listbox], [role=option], .chip, .confirm-sub, .sheet-pop")) return false;
+  return !(event.target instanceof HTMLElement && event.target.clientWidth > 0 && event.offsetX > event.target.clientWidth);
+}
+
+/** #228: drags `slip` by its paper — `move` hears how far the pointer went (px) and where it is on the screen. */
+export function dragByPaper(slip: HTMLElement, handlers: { start?(x: number, y: number): void; move(dx: number, dy: number, x: number, y: number): void; end?(x: number, y: number): void }): void {
+  slip.addEventListener("pointerdown", (event) => {
+    if (!startsSlipDrag(event)) return;
+    event.preventDefault();
+    const fromX = event.screenX, fromY = event.screenY;
+    handlers.start?.(fromX, fromY);
+    try { slip.setPointerCapture(event.pointerId); } catch { /* a press that isn't a real pointer's */ }
+    const move = (next: PointerEvent) => handlers.move(next.screenX - fromX, next.screenY - fromY, next.screenX, next.screenY);
+    const end = (last: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
+      handlers.end?.(last.screenX, last.screenY);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
+  });
+}
+
+/** #229: a press a waiting question held up — the slip shakes once over 톡, or under Reduce Motion its tape blinks (dim,
+ * back, dim, back, 살짝 each). (The animations API: base.css's Reduce Motion rule shortens CSS animations only.) */
+export function nudge(slip: HTMLElement): void {
+  if (reduceMotion()) {
+    const steps = nudgeBlink.length;
+    slip.querySelector<HTMLElement>(".tape")?.animate(nudgeBlink.flatMap((opacity, index) => [{ opacity, offset: index / steps }, { opacity, offset: (index + 1) / steps }]),
+      { duration: motion.quick * steps });
+    return;
+  }
+  slip.animate([0, ...nudgeShake].map((x) => ({ translate: `${x}px 0` })), { duration: motion.bounce, easing: "linear" });
 }
 
 /**

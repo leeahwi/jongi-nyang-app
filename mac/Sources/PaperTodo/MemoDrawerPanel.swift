@@ -30,7 +30,8 @@ final class MemoDrawerController {
     /// Set by the app.
     var onShortcutChange: () -> Void = {}
 
-    static let slide: TimeInterval = 0.18
+    /// The drawer slides out with 등장 (0.18 s, ease-out) and back in as long (ease-in); Windows slides as long.
+    static let slide: TimeInterval = Motion.enter.duration
 
     init(model: AppModel, live: Bool) {
         self.model = model
@@ -405,8 +406,15 @@ final class DrawerPanel: NSPanel {
         isMovable = false
     }
 
-    override var canBecomeKey: Bool { true }
+    /// Not in a check's run (#217): a non-activating panel takes the keyboard even while the app is behind.
+    override var canBecomeKey: Bool { !TestHooks.staysBehind }
     override var canBecomeMain: Bool { false }
+
+    /// A check's run (#217): this would be the key window now, though it never becomes one (PerfDrive's keys go here).
+    override func makeKeyAndOrderFront(_ sender: Any?) {
+        super.makeKeyAndOrderFront(sender)
+        PerfDrive.wouldBeKey(self)
+    }
 
     override func sendEvent(_ event: NSEvent) {
         if event.type == .keyDown, onKey(event) { return }
@@ -455,6 +463,7 @@ struct DrawerHandleView: View {
     var onDrag: (CGFloat) -> Void = { _ in }
     var onDragEnd: () -> Void = {}
     @State private var pointerOn = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     private var hovering: Bool { pointerOn || previewHover }
     @State private var dragged = false
     @State private var startY: CGFloat?
@@ -494,7 +503,8 @@ struct DrawerHandleView: View {
         .frame(width: Self.size.width, height: Self.size.height)
         .contentShape(Rectangle().inset(by: 2))
         .onHover { inside in
-            withAnimation(.easeOut(duration: 0.12)) { pointerOn = inside }
+            // 살짝 (#166); at once under Reduce Motion, as the drawer's own slide.
+            withAnimation(Motion.animation(.quick, reduce: reduceMotion)) { pointerOn = inside }
         }
         .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .global)
             .onChanged { _ in
@@ -517,7 +527,7 @@ struct DrawerHandleView: View {
     }
 }
 
-/// The drawer window's content: the SwiftUI drawer over, for 반투명 and 강하게, a behind-window blur cut to the paper's
+/// The drawer window's content: the SwiftUI drawer over, for 반투명 and 투명, a behind-window blur cut to the paper's
 /// shape (ears and all). Under Reduce transparency (or 불투명, 바탕 없음) there's no blur at all — nothing runs while idle.
 final class DrawerBackdropView: NSView {
     private let drawer: MemoDrawer
@@ -560,7 +570,7 @@ final class DrawerBackdropView: NSView {
         let frame = NSRect(x: x, y: top, width: width, height: max(0, bounds.height - top))
         if blur.frame != frame { blur.frame = frame }
         blur.appearance = NSAppearance(named: drawer.palette.scheme == .dark ? .darkAqua : .aqua)
-        // The system's own blur (its radius isn't ours to set): 강하게 differs by letting more of it through (62 %).
+        // The system's own blur (its radius isn't ours to set): 투명 differs by letting more of it through (62 %).
         blur.material = .popover
         guard frame.size != maskSize || right != maskRight else { return }
         maskSize = frame.size

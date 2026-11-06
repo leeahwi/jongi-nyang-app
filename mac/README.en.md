@@ -12,7 +12,7 @@
 - **macOS 14 or later** — this folder (`mac/`). SwiftUI + AppKit, no outside libraries.
 - **Windows 10/11** — the [`windows/` folder](../windows). The same design and features in Electron + TypeScript.
 - Both apps use **the same file format**, so a Mac and a Windows PC can share one list through a shared folder.
-- No internet, account or server: everything stays on your computer (or in a sync folder you pick).
+- No internet, account or server: everything stays on your computer (or in a shared folder you pick).
 - In Korean, English and Dutch (Desk → Appearance → Language).
 
 ---
@@ -34,7 +34,7 @@
 ### 📝 One page for today
 - Write anything on the one **input line** at the bottom. Click the square and it fills with sage while a pencil line crosses the to-do out. A day ends at **4 a.m.**
 - Under the title, the **day ribbon**: what’s on now in large handwriting, the time left in the ring beside it (‘40 min left’), the next two things under it (‘2:00 PM Finish the report · in 40 min’), and a thin bar of the whole day on top. ‘Whole day ›’ opens it in place into the **day’s timetable**. To-dos with a reminder still to come today gather at the top under **Next**.
-- Pen, Marker or Clean lettering in four text sizes. Drag rows by their handle; bring back deleted ones with `⌘Z`.
+- Pen, Marker or Clean lettering in seven text sizes. Drag rows by their handle; bring back deleted ones with `⌘Z`.
 - Tabs at the top: **Today · Ahead**. Notes live in the [notes drawer](#-notes-drawer-143--144) at the edge of the screen. **Ahead** shows each day of this week and next week from tomorrow, with its events and the to-dos due that day; later deadlines sit by month and undated to-dos under **Someday**. Drag a to-do to another day to move its due date.
 - In the menu bar, a small **cat face**: ‘12:30’ while a timer runs, ‘Dentist 40 min’ when something starts within the hour. Click it for the **Today window** (next event · timer · next alarm, a few of today’s to-dos, the input line).
 - Double-click the top or press `⌘M` and the notepad folds into a **little sticky note** with Jongi-nyang peeking over it.
@@ -94,14 +94,25 @@
 - Desk → Storage & backup → **Backup & move** (or File → Export everything `⇧⌘E` / Import `⇧⌘I`): your to-dos, notes, repeats, events, alarms, history and focus history in one `.jongi` file, to import in Jongi-nyang on another computer (Mac ↔ Windows too). See [Backup & move](#backup--move).
 
 ### 🗂 Desk
-- Calendar, History, Clock, Settings and Help now share one **Desk** window. Open it with the desk button at the top right of the notepad or `⌘D`, and pick a pane in the list on the left (View · Settings · Help) or with `⌘1`–`⌘9`. In a narrow window the list shrinks to icons.
+- Calendar, History, Alarms & timers, Settings and Help now share one **Desk** window. Open it with the desk button at the top right of the notepad or `⌘D`, and pick a pane in the list on the left (View · Settings · Notes & data · Help) or with `⌘1`–`⌘9`. In a narrow window the list shrinks to icons.
 
 ### 🌙 Night paper
-- Desk → Appearance → **Paper: Automatic · Day · Night**. On Automatic, the notepad, slips, desk and Today window all turn to **night paper** — like paper in a room with the lights off — when your Mac is in dark mode. Every day and night colour passes WCAG AA contrast (`scripts/check-contrast.py`).
+- Desk → Appearance → **Day & night** (Automatic · Day · Night). On Automatic, the notepad, slips, desk and Today window all turn to **night paper** — like paper in a room with the lights off — when your Mac is in dark mode. Every day and night colour passes WCAG AA contrast (`scripts/check-contrast.py`).
 
 ### 🌐 한국어 · English · Nederlands
 - Desk → Appearance → **Language**: Automatic · 한국어 · English · Nederlands. Automatic follows your Mac's language order (English when none of the three is there); changing it restarts Jongi-nyang.
 - Menus, settings, help, reminders, cat talk, dates and times are all in that language. English and Dutch handwriting uses Caveat (pen) and Kalam (marker); titles written in Korean still show in Korean handwriting.
+
+### 🗓 Desktop calendar widgets · fifteen papers (1.48)
+![A wall calendar widget for this month on the desktop: each day is a paper tile with its events and holiday names, and a cat's ears peek out at the top right](../docs/screenshots/mac/en/widget-month-wall-100.png)
+
+- **Desktop calendar widgets**: in Desk → Events → Desktop widgets, pick Today, This week, This month, Wall calendar or Today list, up to four at a time. Choose an opacity from 20 to 100%; each day sits on a paper tile, so the text stays readable when the widget is faint. Widget settings stay on this Mac.
+- **Day sheet**: click a day on a widget to see everything on it, and type there as you would in the notepad's input line to add it right away.
+- **Lunar dates and holidays**: the Desk calendar and widgets show lunar dates and the names of Korean public holidays, worked out on this Mac without the internet.
+- **Fifteen papers**: pick one in Desk → Appearance → Paper, and the notepad, calendar, widgets, slips, Desk and notes drawer all change to it. New are Sticky note, Manuscript paper, Blue lined notebook, Lavender, Recycled paper, Night sky and Chalkboard, and a light paper switches at night to the one you pick under At night.
+- **Drag slips**: drag question slips and the Quick add and Quick note slips by their paper or title bar. Quick slips remember where you left them.
+- **A cat that taps along**: when you type in Jongi-nyang, the cat taps with its paws. It never reads or keeps which keys you pressed. Choose Off, In this app or In all apps under `Tap along while typing` in Desk → Jongi-nyang; In all apps makes macOS ask for Input Monitoring.
+- **Four groups in Desk**: the list on the left is now View · Settings · Notes & data · Help. Clock is now Alarms & timers in Settings.
 
 ### 🖥 Spaces per device · a new Today window (1.47)
 ![Desk → Spaces with Work hidden on this device and Study shown only at set weekday times](../docs/screenshots/mac/spaces-device-desk.png)
@@ -160,7 +171,7 @@
 - Redrawn once a minute only (idle CPU with the notepad open stays under 1%). The timer tag no longer changes width as the seconds tick.
 
 ### 🕑 A time for a to-do (1.39)
-- Give a to-do a **time** on its day (start–end; a start alone counts as 30 min): right-click → **Set a time…**, the **Time** tab in its reminder slip (a quarter-hour list or a typed time, and 30 min · 1 h · 2 h), or type `report 2-4pm`, `report from 2 to 4`, `2pm–3:30pm report` → chip `To-do · today 2:00–4:00 PM` (Tab makes it an event at the same time).
+- Give a to-do a **time** on its day (start–end; a start alone counts as 30 min): right-click → **Set a time…**, the **Time** section of its reminder slip (a quarter-hour list or a typed time, and 30 min · 1 h · 2 h), or type `report 2-4pm`, `report from 2 to 4`, `2pm–3:30pm report` → chip `To-do · today 2:00–4:00 PM` (Tab makes it an event at the same time).
 - The **day ribbon**’s bar shows it in green, and the opened **timetable** as a green-outlined block: faded and crossed out when done, outlined in red when its time is over and it isn't. Drag the block to move it, or its top or bottom edge to change the start or end, in quarter hours. It joins the now · next lines too.
 - Rows show `🕑 2:00–4:00 PM`; **Next** lists timed to-dos by start. Ahead, the Desk calendar (week and day list), the Today window and search show the time too. A to-do without a reminder gets one at the start, and a reminder at the start moves with the time. Focus offers what's left of the time first.
 - Saved as optional `timeStart` · `timeEnd` (`"HH:mm"`) in the to-do file (the same on Windows); kept in the history, backups and text export.
@@ -170,7 +181,7 @@
 - **Tomorrow · change date**: ‘→ Tomorrow’ on a row, right-click → Change date (Tomorrow · This Friday · Next Monday · Someday · Pick a date…), and on a selected row `⌥→` / `⌥←` a day later · earlier, `⌥↓` to Someday. A move shows ‘Moved to tomorrow · Undo’.
 - **Since yesterday · 3 days**: a small mark on undated to-dos that stay on Today (an optional `todaySince` in the to-do file, the same on Windows).
 - **Evening tidy-up**: in the evening (8 PM by default) ‘3 to-dos left today. Move them to tomorrow?’ — To tomorrow · To Someday · Leave as is; missed, it comes as a morning tidy-up. With **Today’s one thing** on, the day’s first line asks for the one thing and stars it at the top.
-- **Snooze**: 5 · 10 · 30 min · 1 hour · tonight at 7 PM · tomorrow at 9 AM · move to tomorrow; events get ‘Again 5 min before’. Missed reminders can also go to **macOS notifications** (Done · In 10 min).
+- **Snooze**: 5 · 10 · 30 min · 1 hour · tonight at 7 PM · tomorrow at 9 AM · Do tomorrow; events get ‘Again 5 min before’. Missed reminders can also go to **macOS notifications** (Done · In 10 min).
 - **Search `⌘F`**: Today · Ahead · the notes drawer · History · Events at once (notes by folder name too), case and accents ignored (Korean first consonants too).
 - The input line: `every day drink water` · `every Monday 9am team meeting` → **repeats**, `take out laundry in 30 min` → a reminder in 30 minutes. Click an empty spot in the day’s timetable for a new to-do or event at that time; `F` on a row starts a focus.
 - **`⌃⌥J`** shows or hides the notepad from anywhere; ⋯ → **dock to the screen edge**; the Dock icon’s menu (Quick add · Quick note · Desk · Focus 25 min · 5 min timer) and count; a timer ring around the menu-bar face; **copied text** in a quick note; **Undo** toasts for delete · all done · clear; focus card `Space` · `⌘↩` · `⌘=`.

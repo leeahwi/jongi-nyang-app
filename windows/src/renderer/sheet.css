@@ -59,7 +59,7 @@
 .sheet-color::after { content: ""; width: 18px; height: 18px; border-radius: 50%; background: var(--dot); }
 .sheet-color[aria-checked="true"]::after { box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px var(--dot); }
 .sheet-color:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
-:root[data-paper="night"] .sheet-color::after { filter: brightness(0.85); }
+:root[data-scheme="dark"] .sheet-color::after { filter: brightness(0.85); }
 .sheet-place { flex: 1; min-width: 0; height: 28px; padding: 0; border: 0; outline: none; background: transparent; font: 13px var(--ui); color: var(--ink); user-select: text; }
 .sheet-place::placeholder { color: var(--ink-3); }
 .sheet-note { display: flex; align-items: flex-start; gap: 6px; margin-top: 8px; font-size: 12px; line-height: 1.45; color: var(--ink-2); }

@@ -874,7 +874,8 @@ private enum CoreTests {
             let late = event("늦은", at(7, 23, 30), at(8, 0, 30))
             let tomorrow = event("내일", at(8, 0), at(8, 1))
             let events = [birthday, trip, meeting, night, late, tomorrow]
-            try expect(CalendarMonth.eventsOn("2026-10-07", events, calendar: seoul).map(\.title) == ["생일", "출장", "야간", "회의", "늦은"], "3")
+            // calendar-flows D1: the all-day one begun earlier on top (its band keeps its place).
+            try expect(CalendarMonth.eventsOn("2026-10-07", events, calendar: seoul).map(\.title) == ["출장", "생일", "야간", "회의", "늦은"], "3")
             // 4
             func time(_ e: CalendarEvent) -> String { CalendarMonth.agendaTime(e, on: "2026-10-07", calendar: seoul) }
             try expect(time(birthday) == "종일" && time(meeting) == "10:00–11:00" && time(night) == "~01:00" && time(late) == "23:30~"
@@ -891,7 +892,12 @@ private enum CoreTests {
             try expect(onDay.map { "\($0.title) \($0.kind.rawValue) \($0.time ?? "-")" } == ["C reminder 09:30", "B reminder 15:00", "A deadline -", "D deadline -"], "5: \(onDay)")
             // 6
             let cell = CalendarMonth.cellItems("2026-10-07", events: events, tasks: tasks, calendar: seoul)
-            try expect(cell.items == [.event(birthday), .event(trip), .event(night)] && cell.more == 4, "6: \(cell.more)")
+            // #227: events, deadlines, then reminders (C 09:30, B 15:00) — D is due that day, so only its deadline.
+            try expect(cell.items == [.event(trip), .event(birthday), .event(night)] && cell.more == 6, "6: \(cell.more)")
+            let roomy = CalendarMonth.cellItems("2026-10-07", events: events, tasks: tasks, limit: 10, calendar: seoul).items.compactMap { item -> String? in
+                if case .task(let task) = item { return "\(task.kind.rawValue) \(task.title)" } else { return nil }
+            }
+            try expect(roomy == ["deadline A", "deadline D", "reminder C", "reminder B"], "6: \(roomy)")
             // 7
             try expect(CalendarMonth.monthTitle(year: 2026, month: 10) == "2026년 10월"
                        && CalendarMonth.weekTitle(week) == "10월 4일 – 10일"
@@ -984,8 +990,16 @@ private enum CoreTests {
                 try expect(page.events(on: day) == CalendarMonth.eventsOn(day, events, calendar: seoul), "events \(day)")
                 try expect(page.tasks(on: day) == before(day, ranges: true), "to-dos \(day)")
                 try expect(CalendarMonth.dayTasks(day, tasks, now: now, calendar: seoul) == before(day, ranges: true), "dayTasks \(day)")
+                // #227: and then the day's reminders by time, then title (a to-do due that day only as its deadline).
                 let cellBefore = CalendarMonth.eventsOn(day, events, calendar: seoul).map(CalendarMonth.CellItem.event)
                     + before(day, ranges: false).filter { $0.kind == .deadline }.map(CalendarMonth.CellItem.task)
+                    + tasks.filter { !$0.isCompleted && $0.dueDate != day && $0.reminderAt.map { CalendarDraft.day($0, calendar: seoul) } == day }
+                        .sorted { $0.reminderAt! != $1.reminderAt! ? $0.reminderAt! < $1.reminderAt! : $0.title < $1.title }
+                        .map { task in
+                            let p = seoul.dateComponents([.hour, .minute], from: task.reminderAt!)
+                            return CalendarMonth.CellItem.task(.init(title: task.title, kind: .reminder, time: AppLanguage.ko.clock(hour: p.hour!, minute: p.minute!),
+                                                                     taskId: task.id))
+                        }
                 for limit in [1, 3, 99] {
                     let cell = page.cell(day, limit: limit)
                     try expect(cell.items == Array(cellBefore.prefix(limit)) && cell.more == max(0, cellBefore.count - limit), "cell \(day) \(limit)")

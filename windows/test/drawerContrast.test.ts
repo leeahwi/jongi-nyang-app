@@ -3,7 +3,11 @@ import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { contrast, tokensIn } from "../src/core/contrast";
-import { backdropClashes, folderColors, type MemoPaper } from "../src/core/memoDrawer";
+import { backdropClashes, darkPapers, folderColors, memoPapers, type MemoPaper } from "../src/core/memoDrawer";
+
+/** #244: the seven new papers' drawer colours as docs/plans/paper-themes/tokens.json gives them (`drawer.palette`). */
+const tokensJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), "../docs/plans/paper-themes/tokens.json"), "utf8")) as { papers: { key: string; drawer: { existing?: boolean; palette?: Record<string, string | number> } }[] };
+const newPalettes = Object.fromEntries(tokensJson.papers.filter((paper) => paper.drawer.palette).map((paper) => [paper.key, paper.drawer.palette!]));
 
 /**
  * 메모 서랍's eight papers (src/renderer/drawer.css, 1.29 colours; #142 한지 · 쑥색 · 벚꽃 · 먹색): every text colour on what it sits on at 4.5:1,
@@ -25,8 +29,8 @@ const block = (look: string) => {
   return tokensIn(css.slice(open, css.indexOf("}", open)));
 };
 
-/** The papers (#142: 한지 · 쑥색 · 벚꽃 · 먹색 too, the Mac's colours). */
-const looks = ["day", "night", "kraft", "grid", "hanji", "sage", "blossom", "ink"];
+/** The papers (#142: 한지 · 쑥색 · 벚꽃 · 먹색 too, the Mac's colours; #244: all fifteen). */
+const looks: string[] = memoPapers;
 
 type Need = "text" | "ui" | "line" | "edge" | "sheet";
 // The open memo's line: a mark (3:1), kept at 3.2:1 or more as the spec measured it.
@@ -61,6 +65,10 @@ const pairs: [string, string, Need, string][] = [
   ["d-select", "d-paper", "ui", "the focus ring on the paper"],
   ["d-select", "d-menu", "ui", "the chosen swatch's ring"],
   ["d-bar", "d-bar-track", "ui", "a checklist's progress"],
+  // #240: the progress sits inside the checklist's chip; all done, the chip reads ‘✓ 4/4’ in the check colour.
+  ["d-bar", "d-chip", "ui", "a checklist's progress fill inside its chip (#240)"],
+  ["d-check", "d-chip", "ui", "a finished checklist's ✓ in its chip (#240)"],
+  ["d-ink", "d-chip", "text", "a finished checklist's ‘4/4’ (#240)"],
   ["d-pin", "d-card", "ui", "the paw on a pinned card"],
   ["d-pin", "d-paper", "ui", "the paw on the 고정 header"],
   ["d-open", "d-card", "ui", "the default open line"],
@@ -86,7 +94,9 @@ for (const look of looks) {
     const check = (fg: string, bg: string, need: Need, where: string) => {
       assert.ok(tokens[fg] && tokens[bg], `${look}: --${fg} or --${bg} missing`);
       const ratio = contrast(tokens[fg], tokens[bg]);
-      const needed = needs[need];
+      // #244: the seven new papers are measured as tokens.json's check (the Mac's DRAWER_PAIRS) measures them: the open
+      // line a mark at 3:1 (WCAG), a sheet on the drawer told apart at 1.15:1 (밤하늘's slip on its night-blue paper is 1.20).
+      const needed = look in newPalettes && need === "line" ? 3 : look in newPalettes && need === "sheet" ? 1.15 : needs[need];
       lines.push(`  ${ratio >= needed ? "ok  " : "FAIL"} --${fg} on --${bg} = ${ratio.toFixed(2)} (${needed}) · ${where}`);
       if (ratio < needed) failures.push(`${fg} on ${bg} ${ratio.toFixed(2)}`);
     };
@@ -125,7 +135,10 @@ test("drawer contrast (1.30): no stripes on the bookmarks or the handle; the han
 // #14 (option B): a card's preview is the ink one step lighter over its sheet — day 78 %, night 86 % (the mock), kraft 84 %
 // and grid 80 % — written as the colour that makes, the same as the Mac's DrawerPalette.preview; and on every paper it
 // reads better than the grey (--d-preview) it replaced.
-const peekStrength: Record<string, number> = { day: 0.78, night: 0.86, kraft: 0.84, grid: 0.8, hanji: 0.8, sage: 0.84, blossom: 0.82, ink: 0.86 };
+const peekStrength: Record<string, number> = {
+  day: 0.78, night: 0.86, kraft: 0.84, grid: 0.8, hanji: 0.8, sage: 0.84, blossom: 0.82, ink: 0.86,
+  ...Object.fromEntries(Object.entries(newPalettes).map(([key, palette]) => [key, palette.previewInk as number])),
+};
 const blend = (fg: string, alpha: number, bg: string) => "#" + [1, 3, 5].map((i) => Math.round(parseInt(fg.slice(i, i + 2), 16) * alpha + parseInt(bg.slice(i, i + 2), 16) * (1 - alpha)).toString(16).padStart(2, "0")).join("");
 for (const look of looks) {
   test(`drawer contrast (#14): ${look} preview is the ink at ${peekStrength[look] * 100} % and reads better than before`, () => {
@@ -140,12 +153,15 @@ for (const look of looks) {
 // #82 · #83: the + under the pointer (ink on the sheet with 6 % ink over it), and the close bar on the see-through
 // paper (반투명 82 %, 강하게 62 % over the window's material, taken as #ececec — #2a2a2a under night paper — as the
 // Mac's check does): 3:1 on every paper. The bar's colour is the Mac's DrawerPalette.closeBar.
-const macCloseBar: Record<string, string> = { day: "#7b766a", night: "#8e897d", kraft: "#6a583f", grid: "#74808b", hanji: "#847f74", sage: "#768170", blossom: "#8c767b", ink: "#757c8c" };
+const macCloseBar: Record<string, string> = {
+  day: "#7b766a", night: "#8e897d", kraft: "#6a583f", grid: "#74808b", hanji: "#847f74", sage: "#768170", blossom: "#8c767b", ink: "#757c8c",
+  ...Object.fromEntries(Object.entries(newPalettes).map(([key, palette]) => [key, palette.closeBar as string])),
+};
 for (const look of looks) {
   test(`drawer contrast (#82, #83): ${look} — the + under the pointer, the close bar on the see-through paper`, () => {
     const tokens = block(look);
     assert.equal(tokens["d-closebar"], macCloseBar[look], "the same colour as the Mac's closeBar");
-    const material = look === "night" || look === "ink" ? "#2a2a2a" : "#ececec";
+    const material = darkPapers.includes(look as MemoPaper) ? "#2a2a2a" : "#ececec";
     const rows: [string, number][] = [
       ["the + under the pointer: --d-ink on the 6 % tint", contrast(tokens["d-ink"], blend(tokens["d-ink"], 0.06, tokens["d-card"]))],
       ["the close bar on the 반투명 paper (82 %)", contrast(tokens["d-closebar"], blend(tokens["d-paper"], 0.82, material))],
@@ -178,7 +194,7 @@ for (const darkApp of [false, true]) {
     for (const look of looks) {
       const tokens = block(look);
       const clash = backdropClashes(look as MemoPaper, darkApp);
-      assert.equal(clash, (look === "night" || look === "ink") !== darkApp, `${look}: clashes only when its light or dark differs from the app's`);
+      assert.equal(clash, darkPapers.includes(look as MemoPaper) !== darkApp, `${look}: clashes only when its light or dark differs from the app's`);
       for (const [backdrop, alpha] of [["반투명", 0.82], ["강하게", 0.62]] as const) {
         const seeThrough = blend(tokens["d-paper"], alpha, material);
         const drawn = clash ? tokens["d-paper"] : seeThrough;

@@ -12,38 +12,55 @@ const listen = new Set([
   "popup:show", "popup:retain", "popup:reset", "floating:summary", "history:changed", "pet:state", "timer:state", "timer:chime", "quick:open",
   "quickMemo:open", "quickMemo:blur", "timerSheet:open", "ring:show", "ring:hush", "note:toast", "confirm:show", "glance:open",
   "desk:pane", "paper", "focus:chime", "note:notice", "note:row-menu", "drawer:open", "drawer:shut", "drawer:look", "drawer:backdrop", "handle:state",
-  "ears:twitch", "ears:preview",
+  "ears:twitch", "ears:preview", "slip:asking", "confirm:nudge",
+  // #234: the desktop calendar widgets and their day sheet.
+  "widget:settings", "widget:made", "widget:removed", "widgetSheet:open",
 ]);
 const send = new Set([
   "popup:interactive", "popup:complete", "popup:complete-all", "popup:snooze", "popup:snooze-until", "popup:tomorrow", "popup:event-again", "popup:sweep", "popup:open", "popup:open-event", "popup:closed",
   "floating:drag-start", "floating:drag", "floating:drag-end", "floating:click", "floating:menu",
-  "pet:ready", "pet:interactive", "pet:click", "pet:answer", "pet:open-note", "pet:menu", "pet:drag-start", "pet:drag-end",
+  "pet:ready", "pet:interactive", "pet:click", "pet:answer", "pet:open-note", "pet:menu", "pet:drag-start", "pet:drag", "pet:drag-end",
   "timer:ready", "timer:interactive", "timer:toggle", "timer:pause", "timer:stop", "timer:dismiss", "timer:menu",
   "timer:drag-start", "timer:drag", "timer:drag-end", "quick:close",
   "quickMemo:draft", "quickMemo:close", "quickMemo:save", "timerSheet:start", "timerSheet:close", "ring:ready", "ring:stop", "ring:snooze",
   "slip:size", "confirm:answer", "confirm:ready", "glance:close", "glance:size",
   "drawer:close", "drawer:hidden", "drawer:interactive", "drawer:resize", "drawer:shape", "drawer:big", "handle:open", "handle:drag",
   "ears:interactive", "ears:twitch", "desk:shown",
+  "widget:ready", "widget:interactive", "widget:menu", "widget:day", "widget:drag-start", "widget:drag", "widget:drag-end",
+  "widgetSheet:close", "widgetSheet:size", "widgetSheet:made",
 ]);
 
 /** The app's language, asked once as the page loads (the main process chose it at launch). */
 const lang = ipcRenderer.sendSync("lang:get") as Lang;
 /** The app's clock (24-hour or 12-hour, the system's), asked once as the page loads; lang.ts reads it. */
 const hourCycle = ipcRenderer.sendSync("clock:get") as string;
+/** The week's first day (the system's "monday" · "sunday", or "" for the language's own); lang.ts reads it. */
+const weekStart = ipcRenderer.sendSync("week:get") as string;
 
 /**
- * 밤 종이: `<html data-paper="night">` switches every token (base.css). Set before the page draws and
- * again whenever the setting or the system's appearance changes, in every window and every frame.
+ * 종이 (#244): `<html data-paper="kraft" data-scheme="light">` — the paper shown (every token, base.css · papers.css)
+ * and its lightness (the rules every dark paper shares). Set before the page draws and again whenever a setting or
+ * the system's appearance changes, in every window and every frame.
  */
-let night = ipcRenderer.sendSync("paper:get") === true;
-const markPaper = () => { if (document.documentElement) document.documentElement.dataset.paper = night ? "night" : "day"; };
+interface PaperShown { paper: string; dark: boolean; nightNow: boolean }
+const readShown = (value: unknown): PaperShown => {
+  const shown = value as Partial<PaperShown> | null;
+  return { paper: typeof shown?.paper === "string" && /^[a-z]{2,12}$/.test(shown.paper) ? shown.paper : "day", dark: shown?.dark === true, nightNow: shown?.nightNow === true };
+};
+let shown = readShown(ipcRenderer.sendSync("paper:get"));
+const markPaper = () => {
+  const root = document.documentElement;
+  if (!root) return;
+  root.dataset.paper = shown.paper;
+  root.dataset.scheme = shown.dark ? "dark" : "light";
+};
 markPaper();
 document.addEventListener("readystatechange", markPaper);
 const paperListeners: ((night: boolean) => void)[] = [];
 ipcRenderer.on("paper", (_event, value: unknown) => {
-  night = value === true;
+  shown = readShown(value);
   markPaper();
-  for (const listener of paperListeners) listener(night);
+  for (const listener of paperListeners) listener(shown.dark);
 });
 
 /** #71: the parts of the state this page listens for (each on its own channel; see StateKind). */
@@ -54,8 +71,13 @@ const api = {
   platform: process.platform,
   lang,
   hourCycle,
-  /** Night paper now, and a call whenever it changes (pages that draw colours themselves). */
-  isNight: (): boolean => night,
+  weekStart,
+  /** A dark paper shown now, and a call whenever the paper changes (pages that draw colours themselves). */
+  isNight: (): boolean => shown.dark,
+  /** The paper shown now (#244: one of core/paper.ts's fifteen keys). */
+  paperShown: (): string => shown.paper,
+  /** Whether it is night by 낮 · 밤 now (설정 draws the drawer's own paper by it). */
+  paperNightNow: (): boolean => shown.nightNow,
   onPaper: (callback: (night: boolean) => void): void => { paperListeners.push(callback); },
   getState: (): Promise<AppState> => ipcRenderer.invoke("state:get"),
   act: (action: Action): Promise<void> => ipcRenderer.invoke("act", action),

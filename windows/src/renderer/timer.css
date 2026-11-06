@@ -1,7 +1,7 @@
 html, body { background: transparent; overflow: hidden; }
 /* The phases' colours: focus red, rest sage — lifted at night so they read on the dark board. */
 :root { --focus: #c74a36; --rest: #627f55; --board: rgb(254, 252, 247); --board-veil: linear-gradient(rgba(254, 252, 247, 0.82), rgba(254, 252, 247, 0.82)), url("../../assets/texture.png"); --face: white; }
-:root[data-paper="night"] { --focus: #e3866f; --rest: var(--sage); --board: var(--card); --board-veil: none; --face: #3b3933; }
+:root[data-scheme="dark"] { --focus: #e3866f; --rest: var(--sage); --board: var(--card); --board-veil: none; --face: #3b3933; }
 
 /* The paper cat holds the board at the bottom of the window; its speech bubble above. Once a
    countdown has ended the board is gone and the cat cheers under the message. */
@@ -15,7 +15,8 @@ html, body { background: transparent; overflow: hidden; }
 .cat { width: 92px; height: 92px; object-fit: contain; margin-bottom: -29px; transform-origin: 50% 93%; pointer-events: auto; user-select: none; }
 .done .cat { margin-bottom: 0; }
 .cat[hidden] { display: none; }
-/* #67: held paused and moved on about 8 times a second (renderer/sampled.ts sets --t, the ms since it started). */
+/* #67: held paused and moved on about 8 times a second (renderer/sampled.ts sets --t, the ms since it started), for
+   one breath every 20 seconds; between them the cat holds still (--t 0, the first frame). */
 .cat.awake { animation: breathe-awake 2.6s ease-in-out infinite paused, sway 5.3s ease-in-out infinite paused; animation-delay: calc(var(--t, 0) * -1ms); will-change: scale, rotate; }
 .cat.asleep { animation: breathe-asleep 3.4s ease-in-out infinite paused; animation-delay: calc(var(--t, 0) * -1ms); will-change: scale; }
 @keyframes breathe-awake { 0%, 100% { scale: 1 1; } 45% { scale: 0.9944 1.016; } }

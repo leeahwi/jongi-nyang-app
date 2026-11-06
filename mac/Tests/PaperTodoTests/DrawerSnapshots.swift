@@ -91,6 +91,8 @@ extension DesignSnapshots {
         keptModels.append(model)
         model.paperColor = night ? .night : .day
         let drawer = model.drawer
+        // #244: these scenes draw the drawer's own papers (노트와 같은 종이 off), as before 1.48.
+        drawer.sameAsNote = false
         drawer.now = { base }
         drawer.refreshForSnapshot()
         drawer.recentMoves = ["home", "shopping"]
@@ -190,7 +192,7 @@ extension DesignSnapshots {
         try shot("auto-\(night ? "night" : "day")", size())
         drawer.theme = night ? .night : .day
         let paper = night ? "night" : "day"
-        // #114 · #120 on the new papers (#142): the found line, 체크 남음 and 지운 메모 in 한지 and 먹색, as they are.
+        // #114 · #120 on the new papers (#142): the found line, 안 한 체크 and 지운 메모 in 한지 and 먹색, as they are.
         drawer.nightPaper = false
         for theme in [MemoDrawer.Theme.hanji, .ink] {
             drawer.theme = theme
@@ -289,7 +291,7 @@ extension DesignSnapshots {
         try shot("search-\(paper)", size())
         drawer.query = t("ㅋㅋㅋ", "zebra", "zebra")
         try shot("search-none-\(paper)", size())
-        // #114: the found line deep in a long one (brought near its start); 체크 남음 alone; this folder only.
+        // #114: the found line deep in a long one (brought near its start); 안 한 체크 alone; this folder only.
         drawer.query = "QA"
         try shot("search-line-\(paper)", size())
         drawer.endSearch()
@@ -519,6 +521,26 @@ extension DesignSnapshots {
         drawer.theme = night ? .night : .day
         try render(HStack(spacing: 18) { ForEach(handles.indices, id: \.self) { handles[$0] } }
                     .padding(16).background(screen), size: nil, to: output.appendingPathComponent("drawer-handle.png"))
+
+        // #240: a checklist's chip on every paper — its progress inside the chip (2/4, 0/3), and all done (✓ 4/4).
+        if !night {
+            let papers: [DrawerPalette] = [.day, .night, .kraft, .grid, .hanji, .sage, .blossom, .ink]
+            try render(VStack(alignment: .leading, spacing: 0) {
+                ForEach(papers.indices, id: \.self) { index in
+                    let palette = papers[index]
+                    HStack(spacing: 10) {
+                        ChecklistChip(done: 2, total: 4, palette: palette)
+                        ChecklistChip(done: 0, total: 3, palette: palette)
+                        ChecklistChip(done: 4, total: 4, palette: palette)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 14).padding(.vertical, 9)
+                    .frame(width: 300)
+                    .background(palette.sheet)
+                    .environment(\.colorScheme, palette.scheme)
+                }
+            }, size: nil, to: output.appendingPathComponent("drawer-checklist-chips.png"))
+        }
 
         // Settings: the groups as the desk's 메모 서랍 pane draws them; listening for a key; a key the app already uses.
         func settings(_ view: some View) -> some View {

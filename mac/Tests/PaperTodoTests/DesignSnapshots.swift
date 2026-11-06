@@ -501,9 +501,9 @@ enum DesignSnapshots {
         let controller = ReminderController(model: model, preferences: preferences, onOpen: {})
         let archive = ArchiveStore(model: model)
         func desk(_ pane: DeskPane, _ name: String, size: NSSize = DeskMetrics.size, alarmEditing: String? = nil,
-                  help: (topic: String, query: String)? = nil, week: Bool = false) throws {
+                  help: (topic: String, query: String)? = nil, week: Bool = false, calendarDay: String? = nil) throws {
             try render(DeskView(state: DeskState(pane: pane), model: model, archive: archive, reminders: controller, previewTitlebar: true,
-                                previewAlarmEditing: alarmEditing, previewHelp: help, previewCalendarWeek: week),
+                                previewAlarmEditing: alarmEditing, previewHelp: help, previewCalendarWeek: week, previewCalendarDay: calendarDay),
                        size: size, to: output.appendingPathComponent("\(name).png"))
         }
         let full = NSSize(width: DeskMetrics.size.width, height: 1500)
@@ -517,6 +517,17 @@ enum DesignSnapshots {
             try desk(pane, "desk-\(pane.rawValue)")
             try desk(pane, "desk-\(pane.rawValue)-full", size: full)
         }
+        // #230: 글자 칠 때 두드리기 in all apps — allowed (the small cat's corner below), and not allowed (the line and its button).
+        let petWasVisible = model.petVisible
+        model.petVisible = true
+        try desk(.pet, "desk-pet-typing")
+        model.petTyping = .everywhere
+        try desk(.pet, "desk-pet-typing-everywhere")
+        model.typingNoPermission = true
+        try desk(.pet, "desk-pet-typing-no-permission")
+        model.typingNoPermission = false
+        model.petTyping = .app
+        model.petVisible = petWasVisible
         // #195: 저장 위치's footnote (a move copies the list there and restarts) on the narrowest desk, and the toast the
         // restarted app shows once (the sample folder's name).
         try desk(.storage, "desk-narrow-storage", size: DeskMetrics.minimum)
@@ -527,6 +538,10 @@ enum DesignSnapshots {
         model.sharedFolder = folder
         FolderPath.standIn = (folder.path, NSHomeDirectory() + "/Library/Mobile Documents/com~apple~CloudDocs/종이냥")
         try desk(.storage, "desk-storage-shared")
+        // #240 (D2 C): 자세히 보기 open — the folder, 자동 백업, the list, 완료한 일 and the backup file, all still there.
+        StoragePanel.previewMore = true
+        try desk(.storage, "desk-storage-more", size: full)
+        StoragePanel.previewMore = false
         // The restore question (#140), on a shared folder (its extra line) and on this Mac's.
         let restoring = sampleBackups.entries[2]
         let restoreCopy = try Backup.parse(String(contentsOf: restoring.url, encoding: .utf8))
@@ -704,6 +719,21 @@ enum DesignSnapshots {
         try desk(.calendar, "desk-narrow-calendar", size: DeskMetrics.minimum)
         try desk(.calendar, "desk-narrow-calendar-week", size: DeskMetrics.minimum, week: true)
         try desk(.calendar, "desk-wide-calendar", size: NSSize(width: 1600, height: 1000))
+        // #260: the months with holidays — October 2026 (개천절, its 대체공휴일, 한글날) and February 2027 (설날, its 대체공휴일) — the
+        // long names on two lines where a cell has room (not where a band goes through the day), as on Windows.
+        func held(_ id: String, _ title: String, _ date: String, days: Int, _ color: LocalEvent.Color, hour: Int? = nil) -> LocalEvent {
+            LocalEvent(id: id, title: title, date: date, allDay: hour == nil, days: days, start: (hour ?? 0) * 60, end: (hour ?? 0) * 60 + 60, color: color)
+        }
+        model.calendar.showForSnapshot(monthEvents + [
+            held("flows-trip", t("제주 여행", "Trip to Jeju", "Reis naar Jeju"), "2026-10-18", days: 3, .sage),
+            held("flows-camp", t("가을 캠핑", "Autumn camping", "Herfstkamperen"), "2026-10-30", days: 3, .yellow),
+            held("flows-dentist", t("치과 정기 검진 예약", "Book a dentist check-up", "Tandartscontrole inplannen"), "2026-10-14", days: 1, .blue, hour: 10),
+            held("flows-grandma", t("할머니 댁", "At Grandma’s", "Bij oma"), "2027-02-08", days: 2, .purple),
+        ])
+        try desk(.calendar, "desk-calendar-holidays", calendarDay: "2026-10-05")
+        try desk(.calendar, "desk-narrow-calendar-holidays", size: DeskMetrics.minimum, calendarDay: "2026-10-05")
+        try desk(.calendar, "desk-calendar-seollal", calendarDay: "2027-02-08")
+        model.calendar.showForSnapshot(monthEvents)
         // 1.39: to-dos with a time — today's (no date) and one in two days — as outlined blocks in the week and the day panel.
         model.add(t("보고서 쓰기", "Write the report", "Verslag schrijven"), literal: true)
         let todayRanged = model.items.last!.id
@@ -716,6 +746,31 @@ enum DesignSnapshots {
         try desk(.calendar, "desk-calendar-week-ranges", week: true)
         model.delete(todayRanged)
         model.delete(laterRanged)
+        // #227: to-dos with a reminder — a bell and the title in the month's cells (after the events and deadlines, "+N" when
+        // they don't fit), with their time in the week. One due the same day shows once, as its deadline; a finished one not at all.
+        func remind(_ title: String, days: Int, hour: Int, minute: Int = 0, due: Bool = false, done: Bool = false) -> UUID {
+            model.add(title, literal: true)
+            let id = model.items.last!.id
+            let day = Calendar.current.date(byAdding: .day, value: days, to: Calendar.current.startOfDay(for: now))!
+            model.setTaskReminder(id, at: Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: day)!)
+            if due { model.setDue(id, to: Deadline.key(day)) }
+            if done { model.toggle(id) }
+            return id
+        }
+        let calendarReminders = [
+            remind(t("치과 예약", "Dentist appointment", "Tandartsafspraak"), days: 0, hour: 15),
+            remind(t("엄마한테 전화하기", "Call Mom", "Mama bellen"), days: 0, hour: 19, minute: 30),
+            remind(t("약 먹기", "Take my medicine", "Medicijnen innemen"), days: 0, hour: 21),
+            remind(t("택배 받기", "Pick up the parcel", "Pakketje ophalen"), days: 1, hour: 10),
+            remind(t("보고서 보내기", "Send the report", "Verslag versturen"), days: 3, hour: 9, minute: 30, due: true),
+            remind(t("운동 가기", "Go to the gym", "Naar de sportschool"), days: 3, hour: 18),
+            remind(t("도서관 책 반납", "Return the library books", "Bibliotheekboeken terugbrengen"), days: -2, hour: 11),
+            remind(t("빨래 개기", "Fold the laundry", "Was opvouwen"), days: 4, hour: 8, done: true),
+        ]
+        try desk(.calendar, "desk-calendar-reminders")
+        try desk(.calendar, "desk-calendar-week-reminders", week: true)
+        try desk(.calendar, "desk-narrow-calendar-reminders", size: DeskMetrics.minimum)
+        for id in calendarReminders { model.delete(id) }
         model.calendar.showForSnapshot([])
         let periodicTasks = model.items.filter { !$0.isCompleted }.map(ReminderPopupTask.init)
         let popup = ReminderPopupController(onOpen: {}, onSnooze: { _ in }, onComplete: { _ in })
@@ -859,6 +914,9 @@ enum DesignSnapshots {
         // Quick entry (⌃⌥N) with a date understood, and a row picked with the keyboard.
         try slip(QuickEntryView(model: model, text: t("내일 3시 회의", "meeting tomorrow 3pm", "morgen om 3 uur overleg")), to: output.appendingPathComponent("quick-entry.png"))
         try slip(QuickEntryView(model: model), to: output.appendingPathComponent("quick-entry-empty.png"))
+        // #240 (D3 B): the button follows the picked chip — a timer, an alarm.
+        try slip(QuickEntryView(model: model, text: t("타이머 40", "timer 40", "timer 40")), to: output.appendingPathComponent("quick-entry-timer.png"))
+        try slip(QuickEntryView(model: model, text: t("알람 7시", "alarm 7am", "wekker 7:00")), to: output.appendingPathComponent("quick-entry-alarm.png"))
         let timerCommit = IntentCommit(text: "", candidates: model.intentCandidates(t("타이머 40", "timer 40", "timer 40")), index: 0, key: nil, made: .nothing, page: .todos)
         try slip(QuickEntryView(model: model, previewToast: model.makeToast(for: timerCommit, onChange: { _ in })), to: output.appendingPathComponent("quick-entry-toast.png"))
         model.page = .todos
@@ -929,6 +987,24 @@ enum DesignSnapshots {
             ("question-eyes", { $0.question = PetChatter.pick(PetChatter.Context(hour: 16, open: 2, done: 1), questions: true, recent: ["q.mood", "q.water", "q.stretch", "q.snack", "q.walk", "q.music", "q.pet"], language: .current, random: { 0.99 }) }),
             ("question-mood", { $0.question = PetChatter.pick(PetChatter.Context(hour: 16, open: 2, done: 1), questions: true, recent: ["q.water", "q.stretch"], language: .current, random: { 0.95 }) }),
         ]
+        // #230: on its cushion — resting between keys, the left paw down, the right paw down.
+        for pose in TypingCat.Pose.allCases {
+            let state = PetState()
+            state.homeX = 150
+            state.typing = pose
+            try render(DesktopPetView(state: state).background(desktop),
+                       size: NSSize(width: 300, height: 250), to: output.appendingPathComponent("pet-typing-\(pose.rawValue).png"))
+        }
+        // The small cat over full-screen apps at the three sizes to compare (96 · 112 · 128 pt), each pose.
+        try render(VStack(alignment: .leading, spacing: 10) {
+            ForEach(TypingCat.Pose.allCases, id: \.self) { pose in
+                HStack(alignment: .bottom, spacing: 24) {
+                    ForEach([96, 112, 128] as [CGFloat], id: \.self) { side in
+                        Image(nsImage: PetArt.typing(pose)!).resizable().frame(width: side, height: side)
+                    }
+                }
+            }
+        }.padding(16).background(desktop), size: nil, to: output.appendingPathComponent("pet-typing-sizes.png"))
         for (name, configure) in petStates {
             let state = PetState()
             state.homeX = 150

@@ -12,13 +12,14 @@ import { noteOrigin, type Point } from "../core/placement";
 import { ArchiveStore } from "./archiveStore";
 import { CalendarService } from "./calendar";
 import { defaultPrefs, readStateKind, stateChannels, stateSlice, type AppState, type StateKind, type NoteNotice, fontTitles, pomodoroSettings, textStepTitles, type Action, type FocusCommand, type IntentMade, type IntentRequest, type IntentResult, type NotebookFont, type ParsedWhen, type Prefs, type WireCandidate, type IntentPage } from "../core/types";
-import { hourCycle, nativeName, resolveLang, setHourCycle, spokenTime, type HourCycle, type Lang, type LanguageSetting } from "../core/lang";
+import { firstDayFromIntl, firstDayFromRegistry, hourCycle, nativeName, resolveLang, setHourCycle, setWeekStart, spokenTime, weekStartSet, type HourCycle, type Lang, type LanguageSetting } from "../core/lang";
 import { lang, setLang, t } from "../i18n";
-import type { CalendarSheetRequest } from "../core/calendar";
+import { dateKey, localDate, weekDays, type CalendarSheetRequest } from "../core/calendar";
 import { backupCounts, backupFileName, countsText, exportedText, makeBackup, parseBackup, parseSavedName, savedName, savedWhen, summary, summaryText, type BackupCounts, type BackupFiles, type BackupReason } from "../core/backup";
 import { newAlarm, readAlarm, type Alarm } from "../core/alarm";
 import { emptyIntentMemory, learnSwitch } from "../core/intent";
-import { deskPanes, deskTitleBar, pageOfPane, paperColor, paperInk2, readPane, themeSource, type DeskPage, type DeskPane } from "../core/desk";
+import { deskPanes, deskTitleBar, pageOfPane, readPane, type DeskPage, type DeskPane, type PaperSetting } from "../core/desk";
+import { darkKinds, drawerKindOf, drawerShown, paperBackground, paperInk2, paperKinds, shownPaper, themeSourceOf, type NightChoice, type PaperChoice, type PaperKind, type PaperLook } from "../core/paper";
 import { expand, type EventColor, type LocalEvent } from "../core/events";
 import { glanceText, type GlanceTimer } from "../core/glance";
 import { offscreen, offscreenEnabled, shortcutsDisabled, testHooks } from "./env";
@@ -27,6 +28,9 @@ import { Desk, type DeskExtra } from "./desk";
 import { FloatingNote } from "./floating";
 import { NoteEars, earsPreview } from "./noteEars";
 import { GlanceWindow } from "./glanceWindow";
+import { CalendarWidgets } from "./calendarWidget";
+import { lunarCellWidth, widget as makeWidget, type WidgetKind, type WidgetStyle } from "../core/calendarWidget";
+import { WidgetSheet } from "./widgetSheet";
 import { layoutCheckScript, type LayoutCheckOptions, type LayoutReport } from "./layoutCheck";
 import { DesktopPet } from "./pet";
 import { ReminderPopup } from "./popup";
@@ -54,6 +58,7 @@ import { aiAwayText, aiEntry, aiToastText, aiUndoText, type AiItem, type AiLogEn
 import { FocusTimerWidget } from "./timer";
 import { guardWebContents, openExternalSafely, refused, senderPage } from "./security";
 import { mayAct, pageChannels, readAction, readCalendarRequest, readIntentRequest, type PageName } from "../core/ipcCheck";
+import { widgetPressWhileUp } from "../core/slipMove";
 import { FocusLog } from "./focusLog";
 import { EveningSweep } from "./sweep";
 import { focusRecord, type FocusRecord } from "../core/focus";
@@ -105,6 +110,9 @@ let alarmClock: AlarmClock;
 let calendar: CalendarService;
 let confirmSlip: SlipConfirm;
 let glance: GlanceWindow;
+/** 바탕화면 달력 위젯 (#234) and the day sheet a click on one opens. */
+let widgets: CalendarWidgets;
+let widgetSheet: WidgetSheet;
 let sweep: EveningSweep;
 
 /** A question on a slip over `parent` (the 쪽지 family's confirm); resolves with the answer's index. */
@@ -164,6 +172,31 @@ function systemHourCycle(): HourCycle {
     return cycle === "h11" || cycle === "h12" ? "h12" : "h24";
   } catch {
     return hourCycle(lang());
+  }
+}
+
+/**
+ * The system's first day of the week (calendar-flows D4): Windows' own setting (설정 → 시간 및 언어 → 지역 형식 → 한 주의
+ * 첫날, the registry's `iFirstDayOfWeek`), else the system locale's (Intl's week info). Snapshots keep each language's own.
+ */
+function systemWeekStart(): string | undefined {
+  const forced = testHooks ? process.env.PAPERTODO_WEEKSTART : undefined;
+  if (forced) return forced;
+  if (snapshotDirectory) return undefined;
+  if (process.platform === "win32") {
+    try {
+      const output = execFileSync("reg", ["query", "HKCU\\Control Panel\\International"], { encoding: "utf8", timeout: 1500, windowsHide: true });
+      const found = firstDayFromRegistry(/^\s*iFirstDayOfWeek\s+REG_SZ\s+(\S+)\s*$/m.exec(output)?.[1]);
+      if (found) return found;
+    } catch {
+      // No reg.exe or no answer in time: Intl below.
+    }
+  }
+  try {
+    const locale = new Intl.Locale(app.getSystemLocale() || "ko-KR") as Intl.Locale & { getWeekInfo?: () => { firstDay?: number }; weekInfo?: { firstDay?: number } };
+    return firstDayFromIntl((locale.getWeekInfo?.() ?? locale.weekInfo)?.firstDay);
+  } catch {
+    return undefined;
   }
 }
 
@@ -277,27 +310,50 @@ function resendState(): void {
   for (const kinds of stateFrames.values()) for (const kind of kinds.keys()) kinds.set(kind, undefined);
 }
 
-// ─── 밤 종이 ──────────────────────────────────────────────────────────────────
+// ─── 종이 (#244) ──────────────────────────────────────────────────────────────
 
-/** Night paper now: the setting (낮 · 밤), or with 자동 what the system's appearance says. */
-const paperNight = (): boolean => nativeTheme.shouldUseDarkColors;
-let nightShown: boolean | undefined;
+/** 낮 · 밤, 종이 and 밤에는 as set. */
+const paperChoice = (): PaperChoice => ({ dayNight: store.prefs.paper, paper: store.prefs.paperTheme, night: store.prefs.paperNight });
+/**
+ * The paper shown now. Windows' light or dark is asked only while the theme follows the system (themeSourceOf): where it
+ * is set outright, the paper shown doesn't depend on it.
+ */
+const paperLookNow = (): PaperLook => shownPaper(paperChoice(), systemDark());
+/**
+ * Windows' light or dark (its apps' mode). Electron answers the theme set, so it is read while the theme follows the
+ * system and remembered; with the theme set outright the notepad's paper doesn't need it, only a drawer with its own
+ * paper might (the last answer then).
+ */
+let systemDarkSeen = nativeTheme.shouldUseDarkColors;
+function systemDark(): boolean {
+  if (nativeTheme.themeSource === "system") systemDarkSeen = nativeTheme.shouldUseDarkColors;
+  return systemDarkSeen;
+}
+/** The drawer's paper shown now: the notepad's, or its own (노트와 같은 종이 off). */
+const drawerPaperNow = (): PaperKind => drawerShown(
+  { sameAsNote: store.prefs.drawerSameAsNote, paper: drawerKindOf(store.prefs.drawerTheme), night: store.prefs.drawerNight }, paperChoice(), systemDark());
+/** Whether it is night now by 낮 · 밤 (밤, or 자동 with Windows dark): 설정 draws the drawer's own paper by it. */
+const paperNightNow = (): boolean => store.prefs.paper === "night" || (store.prefs.paper === "auto" && systemDark());
+let paperShownKey: string | undefined;
 
-/** The setting decides Electron's theme (title bars, menus, scrollbars follow it); then every window hears. */
+/** The settings decide Electron's theme (title bars, menus, scrollbars follow the shown paper's lightness); then every window hears. */
 function applyPaper(): void {
-  nativeTheme.themeSource = themeSource(store.prefs.paper);
+  systemDark();
+  nativeTheme.themeSource = themeSourceOf(paperChoice());
   refreshPaper();
 }
 
-/** Every window and frame turns to the paper now in force, and the windows' own backgrounds too (no flash). */
+/** Every window and frame turns to the paper now shown, and the windows' own backgrounds too (no flash). Once per change. */
 function refreshPaper(): void {
-  const night = paperNight();
-  if (night === nightShown) return;
-  nightShown = night;
-  const color = paperColor(night);
+  const look = paperLookNow();
+  const nightNow = paperNightNow();
+  const key = `${look.shown}|${look.scheme}|${nightNow}`;
+  if (key === paperShownKey) return;
+  paperShownKey = key;
+  const color = paperBackground[look.shown];
   if (note && !note.isDestroyed()) note.setBackgroundColor(color);
   desk?.setBackground(color);
-  sendEverywhere("paper", night);
+  sendEverywhere("paper", { paper: look.shown, dark: look.scheme === "dark", nightNow });
   drawer?.sendLook();
 }
 
@@ -336,7 +392,7 @@ function createNote(): BrowserWindow {
     // 2b (S45): 1,200 wide while 오늘 is grouped by space, else 720.
     minWidth: 350, minHeight: 400, maxWidth: noteWidthCap(), maxHeight: 1200,
     frame: false, show: false, maximizable: false, fullscreenable: false,
-    backgroundColor: paperColor(paperNight()), title: t("종이냥"), icon: path.join(assetsDirectory, "cat.png"),
+    backgroundColor: paperBackground[paperLookNow().shown], title: t("종이냥"), icon: path.join(assetsDirectory, "cat.png"),
     alwaysOnTop: store.prefs.alwaysOnTop,
     webPreferences: webPreferences(), enableLargerThanScreen: Boolean(snapshotDirectory) || offscreenEnabled,
   });
@@ -378,13 +434,15 @@ function showNote(): void {
   if (center && collapseAnchorInNote) {
     const [width, height] = note.getSize();
     const origin = noteOrigin(center, collapseAnchorInNote, { width, height }, screen.getAllDisplays().map((display) => display.workArea));
-    note.setPosition(Math.round(origin.x), Math.round(origin.y));
+    // (Off-screen runs, #250: the place is worked out on the displays, then shifted off them as the note started.)
+    note.setPosition(Math.round(origin.x + offscreen.x), Math.round(origin.y + offscreen.y));
   }
   collapseAnchorInNote = undefined;
   floating.hide();
   if (note.isMinimized()) note.restore();
-  note.show();
-  note.focus();
+  // Off-screen runs show it without taking the keyboard from the app in front (as it starts).
+  if (offscreenEnabled) note.showInactive();
+  else { note.show(); note.focus(); }
   noteEars.sync();
   focusTimer?.noteShown(); // 집중: the card is back, the board goes
 }
@@ -392,7 +450,9 @@ function showNote(): void {
 function collapse(anchor?: Point): void {
   if (!note.isVisible()) return;
   note.webContents.send("note:commit-editing");
-  const bounds = note.getBounds();
+  // In the displays' coordinates (off-screen runs, #250: without the shift; floating.show adds it back).
+  const shown = note.getBounds();
+  const bounds = { ...shown, x: shown.x - offscreen.x, y: shown.y - offscreen.y };
   const point = anchor ?? { x: bounds.x + bounds.width / 2, y: bounds.y + 42 };
   note.hide();
   noteEars.sync();
@@ -414,6 +474,12 @@ function openSettings(tab?: string): void {
   openDesk(readPane(tab, true) ?? "appearance");
 }
 
+/** 위젯의 메뉴 → 설정…: 책상 → 일정 with that widget's settings slip open (said again while a new desk loads). */
+function openWidgetSettings(id: string): void {
+  openDesk("events");
+  for (const after of [0, 600, 1500]) setTimeout(() => desk.sendAll("desk:pane", { pane: "events", widget: id }), after);
+}
+
 /** 도움말: every topic, searchable. `topic` / `query` open it at a page (used by snapshots). */
 function openHelp(topic?: string, query?: string): void {
   openDesk("help", { ...(topic ? { topic } : {}), ...(query ? { query } : {}) });
@@ -430,10 +496,14 @@ function openSearch(): void {
   note.webContents.send("note:row-command", { id: "", command: "search" });
 }
 
-/** 달력: the month (or week) with the events and the tasks' deadlines and alerts, on `day` when given. */
-function openCalendar(day?: string): void {
+/**
+ * 달력: the month (or week) with the events and the tasks' deadlines and alerts, on `day` when given — with `event`'s
+ * sheet open over it (고치기 · 지우기: an event pressed on a widget or its day sheet, calendar-flows D3).
+ */
+function openCalendar(day?: string, event?: string): void {
   const chosen = day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : undefined;
-  openDesk("calendar", chosen ? { day: chosen } : {});
+  const key = chosen && event && calendar.find(event) ? event : undefined;
+  openDesk("calendar", chosen ? { day: chosen, ...(key ? { event: key } : {}) } : {});
 }
 
 /**
@@ -473,7 +543,8 @@ function shortcutQuestion(): ConfirmQuestion {
     ] },
     { title: t("집중"), rows: [
       { title: t("일시정지 · 계속"), keys: [t("Space")] },
-      { title: t("다 했어요"), keys: ["Ctrl", "Enter"] },
+      // The focus card's button (en "Done", not the folded icon's "All done").
+      { title: t("다 했어요", undefined, "focus"), keys: ["Ctrl", "Enter"] },
       { title: t("5분 더"), keys: ["Ctrl", "="] },
       { title: t("그만두기"), keys: ["Esc"] },
     ] },
@@ -1051,7 +1122,7 @@ async function importBackup(): Promise<void> {
   const { backup } = parsed;
   const when = exportedText(backup.exportedAt, lang());
   const response = await ask(parent, {
-    icon: "box", title: t("가져오기"), message: t("이 백업을 가져올까요?"), size: "m",
+    icon: "box", title: t("가져오기"), message: t("이 백업을 가져올까요?"), replacesList: true, size: "m",
     detail: [
       path.basename(file),
       when ? t("{from}에서 {when} 내보냄", { from: backup.from ?? t("종이냥"), when }) : t("{from}에서 내보냄", { from: backup.from ?? t("종이냥") }),
@@ -1067,7 +1138,7 @@ async function importBackup(): Promise<void> {
   const mode = response === 1 ? "replace" : "merge";
   if (mode === "replace") {
     const sure = await ask(parent, {
-      icon: "warning", title: t("바꾸기"), message: t("지금 있는 할 일 · 메모 · 일정 · 기록이 이 백업으로 바뀌어요. 바꾸기 전 상태는 자동으로 백업해 둘게요."),
+      icon: "warning", title: t("바꾸기"), message: t("지금 있는 할 일 · 메모 · 일정 · 기록이 이 백업으로 바뀌어요. 바꾸기 전 상태는 자동으로 백업해 둘게요."), replacesList: true,
       buttons: [{ label: t("취소"), kind: "ghost" }, { label: t("바꾸기"), kind: "primary", clay: true }], cancelId: 0, size: "m",
     });
     if (sure !== 1) return;
@@ -1133,7 +1204,7 @@ async function chooseBackupFolder(): Promise<void> {
 /** The restore question (also drawn by the snapshots): when, what the copy holds, the two ways back, and the other devices. */
 function restoreQuestion(date: Date, counts: ReturnType<typeof backupCounts>, shared: boolean): ConfirmQuestion {
   return {
-    icon: "box", title: t("되돌리기", undefined, "restore"), message: t("{when} 백업으로 되돌릴까요?", { when: savedWhen(date, new Date(), lang(), true) }), size: "m", cancelId: 0,
+    icon: "box", title: t("되돌리기", undefined, "restore"), message: t("{when} 백업으로 되돌릴까요?", { when: savedWhen(date, new Date(), lang(), true) }), replacesList: true, size: "m", cancelId: 0,
     detail: [countsText(counts, lang()), "", t("합치기: 지금 것은 두고, 그 뒤에 지운 것만 되살려요."), t("바꾸기: 지금 것을 모두 그때로 바꿔요."),
       t("어느 쪽이든 지금 것은 먼저 백업해 둬요."), ...(shared ? [t("다른 기기의 목록도 같이 바뀌어요.")] : [])].join("\n"),
     buttons: [{ label: t("취소"), kind: "ghost" }, { label: t("바꾸기"), kind: "danger" }, { label: t("합치기"), kind: "primary" }],
@@ -1213,17 +1284,25 @@ async function switchStorage(folder: string | undefined): Promise<void> {
   if (hasList(target)) {
     const response = await ask(parent, {
       icon: "folder", title: t("저장 위치"), size: "m",
-      message: folder ? t("이 폴더에 이미 종이냥 목록이 있어요.") : t("이 PC에 전에 쓰던 목록이 있어요."),
+      message: folder ? t("이 폴더에 이미 종이냥 목록이 있어요.") : t("이 PC에 전에 쓰던 목록이 있어요."), replacesList: true,
       // An overwrite backs the overwritten list up first (#137, moveData); the record is merged either way.
       detail: [folder
-        ? t("다른 기기에서 쓰던 목록이면 ‘폴더 목록 쓰기’를 고르세요. 덮어써도 바꾸기 전 상태를 이 PC에 백업해 둬요.")
-        : t("공유 폴더로 옮기기 전의 목록으로 돌아가려면 ‘전에 쓰던 목록 쓰기’를 고르세요. 덮어써도 바꾸기 전 상태를 백업해 둬요."),
+        ? t("다른 기기에서 쓰던 목록이면 ‘폴더 목록 쓰기’를 고르면 돼요. 덮어써도 바꾸기 전 상태를 이 PC에 백업해 둬요.")
+        : t("공유 폴더로 옮기기 전의 목록으로 돌아가려면 ‘전에 쓰던 목록 쓰기’를 고르면 돼요. 덮어써도 바꾸기 전 상태를 백업해 둬요."),
       t("어느 쪽이든 완료 기록은 합쳐지고, 종이냥이 다시 시작돼요.")].join("\n"),
       buttons: [{ label: t("취소"), kind: "ghost" }, { label: folder ? t("이 PC 목록으로 덮어쓰기") : t("공유 폴더 목록으로 덮어쓰기"), kind: "ghost" },
         { label: folder ? t("폴더 목록 쓰기") : t("전에 쓰던 목록 쓰기"), kind: "primary" }], cancelId: 0,
     });
     if (response === 0) return;
     copy = response === 1;
+  } else if (!folder) {
+    // #240: ‘이 PC에만’ is one click on the storage pane now — say what it does before the list moves and the app restarts.
+    const response = await ask(parent, {
+      icon: "folder", title: t("저장 위치"), size: "m", message: t("목록을 이 PC로 옮길까요?"),
+      detail: t("지금 목록이 이 PC의 기본 폴더로 옮겨지고 종이냥이 다시 시작돼요. 공유 폴더의 파일은 그대로 남아요."),
+      buttons: [{ label: t("취소"), kind: "ghost" }, { label: t("이 PC로 옮기기"), kind: "primary" }], cancelId: 0,
+    });
+    if (response !== 1) return;
   }
   store.flush();
   try {
@@ -1353,6 +1432,14 @@ function handle(action: Action, sender: Electron.WebContents, frame?: WebFrameMa
       return;
     }
     case "copyText": { clipboard.writeText(action.text); return; }
+    // #228 · #229: the question slip's paper dragged; a press a waiting question held up.
+    case "slipDrag": {
+      // #246: 빠른 입력 · 빠른 메모 drag by their paper too (and a double-click puts them back); the question slip (#228).
+      if (quick?.dragSlip(sender, action.phase, action.x, action.y) || quickMemo?.dragSlip(sender, action.phase, action.x, action.y)) return;
+      if (action.phase !== "reset") confirmSlip.dragSlip(sender, action.phase, action.x, action.y);
+      return;
+    }
+    case "slipBlocked": return confirmSlip.nudge();
     case "add": {
       const { reminderAt, dueDate } = parsedWhen(action);
       return store.mutate((history) => history.addTo(action.title, undefined, new Date(), dueDate, reminderAt));
@@ -1426,9 +1513,11 @@ function handle(action: Action, sender: Electron.WebContents, frame?: WebFrameMa
     case "timerCommand": return focusTimer.command(action.command);
     case "focus": return focusCommand(action.command);
     case "chatterPreview": return pet?.speakUp();
+    // #230: a key went down in one of the app's windows; the cat decides whether to tap along.
+    case "petTap": return pet?.tap();
     case "openHistory": return openHistory(action.day);
     case "openSearch": return openSearch();
-    case "openCalendar": return openCalendar(action.day);
+    case "openCalendar": return openCalendar(action.day, action.event);
     case "exportBackup": void exportBackup(); return;
     case "importBackup": void importBackup(); return;
     case "setBackupAuto": return backups.setAuto(action.on);
@@ -1447,6 +1536,11 @@ function handle(action: Action, sender: Electron.WebContents, frame?: WebFrameMa
     case "previewReminder": return periodic.preview();
     case "snoozePeriodic": return periodic.snooze(action.minutes);
     case "copyList": return copyList();
+    // 바탕화면 달력 위젯 (#234).
+    case "widgetAdd": { widgets.add(action.kind, action.style); return; }
+    case "widgetChange": return widgets.change(action.id, action.changes);
+    case "widgetRemove": return widgets.remove(action.id);
+    case "widgetRestore": return widgets.restore(action.widget, action.index);
     case "exportList": void exportList(); return;
     case "showMenu": {
       const window = BrowserWindow.fromWebContents(sender);
@@ -2085,6 +2179,7 @@ function trayMenu(): MenuItemConstructorOptions[] {
     { label: t("1시간 쉬기"), enabled: store.prefs.reminderEnabled, click: () => periodic.snooze(60) },
     { label: t("완료 기록…"), click: () => openHistory() },
     { label: t("달력…"), click: () => openCalendar() },
+    ...(widgets?.trayItem() ?? []),
     { label: t("설정…"), click: () => openSettings() },
     { label: t("도움말…"), click: () => openHelp() },
     { type: "separator" },
@@ -2102,6 +2197,20 @@ function nextAlarmItem(): MenuItemConstructorOptions[] {
   const next = alarmClock?.next();
   if (!next) return [];
   return [{ label: t("다음 알람 {time}", { time: spokenTime(next.at.getHours(), next.at.getMinutes(), lang()) }), click: () => openSettings("clock") }];
+}
+
+/**
+ * #253 (docs/plans/widget-ask-cases.json `presses`): a widget's or its day sheet's action while a question waits. A line
+ * that opens the note or the desk's calendar brings that window forward and the question stays over it (or nudges, when
+ * it is the window the question was asked over); a press the sheet holds for the answer nudges the question without
+ * taking the sheet's keys (it goes away when it loses them, its text kept).
+ */
+function widgetAct(action: Action, sender: Electron.WebContents, frame: WebFrameMain | null, page: "widget" | "widgetSheet"): void {
+  if (action.type === "slipBlocked") return confirmSlip.nudge(page === "widget");
+  if (confirmSlip.up === "none" || (action.type !== "calendarShowTask" && action.type !== "openCalendar")) return handle(action, sender, frame);
+  handle(action, sender, frame);
+  const opened = action.type === "calendarShowTask" ? note : desk.browserWindow;
+  confirmSlip.cameForward(opened && !opened.isDestroyed() ? opened : undefined);
 }
 
 function registerIPC(): void {
@@ -2129,14 +2238,19 @@ function registerIPC(): void {
   // still gets an answer (a sync message waits for one): the default.
   ipcMain.on("lang:get", (event) => { event.returnValue = from(event) ? lang() : "ko"; });
   ipcMain.on("clock:get", (event) => { event.returnValue = from(event) ? hourCycle(lang()) : "h24"; });
+  ipcMain.on("week:get", (event) => { event.returnValue = from(event) ? weekStartSet() ?? "" : ""; });
   ipcMain.handle("act", (event, value: unknown) => {
     const page = from(event);
     const action = readAction(value);
     if (!page || !action || !(anyAction || mayAct(page, action))) return void refused("act", page, value);
+    if (page === "widget" || page === "widgetSheet") return widgetAct(action, event.sender, event.senderFrame, page);
     return handle(action, event.sender, event.senderFrame);
   });
   // 밤 종이: asked by every page (and frame) as it loads, before it draws.
-  ipcMain.on("paper:get", (event) => { event.returnValue = from(event) ? paperNight() : false; });
+  ipcMain.on("paper:get", (event) => {
+    const look = paperLookNow();
+    event.returnValue = from(event) ? { paper: look.shown, dark: look.scheme === "dark", nightNow: paperNightNow() } : { paper: "day", dark: false, nightNow: false };
+  });
   ipcMain.handle("history:get", (event) => {
     if (!from(event, "history:get")) return undefined;
     // 스페이스 2c (H1–H3): each line with its space worked out, the live spaces and 일반's name, for the filter.
@@ -2149,7 +2263,15 @@ function registerIPC(): void {
     return request ? calendar.write(request) : { ok: false, error: "" };
   });
   ipcMain.handle("intent", (event, value: unknown) => {
-    const request = from(event, "intent") ? readIntentRequest(value) : undefined;
+    const page = from(event, "intent");
+    const request = page ? readIntentRequest(value) : undefined;
+    // #253: from a widget or its day sheet, putting in and taking back wait while the question replaces the whole list
+    // (the page dims and asks first; this is the main process's own check). The text stays in the sheet.
+    if (request && (page === "widget" || page === "widgetSheet") && request.op !== "learn"
+      && widgetPressWhileUp(request.op === "undo" ? "undo" : "add", confirmSlip.up) === "waits") {
+      confirmSlip.nudge(false);
+      return {};
+    }
     return request ? intentRequest(request) : {};
   });
   ipcMain.handle("search", (event, query: unknown) => (from(event, "search") && typeof query === "string" && query.length <= 200
@@ -2259,6 +2381,12 @@ async function runSnapshots(directory: string): Promise<void> {
     calendar.showSample();
     return finishSnapshots(await sizeSweep(directory, save, wait, settled));
   }
+  // `npm run snapshot -- papers`: 종이 테마 열다섯 가지 (#244) — every paper's notepad, desk calendar and drawer
+  // (Korean), the 꾸미기 → 종이 gallery and the drawer's (every language), into snapshots/papers/.
+  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "papers") {
+    calendar.showSample();
+    return finishSnapshots(await paperShots(directory, save, wait));
+  }
   // `npm run snapshot -- redesign`: only the new design's shots (the note, the line, the slips).
   if (process.env.PAPERTODO_SNAPSHOT_ONLY === "redesign") {
     await redesignShots(save, wait, settled);
@@ -2322,6 +2450,16 @@ async function runSnapshots(directory: string): Promise<void> {
   if (process.env.PAPERTODO_SNAPSHOT_ONLY === "device") {
     return finishSnapshots(await deviceShots(directory, save, wait, settled));
   }
+  // `npm run snapshot -- reminders`: 달력의 알림 할 일 (#227) — the month, the week and a small desk, day and night.
+  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "reminders") {
+    calendar.showSample();
+    return finishSnapshots(await calendarReminderShots(directory, save, wait));
+  }
+  // `npm run snapshot -- widgets`: 바탕화면 달력 위젯 (#234) — every kind at 100 % and 40 % over sample wallpapers, the day
+  // sheet, the gallery and the settings slip, day and night.
+  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "widgets") {
+    return finishSnapshots(await widgetShots(directory, save, wait));
+  }
   // `npm run snapshot -- spaces2c`: 찾기의 #스페이스 and 완료 기록 by space (1.32), day and night.
   if (process.env.PAPERTODO_SNAPSHOT_ONLY === "spaces2c") {
     return finishSnapshots(await spaces2cShots(directory, save, wait, settled));
@@ -2351,6 +2489,10 @@ async function runSnapshots(directory: string): Promise<void> {
   // `npm run snapshot -- glance`: only the 오늘 창's states (#200), day and night, into glance/.
   if (process.env.PAPERTODO_SNAPSHOT_ONLY === "glance") {
     return finishSnapshots(await todayWindowShots(directory, save, wait, settled));
+  }
+  // `npm run snapshot -- slips`: the question slip dragged and nudged, the times slip beside a working desk (#228 · #229).
+  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "slips") {
+    return finishSnapshots(await slipShots(directory, save, wait));
   }
   // `npm run snapshot -- stage2`: only 앞으로 and the 오늘 창.
   if (process.env.PAPERTODO_SNAPSHOT_ONLY === "stage2") {
@@ -3505,6 +3647,124 @@ async function stripShots(directory: string, save: Save, wait: Wait, settled: (w
   return problems;
 }
 
+/**
+ * 종이 테마 열다섯 가지 (#244): in Korean, each paper's notepad, desk calendar (month) and drawer (노트와 같은 종이), by day;
+ * a light paper at night (크라프트지 → 밤하늘, and 그대로); in every language, 꾸미기 → 종이 with a light and a dark paper
+ * picked (밤에는 dimmed) and 메모 서랍 → 서랍 종이 with 노트와 같은 종이 off. Checks that no tile name or row is cut.
+ */
+async function paperShots(directory: string, save: Save, wait: Wait): Promise<number> {
+  let problems = 0;
+  fs.mkdirSync(path.join(directory, "papers"), { recursive: true });
+  const korean = lang() === "ko";
+  const choose = async (paper: PaperKind, dayNight: PaperSetting = "day", night: NightChoice = "night") => {
+    store.setPref("paper", dayNight);
+    store.setPref("paperTheme", paper);
+    store.setPref("paperNight", night);
+    await wait(450);
+  };
+  const tileCheck = `(() => {
+    const out = [];
+    for (const name of document.querySelectorAll(".pt-name, .pt-head, .row.paper-night .grow div")) if (name.scrollWidth > name.clientWidth + 1 || name.scrollHeight > name.clientHeight + 1) out.push("cut: " + name.textContent);
+    const tiles = [...document.querySelectorAll(".paper-tiles .paper-tile")];
+    const group = document.querySelector(".paper-tiles");
+    if (group && group.getAttribute("role") !== "radiogroup") out.push("not one radio group");
+    if (tiles.length && tiles.length !== 15) out.push(tiles.length + " tiles");
+    if (tiles.filter((tile) => tile.getAttribute("aria-checked") === "true").length > 1) out.push("more than one picked");
+    return (out.join("; ") || "ok") + " · " + tiles.filter((tile) => tile.getAttribute("aria-checked") === "true").map((tile) => tile.getAttribute("aria-label")).join("");
+  })()`;
+  const settingsShot = async (name: string, pane: DeskPane, selector: string) => {
+    await showDeskPane(pane, wait);
+    await inPane("settings", `document.querySelector(${JSON.stringify(selector)})?.closest(".group")?.scrollIntoView({ block: "start" })`);
+    await wait(300);
+    await inPane("settings", settledScript);
+    const report = await inPane("settings", tileCheck) as string;
+    if (!report.startsWith("ok")) problems += 1;
+    console.log(`papers ${name}: ${report}`);
+    await save(`papers/${name}`, captureDesk(wait));
+  };
+  // The galleries, in this run's language.
+  await choose("memo");
+  await settingsShot("settings-paper-light", "appearance", ".paper-tiles");
+  await choose("chalk");
+  await settingsShot("settings-paper-dark", "appearance", ".paper-tiles");
+  await choose("day");
+  store.setPref("drawerSameAsNote", true);
+  await settingsShot("settings-drawer-same", "drawer", ".drawer-same");
+  store.setPref("drawerSameAsNote", false);
+  store.setPref("drawerTheme", "lined");
+  await settingsShot("settings-drawer-own", "drawer", ".paper-tiles");
+  store.setPref("drawerSameAsNote", true);
+  store.setPref("drawerTheme", "auto");
+  // A keyboard step on the gallery: → from 재생지 picks 밤 종이 and keeps the focus on it (K1).
+  await choose("recycled");
+  await showDeskPane("appearance", wait);
+  await inPane("settings", `document.querySelector('.paper-tile[aria-checked="true"]')?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }))`);
+  await wait(500);
+  const stepped = `${store.prefs.paperTheme} · focus ${await inPane("settings", `document.activeElement?.dataset?.kind ?? "none"`)}`;
+  console.log(`papers keyboard → from recycled: ${stepped}`);
+  if (stepped !== "night · focus night") problems += 1;
+  if (!korean) return problems;
+
+  // Every paper, by day: the notepad, the desk calendar, the drawer.
+  note.setSize(420, 600);
+  drawerSample();
+  store.setPref("drawerSide", "right");
+  store.setPref("drawerWidth", 300);
+  store.setPref("drawerBackdrop", "solid");
+  for (const paper of paperKinds) {
+    await choose(paper);
+    const shown = await note.webContents.executeJavaScript(`document.documentElement.dataset.paper + "/" + document.documentElement.dataset.scheme`);
+    console.log(`papers ${paper}: note ${shown}, background ${note.getBackgroundColor()}, theme ${nativeTheme.themeSource}`);
+    if (shown !== `${paper}/${darkKinds.includes(paper) ? "dark" : "light"}`) problems += 1;
+    await note.webContents.executeJavaScript(settledScript).catch(() => undefined);
+    await save(`papers/${paper}-note`, note.webContents.capturePage());
+    await showDeskPane("calendar", wait);
+    await inPane("calendar", settledScript);
+    await save(`papers/${paper}-calendar`, captureDesk(wait));
+    const window = await drawer.showForSnapshot();
+    await wait(450);
+    await window.webContents.executeJavaScript(settledScript).catch(() => undefined);
+    console.log(`papers ${paper}: drawer ${await window.webContents.executeJavaScript(`document.documentElement.dataset.look`)}`);
+    await save(`papers/${paper}-drawer`, window.webContents.capturePage());
+  }
+  drawer.hideForSnapshot();
+  // The desktop widget follows the paper shown (#234 · #244): this month (detail) solid and at 40 % over a busy
+  // wallpaper, and the today widget, on a few papers of each kind.
+  const widgetCheck = `(() => {
+    const out = [];
+    const inner = document.querySelector(".wg .in");
+    if (inner && inner.scrollHeight > inner.clientHeight + 1) out.push("overflow");
+    for (const el of document.querySelectorAll(".tt, .t, .tm, .n, .sh, .empty")) if (el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).textOverflow !== "ellipsis" && el.clientWidth > 0) out.push("cut: " + el.textContent);
+    return (out.join("; ") || "ok") + " · " + document.documentElement.dataset.paper + "/" + document.documentElement.dataset.scheme;
+  })()`;
+  for (const paper of ["kraft", "memo", "lined", "chalk", "nightsky"] as const) {
+    await choose(paper);
+    for (const [kind, style, opacity, wall] of [["month", "detail", 100, "light"], ["month", "detail", 40, "busy"], ["today", "simple", 85, "busy"]] as const) {
+      store.setPref("calendarWidgets", [makeWidget({ id: "paper", kind, style, opacity, place: { display: "0", x: 1, y: 0 } })]);
+      widgets.sync();
+      for (let tries = 0; tries < 50 && !widgets.isReady("paper"); tries += 1) await wait(100);
+      const window = widgets.preview("paper", { wall, hover: false, offset: 0 });
+      if (!window) { console.log(`papers ${paper} widget: NO WINDOW`); problems += 1; continue; }
+      await wait(500);
+      const found = String(await window.webContents.executeJavaScript(widgetCheck).catch((error: Error) => `script failed: ${error.message}`));
+      console.log(`papers ${paper} widget ${kind}-${style}-${opacity}: ${found}`);
+      if (!found.startsWith("ok") || !found.endsWith(`${paper}/${darkKinds.includes(paper) ? "dark" : "light"}`)) problems += 1;
+      await save(`papers/${paper}-widget-${kind}-${opacity}`, window.webContents.capturePage());
+    }
+  }
+  store.setPref("calendarWidgets", []);
+  widgets.sync();
+  // A light paper at night: 밤에는 밤하늘 종이, then 그대로 (the menus stay light).
+  await choose("kraft", "night", "nightsky");
+  await save("papers/kraft-at-night-nightsky-note", note.webContents.capturePage());
+  await choose("kraft", "night", "keep");
+  console.log(`papers kraft at night, keep: theme ${nativeTheme.themeSource}`);
+  await save("papers/kraft-at-night-keep-note", note.webContents.capturePage());
+  await choose("day", "day", "night");
+  note.setSize(420, 560);
+  return problems;
+}
+
 /** A page has painted and its one-off animations are done (runs in a window's page or a desk pane's frame). */
 const settledScript = `Promise.all(document.getAnimations()
   .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
@@ -3589,6 +3849,11 @@ async function deskShots(save: Save, wait: Wait, settled: (window: BrowserWindow
     if (title && r(title).height > 30) out.push("title wraps");
     const date = document.querySelector(".panel-head .date");
     if (date && date.scrollWidth > date.clientWidth + 1) out.push("panel date clipped");
+    // calendar-flows 11: a wide cell without +N in its head keeps its lunar date.
+    for (const cell of document.querySelectorAll(".month .cell")) {
+      const lunar = cell.querySelector("[data-lunar-day]");
+      if (lunar && lunar.hidden && cell.clientWidth >= ${lunarCellWidth} && !cell.querySelector(".more")) { out.push("lunar hidden " + cell.dataset.day + " w" + cell.clientWidth); break; }
+    }
     return out.join("; ");
   })()`;
   const calendarShot = async (name: string) => {
@@ -4106,12 +4371,12 @@ function glanceState(name: GlanceStateName): () => void {
 function confirmQuestions(): [string, ConfirmQuestion][] {
   return [
     ["confirm-language", languageQuestion(lang() === "en" ? "nl" : "en")],
-    ["confirm-import", { icon: "box", title: t("가져오기"), message: t("이 백업을 가져올까요?"), size: "m", cancelId: 0,
+    ["confirm-import", { icon: "box", title: t("가져오기"), message: t("이 백업을 가져올까요?"), replacesList: true, size: "m", cancelId: 0,
       detail: [`${t("종이냥")}-2026-10-08.jongi`, t("{from}에서 {when} 내보냄", { from: "Mac 1.34.0", when: exportedText(new Date().toISOString(), lang()) ?? "" }), summaryText({ todos: 12, memos: 3, repeats: 2, events: 9, archive: 140, alarms: 3, focus: 18 }, lang()), "", t("합치기: 지금 것은 그대로 두고 없는 것만 더해요."), t("바꾸기: 지금 것을 모두 이 백업으로 바꿔요."), t("어느 쪽이든 지금 것은 먼저 백업해 둬요.")].join("\n"),
       buttons: [{ label: t("취소"), kind: "ghost" }, { label: t("바꾸기"), kind: "danger" }, { label: t("합치기"), kind: "primary" }] }],
     ["confirm-restore", sampleRestoreQuestion(false)],
-    ["confirm-storage", { icon: "folder", title: t("저장 위치"), size: "m", cancelId: 0, message: t("이 폴더에 이미 종이냥 목록이 있어요."),
-      detail: [t("다른 기기에서 쓰던 목록이면 ‘폴더 목록 쓰기’를 고르세요. 덮어써도 바꾸기 전 상태를 이 PC에 백업해 둬요."), t("어느 쪽이든 완료 기록은 합쳐지고, 종이냥이 다시 시작돼요.")].join("\n"),
+    ["confirm-storage", { icon: "folder", title: t("저장 위치"), size: "m", cancelId: 0, message: t("이 폴더에 이미 종이냥 목록이 있어요."), replacesList: true,
+      detail: [t("다른 기기에서 쓰던 목록이면 ‘폴더 목록 쓰기’를 고르면 돼요. 덮어써도 바꾸기 전 상태를 이 PC에 백업해 둬요."), t("어느 쪽이든 완료 기록은 합쳐지고, 종이냥이 다시 시작돼요.")].join("\n"),
       buttons: [{ label: t("취소"), kind: "ghost" }, { label: t("이 PC 목록으로 덮어쓰기"), kind: "ghost" }, { label: t("폴더 목록 쓰기"), kind: "primary" }] }],
     // 1.28: where the memo tab's memos went (M1).
     ...(moveQuestion() ? [["confirm-move-notice", moveQuestion()!] as [string, ConfirmQuestion]] : []),
@@ -5106,6 +5371,553 @@ async function deviceShots(directory: string, save: Save, wait: Wait, settled: (
   return problems;
 }
 
+/**
+ * #228 · #229 (docs/plans/slip-move-cases.json), off-screen: the question slip follows a drag on its title row but not one
+ * that starts on its button; while it waits, presses on the note reach none of the note's own handlers and nudge it (one
+ * each); answered, the note takes them again. The times slip moves about the 스페이스 pane by its paper, holds nothing
+ * up (the next row's popup opens beside it), a space has one, and Esc closes the one with the focus. Prints
+ * `slips <check>: ok` or what went wrong, and saves the question moved and two times slips.
+ */
+async function slipShots(directory: string, save: Save, wait: Wait): Promise<number> {
+  let problems = 0;
+  const report = (name: string, wrong: string[]) => {
+    console.log(`slips ${name}: ${wrong.length ? wrong.join("; ") : "ok"}`);
+    problems += wrong.length;
+  };
+  fs.mkdirSync(path.join(directory, "slips"), { recursive: true });
+  const press = async (contents: Electron.WebContents, x: number, y: number, to = { x, y }, button: "left" | "right" = "left") => {
+    contents.sendInputEvent({ type: "mouseDown", x, y, button, clickCount: 1 });
+    await wait(60);
+    if (to.x !== x || to.y !== y) {
+      contents.sendInputEvent({ type: "mouseMove", x: to.x, y: to.y, button, modifiers: [button === "left" ? "leftbuttondown" : "rightbuttondown"] });
+      await wait(250);
+    }
+    contents.sendInputEvent({ type: "mouseUp", x: to.x, y: to.y, button, clickCount: 1 });
+    await wait(250);
+  };
+  // The question: 저장 폴더's, asked over the note.
+  const question = confirmQuestions().find(([name]) => name === "confirm-storage")?.[1] ?? confirmQuestions()[0][1];
+  const answered = confirmSlip.ask(note, question);
+  await wait(900);
+  const slip = confirmSlip.snapshotWindow;
+  if (!slip) { report("question", ["no question window"]); return problems; }
+  // Pointer events as the page gets them, at the window's own place on the (off-screen) desktop: input sent to a window
+  // that isn't key would make the system bring it onto a display first.
+  const dragOn = async (selector: string, dx: number, dy: number) => {
+    const { x, y } = slip.getBounds();
+    const found = await slip.webContents.executeJavaScript(`(() => {
+      const target = document.querySelector(${JSON.stringify(selector)});
+      if (!target) return false;
+      const r = target.getBoundingClientRect(), cx = r.left + Math.min(12, r.width / 2), cy = r.top + r.height / 2;
+      const at = (type, mx, my) => new PointerEvent(type, { bubbles: true, button: 0, buttons: 1, pointerId: 9, clientX: cx + mx, clientY: cy + my, screenX: ${x} + cx + mx, screenY: ${y} + cy + my });
+      target.dispatchEvent(at("pointerdown", 0, 0));
+      window.dispatchEvent(at("pointermove", ${dx}, ${dy}));
+      return true;
+    })()`) as boolean;
+    await wait(250);
+    await slip.webContents.executeJavaScript(`window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, button: 0, pointerId: 9 })); 0`);
+    await wait(150);
+    return found;
+  };
+  const before = slip.getBounds();
+  const wrong: string[] = [];
+  if (!await dragOn(".sbtn.primary", 40, 30)) wrong.push("no button on the slip");
+  const still = slip.getBounds();
+  if (still.x !== before.x || still.y !== before.y) wrong.push(`a drag from the button moved it (${still.x - before.x}, ${still.y - before.y})`);
+  if (!await dragOn(".slip-heading", 30, 20)) wrong.push("no title on the slip");
+  const moved = slip.getBounds();
+  if (moved.x - before.x !== 30 || moved.y - before.y !== 20) wrong.push(`the title row's drag moved it by (${moved.x - before.x}, ${moved.y - before.y}), not (30, 20)`);
+  report("question drag", wrong);
+  await save("slips/question-moved", confirmSlip.capture());
+  // Held: the note's handlers count what reaches them.
+  await note.webContents.executeJavaScript(`window.__reached = 0; for (const type of ["pointerdown", "mousedown", "click", "contextmenu"]) document.addEventListener(type, () => { window.__reached += 1; }, true); 0`);
+  const held: string[] = [];
+  await press(note.webContents, 200, 300);
+  await press(note.webContents, 200, 300, { x: 200, y: 300 }, "right");
+  const reached = await note.webContents.executeJavaScript("window.__reached") as number;
+  const shown = await slip.webContents.executeJavaScript(`document.getElementById("stage").dataset.nudges ?? "0"`) as string;
+  if (reached !== 0) held.push(`the note's handlers heard ${reached} events`);
+  if (confirmSlip.nudges !== 2) held.push(`${confirmSlip.nudges} nudges for 2 presses`);
+  if (shown !== "2") held.push(`the question shook ${shown} times`);
+  report("held presses", held);
+  // Answered (Esc): the note works again.
+  await slip.webContents.executeJavaScript(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); 0`);
+  const answer = await Promise.race([answered, wait(1500).then(() => -1)]);
+  await press(note.webContents, 200, 300);
+  const after = await note.webContents.executeJavaScript("window.__reached") as number;
+  report("answered", [...(answer === question.cancelId ? [] : [`answer ${String(answer)}`]), ...(after > 0 ? [] : ["the note still held up"])]);
+
+  // The times slip in 설정 → 스페이스.
+  const ids = { work: "s-m1a2b3", home: "s-m4c5d6", study: "s-m7e8f9" };
+  store.changeSpaces((data) => addSpace(addSpace(addSpace(data, t("회사"), ids.work, "pink"), t("집"), ids.home, "mint"), t("공부"), ids.study, "sky"));
+  await showDeskPane("spaces", wait);
+  await wait(300);
+  const open = async (id: string) => {
+    await inPane("settings", `document.querySelector('.space-row[data-id="${id}"] .space-device').click()`);
+    await wait(200);
+    await inPane("settings", `(() => { const rows = [...document.querySelectorAll(".menu .mi")]; rows[rows.length - 1]?.click(); })()`);
+    await wait(350);
+  };
+  const count = () => inPane("settings", `document.querySelectorAll(".device-slip").length`) as Promise<number>;
+  const times: string[] = [];
+  await open(ids.work);
+  await open(ids.work);
+  if (await count() !== 1) times.push(`asked twice for the first space: ${await count()} slips`);
+  await open(ids.home);
+  if (await count() !== 2) times.push(`two spaces: ${await count()} slips`);
+  if (await inPane("settings", `document.querySelectorAll(".device-scrim").length`) !== 0) times.push("a scrim holds the pane up");
+  // Dragged by its title row (pointer events as the page gets them), the second slip goes 40 left and 30 down.
+  const dragged = await inPane("settings", `(() => {
+    const slips = document.querySelectorAll(".device-slip"), slip = slips[slips.length - 1], head = slip.querySelector(".slip-heading");
+    const from = slip.getBoundingClientRect(), r = head.getBoundingClientRect(), x = r.left + 10, y = r.top + r.height / 2;
+    const at = (type, dx, dy) => new PointerEvent(type, { bubbles: true, button: 0, buttons: 1, pointerId: 7, clientX: x + dx, clientY: y + dy, screenX: x + dx, screenY: y + dy });
+    head.dispatchEvent(at("pointerdown", 0, 0));
+    window.dispatchEvent(at("pointermove", -40, 30));
+    window.dispatchEvent(at("pointerup", -40, 30));
+    const to = slip.getBoundingClientRect();
+    return [Math.round(to.left - from.left), Math.round(to.top - from.top)];
+  })()`) as [number, number];
+  if (!Array.isArray(dragged) || dragged[0] !== -40 || dragged[1] !== 30) times.push(`the drag moved it by ${JSON.stringify(dragged)}, not [-40, 30]`);
+  // The pane works beside the slips: the third space's popup opens.
+  await inPane("settings", `document.querySelector('.space-row[data-id="${ids.study}"] .space-device').click()`);
+  await wait(200);
+  if (await inPane("settings", `document.querySelectorAll(".menu .mi").length`) === 0) times.push("the third space's popup didn't open beside the slips");
+  await inPane("settings", `document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+  await wait(150);
+  await save("slips/times-two", captureDesk(wait));
+  // Esc closes the slip with the focus only.
+  await inPane("settings", `document.querySelector(".device-slip .device-presets .chip")?.focus(); document.activeElement.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+  await wait(150);
+  if (await count() !== 1) times.push(`Esc in one slip left ${await count()}`);
+  await inPane("settings", `document.querySelector(".device-slip .slip-x")?.click()`);
+  await wait(150);
+  if (await count() !== 0) times.push(`× left ${await count()} slips`);
+  report("times slips", times);
+
+  // #246: 빠른 입력 and 빠른 메모 move by their title row (not by their field), keeping what is typed and the caret.
+  for (const [name, show, owner, typed] of [
+    ["quick entry", () => quick.showForSnapshot(t("내일 3시 회의")), () => quick.snapshotWindow, "textarea.typed"],
+    ["quick memo", () => quickMemo.showForSnapshot(t("장보기")), () => quickMemo.snapshotWindow, "textarea.ruled"],
+  ] as const) {
+    await show();
+    await wait(900);
+    const window = owner();
+    const kept: string[] = [];
+    if (!window) { report(`${name} drag`, ["no window"]); continue; }
+    await window.webContents.executeJavaScript(`(() => { const f = document.querySelector(${JSON.stringify(typed)}); f.focus(); f.setSelectionRange(2, 2); return 0; })()`);
+    const drag = async (selector: string, dx: number, dy: number) => {
+      const { x, y } = window.getBounds();
+      const found = await window.webContents.executeJavaScript(`(() => {
+        const target = document.querySelector(${JSON.stringify(selector)});
+        if (!target) return false;
+        const r = target.getBoundingClientRect(), cx = r.left + Math.min(12, r.width / 2), cy = r.top + r.height / 2;
+        const at = (type, mx, my) => new PointerEvent(type, { bubbles: true, button: 0, buttons: 1, pointerId: 11, clientX: cx + mx, clientY: cy + my, screenX: ${x} + cx + mx, screenY: ${y} + cy + my });
+        target.dispatchEvent(at("pointerdown", 0, 0));
+        window.dispatchEvent(at("pointermove", ${dx}, ${dy}));
+        return true;
+      })()`) as boolean;
+      await wait(250);
+      await window.webContents.executeJavaScript(`window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, button: 0, pointerId: 11 })); 0`);
+      await wait(150);
+      return found;
+    };
+    const before = window.getBounds();
+    if (!await drag(typed, 40, 30)) kept.push("no field");
+    const still = window.getBounds();
+    if (still.x !== before.x || still.y !== before.y) kept.push(`a drag from the field moved it (${still.x - before.x}, ${still.y - before.y})`);
+    if (!await drag(".slip-heading", 30, 20)) kept.push("no title row");
+    const moved = window.getBounds();
+    if (moved.x - before.x !== 30 || moved.y - before.y !== 20) kept.push(`the title row's drag moved it by (${moved.x - before.x}, ${moved.y - before.y}), not (30, 20)`);
+    const field = await window.webContents.executeJavaScript(`(() => { const f = document.querySelector(${JSON.stringify(typed)}); return [f.value, document.activeElement === f, f.selectionStart]; })()`) as [string, boolean, number];
+    if (!field[1] || field[2] !== 2) kept.push(`after the drag the field ${field[1] ? "" : "lost the focus "}has its caret at ${field[2]}, not 2`);
+    if (!field[0]) kept.push("what was typed is gone");
+    report(`${name} drag`, kept);
+    if (name === "quick entry") quick.hide(); else quickMemo.hide();
+  }
+  return problems;
+}
+
+/**
+ * 달력의 알림 할 일 (#227): to-dos with a reminder over the month (three today, one due the same day as its reminder, one
+ * finished) — a bell and the title in the cells after the events and deadlines, "+N" when they don't fit, their time in
+ * the week. Checks that no cell spills and no title is cut without its ellipsis.
+ */
+/**
+ * 바탕화면 달력 위젯 (#234): each kind over a sample wallpaper (day: light and busy; night: dark and busy) at 100 % and
+ * 40 %, one hovered, the day sheet with a line typed in, and 책상 → 일정 with the gallery and a widget's settings slip.
+ * The widgets' windows are never shown (they paint hidden). Each shot is checked for cut text and for a Korean word
+ * broken across lines.
+ */
+async function widgetShots(directory: string, save: Save, wait: Wait): Promise<number> {
+  let problems = 0;
+  fs.mkdirSync(path.join(directory, "widgets", "night"), { recursive: true });
+  calendar.showSample();
+  // calendar-flows: in October 2026, a three-day trip (Sun–Tue), a weekend one across two week rows (Fri–Sun) and a long
+  // title in a cell with room — the bands joining and a title on two lines (sample data only).
+  const flowStamp = new Date().toISOString();
+  const flowEvent = (id: string, title: string, date: string, allDay: boolean, days: number, color: EventColor): LocalEvent => ({
+    id, title, date, allDay, days, start: allDay ? 540 : 600, end: allDay ? 600 : 660, repeat: "none", skip: [], color, createdAt: flowStamp, updatedAt: flowStamp,
+  });
+  store.replaceEvents([...store.events, flowEvent("FLOWS-0001", t("제주 여행"), "2026-10-18", true, 3, "sage"),
+    flowEvent("FLOWS-0002", t("가을 캠핑"), "2026-10-30", true, 3, "yellow"), flowEvent("FLOWS-0003", t("치과 정기 검진 예약"), "2026-10-14", false, 1, "blue"),
+    // #260: February 2027 (설날 and its 대체공휴일) with a band through two of its holidays — their names keep one line there.
+    flowEvent("FLOWS-0004", t("할머니 댁"), "2027-02-08", true, 2, "purple")]);
+  const at = (days: number, hour: number, minute = 0) => {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    date.setHours(hour, minute, 0, 0);
+    return date;
+  };
+  const made: string[] = [];
+  store.mutate((history) => {
+    const add = (title: string, when: Date | undefined, due?: Date) => {
+      const item = history.addTo(title, undefined, new Date(), due ? dateKey(due) : undefined, when?.toISOString());
+      if (item) made.push(item.id);
+    };
+    add(t("치과 예약"), at(0, 23, 30));
+    add(t("장보기"), undefined, at(0, 12));
+    add(t("도서관 책 반납"), at(1, 11));
+    add(t("보고서 초안"), undefined, at(3, 12));
+    add(t("팀 회의 자료 보내기"), undefined, at(5, 12));
+  });
+  const check = `(() => {
+    const out = [];
+    const inner = document.querySelector(".wg .in");
+    if (inner && inner.scrollHeight > inner.clientHeight + 1) out.push("overflow " + (inner.scrollHeight - inner.clientHeight) + "px");
+    // (+N's button is wider to click than it looks: its hit area isn't text.)
+    for (const el of document.querySelectorAll(".tt, .t, .tm, .w, .n, .sh, .empty, .m")) {
+      if (el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).textOverflow !== "ellipsis" && el.clientWidth > 0) out.push("cut: " + el.textContent);
+    }
+    // A Korean word split across two lines.
+    const range = document.createRange();
+    // (The today widget's month and weekday are two lines on purpose.)
+    for (const el of document.querySelectorAll(".empty, .sh, .wtoast .tx, .hd .t")) {
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let node; let lastTop; let prev = "";
+      while ((node = walker.nextNode())) for (let i = 0; i < node.length; i++) {
+        range.setStart(node, i); range.setEnd(node, i + 1); const rect = range.getClientRects()[0]; const ch = node.data[i];
+        if (!rect || !rect.width || /\s/.test(ch)) { prev = ch; continue; }
+        const top = Math.round(rect.top);
+        if (lastTop !== undefined && Math.abs(top - lastTop) > 4 && /[\\uac00-\\ud7a3]/.test(prev) && /[\\uac00-\\ud7a3]/.test(ch)) out.push("split: " + el.textContent);
+        lastTop = top; prev = ch;
+      }
+    }
+    return out.length ? out.join("; ") : "ok · " + document.querySelectorAll(".ln, .cl, .c, .r").length + " cells";
+  })()`;
+  const kinds: { kind: WidgetKind; style: WidgetStyle }[] = [
+    { kind: "today", style: "simple" }, { kind: "week", style: "simple" }, { kind: "week", style: "detail" },
+    { kind: "month", style: "simple" }, { kind: "month", style: "detail" }, { kind: "month", style: "wall" }, { kind: "agenda", style: "simple" },
+  ];
+  // #234: the week and the month on October 2026 (개천절, its 대체공휴일 and 한글날, and the lunar dates), whatever today is.
+  const holidayDay = "2026-10-05";
+  const pageTo = (kind: WidgetKind) => {
+    const now = new Date();
+    if (kind === "month") return (2026 * 12 + 9) - (now.getFullYear() * 12 + now.getMonth());
+    if (kind !== "week") return 0;
+    const weekStart = (key: string) => localDate(weekDays(key, lang())[0])?.getTime() ?? 0;
+    return Math.round((weekStart(holidayDay) - weekStart(dateKey(now))) / (7 * 86_400_000));
+  };
+  let offsetNow = 0;
+  const shot = async (name: string, wall: string, hover = false) => {
+    for (let tries = 0; tries < 50 && !widgets.isReady("snap"); tries += 1) await wait(100);
+    const window = widgets.preview("snap", { wall, hover, offset: offsetNow });
+    if (!window) { console.log(`widgets ${name}: NO WINDOW`); problems += 1; return; }
+    await wait(450);
+    const found = String(await window.webContents.executeJavaScript(check).catch((error: Error) => `script failed: ${error.message}`));
+    console.log(`widgets ${name}: ${found}`);
+    if (!found.startsWith("ok")) problems += 1;
+    await save(`widgets/${name}`, window.webContents.capturePage());
+  };
+  for (const paper of ["day", "night"] as const) {
+    const prefix = paper === "night" ? "night/" : "";
+    store.setPref("paper", paper);
+    for (const { kind, style } of kinds) {
+      for (const opacity of [100, 40]) {
+        store.setPref("calendarWidgets", [makeWidget({ id: "snap", kind, style, opacity, place: { display: "0", x: 1, y: 0 } })]);
+        widgets.sync();
+        offsetNow = pageTo(kind);
+        for (const wall of paper === "day" ? ["light", "busy"] : ["dark", "busy"]) {
+          if (opacity === 100 && wall === "busy") continue;
+          await shot(`${prefix}${kind}-${style}-${opacity}-${wall}`, wall);
+        }
+      }
+    }
+    // Hovered: solid, with ‹ 오늘 ›.
+    store.setPref("calendarWidgets", [makeWidget({ id: "snap", kind: "month", style: "detail", opacity: 40, place: { display: "0", x: 1, y: 0 } })]);
+    widgets.sync();
+    offsetNow = pageTo("month");
+    await shot(`${prefix}month-detail-40-hover`, "busy", true);
+    offsetNow = 0;
+    // The day sheet beside it, a line typed in (read on that day).
+    const sheet = await widgetSheet.showForSnapshot("snap", dateKey(at(2, 12)), t("3시 팀 회의"));
+    await wait(700);
+    await save(`widgets/${prefix}sheet`, sheet.webContents.capturePage());
+    const busy = await widgetSheet.showForSnapshot("snap", dateKey(new Date()), "");
+    await wait(500);
+    await save(`widgets/${prefix}sheet-today`, busy.webContents.capturePage());
+    // 책상 → 일정: the widgets' rows, then the gallery and a widget's settings slip.
+    store.setPref("calendarWidgets", [makeWidget({ id: "snap", kind: "month", style: "simple", place: { display: "0", x: 1, y: 0 } }), makeWidget({ id: "snap2", kind: "today", style: "simple", opacity: 70, clickThrough: true, place: { display: "0", x: 1, y: 1 } })]);
+    widgets.sync();
+    await showDeskPane("events", wait);
+    await wait(500);
+    await save(`widgets/${prefix}desk`, captureDesk(wait));
+    await inPane("settings", `[...document.querySelectorAll(".action.small")].find((button) => button.querySelector(".icon") && button.closest(".group"))?.click()`);
+    await wait(500);
+    await save(`widgets/${prefix}gallery`, captureDesk(wait));
+    await inPane("settings", `document.querySelector(".device-scrim")?.click()`);
+    await wait(300);
+    await inPane("settings", `document.querySelector(".widget-row .action.small")?.click()`);
+    await wait(500);
+    await save(`widgets/${prefix}settings`, captureDesk(wait));
+    await inPane("settings", `document.querySelector(".device-scrim")?.click()`);
+    await wait(300);
+    // The desk's 달력 on October 2026: holidays and lunar dates in the month and in the week.
+    await showDeskPane("calendar", wait);
+    desk.browserWindow!.setContentSize(920, 640 + deskTitleBar);
+    openCalendar(holidayDay);
+    await inPane("calendar", `document.querySelectorAll(".view-seg button")[1]?.click()`);
+    await wait(500);
+    await save(`widgets/${prefix}desk-calendar-month`, captureDesk(wait));
+    // #260: February 2027 — 설날's three days and its 대체공휴일 (the long names on two lines where a cell has room).
+    openCalendar("2027-02-08");
+    await wait(500);
+    await save(`widgets/${prefix}desk-calendar-seollal`, captureDesk(wait));
+    openCalendar(holidayDay);
+    await wait(300);
+    await inPane("calendar", `document.querySelector(".view-seg button")?.click()`);
+    await wait(500);
+    await save(`widgets/${prefix}desk-calendar-week`, captureDesk(wait));
+    await inPane("calendar", `document.querySelectorAll(".view-seg button")[1]?.click()`);
+    // calendar-flows: a holiday's day sheet (its name first), and an event pressed on a widget — the desk's calendar on
+    // its day with its sheet open (D3).
+    const holidaySheet = await widgetSheet.showForSnapshot("snap", "2026-10-09", "");
+    await wait(500);
+    await save(`widgets/${prefix}sheet-holiday`, holidaySheet.webContents.capturePage());
+    widgetSheet.hide();
+    openCalendar("2026-10-18", "local/FLOWS-0001@2026-10-18");
+    await wait(700);
+    const opened = String(await inPane("calendar", `(() => { const sheet = document.querySelector(".event-sheet"); const field = sheet?.querySelector("input, textarea, [contenteditable]"); return sheet ? "sheet " + (field?.value ?? field?.textContent ?? "") + " · " + (document.querySelector(".cell.selected")?.dataset.day ?? "none") : "NO SHEET"; })()`));
+    console.log(`widgets ${prefix}event-pressed: ${opened}`);
+    if (!opened.startsWith("sheet")) problems += 1;
+    await save(`widgets/${prefix}desk-calendar-event`, captureDesk(wait));
+    await inPane("calendar", `document.querySelector(".event-sheet")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+    await wait(300);
+  }
+  problems += await widgetAskShots(save, wait);
+  store.setPref("calendarWidgets", []);
+  widgets.sync();
+  store.mutate((history) => { for (const id of made) history.delete(id); });
+  store.setPref("paper", "day");
+  return problems;
+}
+
+/**
+ * #253 (docs/plans/widget-ask-cases.json), off-screen, the widget kept on top: what is being typed in the memo drawer, the
+ * quick entry and the quick memo keeps its text and caret while the widget is pressed (T1–T3). While a question waits,
+ * the widget turns its months and the day sheet its days (W1 · W4), the sheet puts in and the toast takes back (W5 · W6),
+ * a window coming forward under the question doesn't nudge it (O1), and the question floats over the widget (Z1). The
+ * questions are asked over no window (see below). While a question that replaces the whole list waits, 넣기 dims and says why, and
+ * Enter in the sheet and the toast's 되돌리기 nudge the question instead (L5 · L6), the text kept. Prints
+ * `widgets asked <check>: ok` or what went wrong, and saves the waiting sheet.
+ */
+async function widgetAskShots(save: Save, wait: Wait): Promise<number> {
+  let problems = 0;
+  const report = (name: string, wrong: string[]) => {
+    console.log(`widgets asked ${name}: ${wrong.length ? wrong.join("; ") : "ok"}`);
+    problems += wrong.length;
+  };
+  const run = (window: BrowserWindow | undefined, script: string) => (window ? window.webContents.executeJavaScript(script).catch((error: Error) => `script failed: ${error.message}`) : Promise.resolve("no window"));
+  store.setPref("calendarWidgets", [makeWidget({ id: "snap", kind: "month", style: "simple", level: "top", place: { display: "0", x: 1, y: 0 } })]);
+  widgets.sync();
+  for (let tries = 0; tries < 50 && !widgets.isReady("snap"); tries += 1) await wait(100);
+  const widget = widgets.windowOf("snap");
+  if (!widget) { report("widget", ["no widget window"]); return problems; }
+  await wait(400);
+  const title = () => run(widget, `document.querySelector(".hd .t")?.textContent ?? ""`) as Promise<string>;
+  const nextMonth = () => run(widget, `[...document.querySelectorAll(".nav button")].at(-1)?.click(); 0`);
+  const backToday = () => run(widget, `document.querySelector(".nav .td")?.click(); 0`);
+
+  // T1–T3: a line typed with the caret inside it; the widget pressed; the text and the caret where they were.
+  const typing: string[] = [];
+  await quick.showForSnapshot("");
+  await quickMemo.showForSnapshot("");
+  const drawerWindow = await drawer.showForSnapshot();
+  await wait(500);
+  const fields: [string, BrowserWindow | undefined, string][] = [
+    ["drawer", drawerWindow, `document.querySelector("textarea[aria-label]")`],
+    ["quick", quick.snapshotWindow, `document.querySelector("textarea.typed")`],
+    ["quickMemo", quickMemo.snapshotWindow, `document.querySelector("textarea.ruled")`],
+  ];
+  for (const [name, window, field] of fields) {
+    const typed = await run(window, `(() => { const f = ${field}; if (!f) return "no field"; f.focus(); f.value = ${JSON.stringify(t("겨울옷 정리하기"))}; f.setSelectionRange(3, 3); return "ok"; })()`);
+    if (typed !== "ok") typing.push(`${name}: ${String(typed)}`);
+  }
+  const before = await title();
+  await nextMonth();
+  await wait(200);
+  if (await title() === before) typing.push("the widget didn't turn its month");
+  await backToday();
+  for (const [name, window, field] of fields) {
+    const kept = await run(window, `(() => { const f = ${field}; return f && f.value === ${JSON.stringify(t("겨울옷 정리하기"))} && f.selectionStart === 3 && f.selectionEnd === 3 && document.activeElement === f ? "ok" : "moved"; })()`);
+    if (kept !== "ok") typing.push(`${name}: the text or the caret ${String(kept)}`);
+  }
+  await run(drawerWindow, `(() => { const f = document.querySelector("textarea[aria-label]"); if (f) { f.value = ""; f.blur(); } return 0; })()`);
+  quick.hide();
+  quickMemo.hide();
+  drawer.hideForSnapshot();
+  report("typing", typing);
+
+  // A question (집중을 그만둘까요?) over the note: the widget and the sheet work.
+  const plain: ConfirmQuestion = { icon: "timer", title: t("집중"), message: t("집중을 그만둘까요?"), buttons: [{ label: t("계속하기"), kind: "ghost" }, { label: t("그만두기"), kind: "primary" }], cancelId: 0 };
+  const answer = async (asked: Promise<number>) => {
+    await run(confirmSlip.snapshotWindow, `document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); 0`);
+    await Promise.race([asked, wait(1500)]);
+    await wait(200);
+  };
+  const day = dateKey(new Date(Date.now() + 2 * 86_400_000));
+  const titled = (text: string) => store.items.find((item) => item.title === text);
+  const flower = t("택배 받기"), post = t("운동 가기");
+  const put = async (sheet: BrowserWindow, text: string) => {
+    await run(sheet, `(() => { const f = document.querySelector("textarea.typed"); f.value = ${JSON.stringify(text)}; f.dispatchEvent(new Event("input", { bubbles: true })); f.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); return 0; })()`);
+    await wait(500);
+  };
+  const toastUndo = () => run(widget, `(() => { const b = document.querySelector(".wtoast button"); if (!b) return "no toast"; b.click(); return "ok"; })()`);
+  const works: string[] = [];
+  // Asked over no window: an off-screen run's windows have no owner on a Mac (offscreenGuard.ts, #250), so there is no
+  // window it was asked over to check, and the widget's rules don't need one (O2 is the shared cases').
+  let asked = confirmSlip.ask(undefined, plain);
+  await wait(900);
+  if (confirmSlip.up !== "question") works.push(`up: ${confirmSlip.up}`);
+  if (!confirmSlip.floating) works.push("the question isn't over the widget kept on top");
+  const shown = await title();
+  await nextMonth();
+  await wait(200);
+  if (await title() === shown) works.push("‹ › held up");
+  await backToday();
+  let sheet = await widgetSheet.showForSnapshot("snap", day, "");
+  await wait(400);
+  const sheetTitle = () => run(sheet, `document.querySelector(".slip-title")?.textContent ?? ""`) as Promise<string>;
+  const dayShown = await sheetTitle();
+  await run(sheet, `document.querySelectorAll(".day-nav button")[1]?.click(); 0`);
+  await wait(200);
+  if (await sheetTitle() === dayShown) works.push("the sheet's next day held up");
+  await run(sheet, `document.querySelectorAll(".day-nav button")[0]?.click(); 0`);
+  await wait(200);
+  await put(sheet, flower);
+  if (!titled(flower)) works.push("put in held up");
+  if (String(await toastUndo()) !== "ok") works.push("no toast after putting in");
+  await wait(400);
+  if (titled(flower)) works.push("taking back held up");
+  // O1: a window coming forward under the question doesn't nudge it (O2, the window it was asked over, is the shared
+  // cases' — told directly: opening the note focuses it, and a focused window in an off-screen run is pulled onto a screen).
+  const nudged = confirmSlip.nudges;
+  await put(sheet, flower);
+  confirmSlip.cameForward(note);
+  await wait(300);
+  if (confirmSlip.nudges !== nudged) works.push("a window coming forward nudged the question");
+  if (confirmSlip.up !== "question" || !confirmSlip.floating) works.push("the question isn't over everything after another window came");
+  await answer(asked);
+  if (confirmSlip.floating) works.push("still floating after the answer");
+  report("question", works);
+
+  // A question that replaces the whole list (되돌리기): the sheet and the toast wait, the text stays.
+  const waits: string[] = [];
+  asked = confirmSlip.ask(undefined, sampleRestoreQuestion(false));
+  await wait(700);
+  if (confirmSlip.up !== "replacesList") waits.push(`up: ${confirmSlip.up}`);
+  const before2 = confirmSlip.nudges;
+  if (String(await toastUndo()) !== "ok") waits.push("the toast went before the check");
+  await wait(300);
+  if (!titled(flower)) waits.push("taking back went through");
+  if (confirmSlip.nudges !== before2 + 1) waits.push(`taking back: ${confirmSlip.nudges - before2} nudges, not 1`);
+  const turned = await title();
+  await nextMonth();
+  await wait(200);
+  if (await title() === turned) waits.push("‹ › held up");
+  await backToday();
+  sheet = await widgetSheet.showForSnapshot("snap", day, "");
+  await wait(400);
+  const why = t("질문에 답하면 넣을 수 있어요");
+  const dim = await run(sheet, `(() => { const k = document.querySelector(".keys .waiting"); const f = document.querySelector("textarea.typed"); return k && k.title === ${JSON.stringify(why)} && f.getAttribute("aria-description") === ${JSON.stringify(why)} ? "ok" : "not dimmed"; })()`);
+  if (dim !== "ok") waits.push(`the put-in key ${String(dim)}`);
+  await put(sheet, post);
+  if (titled(post)) waits.push("put in went through");
+  if (confirmSlip.nudges !== before2 + 2) waits.push(`Enter: ${confirmSlip.nudges - before2 - 1} nudges, not 1`);
+  const kept = await run(sheet, `document.querySelector("textarea.typed")?.value ?? ""`);
+  if (kept !== post) waits.push(`the text became “${String(kept)}”`);
+  const shook = await run(confirmSlip.snapshotWindow, `document.getElementById("stage").dataset.nudges ?? "0"`);
+  if (Number(shook) < 2) waits.push(`the question shook ${String(shook)} times`);
+  await save("widgets/sheet-waiting", sheet.webContents.capturePage());
+  await answer(asked);
+  const free = await run(sheet, `document.querySelector(".keys .waiting") ? "dimmed" : "ok"`);
+  if (free !== "ok") waits.push("the put-in key still dimmed after the answer");
+  report("replaces the list", waits);
+  await run(sheet, `(() => { const f = document.querySelector("textarea.typed"); f.value = ""; f.dispatchEvent(new Event("input", { bubbles: true })); return 0; })()`);
+  store.mutate((history) => { for (const one of store.items.filter((entry) => entry.title === flower || entry.title === post)) history.delete(one.id); });
+  return problems;
+}
+
+async function calendarReminderShots(directory: string, save: Save, wait: Wait): Promise<number> {
+  let problems = 0;
+  fs.mkdirSync(path.join(directory, "reminders", "night"), { recursive: true });
+  const at = (days: number, hour: number, minute = 0) => {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    date.setHours(hour, minute, 0, 0);
+    return date;
+  };
+  const made: string[] = [];
+  store.mutate((history) => {
+    const add = (title: string, when: Date, due = false, done = false) => {
+      const item = history.addTo(title, undefined, new Date(), due ? dateKey(when) : undefined, when.toISOString());
+      if (!item) return;
+      made.push(item.id);
+      if (done) history.toggle(item.id);
+    };
+    add(t("치과 예약"), at(0, 15));
+    add(t("엄마한테 전화하기"), at(0, 19, 30));
+    add(t("약 먹기"), at(0, 21));
+    add(t("택배 받기"), at(1, 10));
+    add(t("보고서 보내기"), at(3, 9, 30), true);
+    add(t("운동 가기"), at(3, 18));
+    add(t("도서관 책 반납"), at(-2, 11));
+    add(t("빨래 개기"), at(4, 8), false, true);
+  });
+  const check = `(() => {
+    const out = [];
+    for (const cell of document.querySelectorAll(".cell, .day-row")) if (cell.scrollHeight > cell.clientHeight + 1) out.push("overflow " + cell.dataset.day);
+    for (const t of document.querySelectorAll(".item .t, .line .t")) if (t.scrollWidth > t.clientWidth + 1 && getComputedStyle(t).textOverflow !== "ellipsis") out.push("cut: " + t.textContent);
+    const bells = document.querySelectorAll(".item.reminder, .dot.reminder, .line.task.reminder").length;
+    return out.length ? out.join("; ") : "ok · " + bells + " reminders";
+  })()`;
+  const shot = async (name: string) => {
+    await wait(400);
+    await inPane("calendar", settledScript);
+    const found = String(await inPane("calendar", check));
+    console.log(`reminders ${name}: ${found}`);
+    if (!found.startsWith("ok")) problems += 1;
+    await save(`reminders/${name}`, captureDesk(wait));
+  };
+  for (const paper of ["day", "night"] as const) {
+    const prefix = paper === "night" ? "night/" : "";
+    store.setPref("paper", paper);
+    await showDeskPane("calendar", wait);
+    desk.browserWindow!.setContentSize(920, 640 + deskTitleBar);
+    openCalendar(dateKey(new Date()));
+    await inPane("calendar", `document.querySelectorAll(".view-seg button")[1]?.click()`);
+    await shot(`${prefix}month`);
+    await inPane("calendar", `document.querySelector(".view-seg button")?.click()`);
+    await shot(`${prefix}week`);
+    await inPane("calendar", `document.querySelectorAll(".view-seg button")[1]?.click()`);
+    // The smallest desk: shorter cells, so "+N" sooner.
+    desk.browserWindow!.setContentSize(760, 520 + deskTitleBar);
+    await shot(`${prefix}month-small`);
+    desk.browserWindow!.setContentSize(920, 640 + deskTitleBar);
+  }
+  store.mutate((history) => { for (const id of made) history.delete(id); });
+  store.setPref("paper", "day");
+  return problems;
+}
+
 async function drawerShots(directory: string, save: Save, wait: Wait): Promise<number> {
   let problems = 0;
   const sample = drawerSample();
@@ -5114,6 +5926,8 @@ async function drawerShots(directory: string, save: Save, wait: Wait): Promise<n
   store.setPref("drawerWidth", 300);
   store.setPref("drawerShortcut", "Control+Shift+D");
   store.setPref("drawerBackdrop", "solid");
+  // #244: the drawer follows the note by default; these shots pick the drawer's own paper (and its night one).
+  store.setPref("drawerSameAsNote", false);
   const window = await drawer.showForSnapshot();
   const run = (script: string) => window.webContents.executeJavaScript(script).catch((error: Error) => `script failed: ${error.message}`);
   const own = `(() => {
@@ -5152,7 +5966,7 @@ async function drawerShots(directory: string, save: Save, wait: Wait): Promise<n
     if (document.querySelectorAll(".hd .ic .ib").length !== 1) out.push("header icons: not just search"); // #111
     return out;
   })()`;
-  const backdrop = (look: string) => look === "night" || look === "ink" ? "#1f1e1b" : look === "kraft" ? "#cfc8bb" : look === "grid" ? "#d3d7db" : "#d8d4cc";
+  const backdrop = (look: string) => darkKinds.includes(look as PaperKind) ? "#1f1e1b" : look === "kraft" ? "#cfc8bb" : look === "grid" ? "#d3d7db" : "#d8d4cc";
   const shot = async (name: string, prepare = "", desktop = false) => {
     if (prepare) await run(prepare);
     await wait(350);
@@ -5164,7 +5978,7 @@ async function drawerShots(directory: string, save: Save, wait: Wait): Promise<n
     problems += found.length;
     // A desktop behind it, as the mock has, so the transparent window reads in the picture (바탕: a busy one).
     if (desktop) await run(fakeDesktop);
-    else await run(`document.body.style.background = ${JSON.stringify("")} || ({ night: "${backdrop("night")}", ink: "${backdrop("ink")}", kraft: "${backdrop("kraft")}", grid: "${backdrop("grid")}" })[document.documentElement.dataset.look] || "${backdrop("day")}"`);
+    else await run(`document.body.style.background = ${JSON.stringify("")} || (${JSON.stringify(Object.fromEntries(paperKinds.map((look) => [look, backdrop(look)])))})[document.documentElement.dataset.look] || "${backdrop("day")}"`);
     await wait(150);
     await save(`drawer/${name}`, window.webContents.capturePage());
     await run(`document.body.style.background = ""; document.getElementById("fake-desktop")?.remove()`);
@@ -5546,7 +6360,7 @@ async function drawerShots(directory: string, save: Save, wait: Wait): Promise<n
   await run(reset);
   await shot("drawer-search-none", `window.drawerTest.search("zzz")`);
   await run(reset);
-  // #114: results by folder with the found line deep in a long one; 체크 남음 alone; this folder only with 링크; day and night, and 한지 · 먹색 (#142).
+  // #114: results by folder with the found line deep in a long one; 안 한 체크 alone; this folder only with 링크; day and night, and 한지 · 먹색 (#142).
   for (const theme of ["day", "night", "hanji", "ink"] as const) {
     store.setPref("drawerTheme", theme);
     await run(reset);
@@ -5560,7 +6374,7 @@ async function drawerShots(directory: string, save: Save, wait: Wait): Promise<n
   }
   store.setPref("drawerTheme", "day");
   await run(reset);
-  // 바탕: 불투명 · 반투명 · 강하게 · 바탕 없음 over a busy desktop, day and night.
+  // 바탕: 불투명 · 반투명 · 투명 · 바탕 없음 over a busy desktop, day and night.
   for (const theme of ["day", "night"] as const) {
     store.setPref("drawerTheme", theme);
     for (const mode of ["solid", "frost", "strong", "none"] as const) {
@@ -5700,6 +6514,7 @@ async function drawerShots(directory: string, save: Save, wait: Wait): Promise<n
   if (handle) await save("drawer/drawer-handle", handle.webContents.capturePage());
   drawer.hideForSnapshot();
   console.log(problems ? `DRAWER PROBLEMS: ${problems}` : "DRAWER OK");
+  store.setPref("drawerSameAsNote", true);
   return problems;
 }
 
@@ -6589,6 +7404,8 @@ app.whenReady().then(() => {
   setLang(appLanguage(place.settings));
   // Every time in the app on the system's clock (preload hands it to each window: "clock:get").
   setHourCycle(systemHourCycle());
+  // The week's first day from the system's too (preload: "week:get").
+  setWeekStart(systemWeekStart());
   // Google 캘린더 · Tasks are gone: their sign-in and copies on this device go too.
   removeLeftovers(place.settings);
   // 자동 백업 (#139): a new version's first launch copies the storage folder before the store reads (and may rewrite) it.
@@ -6636,16 +7453,19 @@ app.whenReady().then(() => {
   store.on("reloaded", () => desk.sendAll("history:changed"));
   Menu.setApplicationMenu(null);
   registerIPC();
-  confirmSlip = new SlipConfirm(rendererDirectory);
+  // #253: every page hears what is up (the widgets and their day sheet wait only for a question that replaces the whole
+  // list); the question floats over a widget kept on top and the day sheet.
+  confirmSlip = new SlipConfirm(rendererDirectory, (on, replacesList) => sendEverywhere("slip:asking", on, replacesList),
+    () => widgets?.floats === true || widgetSheet?.isVisible === true);
   periodicPopup = new ReminderPopup(rendererDirectory);
   taskPopup = new ReminderPopup(rendererDirectory);
   // 밤 종이 before the first window: its background is already the right paper.
   applyPaper();
   nativeTheme.on("updated", refreshPaper);
-  store.on("prefs", (key: keyof Prefs) => { if (key === "paper") applyPaper(); });
+  store.on("prefs", (key: keyof Prefs) => { if (key === "paper" || key === "paperTheme" || key === "paperNight") applyPaper(); });
   desk = new Desk(store, rendererDirectory, {
-    webPreferences, icon: path.join(assetsDirectory, "cat.png"), background: () => paperColor(paperNight()), snapshots: Boolean(snapshotDirectory), guide: showGuide, search: openSearch,
-    chrome: snapshotDirectory ? "preview" : process.platform === "win32" ? "overlay" : undefined, symbols: () => paperInk2(paperNight()),
+    webPreferences, icon: path.join(assetsDirectory, "cat.png"), background: () => paperBackground[paperLookNow().shown], snapshots: Boolean(snapshotDirectory), guide: showGuide, search: openSearch,
+    chrome: snapshotDirectory ? "preview" : process.platform === "win32" ? "overlay" : undefined, symbols: () => paperInk2[paperLookNow().shown],
     inSight: deskInSight,
   });
   note = createNote();
@@ -6679,10 +7499,23 @@ app.whenReady().then(() => {
   // The note's visibility settles after the event: look a moment later.
   for (const event of ["show", "hide", "minimize", "restore"] as const) note.on(event as "show", () => setTimeout(() => focusTimer.noteShown(), 50));
   glance = new GlanceWindow(rendererDirectory, live);
+  // 바탕화면 달력 위젯 (#234): this PC's widgets (none until one is added in 책상 → 일정), and the day sheet beside one.
+  widgetSheet = new WidgetSheet(rendererDirectory, live, Boolean(snapshotDirectory), {
+    made: (id, payload) => widgets.windowOf(id)?.webContents.send("widget:made", payload),
+    asked: () => confirmSlip.up,
+    hidden: () => confirmSlip.raise(),
+  });
+  widgets = new CalendarWidgets(store, rendererDirectory, {
+    openSettings: openWidgetSettings,
+    // #253: a question waiting stays over the sheet.
+    openSheet: (id, day, beside) => { widgetSheet.open(id, day, beside); confirmSlip.raise(); },
+    changed: updateTray,
+  }, Boolean(snapshotDirectory));
+  widgets.sync();
   timerSheet = new TimerSheet(rendererDirectory, live, (minutes) => focusTimer.command({ kind: "countdown", minutes }));
   quickMemo = new QuickMemo(store, rendererDirectory, live, (id) => notice({ icon: "note", text: t("메모 서랍에 넣었어요"), show: "drawer", entry: id }));
   // 메모 서랍: its shortcut and its handle at the screen's edge (tests and snapshots take neither).
-  drawer = new MemoDrawer(store, rendererDirectory, live, { night: paperNight, reduceMotion: () => !systemPreferences.getAnimationSettings().shouldRenderRichAnimation });
+  drawer = new MemoDrawer(store, rendererDirectory, live, { look: drawerPaperNow, reduceMotion: () => !systemPreferences.getAnimationSettings().shouldRenderRichAnimation });
   pet = new DesktopPet(store, rendererDirectory, {
     openNote: showNote, changed: updateTray, timerMenu: () => focusTimer.timerMenu(),
     // 종이냥 한마디 waits while the timer runs or a reminder is up; ‘쉴래요’ starts five minutes.

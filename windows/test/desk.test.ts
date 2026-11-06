@@ -1,39 +1,60 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
 import {
   deskFrame, deskPanes, deskSections, isNight, isSettingsTab, pageOfPane, paneForShortcut, paperColor, readPaper, readPane,
   settingsTabs, shortcutForPane, stepPane, themeSource,
 } from "../src/core/desk";
+import { setLang } from "../src/i18n";
+import { paneTitle, sectionTitle } from "../src/renderer/deskPanes";
 
-test("desk: the sidebar's order — 보기 · 설정 · 도움, thirteen panes (AI 연결 since 1.27, 메모 서랍 since 1.28, 스페이스 after it since 1.30)", () => {
-  assert.deepEqual(deskSections.map((entry) => entry.section), ["view", "settings", "help"]);
-  assert.deepEqual(deskPanes, ["calendar", "history", "clock", "appearance", "notifications", "repeat", "pet", "events", "storage", "drawer", "spaces", "ai", "help"]);
-  assert.equal(shortcutForPane("spaces"), undefined); // no digit, as AI 연결
+// 책상 목록의 묶음 (#240, D4 B): the shared cases from docs/plans/desk-sidebar-cases.json (the Mac's test-localization.sh
+// reads the same file).
+const sidebarCases = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "desk-sidebar-cases.json"), "utf8")) as {
+  maxRows: number; sections: { section: string; panes: string[] }[]; shortcuts: string[]; titles: Record<string, [string, string, string]>;
+};
+
+test("desk: the sidebar's groups — 보기 · 설정 · 메모와 데이터 · 도움, each six rows or fewer (shared cases)", () => {
+  assert.deepEqual(deskSections, sidebarCases.sections);
+  for (const { panes } of deskSections) assert.ok(panes.length <= sidebarCases.maxRows, `${panes.join(", ")}: more than ${sidebarCases.maxRows} rows`);
+  assert.deepEqual(deskPanes, ["calendar", "history", "appearance", "notifications", "clock", "repeat", "events", "pet", "drawer", "spaces", "storage", "ai", "help"]);
+  assert.equal(new Set(deskPanes).size, 13);
 });
 
-test("desk: Ctrl+1…9 go down the sidebar; 도움말 has none (F1)", () => {
-  assert.equal(paneForShortcut(1), "calendar");
-  assert.equal(paneForShortcut(2), "history");
-  assert.equal(paneForShortcut(4), "appearance");
-  assert.equal(paneForShortcut(9), "storage");
+test("desk: Ctrl+1…9 go down the sidebar, 달력 to 메모 서랍; the rest and 도움말 have none (F1)", () => {
+  sidebarCases.shortcuts.forEach((pane, index) => assert.equal(paneForShortcut(index + 1), pane));
   assert.equal(paneForShortcut(0), undefined);
   assert.equal(paneForShortcut(10), undefined);
-  assert.equal(shortcutForPane("clock"), 3);
+  assert.equal(shortcutForPane("clock"), 5);
+  assert.equal(shortcutForPane("storage"), undefined);
+  assert.equal(shortcutForPane("spaces"), undefined);
   assert.equal(shortcutForPane("help"), undefined);
   assert.equal(shortcutForPane("ai"), undefined);
-  assert.equal(shortcutForPane("drawer"), undefined);
   for (let digit = 1; digit <= 9; digit += 1) assert.equal(shortcutForPane(paneForShortcut(digit)!), digit);
+});
+
+test("desk: 알람 · 타이머 and 메모와 데이터 in ko · en · nl (shared cases)", () => {
+  const [clockKo, clockEn, clockNl] = sidebarCases.titles.clock;
+  const [dataKo, dataEn, dataNl] = sidebarCases.titles.data;
+  for (const [language, clock, data] of [["ko", clockKo, dataKo], ["en", clockEn, dataEn], ["nl", clockNl, dataNl]] as const) {
+    setLang(language);
+    assert.equal(paneTitle("clock"), clock);
+    assert.equal(sectionTitle("data"), data);
+  }
+  setLang("ko");
 });
 
 test("desk: ↑ ↓ step through the panes and stop at the ends", () => {
   assert.equal(stepPane("calendar", 1), "history");
-  assert.equal(stepPane("clock", 1), "appearance");
+  assert.equal(stepPane("history", 1), "appearance");
+  assert.equal(stepPane("notifications", 1), "clock");
   assert.equal(stepPane("calendar", -1), "calendar");
   assert.equal(stepPane("help", 1), "help");
   assert.equal(stepPane("help", -1), "ai");
-  assert.equal(stepPane("storage", 1), "drawer");
-  assert.equal(stepPane("drawer", 1), "spaces");
-  assert.equal(stepPane("spaces", 1), "ai");
+  assert.equal(stepPane("pet", 1), "drawer");
+  assert.equal(stepPane("spaces", 1), "storage");
+  assert.equal(stepPane("storage", 1), "ai");
 });
 
 test("desk: the settings panes share one page; the old tab names still open the right pane", () => {

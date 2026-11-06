@@ -23,7 +23,7 @@
 :root[data-font="clean"] .tab-label { font-size: 12.5px; }
 .index-tab[aria-selected="true"] .tab-label { color: var(--tab-ink); }
 /* Night: a hair of stroke keeps the pen's thin strokes legible on the tabs. */
-:root[data-paper="night"]:not([data-font="clean"]) .tab-label { -webkit-text-stroke: 0.35px currentColor; }
+:root[data-scheme="dark"]:not([data-font="clean"]) .tab-label { -webkit-text-stroke: 0.35px currentColor; }
 .tab-count { position: relative; font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--tab-ink); min-width: 8px; text-align: center; margin-top: -4px; }
 .index-tabs.tight .index-tab { padding: 0 9px; gap: 3px; }
 .index-tabs.compact .tab-count { display: none; }
@@ -91,6 +91,8 @@
 /* #65: 오늘 with 2,000 rows — the rows out of view skip style, layout and paint (their height is fixed, so the list
    is as tall). The clip margin keeps what a row draws past its edges (the drop line, focus rings) as it was. */
 .lines > .row { content-visibility: auto; contain-intrinsic-block-size: auto var(--row); overflow-clip-margin: 24px; }
+/* 200 rows or more: in blocks (note.ts inBlocks), each skipped as a whole — fewer for the page to check on each frame. */
+.lines > .row-block { content-visibility: auto; contain-intrinsic-block-size: calc(var(--row) * var(--rows, 1)); overflow-clip-margin: 24px; }
 .row::after { content: ""; position: absolute; inset: 3px 7px 3px 14px; border-radius: 4px; background: color-mix(in srgb, var(--sage) 5.5%, transparent); opacity: 0; pointer-events: none; transition: opacity 0.1s; }
 .row:hover::after, .row.editing::after, .row.preview-hover::after { opacity: 1; }
 .row.dragging { opacity: 0.55; }
@@ -215,7 +217,11 @@
 .editor .quick.lengths button { justify-content: flex-start; }
 .pop-list button.pop-none { color: var(--secondary); border-bottom: 1px solid var(--rule); border-radius: 8px 8px 0 0; margin-bottom: 2px; }
 .quick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.quick button { height: 34px; border-radius: 8px; border: 1px solid var(--rule); background: color-mix(in srgb, var(--card) 45%, transparent); display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 12.5px; }
+.quick button { height: 34px; border-radius: 8px; border: 1px solid var(--rule); background: color-mix(in srgb, var(--card) 45%, transparent); display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 12.5px; white-space: nowrap; min-width: 0; }
+/* A narrow note (#240, 점검 3의 34): a choice stays on one line (en ‘Tomorrow at 9 AM’ wrapped) — a little less room around it. */
+@media (max-width: 380px) {
+  .quick button { gap: 6px; padding: 0 7px; font-size: 12px; }
+}
 .quick button::before { content: ""; width: 12px; height: 12px; border-radius: 50%; border: 1.2px solid var(--check-border); flex: none; }
 .quick button.selected { border-color: var(--sage); background: color-mix(in srgb, var(--sage) 9%, transparent); }
 .quick button.selected::before { border: 4px solid var(--sage); }
@@ -244,7 +250,7 @@
 .guide { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 16px; }
 .guide-scrim { position: absolute; inset: 0; background: color-mix(in srgb, var(--ink) 18%, transparent); }
 /* At night ink is light: a black scrim dims the note instead of fogging it. */
-:root[data-paper="night"] .guide-scrim { background: rgba(0, 0, 0, 0.4); }
+:root[data-scheme="dark"] .guide-scrim { background: rgba(0, 0, 0, 0.4); }
 .guide-card {
   position: relative; width: 320px; max-width: 100%; display: flex; flex-direction: column; align-items: center; padding: 18px 18px 16px;
   border-radius: 16px; border: 0.8px solid var(--rule); box-shadow: 0 8px 36px rgba(0, 0, 0, 0.16);
@@ -259,6 +265,8 @@
 .guide-keys { min-height: 76px; width: 100%; margin-top: 10px; padding: 0 8px; display: flex; flex-direction: column; gap: 5px; }
 .guide-key { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--secondary); }
 .guide-key kbd { font: 600 11px var(--ui); font-variant-numeric: tabular-nums; color: var(--sage-text); background: color-mix(in srgb, var(--sage) 10%, transparent); border-radius: 5px; padding: 3px 7px; }
+.guide-act { display: inline-flex; align-items: center; gap: 5px; font: 600 11px var(--ui); color: var(--sage-text); padding: 3px 0; }
+.guide-box { width: 9px; height: 9px; border: 1.4px solid currentColor; border-radius: 2px; }
 .guide-login { width: 100%; margin-top: 10px; padding: 9px 10px 9px 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-radius: 10px; background: var(--paper-2); font: 500 12px var(--ui); color: var(--ink); }
 .guide-login span { min-width: 0; }
 .guide-dots { display: flex; gap: 6px; margin-top: 14px; }
@@ -270,7 +278,7 @@
 /* 다음 ↩ / 시작하기 ↩: the keycap inside the primary, as on a slip's primary (slip.css). */
 .guide-actions .action.next { display: inline-flex; align-items: center; gap: 8px; flex: none; white-space: nowrap; }
 .guide-actions .action.next .keycap { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.28); color: #f3f6ef; }
-:root[data-paper="night"] .guide-actions .action.next .keycap { background: rgba(31, 42, 30, 0.1); border-color: rgba(31, 42, 30, 0.3); color: var(--on-sage); }
+:root[data-scheme="dark"] .guide-actions .action.next .keycap { background: rgba(31, 42, 30, 0.1); border-color: rgba(31, 42, 30, 0.3); color: var(--on-sage); }
 .guide-skip { font-size: 12px; color: var(--faded); }
 .guide-skip:hover { color: var(--secondary); }
 @media (prefers-reduced-motion: reduce) { .guide-card.turn .guide-art { animation: none; } }
@@ -283,8 +291,9 @@
    their own ruled line, so a heading never sits on the line of the row above, and the paper goes on
    ruled below the last row. */
 .lines.grouped { display: flex; flex-direction: column; background-image: none; }
-.lines.grouped > .row, .lines.grouped > .all-done, .lines.grouped > .lens-more { flex: none; background-image: linear-gradient(var(--rule), var(--rule)); background-repeat: no-repeat; background-size: calc(100% - 38px) 1px; background-position: 18px 100%; }
-.lines.grouped > .row.selected { background-image: linear-gradient(var(--sage), var(--sage)), linear-gradient(var(--rule), var(--rule)); background-size: 2px calc(100% - 10px), calc(100% - 38px) 1px; background-position: calc(var(--margin) - 1px) 5px, 18px 100%; }
+.lines.grouped > .row-block { flex: none; }
+.lines.grouped > .row, .lines.grouped > .row-block > .row, .lines.grouped > .all-done, .lines.grouped > .lens-more { flex: none; background-image: linear-gradient(var(--rule), var(--rule)); background-repeat: no-repeat; background-size: calc(100% - 38px) 1px; background-position: 18px 100%; }
+.lines.grouped > .row.selected, .lines.grouped > .row-block > .row.selected { background-image: linear-gradient(var(--sage), var(--sage)), linear-gradient(var(--rule), var(--rule)); background-size: 2px calc(100% - 10px), calc(100% - 38px) 1px; background-position: calc(var(--margin) - 1px) 5px, 18px 100%; }
 .lines-fill { flex: 1 0 0; min-height: 0; background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--row) - 1px), var(--rule) calc(var(--row) - 1px), var(--rule) var(--row)); background-size: calc(100% - 38px) 100%; background-position: 18px 0; background-repeat: no-repeat; }
 .group-head, .group-mark { flex: none; height: 22px; display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; padding: 0 20px 3px calc(var(--margin) + 17px); position: relative; z-index: 1; pointer-events: none; font: 600 10.5px/14px var(--ui); letter-spacing: 0.04em; color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .group-head .group-name, .group-mark .group-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -401,7 +410,8 @@
 .tb-time { flex: none; min-width: 0; max-width: 100%; font: 500 10px/13px var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tb-time.hidden { display: none; }
 .tt-block.event { --tint: 14%; padding: 2px 6px 2px 10px; background: color-mix(in srgb, var(--ev) var(--tint), var(--paper)); box-shadow: inset 3px 0 0 var(--ev); }
-:root[data-paper="night"] .tt-block.event { --tint: 24%; box-shadow: inset 3px 0 0 color-mix(in srgb, var(--ev) 85%, black); }
+/* On a dark paper the tint is deeper; the bar is the paper's own event mark already (#244, --ev-*). */
+:root[data-scheme="dark"] .tt-block.event { --tint: 24%; }
 .tt-block.event.tall { flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 1px; padding: 4px 6px 4px 10px; }
 .tt-block.event.tall .tb-time { flex: 0 1 auto; }
 .tt-block.event.over { opacity: 0.6; }
@@ -606,27 +616,28 @@
 .fc-btn { height: 34px; padding: 0 12px 0 14px; border-radius: 10px; display: inline-flex; align-items: center; gap: 7px; font: 600 13px var(--ui); white-space: nowrap; color: var(--ink); background: var(--paper-2); }
 .fc-btn .keycap { font-weight: 600; }
 .fc-btn.pri .keycap { background: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.28); color: #f3f6ef; }
-:root[data-paper="night"] .fc-btn.pri .keycap { background: rgba(31, 42, 30, 0.1); border-color: rgba(31, 42, 30, 0.3); color: var(--on-sage); }
+:root[data-scheme="dark"] .fc-btn.pri .keycap { background: rgba(31, 42, 30, 0.1); border-color: rgba(31, 42, 30, 0.3); color: var(--on-sage); }
 /* A narrow note: the buttons keep their words, the keycaps step aside. */
 @media (max-width: 400px) { .fc-btn .keycap { display: none; } .fc-btn { padding: 0 14px; } }
 /* ⏸ / ▶ under the time. */
-.fc-play { width: 26px; height: 26px; margin-top: 4px; border-radius: 50%; display: grid; place-items: center; color: var(--ink-2); background: var(--paper-2); }
+/* #240 (점검 3의 19): at least 32 × 28, easy to hit (it was 26 × 26, 22 × 22 on a small ring). */
+.fc-play { width: 36px; height: 28px; margin-top: 4px; border-radius: 14px; display: grid; place-items: center; color: var(--ink-2); background: var(--paper-2); box-shadow: inset 0 0 0 0.8px var(--rule); }
 .fc-play:hover { color: var(--ink); background: color-mix(in srgb, var(--sage) 10%, var(--paper-2)); }
 .fc-play:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
-.fc-ring[style*="--size: 9"] .fc-play, .fc-ring[style*="--size: 8"] .fc-play { width: 22px; height: 22px; margin-top: 2px; }
+.fc-ring[style*="--size: 9"] .fc-play, .fc-ring[style*="--size: 8"] .fc-play { width: 32px; height: 28px; margin-top: 2px; }
 .fc-btn:hover { background: color-mix(in srgb, var(--sage) 8%, var(--paper-2)); }
 .fc-btn:active { background: color-mix(in srgb, var(--ink) 8%, var(--paper-2)); }
 .fc-btn.pri { color: var(--on-sage); background: var(--sage); box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 2px 6px -2px rgba(60, 90, 60, 0.5); }
 .fc-btn.pri:hover { background: color-mix(in srgb, black 6%, var(--sage)); }
-:root[data-paper="night"] .fc-btn.pri { box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.6); }
-:root[data-paper="night"] .fc-btn.pri:hover { background: color-mix(in srgb, var(--sage) 88%, white); }
+:root[data-scheme="dark"] .fc-btn.pri { box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.6); }
+:root[data-scheme="dark"] .fc-btn.pri:hover { background: color-mix(in srgb, var(--sage) 88%, white); }
 .fc-btn.pulse { animation: fc-pulse 0.9s ease-out 1; }
 @keyframes fc-pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--sage) 55%, transparent); } 100% { box-shadow: 0 0 0 12px transparent; } }
 /* The rest of today: folded under a line at the bottom, with the cat at its left. */
 .fc-foot { flex: none; height: 48px; margin: 0 14px; display: grid; grid-template-columns: 52px minmax(0, 1fr) 52px; align-items: center; border-top: 1px solid var(--rule); }
 .fc-cat { width: 44px; height: 44px; object-fit: contain; align-self: end; margin-bottom: 1px; user-select: none; transform-origin: 50% 90%; }
 .fc-cat.nod { animation: nod 0.4s ease-out; }
-:root[data-paper="night"] .fc-cat { opacity: 0.92; }
+:root[data-scheme="dark"] .fc-cat { opacity: 0.92; }
 .fc-rest { justify-self: center; max-width: 100%; height: 26px; padding: 0 8px; border-radius: 7px; font-size: 11.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .fc-rest:hover { color: var(--ink-2); background: color-mix(in srgb, var(--sage) 8%, transparent); }
 /* The list opens below the line: it scrolls on its own (soft edge at the bottom), the column above gives room. */
@@ -704,7 +715,7 @@
   --d-menu: var(--card); --d-menu-edge: var(--rule-strong); --d-ink: var(--ink); --d-meta: var(--ink-3); --d-icon: var(--ink-2); --d-hover: color-mix(in srgb, var(--ink) 7%, transparent);
   --d-danger: var(--clay-text); --d-sub: var(--sage-text); --d-preview: var(--ink-2); --d-select: var(--sage); --d-hand: var(--body-font);
 }
-:root[data-paper="night"] .menu { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 30px -10px rgba(0, 0, 0, 0.7); }
+:root[data-scheme="dark"] .menu { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 30px -10px rgba(0, 0, 0, 0.7); }
 .menu .dot.all { background: var(--faint); }
 .space-new { display: flex; flex-direction: column; gap: 6px; padding: 2px 3px 3px; min-width: 200px; }
 .space-new .label { margin: 3px 5px 0; }

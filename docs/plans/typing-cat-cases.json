@@ -1,0 +1,159 @@
+{
+  "about": "치면 두드리는 고양이 (#230): the cases both apps run — Mac scripts/test-typing-cat.sh (PaperCore/TypingCat.swift), Windows test/typingCat.test.ts (src/core/typingCat.ts). Times are milliseconds on a monotonic clock. A step with `key` is a key going down; `stop` is the cat hidden, the setting turned off or the permission gone; any other step moves the clock to `at` (the one timer fires on the way) and checks what is drawn: `pose`, `next` (the paw for the next key) and `timer` (whether a wake is still waiting).",
+  "holdMs": 120,
+  "lingerMs": 3000,
+  "chatterQuietMs": 5000,
+  "paws": [
+    {
+      "case": "T1 the first key puts the left paw down at once, and 120 ms later it rests",
+      "steps": [
+        { "at": 0, "pose": "idle", "next": "left", "timer": false },
+        { "at": 0, "key": true },
+        { "at": 0, "pose": "left", "next": "right", "timer": true },
+        { "at": 119, "pose": "left", "timer": true },
+        { "at": 120, "pose": "idle", "next": "right", "timer": false }
+      ]
+    },
+    {
+      "case": "T2 each key puts the other paw down",
+      "steps": [
+        { "at": 0, "key": true },
+        { "at": 0, "pose": "left" },
+        { "at": 50, "key": true },
+        { "at": 50, "pose": "right", "next": "left" },
+        { "at": 100, "key": true },
+        { "at": 100, "pose": "left", "next": "right" },
+        { "at": 220, "pose": "idle", "timer": false }
+      ]
+    },
+    {
+      "case": "T3 a new key moves the rest on: the first key's 120 ms doesn't cut the second paw short",
+      "steps": [
+        { "at": 0, "key": true },
+        { "at": 100, "key": true },
+        { "at": 120, "pose": "right", "timer": true },
+        { "at": 150, "pose": "right", "timer": true },
+        { "at": 219, "pose": "right", "timer": true },
+        { "at": 220, "pose": "idle", "timer": false }
+      ]
+    },
+    {
+      "case": "T4 the next paw is kept across rests, so slow typing alternates too",
+      "steps": [
+        { "at": 0, "key": true },
+        { "at": 500, "pose": "idle", "next": "right" },
+        { "at": 1000, "key": true },
+        { "at": 1000, "pose": "right", "next": "left" },
+        { "at": 3000, "key": true },
+        { "at": 3000, "pose": "left", "next": "right" },
+        { "at": 3120, "pose": "idle", "timer": false }
+      ]
+    },
+    {
+      "case": "T5 a burst leaves nothing behind: 40 keys 10 ms apart, then rest 120 ms after the last and no timer",
+      "burst": { "from": 0, "every": 10, "count": 40 },
+      "steps": [
+        { "at": 390, "pose": "right", "next": "left", "timer": true },
+        { "at": 509, "pose": "right", "timer": true },
+        { "at": 510, "pose": "idle", "next": "left", "timer": false },
+        { "at": 5000, "pose": "idle", "next": "left", "timer": false }
+      ]
+    },
+    {
+      "case": "T6 reduced motion: the cat stays still in its resting pose, nothing waits, the paws don't move on",
+      "steps": [
+        { "at": 0, "key": true, "reduceMotion": true },
+        { "at": 0, "pose": "idle", "next": "left", "timer": false },
+        { "at": 40, "key": true, "reduceMotion": true },
+        { "at": 40, "pose": "idle", "next": "left", "timer": false },
+        { "at": 500, "key": true },
+        { "at": 500, "pose": "left", "next": "right", "timer": true }
+      ]
+    },
+    {
+      "case": "T7 hidden with a paw down: it rests at once and nothing waits; the next paw is kept",
+      "steps": [
+        { "at": 0, "key": true },
+        { "at": 50, "stop": "hidden" },
+        { "at": 50, "pose": "idle", "next": "right", "timer": false },
+        { "at": 300, "pose": "idle", "timer": false }
+      ]
+    },
+    {
+      "case": "T8 turned off mid-burst",
+      "burst": { "from": 0, "every": 30, "count": 5 },
+      "steps": [
+        { "at": 125, "stop": "off" },
+        { "at": 125, "pose": "idle", "timer": false },
+        { "at": 1000, "pose": "idle", "timer": false }
+      ]
+    },
+    {
+      "case": "T9 the permission taken back (Mac, in all apps) with a paw down",
+      "steps": [
+        { "at": 0, "key": true },
+        { "at": 10, "key": true },
+        { "at": 20, "stop": "revoked" },
+        { "at": 20, "pose": "idle", "next": "left", "timer": false }
+      ]
+    }
+  ],
+  "counts": [
+    { "case": "a letter", "repeat": false, "command": false, "control": false, "counts": true },
+    { "case": "a key held down (its repeats)", "repeat": true, "command": false, "control": false, "counts": false },
+    { "case": "a ⌘ shortcut (⌘C, ⌘S)", "repeat": false, "command": true, "control": false, "counts": false },
+    { "case": "a ⌃ shortcut (⌃C)", "repeat": false, "command": false, "control": true, "counts": false },
+    { "case": "a held ⌘ shortcut", "repeat": true, "command": true, "control": false, "counts": false }
+  ],
+  "priorities": [
+    { "case": "P1 sitting: a paw goes down", "doing": "resting", "reply": "type" },
+    { "case": "P2 a small moment (blink, look, stretch, grooming, yawn, tea) gives way", "doing": "moment", "reply": "type" },
+    { "case": "P3 walking: it stops where it is and types", "doing": "walking", "reply": "stopAndType" },
+    { "case": "P4 dozing: the person is back, it wakes and types", "doing": "sleeping", "reply": "wakeAndType" },
+    { "case": "P5 cheering, hearts or a hop: it finishes, and keys meanwhile aren't caught up later", "doing": "answering", "reply": "ignore" },
+    { "case": "P6 being dragged: no paws", "doing": "dragging", "reply": "ignore" },
+    { "case": "P7 hidden or out of sight: nothing", "doing": "hidden", "reply": "ignore" }
+  ],
+  "linger": [
+    { "case": "L1 still on its cushion 2.9 s after the last key", "lastKey": 0, "now": 2900, "within": true },
+    { "case": "L2 back to its usual moments 3 s after", "lastKey": 0, "now": 3000, "within": false },
+    { "case": "L3 never typed", "now": 0, "within": false }
+  ],
+  "chatter": [
+    { "case": "C1 종이냥 한마디 waits while typing", "lastKey": 1000, "now": 5999, "quiet": true },
+    { "case": "C2 …and speaks 5 s after the last key", "lastKey": 1000, "now": 6000, "quiet": false }
+  ],
+  "mac": {
+    "sources": [
+      { "case": "M1 in this app (the default)", "scope": "app", "granted": false, "petShown": true, "source": "app" },
+      { "case": "M2 in all apps, allowed", "scope": "everywhere", "granted": true, "petShown": true, "source": "everywhere" },
+      { "case": "M3 in all apps, not allowed: in this app only (never pretended)", "scope": "everywhere", "granted": false, "petShown": true, "source": "app" },
+      { "case": "M4 turned off", "scope": "off", "granted": true, "petShown": true, "source": "none" },
+      { "case": "M5 the pet hidden: nothing is heard", "scope": "everywhere", "granted": true, "petShown": false, "source": "none" },
+      { "case": "M6 the pet hidden, in this app", "scope": "app", "granted": false, "petShown": false, "source": "none" }
+    ],
+    "asking": [
+      { "case": "A1 just chose in all apps, never asked in this build: ask once (the line shows beside macOS's question)", "scope": "everywhere", "granted": false, "asked": false, "chosenNow": true, "ask": true, "note": true },
+      { "case": "A2 asked and refused, chosen again: no second ask, the line with a button to System Settings", "scope": "everywhere", "granted": false, "asked": true, "chosenNow": true, "ask": false, "note": true },
+      { "case": "A3 allowed: nothing to ask or say", "scope": "everywhere", "granted": true, "asked": true, "chosenNow": true, "ask": false, "note": false },
+      { "case": "A4 in this app: never asks", "scope": "app", "granted": false, "asked": false, "chosenNow": true, "ask": false, "note": false },
+      { "case": "A5 turned off after a refusal: the line goes", "scope": "off", "granted": false, "asked": true, "chosenNow": true, "ask": false, "note": false },
+      { "case": "A6 after an update (this build never asked), still in all apps: no question at launch, only the line", "scope": "everywhere", "granted": false, "asked": false, "chosenNow": false, "ask": false, "note": true },
+      { "case": "A7 the permission taken back: no question, the line", "scope": "everywhere", "granted": false, "asked": true, "chosenNow": false, "ask": false, "note": true }
+    ],
+    "companion": [
+      { "case": "F1 a full-screen app covers the pet: the small cat shows", "source": "everywhere", "enabled": true, "petShown": true, "dockCovered": true, "locked": false, "shows": true },
+      { "case": "F2 the pet above the Dock can be seen: only it shows", "source": "everywhere", "enabled": true, "petShown": true, "dockCovered": false, "locked": false, "shows": false },
+      { "case": "F3 in this app only: never over full-screen apps", "source": "app", "enabled": true, "petShown": true, "dockCovered": true, "locked": false, "shows": false },
+      { "case": "F4 turned off from the pet's menu", "source": "everywhere", "enabled": false, "petShown": true, "dockCovered": true, "locked": false, "shows": false },
+      { "case": "F5 the pet hidden", "source": "none", "enabled": true, "petShown": false, "dockCovered": true, "locked": false, "shows": false },
+      { "case": "F6 the screen locked", "source": "everywhere", "enabled": true, "petShown": true, "dockCovered": true, "locked": true, "shows": false }
+    ],
+    "frames": [
+      { "case": "G1 bottom right of a 1440×900 screen", "corner": "bottomRight", "screen": [0, 0, 1440, 900], "topInset": 0, "frame": [1308, 20, 112, 112] },
+      { "case": "G2 top left under a 38 pt notch", "corner": "topLeft", "screen": [0, 0, 1512, 982], "topInset": 38, "frame": [20, 812, 112, 112] },
+      { "case": "G3 a second screen to the left, below the first", "corner": "topRight", "screen": [-1920, -300, 1920, 1080], "topInset": 0, "frame": [-132, 648, 112, 112] },
+      { "case": "G4 a tiny screen: smaller, still inside", "corner": "bottomLeft", "screen": [0, 0, 120, 100], "topInset": 0, "frame": [20, 20, 60, 60] }
+    ]
+  }
+}

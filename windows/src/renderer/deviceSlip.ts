@@ -3,8 +3,9 @@ import {
   cleanDays, dayName, deviceMoment, deviceNowLine, devicePresets, deviceSentence, deviceStatus, deviceWords, maxTimes, ruleShows,
   type DevicePreset, type DeviceRule, type DeviceTimes,
 } from "../core/spaceDevice";
+import { SlipShelf, draggedSlip } from "../core/slipMove";
 import { h, icon, lang, t } from "./api";
-import { appear, chip, keyCap, slipButton, slipHead, tape } from "./slip";
+import { appear, chip, dragByPaper, keyCap, slipButton, slipHead, tape } from "./slip";
 import { timeList, timeOf } from "./timePick";
 
 /**
@@ -24,16 +25,30 @@ export function deviceStatusLine(rule: DeviceRule | undefined, hiddenNow: boolea
   return text ? h("span", { class: `device-status ${rule?.show === "hide" ? "hidden" : "timed"}` }, text) : null;
 }
 
+type TimesSlip = { slip: HTMLElement; close(): void };
+/** #229: the times slips up now, one per space. */
+const openSlips = new SlipShelf<TimesSlip>();
+/** The slip in front (each one brought forward goes over the others). */
+let front = 26;
+
 /**
  * 시간 정하기 (§4): 바로 고르기 chips, the time ranges (days, start – end, ×), + 시간 더하기, the summary with what it
- * means now, 취소 · 저장 (Enter; Esc cancels). Drawn over the page on a scrim; `save` gets the rows on 저장.
+ * means now, 취소 · 저장 (Enter; Esc cancels). `save` gets the rows on 저장. #229: drawn over the page without holding it
+ * up — the rest of the desk works while it is up — and a space (`key`) has one: asked again, that one comes forward.
+ * #228: its paper drags it about the page, its head kept inside.
  */
-export function openTimesSlip(options: { title: string; times: DeviceTimes[]; now?: () => Date; save: (times: DeviceTimes[]) => void; closed?: () => void }): { close(): void } {
+export function openTimesSlip(options: { key: string; title: string; times: DeviceTimes[]; now?: () => Date; save: (times: DeviceTimes[]) => void; closed?: () => void }): { close(): void } {
+  const { slip: made, isNew } = openSlips.take(options.key, () => timesSlip(options));
+  made.slip.style.zIndex = String(++front);
+  if (!isNew) made.slip.querySelector<HTMLElement>(".device-presets .chip")?.focus();
+  return made;
+}
+
+function timesSlip(options: { key: string; title: string; times: DeviceTimes[]; now?: () => Date; save: (times: DeviceTimes[]) => void; closed?: () => void }): TimesSlip {
   const language = lang();
   const now = options.now ?? (() => new Date());
   let rows: DeviceTimes[] = options.times.map((times) => ({ ...times, days: [...times.days] }));
-  const scrim = h("div", { class: "device-scrim" });
-  const slip = h("div", { class: "slip l device-slip", role: "dialog", "aria-modal": "true", "aria-label": options.title });
+  const slip = h("div", { class: "slip l device-slip", role: "dialog", "aria-label": options.title });
   const presets = h("div", { class: "device-presets" });
   const list = h("div", { class: "device-rows" });
   const add = h("button", { class: "device-add" }, icon("plus", 13), h("span", {}, deviceWords.addTime[language]));
@@ -103,25 +118,42 @@ export function openTimesSlip(options: { title: string; times: DeviceTimes[]; no
   slip.append(tape("confirm"), head.element,
     h("div", { class: "slip-body device-body" }, h("p", { class: "device-lead" }, deviceWords.slipNote[language]), presets, list, add, summary),
     h("div", { class: "slip-foot" }, h("span", { class: "keys" }, h("span", {}, keyCap("Esc"), t("취소"))), h("span", { class: "spacer" }), cancel, save));
+  // The keys are the slip's while the focus is in it (the page goes on working around it).
   const keys = (event: KeyboardEvent) => {
-    if (event.isComposing) return;
+    if (event.isComposing || !slip.contains(document.activeElement)) return;
     if (event.key === "Escape" && !document.querySelector(".sheet-pop")) { event.preventDefault(); event.stopPropagation(); close(); }
     if (event.key === "Enter" && !document.querySelector(".sheet-pop") && (event.target as HTMLElement).tagName !== "BUTTON") { event.preventDefault(); save.click(); }
   };
+  // #228: dragged by its paper about the page, its head kept inside (core/slipMove.ts).
+  let from: DOMRect | undefined;
+  dragByPaper(slip, {
+    start: () => {
+      from = slip.getBoundingClientRect();
+      slip.style.zIndex = String(++front);
+    },
+    move: (dx, dy) => {
+      if (!from) return;
+      const to = draggedSlip({ x: from.left, y: from.top, width: from.width, height: from.height }, dx, dy, { x: 0, y: 0, width: window.innerWidth, height: window.innerHeight });
+      slip.classList.add("moved");
+      slip.style.left = `${Math.round(to.x)}px`;
+      slip.style.top = `${Math.round(to.y)}px`;
+    },
+    end: () => { from = undefined; },
+  });
+  slip.addEventListener("pointerdown", () => { slip.style.zIndex = String(++front); }, true);
   let closed = false;
   const close = () => {
     if (closed) return;
     closed = true;
     document.removeEventListener("keydown", keys, true);
-    scrim.remove();
     slip.remove();
+    openSlips.drop(options.key);
     options.closed?.();
   };
-  scrim.addEventListener("click", close);
   document.addEventListener("keydown", keys, true);
   draw();
-  document.body.append(scrim, slip);
+  document.body.append(slip);
   appear(slip);
   requestAnimationFrame(() => slip.querySelector<HTMLElement>(".device-presets .chip")?.focus());
-  return { close };
+  return { slip, close };
 }

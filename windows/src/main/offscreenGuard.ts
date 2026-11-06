@@ -1,13 +1,16 @@
-import { app, screen, type BrowserWindow, type Rectangle } from "electron";
-import { awayBounds, nearDisplay } from "../core/offscreen";
-import { offscreen } from "./env";
+import { app, screen, type BrowserWindow } from "electron";
+import fs from "node:fs";
+import path from "node:path";
+import { guardWindow } from "../core/offscreen";
+import { offscreen, testHooks } from "./env";
 
 /**
- * Off-screen runs (#92: snapshots, perf, the drag probe): every window's place and size go through one door. A resize
- * or a move is one native setBounds that carries the off-screen x and y with the size, so no step leaves a window at
- * a place the system picked; the result is checked, and before every show too. A window that is anywhere near a
- * display (core/offscreen.ts) is put straight back at the run's home and the run says so. The #92 watch
- * (tools/offscreen-watch.swift) stays as the backstop that stops the run.
+ * Off-screen runs (#92: snapshots, perf, the drag probe): every window's place and size go through one door
+ * (core/offscreen.ts guardWindow). A resize or a move is one native setBounds that carries the off-screen x and y with
+ * the size, so no step leaves a window at a place the system picked; the result is checked, and before every show and
+ * focus too. A window that is anywhere near a display is put straight back at the run's home and the run says so. On
+ * a Mac no window has an owner there, and none shows in Mission Control or App Exposé (#250). The #92 watch (tools/offscreen-watch.swift) stays as the backstop that
+ * stops the run.
  *
  * Why (2026-11-03): a snapshot run on a Mac had a window titled 저장과 백업 come up partly on the screen's top-left
  * (-279, -295, 437 × 321) just after the desk was resized 820 → 920 and the note was resized; the watch stopped it.
@@ -22,35 +25,33 @@ export function guardOffscreen(): void {
 const home = { x: offscreen.x + 100, y: offscreen.y + 100 };
 const displays = () => screen.getAllDisplays().map((display) => display.bounds);
 
+/**
+ * #250: the run's window log (test builds, PAPERTODO_WINDOW_LOG, set by tools/offscreen-watch.mjs): each window as it is
+ * made — the system's number for it (the one the watch prints), its title, place, and the page it loads — and each one
+ * put back. A window the watch catches is then named, or found to be none of the app's (a menu or popup of the system's).
+ */
+const windowLog = testHooks ? process.env.PAPERTODO_WINDOW_LOG : undefined;
+function note(line: string): void {
+  if (!windowLog) return;
+  try { fs.appendFileSync(windowLog, `${line}\n`); } catch { /* the log is a help, never a reason to stop */ }
+}
+/** The window server's number for `window` (macOS: "window:<CGWindowID>:0"). */
+function number(window: BrowserWindow): string {
+  try { return window.getMediaSourceId().split(":")[1] ?? "?"; } catch { return "?"; }
+}
+const place = (bounds: { x: number; y: number; width: number; height: number }) => `${bounds.x} ${bounds.y} ${bounds.width}×${bounds.height}`;
+
 function keepAway(window: BrowserWindow): void {
-  const native = { setBounds: window.setBounds.bind(window), show: window.show.bind(window), showInactive: window.showInactive.bind(window) };
-  const check = (why: string) => {
-    if (window.isDestroyed()) return;
-    const now = window.getBounds();
-    if (!nearDisplay(now, displays())) return;
-    console.log(`offscreen guard: "${window.getTitle()}" was at ${now.x} ${now.y} ${now.width}×${now.height} (${why}), put back`);
-    native.setBounds({ ...home, width: now.width, height: now.height });
-  };
-  const place = (bounds: Partial<Rectangle>, why: string) => {
-    if (window.isDestroyed()) return;
-    native.setBounds(awayBounds({ ...window.getBounds(), ...bounds }, displays(), home));
-    check(why);
-  };
-  window.setBounds = (bounds: Partial<Rectangle>) => place(bounds, "setBounds");
-  window.setPosition = (x: number, y: number) => place({ x, y }, "setPosition");
-  window.setSize = (width: number, height: number) => place({ width, height }, "setSize");
-  window.setContentSize = (width: number, height: number) => {
-    // The frame around the content (none for the frameless windows) stays as it is.
-    const [contentWidth, contentHeight] = window.getContentSize();
-    const now = window.getBounds();
-    place({ width: now.width + width - contentWidth, height: now.height + height - contentHeight }, "setContentSize");
-  };
-  window.center = () => place({}, "center");
-  window.show = () => { place({}, "show"); native.show(); check("show"); };
-  window.showInactive = () => { place({}, "showInactive"); native.showInactive(); check("showInactive"); };
-  // Moved or resized by the system (a display change, macOS pulling a window back): back at once.
-  window.on("move", () => check("moved"));
-  window.on("resize", () => check("resized"));
-  // Made where the system put it (a window made without a place is centred on a display): away before anything else.
-  place({}, "made");
+  const made = window.getBounds();
+  guardWindow(window, {
+    displays, home, noOwners: process.platform === "darwin", hideFromOverviews: process.platform === "darwin",
+    putBack: (now, why) => {
+      console.log(`offscreen guard: "${window.getTitle()}" was at ${place(now)} (${why}), put back`);
+      note(`put back ${number(window)} "${window.getTitle()}" ${place(now)} (${why})`);
+    },
+  });
+  note(`made ${number(window)} "${window.getTitle()}" at ${place(made)} → ${place(window.getBounds())}`);
+  window.webContents.on("did-finish-load", () => {
+    if (!window.isDestroyed()) note(`page ${number(window)} "${window.getTitle()}" ${path.basename(window.webContents.getURL().split(/[?#]/)[0])}`);
+  });
 }

@@ -86,7 +86,7 @@ private enum LocalizationTests {
             try expectEqual(L("끄기"), pick("끄기", "Stop", "Stoppen"), "stop")
             try expectEqual(L("다음 알람 \(Alarm.timeText(Alarm(time: "07:00"), language: language))"),
                             pick("다음 알람 오전 7:00", "Next alarm 7:00 AM", "Volgende wekker 07:00"), "next alarm")
-            try expectEqual(DeskPane.clock.title, pick("시계", "Clock", "Klok"), "desk pane")
+            try expectEqual(DeskPane.clock.title, pick("알람 · 타이머", "Alarms & timers", "Wekkers & timers"), "desk pane (#240: was 시계)")
             try expectEqual(String(localized: "완료", table: "Settings"), pick("완료", "Done", "Klaar"), "the editor's done")
             try expectEqual(L("완료"), pick("완료", "Mark done", "Afvinken"), "mark done stays")
             try expectEqual(L("예: 40 또는 1:30"), pick("예: 40 또는 1:30", "e.g. 40 or 1:30", "bijv. 40 of 1:30"), "placeholder")
@@ -99,6 +99,30 @@ private enum LocalizationTests {
                                  "Nog geen wekkers. Zet er een om op te staan of je medicijnen te nemen."), "no alarms")
         }
 
+        // 책상 목록의 묶음 (#240, D4 B): the shared cases in docs/plans/desk-sidebar-cases.json (the Windows desk's
+        // test/desk.test.ts reads the same file). The pane names there are the Windows ones (반복 is "repeat").
+        try test("the desk's sidebar groups and ⌘1–⌘9 (shared cases)") {
+            let path = "../docs/plans/desk-sidebar-cases.json"
+            let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
+            let name = { (pane: DeskPane) in pane == .repeating ? "repeat" : pane.rawValue }
+            let sections = (file["sections"] as! [[String: Any]]).map { ($0["section"] as! String, $0["panes"] as! [String]) }
+            try expectEqual(DeskPane.Section.allCases.map(\.rawValue), sections.map(\.0), "groups")
+            let maxRows = (file["maxRows"] as! NSNumber).intValue
+            for (section, (id, panes)) in zip(DeskPane.Section.allCases, sections) {
+                try expectEqual(section.panes.map(name), panes, "the rows of \(id)")
+                try expect(section.panes.count <= maxRows, "\(id): more than \(maxRows) rows")
+            }
+            let shortcuts = file["shortcuts"] as! [String]
+            try expectEqual(DeskPane.allCases.filter { $0.shortcut != nil }.map(name), shortcuts, "⌘1–⌘9")
+            for (index, id) in shortcuts.enumerated() {
+                try expectEqual(DeskPane.allCases.first { name($0) == id }?.shortcut, index + 1, "⌘\(index + 1)")
+            }
+            let titles = file["titles"] as! [String: [String]]
+            let column = AppLanguage.allCases.firstIndex(of: language)!
+            try expectEqual(DeskPane.clock.title, titles["clock"]![column], "알람 · 타이머")
+            try expectEqual(DeskPane.Section.data.title, titles["data"]![column], "메모와 데이터")
+        }
+
         try test("the desk and night paper (glossary)") {
             try expectEqual(DeskPane.calendar.windowTitle, pick("달력", "Calendar", "Kalender"), "window title (#73: just the pane's name, not ‘책상 — 달력’)")
             try expectEqual(DeskPane.notifications.title, pick("알림", "Reminders", "Herinneringen"), "reminders pane (its own table)")
@@ -106,11 +130,30 @@ private enum LocalizationTests {
             try expectEqual(DeskPane.pet.title, pick("종이냥", "Cat", "Kat"), "cat pane")
             try expectEqual(L("종이냥"), pick("종이냥", "Jongi-nyang", "Jongi-nyang"), "the app's name stays")
             try expectEqual(DeskPane.storage.title, pick("저장과 백업", "Storage & backup", "Opslag & back-up"), "storage pane")
-            try expectEqual(DeskPane.Section.allCases.map(\.title), language == .ko ? ["보기", "설정", "도움"] : language == .en ? ["View", "Settings", "Help"] : ["Bekijken", "Instellingen", "Help"], "sidebar headings")
+            try expectEqual(DeskPane.Section.allCases.map(\.title), language == .ko ? ["보기", "설정", "메모와 데이터", "도움"] : language == .en ? ["View", "Settings", "Notes & data", "Help"] : ["Bekijken", "Instellingen", "Notities & gegevens", "Help"], "sidebar headings")
             try expectEqual(PaperColor.allCases.map(\.title), language == .ko ? ["자동", "낮", "밤"] : language == .en ? ["Automatic", "Day", "Night"] : ["Automatisch", "Dag", "Nacht"], "paper colour")
             // #142: ‘종이 색’ is ‘낮 · 밤’ (the same setting).
             try expectEqual(L("낮 · 밤"), pick("낮 · 밤", "Day & night", "Dag & nacht"), "day and night setting")
             try expectEqual(L("밤 종이"), pick("밤 종이", "Night paper", "Nachtpapier"), "night paper")
+        }
+
+        try test("the fifteen papers (#244): names, the tiles' spoken words, 밤에는") {
+            // The names the app shows are PaperKind's (the shared cases and tokens.json have the same three).
+            try expectEqual(PaperKind.allCases.map(\.title), PaperKind.allCases.map { $0.names.name(language) }, "paper names")
+            try expectEqual(PaperKind.allCases.map(\.spoken), PaperKind.allCases.map { $0.spokenLabel(language) }, "spoken tile names (K2)")
+            try expectEqual(PaperKind.memo.spoken, pick("노란 메모지, 밝은 종이", "Sticky note, light paper", "Plakbriefje, licht papier"), "K2")
+            try expectEqual(NightChoice.allCases.map(\.title), language == .ko ? ["그대로", "밤 종이", "먹색 종이", "밤하늘 종이", "칠판"]
+                            : language == .en ? ["Keep this paper", "Night paper", "Ink", "Night sky", "Chalkboard"]
+                            : ["Dit papier houden", "Nachtpapier", "Inkt", "Nachthemel", "Schoolbord"], "밤에는")
+            try expectEqual([L("밤에는"), L("노트와 같은 종이"), L("어두운 종이는 밤에도 그대로예요.")],
+                            language == .ko ? ["밤에는", "노트와 같은 종이", "어두운 종이는 밤에도 그대로예요."]
+                            : language == .en ? ["At night", "Same as the notepad", "Dark papers stay the same at night."]
+                            : ["’s Nachts", "Zelfde als het notitieblok", "Donker papier blijft ’s nachts hetzelfde."], "plan words (11장)")
+            // The drawer ⚙'s short names: 메모지 · 원고지 · 재생지 have their own table (their Korean means something else elsewhere).
+            try expectEqual([PaperKind.memo, .manuscript, .recycled, .lined].map(\.short),
+                            language == .ko ? ["메모지", "원고지", "재생지", "줄노트"] : language == .en ? ["Sticky", "Manuscript", "Recycled", "Lined"]
+                            : ["Plakbriefje", "Manuscript", "Kringloop", "Lijntjes"], "short names")
+            try expectEqual(L("메모지"), pick("메모지", "Cards", "Kaartjes"), "the spaces' 메모지 stays")
         }
 
         try test("dates the app writes itself") {

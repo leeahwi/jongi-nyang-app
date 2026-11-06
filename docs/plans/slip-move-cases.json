@@ -1,0 +1,53 @@
+{
+  "about": "질문 쪽지 옮기기와 막힌 클릭의 공유 사례 (#228 · #229). drag: 쪽지의 종이(slip: x, y, 너비, 높이)를 by만큼 끌면 가는 자리(to: x, y). 좌표는 화면을 보는 대로 왼쪽 위가 0이고 아래로 커져요(Mac은 위아래를 뒤집어 넣어요). area는 포인터가 있는 화면의 쓸 수 있는 곳(메뉴 막대 · 작업 표시줄 밖)이고, null이면 포인터가 어느 화면에도 없어서 그대로 따라가요. 쪽지 위쪽 44(아이콘과 제목)는 화면 밖으로 나가지 않고, 옆으로는 적어도 80이 화면에 남아요. clicks: 쪽지(up)가 떠 있을 때 다른 곳(click)을 누르면 생기는 일. question은 꼭 답이 필요한 질문(저장하지 않고 끝내기, 저장 폴더, 가져오기 …)이고 settings는 시간 정하기 쪽지처럼 설정을 고르는 쪽지예요. nudge는 그 클릭을 막고, 질문 쪽지를 앞으로 꺼내 흔들고, 경고음을 한 번 내요. works는 클릭이 그대로 가요. open: 시간 정하기 쪽지를 연 차례(스페이스 키)와 떠 있는 쪽지 수. nudge: 흔들림(가로 pt · px, ‘톡’ 0.3초 동안 고르게 오가요)와 움직임 줄이기의 테이프 깜빡임(테이프 투명도, 한 칸 살짝 0.12초). Mac SlipMove(PaperCore) · SlipModal, Windows core/slipMove.ts가 이 파일을 읽어요. place (#246): 빠른 입력 · 빠른 메모는 끌어 옮긴 자리를 화면(디스플레이)마다 기억해요. keep은 놓은 쪽지(slip)에서 기억할 자리(그 화면의 쓸 수 있는 곳 왼쪽 위에서 쪽지 왼쪽 위까지 dx, dy, 그때 그 곳의 너비 · 높이). open은 다음에 열 때의 자리(to: 쪽지 왼쪽 위): 같은 크기의 곳이면 그 자리(위쪽은 화면 안에, 옆으로는 80이 남게), 기억이 없거나 화면 크기가 바뀌었으면 null(늘 뜨던 자리). Mac SlipMove.Place · placed, Windows slipPlace · placedSlip이 읽어요.",
+  "head": 44,
+  "keep": 80,
+  "drag": [
+    { "case": "M1 끄는 만큼 따라가요", "slip": [400, 200, 460, 300], "area": [0, 25, 1440, 875], "by": [40, -30], "to": [440, 170] },
+    { "case": "M2 조금만 끌어도 그만큼", "slip": [400, 200, 460, 300], "area": [0, 25, 1440, 875], "by": [3, 2], "to": [403, 202] },
+    { "case": "M3 위로는 메뉴 막대 아래까지", "slip": [400, 200, 460, 300], "area": [0, 25, 1440, 875], "by": [0, -500], "to": [400, 25] },
+    { "case": "M4 아래로는 제목이 화면에 남을 때까지", "slip": [400, 200, 460, 300], "area": [0, 25, 1440, 875], "by": [0, 2000], "to": [400, 856] },
+    { "case": "M5 왼쪽으로는 80이 남을 때까지", "slip": [400, 200, 460, 300], "area": [0, 25, 1440, 875], "by": [-2000, 0], "to": [-380, 200] },
+    { "case": "M6 오른쪽으로는 80이 남을 때까지", "slip": [400, 200, 460, 300], "area": [0, 25, 1440, 875], "by": [2000, 0], "to": [1360, 200] },
+    { "case": "M7 왼쪽 아래 구석", "slip": [400, 200, 460, 300], "area": [0, 25, 1440, 875], "by": [-2000, 2000], "to": [-380, 856] },
+    { "case": "M8 둘째 화면에서도 그 화면 안에", "slip": [1500, 100, 320, 200], "area": [1440, 0, 1920, 1080], "by": [2500, 0], "to": [3280, 100] },
+    { "case": "M9 쪽지보다 낮은 화면이면 위쪽만", "slip": [100, 100, 460, 600], "area": [0, 0, 800, 400], "by": [0, 300], "to": [100, 356] },
+    { "case": "M10 포인터가 어느 화면에도 없으면 그대로", "slip": [400, 200, 460, 300], "area": null, "by": [-50000, 0], "to": [-49600, 200] },
+    { "case": "Q1 빠른 입력 쪽지도 끄는 만큼 따라가요 (#246)", "slip": [510, 200, 420, 150], "area": [0, 25, 1440, 875], "by": [-200, 120], "to": [310, 320] },
+    { "case": "Q2 빠른 메모 쪽지도 위로는 메뉴 막대 아래까지 (#246)", "slip": [510, 200, 420, 260], "area": [0, 25, 1440, 875], "by": [0, -900], "to": [510, 25] }
+  ],
+  "clicks": [
+    { "case": "C1 질문이 떠 있을 때 노트를 누르면 흔들려요", "up": "question", "click": "note", "then": "nudge" },
+    { "case": "C2 메모 서랍도", "up": "question", "click": "drawer", "then": "nudge" },
+    { "case": "C3 책상도", "up": "question", "click": "desk", "then": "nudge" },
+    { "case": "C4 오늘 창도", "up": "question", "click": "today", "then": "nudge" },
+    { "case": "C5 할 일 알림 쪽지도", "up": "question", "click": "reminder", "then": "nudge" },
+    { "case": "C6 고양이도", "up": "question", "click": "pet", "then": "nudge" },
+    { "case": "C7 떠 있는 시간 정하기 쪽지도", "up": "question", "click": "times", "then": "nudge" },
+    { "case": "C8 울리는 알람은 끌 수 있어요", "up": "question", "click": "alarm", "then": "works" },
+    { "case": "C9 질문 쪽지 자신은 그대로 눌러져요", "up": "question", "click": "question", "then": "works" },
+    { "case": "S1 시간 정하기 쪽지가 떠 있어도 노트를 써요", "up": "settings", "click": "note", "then": "works" },
+    { "case": "S2 메모 서랍도", "up": "settings", "click": "drawer", "then": "works" },
+    { "case": "S3 책상도", "up": "settings", "click": "desk", "then": "works" },
+    { "case": "S4 시간 정하기 쪽지 자신도", "up": "settings", "click": "times", "then": "works" }
+  ],
+  "open": [
+    { "case": "T1 같은 스페이스는 하나만", "keys": ["work", "work"], "slips": 1 },
+    { "case": "T2 다른 스페이스는 따로", "keys": ["work", "home"], "slips": 2 },
+    { "case": "T3 섞여도 스페이스마다 하나", "keys": ["work", "home", "work", "study", "home"], "slips": 3 }
+  ],
+  "nudge": { "shake": [-7, 6, -4, 2, 0], "motion": "bounce", "blink": [0.25, 1, 0.25, 1], "blinkStep": "quick", "beeps": 1 },
+  "place": {
+    "keep": [
+      { "case": "K1 놓은 자리를 그 화면 기준으로 기억해요", "slip": [500, 300, 420, 150], "area": [0, 25, 1440, 875], "saved": { "dx": 500, "dy": 275, "areaWidth": 1440, "areaHeight": 875 } },
+      { "case": "K2 둘째 화면에서는 그 화면 기준", "slip": [1600, 140, 420, 150], "area": [1440, 0, 1920, 1040], "saved": { "dx": 160, "dy": 140, "areaWidth": 1920, "areaHeight": 1040 } }
+    ],
+    "open": [
+      { "case": "P1 같은 화면이면 기억한 자리에서 열려요", "saved": { "dx": 500, "dy": 275, "areaWidth": 1440, "areaHeight": 875 }, "size": [420, 150], "area": [0, 25, 1440, 875], "to": [500, 300] },
+      { "case": "P2 기억이 없으면 늘 뜨던 자리", "saved": null, "size": [420, 150], "area": [0, 25, 1440, 875], "to": null },
+      { "case": "P3 화면 크기가 바뀌면 늘 뜨던 자리로 돌아와요", "saved": { "dx": 500, "dy": 275, "areaWidth": 1440, "areaHeight": 875 }, "size": [420, 150], "area": [0, 25, 1280, 775], "to": null },
+      { "case": "P4 쪽지가 더 커져도 위쪽은 화면 안에", "saved": { "dx": 200, "dy": 840, "areaWidth": 1440, "areaHeight": 875 }, "size": [420, 300], "area": [0, 25, 1440, 875], "to": [200, 856] },
+      { "case": "P5 메뉴 막대 자리가 달라도 같은 크기면 그 자리", "saved": { "dx": 300, "dy": 100, "areaWidth": 1440, "areaHeight": 875 }, "size": [420, 150], "area": [0, 0, 1440, 875], "to": [300, 100] }
+    ]
+  }
+}

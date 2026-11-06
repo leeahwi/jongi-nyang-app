@@ -11,6 +11,8 @@ import SwiftUI
 @MainActor
 final class QuickMemoController {
     private let model: AppModel
+    /// #246: where it was dragged, per display (the app's own preferences; an isolated test copy's own).
+    private var places: SlipPlaces { SlipPlaces(key: "quickMemo.places", preferences: model.preferences) }
     private var panel: SlipPanel?
     private var hotKey: GlobalHotKey?
     /// Whether ⌃⌥M could be claimed (another app may own it).
@@ -75,11 +77,8 @@ final class QuickMemoController {
         let panel = panel ?? makePanel()
         let copied = copiedText()
         panel.show(QuickMemoView(model: model, text: copied, selectAll: copied != nil, onClose: { [weak self] in self?.close() }))
-        let mouse = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main
-        if let area = screen?.visibleFrame {
-            panel.placeSlip(topCenter: NSPoint(x: area.midX, y: area.maxY - area.height / 5))
-        }
+        // #246: where it was dragged to on this display, else the usual spot.
+        places.place(panel)
         panel.makeKeyAndOrderFront(nil)
     }
 
@@ -93,6 +92,10 @@ final class QuickMemoController {
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.onResignKey = { [weak self] in self?.close() }
+        // #246: its paper and title row drag it (not its field, chips or buttons); the place is kept per display.
+        panel.movesByPaper = true
+        panel.onMoved = { [weak self, weak panel] in if let panel { self?.places.keep(panel) } }
+        panel.onDoubleClick = { [weak self, weak panel] in if let panel { self?.places.reset(panel) } }
         self.panel = panel
         return panel
     }

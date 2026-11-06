@@ -75,11 +75,11 @@ async function launch(name, memoOptions) {
   const inspectPort = portBase++;
   const started = Date.now();
   const child = spawn(electronBinary, [option("app") ?? root, "--demo", `--remote-debugging-port=${debugPort}`, `--inspect=${inspectPort}`, `--user-data-dir=${path.join(folder, "user-data")}`, "--disable-backgrounding-occluded-windows"], {
-    env: { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== "ELECTRON_RUN_AS_NODE")), PAPERTODO_NO_SHORTCUTS: "1", PAPERTODO_OFFSCREEN: "1", PAPERTODO_DEMO_DATA: data, PAPERTODO_LANG: "ko", TMPDIR: tmp },
+    env: { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => key !== "ELECTRON_RUN_AS_NODE")), PAPERTODO_NO_SHORTCUTS: "1", PAPERTODO_OFFSCREEN: "1", PAPERTODO_DEMO_DATA: data, PAPERTODO_LANG: "ko", TMPDIR: tmp, PAPERTODO_WINDOW_LOG: path.join(folder, "windows.log") },
     stdio: ["ignore", "ignore", "pipe"],
   });
   children.add(child);
-  watchWindows(child, (why) => { console.error(`perf-memo: ${why}`); process.exit(1); });
+  watchWindows(child, (why) => { console.error(`perf-memo: ${why}`); process.exit(1); }, path.join(folder, "windows.log"));
   child.on("exit", () => children.delete(child));
   let stderr = "";
   child.stderr.on("data", (chunk) => { stderr += chunk; });

@@ -95,12 +95,13 @@ final class AIConnection: ObservableObject {
         onEnabledChange?(on)
     }
 
-    /// ai-link.json, at launch and whenever the toggle changes (the folder and the language change only with a
-    /// restart, which writes it again).
+    /// ai-link.json, at launch, whenever the toggle changes and whenever 이 기기에서 changes (N3-9; the folder and the
+    /// language change only with a restart, which writes it again).
     func writeLink() {
         guard live else { return }
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
-        let link = AIConnect.Link(enabled: enabled, dataFolder: dataFolder.path, lang: language, app: "mac \(version)")
+        let link = AIConnect.Link(enabled: enabled, dataFolder: dataFolder.path, lang: language, app: "mac \(version)",
+                                  spaceDevice: SpaceDevice.linkRules(model.deviceRules))
         do {
             try FileManager.default.createDirectory(at: settingsFolder, withIntermediateDirectories: true)
             try link.encoded().write(to: linkURL, options: .atomic)

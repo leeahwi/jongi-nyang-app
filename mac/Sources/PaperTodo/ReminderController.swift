@@ -192,6 +192,7 @@ struct SettingsPaneView: View {
 
     /// Snapshots: an alarm already open for editing.
     private let alarmEditing: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     internal init(controller: ReminderController, model: AppModel, pane: DeskPane, alarmEditing: String? = nil) {
         self.controller = controller
@@ -207,6 +208,9 @@ struct SettingsPaneView: View {
                     if pane == .drawer {
                         // 서랍 열기 in the header, not in a row that is about something else (#27).
                         DeskPaneHeader(title: pane.title, subtitle: pane.subtitle) { OpenDrawerButton(model: model) }
+                    } else if let question = pane.question {
+                        // #240 (D2 C): the pane's question as its title, its name small above it.
+                        DeskPaneHeader(title: question, subtitle: pane.subtitle, eyebrow: pane.title)
                     } else {
                         DeskPaneHeader(title: pane.title, subtitle: pane.subtitle, cat: pane == .appearance ? .groom : nil)
                     }
@@ -221,9 +225,6 @@ struct SettingsPaneView: View {
             }
             .scrollIndicators(.automatic)
             .scrollEdgeFade()
-            if pane == .notifications {
-                settingsActions
-            }
         }
         .foregroundStyle(PaperTheme.ink)
         .onChange(of: model.reminderStyle) { if pane == .notifications { controller.preview() } }
@@ -240,14 +241,8 @@ struct SettingsPaneView: View {
             AlarmSettingsGroup(book: model.alarms, notebookFont: model.notebookFont, editing: alarmEditing)
             PetSettingsPanel(model: model, part: .timer)
         case .events: CalendarSettingsPanel(calendar: model.calendar)
-        case .storage:
-            StorageSettingsGroup(model: model)
-            CompletedSettingsGroup(model: model)
-            if let book = model.backups {
-                AutoBackupGroup(book: book, model: model)
-                BackupListGroup(book: book, model: model)
-            }
-            BackupSettingsGroup(model: model)
+        // #240 (D2 C): where the list lives and one line about the backups; the rest behind 자세히 보기.
+        case .storage: StoragePanel(model: model)
         case .drawer: MemoDrawerSettingsGroup(drawer: model.drawer)
         case .spaces:
             SpacesSettingsPanel(model: model)
@@ -265,6 +260,8 @@ struct SettingsPaneView: View {
         Group {
             LanguageSettingsGroup(model: model)
             PaperColorGroup(model: model)
+            // #244: the fifteen papers and 밤에는, under 낮 · 밤.
+            PaperThemeGroup(model: model)
 
             // The sample sheet, named like every other group (#21).
             VStack(alignment: .leading, spacing: 7) {
@@ -355,7 +352,8 @@ struct SettingsPaneView: View {
         .background(PaperTheme.paper, in: RoundedRectangle(cornerRadius: 12))
         .overlay { RoundedRectangle(cornerRadius: 12).stroke(PaperTheme.rule, lineWidth: 0.8) }
         .shadow(color: .black.opacity(0.05), radius: 6, y: 2)
-        .animation(.easeOut(duration: 0.15), value: model.textSize)
+        // The preview grows or shrinks with 바뀜 (#166); at once under Reduce Motion.
+        .animation(Motion.animation(.change, reduce: reduceMotion), value: model.textSize)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("글씨 미리보기")
     }
@@ -378,20 +376,35 @@ struct SettingsPaneView: View {
                     }
                 }
                 .padding(12)
+                // #240 (D1 B): the preview sits with the styles it shows, plain — no filled button in a settings pane.
+                SettingsSeparator()
+                HStack(spacing: 12) {
+                    Text(L("고른 모양으로 한 번 띄워 봐요. 목록은 그대로예요."))
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(PaperTheme.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Button { controller.preview() } label: {
+                        Label(L("한 번 띄워 보기"), systemImage: "play.fill").labelStyle(.titleAndIcon)
+                    }
+                    .buttonStyle(PaperActionButtonStyle())
+                }
+                .padding(.vertical, 6)
+                .settingsRow()
             }
 
             SettingsGroup(title: L("주기 알림"), footer: statusText) {
                 HStack(spacing: 12) {
                     SettingsTile(systemImage: "bell.badge")
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("남은 할 일 알려주기").font(.system(size: 13, weight: .medium))
+                        Text("남은 할 일 알려 주기").font(.system(size: 13, weight: .medium))
                         Text("할 일이 남아 있을 때만 종이냥이 한 번에 모아서 알려 줘요.")
                             .font(.system(size: 11))
                             .foregroundStyle(PaperTheme.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 0)
-                    Toggle("남은 할 일 알려주기", isOn: $controller.enabled)
+                    Toggle("남은 할 일 알려 주기", isOn: $controller.enabled)
                         .toggleStyle(PaperToggleStyle())
                         .labelsHidden()
                 }
@@ -424,6 +437,29 @@ struct SettingsPaneView: View {
                 .settingsRow()
                 // Resting while 주기 알림 is off: faded as a whole, but not system-disabled (that dimmed
                 // the words to 1.3–1.6:1 at night).
+                .allowsHitTesting(controller.enabled)
+                .opacity(controller.enabled ? 1 : 0.55)
+                .accessibilityHidden(!controller.enabled)
+
+                // #240 (D1 B): 1시간 쉬기 is a row of 주기 알림 (it rests these reminders now), not a bar under the pane.
+                SettingsSeparator()
+                HStack(spacing: 12) {
+                    SettingsTile(systemImage: "moon")
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L("잠시 쉬기")).font(.system(size: 13, weight: .medium))
+                        Text(restDetail)
+                            .font(.system(size: 11))
+                            .foregroundStyle(PaperTheme.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 8)
+                    Button { controller.snooze(minutes: 60) } label: {
+                        Text(L("1시간 쉬기"))
+                    }
+                    .buttonStyle(PaperActionButtonStyle())
+                }
+                .padding(.vertical, 6)
+                .settingsRow()
                 .allowsHitTesting(controller.enabled)
                 .opacity(controller.enabled ? 1 : 0.55)
                 .accessibilityHidden(!controller.enabled)
@@ -493,49 +529,25 @@ struct SettingsPaneView: View {
         return L("\(minutes / 60)시간 \(minutes % 60)분마다")
     }
 
-    private var settingsActions: some View {
-        HStack(spacing: 8) {
-            Button {
-                controller.preview()
-            } label: {
-                Label("미리보기", systemImage: "play.fill")
-            }
-            .buttonStyle(PaperActionButtonStyle(primary: true))
-            .help("지금 알림을 한 번 띄워 봐요. 목록은 바뀌지 않아요.")
-
-            Spacer(minLength: 0)
-
-            Button {
-                controller.snooze(minutes: 60)
-            } label: {
-                Label("1시간 쉬기", systemImage: "moon")
-            }
-            .buttonStyle(PaperActionButtonStyle())
-            .disabled(!controller.enabled)
-        }
-        .frame(maxWidth: DeskMetrics.column)
-        .padding(.horizontal, DeskMetrics.gutter)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(PaperTheme.paper)
-        .overlay(alignment: .top) {
-            Rectangle().fill(PaperTheme.rule.opacity(0.8)).frame(height: 0.7)
-        }
-    }
-
     private var statusText: String {
         if !controller.enabled {
             return L("꺼져 있어요. 켜면 노트를 쓰는 동안에는 잠시 기다렸다 알려 줘요.")
         } else if !controller.hasTasks {
             return L("남은 할 일이 생기면 알려 줘요.")
-        } else if let next = controller.nextDue {
-            let language = AppLanguage.current
-            let time = language == .ko
-                ? next.formatted(.dateTime.locale(Locale(identifier: "ko_KR")).hour().minute())
-                : language.clock(hour: Calendar.current.component(.hour, from: next), minute: Calendar.current.component(.minute, from: next))
-            return L("다음 알림 \(time) · 노트를 쓰는 동안은 잠시 기다려요.")
+        } else if controller.nextDue != nil {
+            return L("노트를 쓰는 동안은 잠시 기다려요.")
         }
         return L("알림 시간을 준비하고 있어요.")
+    }
+
+    /// Under 잠시 쉬기: when the next one comes, while there is one (#240: the footnote said it before).
+    private var restDetail: String {
+        guard controller.enabled, controller.hasTasks, let next = controller.nextDue else { return L("1시간 동안 주기 알림을 쉬어요.") }
+        let language = AppLanguage.current
+        let time = language == .ko
+            ? next.formatted(.dateTime.locale(Locale(identifier: "ko_KR")).hour().minute())
+            : language.clock(hour: Calendar.current.component(.hour, from: next), minute: Calendar.current.component(.minute, from: next))
+        return L("다음 알림 \(time)")
     }
 }
 
@@ -680,6 +692,13 @@ extension View {
             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             .contentShape(Rectangle())
     }
+
+    /// A few words under a row, inside the card (no separator above).
+    func settingsCaption() -> some View {
+        padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, -4)
+    }
 }
 
 /// A miniature of each reminder layout, so the choice is visual rather than a word.
@@ -784,7 +803,8 @@ struct RepeatSettingsPanel: View {
 
     private func row(_ entry: Series) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: "repeat").font(.system(size: 13, weight: .medium)).foregroundStyle(PaperTheme.sage)
+            // On the pane's tile like every other row (#240, 점검 3의 26: Windows draws it so).
+            SettingsTile(systemImage: "repeat")
             VStack(alignment: .leading, spacing: 2) {
                 Text(entry.title.handwritten).font(model.notebookFont.bodyFont(.small)).lineLimit(1)
                 Text("\(Repeat.describe(entry.rule, remindAt: entry.remindAt, language: .current)) · \(nextLabel(entry))")
@@ -898,12 +918,14 @@ struct CompletedSettingsGroup: View {
 
 /// ‘↗ 폴더 열기’ at the end of a folder's row (저장 폴더, 기록 폴더 — #52: one name, one place, as on Windows).
 struct OpenFolderButton: View {
+    /// ‘폴더 열기’ in a folder's row; the storage pane's own row names the folder (#240: ‘저장 폴더 열기’).
+    var title = L("폴더 열기")
     let help: String
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Label(L("폴더 열기"), systemImage: "arrow.up.forward.app").labelStyle(.titleAndIcon)
+            Label(title, systemImage: "arrow.up.forward.app").labelStyle(.titleAndIcon)
         }
         .buttonStyle(PaperActionButtonStyle())
         .fixedSize()
@@ -938,7 +960,11 @@ struct StorageSettingsGroup: View {
                 if model.sharedFolder != nil {
                     Button("기본으로", action: model.resetStorageFolder).buttonStyle(PaperActionButtonStyle())
                 }
-                Button("다른 폴더…", action: model.chooseStorageFolder).buttonStyle(PaperActionButtonStyle(primary: true))
+                // A rare step that moves the whole list: a plain button with the folder, as on Windows (not the pane's one filled button).
+                Button(action: model.chooseStorageFolder) {
+                    Label(L("다른 폴더…"), systemImage: "folder").labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(PaperActionButtonStyle())
             }
             .padding(.vertical, 8)
             .settingsRow()
@@ -970,6 +996,25 @@ struct CalendarSettingsPanel: View {
                 }
                 .settingsRow()
             }
+            // #234: 음력 · 공휴일 (the desk calendar and the widgets).
+            SettingsGroup(title: L("달력"), more: "widgets",
+                          footer: L("한국의 공휴일이에요. 선거일처럼 그때 정해지는 쉬는 날은 앱을 업데이트하면 더해져요.")) {
+                HStack {
+                    SettingsLabel(L("음력 날짜 보이기"), systemImage: "moon")
+                    Spacer()
+                    Toggle(L("음력 날짜 보이기"), isOn: $calendar.showsLunar).toggleStyle(PaperToggleStyle()).labelsHidden()
+                }
+                .settingsRow()
+                SettingsSeparator()
+                HStack {
+                    SettingsLabel(L("공휴일 보이기"), systemImage: "flag")
+                    Spacer()
+                    Toggle(L("공휴일 보이기"), isOn: $calendar.showsHolidays).toggleStyle(PaperToggleStyle()).labelsHidden()
+                }
+                .settingsRow()
+            }
+            // #234: 바탕화면 위젯.
+            CalendarWidgetsGroup(widgets: CalendarWidgets.shared)
         }
     }
 }
@@ -984,8 +1029,13 @@ struct FolderPath: View {
     /// Snapshots only: the sample's temporary folder said as a stand-in one (`from` → `to`), so no real path is drawn.
     @MainActor static var standIn: (from: String, to: String)?
 
+    /// The path as drawn: the snapshots' stand-in folder, else the real one.
+    static func shownPath(_ url: URL) -> String {
+        standIn.map { url.path.replacingOccurrences(of: $0.from, with: $0.to) } ?? url.path
+    }
+
     var body: some View {
-        let shown = Self.standIn.map { url.path.replacingOccurrences(of: $0.from, with: $0.to) } ?? url.path
+        let shown = Self.shownPath(url)
         let place = FolderPlace.of(shown, home: NSHomeDirectory())
         HStack(spacing: 0) {
             if !place.leadText.isEmpty {
@@ -1033,10 +1083,14 @@ struct PetSettingsPanel: View {
 
     @ViewBuilder
     private var petGroup: some View {
-            SettingsGroup(title: L("종이냥 펫"), footer: L("Dock 위에 앉아 눈을 깜빡이고, 가끔 걸어 다녀요. 끌어서 옮기고, 우클릭하면 메뉴가 나와요.")) {
+            SettingsGroup(title: L("종이냥 펫"), more: "pet", footer: L("Dock 위에 앉아 눈을 깜빡이고, 가끔 걸어 다녀요. 끌어서 옮기고, 우클릭하면 메뉴가 나와요.")) {
                 toggleRow(L("펫 보이기"), systemImage: "cat", isOn: $model.petVisible)
                 SettingsSeparator()
                 toggleRow(L("돌아다니기"), systemImage: "figure.walk", isOn: $model.petWanders)
+                    .disabled(!model.petVisible)
+                    .opacity(model.petVisible ? 1 : 0.45)
+                SettingsSeparator()
+                typingRows
                     .disabled(!model.petVisible)
                     .opacity(model.petVisible ? 1 : 0.45)
             }
@@ -1072,9 +1126,90 @@ struct PetSettingsPanel: View {
             }
     }
 
+    /// 글자 칠 때 두드리기 (#230): off · in this app · in all apps, what it hears, and (in all apps) the small cat over
+    /// full-screen apps.
+    @ViewBuilder
+    private var typingRows: some View {
+        HStack(spacing: 12) {
+            SettingsLabel(L("글자 칠 때 두드리기"), systemImage: "keyboard")
+            Spacer(minLength: 8)
+            PaperSegmented(selection: $model.petTyping,
+                           options: TypingCat.Scope.allCases.map { ($0, Self.typingTitle($0), nil) },
+                           label: L("글자 칠 때 두드리기"), fit: true)
+                .frame(width: 300)
+        }
+        .settingsRow()
+        if model.petTyping != .off {
+            VStack(alignment: .leading, spacing: 6) {
+                if model.typingNoPermission {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(L("입력 모니터링 권한이 없어서 종이냥 안에서만 두드려요."))
+                            .foregroundStyle(PaperTheme.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 4)
+                        Button(L("시스템 설정 열기"), action: model.openInputMonitoringSettings)
+                            .buttonStyle(PaperActionButtonStyle())
+                    }
+                } else {
+                    Text(model.petTyping == .everywhere ? L("다른 앱에서 칠 때도 두드려요. 키를 눌렀다는 것만 알고, 어떤 키인지는 몰라요.")
+                         : L("종이냥에서 글자를 치면 앞발로 두드려요. 무엇을 쳤는지는 보지 않아요."))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if model.petTyping == .everywhere {
+                    Text(L("종이냥은 아직 Apple의 정식 서명이 없어서, 업데이트하면 macOS가 권한을 다시 물을 수 있어요."))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .font(.system(size: 11.5))
+            .foregroundStyle(PaperTheme.ink2)
+            .padding(.leading, FolderPath.indent)
+            .padding(.bottom, 10)
+            .settingsCaption()
+        }
+        if model.petTyping == .everywhere {
+            SettingsSeparator()
+            HStack(spacing: 12) {
+                SettingsLabel(L("전체 화면에서 보이기"), systemImage: "rectangle.inset.bottomright.filled")
+                Spacer(minLength: 8)
+                PaperMenuPicker(selection: companionCorner,
+                                options: [(nil, String(localized: "끄기", table: "Settings"))] + TypingCompanion.Corner.allCases.map { ($0, Self.cornerTitle($0)) },
+                                label: L("전체 화면에서 보이기"))
+            }
+            .settingsRow()
+            .disabled(model.typingNoPermission)
+            .opacity(model.typingNoPermission ? 0.45 : 1)
+        }
+    }
+
+    /// 끄기, or the corner it sits in.
+    private var companionCorner: Binding<TypingCompanion.Corner?> {
+        Binding(get: { model.petCompanion ? model.petCompanionCorner : nil },
+                set: { corner in
+                    model.petCompanion = corner != nil
+                    if let corner { model.petCompanionCorner = corner }
+                })
+    }
+
+    static func typingTitle(_ scope: TypingCat.Scope) -> String {
+        switch scope {
+        case .off: String(localized: "끄기", table: "Settings")
+        case .app: L("종이냥에서만")
+        case .everywhere: L("모든 앱에서")
+        }
+    }
+
+    static func cornerTitle(_ corner: TypingCompanion.Corner) -> String {
+        switch corner {
+        case .topLeft: L("왼쪽 위")
+        case .topRight: L("오른쪽 위")
+        case .bottomLeft: L("왼쪽 아래")
+        case .bottomRight: L("오른쪽 아래")
+        }
+    }
+
     @ViewBuilder
     private var timerGroups: some View {
-            SettingsGroup(title: L("뽀모도로"), more: "timer", footer: L("집중과 휴식을 번갈아 해요. 시간은 −·+로 1분씩(⌥나 ⇧를 누르면 5분씩) 바꾸거나 직접 적어요.")) {
+            SettingsGroup(title: L("뽀모도로"), more: "timer", footer: L("집중과 휴식을 번갈아 해요. −와 +로 1분씩, ⇧와 함께 누르면 5분씩 바뀌어요. 숫자를 눌러 직접 적어도 돼요.")) {
                 stepperRow(L("집중"), systemImage: "target", value: $model.pomodoroSettings.focusMinutes, range: 1...180, unit: L("분"))
                 SettingsSeparator()
                 stepperRow(L("휴식"), systemImage: "cup.and.saucer", value: $model.pomodoroSettings.restMinutes, range: 1...60, unit: L("분"))
@@ -1214,7 +1349,8 @@ struct SettingsLabel: View {
 }
 
 /// "− 25분 +" on paper instead of the system stepper arrows: −/+ change it by one (by five with
-/// ⌥ or ⇧ held), and the number can be typed.
+/// ⌥ or ⇧ held), and the number can be typed. The number changes at once, as on Windows (#166 D8): a number that
+/// moves is harder to read, and the old 0.2 s spring ran under Reduce Motion too.
 private struct PaperStepper: View {
     let title: String
     @Binding var value: Int
@@ -1269,7 +1405,7 @@ private struct PaperStepper: View {
     }
 
     private func button(_ symbol: String, enabled: Bool, action: @escaping () -> Void) -> some View {
-        Button { withAnimation(.snappy(duration: 0.2)) { action() } } label: {
+        Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(enabled ? PaperTheme.ink2 : PaperTheme.faint)

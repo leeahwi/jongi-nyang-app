@@ -154,7 +154,7 @@
 "노트 위의 작은 친구, 종이냥" = "Jongi-nyang, het vriendje op je notitieblok";
 /* HelpView.swift */
 "종이냥 도움말" = "Jongi-nyang-help";
-"궁금한 걸 찾아보세요" = "Zoek wat je wilt weten";
+"궁금한 걸 찾아봐요" = "Zoek op wat je wilt weten";
 "찾기 (예: 반복)" = "Zoeken (bijv. herhalen)";
 "찾기 지우기" = "Zoekveld wissen";
 "맞는 게 없어요. 다른 말로 찾아볼까요?" = "Niets gevonden. Andere woorden proberen?";
@@ -197,7 +197,7 @@
 "반복하는 날마다 목록에 한 줄씩 나타나요.\n1. 매일 · 평일 · 매주(요일 여러 개) · 매월(없는 날은 말일) 중에 골라요.\n2. 같은 자리에서 알림 시각을 켜요.\n· 전날 것을 못 끝냈으면 새로 쌓지 않고 그 줄을 오늘로 옮겨요.\n· 모든 반복은 책상 → 반복에서 고치거나 지워요." = "Op elke dag dat hij herhaalt, verschijnt er een regel.\n1. Kies Elke dag, Werkdagen, Elke week (op een of meer dagen) of Elke maand (in kortere maanden de laatste dag).\n2. Zet daar meteen een herinneringstijd aan.\n· Is die van gisteren niet af, dan schuift die door naar vandaag in plaats van zich op te stapelen.\n· Herhalingen wijzig of verwijder je in Bureau → Herhalen.";
 "알림이 오면" = "Als er een herinnering komt";
 "주기 알림" = "Regelmatige herinneringen";
-"남은 할 일이 있으면 정해 둔 간격(기본 30분)마다 한 번에 모아서 알려 줘요.\n· 노트를 쓰는 동안은 기다렸다 알려요.\n· 책상 → 알림에서 간격, 표시 시간, 모양(미니·쪽지·친구)을 고르고 미리보기로 확인해요." = "Zolang er taken over zijn, krijg je met een vaste tussenpoos (standaard 30 minuten) één herinnering voor allemaal.\n· Zolang je het notitieblok gebruikt, wacht hij.\n· Kies in Bureau → Herinneringen de tussenpoos, hoe lang hij blijft staan en de stijl (Mini, Briefje, Vriendje), en bekijk een voorbeeld.";
+"남은 할 일이 있으면 정해 둔 간격(기본 30분)마다 한 번에 모아서 알려 줘요.\n· 노트를 쓰는 동안은 기다렸다 알려요.\n· 책상 → 알림에서 간격, 표시 시간, 모양(미니·쪽지·친구)을 고르고 ‘한 번 띄워 보기’로 확인해요." = "Zolang er taken over zijn, krijg je met een vaste tussenpoos (standaard 30 minuten) één herinnering voor allemaal.\n· Zolang je het notitieblok gebruikt, wacht hij.\n· Kies in Bureau → Herinneringen de tussenpoos, hoe lang hij blijft staan en de stijl (Mini, Briefje, Vriendje), en probeer het met ‘Nu één tonen’.";
 "앱이 켜져 있어야 해요" = "De app moet open zijn";
 "알림은 앱이 실행 중일 때 동작해요. 창을 닫거나 접어도 괜찮지만 ⌘Q로 끄면 멈춰요. 꺼져 있는 동안 지난 알림은 다음에 켤 때 한 번 알려 줘요." = "Herinneringen werken zolang de app open is. Het venster sluiten of inklappen is prima, maar stoppen met ⌘Q zet ze stil. Herinneringen die je miste terwijl hij dicht was, komen één keer als je hem weer opent.";
 "창 다루기" = "Het venster";
@@ -227,7 +227,7 @@
 "할 일 줄을 우클릭 → ‘달력에 넣기…’로 할 일을 일정으로 넣어요.\n· 할 일의 알림 시각이나 마감으로 날짜를 채워 줘요.\n· 넣은 할 일 끝에는 작은 달력이 붙어요.\n· 넣은 뒤 할 일을 고쳐도 일정은 그대로예요." = "Rechtsklik op een taak → ‘In kalender zetten…’ om hem in de kalender te zetten.\n· De datum komt van de herinneringstijd of deadline van de taak.\n· De taak krijgt een kalendertje aan het eind.\n· Wijzig je de taak daarna, dan blijft de afspraak zoals hij is.";
 "일정 알림" = "Herinneringen voor afspraken";
 "달력" = "Kalender";
-"월 · 주로 일정과 마감을 한눈에 봐요.\n1. 노트 위쪽의 책상 버튼, ⋯ → 달력, ⌘D로 책상의 달력을 열어요.\n2. 날짜를 누르면 오른쪽에 그날 일정과 할 일이 보여요.\n3. 날짜를 두 번 누르면 새 일정을 만들어요." = "Zie afspraken en deadlines in één oogopslag, per maand of week.\n1. Open de kalender op het Bureau met de bureauknop bovenaan het notitieblok, ⋯ → Kalender of ⌘D.\n2. Klik op een dag om rechts de afspraken en taken van die dag te zien.\n3. Dubbelklik op een dag voor een nieuwe afspraak.";
+"월 · 주로 일정 · 마감 · 알림을 한눈에 봐요.\n1. 노트 위쪽의 책상 버튼, ⋯ → 달력, ⌘D로 책상의 달력을 열어요.\n2. 날짜를 누르면 오른쪽에 그날 일정과 할 일이 보여요.\n3. 날짜를 두 번 누르면 새 일정을 만들어요.\n· 여러 날 일정은 첫날에 이름이 보이고, 이어지는 날로 막대가 이어져요.\n· 한 주는 시스템 설정에 맞춰 월요일이나 일요일부터 시작해요." = "Zie afspraken, deadlines en herinneringen in één oogopslag, per maand of week.\n1. Open de kalender op het Bureau met de bureauknop bovenaan het notitieblok, ⋯ → Kalender of ⌘D.\n2. Klik op een dag om rechts de afspraken en taken van die dag te zien.\n3. Dubbelklik op een dag voor een nieuwe afspraak.\n· Een afspraak van meer dagen toont de naam op de eerste dag, en de balk loopt door over de dagen erna.\n· Een week begint op maandag of zondag, zoals op je Mac is ingesteld.";
 "어디에 저장되나요?" = "Waar worden ze bewaard?";
 "일정은 할 일과 같은 저장 폴더에 있어요. 인터넷 계정에 연결하지 않아요.\n· 공유 폴더를 쓰면 다른 기기의 종이냥과 함께 써요.\n· 파일 이름은 events.json이에요." = "Afspraken staan in dezelfde opslagmap als je taken. Er komt geen online account aan te pas.\n· Met een gedeelde map gebruikt Jongi-nyang op je andere apparaten ze ook.\n· Het bestand heet events.json.";
 "백업 · 옮기기" = "Back-up & verhuizen";
@@ -254,11 +254,11 @@
 "25분 집중, 5분 휴식" = "25 min focus, 5 min pauze";
 "집중 타이머" = "Focustimer";
 "타이머 켜기" = "Een timer starten";
-"펫 우클릭 → 타이머, 노트 ⋯ → 타이머, 보기 메뉴 → 타이머, 팻말 우클릭, 책상 → 시계에서 5·15·25·50분 타이머나 뽀모도로를 시작해요." = "Start een timer van 5, 15, 25 of 50 minuten of een Pomodoro via rechtsklik op de kat → Timer, ⋯ in het notitieblok → Timer, Weergave → Timer, rechtsklik op het bordje of Bureau → Klok.";
+"펫 우클릭 → 타이머, 노트 ⋯ → 타이머, 보기 메뉴 → 타이머, 팻말 우클릭, 책상 → 알람 · 타이머에서 5·15·25·50분 타이머나 뽀모도로를 시작해요." = "Start een timer van 5, 15, 25 of 50 minuten of een Pomodoro via rechtsklik op de kat → Timer, ⋯ in het notitieblok → Timer, Weergave → Timer, rechtsklik op het bordje of Bureau → Wekkers & timers.";
 "팻말 다루기" = "Het bordje gebruiken";
 "타이머는 종이냥이 든 팻말로 떠요. 빨간 원(집중)이나 초록 원(휴식)이 줄어들어요.\n1. 팻말을 누르면 일시정지해요. 종이냥이 눈을 감아요.\n2. ⏸ · ■ 버튼으로 멈추거나 끝내요.\n3. 끌어서 원하는 곳에 두면 다음에도 그 자리에 떠요.\n· 우클릭하면 5분 더 · 중지 메뉴가 있어요." = "De timer verschijnt als een bordje dat Jongi-nyang vasthoudt. Er krimpt een rode cirkel (focus) of groene cirkel (pauze) op.\n1. Klik op het bordje om te pauzeren. Jongi-nyang doet zijn ogen dicht.\n2. Met de knoppen ⏸ en ■ pauzeer of stop je.\n3. Sleep het waar je wilt, dan verschijnt het daar de volgende keer ook.\n· Rechtsklik voor 5 min extra en Stoppen.";
 "뽀모도로" = "Pomodoro";
-"집중 25분 → 휴식 5분, 4번마다 긴 휴식 15분이에요.\n1. 책상 → 시계에서 시간과 횟수를 정해요. −·+나 숫자로 바꾸고, ⌥를 누르면 5분씩 바뀌어요.\n2. 다음 단계 자동 시작과 끝날 때 소리를 정해요.\n· 앱을 다시 켜도 타이머는 이어져요." = "25 minuten focus → 5 minuten pauze, en elke 4 rondes een lange pauze van 15 minuten.\n1. Stel in Bureau → Klok de tijden en rondes in met − en + of door een getal te typen. Houd ⌥ ingedrukt voor stappen van 5.\n2. Kies of de volgende stap vanzelf start, en het geluid aan het einde.\n· De timer loopt door, ook als je de app opnieuw start.";
+"집중 25분 → 휴식 5분, 4번마다 긴 휴식 15분이에요.\n1. 책상 → 알람 · 타이머에서 시간과 횟수를 정해요. −·+나 숫자로 바꾸고, ⌥를 누르면 5분씩 바뀌어요.\n2. 다음 단계 자동 시작과 끝날 때 소리를 정해요.\n· 앱을 다시 켜도 타이머는 이어져요." = "25 minuten focus → 5 minuten pauze, en elke 4 rondes een lange pauze van 15 minuten.\n1. Stel in Bureau → Wekkers & timers de tijden en rondes in met − en + of door een getal te typen. Houd ⌥ ingedrukt voor stappen van 5.\n2. Kies of de volgende stap vanzelf start, en het geluid aan het einde.\n· De timer loopt door, ook als je de app opnieuw start.";
 "꾸미기·설정" = "Instellingen";
 "내 손에 맞게" = "Helemaal van jou";
 "글꼴과 글자 크기" = "Lettertype en tekstgrootte";
@@ -276,7 +276,7 @@
 "내 Mac에만 저장돼요" = "Alleen op je Mac bewaard";
 "저장 위치" = "Opslagmap";
 "다른 기기와 함께 쓰기" = "Samen met andere apparaten";
-"iCloud Drive · Dropbox · OneDrive 같은 공유 폴더를 고르면, 다른 Mac이나 Windows와 같은 목록을 써요.\n1. 책상 → 저장과 백업 → 저장 위치에서 폴더를 골라요. 지금 목록이 그 폴더로 옮겨져요. 공유 폴더 안에 빈 폴더(예: 종이냥)를 새로 만들어 고르면 좋아요.\n2. 다른 기기의 종이냥에서도 같은 폴더를 골라요.\n· 다른 기기에서 바꾸면 몇 초 안에 이쪽에도 반영돼요.\n· 폴더를 바꾸면 종이냥이 다시 시작돼요." = "Kies een gedeelde map in iCloud Drive, Dropbox of OneDrive om één lijst te delen met Jongi-nyang op een andere Mac of op Windows.\n1. Kies de map in Bureau → Opslag & back-up → Opslag. Je huidige lijst gaat naar die map. Maak er het liefst een nieuwe, lege map voor (bijvoorbeeld Jongi-nyang) in de gedeelde map.\n2. Kies dezelfde map in Jongi-nyang op je andere apparaten.\n· Wijzigingen daar zie je hier binnen een paar seconden.\n· Jongi-nyang start opnieuw als je de map wijzigt.";
+"iCloud Drive · Dropbox · OneDrive 같은 공유 폴더를 고르면, 다른 Mac이나 Windows와 같은 목록을 써요.\n1. 책상 → 저장과 백업에서 ‘공유 폴더에’를 누르고 폴더를 골라요. 지금 목록이 그 폴더로 옮겨져요. 공유 폴더 안에 빈 폴더(예: 종이냥)를 새로 만들어 고르면 좋아요.\n2. 다른 기기의 종이냥에서도 같은 폴더를 골라요.\n· 다른 기기에서 바꾸면 몇 초 안에 이쪽에도 반영돼요.\n· 폴더를 바꾸면 종이냥이 다시 시작돼요." = "Kies een gedeelde map in iCloud Drive, Dropbox of OneDrive om één lijst te delen met Jongi-nyang op een andere Mac of op Windows.\n1. Klik in Bureau → Opslag & back-up op ‘In een gedeelde map’ en kies de map. Je huidige lijst gaat naar die map. Maak er het liefst een nieuwe, lege map voor (bijvoorbeeld Jongi-nyang) in de gedeelde map.\n2. Kies dezelfde map in Jongi-nyang op je andere apparaten.\n· Wijzigingen daar zie je hier binnen een paar seconden.\n· Jongi-nyang start opnieuw als je de map wijzigt.";
 "두 기기에서 동시에 고치면" = "Tegelijk bewerken op twee apparaten";
 "거의 같은 때 고쳐도 양쪽 변경이 다 남아요.\n· 같은 메모를 함께 고치면 두 글을 합쳐요. 같은 자리를 서로 다르게 고친 줄은 둘 다 남겨요.\n· 할 일 알림은 켜져 있는 기기마다 울려요.\n· 꺼져 있던 기기는 다른 기기가 이미 알린 지난 알림을 다시 띄우지 않아요.\n· 글꼴 · 알림 같은 설정은 기기마다 따로예요." = "Ook wijzigingen op bijna hetzelfde moment blijven allebei bewaard.\n· Twee wijzigingen in dezelfde notitie worden samengevoegd. Waar allebei hetzelfde stuk veranderden, blijven beide regels staan.\n· Herinneringen voor taken gaan af op elk apparaat dat aan staat.\n· Een apparaat dat uit stond, toont geen oude herinneringen die een ander apparaat al liet zien.\n· Instellingen zoals lettertype en herinneringen zijn per apparaat.";
 "Windows와 같은 형식" = "Zelfde formaat als Windows";
@@ -408,7 +408,6 @@
 "예: 책 10쪽 읽기" = "bijv. 10 bladzijden lezen";
 "꾸미기" = "Weergave";
 "알림" = "Herinnering";
-"주기 알림과 알림 모양을 정하고, 미리보기로 확인해요." = "Stel regelmatige herinneringen en hun uiterlijk in, en bekijk een voorbeeld.";
 "반복하는 날마다 목록에 한 줄씩 놓여요." = "Op elke dag dat hij herhaalt, komt er een regel op de lijst.";
 "종이냥을 보이거나 숨기고, 돌아다닐지, 말을 걸지 정해요." = "Toon of verberg Jongi-nyang, en kies of hij rondloopt en praat.";
 "알람을 맞추고, 뽀모도로 시간과 소리를 정해 바로 시작해요." = "Zet wekkers, kies de Pomodoro-tijden en het geluid en begin meteen.";
@@ -426,7 +425,7 @@
 "글씨 미리보기" = "Voorbeeld van de tekst";
 "알림 모양" = "Stijl van herinneringen";
 "할 일이 남아 있을 때만 종이냥이 한 번에 모아서 알려 줘요." = "Zolang er taken over zijn, herinnert Jongi-nyang je aan allemaal tegelijk.";
-"남은 할 일 알려주기" = "Herinner me aan wat er nog openstaat";
+"남은 할 일 알려 주기" = "Herinner me aan wat er nog openstaat";
 "간격" = "Interval";
 "화면에 머무는 시간" = "Hoe lang in beeld";
 "%lld초" = "%lld sec";
@@ -435,11 +434,16 @@
 "%lld분마다" = "Elke %lld min";
 "%lld시간 %lld분마다" = "Elke %lld u %lld min";
 "미리보기" = "Voorbeeld";
-"지금 알림을 한 번 띄워 봐요. 목록은 바뀌지 않아요." = "Toont nu een herinnering. Je lijst verandert niet.";
 "1시간 쉬기" = "1 uur pauze";
+"고른 모양으로 한 번 띄워 봐요. 목록은 그대로예요." = "Toont één herinnering in de gekozen stijl. Je lijst blijft zoals hij is.";
+"한 번 띄워 보기" = "Nu één tonen";
+"잠시 쉬기" = "Even pauze";
+"1시간 동안 주기 알림을 쉬어요." = "Zet de regelmatige herinneringen een uur op pauze.";
+"다음 알림 %@" = "Volgende herinnering %@";
+"노트를 쓰는 동안은 잠시 기다려요." = "Wacht zolang je het notitieblok gebruikt.";
+"주기 알림과 알림 모양을 정해요." = "Stel de regelmatige herinneringen in en hoe herinneringen eruitzien.";
 "꺼져 있어요. 켜면 노트를 쓰는 동안에는 잠시 기다렸다 알려 줘요." = "Uit. Als hij aan staat, wacht hij zolang je het notitieblok gebruikt.";
 "남은 할 일이 생기면 알려 줘요." = "Jongi-nyang herinnert je eraan zodra er taken over zijn.";
-"다음 알림 %@ · 노트를 쓰는 동안은 잠시 기다려요." = "Volgende herinnering %@ · wacht zolang je het notitieblok gebruikt.";
 "알림 시간을 준비하고 있어요." = "De herinneringstijd wordt klaargezet.";
 "반복 할 일" = "Herhalende taken";
 "반복하는 날마다 목록에 하나씩 나타나요. 전날 것을 못 끝냈으면 새로 쌓지 않고 오늘로 옮겨요." = "Op elke dag dat hij herhaalt, verschijnt er één op de lijst. Is die van gisteren niet af, dan schuift die door naar vandaag in plaats van zich op te stapelen.";
@@ -483,7 +487,7 @@
 "가끔 물어보기" = "Af en toe iets vragen";
 "지금 한마디 듣기" = "Nu iets horen";
 "들어 보기" = "Luisteren";
-"집중과 휴식을 번갈아 해요. 시간은 −·+로 1분씩(⌥나 ⇧를 누르면 5분씩) 바꾸거나 직접 적어요." = "Wissel focus en pauze af. Pas de tijden met − en + per minuut aan (per 5 met ⌥ of ⇧), of typ ze.";
+"집중과 휴식을 번갈아 해요. −와 +로 1분씩, ⇧와 함께 누르면 5분씩 바뀌어요. 숫자를 눌러 직접 적어도 돼요." = "Wissel focus en pauze af. − en + veranderen een tijd per minuut, met ⇧ per 5. Je kunt ook op het getal klikken en typen.";
 "집중" = "Focus";
 "분" = " min";
 "휴식" = "Pauze";
@@ -536,9 +540,9 @@
 /* ShelfPageView.swift */
 /* StorageFolder.swift */
 "이 Mac에 전에 쓰던 목록이 있어요." = "Op deze Mac staat de lijst die je eerder gebruikte.";
-"공유 폴더로 옮기기 전의 목록으로 돌아가려면 ‘전에 쓰던 목록 쓰기’를 고르세요. 덮어써도 바꾸기 전 상태를 백업해 둬요." = "Wil je terug naar de lijst van voor de gedeelde map, kies dan ‘Eerdere lijst gebruiken’. Overschrijf je die, dan wordt die eerst als back-up bewaard.";
+"공유 폴더로 옮기기 전의 목록으로 돌아가려면 ‘전에 쓰던 목록 쓰기’를 고르면 돼요. 덮어써도 바꾸기 전 상태를 백업해 둬요." = "Wil je terug naar de lijst van voor de gedeelde map, kies dan ‘Eerdere lijst gebruiken’. Overschrijf je die, dan wordt die eerst als back-up bewaard.";
 "이 폴더에 이미 종이냥 목록이 있어요." = "Deze map heeft al een lijst van Jongi-nyang.";
-"다른 기기에서 쓰던 목록이면 ‘폴더 목록 쓰기’를 고르세요. 덮어써도 바꾸기 전 상태를 이 Mac에 백업해 둬요." = "Komt de lijst van je andere apparaat, kies dan ‘Lijst uit de map gebruiken’. Overschrijf je die, dan komt de lijst uit de map eerst als back-up op deze Mac.";
+"다른 기기에서 쓰던 목록이면 ‘폴더 목록 쓰기’를 고르면 돼요. 덮어써도 바꾸기 전 상태를 이 Mac에 백업해 둬요." = "Komt de lijst van je andere apparaat, kies dan ‘Lijst uit de map gebruiken’. Overschrijf je die, dan komt de lijst uit de map eerst als back-up op deze Mac.";
 "어느 쪽이든 완료 기록은 합쳐지고, 종이냥이 다시 시작돼요." = "Hoe dan ook wordt de geschiedenis samengevoegd en start Jongi-nyang opnieuw.";
 "폴더 목록 쓰기" = "Lijst uit de map gebruiken";
 "공유 폴더 목록으로 덮어쓰기" = "Overschrijven met gedeelde lijst";
@@ -613,7 +617,7 @@
 /* QuickMemo.swift */
 "닫기" = "Sluiten";
 /* ReminderController.swift */
-"시계" = "Klok";
+"알람 · 타이머" = "Wekkers & timers";
 "빠른 메모는 메모 서랍에서 마지막으로 본 폴더 맨 위에 들어가요." = "Een snelle notitie komt bovenaan de map die je het laatst open had in de notitielade.";
 "다른 앱이 ⌃⌥M을 쓰고 있어요. 그 앱의 단축키를 바꾼 뒤 다시 켜 주세요." = "Een andere app gebruikt ⌃⌥M. Wijzig de sneltoets in die app en zet dit daarna weer aan.";
 "어디서든 빠른 메모 (⌃⌥M)" = "Overal een snelle notitie (⌃⌥M)";
@@ -621,10 +625,10 @@
 "직접" = "Zelf";
 /* HelpView.swift */
 "시간 직접 정하기" = "Zelf een tijd kiezen";
-"1분에서 3시간까지 원하는 시간으로 타이머를 맞춰요.\n1. 타이머 메뉴의 ‘직접 정하기…’를 누르거나, 책상 → 시계 → 타이머 시작의 ‘직접’ 칸을 써요.\n2. 40, 1:30, 1시간 30분처럼 적어요. 적는 동안 알아들은 시간이 아래에 보여요.\n· 직접 정한 시간은 최근 것부터 세 개까지 타이머 메뉴에 남아요." = "Zet een timer op elke duur van 1 minuut tot 3 uur.\n1. Kies ‘Zelf instellen…’ in een timermenu, of gebruik ‘Zelf’ bij Bureau → Klok → Timer starten.\n2. Typ een duur zoals 40, 1:30 of 1u 30m. Terwijl je typt, zie je eronder welke duur hij begrijpt.\n· Je laatste drie eigen tijden blijven in de timermenu’s staan.";
+"1분에서 3시간까지 원하는 시간으로 타이머를 맞춰요.\n1. 타이머 메뉴의 ‘직접 정하기…’를 누르거나, 책상 → 알람 · 타이머 → 타이머 시작의 ‘직접’ 칸을 써요.\n2. 40, 1:30, 1시간 30분처럼 적어요. 적는 동안 알아들은 시간이 아래에 보여요.\n· 직접 정한 시간은 최근 것부터 세 개까지 타이머 메뉴에 남아요." = "Zet een timer op elke duur van 1 minuut tot 3 uur.\n1. Kies ‘Zelf instellen…’ in een timermenu, of gebruik ‘Zelf’ bij Bureau → Wekkers & timers → Timer starten.\n2. Typ een duur zoals 40, 1:30 of 1u 30m. Terwijl je typt, zie je eronder welke duur hij begrijpt.\n· Je laatste drie eigen tijden blijven in de timermenu’s staan.";
 "제때 깨워 줄게요" = "Ik maak je op tijd wakker";
 "알람 만들기" = "Een wekker zetten";
-"알람은 책상 → 시계 → 알람에서 만들어요. 펫 우클릭이나 ⋯ → 알람…으로도 열려요.\n1. ‘알람 추가’를 눌러요.\n2. 시간 · 이름 · 요일 · 소리 · 다시 울림을 정하고 ‘완료’를 눌러요.\n3. 줄을 누르면 고치고, 스위치로 켜고 꺼요.\n· 켜 둔 알람이 있으면 보기 메뉴에 ‘다음 알람’이 보여요." = "Wekkers maak je in Bureau → Klok → Wekkers. Rechtsklik op de kat en ⋯ → Wekkers… openen het ook.\n1. Klik op ‘Wekker toevoegen’.\n2. Kies tijd, naam, dagen, geluid en sluimeren, en klik op ‘Klaar’.\n3. Klik op een rij om hem te wijzigen; met de schakelaar zet je hem aan of uit.\n· Staat er een wekker aan, dan toont het menu Weergave ‘Volgende wekker’.";
+"알람은 책상 → 알람 · 타이머에서 만들어요. 펫 우클릭이나 ⋯ → 알람…으로도 열려요.\n1. ‘알람 추가’를 눌러요.\n2. 시간 · 이름 · 요일 · 소리 · 다시 울림을 정하고 ‘완료’를 눌러요.\n3. 줄을 누르면 고치고, 스위치로 켜고 꺼요.\n· 켜 둔 알람이 있으면 보기 메뉴에 ‘다음 알람’이 보여요." = "Wekkers maak je in Bureau → Wekkers & timers. Rechtsklik op de kat en ⋯ → Wekkers… openen het ook.\n1. Klik op ‘Wekker toevoegen’.\n2. Kies tijd, naam, dagen, geluid en sluimeren, en klik op ‘Klaar’.\n3. Klik op een rij om hem te wijzigen; met de schakelaar zet je hem aan of uit.\n· Staat er een wekker aan, dan toont het menu Weergave ‘Volgende wekker’.";
 "요일을 고르면 그 요일마다 울려요(평일 · 주말 · 매일로 줄여 보여요). 하나도 고르지 않으면 한 번만 울리고, 울린 뒤에는 스위치가 저절로 꺼져요." = "Kies dagen en hij gaat op elk daarvan af (kort getoond als Doordeweeks, Weekend of Elke dag). Kies je er geen, dan gaat hij één keer af en zet hij daarna zichzelf uit.";
 "울릴 때" = "Als hij afgaat";
 "Return 끄기" = "Return stoppen";
@@ -656,7 +660,7 @@
 "남은 할 일" = "Nog te doen";
 "넣고 나면 아래에 ‘일정으로 넣었어요 · 할 일로 바꾸기’ 같은 안내가 4초 떠요.\n· ‘바꾸기’를 누르면 방금 것은 흔적 없이 지우고 다른 뜻으로 다시 넣어요.\n· 같은 말을 두 번 바꾸면 다음부터 그쪽으로 먼저 알아들어요.\n· 바로 ⌘Z를 누르면 넣은 것을 되돌려요." = "Zodra het erin staat, verschijnt onderaan 4 seconden een melding als ‘Toegevoegd als afspraak · Maak er een taak van’.\n· ‘Maak er een … van’ haalt wat net is gemaakt spoorloos weg en zet het er op de andere manier in.\n· Verander je dezelfde woorden twee keer, dan leest hij ze de volgende keer meteen zo.\n· Met ⌘Z meteen daarna draai je het terug.";
 "넣은 뒤 바꾸기" = "Achteraf omzetten";
-"다른 뜻" = "andere betekenis";
+"다른 뜻" = "andere keuze";
 "다른 앱을 쓰다가 ⌃⌥N을 누르면 같은 입력 줄이 쪽지로 떠요. ⌘Return은 일정으로 넣어요. 책상 → 꾸미기 → 빠른 입력에서 끌 수 있어요." = "Druk in elke app op ⌃⌥N en dezelfde invoerregel verschijnt op een briefje. ⌘Return zet het erin als afspraak. Uitzetten kan via Bureau → Weergave → Snel toevoegen.";
 "다시 울림" = "Sluimeren";
 "다음 · 그 밖에" = "Volgende · De rest";
@@ -741,18 +745,16 @@
 "종이냥 보이기" = "Kat tonen";
 "종이냥 숨기기" = "Kat verbergen";
 "책상" = "Bureau";
-"달력 · 완료 기록 · 시계 · 설정 · 도움말이 한 창에 있어요.\n1. 노트 위쪽의 책상 버튼이나 ⌘D로 열어요.\n2. 왼쪽 목록이나 ⌘1–⌘9로 칸을 골라요. 목록에서 ↑↓도 돼요.\n· 창이 좁으면 목록이 아이콘만 남아요." = "Kalender, Geschiedenis, Klok, Instellingen en Help delen één venster.\n1. Open het met de bureauknop bovenaan het notitieblok of ⌘D.\n2. Kies een onderdeel in de lijst links of met ⌘1–⌘9. ↑↓ werkt ook in de lijst.\n· In een smal venster blijven alleen de pictogrammen over.";
+"달력 · 완료 기록 · 설정 · 도움말이 한 창에 있어요.\n1. 노트 위쪽의 책상 버튼이나 ⌘D로 열어요.\n2. 왼쪽 목록이나 ⌘1–⌘9로 칸을 골라요. 목록에서 ↑↓도 돼요.\n· 창이 좁으면 목록이 아이콘만 남아요." = "Kalender, Geschiedenis, Instellingen en Help delen één venster.\n1. Open het met de bureauknop bovenaan het notitieblok of ⌘D.\n2. Kies een onderdeel in de lijst links of met ⌘1–⌘9. ↑↓ werkt ook in de lijst.\n· In een smal venster blijven alleen de pictogrammen over.";
 "밤 종이" = "Nachtpapier";
-"책상 → 꾸미기 → 낮 · 밤에서 자동 · 낮 · 밤을 골라요. 바꾸면 열린 창이 바로 따라 바뀌어요.\n· 자동이면 Mac이 어두운 모드일 때 어두운 밤 종이로 바뀌어요.\n· 노트 · 쪽지 · 책상 · 오늘 창이 모두 함께 바뀌어요." = "Kies Automatisch, Dag of Nacht in Bureau → Weergave → Dag & nacht. Open vensters veranderen meteen mee.\n· Op Automatisch wordt het donker nachtpapier als je Mac in de donkere modus staat.\n· Notitieblok, briefjes, Bureau en Vandaag-venster veranderen allemaal mee.";
 "낮" = "Dag";
 "밤" = "Nacht";
 "새 일정 (Return)" = "Nieuwe afspraak (Return)";
 "설정…" = "Instellingen…";
 "저장과 백업" = "Opslag & back-up";
 "저장과 백업…" = "Opslag & back-up…";
-"책상 — 달력 · 기록 · 시계 · 설정 (⌘ D)" = "Bureau — kalender, geschiedenis, klok, instellingen (⌘ D)";
+"책상 — 달력 · 기록 · 설정 (⌘ D)" = "Bureau — kalender, geschiedenis, instellingen (⌘ D)";
 "책상 열기" = "Bureau openen";
-"할 일과 기록이 저장되는 곳, 자동 백업과 다른 컴퓨터로 옮기는 백업이에요." = "Waar je taken en geschiedenis bewaard worden, automatische back-ups, en back-ups om ze naar een andere computer te verhuizen.";
 
 /* 1.37 — 집중 (focusmodus) */
 "이거 집중" = "Hierop focussen";
@@ -817,7 +819,7 @@
 "필요 없을 땐 작은 포스트잇으로 접어 둬요.\n어디서든 %@ 키로 다시 불러요.\n아래 스위치를 끄면 로그인할 때 열리지 않아요." = "Klap het in tot een plakbriefje als je het niet nodig hebt. Met %@ haal je het overal terug.\nZet de schakelaar hieronder uit, dan opent het niet bij inloggen.";
 "노트 보이기 · 숨기기" = "Notitieblok tonen · verbergen";
 "로그인할 때 같이 열기" = "Jongi-nyang openen bij inloggen";
-"‘로그인할 때 같이 열기’를 켜면 Mac에 로그인할 때 종이냥이 바로 열려요.\n· 이 스위치는 처음 안내의 마지막 카드와 책상 → 꾸미기 → 시작에 있어요.\n· 꺼 둔 채로 세 번 직접 켜면 종이냥이 한 번 물어봐요." = "Zet ‘Openen bij inloggen’ aan en Jongi-nyang opent meteen als je inlogt op de Mac.\n· De schakelaar staat op de laatste kaart van de rondleiding en in Bureau → Weergave → Opstarten.\n· Staat hij uit en open je de app drie keer zelf, dan vraagt de kat het je één keer.";
+"‘로그인할 때 같이 열기’를 켜면 Mac에 로그인할 때 종이냥이 바로 열려요.\n· 이 스위치는 처음 안내의 마지막 카드와 책상 → 꾸미기 → 시작에 있어요.\n· 꺼 둔 채로 세 번 직접 켜면 종이냥이 한 번 물어봐요." = "Zet ‘Jongi-nyang openen bij inloggen’ aan en Jongi-nyang opent meteen als je inlogt op de Mac.\n· De schakelaar staat op de laatste kaart van de rondleiding en in Bureau → Weergave → Opstarten.\n· Staat hij uit en open je de app drie keer zelf, dan vraagt de kat het je één keer.";
 "줄에 마우스를 올리면 오른쪽 끝에 ⋯가 나타나요. ⋯ 또는 우클릭 → 지우기, 줄을 고른 뒤 ⌫로 지워요.\n· 지우면 아래에 ‘할 일을 지웠어요 · 되돌리기’가 잠깐 떠요.\n· ⌘Z로도 되돌리고, ⇧⌘Z로 다시 실행해요.\n· 메모를 지울 때, 알림의 ‘모두 끝내기’, 완료한 일 정리도 같은 안내로 되돌릴 수 있어요." = "Ga met de muis over een regel en rechts verschijnt ⋯. Verwijder hem via ⋯ of het rechtsklikmenu, of kies de regel en druk op ⌫.\n· Na het verwijderen staat er even ‘Taak verwijderd · Herstel’.\n· Ook ⌘Z haalt het terug, ⇧⌘Z doet het opnieuw.\n· Een notitie verwijderen, ‘Alles afvinken’ bij een herinnering en Afgevinkte taken opruimen maak je op dezelfde manier ongedaan.";
 "내일로 · 날짜 바꾸기" = "Morgen · Datum wijzigen";
 "오늘 탭의 할 일을 내일이나 다른 날로 옮겨요.\n· 줄에 마우스를 올리면 ‘→ 내일’로 내일 할 일로 옮겨요.\n· 우클릭 → 날짜 바꾸기에서 내일 · 이번 주 금요일(월–목요일에만) · 다음 주 월요일 · 언젠가 · 날짜 고르기…를 골라요.\n· 줄을 고른 뒤 ⌥→는 하루 뒤로, ⌥←는 하루 앞으로(오늘보다 앞으로는 안 가요), ⌥↓는 언젠가로.\n· 옮기면 ‘내일로 옮겼어요 · 되돌리기’가 떠요." = "Zet een taak van Vandaag op morgen of een andere dag.\n· Ga met de muis over een regel en ‘→ Morgen’ zet hem op morgen.\n· Rechtsklik → Datum wijzigen biedt Morgen · Deze vrijdag (alleen maandag tot donderdag) · Volgende maandag · Ooit · Datum kiezen….\n· Met een regel geselecteerd zet ⌥→ hem een dag later, ⌥← een dag eerder (nooit vóór vandaag) en ⌥↓ naar Ooit.\n· Na het verplaatsen staat er ‘Verplaatst naar morgen · Herstel’.";
@@ -964,7 +966,7 @@
 "연결 명령을 복사해 두었어요. 터미널에 붙여 넣어 주세요." = "De verbindingsopdracht is gekopieerd. Plak hem in Terminal.";
 "책상 → AI 연결에서 켜고, Claude 데스크톱이나 Claude Code에 연결해요. 끄면 Claude는 아무것도 읽거나 쓰지 못해요.\n1. ‘Claude가 종이냥을 보고 쓸 수 있게 하기’를 켜요. 처음에는 꺼져 있어요.\n2. ‘Claude 데스크톱에 연결’을 눌러요. Claude 데스크톱이 ‘종이냥 for Claude’를 설치할지 물어봐요.\n3. Claude Code만 쓴다면 ‘Claude Code에 연결’을 눌러요.\n· ‘Claude 데스크톱에 연결’은 Claude Code가 있으면 같이 연결해요.\n· Claude Code는 터미널과 Claude 데스크톱의 Code 탭에서 써요. Node.js(nodejs.org)가 필요해요." = "Zet het aan in Bureau → AI-koppeling en verbind Claude Desktop of Claude Code. Staat het uit, dan kan Claude niets lezen of schrijven.\n1. Zet ‘Claude Jongi-nyang laten lezen en schrijven’ aan. Het staat eerst uit.\n2. Klik op ‘Verbinden met Claude Desktop’. Claude Desktop vraagt of ‘Jongi-nyang for Claude’ geïnstalleerd mag worden.\n3. Gebruik je alleen Claude Code, klik dan op ‘Verbinden met Claude Code’.\n· ‘Verbinden met Claude Desktop’ verbindt ook Claude Code als die er is.\n· Claude Code werkt in Terminal en in het Code-tabblad van Claude Desktop. Het vereist Node.js (nodejs.org).";
 "Claude 데스크톱이 필요해요" = "Claude Desktop is nodig";
-"Claude 데스크톱이나 Claude Code와 이야기하면서 할 일 · 일정 · 메모를 보고 새로 넣어요.\n· 할 일과 반복하지 않는 일정은 고칠 수도 있어요.\n· 할 일을 스페이스로 보고 거르고, 넣을 때 스페이스를 정하고, 물어본 뒤 다른 스페이스로 옮겨요.\n· 예: ‘내일 3시–4시 보고서 쓰기 넣어줘’, ‘이번 주 뭐 했는지 정리해줘’\n· 지우기, 반복 일정 · 알람 고치기, 메모 고치기, 스페이스 만들기 · 지우기는 하지 않아요." = "Terwijl je met Claude Desktop of Claude Code praat, kan Claude je taken, afspraken en notities bekijken en nieuwe toevoegen.\n· Taken en eenmalige afspraken kan Claude ook wijzigen.\n· Claude kan taken per ruimte bekijken en filteren, nieuwe in een ruimte zetten en ze na je ja naar een andere ruimte verplaatsen.\n· Bijvoorbeeld: ‘zet morgen 15–16 uur rapport schrijven erin’, ‘vat samen wat ik deze week deed’.\n· Claude verwijdert niets en wijzigt geen herhalende afspraken, wekkers of notities, en maakt of verwijdert geen ruimtes.";
+"Claude 데스크톱이나 Claude Code와 이야기하면서 할 일 · 일정 · 메모를 보고 새로 넣어요.\n· 할 일과 반복하지 않는 일정은 고칠 수도 있어요.\n· 할 일을 스페이스로 보고 거르고, 넣을 때 스페이스를 정하고, 물어본 뒤 다른 스페이스로 옮겨요.\n· 이 기기에서 숨긴 스페이스의 할 일은 오늘과 목록에서 빼요. 그 스페이스를 말하면 보여 줘요.\n· 예: ‘내일 3시–4시 보고서 쓰기 넣어줘’, ‘이번 주 뭐 했는지 정리해줘’\n· 지우기, 반복 일정 · 알람 고치기, 메모 고치기, 스페이스 만들기 · 지우기는 하지 않아요." = "Terwijl je met Claude Desktop of Claude Code praat, kan Claude je taken, afspraken en notities bekijken en nieuwe toevoegen.\n· Taken en eenmalige afspraken kan Claude ook wijzigen.\n· Claude kan taken per ruimte bekijken en filteren, nieuwe in een ruimte zetten en ze na je ja naar een andere ruimte verplaatsen.\n· Taken in ruimtes die op dit apparaat verborgen zijn, laat Claude weg, tenzij je de ruimte noemt.\n· Bijvoorbeeld: ‘zet morgen 15–16 uur rapport schrijven erin’, ‘vat samen wat ik deze week deed’.\n· Claude verwijdert niets en wijzigt geen herhalende afspraken, wekkers of notities, en maakt of verwijdert geen ruimtes.";
 "Claude가 넣거나 고치면 노트 아래에 ‘Claude가 할 일 2개를 넣었어요 · 되돌리기’가 떠요.\n1. 안내의 ‘되돌리기’를 눌러요. 그 뒤로 여기서 아무것도 바꾸지 않았다면 ⌘Z로도 돼요.\n2. 나중에 되돌리려면 책상 → AI 연결 → 최근 AI 작업에서 오늘과 어제 한 일을 하나씩 되돌려요.\n· 그사이 바뀐 항목은 그대로 둬요.\n· Claude가 넣거나 고친 할 일과 일정에는 그날 동안 작은 ‘Claude’ 도장이 찍혀요." = "Als Claude iets toevoegt of wijzigt, verschijnt onderaan het notitieblok ‘Claude heeft 2 taken toegevoegd · Herstel’.\n1. Klik op ‘Herstel’ in de melding. Heb je hier sindsdien niets veranderd, dan werkt ⌘Z ook.\n2. Later herstellen kan in Bureau → AI-koppeling → Recent AI-werk: daar herstel je het werk van vandaag en gisteren één voor één.\n· Wat intussen is gewijzigd, blijft zoals het is.\n· Taken en afspraken die Claude toevoegde of wijzigde, krijgen die dag een klein ‘Claude’-stempel.";
 "Claude가 오늘 넣거나 고쳤어요" = "Vandaag door Claude toegevoegd of gewijzigd";
 "Claude가 종이냥을 보고 쓸 수 있게 하기" = "Claude Jongi-nyang laten lezen en schrijven";
@@ -1031,7 +1033,7 @@
 "%@만" = "Alleen %@";
 "찾는 곳" = "Zoeken in";
 "거르기" = "Filter";
-"체크 남음" = "Niet afgevinkt";
+"안 한 체크" = "Niet afgevinkt";
 "링크" = "Links";
 "켜짐" = "Aan";
 "꺼짐" = "Uit";
@@ -1087,7 +1089,7 @@
 
 /* 1.44 — 메모 서랍을 더 쉽게 */
 "%@로 열고 닫아요" = "%@ opent en sluit hem";
-"강하게" = "Sterk";
+"투명" = "Helder";
 "고정 모두 풀기" = "Alles losmaken";
 "고정을 모두 풀었어요" = "Alles losgemaakt";
 "고친 순" = "Laatst bewerkt";
@@ -1108,7 +1110,7 @@
 "불투명" = "Dekkend";
 "브라우저에서 열기" = "Openen in de browser";
 "서랍과 같게" = "Zoals de lade";
-"손쉬운 사용의 ‘투명도 줄이기’가 켜져 있어서 반투명 · 강하게는 불투명으로 보여요." = "‘Verminder transparantie’ (Toegankelijkheid) staat aan, dus Mat en Sterk zien er dekkend uit.";
+"손쉬운 사용의 ‘투명도 줄이기’가 켜져 있어서 반투명 · 투명은 불투명으로 보여요." = "‘Verminder transparantie’ (Toegankelijkheid) staat aan, dus Mat en Helder zien er dekkend uit.";
 "여기에 새 메모" = "Nieuwe notitie hier";
 "오른쪽에 두기" = "Rechts zetten";
 "왼쪽에 두기" = "Links zetten";
@@ -1172,9 +1174,9 @@
 "옆 책갈피 하나가 폴더 하나예요.\n1. 맨 아래 +로 폴더를 만들어요(이름과 색).\n2. 메모를 책갈피 위로 끌어 놓으면 그 폴더로 옮겨요.\n3. 책갈피를 끌어 순서를 바꿔요.\n· 마우스를 올리면 ‘장보기 · 세 장 · ⌘3’처럼 알려 줘요.\n· 머리말의 폴더 이름(▾)이나 ⌘L을 누르면 폴더 목록이 떠요.\n· 책갈피를 우클릭하면 여기에 새 메모 · 이름 바꾸기 · 색 · 정렬(고친 순 · 만든 순 · 제목 순) · 복제 · 폴더 지우기가 있어요.\n· 폴더를 지우면 안의 메모는 ‘메모’ 폴더로 가요. 되돌릴 수 있고, ‘메모’ 폴더는 지울 수 없어요.\n· 핀 책갈피 ‘고정’에는 폴더와 상관없이 고정한 메모가 모여요. 우클릭으로 정렬하거나 고정을 모두 풀어요.\n· 폴더와 고정은 백업과 공유 폴더에도 함께 가요." = "Elke bladwijzer aan de zijkant is een map.\n1. Maak een map met + onderaan (een naam en een kleur).\n2. Zet een notitie op een bladwijzer neer om haar naar die map te verplaatsen.\n3. Sleep bladwijzers om de volgorde te veranderen.\n· Aanwijzen toont iets als ‘Boodschappen · 3 notities · ⌘3’.\n· De mapnaam in de kop (▾) of ⌘L toont de lijst met mappen.\n· Rechtsklik op een bladwijzer voor Nieuwe notitie hier · Naam wijzigen · Kleur · Sorteren (Laatst bewerkt · Aanmaakdatum · Titel) · Dupliceren · Map verwijderen.\n· Verwijder je een map, dan gaan de notities naar ‘Notities’; herstellen kan. ‘Notities’ zelf kun je niet verwijderen.\n· De punaisebladwijzer ‘Vastgezet’ verzamelt vastgezette notities uit elke map. Rechtsklik erop om te sorteren of alles los te maken.\n· Mappen en vastgezette notities gaan mee in back-ups en gedeelde mappen.";
 "찾기와 키보드" = "Zoeken en toetsen";
 "찾기 결과" = "Zoekresultaten";
-"검색칸 아래 칩으로 찾는 곳과 거르기를 골라요.\n· ‘모든 폴더’가 처음이고, ‘회사만’처럼 지금 폴더에서만 찾을 수도 있어요.\n· 체크 남음 · 링크 · 고정을 누르면 그런 메모만 남아요. 글을 적지 않고 칩만 눌러도 돼요(체크 남음만 누르면 아직 안 끝낸 목록이 모여요).\n· 결과는 폴더별로 묶이고, 찾은 줄에서 찾은 말이 칠해져 보여요. 날짜는 ‘10월 21일’처럼 날짜로 보여요.\n· ↑↓로 고르고 ↩로 그 폴더에서 열어요." = "Met de chips onder het zoekveld kies je waar je zoekt en wat je overhoudt.\n· ‘Alle mappen’ staat eerst; je kunt ook alleen in de huidige map zoeken, zoals ‘Alleen Werk’.\n· Niet afgevinkt · Links · Vastgezet laten alleen zulke notities staan. Een chip werkt ook zonder tekst (alleen Niet afgevinkt verzamelt de lijsten die nog niet af zijn).\n· De resultaten staan per map bij elkaar, met de gezochte woorden gemarkeerd in de regel waar ze staan. Datums staan als datum, zoals ‘21 okt’.\n· Kies er een met ↑↓ en open hem in zijn map met ↩.";
+"검색칸 아래 칩으로 찾는 곳과 거르기를 골라요.\n· ‘모든 폴더’가 처음이고, ‘회사만’처럼 지금 폴더에서만 찾을 수도 있어요.\n· 안 한 체크 · 링크 · 고정을 누르면 그런 메모만 남아요. 글을 적지 않고 칩만 눌러도 돼요(안 한 체크만 누르면 아직 안 끝낸 목록이 모여요).\n· 결과는 폴더별로 묶이고, 찾은 줄에서 찾은 말이 칠해져 보여요. 날짜는 ‘10월 21일’처럼 날짜로 보여요.\n· ↑↓로 고르고 ↩로 그 폴더에서 열어요." = "Met de chips onder het zoekveld kies je waar je zoekt en wat je overhoudt.\n· ‘Alle mappen’ staat eerst; je kunt ook alleen in de huidige map zoeken, zoals ‘Alleen Werk’.\n· Niet afgevinkt · Links · Vastgezet laten alleen zulke notities staan. Een chip werkt ook zonder tekst (alleen Niet afgevinkt verzamelt de lijsten die nog niet af zijn).\n· De resultaten staan per map bij elkaar, met de gezochte woorden gemarkeerd in de regel waar ze staan. Datums staan als datum, zoals ‘21 okt’.\n· Kies er een met ↑↓ en open hem in zijn map met ↩.";
 "⌘F로 모든 폴더에서 찾아요.\n· 초성으로도, 폴더 이름으로도 찾아요. 결과는 폴더별로 묶여요.\n· 노트의 검색(⌘F)에서 메모를 고르면 서랍에서 열려요.\n· ⌘1–⌘9는 책갈피 순서대로 폴더, ⌘0은 고정, ⌘L은 폴더 목록이에요." = "⌘F zoekt in alle mappen.\n· Ook mapnamen tellen mee, en de resultaten staan per map bij elkaar.\n· Kies je een notitie in het zoeken van het notitieblok (⌘F), dan opent ze in de lade.\n· ⌘1–⌘9 kiezen de mappen in volgorde, ⌘0 is Vastgezet, ⌘L de lijst met mappen.";
-"서랍 아래 ⚙(빈 곳 우클릭과 같아요)에서 종이 · 바탕 · 왼쪽 · 오른쪽을 바로 바꿔요.\n· 종이는 자동 · 낮 · 밤 · 크라프트 · 모눈이에요. 메모 한 장만 바꾸려면 우클릭 → 이 메모의 종이.\n· 바탕은 불투명 · 반투명 · 강하게 · 바탕 없음이에요. 바탕 없음은 메모만 화면 위에 떠요.\n· 반투명 · 강하게는 뒤 화면이 흐리게 비쳐요(투명도 줄이기를 켜면 불투명).\n· 폭은 서랍 안쪽 끝을 끌어 260–480으로 바꿔요. 다음에도 기억해요.\n· ‘다른 창 위에 띄우기’를 끄면 다른 앱을 눌렀을 때 서랍이 그 창 뒤로 가요.\n· 책상 → 메모 서랍(⌘,)에서 단축키, 손잡이, 다른 창 위에 띄우기, 폭도 정해요." = "Met ⚙ onderaan (hetzelfde als rechtsklikken op een lege plek) verander je meteen het papier, de achtergrond en de kant.\n· Papier: Auto · Dag · Nacht · Kraft · Ruitjes. Voor één notitie: rechtsklik → Papier van deze notitie.\n· Achtergrond: Dekkend · Mat · Sterk · Geen. Bij Geen zweven alleen de notities op het scherm.\n· Bij Mat en Sterk schijnt het scherm erachter wazig door (dekkend als Verminder transparantie aan staat).\n· Sleep de binnenrand van de lade voor de breedte (260–480); die wordt onthouden.\n· Staat ‘Boven andere vensters houden’ uit, dan gaat de lade achter een andere app als je die aanklikt.\n· In Bureau → Notitielade (⌘,) kies je ook de sneltoets, het handvat, boven andere vensters houden en de breedte.";
+"서랍 아래 ⚙(빈 곳 우클릭과 같아요)에서 종이 · 바탕 · 왼쪽 · 오른쪽을 바로 바꿔요.\n· 종이는 자동 · 낮 · 밤 · 크라프트 · 모눈이에요. 메모 한 장만 바꾸려면 우클릭 → 이 메모의 종이.\n· 바탕은 불투명 · 반투명 · 투명 · 바탕 없음이에요. 바탕 없음은 메모만 화면 위에 떠요.\n· 반투명 · 투명은 뒤 화면이 흐리게 비쳐요(투명도 줄이기를 켜면 불투명).\n· 폭은 서랍 안쪽 끝을 끌어 260–480으로 바꿔요. 다음에도 기억해요.\n· ‘다른 창 위에 띄우기’를 끄면 다른 앱을 눌렀을 때 서랍이 그 창 뒤로 가요.\n· 책상 → 메모 서랍(⌘,)에서 단축키, 손잡이, 다른 창 위에 띄우기, 폭도 정해요." = "Met ⚙ onderaan (hetzelfde als rechtsklikken op een lege plek) verander je meteen het papier, de achtergrond en de kant.\n· Papier: Auto · Dag · Nacht · Kraft · Ruitjes. Voor één notitie: rechtsklik → Papier van deze notitie.\n· Achtergrond: Dekkend · Mat · Helder · Geen. Bij Geen zweven alleen de notities op het scherm.\n· Bij Mat en Helder schijnt het scherm erachter wazig door (dekkend als Verminder transparantie aan staat).\n· Sleep de binnenrand van de lade voor de breedte (260–480); die wordt onthouden.\n· Staat ‘Boven andere vensters houden’ uit, dan gaat de lade achter een andere app als je die aanklikt.\n· In Bureau → Notitielade (⌘,) kies je ook de sneltoets, het handvat, boven andere vensters houden en de breedte.";
 "다른 앱을 쓰다가도 ⌃⌥M을 누르면 작은 메모 종이가 떠요.\n1. 몇 줄 적고 ⌘↩를 누르면 서랍에서 마지막으로 본 폴더 맨 위에 들어가요.\n2. Esc나 다른 곳을 누르면 닫혀요. 쓰던 글은 다음에 열 때 그대로 있어요.\n· 입력 줄의 /메모도 같은 폴더에 들어가요.\n· 펫 우클릭 → 빠른 메모, ⋯ → 빠른 메모…, 파일 메뉴에서도 열려요.\n· 책상 → 꾸미기 → 빠른 입력에서 끌 수 있어요." = "Druk in elke app op ⌃⌥M en er verschijnt een klein notitiebriefje.\n1. Schrijf een paar regels en druk op ⌘↩: ze komt boven in de map die je het laatst in de lade bekeek.\n2. Esc of ergens anders klikken sluit hem. Wat je schreef staat er de volgende keer nog.\n· /notitie in de invoerregel gaat naar dezelfde map.\n· Rechtsklik op de kat → Snelle notitie, ⋯ → Snelle notitie… of het menu Archief openen hem ook.\n· Je kunt hem uitzetten in Bureau → Weergave → Snel toevoegen.";
 "책상 → 꾸미기 → 빠른 입력의 ‘빠른 메모를 열 때 복사한 글 넣기’를 켜면, 빈 빠른 메모에 방금 복사한 글이 골라진 채로 들어가요.\n· 그대로 ⌘↩로 넣거나, 그냥 적으면 바뀌어요.\n· 지난번에 연 뒤 2분 안에 복사한 글만 들어가요." = "Zet ‘Gekopieerde tekst in een snelle notitie zetten’ aan in Bureau → Weergave → Snel toevoegen, en een lege snelle notitie opent met wat je net kopieerde, geselecteerd.\n· Houd het met ⌘↩, of typ gewoon om het te vervangen.\n· Alleen tekst die je in de 2 minuten sinds de vorige keer kopieerde.";
 "앱 언어" = "Taal van de app";
@@ -1280,7 +1282,7 @@
 "하루 한 번, 그리고 가져오기 · 저장 폴더 덮어쓰기 · 되돌리기 · 업데이트 전에 이 기기의 백업 폴더에 백업 파일(.jongi)을 남겨요.\n· 매일 백업은 14개, ‘전’ 백업은 종류마다 10개, 직접 만든 백업은 지울 때까지 남아요.\n· 백업에는 할 일 · 메모 · 일정 · 기록이 모두 들어 있어요. 어디로도 보내지 않아요.\n· 책상 → 저장과 백업 → 백업 목록에서 골라 되돌려요. 합치기는 지운 것만 되살리고, 바꾸기는 모두 그때로 바꿔요." = "Eén keer per dag, en voor een import, het overschrijven van de opslagmap, terugzetten of een update, komt er een back-upbestand (.jongi) in de back-upmap op dit apparaat.\n· 14 dagelijkse back-ups blijven staan, 10 van elk ‘voor’-soort, en die je zelf maakt tot je ze verwijdert.\n· Een back-up bevat al je taken, notities, afspraken en geschiedenis. Hij gaat nergens heen.\n· Zet er een terug via Bureau → Opslag & back-up → Je back-ups. Samenvoegen zet alleen verwijderde dingen terug; Vervangen zet alles terug naar toen.";
 "메모를 누르면 그 자리에서 펼쳐져 바로 고쳐요.\n1. ↑↓로 고르고 ↩로 펼쳐요. Esc로 접어요.\n2. 펼친 메모 아래의 Aa는 서식 막대, ⤢는 크게 보기, ⋯는 우클릭과 같은 메뉴(복사 · 고정 · 폴더로 옮기기 · 이 메모의 종이 · 지우기 …)예요.\n· 메모는 ‘고정 · 오늘 · 어제 · 이번 주 · 지난주 · 10월’ 머리말 아래에 모여요. 카드에는 짧은 시간만 있어요.\n· 마우스를 올리면 복사 · 고정 · ⋯가 떠요. 우클릭하면 할 수 있는 일이 모두 있어요.\n· 링크가 있으면 주소(누르면 브라우저로 열려요), 전화번호가 있으면 번호(누르면 복사)가 작게 붙어요. 메모 글은 바뀌지 않아요.\n· ⇧⌘C는 고른 메모 복사, ⌘⌫는 지우기예요. 지우면 ‘메모를 지웠어요 · 되돌리기’가 떠요." = "Klik op een notitie en ze gaat ter plekke open, klaar om te bewerken.\n1. Kies er een met ↑↓ en open haar met ↩. Esc klapt haar dicht.\n2. Onder de open notitie: Aa opent de opmaakbalk, ⤢ toont haar groter, ⋯ heeft hetzelfde menu als rechtsklikken (Kopieer · Vastzetten · Naar map verplaatsen · Papier van deze notitie · Verwijderen …).\n· Notities staan onder kopjes als ‘Vastgezet · Vandaag · Gisteren · Deze week · Vorige week · oktober’; een kaart toont alleen een korte tijd.\n· Wijs aan voor Kopieer · Vastzetten · ⋯. Rechtsklikken toont alles wat kan.\n· Een link toont het adres (klik om het in de browser te openen), een telefoonnummer het nummer (klik om te kopiëren). De tekst van de notitie blijft zoals hij is.\n· ⇧⌘C kopieert de gekozen notitie, ⌘⌫ verwijdert haar; ‘Notitie verwijderd · Herstel’ verschijnt.";
 "‘- [ ] 우유’처럼 적은 줄은 체크 상자로 보여요.\n1. 상자를 누르면 체크되고, 메모에는 ‘- [x] 우유’로 저장돼요. 고치는 동안에도 상자로 보이고, 커서가 있는 줄만 기호가 옅게 보여요.\n2. 다 한 줄은 ⋯나 우클릭의 ‘체크한 줄 지우기’로 한 번에 지워요. 되돌릴 수 있어요.\n· 접힌 메모에는 ‘2/4’와 진행 막대가 보여요." = "Een regel als ‘- [ ] melk’ wordt een vinkje.\n1. Klik op het vakje om het af te vinken; de notitie bewaart het als ‘- [x] melk’. Ook tijdens het bewerken blijft het een vakje; alleen de regel met de cursor toont de tekens, vaag.\n2. Verwijder afgevinkte regels in één keer met ‘Afgevinkte regels verwijderen’ in ⋯ of het rechtsklikmenu. Herstellen kan.\n· Een dichte notitie toont ‘2/4’ en een voortgangsbalk.";
-"서랍 아래 ⚙(빈 곳 우클릭과 같아요)에서 종이 · 바탕 · 왼쪽 · 오른쪽 · 다른 창 위에 띄우기를 바로 바꿔요.\n· 종이는 낮 · 밤 · 크라프트 · 모눈 · 한지 · 쑥색 · 벚꽃 · 먹색이에요. 밤에 밤 종이로 바꿀지는 책상 → 메모 서랍 → 서랍 종이에서 정해요. 메모 한 장만 바꾸려면 우클릭 → 이 메모의 종이.\n· 바탕은 불투명 · 반투명 · 강하게 · 바탕 없음이에요. 바탕 없음은 메모만 화면 위에 떠요.\n· 반투명 · 강하게는 뒤 화면이 흐리게 비쳐요(투명도 줄이기를 켜면 불투명).\n· 폭은 서랍 안쪽 끝을 끌어 260–480으로 바꿔요. 다음에도 기억해요.\n· ‘다른 창 위에 띄우기’를 끄면 다른 앱을 눌렀을 때 서랍이 그 창 뒤로 가요.\n· 책상 → 메모 서랍(⌘,)에서 단축키, 손잡이, 다른 창 위에 띄우기, 폭도 정해요." = "Met ⚙ onderaan (hetzelfde als rechtsklikken op een lege plek) verander je meteen het papier, de achtergrond, de kant en ‘Boven andere vensters houden’.\n· Papier: Dag · Nacht · Kraft · Ruitjes · Hanji · Salie · Bloesem · Inkt. Of het ’s nachts nachtpapier wordt, kies je bij Bureau → Notitielade → Ladepapier. Voor één notitie: rechtsklik → Papier van deze notitie.\n· Achtergrond: Dekkend · Mat · Sterk · Geen. Bij Geen zweven alleen de notities op het scherm.\n· Bij Mat en Sterk schijnt het scherm erachter wazig door (dekkend als Verminder transparantie aan staat).\n· Sleep de binnenrand van de lade voor de breedte (260–480); die wordt onthouden.\n· Staat ‘Boven andere vensters houden’ uit, dan gaat de lade achter een andere app als je die aanklikt.\n· In Bureau → Notitielade (⌘,) kies je ook de sneltoets, het handvat, boven andere vensters houden en de breedte.";
+"서랍 아래 ⚙(빈 곳 우클릭과 같아요)에서 종이 · 바탕 · 왼쪽 · 오른쪽 · 다른 창 위에 띄우기를 바로 바꿔요.\n· 서랍은 처음에 노트와 같은 종이예요. ⚙에서 종이를 고르면 서랍만 그 종이가 돼요. 서랍의 ‘밤에는’은 책상 → 메모 서랍 → 서랍 종이에서 정해요. 메모 한 장만 바꾸려면 우클릭 → 이 메모의 종이.\n· 바탕은 불투명 · 반투명 · 투명 · 바탕 없음이에요. 바탕 없음은 메모만 화면 위에 떠요.\n· 반투명 · 투명은 뒤 화면이 흐리게 비쳐요(투명도 줄이기를 켜면 불투명).\n· 폭은 서랍 안쪽 끝을 끌어 260–480으로 바꿔요. 다음에도 기억해요.\n· ‘다른 창 위에 띄우기’를 끄면 다른 앱을 눌렀을 때 서랍이 그 창 뒤로 가요.\n· 책상 → 메모 서랍(⌘,)에서 단축키, 손잡이, 다른 창 위에 띄우기, 폭도 정해요." = "Met ⚙ onderaan (hetzelfde als rechtsklikken op een lege plek) verander je meteen het papier, de achtergrond, de kant en ‘Boven andere vensters houden’.\n· De lade begint op hetzelfde papier als het notitieblok. Kies je in ⚙ een papier, dan krijgt alleen de lade dat papier. Het eigen ’s Nachts van de lade kies je bij Bureau → Notitielade → Ladepapier. Voor één notitie: rechtsklik → Papier van deze notitie.\n· Achtergrond: Dekkend · Mat · Helder · Geen. Bij Geen zweven alleen de notities op het scherm.\n· Bij Mat en Helder schijnt het scherm erachter wazig door (dekkend als Verminder transparantie aan staat).\n· Sleep de binnenrand van de lade voor de breedte (260–480); die wordt onthouden.\n· Staat ‘Boven andere vensters houden’ uit, dan gaat de lade achter een andere app als je die aanklikt.\n· In Bureau → Notitielade (⌘,) kies je ook de sneltoets, het handvat, boven andere vensters houden en de breedte.";
 "어디서든 ⇧⌘D를 누르면 화면 끝에서 메모 서랍이 나와요.\n1. ⇧⌘D를 누르거나 화면 끝의 고양이 발 손잡이를 눌러요.\n2. 같은 단축키나 Esc로 닫아요. 서랍 안쪽 가장자리 밖으로 나온 크림색 › 탭을 눌러도 닫혀요.\n· 노트 위의 발 버튼, ⌘3, ⋯ → 메모 서랍, 펫 우클릭, Dock 아이콘 우클릭으로도 열려요.\n· 다른 앱을 눌러도 닫히지 않아요.\n· 손잡이는 위아래로 끌어 옮겨요.\n· 예전 메모 탭의 메모는 모두 ‘메모’ 폴더에 있어요." = "Druk overal op ⇧⌘D en de notitielade schuift uit de rand van het scherm.\n1. Druk op ⇧⌘D, of klik op het pootjeshandvat aan de schermrand.\n2. Sluit haar met dezelfde sneltoets of Esc, of klik op het crèmekleurige ›-lipje dat uit de binnenrand van de lade steekt.\n· De pootknop boven het notitieblok, ⌘3, ⋯ → Notitielade, rechtsklikken op de kat en rechtsklikken op het Dock-symbool openen haar ook.\n· Een klik in een andere app sluit haar niet.\n· Sleep het handvat omhoog of omlaag om het te verplaatsen.\n· Notities van het oude tabblad Notities staan allemaal in de map ‘Notities’.";
 /* 할 일 스페이스 2b (1.47): 스페이스별로 묶기. */
 "스페이스별로 묶기" = "Groeperen per ruimte";
@@ -1301,7 +1303,7 @@
 "조금 크게" = "Iets groter";
 "더 크게" = "Groter";
 "노트 글꼴" = "Lettertype notitieblok";
-"⌘ = 와 ⌘ − 로 한 칸씩 바꿔요. 줄 간격은 노트 줄(44pt)에 맞춰져 있어요." = "⌘ = en ⌘ − veranderen het een stap. De regelafstand past bij de regels van 44 pt van het notitieblok.";
+"⌘ = 와 ⌘ − 로 한 칸씩 바꿔요. 줄 간격은 노트의 줄에 맞춰져 있어요." = "⌘ = en ⌘ − veranderen het een stap. De regelafstand past bij de regels van het notitieblok.";
 "%lld포인트" = "%lld punten";
 "줄 간격" = "Regelafstand";
 "문단 간격" = "Alinea-afstand";
@@ -1324,11 +1326,9 @@
 "쑥색" = "Salie";
 "벚꽃" = "Bloesem";
 "먹색" = "Inkt";
-"언어와 낮 · 밤, 노트의 글꼴과 글자 크기를 정해요." = "Kies de taal, dag & nacht en het lettertype en de tekstgrootte van het notitieblok.";
+"언어와 낮 · 밤, 종이, 노트의 글꼴과 글자 크기를 정해요." = "Kies de taal, dag & nacht, het papier en het lettertype en de tekstgrootte van het notitieblok.";
 "낮 · 밤" = "Dag & nacht";
-"밤에는 밤 종이로" = "’s Nachts nachtpapier";
-"낮 · 밤이 밤일 때 고른 종이 대신 밤 종이(먹색 종이를 골랐으면 그대로)" = "Als dag & nacht op nacht staat, nachtpapier in plaats van het gekozen papier (Inkt blijft Inkt)";
-"바탕은 서랍 종이를 비쳐 보이게 하거나(반투명 · 강하게) 걷어 내요(바탕 없음). 메모지는 늘 불투명해요." = "Bij Mat en Sterk schijnt het scherm achter de lade wazig door; bij Geen zweven alleen de notities op het scherm (de notities zelf blijven altijd dekkend).";
+"바탕은 서랍 종이를 비쳐 보이게 하거나(반투명 · 투명) 걷어 내요(바탕 없음). 메모지는 늘 불투명해요." = "Bij Mat en Helder schijnt het scherm achter de lade wazig door; bij Geen zweven alleen de notities op het scherm (de notities zelf blijven altijd dekkend).";
 "책상 · 노트 · 쪽지 · 서랍이 같이 바뀌어요. 자동이면 Mac이 어두운 모드일 때 밤이 돼요." = "Bureau, notitieblok, briefjes en lade veranderen samen mee. Op Automatisch wordt het nacht als je Mac in de donkere modus staat.";
 "종이는 이 Mac에만 저장돼요. 공유 폴더의 다른 기기는 저마다 고른 종이로 보여요." = "Het papier wordt alleen op deze Mac bewaard. Andere apparaten in de gedeelde map tonen elk hun eigen papier.";
 "서랍 종이" = "Ladepapier";
@@ -1393,4 +1393,116 @@
 
 /* #196 기기마다 보일 스페이스 (1.47) */
 "기기마다 보이기" = "Ruimtes per apparaat";
-"공유 폴더로 여러 기기가 같은 목록을 써도, 기기마다 보일 스페이스를 따로 정해요.\n1. 책상 → 스페이스에서 줄 오른쪽의 ‘이 기기에서’ 팝업을 열어요.\n2. 보이기 · 숨기기 · 시간 정하기… 중에서 골라요. ‘모든 스페이스 ▾’의 ‘이 기기에서 숨기기 ▸’로도 바로 숨겨요.\n· 시간 정하기는 줄마다 요일과 시각을 정해요. 줄을 여러 개 둘 수 있고, 하나라도 맞으면 보여요. 22:00–06:00처럼 밤을 넘겨도 돼요.\n· 숨긴 스페이스의 할 일은 오늘 · 앞으로 탭, 오늘 창, 하루 띠, 저녁 정리에 나오지 않고, 이 기기에서는 알림도 울리지 않아요. 숨어 있던 동안 지난 알림은 나중에도 울리지 않아요.\n· 목록 맨 아래 ‘잠깐 보기’를 누르면 잠시 보여요. 앱을 다시 켜거나 ‘다시 숨기기’를 누르면 다시 숨어요.\n· 완료 기록에는 모두 보여요. 찾기에서는 옅게 보이고 ‘숨김’이 붙어요.\n· 이 설정은 이 기기에만 있어요. 다른 기기와 종이냥 for Claude에는 모두 보여요." = "Ook als meerdere apparaten via een gedeelde map één lijst gebruiken, kiest elk apparaat welke ruimtes het toont.\n1. Open in Bureau → Ruimtes de keuzelijst ‘Op dit apparaat’ rechts in een rij.\n2. Kies Tonen, Verbergen of Tijden instellen…. Met ‘Verbergen op dit apparaat ▸’ onder ‘Alle ruimtes ▾’ verberg je er ook meteen een.\n· Bij Tijden instellen kies je per rij dagen en tijden. Je kunt meerdere rijen toevoegen; de ruimte is zichtbaar als er één klopt. Een rij als 22:00–06:00 loopt door na middernacht.\n· Taken in een verborgen ruimte staan niet in Vandaag, Vooruit, het Vandaag-venster, de Daglint en de Avondopruiming, en hun herinneringen gaan op dit apparaat niet af. Herinneringen die voorbijgingen terwijl de ruimte verborgen was, gaan ook later niet af.\n· Met ‘Even kijken’ onderaan de lijst zie je ze even. Ze verdwijnen weer als de app opnieuw start of je op ‘Weer verbergen’ klikt.\n· Geschiedenis toont alles. Zoeken toont ze vaag, met ‘Verborgen’.\n· Deze instelling blijft op dit apparaat. Andere apparaten en Jongi-nyang for Claude zien alles nog.";
+"공유 폴더로 여러 기기가 같은 목록을 써도, 기기마다 보일 스페이스를 따로 정해요.\n1. 책상 → 스페이스에서 줄 오른쪽의 ‘이 기기에서’ 팝업을 열어요.\n2. 보이기 · 숨기기 · 시간 정하기… 중에서 골라요. ‘모든 스페이스 ▾’의 ‘이 기기에서 숨기기 ▸’로도 바로 숨겨요.\n· 시간 정하기는 줄마다 요일과 시각을 정해요. 줄을 여러 개 둘 수 있고, 하나라도 맞으면 보여요. 22:00–06:00처럼 밤을 넘겨도 돼요.\n· 숨긴 스페이스의 할 일은 오늘 · 앞으로 탭, 오늘 창, 하루 띠, 저녁 정리에 나오지 않고, 이 기기에서는 알림도 울리지 않아요. 숨어 있던 동안 지난 알림은 나중에도 울리지 않아요.\n· 목록 맨 아래 ‘잠깐 보기’를 누르면 잠시 보여요. 앱을 다시 켜거나 ‘다시 숨기기’를 누르면 다시 숨어요.\n· 완료 기록에는 모두 보여요. 찾기에서는 옅게 보이고 ‘숨김’이 붙어요.\n· 이 설정은 이 기기에만 있어요. 다른 기기에는 모두 보여요. 이 기기의 종이냥 for Claude도 숨긴 스페이스의 할 일을 빼고 보여 줘요." = "Ook als meerdere apparaten via een gedeelde map één lijst gebruiken, kiest elk apparaat welke ruimtes het toont.\n1. Open in Bureau → Ruimtes de keuzelijst ‘Op dit apparaat’ rechts in een rij.\n2. Kies Tonen, Verbergen of Tijden instellen…. Met ‘Verbergen op dit apparaat ▸’ onder ‘Alle ruimtes ▾’ verberg je er ook meteen een.\n· Bij Tijden instellen kies je per rij dagen en tijden. Je kunt meerdere rijen toevoegen; de ruimte is zichtbaar als er één klopt. Een rij als 22:00–06:00 loopt door na middernacht.\n· Taken in een verborgen ruimte staan niet in Vandaag, Vooruit, het Vandaag-venster, de Daglint en de Avondopruiming, en hun herinneringen gaan op dit apparaat niet af. Herinneringen die voorbijgingen terwijl de ruimte verborgen was, gaan ook later niet af.\n· Met ‘Even kijken’ onderaan de lijst zie je ze even. Ze verdwijnen weer als de app opnieuw start of je op ‘Weer verbergen’ klikt.\n· Geschiedenis toont alles. Zoeken toont ze vaag, met ‘Verborgen’.\n· Deze instelling blijft op dit apparaat. Andere apparaten zien alles nog. Jongi-nyang for Claude op dit apparaat laat de taken van verborgen ruimtes ook weg.";
+
+/* #230 치면 두드리는 고양이 (1.48) */
+"글자 칠 때 두드리기" = "Meetikken tijdens typen";
+"종이냥에서만" = "In deze app";
+"모든 앱에서" = "In alle apps";
+"종이냥에서 글자를 치면 앞발로 두드려요. 무엇을 쳤는지는 보지 않아요." = "Typ je in deze app, dan tikt de kat mee met zijn pootjes. Wat je typt, ziet hij nooit.";
+"다른 앱에서 칠 때도 두드려요. 키를 눌렀다는 것만 알고, 어떤 키인지는 몰라요." = "Hij tikt ook mee in andere apps. Hij weet alleen dat je een toets indrukt, nooit welke.";
+"종이냥은 아직 Apple의 정식 서명이 없어서, 업데이트하면 macOS가 권한을 다시 물을 수 있어요." = "Jongi-nyang is nog niet volledig door Apple ondertekend, dus macOS kan na een update opnieuw om toestemming vragen.";
+"입력 모니터링 권한이 없어서 종이냥 안에서만 두드려요." = "Invoermonitoring is niet toegestaan, dus de kat tikt alleen in deze app mee.";
+"시스템 설정 열기" = "Systeeminstellingen openen";
+"전체 화면에서 보이기" = "Tonen boven schermvullende apps";
+"왼쪽 위" = "Linksboven";
+"오른쪽 위" = "Rechtsboven";
+"왼쪽 아래" = "Linksonder";
+"오른쪽 아래" = "Rechtsonder";
+"글자 칠 때" = "Tijdens het typen";
+"글자를 치면 고양이가 방석에 기대 앞발을 번갈아 내려요. 치기를 멈추면 곧 쉬어요.\n1. 책상 → 종이냥 → 종이냥 펫의 ‘글자 칠 때 두드리기’에서 끄기 · 종이냥에서만 · 모든 앱에서 중에 골라요.\n2. ‘모든 앱에서’를 고르면 macOS가 입력 모니터링 권한을 한 번 물어요. 허락하면 다른 앱에서 칠 때도 두드려요.\n· 종이냥이 아는 건 키를 눌렀다는 것과 그 시각뿐이에요. 어떤 키인지, 무엇을 쳤는지는 읽지도 남기지도 않아요.\n· 키를 꾹 누르고 있거나 ⌘ · ⌃ 단축키를 쓸 때는 두드리지 않아요.\n· ‘모든 앱에서’일 때 전체 화면 앱 위에는 Dock 위 고양이 대신 작은 고양이가 구석에 떠요. 클릭은 뒤 앱으로 가요. 펫이나 메뉴 막대의 종이냥 얼굴을 우클릭해 ‘전체 화면에서 보이기’를 끄면 숨어요.\n· 작은 고양이는 화면을 공유할 때도 보여요.\n· 권한이 없으면 종이냥 안에서만 두드려요. 종이냥은 아직 Apple의 정식 서명이 없어서, 업데이트하면 macOS가 권한을 다시 물을 수 있어요.\n· 손쉬운 사용의 ‘동작 줄이기’를 켜면 가만히 앉아 있어요." = "Typ je, dan leunt de kat op zijn kussen en zet hij om de beurt een pootje neer. Stop je, dan rust hij al snel.\n1. Kies in Bureau → Kat → Bureaubladkat bij ‘Meetikken tijdens typen’ Uit, In deze app of In alle apps.\n2. Kies je ‘In alle apps’, dan vraagt macOS één keer om Invoermonitoring. Sta je het toe, dan tikt de kat ook mee in andere apps.\n· Hij weet alleen dat je een toets indrukt, en wanneer. Welke toets of wat je typt, wordt nooit gelezen of bewaard.\n· Houd je een toets ingedrukt of gebruik je een sneltoets met ⌘ of ⌃, dan tikt hij niet.\n· Met ‘In alle apps’ zit er boven schermvullende apps een kleine kat in een hoek, in plaats van die boven het Dock. Klikken gaan door naar de app erachter. Verbergen doe je door met rechts op de kat of op het kattengezichtje in de menubalk te klikken en ‘Tonen boven schermvullende apps’ uit te zetten.\n· De kleine kat is ook te zien als je je scherm deelt.\n· Zonder toestemming tikt hij alleen in deze app mee. Jongi-nyang is nog niet volledig door Apple ondertekend, dus macOS kan na een update opnieuw vragen.\n· Met ‘Beweging verminderen’ aan in Toegankelijkheid zit hij stil.";
+
+/* 바탕화면 달력 위젯 (#234) */
+"%@ 위젯" = "Widget %@";
+"+ 넣기" = "+ Toevoegen";
+"+ 위젯 더하기" = "+ Widget toevoegen";
+"고른 위젯이 화면 오른쪽 위에 나타나요." = "De widget verschijnt rechtsboven op je scherm.";
+"끄면 다른 창 아래, 바탕화면에 있어요." = "Als dit uit staat, ligt hij op het bureaublad onder andere vensters.";
+"날짜 쪽지" = "Dagbriefje";
+"날짜를 눌러 넣기" = "Toevoegen vanaf een dag";
+"다른 날" = "Andere dag";
+"다른 창 아래 · 위" = "Onder of boven andere vensters";
+"달력 위젯 보이기" = "Kalenderwidgets tonen";
+"달력 위젯 숨기기" = "Kalenderwidgets verbergen";
+"더하기" = "Toevoegen";
+"마우스를 올리면 선명하게" = "Helder bij aanwijzen";
+"모든 데스크톱에" = "Op alle bureaubladen";
+"바쁜 날 다 보기" = "Een drukke dag helemaal zien";
+"바탕화면 위젯" = "Bureaubladwidgets";
+"바탕화면에 달력을 두고, 날짜를 눌러 바로 넣어요." = "Zet een kalender op je bureaublad en klik op een dag om iets toe te voegen.";
+"바탕화면에 두기" = "Op het bureaublad";
+"바탕화면에 종이 달력을" = "Een papieren kalender op je bureaublad";
+"불투명도 %lld%%" = "Dekking %lld%%";
+"불투명도 · 클릭 통과" = "Dekking en klikken doorlaten";
+"불투명도" = "Dekking";
+"아직 아무것도 없어요" = "Nog niets";
+"옮기기 · 메뉴" = "Verplaatsen en het menu";
+"위젯 더하기" = "Widget toevoegen";
+"위젯 두기" = "Een widget neerzetten";
+"위젯 메뉴" = "Widgetmenu";
+"위젯 제거" = "Widget verwijderen";
+"위젯은 4개까지 둘 수 있고, 이 Mac에만 저장해요." = "Je kunt tot 4 widgets plaatsen. Ze worden alleen op deze Mac bewaard.";
+"위젯은 4개까지 둘 수 있어요." = "Je kunt tot 4 widgets plaatsen.";
+"위젯을 제거했어요" = "Widget verwijderd";
+"위치 고정" = "Positie vastzetten";
+"이 Mac에만 저장해요." = "Alleen op deze Mac bewaard.";
+"켜면 귀만 마우스를 받아요." = "Als dit aan staat, reageren alleen de oortjes op de muis.";
+"클릭 통과" = "Klikken doorlaten";
+"투명도 줄이기가 켜져 있어서 위젯이 늘 선명하게 보여요." = "Transparantie verminderen staat aan, dus widgets blijven helder.";
+"할 일 ↔ 일정" = "Taak ↔ afspraak";
+"할 일이나 일정을 적어요" = "Typ een taak of afspraak";
+"항상 위" = "Bovenop";
+"날짜를 누르면 위젯 옆에 날짜 쪽지가 떠요. 그날의 일을 시각과 함께 모두 보여 줘요.\n1. 아래 줄에 적으면 입력 줄처럼 읽어서 칩으로 보여 줘요.\n2. Return으로 넣어요. Tab은 할 일과 일정을 바꿔요.\n· 날짜를 적지 않으면 누른 날에 들어가요. ‘내일 3시’처럼 적으면 적은 날이에요.\n· ‘알람 7시 약 먹기’는 7시에 알림이 있는 할 일이 돼요.\n· 글이 비어 있을 때 ⌥← · ⌥→를 누르면 하루 앞뒤로 가요.\n· 넣으면 위젯 아래에 ‘토요일 할 일에 넣었어요 · 되돌리기’가 떠요." = "Klik op een dag en naast de widget opent een dagbriefje met alles van die dag en de tijd erbij.\n1. Typ in de regel onderaan: die wordt gelezen zoals de invoerregel en als chips getoond.\n2. Druk op Return om toe te voegen. Tab wisselt tussen taak en afspraak.\n· Staat er geen dag in, dan komt het op de dag waarop je klikte. Typ ‘morgen 15:00’ en het komt op die dag.\n· ‘wekker 7:00 medicijn innemen’ wordt een taak met een herinnering om 7:00.\n· Staat er nog niets, dan ga je met ⌥← en ⌥→ naar de dag ervoor of erna.\n· Daarna verschijnt onder de widget ‘Taak toegevoegd voor zaterdag · Herstel’.";
+"칸에 다 들어가지 않으면 ‘+3’처럼 보여요. ‘+3’이나 날짜를 누르면 날짜 쪽지에 그날 일이 모두 있어요.\n· 일정을 누르면 책상의 달력에서 그 일정이 열려요. 고치거나 지울 수 있어요. 할 일을 누르면 노트에서 그 줄을 보여 줘요.\n· 위젯에서는 할 일을 체크하지 않아요. 바탕화면에서 잘못 눌러 끝내지 않게요." = "Past een dag niet in zijn vakje, dan zie je ‘+3’. Klik op ‘+3’ of op de dag om alles op het dagbriefje te zien.\n· Klik op een afspraak om hem in de kalender van het bureau te openen; daar wijzig of verwijder je hem. Klik op een taak om de regel in het notitieblok te zien.\n· Op een widget vink je geen taken af, zodat een verkeerde klik op het bureaublad er nooit een afrondt.";
+"오른쪽 위의 고양이 귀를 끌어 옮겨요. 귀를 누르거나 위젯을 우클릭하면 메뉴가 열려요.\n· 화면 가장자리나 다른 위젯 가까이에 놓으면 붙어요.\n· 모니터를 빼면 주 화면으로 갔다가, 다시 꽂으면 원래 자리로 돌아와요.\n· ‘위치 고정’을 켜면 끌어도 움직이지 않아요." = "Sleep de kattenoortjes rechtsboven om een widget te verplaatsen. Klik op de oortjes of klik met rechts op de widget voor het menu.\n· Zet je hem vlak bij de rand van het scherm of een andere widget, dan klikt hij ertegenaan.\n· Koppel je een scherm los, dan gaat de widget naar het hoofdscherm; sluit je het weer aan, dan gaat hij terug.\n· Met ‘Positie vastzetten’ aan blijft hij liggen als je sleept.";
+"위젯은 바탕화면에 있어서 다른 창이 늘 그 위에 와요. ‘항상 위에 두기’를 켜면 다른 창 위에 떠요.\n· 전체 화면 앱 위에는 뜨지 않아요.\n· 윈도우 → 달력 위젯 숨기기로 잠시 모두 숨겨요. 앱을 다시 켜면 다시 보여요." = "Widgets liggen op het bureaublad, dus andere vensters komen er altijd overheen. Zet ‘Altijd bovenop’ aan om er een boven andere vensters te houden.\n· Boven schermvullende apps verschijnen ze niet.\n· Venster → Kalenderwidgets verbergen zet ze even weg. Als de app opnieuw start, zijn ze terug.";
+"이전 날" = "Vorige dag";
+"다음 날" = "Volgende dag";
+/* CalendarWidgetSheet.swift (#253): 넣기 waits for a question that replaces the whole list */
+"질문에 답하면 넣을 수 있어요" = "Je kunt dit toevoegen zodra je de vraag hebt beantwoord";
+"바탕화면에 종이 달력을 두고, 날짜를 눌러 바로 넣어요.\n1. 책상 → 일정 → 바탕화면 위젯에서 ‘+ 위젯 더하기’를 눌러요.\n2. 오늘, 이번 주, 이번 달, 오늘 목록 중에 골라요. 이번 주와 이번 달은 간단히와 자세히가 있고, 이번 달은 크게 보는 벽 달력도 있어요.\n· 4개까지 둘 수 있어요. 같은 종류를 둘 둬도 돼요.\n· 위젯은 이 Mac에만 저장해요. 공유 폴더에는 쓰지 않아요.\n· 이 Mac에서 숨긴 스페이스의 할 일은 위젯에도 나오지 않아요." = "Zet een papieren kalender op je bureaublad en klik op een dag om iets toe te voegen.\n1. Klik in Bureau → Afspraken → Bureaubladwidgets op ‘+ Widget toevoegen’.\n2. Kies Vandaag, Deze week, Deze maand of Lijst van vandaag. Deze week en Deze maand zijn er eenvoudig en uitgebreid, en Deze maand ook als grote wandkalender.\n· Je kunt tot 4 widgets plaatsen, ook twee van dezelfde soort.\n· Widgets worden alleen op deze Mac bewaard, nooit in de gedeelde map.\n· Taken van ruimtes die op deze Mac verborgen zijn, staan ook niet op de widgets.";
+"위젯마다 불투명도를 20–100%에서 골라요. 종이만 옅어지고 글자는 그대로예요.\n· 날짜마다 종이 타일이 있어요. 타일은 글자가 늘 읽히는 만큼만 옅어지고, 타일 사이로 바탕화면이 흐리게 비쳐요.\n· 마우스를 올리면 선명해져요. 설정 쪽지에서 끌 수 있어요.\n· ‘클릭 통과’를 켜면 위젯 위를 눌러도 뒤가 눌려요. 귀에 마우스를 올리거나 ⌥을 누르고 있으면 다시 누를 수 있어요.\n· 손쉬운 사용의 ‘투명도 줄이기’를 켜면 위젯이 늘 선명해요." = "Kies voor elke widget een dekking van 20 tot 100%. Alleen het papier vervaagt; de tekst blijft zoals hij is.\n· Elke dag is een papieren tegel. Een tegel vervaagt maar zover de tekst leesbaar blijft, en tussen de tegels schemert het bureaublad zacht door.\n· Wijs je hem aan, dan wordt hij helder. Dat zet je uit in de instellingen.\n· Met ‘Klikken doorlaten’ aan gaan klikken op de widget naar wat erachter ligt. Wijs de oortjes aan of houd ⌥ ingedrukt om er weer op te klikken.\n· Met Transparantie verminderen aan in Toegankelijkheid blijven widgets altijd helder.";
+"달력과 바탕화면 위젯의 날짜 칸에 음력 날짜와 한국 공휴일이 보여요.\n· 음력은 칸 오른쪽 위에 ‘8.21’처럼 작게 보여요. 음력 초하루는 ‘음 9.1’, 윤달 초하루는 ‘윤 4.1’이에요.\n· 공휴일은 날짜가 빨갛고 이름이 보여요. 설날 · 추석 연휴와 대체공휴일도 셈해요.\n· 선거일처럼 그때 정해지는 쉬는 날은 앱을 업데이트하면 더해져요.\n· 책상 → 일정 → 달력에서 따로 끌 수 있어요. 이 Mac에만 저장해요." = "De kalender en de bureaubladwidgets tonen in elke dag de maankalenderdatum en de Koreaanse feestdagen.\n· De maankalenderdatum staat klein rechtsboven, zoals ‘8.21’. De eerste dag van een maanmaand staat als ‘☾ 9.1’.\n· Bij een feestdag is de datum rood en staat de naam erbij. Seollal, Chuseok en vervangende vrije dagen worden ook berekend.\n· Vrije dagen die later worden vastgesteld, zoals verkiezingen, komen met app-updates.\n· Zet ze apart uit in Bureau → Afspraken → Kalender. Dit wordt alleen op deze Mac bewaard.";
+"음력 · 공휴일" = "Maankalender en feestdagen";
+"음력 날짜 보이기" = "Maankalenderdatums tonen";
+"공휴일 보이기" = "Feestdagen tonen";
+"한국의 공휴일이에요. 선거일처럼 그때 정해지는 쉬는 날은 앱을 업데이트하면 더해져요." = "Dit zijn de Koreaanse feestdagen. Vrije dagen die later worden vastgesteld, zoals verkiezingen, komen met app-updates.";
+/* StoragePanel.swift (#240, D2 C) */
+"할 일을 어디에 둘까요?" = "Waar bewaar je je taken?";
+"공유 폴더에 두면 다른 기기에서도 같은 목록을 써요." = "In een gedeelde map gebruiken je andere apparaten dezelfde lijst.";
+"이 Mac에만" = "Alleen op deze Mac";
+"공유 폴더에" = "In een gedeelde map";
+"이 Mac의 기본 폴더로 옮겨요" = "Zet de lijst in de eigen map van deze Mac";
+"지금 여기 있어요 · %@" = "Staat nu hier · %@";
+"iCloud Drive 같은 폴더를 골라요" = "Kies een map zoals iCloud Drive";
+"백업" = "Back-ups";
+"자세히 보기" = "Details tonen";
+"자세히 접기" = "Details verbergen";
+"펼쳐짐" = "Uitgeklapt";
+"목록을 이 Mac으로 옮길까요?" = "De lijst naar deze Mac verplaatsen?";
+"지금 목록이 이 Mac의 기본 폴더로 옮겨지고 종이냥이 다시 시작돼요. 공유 폴더의 파일은 그대로 남아요." = "De lijst gaat naar de eigen map van deze Mac en Jongi-nyang start opnieuw. De bestanden in de gedeelde map blijven staan.";
+"이 Mac으로 옮기기" = "Naar deze Mac verplaatsen";
+/* MemoDrawerCards.swift (#240): a checklist chip, read and hovered */
+"체크 %lld개 중 %lld개 했어요" = "%2$lld van %1$lld afgevinkt";
+/* #244: 꾸미기 → 종이, the seven new papers, 밤에는, 노트와 같은 종이 (PaperThemeGallery.swift, PaperKindNames.swift) */
+"노란 메모지" = "Plakbriefje";
+"원고지" = "Manuscriptpapier";
+"하늘색 줄노트" = "Blauw lijntjesschrift";
+"라벤더 종이" = "Lavendel";
+"재생지" = "Kringlooppapier";
+"밤하늘 종이" = "Nachthemel";
+"칠판" = "Schoolbord";
+"줄노트" = "Lijntjes";
+"밤하늘" = "Nachthemel";
+"%@, 밝은 종이" = "%@, licht papier";
+"%@, 어두운 종이" = "%@, donker papier";
+"그대로" = "Dit papier houden";
+"밝은 종이" = "Lichte papieren";
+"어두운 종이" = "Donkere papieren";
+"밤에는" = "’s Nachts";
+"어두운 종이는 밤에도 그대로예요." = "Donker papier blijft ’s nachts hetzelfde.";
+"노트와 같은 종이" = "Zelfde als het notitieblok";
+"끄면 서랍만 따로 골라요." = "Zet uit om apart papier voor de lade te kiezen.";
+"노트 · 달력 · 위젯 · 쪽지 · 책상이 같은 종이를 써요. 밝은 종이는 밤이 되면 ‘밤에는’에서 고른 종이로 바뀌어요." = "Notitieblok, agenda, widgets, briefjes en Bureau gebruiken hetzelfde papier. ’s Nachts wordt een licht papier het papier dat je bij ’s Nachts kiest.";
+"종이와 낮 · 밤" = "Papier en dag & nacht";
+"책상 → 꾸미기 → 종이에서 열다섯 종이 가운데 하나를 골라요. 노트 · 달력 · 위젯 · 쪽지 · 책상이 바로 그 종이로 바뀌어요.\n· 밝은 종이는 밤이 되면 ‘밤에는’에서 고른 종이로 바뀌어요. 처음에는 밤 종이예요. 밤에도 그 종이를 쓰려면 ‘그대로’를 골라요.\n· 어두운 종이(밤 종이 · 먹색 종이 · 밤하늘 종이 · 칠판)는 낮에도 그대로예요.\n· 낮 · 밤에서 자동 · 낮 · 밤을 골라요. 자동이면 Mac이 어두운 모드일 때 밤이 돼요.\n· 메뉴와 스크롤 막대도 보이는 종이처럼 밝거나 어두워요." = "Kies in Bureau → Weergave → Papier een van de vijftien papieren. Notitieblok, agenda, widgets, briefjes en Bureau krijgen het meteen.\n· ’s Nachts wordt een licht papier het papier dat je bij ’s Nachts kiest — eerst Nachtpapier. Wil je het ook ’s nachts houden, kies dan ‘Dit papier houden’.\n· De donkere papieren (Nachtpapier · Inkt · Nachthemel · Schoolbord) blijven ook overdag hetzelfde.\n· Bij Dag & nacht kies je Automatisch · Dag · Nacht. Op Automatisch is het nacht als je Mac in de donkere modus staat.\n· Menu’s en schuifbalken worden licht of donker met het papier mee.";

@@ -5,7 +5,7 @@ import { rangeDay, rangeDayText, rangeOf, rangeText } from "../../src/core/timeR
 import { dayKey } from "../../src/core/archive";
 import type { TodoItem } from "../../src/core/notebook";
 import type { Ids } from "./ids";
-import { taskSpace, type SpaceWords } from "./spaces";
+import { hiddenHere, hiddenTag, taskSpace, type SpaceWords } from "./spaces";
 
 /**
  * What the tools say back, in the app's language (ko · en · nl). The text is the short summary a person reads;
@@ -53,6 +53,8 @@ export function taskLine(item: TodoItem, now: Date, lang: Lang, words: TaskWords
   if (repeat) parts.push(`${say(lang, "반복", "repeats", "herhaalt")} ${repeat}`);
   const space = words.spaces?.any ? taskSpace(words.spaces, item.id) : undefined;
   if (space && !space.general) parts.push(`${say(lang, "스페이스", "space", "ruimte")} ${space.name}`);
+  // N3-9: shown though this device hides its space (found with query, or its space picked): marked as 찾기 marks it.
+  if (hiddenHere(words.spaces, item.id)) parts.push(hiddenTag(lang));
   parts.push(`id ${words.ids.short(item.id)}`);
   return parts.join(" · ");
 }
@@ -70,6 +72,7 @@ export function taskData(item: TodoItem, now: Date, words: TaskWords): Record<st
     ...(item.completedAt ? { completedAt: localStamp(new Date(item.completedAt)) } : {}),
     ...(repeat ? { repeat } : {}),
     ...(space ? { space: space.name, spaceId: space.id } : {}),
+    ...(hiddenHere(words.spaces, item.id) ? { hidden: true } : {}),
   };
 }
 

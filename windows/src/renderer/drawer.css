@@ -1,6 +1,6 @@
 /*
- * 메모 서랍 (1.28, 1.29): the drawer at the screen's edge and its handle, in four papers — 낮 종이, 밤 종이, 크라프트지
- * and 모눈 노트. `<html data-look>` picks one (자동 = 낮 or 밤 with the note); a memo with its own paper (이 메모의
+ * 메모 서랍 (1.28, 1.29): the drawer at the screen's edge and its handle, in fifteen papers since #244 (at first four: 낮 종이, 밤 종이,
+ * 크라프트지 and 모눈 노트). `<html data-look>` picks one (자동 = 낮 or 밤 with the note); a memo with its own paper (이 메모의
  * 종이) carries `data-sheet` and takes that paper's sheet, ink, rules and edge while the drawer stays as it is.
  * 1.29 (the user's choices from the mocks): the drawer paper a step darker than the sheets, each sheet with a
  * 1 px edge and a soft shadow, a strip of tape on every memo, date groups, kinds as chips, the open memo's two
@@ -183,6 +183,153 @@
   --d-pintab: #c4a245; --d-pintab-edge: #d6b65a; --d-pintab-ink: #1f1d18;
   --d-closebar: #757c8c;
   --d-shadow-deep: rgba(0, 0, 0, 0.62); --d-slip-bottom: #141926; --d-ear: #1a2030; --d-ear-in: #7d555a;
+  --c-lavender-a: #5e5888; --c-lavender-b: #575181; --c-lavender-ink: #f1edff; --c-lavender-tape: #7d75ad; --c-lavender-edge: #8f87c4; --c-lavender-line: #8f87c4;
+  --c-pink-a: #74545a; --c-pink-b: #6c4e54; --c-pink-ink: #ffe4e8; --c-pink-tape: #8a666c; --c-pink-edge: #a8797f; --c-pink-line: #a8797f;
+  --c-mint-a: #4b6a55; --c-mint-b: #46634f; --c-mint-ink: #e2f5e7; --c-mint-tape: #5f8269; --c-mint-edge: #719a7e; --c-mint-line: #719a7e;
+  --c-yellow-a: #716641; --c-yellow-b: #6a603c; --c-yellow-ink: #fff1bf; --c-yellow-tape: #85794f; --c-yellow-edge: #9d9168; --c-yellow-line: #9d9168;
+  --c-sky-a: #4a5d78; --c-sky-b: #455770; --c-sky-ink: #e3eeff; --c-sky-tape: #5d7090; --c-sky-edge: #7189ad; --c-sky-line: #7189ad;
+  --c-peach-a: #765b49; --c-peach-b: #6e5544; --c-peach-ink: #ffe8d8; --c-peach-tape: #8b6d58; --c-peach-edge: #a08675; --c-peach-line: #a08675;
+  --c-sand-a: #6a644f; --c-sand-b: #635d4a; --c-sand-ink: #f5ecd4; --c-sand-tape: #7b745d; --c-sand-edge: #958c6e; --c-sand-line: #958c6e;
+  --c-gray-a: #5d5a55; --c-gray-b: #57544f; --c-gray-ink: #f0ede6; --c-gray-tape: #6e6b65; --c-gray-edge: #8a8782; --c-gray-line: #8a8782;
+}
+/* ─── 노란 메모지 (#244, tokens.json `drawer`; the folder colours from 한지) ─── */
+:root[data-look="memo"], .it[data-sheet="memo"], .big[data-sheet="memo"] {
+  --d-paper: #eedc84; --d-edge: #ccbc70; --d-line: transparent; --d-ink: #2f2914; --d-title: #2f2914;
+  --d-sub: #4c644a; --d-icon: #5c522c; --d-card: #fffadc; --d-card-edge: #d5d0b4; --d-shadow: rgba(60, 50, 30, 0.12); --d-meta: #605630; --d-preview: #5c522c; --d-peek: #544f38; --d-grp: #5c522c;
+  --d-check: #577456; --d-on-check: #fffadc; --d-box: #857844; --d-done: #605630; --d-select: #6f63b8; --d-open: #577456;
+  --d-bar: #577456; --d-bar-track: #f3e597; --d-foot-rule: #ccbc70; --d-foot: #605630; --d-foot-paw: #c4797e;
+  --d-hover: rgba(70, 60, 40, 0.07); --d-mark: rgba(233, 207, 122, 0.55); --d-menu: #fffadc; --d-menu-edge: #d5d0b4;
+  --d-qk: #fffadc; --d-qk-edge: #d5d0b4; --d-radius: 10px;
+  --d-chip: #f3edd0; --d-pill: #f7f2d4; --d-pill-edge: rgba(70, 60, 40, 0.14); --d-pin: #7f6418; --d-danger: #a4472f;
+  --d-pintab: #f6dc7c; --d-pintab-edge: #dcc062; --d-pintab-ink: #6b5520;
+  --d-closebar: #847845;
+  --d-shadow-deep: rgba(60, 50, 30, 0.24); --d-slip-bottom: #e7d580; --d-ear: #eedc84; --d-ear-in: rgba(242, 201, 198, 0.8);
+  --c-lavender-a: #dcd8f3; --c-lavender-b: #d3cef0; --c-lavender-ink: #3f3a73; --c-lavender-tape: #d3cef0; --c-lavender-edge: #9d92d8; --c-lavender-line: #8d83c2;
+  --c-pink-a: #f2d3d6; --c-pink-b: #eccacd; --c-pink-ink: #6f3239; --c-pink-tape: #ecc6ca; --c-pink-edge: #d3979f; --c-pink-line: #b38087;
+  --c-mint-a: #cfe6d6; --c-mint-b: #c4dfcc; --c-mint-ink: #2d5638; --c-mint-tape: #c4dfcc; --c-mint-edge: #80b090; --c-mint-line: #6d967a;
+  --c-yellow-a: #f3e3a0; --c-yellow-b: #efdc90; --c-yellow-ink: #66531a; --c-yellow-tape: #efdc90; --c-yellow-edge: #bfae71; --c-yellow-line: #998b5a;
+  --c-sky-a: #d6e5f4; --c-sky-b: #cbdcef; --c-sky-ink: #2c4c70; --c-sky-tape: #cbdcef; --c-sky-edge: #8fb0da; --c-sky-line: #728dae;
+  --c-peach-a: #f6dccb; --c-peach-b: #f1d1bc; --c-peach-ink: #6f4026; --c-peach-tape: #f1d1bc; --c-peach-edge: #c8a793; --c-peach-line: #a08676;
+  --c-sand-a: #ebe2cf; --c-sand-b: #e3d8c1; --c-sand-ink: #574629; --c-sand-tape: #e3d8c1; --c-sand-edge: #aea48e; --c-sand-line: #948b79;
+  --c-gray-a: #e2e0da; --c-gray-b: #d9d6cf; --c-gray-ink: #47453f; --c-gray-tape: #d9d6cf; --c-gray-edge: #a8a6a0; --c-gray-line: #8f8d88;
+}
+/* ─── 원고지 (#244, tokens.json `drawer`; the folder colours from 한지) ─── */
+:root[data-look="manuscript"], .it[data-sheet="manuscript"], .big[data-sheet="manuscript"] {
+  --d-paper: #e8e0cf; --d-edge: #c6bfb1; --d-line: transparent; --d-ink: #2d2a26; --d-title: #2d2a26;
+  --d-sub: #50694e; --d-icon: #605a51; --d-card: #fffefb; --d-card-edge: #d5d4d0; --d-shadow: rgba(60, 50, 30, 0.12); --d-meta: #686258; --d-preview: #605a51; --d-peek: #5b5955; --d-grp: #605a51;
+  --d-check: #5c7a5a; --d-on-check: #fffefb; --d-box: #8f877a; --d-done: #686258; --d-select: #6f63b8; --d-open: #5c7a5a;
+  --d-bar: #5c7a5a; --d-bar-track: #f3eee3; --d-foot-rule: #c6bfb1; --d-foot: #686258; --d-foot-paw: #c4797e;
+  --d-hover: rgba(70, 60, 40, 0.07); --d-mark: rgba(233, 207, 122, 0.55); --d-menu: #fffefb; --d-menu-edge: #d5d4d0;
+  --d-qk: #fffefb; --d-qk-edge: #d5d4d0; --d-radius: 10px;
+  --d-chip: #f2f1ee; --d-pill: #f7f6f2; --d-pill-edge: rgba(70, 60, 40, 0.14); --d-pin: #7f6418; --d-danger: #a4472f;
+  --d-pintab: #f6dc7c; --d-pintab-edge: #dcc062; --d-pintab-ink: #6b5520;
+  --d-closebar: #817c70;
+  --d-shadow-deep: rgba(60, 50, 30, 0.24); --d-slip-bottom: #e1d9c9; --d-ear: #e8e0cf; --d-ear-in: rgba(242, 201, 198, 0.8);
+  --c-lavender-a: #dcd8f3; --c-lavender-b: #d3cef0; --c-lavender-ink: #3f3a73; --c-lavender-tape: #d3cef0; --c-lavender-edge: #9d92d8; --c-lavender-line: #8d83c2;
+  --c-pink-a: #f2d3d6; --c-pink-b: #eccacd; --c-pink-ink: #6f3239; --c-pink-tape: #ecc6ca; --c-pink-edge: #d3979f; --c-pink-line: #b38087;
+  --c-mint-a: #cfe6d6; --c-mint-b: #c4dfcc; --c-mint-ink: #2d5638; --c-mint-tape: #c4dfcc; --c-mint-edge: #80b090; --c-mint-line: #6d967a;
+  --c-yellow-a: #f3e3a0; --c-yellow-b: #efdc90; --c-yellow-ink: #66531a; --c-yellow-tape: #efdc90; --c-yellow-edge: #bfae71; --c-yellow-line: #998b5a;
+  --c-sky-a: #d6e5f4; --c-sky-b: #cbdcef; --c-sky-ink: #2c4c70; --c-sky-tape: #cbdcef; --c-sky-edge: #8fb0da; --c-sky-line: #728dae;
+  --c-peach-a: #f6dccb; --c-peach-b: #f1d1bc; --c-peach-ink: #6f4026; --c-peach-tape: #f1d1bc; --c-peach-edge: #c8a793; --c-peach-line: #a08676;
+  --c-sand-a: #ebe2cf; --c-sand-b: #e3d8c1; --c-sand-ink: #574629; --c-sand-tape: #e3d8c1; --c-sand-edge: #aea48e; --c-sand-line: #948b79;
+  --c-gray-a: #e2e0da; --c-gray-b: #d9d6cf; --c-gray-ink: #47453f; --c-gray-tape: #d9d6cf; --c-gray-edge: #a8a6a0; --c-gray-line: #8f8d88;
+}
+/* ─── 하늘색 줄노트 (#244, tokens.json `drawer`; the folder colours from 한지) ─── */
+:root[data-look="lined"], .it[data-sheet="lined"], .big[data-sheet="lined"] {
+  --d-paper: #d0e1f1; --d-edge: #b0c0d0; --d-line: transparent; --d-ink: #1d2a3a; --d-title: #1d2a3a;
+  --d-sub: #50694e; --d-icon: #435367; --d-card: #f8fbff; --d-card-edge: #ccd1d8; --d-shadow: rgba(60, 50, 30, 0.12); --d-meta: #48586c; --d-preview: #435367; --d-peek: #44505d; --d-grp: #435367;
+  --d-check: #577456; --d-on-check: #f8fbff; --d-box: #6e8094; --d-done: #48586c; --d-select: #6f63b8; --d-open: #577456;
+  --d-bar: #577456; --d-bar-track: #dce8f4; --d-foot-rule: #b0c0d0; --d-foot: #48586c; --d-foot-paw: #c4797e;
+  --d-hover: rgba(70, 60, 40, 0.07); --d-mark: rgba(233, 207, 122, 0.55); --d-menu: #f8fbff; --d-menu-edge: #ccd1d8;
+  --d-qk: #f8fbff; --d-qk-edge: #ccd1d8; --d-radius: 10px;
+  --d-chip: #ebeef3; --d-pill: #eff3f7; --d-pill-edge: rgba(70, 60, 40, 0.14); --d-pin: #7f6418; --d-danger: #a4472f;
+  --d-pintab: #f6dc7c; --d-pintab-edge: #dcc062; --d-pintab-ink: #6b5520;
+  --d-closebar: #6a7a8d;
+  --d-shadow-deep: rgba(60, 50, 30, 0.24); --d-slip-bottom: #cadaea; --d-ear: #d0e1f1; --d-ear-in: rgba(242, 201, 198, 0.8);
+  --c-lavender-a: #dcd8f3; --c-lavender-b: #d3cef0; --c-lavender-ink: #3f3a73; --c-lavender-tape: #d3cef0; --c-lavender-edge: #9d92d8; --c-lavender-line: #8d83c2;
+  --c-pink-a: #f2d3d6; --c-pink-b: #eccacd; --c-pink-ink: #6f3239; --c-pink-tape: #ecc6ca; --c-pink-edge: #d3979f; --c-pink-line: #b38087;
+  --c-mint-a: #cfe6d6; --c-mint-b: #c4dfcc; --c-mint-ink: #2d5638; --c-mint-tape: #c4dfcc; --c-mint-edge: #80b090; --c-mint-line: #6d967a;
+  --c-yellow-a: #f3e3a0; --c-yellow-b: #efdc90; --c-yellow-ink: #66531a; --c-yellow-tape: #efdc90; --c-yellow-edge: #bfae71; --c-yellow-line: #998b5a;
+  --c-sky-a: #d6e5f4; --c-sky-b: #cbdcef; --c-sky-ink: #2c4c70; --c-sky-tape: #cbdcef; --c-sky-edge: #8fb0da; --c-sky-line: #728dae;
+  --c-peach-a: #f6dccb; --c-peach-b: #f1d1bc; --c-peach-ink: #6f4026; --c-peach-tape: #f1d1bc; --c-peach-edge: #c8a793; --c-peach-line: #a08676;
+  --c-sand-a: #ebe2cf; --c-sand-b: #e3d8c1; --c-sand-ink: #574629; --c-sand-tape: #e3d8c1; --c-sand-edge: #aea48e; --c-sand-line: #948b79;
+  --c-gray-a: #e2e0da; --c-gray-b: #d9d6cf; --c-gray-ink: #47453f; --c-gray-tape: #d9d6cf; --c-gray-edge: #a8a6a0; --c-gray-line: #8f8d88;
+}
+/* ─── 라벤더 종이 (#244, tokens.json `drawer`; the folder colours from 한지) ─── */
+:root[data-look="lavender"], .it[data-sheet="lavender"], .big[data-sheet="lavender"] {
+  --d-paper: #ddd4f0; --d-edge: #bdb5cf; --d-line: transparent; --d-ink: #2a2638; --d-title: #2a2638;
+  --d-sub: #4c644a; --d-icon: #565070; --d-card: #fcfbff; --d-card-edge: #d2d0d7; --d-shadow: rgba(60, 50, 30, 0.12); --d-meta: #5b5574; --d-preview: #565070; --d-peek: #545160; --d-grp: #565070;
+  --d-check: #577456; --d-on-check: #fcfbff; --d-box: #857e9c; --d-done: #5b5574; --d-select: #6f63b8; --d-open: #577456;
+  --d-bar: #577456; --d-bar-track: #e7e1f4; --d-foot-rule: #bdb5cf; --d-foot: #5b5574; --d-foot-paw: #c4797e;
+  --d-hover: rgba(70, 60, 40, 0.07); --d-mark: rgba(233, 207, 122, 0.55); --d-menu: #fcfbff; --d-menu-edge: #d2d0d7;
+  --d-qk: #fcfbff; --d-qk-edge: #d2d0d7; --d-radius: 10px;
+  --d-chip: #efeef3; --d-pill: #f4f2f7; --d-pill-edge: rgba(70, 60, 40, 0.14); --d-pin: #7f6418; --d-danger: #a4472f;
+  --d-pintab: #f6dc7c; --d-pintab-edge: #dcc062; --d-pintab-ink: #6b5520;
+  --d-closebar: #7c7593;
+  --d-shadow-deep: rgba(60, 50, 30, 0.24); --d-slip-bottom: #d6cee9; --d-ear: #ddd4f0; --d-ear-in: rgba(242, 201, 198, 0.8);
+  --c-lavender-a: #dcd8f3; --c-lavender-b: #d3cef0; --c-lavender-ink: #3f3a73; --c-lavender-tape: #d3cef0; --c-lavender-edge: #9d92d8; --c-lavender-line: #8d83c2;
+  --c-pink-a: #f2d3d6; --c-pink-b: #eccacd; --c-pink-ink: #6f3239; --c-pink-tape: #ecc6ca; --c-pink-edge: #d3979f; --c-pink-line: #b38087;
+  --c-mint-a: #cfe6d6; --c-mint-b: #c4dfcc; --c-mint-ink: #2d5638; --c-mint-tape: #c4dfcc; --c-mint-edge: #80b090; --c-mint-line: #6d967a;
+  --c-yellow-a: #f3e3a0; --c-yellow-b: #efdc90; --c-yellow-ink: #66531a; --c-yellow-tape: #efdc90; --c-yellow-edge: #bfae71; --c-yellow-line: #998b5a;
+  --c-sky-a: #d6e5f4; --c-sky-b: #cbdcef; --c-sky-ink: #2c4c70; --c-sky-tape: #cbdcef; --c-sky-edge: #8fb0da; --c-sky-line: #728dae;
+  --c-peach-a: #f6dccb; --c-peach-b: #f1d1bc; --c-peach-ink: #6f4026; --c-peach-tape: #f1d1bc; --c-peach-edge: #c8a793; --c-peach-line: #a08676;
+  --c-sand-a: #ebe2cf; --c-sand-b: #e3d8c1; --c-sand-ink: #574629; --c-sand-tape: #e3d8c1; --c-sand-edge: #aea48e; --c-sand-line: #948b79;
+  --c-gray-a: #e2e0da; --c-gray-b: #d9d6cf; --c-gray-ink: #47453f; --c-gray-tape: #d9d6cf; --c-gray-edge: #a8a6a0; --c-gray-line: #8f8d88;
+}
+/* ─── 재생지 (#244, tokens.json `drawer`; the folder colours from 한지) ─── */
+:root[data-look="recycled"], .it[data-sheet="recycled"], .big[data-sheet="recycled"] {
+  --d-paper: #d6d5ce; --d-edge: #b6b6af; --d-line: transparent; --d-ink: #262624; --d-title: #262624;
+  --d-sub: #485f46; --d-icon: #4f4e49; --d-card: #f8f8f5; --d-card-edge: #cececb; --d-shadow: rgba(60, 50, 30, 0.12); --d-meta: #55544e; --d-preview: #4f4e49; --d-peek: #4c4c4a; --d-grp: #4f4e49;
+  --d-check: #536e51; --d-on-check: #f8f8f5; --d-box: #7a7972; --d-done: #55544e; --d-select: #6f63b8; --d-open: #536e51;
+  --d-bar: #536e51; --d-bar-track: #e2e1db; --d-foot-rule: #b6b6af; --d-foot: #55544e; --d-foot-paw: #c4797e;
+  --d-hover: rgba(70, 60, 40, 0.07); --d-mark: rgba(233, 207, 122, 0.55); --d-menu: #f8f8f5; --d-menu-edge: #cececb;
+  --d-qk: #f8f8f5; --d-qk-edge: #cececb; --d-radius: 10px;
+  --d-chip: #ebebe8; --d-pill: #f0f0ed; --d-pill-edge: rgba(70, 60, 40, 0.14); --d-pin: #7f6418; --d-danger: #a4472f;
+  --d-pintab: #f6dc7c; --d-pintab-edge: #dcc062; --d-pintab-ink: #6b5520;
+  --d-closebar: #75746e;
+  --d-shadow-deep: rgba(60, 50, 30, 0.24); --d-slip-bottom: #d0cfc8; --d-ear: #d6d5ce; --d-ear-in: rgba(242, 201, 198, 0.8);
+  --c-lavender-a: #dcd8f3; --c-lavender-b: #d3cef0; --c-lavender-ink: #3f3a73; --c-lavender-tape: #d3cef0; --c-lavender-edge: #9d92d8; --c-lavender-line: #8d83c2;
+  --c-pink-a: #f2d3d6; --c-pink-b: #eccacd; --c-pink-ink: #6f3239; --c-pink-tape: #ecc6ca; --c-pink-edge: #d3979f; --c-pink-line: #b38087;
+  --c-mint-a: #cfe6d6; --c-mint-b: #c4dfcc; --c-mint-ink: #2d5638; --c-mint-tape: #c4dfcc; --c-mint-edge: #80b090; --c-mint-line: #6d967a;
+  --c-yellow-a: #f3e3a0; --c-yellow-b: #efdc90; --c-yellow-ink: #66531a; --c-yellow-tape: #efdc90; --c-yellow-edge: #bfae71; --c-yellow-line: #998b5a;
+  --c-sky-a: #d6e5f4; --c-sky-b: #cbdcef; --c-sky-ink: #2c4c70; --c-sky-tape: #cbdcef; --c-sky-edge: #8fb0da; --c-sky-line: #728dae;
+  --c-peach-a: #f6dccb; --c-peach-b: #f1d1bc; --c-peach-ink: #6f4026; --c-peach-tape: #f1d1bc; --c-peach-edge: #c8a793; --c-peach-line: #a08676;
+  --c-sand-a: #ebe2cf; --c-sand-b: #e3d8c1; --c-sand-ink: #574629; --c-sand-tape: #e3d8c1; --c-sand-edge: #aea48e; --c-sand-line: #948b79;
+  --c-gray-a: #e2e0da; --c-gray-b: #d9d6cf; --c-gray-ink: #47453f; --c-gray-tape: #d9d6cf; --c-gray-edge: #a8a6a0; --c-gray-line: #8f8d88;
+}
+/* ─── 밤하늘 종이 (#244, tokens.json `drawer`; the folder colours from 먹색) ─── */
+:root[data-look="nightsky"], .it[data-sheet="nightsky"], .big[data-sheet="nightsky"] {
+  --d-paper: #17142a; --d-edge: #3e3b4f; --d-line: rgba(255, 255, 255, 0.04); --d-ink: #efedf9; --d-title: #efedf9;
+  --d-sub: #a3c49c; --d-icon: #cdc8e4; --d-card: #27233f; --d-card-edge: #4f4b64; --d-shadow: rgba(0, 0, 0, 0.45); --d-meta: #b0aacb; --d-preview: #cdc8e4; --d-peek: #cfcddb; --d-grp: #cdc8e4;
+  --d-check: #a3c49c; --d-on-check: #1f2a1e; --d-box: #8f89b0; --d-done: #b0aacb; --d-select: #b0a8e0; --d-open: #a3c49c;
+  --d-bar: #a3c49c; --d-bar-track: #292542; --d-foot-rule: #3e3b4f; --d-foot: #b0aacb; --d-foot-paw: #d39a9e;
+  --d-hover: rgba(255, 255, 255, 0.06); --d-mark: rgba(190, 168, 90, 0.5); --d-menu: #27233f; --d-menu-edge: #4f4b64;
+  --d-qk: #27233f; --d-qk-edge: #4f4b64; --d-radius: 10px;
+  --d-chip: #332f4a; --d-pill: #2f2b46; --d-pill-edge: rgba(255, 255, 255, 0.12); --d-pin: #d9c47a; --d-danger: #eaa58a;
+  --d-pintab: #c4a245; --d-pintab-edge: #d6b65a; --d-pintab-ink: #1f1d18;
+  --d-closebar: #8a84a3;
+  --d-shadow-deep: rgba(0, 0, 0, 0.62); --d-slip-bottom: #121021; --d-ear: #17142a; --d-ear-in: #7d555a;
+  --c-lavender-a: #5e5888; --c-lavender-b: #575181; --c-lavender-ink: #f1edff; --c-lavender-tape: #7d75ad; --c-lavender-edge: #8f87c4; --c-lavender-line: #8f87c4;
+  --c-pink-a: #74545a; --c-pink-b: #6c4e54; --c-pink-ink: #ffe4e8; --c-pink-tape: #8a666c; --c-pink-edge: #a8797f; --c-pink-line: #a8797f;
+  --c-mint-a: #4b6a55; --c-mint-b: #46634f; --c-mint-ink: #e2f5e7; --c-mint-tape: #5f8269; --c-mint-edge: #719a7e; --c-mint-line: #719a7e;
+  --c-yellow-a: #716641; --c-yellow-b: #6a603c; --c-yellow-ink: #fff1bf; --c-yellow-tape: #85794f; --c-yellow-edge: #9d9168; --c-yellow-line: #9d9168;
+  --c-sky-a: #4a5d78; --c-sky-b: #455770; --c-sky-ink: #e3eeff; --c-sky-tape: #5d7090; --c-sky-edge: #7189ad; --c-sky-line: #7189ad;
+  --c-peach-a: #765b49; --c-peach-b: #6e5544; --c-peach-ink: #ffe8d8; --c-peach-tape: #8b6d58; --c-peach-edge: #a08675; --c-peach-line: #a08675;
+  --c-sand-a: #6a644f; --c-sand-b: #635d4a; --c-sand-ink: #f5ecd4; --c-sand-tape: #7b745d; --c-sand-edge: #958c6e; --c-sand-line: #958c6e;
+  --c-gray-a: #5d5a55; --c-gray-b: #57544f; --c-gray-ink: #f0ede6; --c-gray-tape: #6e6b65; --c-gray-edge: #8a8782; --c-gray-line: #8a8782;
+}
+/* ─── 칠판 (#244, tokens.json `drawer`; the folder colours from 먹색) ─── */
+:root[data-look="chalk"], .it[data-sheet="chalk"], .big[data-sheet="chalk"] {
+  --d-paper: #1b2722; --d-edge: #414c46; --d-line: rgba(255, 255, 255, 0.04); --d-ink: #eef3ea; --d-title: #eef3ea;
+  --d-sub: #a3c49c; --d-icon: #cad4c7; --d-card: #293832; --d-card-edge: #505d57; --d-shadow: rgba(0, 0, 0, 0.45); --d-meta: #abb8a9; --d-preview: #cad4c7; --d-peek: #ced5cd; --d-grp: #cad4c7;
+  --d-check: #a3c49c; --d-on-check: #1f2a1e; --d-box: #8b9b8c; --d-done: #abb8a9; --d-select: #b0a8e0; --d-open: #a3c49c;
+  --d-bar: #a3c49c; --d-bar-track: #2b3b35; --d-foot-rule: #414c46; --d-foot: #abb8a9; --d-foot-paw: #d39a9e;
+  --d-hover: rgba(255, 255, 255, 0.06); --d-mark: rgba(190, 168, 90, 0.5); --d-menu: #293832; --d-menu-edge: #505d57;
+  --d-qk: #293832; --d-qk-edge: #505d57; --d-radius: 10px;
+  --d-chip: #35433d; --d-pill: #313f39; --d-pill-edge: rgba(255, 255, 255, 0.12); --d-pin: #d9c47a; --d-danger: #eaa58a;
+  --d-pintab: #c4a245; --d-pintab-edge: #d6b65a; --d-pintab-ink: #1f1d18;
+  --d-closebar: #879487;
+  --d-shadow-deep: rgba(0, 0, 0, 0.62); --d-slip-bottom: #151e1b; --d-ear: #1b2722; --d-ear-in: #7d555a;
   --c-lavender-a: #5e5888; --c-lavender-b: #575181; --c-lavender-ink: #f1edff; --c-lavender-tape: #7d75ad; --c-lavender-edge: #8f87c4; --c-lavender-line: #8f87c4;
   --c-pink-a: #74545a; --c-pink-b: #6c4e54; --c-pink-ink: #ffe4e8; --c-pink-tape: #8a666c; --c-pink-edge: #a8797f; --c-pink-line: #a8797f;
   --c-mint-a: #4b6a55; --c-mint-b: #46634f; --c-mint-ink: #e2f5e7; --c-mint-tape: #5f8269; --c-mint-edge: #719a7e; --c-mint-line: #719a7e;
@@ -402,8 +549,12 @@ body.drawer-window { background: transparent; overflow: hidden; color: var(--d-i
 .kchip > span { overflow: hidden; text-overflow: ellipsis; }
 .kchip .icon { flex: none; }
 button.kchip:hover { color: var(--d-ink); box-shadow: inset 0 0 0 0.5px var(--d-pill-edge); }
-.kind .bar { flex: 0 0 46px; height: 4px; border-radius: 2px; background: var(--d-bar-track); overflow: hidden; }
-.bar > i { display: block; height: 100%; border-radius: 2px; background: var(--d-bar); }
+/* A checklist's chip (#240): the progress inside it, a rounded track and fill; all done, ‘✓ 4/4’ in the check colour. */
+.kchip.check { gap: 5px; overflow: visible; font-variant-numeric: tabular-nums; }
+.kchip.check .bar { flex: 0 0 26px; height: 5px; border-radius: 3px; background: var(--d-bar-track); overflow: hidden; }
+.kchip.check .bar > i { display: block; height: 100%; border-radius: 3px; background: var(--d-bar); }
+.kchip.check.done { color: var(--d-ink); font-weight: 600; }
+.kchip.check.done .icon { color: var(--d-check); } /* the ✓ a mark (3:1); the count in ink (the check colour is under 4.5:1 as small text on some papers) */
 /* The hover pill: 복사 · 고정 · ⋯ at a collapsed memo's top right (not while dragging). */
 .hov { position: absolute; right: 8px; top: 7px; display: none; gap: 1px; padding: 2px 3px; border-radius: 999px; background: var(--d-card); box-shadow: 0 0 0 0.5px var(--d-pill-edge), 0 2px 6px var(--d-shadow); z-index: 2; }
 .hov .ib { width: 24px; height: 22px; border-radius: 999px; }
@@ -482,6 +633,14 @@ button.bx:hover { border-color: var(--d-ink); }
 .swrow i.s-kraft { background: #fbf6ea; box-shadow: inset 0 0 0 3px #cdb187; } .swrow i.s-kraft.s-drawer { background: #cdb187; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.22); }
 .swrow i.s-grid { background: #fff linear-gradient(#d8e2ee 1px, transparent 1px) 0 0 / 6px 6px, #fff linear-gradient(90deg, #d8e2ee 1px, transparent 1px) 0 0 / 6px 6px; background-color: #fff; }
 .swrow i.s-grid.s-drawer { background-color: #dde6f0; background-image: linear-gradient(#c9d5e3 1px, transparent 1px), linear-gradient(90deg, #c9d5e3 1px, transparent 1px); background-size: 6px 6px; }
+/* #244: the seven new papers (their sheet, and their drawer paper under .s-drawer); the menu's small squares. */
+.swrow i.s-memo, .sq-paper.s-memo { background: #fffadc; box-shadow: inset 0 0 0 3px #eedc84; } .swrow i.s-memo.s-drawer { background: #eedc84; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.22); }
+.swrow i.s-manuscript, .sq-paper.s-manuscript { background: #fffefb; box-shadow: inset 0 0 0 3px #e8e0cf; } .swrow i.s-manuscript.s-drawer { background: #e8e0cf; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.22); }
+.swrow i.s-lined, .sq-paper.s-lined { background: #f8fbff; box-shadow: inset 0 0 0 3px #d0e1f1; } .swrow i.s-lined.s-drawer { background: #d0e1f1; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.22); }
+.swrow i.s-lavender, .sq-paper.s-lavender { background: #fcfbff; box-shadow: inset 0 0 0 3px #ddd4f0; } .swrow i.s-lavender.s-drawer { background: #ddd4f0; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.22); }
+.swrow i.s-recycled, .sq-paper.s-recycled { background: #f8f8f5; box-shadow: inset 0 0 0 3px #d6d5ce; } .swrow i.s-recycled.s-drawer { background: #d6d5ce; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.22); }
+.swrow i.s-nightsky, .sq-paper.s-nightsky { background: #27233f; box-shadow: inset 0 0 0 3px #17142a; } .swrow i.s-nightsky.s-drawer { background: #17142a; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.22); }
+.swrow i.s-chalk, .sq-paper.s-chalk { background: #293832; box-shadow: inset 0 0 0 3px #1b2722; } .swrow i.s-chalk.s-drawer { background: #1b2722; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.22); }
 .menu .sq-paper { display: block; width: 12px; height: 12px; border-radius: 3px; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.3); flex: none; }
 .sq-paper.s-day { background: #fffdf7; } .sq-paper.s-night { background: #3d3a34; } .sq-paper.s-kraft { background: #fbf6ea; box-shadow: inset 0 0 0 2px #cdb187; }
 .sq-paper.s-grid { background-color: #fff; background-image: linear-gradient(#d8e2ee 1px, transparent 1px), linear-gradient(90deg, #d8e2ee 1px, transparent 1px); background-size: 4px 4px; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.3); }
@@ -603,7 +762,7 @@ mark { background: var(--d-mark); color: inherit; border-radius: 2px; padding: 0
 .bk.lifted { opacity: 0.5; }
 .bk:focus-visible { outline: 2px solid var(--d-select); outline-offset: -2px; }
 
-/* ─── 바탕 (1.29): 반투명 · 강하게 — the paper lets the desktop through, blurred (Windows 11: the window's
+/* ─── 바탕 (1.29): 반투명 · 투명 — the paper lets the desktop through, blurred (Windows 11: the window's
    acrylic under it; here a backdrop blur stands in where something is behind the page). The sheets stay
    opaque, and what sits on the paper itself is set in the ink colour. ─── */
 :root[data-backdrop="frost"] .dr { background-color: color-mix(in srgb, var(--d-paper) 82%, transparent); backdrop-filter: blur(18px) saturate(1.2); }

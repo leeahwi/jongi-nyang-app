@@ -455,7 +455,7 @@ enum MemoDrawerArt {
 }
 
 /// The drawer's paper: its colour, its texture (kraft grain, grid squares; #111: no ruled lines), its edge and shadow.
-/// 반투명 / 강하게: the paper at 82 % / 62 % over the blur the panel puts behind it (snapshots draw a blurred desktop).
+/// 반투명 / 투명: the paper at 82 % / 62 % over the blur the panel puts behind it (snapshots draw a blurred desktop).
 private struct PaperBack<S: Shape>: View {
     let palette: DrawerPalette
     let shape: S

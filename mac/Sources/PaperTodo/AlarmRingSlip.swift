@@ -141,7 +141,7 @@ private struct RingingStage: View {
                 Wave(delay: 1, going: going)
             }
             Circle()
-                .fill(RadialGradient(colors: [PaperTheme.token("#fff6ef", night: "#5a4038"), PaperTheme.clay2], center: UnitPoint(x: 0.5, y: 0.4), startRadius: 0, endRadius: 56))
+                .fill(RadialGradient(colors: [PaperTheme.token("#fff6ef", night: "#5a4038"), PaperTheme.dayNight(.clay2)], center: UnitPoint(x: 0.5, y: 0.4), startRadius: 0, endRadius: 56))
                 .frame(width: 100, height: 100)
             Image(nsImage: PetArt.image(.cheer) ?? PaperTheme.mascot)
                 .resizable()

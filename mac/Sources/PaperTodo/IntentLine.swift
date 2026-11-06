@@ -308,6 +308,8 @@ struct IntentField: NSViewRepresentable {
     var onUndo: () -> Bool = { false }
     /// ↑ (-1) / ↓ (+1) — the search slip walks its results.
     var onArrow: (Int) -> Bool = { _ in false }
+    /// ⌥← (-1) / ⌥→ (+1) — the widget's day sheet goes to the day before or after while nothing is written (#234).
+    var onWordArrow: (Int) -> Bool = { _ in false }
     var accessibilityLabel = ""
     /// #162: more than 1 (`growing`: the 입력 줄, 빠른 입력): text with line breaks (pasted, or ⌥Return) grows the
     /// field a line at a time up to this many, then it scrolls inside, and long lines wrap — as Windows' textarea.
@@ -462,6 +464,8 @@ struct IntentField: NSViewRepresentable {
             case #selector(NSResponder.cancelOperation(_:)): return parent.onEscape()
             case #selector(NSResponder.moveUp(_:)): return parent.onArrow(-1)
             case #selector(NSResponder.moveDown(_:)): return parent.onArrow(1)
+            case #selector(NSResponder.moveWordLeft(_:)): return parent.onWordArrow(-1)
+            case #selector(NSResponder.moveWordRight(_:)): return parent.onWordArrow(1)
             default: return false
             }
         }
@@ -545,11 +549,13 @@ struct IntentChips: View {
     /// meaning is a to-do; a click goes to the next choice (⇧Tab with a `#` token).
     var space: SpaceChoiceChip?
     var onSpace: () -> Void = {}
+    /// The chip's words (the widget's day sheet says the day: `할 일 · 14일(토) 마감`, #234); the input line's otherwise.
+    var title: ((Intent.Candidate) -> String)?
 
     var body: some View {
         FlowLayout(spacing: 5, lineSpacing: 5) {
             ForEach(Array(candidates.enumerated()), id: \.offset) { index, candidate in
-                let title = candidate.chip(.current, now: now)
+                let title = self.title?(candidate) ?? candidate.chip(.current, now: now)
                 Button { onPick(index) } label: {
                     IntentChip(title: title, symbol: AppModel.symbol(candidate.kind), picked: index == picked)
                 }
@@ -776,7 +782,7 @@ struct IntentLineView: View {
                     .growing(oneLine: compact ? 22 : 26)
                     .accessibilityHint(L("할 일, 일정, 타이머, 알람이나 메모를 적어요. Tab으로 다른 뜻을 골라요."))
                 // No fade between the shortcut chip and the ↩ hint: a half-faded chip lingered while typing.
-                trailing(readable: !candidates.isEmpty)
+                trailing(readable: !candidates.isEmpty, picked: candidates.isEmpty ? nil : candidates[index])
                     .transaction { $0.animation = nil }
             }
             if let problem {
@@ -837,13 +843,14 @@ struct IntentLineView: View {
         return compact || width < 370 || needed > room ? L("무엇이든 적어요") : long
     }
 
-    /// `readable`: Return would put something in — a slash line it can't read dims the hint.
+    /// `readable`: Return would put something in — a slash line it can't read dims the hint. `picked`: what Return makes,
+    /// said on the hint (#240, D3 B: ‘↩ 일정 넣기’, as the quick entry's button); a narrow line keeps ‘↩ 넣기’.
     @ViewBuilder
-    private func trailing(readable: Bool) -> some View {
+    private func trailing(readable: Bool, picked: Intent.Candidate?) -> some View {
         if typing {
             HStack(spacing: 4) {
                 KeyCap("↩")
-                Text(L("넣기"))
+                Text(compact || width < 300 ? L("넣기") : Intent.actionText(picked, language: .current))
             }
             .font(.system(size: 10.5, weight: .semibold))
             .foregroundStyle(PaperTheme.ink3)

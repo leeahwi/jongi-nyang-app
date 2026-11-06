@@ -1,4 +1,5 @@
 import type { Lang } from "./lang";
+import { darkKinds, drawerThemes, paperKinds, readDrawerTheme, type DrawerTheme, type PaperKind } from "./paper";
 import { clock, dayMonth } from "./lang";
 import type { Memo } from "./memo";
 import type { DrawerFont, TextSize } from "./types";
@@ -64,8 +65,9 @@ export const readView = (value: unknown): FolderView => (value === "titles" ? "t
 export const viewOf = (folder: MemoFolder | undefined): FolderView => readView(folder?.view);
 /** A memo's own paper (이 메모의 종이); undefined = 서랍 따라 (the drawer's). #142: 한지 · 쑥색 · 벚꽃 · 먹색 too (an older
  *  version reads a paper it doesn't know as 서랍 따라). */
-export type MemoPaper = "day" | "night" | "kraft" | "grid" | "hanji" | "sage" | "blossom" | "ink";
-export const memoPapers: MemoPaper[] = ["day", "night", "kraft", "grid", "hanji", "sage", "blossom", "ink"];
+export type MemoPaper = PaperKind;
+/** #244: the fifteen papers (core/paper.ts), in the tiles' order. */
+export const memoPapers: MemoPaper[] = paperKinds;
 export const readMemoPaper = (value: unknown): MemoPaper | undefined => ((memoPapers as unknown[]).includes(value) ? value as MemoPaper : undefined);
 
 const epoch = "1970-01-01T00:00:00Z";
@@ -742,17 +744,15 @@ export function readDrawerShortcut(value: unknown): string {
 // ─── Device settings ──────────────────────────────────────────────────────────
 
 export type DrawerSide = "right" | "left";
-/** 바탕 (1.29): 불투명 (the default) · 반투명 (82 % and a blur) · 강하게 (62 %) · 바탕 없음 (the memos float on the desktop). */
+/** 바탕 (1.29): 불투명 (the default) · 반투명 (82 % and a blur) · 투명 (62 %) · 바탕 없음 (the memos float on the desktop). */
 export type DrawerBackdrop = "solid" | "frost" | "strong" | "none";
 export const drawerBackdrops: DrawerBackdrop[] = ["solid", "frost", "strong", "none"];
 export const readDrawerBackdrop = (value: unknown): DrawerBackdrop => ((drawerBackdrops as unknown[]).includes(value) ? value as DrawerBackdrop : "solid");
-/** The drawer's paper as written (`drawerTheme`): a paper, or `auto` — 낮 종이 with 밤에는 밤 종이로 on (#142). */
-export type DrawerTheme = "auto" | MemoPaper;
-export const drawerThemes: DrawerTheme[] = ["auto", ...memoPapers];
-/** The papers that are dark already: 밤에는 밤 종이로 leaves them as they are. */
-export const darkPapers: MemoPaper[] = ["night", "ink"];
+export { drawerThemes, readDrawerTheme, type DrawerTheme };
+/** The papers that are dark already: 밤에는 leaves them as they are (#244: 밤하늘 · 칠판 too). */
+export const darkPapers: MemoPaper[] = darkKinds;
 /**
- * #184: whether 반투명 · 강하게 would put this paper on an acrylic of the other kind. Windows tints the acrylic light or dark
+ * #184: whether 반투명 · 투명 would put this paper on an acrylic of the other kind. Windows tints the acrylic light or dark
  * with the whole app (Electron's nativeTheme: there is no theme per window, and setBackgroundMaterial takes no tint), not
  * with the drawer paper — so 먹색 under a light app, or 크라프트 under a dark one, would sink its words into it. Such a pair
  * is drawn on 불투명 instead.
@@ -761,9 +761,10 @@ export const backdropClashes = (look: MemoPaper, darkApp: boolean): boolean => d
 export const drawerWidth = { min: 260, max: 480, default: 300 };
 export const clampDrawerWidth = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) ? Math.round(Math.min(drawerWidth.max, Math.max(drawerWidth.min, value))) : drawerWidth.default);
 /**
- * 서랍 종이 (#142, settings plan P3): the paper picked for the day and whether it gives way to 밤 종이 at night. `auto`
- * (1.30's 자동) is 낮 종이 with the switch on; a paper picked by name stayed as it was at night, so the switch is off
- * until it is turned on (`drawerNightPaper`, absent before 1.31). The same rule as the Mac (settings-cases.json).
+ * 서랍 종이 as 1.31–1.32 read it (#142, settings plan P3; settings-cases.json): the paper picked for the day and whether
+ * it gives way to 밤 종이 at night. `auto` (1.30's 자동) is 낮 종이 with the switch on; a paper picked by name stayed as it
+ * was at night, so the switch is off until it is turned on. #244 reads these keys once into 노트와 같은 종이 and 밤에는
+ * (core/paper.ts readDrawerChoice) and keeps writing them for an older version (drawerStored).
  */
 export function drawerPaper(theme: DrawerTheme, nightPaper: boolean | undefined): { paper: MemoPaper; nightPaper: boolean } {
   if (theme === "auto") return { paper: "day", nightPaper: true };
@@ -772,12 +773,11 @@ export function drawerPaper(theme: DrawerTheme, nightPaper: boolean | undefined)
 }
 /** What `drawerTheme` is written as: `auto` for 낮 종이 with the switch on, so 1.30 still follows the note's day and night. */
 export const drawerThemeValue = (paper: MemoPaper, nightPaper: boolean): DrawerTheme => (paper === "day" && nightPaper ? "auto" : paper);
-/** The paper drawn: a light paper turns to 밤 종이 at night when the switch is on; a dark paper stays. */
+/** The paper 1.32 drew: a light paper turns to 밤 종이 at night when the switch is on; a dark paper stays. */
 export function drawerLook(theme: DrawerTheme, night: boolean, nightPaper?: boolean): MemoPaper {
   const picked = drawerPaper(theme, nightPaper);
   return night && picked.nightPaper && !darkPapers.includes(picked.paper) ? "night" : picked.paper;
 }
-export const readDrawerTheme = (value: unknown): DrawerTheme => ((drawerThemes as unknown[]).includes(value) ? value as DrawerTheme : "auto");
 
 /** 메모 글꼴 · 크기 (#84, docs/plans/memo-markdown.md): the faces and the size steps, kept within what the drawer knows. */
 export const drawerFonts: DrawerFont[] = ["clean", "pen", "brush", "mono"];

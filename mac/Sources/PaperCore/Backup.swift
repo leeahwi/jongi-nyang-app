@@ -206,6 +206,38 @@ public enum Backup {
         return Archive.logicalDayStart(lastDaily, calendar: calendar) < Archive.logicalDayStart(now, calendar: calendar)
     }
 
+    /// 저장과 백업's one line about the backups (#240, D2 C): what the user wants to know first — when the last copy was,
+    /// or what is wrong — then how they are made. The same words as the Windows app (backup.ts: backupStatus) and
+    /// docs/plans/storage-summary-cases.json.
+    public struct Status: Equatable, Sendable {
+        public enum Tone: String, Sendable { case ok, off, warn }
+        public var title: String
+        public var detail: String
+        public var tone: Tone
+    }
+
+    public static func status(auto: Bool, failed: Bool, missing: Bool, newest: Date?, now: Date, language: AppLanguage = .ko,
+                              calendar: Calendar = .paper) -> Status {
+        let i = language.index
+        let title: String
+        if failed {
+            title = ["마지막 백업을 하지 못했어요", "The last backup didn’t work", "De laatste back-up is niet gelukt"][i]
+        } else if !auto {
+            title = ["자동 백업이 꺼져 있어요", "Automatic backups are off", "Automatische back-ups staan uit"][i]
+        } else if let newest {
+            let when = savedWhen(newest, now: now, language: language, midSentence: true, calendar: calendar)
+            title = ["\(when)에 백업했어요", "Backed up \(when)", "Back-up gemaakt \(when)"][i]
+        } else {
+            title = ["아직 백업이 없어요", "No backups yet", "Nog geen back-ups"][i]
+        }
+        let detail = failed ? ["백업 폴더를 확인해 주세요.", "Please check the backup folder.", "Controleer de back-upmap."][i]
+            : missing ? ["고른 백업 폴더를 찾지 못해 기본 폴더에 백업해요.", "Couldn’t find the chosen backup folder, so backups go to the default one.",
+                         "De gekozen back-upmap is niet gevonden, dus back-ups gaan naar de standaardmap."][i]
+            : !auto ? ["덮어쓰기 전에는 그래도 백업해 둬요.", "Anything about to be overwritten is still backed up first.", "Wat overschreven wordt, wordt eerst toch bewaard."][i]
+            : ["하루 한 번, 덮어쓰기 전에도 저절로 남겨요.", "Once a day, and before anything is overwritten.", "Eén keer per dag, en voordat iets wordt overschreven."][i]
+        return Status(title: title, detail: detail, tone: failed || missing ? .warn : auto ? .ok : .off)
+    }
+
     /// When a copy was made, by calendar day: "오늘 09:12" · "어제 21:40" · "10월 28일 08:55" · "2025년 12월 30일 08:55" —
     /// en "Today 9:12 AM" · "Oct 28, 8:55 AM" · "Dec 30, 2025, 8:55 AM", nl "Vandaag 09:12" · "28 okt 08:55" · "30 dec 2025 08:55".
     /// `midSentence`: en "today …" · "yesterday …", nl "vandaag …" · "gisteren …". The same as backup.ts savedWhen.

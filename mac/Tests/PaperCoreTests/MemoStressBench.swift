@@ -125,14 +125,17 @@ private enum MemoStressBench {
         }
 
         guard check else { return }
-        // Generous ceilings (about 5–10× what this Mac measures), so only a real slowdown trips them.
+        // Ceilings about 3–10× what this Mac measures (#3, 2026-11-06: an M4 at load 4, the 2,000-memo tier), so a real
+        // slowdown trips them and a busy Mac doesn't. Until 1.48 they were 5–1,000× (merge 100 KB 1,500 ms for 1.5).
         let ceilings: [(String, Double)] = [
-            ("load memos.json", 400), ("save memos.json", 400), ("card words, all memos", 400),
-            // memo-folders.json with the formatters kept (1.45): about 10 and 16 ms on a busy Mac.
-            ("load memo-folders.json", 150), ("save memo-folders.json", 150),
-            // Search (1.45): a first search 30–100 ms on a busy Mac, the next key's with the lines kept about 5 ms.
-            ("per-keystroke list work", 50), ("search \"보고서\"", 250), ("search \"zzqq없음\"", 300), ("search again", 60),
-            ("merge 100KB, lines apart", 500), ("merge 100KB, same line", 1500), ("checklist toggle", 50),
+            // memos.json 11 · 8 ms, every card's words 94 ms.
+            ("load memos.json", 100), ("save memos.json", 100), ("card words, all memos", 300),
+            // memo-folders.json with the formatters kept (1.45): 4 and 8 ms.
+            ("load memo-folders.json", 50), ("save memo-folders.json", 50),
+            // A key's list work 6 ms; a first search 36–52 ms, the next key's with the lines kept 2–3 ms.
+            ("per-keystroke list work", 25), ("search \"보고서\"", 150), ("search \"zzqq없음\"", 200), ("search again", 15),
+            // Merging a 100 KB memo 1.5 ms either way; ticking one of 2,000 checklist lines 2 ms.
+            ("merge 100KB, lines apart", 25), ("merge 100KB, same line", 25), ("checklist toggle", 15),
         ]
         var failed = 0
         for (prefix, ceiling) in ceilings {

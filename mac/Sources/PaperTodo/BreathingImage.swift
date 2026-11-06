@@ -65,9 +65,16 @@ final class BreathingLayerView: NSView {
         let effective: BreathingImage.Style = reduced ? .still : style
         guard effective != currentStyle else { return }
         currentStyle = effective
-        imageLayer.removeAllAnimations()
-        guard effective != .still else { return }
-        let asleep = effective == .asleep
+        Self.breathe(imageLayer, style: effective)
+    }
+
+    /// The breathing and the sway on `layer` (whose anchor is at the paws), or none for `.still`. Also the desktop cat's
+    /// (`PetSpriteView`), which draws its own layers.
+    static func breathe(_ layer: CALayer, style: BreathingImage.Style) {
+        layer.removeAnimation(forKey: "breathe")
+        layer.removeAnimation(forKey: "sway")
+        guard style != .still else { return }
+        let asleep = style == .asleep
 
         // Breathing: a little taller and narrower on the in-breath.
         let breathe = CAKeyframeAnimation(keyPath: "transform")
@@ -81,7 +88,7 @@ final class BreathingLayerView: NSView {
         breathe.timingFunctions = [CAMediaTimingFunction(name: .easeInEaseOut), CAMediaTimingFunction(name: .easeInEaseOut)]
         breathe.duration = asleep ? 3.4 : 2.6
         breathe.repeatCount = .infinity
-        imageLayer.add(breathe, forKey: "breathe")
+        layer.add(breathe, forKey: "breathe")
 
         // A slow sway on a different period, so the motion never looks mechanical.
         if !asleep {
@@ -93,7 +100,7 @@ final class BreathingLayerView: NSView {
             sway.duration = 5.3
             sway.repeatCount = .infinity
             sway.isAdditive = true
-            imageLayer.add(sway, forKey: "sway")
+            layer.add(sway, forKey: "sway")
         }
     }
 }

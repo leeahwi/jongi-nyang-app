@@ -1,6 +1,7 @@
-import { chipText, intentProblem, readIntent, slashHint, slashOf, type Candidate, type IntentKind, type IntentPrefer } from "../core/intent";
+import { actionText, chipText, intentProblem, readIntent, slashHint, slashOf, type Candidate, type IntentKind, type IntentPrefer } from "../core/intent";
 import { findSpace, generalName, readSpaceLine, spaceColor, spaceLineProblem, takesSpace, type SpaceChoice, type SpaceToken, type TodoSpaces } from "../core/todoSpaces";
 import { h, icon, lang, t } from "./api";
+import { restCaret } from "./caretRest";
 import { keyCap } from "./slip";
 
 /**
@@ -37,6 +38,14 @@ export interface InputLineOptions {
   onEscape?: (event: KeyboardEvent) => void;
   /** The text or the readings changed (the quick entry's window fits itself). */
   onChange?: () => void;
+  /** #234: the readings of the line (the widget's day sheet reads on its day); none: the input line's own. */
+  read?: (text: string) => Candidate[];
+  /** #234: a reading's chip (the day sheet names the day); none: the input line's. */
+  chip?: (candidate: Candidate) => string;
+  /** #234: Shift+Enter (the day sheet puts the text in as a to-do); none: a new line. */
+  onShiftEnter?: (event: KeyboardEvent) => void;
+  /** Another reading was picked (Tab, a click): the quick entry's button says it (#240). */
+  onPick?: () => void;
 }
 
 export class InputLine {
@@ -68,6 +77,8 @@ export class InputLine {
     this.field.addEventListener("focus", () => this.element.classList.add("focused"));
     this.field.addEventListener("blur", () => this.element.classList.remove("focused"));
     this.field.addEventListener("keydown", (event) => this.key(event));
+    // #66: the caret stops blinking a while after the last key (each blink drew the whole note again).
+    restCaret(this.field);
     // Sized again whenever the line shows or changes width: a line measured while hidden (the focus card
     // or the pick bar in its place) would otherwise keep a 0px-tall field and no placeholder.
     new ResizeObserver(() => this.grow()).observe(this.element);
@@ -80,6 +91,8 @@ export class InputLine {
   get value(): string { return this.field.value; }
   get readings(): readonly Candidate[] { return this.candidates; }
   get pickedIndex(): number { return this.picked; }
+  /** The reading Enter would put in, or nothing yet. */
+  get pickedReading(): Candidate | undefined { return this.candidates[this.picked]; }
 
   focus(): void { this.field.focus(); }
 
@@ -95,7 +108,14 @@ export class InputLine {
   pick(index: number): void {
     if (index < 0 || index >= this.candidates.length) return;
     this.picked = index;
+    this.picks();
+  }
+
+  /** Another reading picked: the chips, the side's ‘↩ …’ and the owner's button follow. */
+  private picks(): void {
     this.drawChips();
+    this.drawSide();
+    this.options.onPick?.();
   }
 
   /** Reads the text again (the language's day turned, a preference was learned). */
@@ -112,7 +132,7 @@ export class InputLine {
     this.token = line.token;
     this.spaceChoices = line.choices;
     if (this.spacePicked >= this.spaceChoices.length) this.spacePicked = 0;
-    this.candidates = memo ? (text.trim() ? [{ kind: "memo", text: text.trim() }] : []) : this.slashing() ? [] : readIntent(line.text, new Date(), lang(), this.options.prefer?.() ?? {});
+    this.candidates = memo ? (text.trim() ? [{ kind: "memo", text: text.trim() }] : []) : this.slashing() ? [] : this.options.read ? this.options.read(line.text) : readIntent(line.text, new Date(), lang(), this.options.prefer?.() ?? {});
     const kinds = this.candidates.map((candidate) => candidate.kind).join(",");
     if (kinds !== this.kinds) this.picked = 0;
     this.kinds = kinds;
@@ -133,9 +153,9 @@ export class InputLine {
     const chips: HTMLElement[] = this.candidates.map((candidate, index) => {
       const picked = index === this.picked;
       const element = h("button", { class: `chip${picked ? " on" : ""}`, role: "option", "aria-selected": String(picked), tabindex: "-1" },
-        icon(kindIcon[candidate.kind], 13), h("span", {}, chipText(candidate, now, lang())));
+        icon(kindIcon[candidate.kind], 13), h("span", {}, this.options.chip ? this.options.chip(candidate) : chipText(candidate, now, lang())));
       element.addEventListener("mousedown", (event) => event.preventDefault()); // the text keeps the focus
-      element.addEventListener("click", () => { this.picked = index; this.drawChips(); this.field.focus(); });
+      element.addEventListener("click", () => { this.picked = index; this.picks(); this.field.focus(); });
       return element;
     });
     const space = this.spaceChip();
@@ -196,12 +216,17 @@ export class InputLine {
     if (slashing && lang() !== "ko") this.hint.textContent += `  ·  ${slashHint("ko")}`;
   }
 
-  /** The right of the line: the shortcut while empty, ↩ 넣기 while typing. */
+  /**
+   * The right of the line: the shortcut while empty, what Enter makes while typing (#240, D3 B: ‘↩ 일정 넣기’, as the
+   * quick entry's button); a narrow line keeps ‘↩ 넣기’.
+   */
   private drawSide(): void {
     const typing = this.field.value.trim().length > 0;
     // A slashed line that can't be read: Enter does nothing, so ↩ 넣기 dims (as on the Mac).
     const stuck = typing && this.candidates.length === 0;
-    if (typing && this.options.variant === "note") this.side.replaceChildren(h("span", { class: `kbd${stuck ? " dim" : ""}` }, `↩ ${t("넣기")}`));
+    const narrow = this.element.clientWidth > 0 && this.element.clientWidth < 300;
+    const action = narrow ? t("넣기") : actionText(this.pickedReading, lang());
+    if (typing && this.options.variant === "note") this.side.replaceChildren(h("span", { class: `kbd${stuck ? " dim" : ""}` }, `↩ ${action}`));
     else if (!typing && this.options.shortcut?.()) this.side.replaceChildren(h("span", { class: "kbd" }, this.options.shortcut()!));
     else this.side.replaceChildren();
     this.side.hidden = this.side.childElementCount === 0;
@@ -241,7 +266,12 @@ export class InputLine {
     if (event.key === "Tab" && text.trim() && this.candidates.length >= 2) {
       event.preventDefault();
       this.picked = (this.picked + (event.shiftKey ? -1 : 1) + this.candidates.length) % this.candidates.length;
-      this.drawChips();
+      this.picks();
+      return;
+    }
+    if (event.key === "Enter" && event.shiftKey && this.options.onShiftEnter) {
+      event.preventDefault();
+      this.options.onShiftEnter(event);
       return;
     }
     if (event.key === "Enter" && !event.shiftKey) {

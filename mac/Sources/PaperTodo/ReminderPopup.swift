@@ -438,9 +438,9 @@ struct ReminderPopupTask: Identifiable, Equatable {
 }
 
 /// Tests and design renders set PAPERTODO_OFFSCREEN=1 so their sample reminders are drawn
-/// far outside every display instead of popping up on the person's screen.
+/// far outside every display instead of popping up on the person's screen; a check's `--offscreen` run too (#217).
 enum OffscreenRendering {
-    static let enabled = ProcessInfo.processInfo.environment["PAPERTODO_OFFSCREEN"] == "1"
+    static let enabled = ProcessInfo.processInfo.environment["PAPERTODO_OFFSCREEN"] == "1" || TestHooks.staysBehind
     static var offset: NSPoint { enabled ? NSPoint(x: -40_000, y: -40_000) : .zero }
 }
 
@@ -780,9 +780,12 @@ private struct ReminderPopupView: View {
             let again = state.tasks.first?.scheduledAt.map { Snooze.eventAgain(start: $0, now: Date()) != nil } ?? false
             SlipFooter {
                 if again {
-                    Button(Snooze.eventAgainTitle(.current), action: state.onEventAgain)
-                        .buttonStyle(SlipButtonStyle(role: .ghost))
-                        .fixedSize()
+                    // Its icon as on Windows (the snooze's ↺, #240, 점검 3의 21).
+                    Button(action: state.onEventAgain) {
+                        Label(Snooze.eventAgainTitle(.current), systemImage: "arrow.counterclockwise")
+                    }
+                    .buttonStyle(SlipButtonStyle(role: .ghost))
+                    .fixedSize()
                 }
             } trailing: {
                 // With 5분 전에 다시 the header's × closes (닫기 would push 달력에서 열기 out of the slip).
@@ -995,7 +998,11 @@ private struct ReminderPopupView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture(perform: state.onOpen)
+        // VoiceOver reads it as a button and presses it like one (a tap gesture alone is only an image).
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("종이냥, 노트 열기")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { state.onOpen() }
         .help("노트 열기")
     }
 }

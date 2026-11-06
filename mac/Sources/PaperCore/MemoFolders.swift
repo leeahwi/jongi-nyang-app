@@ -23,10 +23,12 @@ public struct MemoFolders: Equatable, Sendable {
         case cards, titles
     }
 
-    /// 이 메모의 종이 (1.44): a memo's own paper; absent = 서랍 따라 (the drawer's). #142: 한지 · 쑥색 · 벚꽃 · 먹색 too (an
-    /// older version reads a paper it doesn't know as 서랍 따라 — the file keeps it as a string).
+    /// 이 메모의 종이 (1.44): a memo's own paper; absent = 서랍 따라 (the drawer's). #142: 한지 · 쑥색 · 벚꽃 · 먹색 too; #244:
+    /// all fifteen papers, in the tiles' order (PaperKind; the Windows app's `memoPapers`). An older version reads a paper it
+    /// doesn't know as 서랍 따라 — the file keeps it as a string.
     public enum Paper: String, CaseIterable, Sendable {
-        case day, night, kraft, grid, hanji, sage, blossom, ink
+        case day, hanji, kraft, grid, sage, blossom, memo, manuscript, lined, lavender, recycled
+        case night, ink, nightsky, chalk
     }
 
     public struct Folder: Equatable, Sendable {
@@ -570,15 +572,21 @@ public struct MemoFolders: Equatable, Sendable {
         }
     }
 
-    /// The footer (1.44): "회사 · 다섯 장" · "Work · 5 notes" · "Werk · 5 notities"; an empty folder just "비어 있어요" ·
-    /// "Empty" · "Leeg" (#39: the line in the middle says how to fill it, the bookmark says which folder).
+    /// The footer (1.44): "회사 · 5장" · "Work · 5 notes" · "Werk · 5 notities"; an empty folder just "비어 있어요" ·
+    /// "Empty" · "Leeg" (#39: the line in the middle says how to fill it, the bookmark says which folder). In digits like the
+    /// counts on the groups above it (‘어제 2’) — #240, it was "다섯 장".
     public static func footerShort(folder name: String, count: Int, language: AppLanguage = .ko) -> String {
-        count == 0 ? emptyFooter(language) : "\(name) · \(sheetCount(count, language: language))"
+        count == 0 ? emptyFooter(language) : "\(name) · \(footerCount(count, language: language))"
     }
 
-    /// 고정's footer (1.44): "고정 · 세 장" · "Pinned · 3 notes" · "Vastgezet · 3 notities"; none "비어 있어요".
+    /// A footer's count: "5장" (digits, #240) · "5 notes" · "5 notities".
+    static func footerCount(_ count: Int, language: AppLanguage) -> String {
+        language == .ko ? "\(count)장" : sheetCount(count, language: language)
+    }
+
+    /// 고정's footer (1.44): "고정 · 3장" · "Pinned · 3 notes" · "Vastgezet · 3 notities"; none "비어 있어요".
     public static func pinnedFooterShort(count: Int, language: AppLanguage = .ko) -> String {
-        count == 0 ? emptyFooter(language) : "\(["고정", "Pinned", "Vastgezet"][language.index]) · \(sheetCount(count, language: language))"
+        count == 0 ? emptyFooter(language) : "\(["고정", "Pinned", "Vastgezet"][language.index]) · \(footerCount(count, language: language))"
     }
 
     /// An empty folder's or 고정's footer: "비어 있어요" · "Empty" · "Leeg".

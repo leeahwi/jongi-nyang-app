@@ -26,7 +26,7 @@ if (tests) {
   await build({ ...common, entryPoints: [path.join(root, "src/preload.ts")], outfile: path.join(out, "preload.js"), platform: "node", format: "cjs", target: "node22", external: ["electron"] });
   await build({
     ...common,
-    entryPoints: ["note", "popup", "floating", "settings", "history", "calendarWindow", "pet", "timer", "help", "quick", "quickMemo", "timerSheet", "ring", "confirm", "glance", "desk", "drawer", "handle", "ears"].map((name) => path.join(root, "src/renderer", `${name}.ts`)),
+    entryPoints: ["note", "popup", "floating", "settings", "history", "calendarWindow", "pet", "timer", "help", "quick", "quickMemo", "timerSheet", "ring", "confirm", "glance", "desk", "drawer", "handle", "ears", "widget", "widgetSheet"].map((name) => path.join(root, "src/renderer", `${name}.ts`)),
     outdir: path.join(out, "renderer"), platform: "browser", format: "iife", target: "chrome130",
   });
   await mkdir(path.join(out, "renderer"), { recursive: true });

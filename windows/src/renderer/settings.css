@@ -63,8 +63,11 @@ select { height: 28px; border-radius: 7px; border: 1px solid var(--rule); backgr
 .tile .name { font-size: 12px; color: var(--secondary); display: flex; align-items: center; gap: 4px; }
 .tile[aria-checked="true"] .name { color: var(--sage-text); font-weight: 600; }
 
-.bottom { flex: none; display: flex; align-items: center; padding: 12px 28px; border-top: 1px solid var(--rule); background: color-mix(in srgb, var(--paper) 94%, transparent); }
-.bottom .spacer { flex: 1; }
+/* 알림 모양 → 한 번 띄워 보기 (#240, D1 B): under the tiles, inset like the rows' rules. */
+.tiles + .row.preview-row { border-top: 1px solid var(--rule); margin-left: 14px; padding-left: 0; padding-top: 6px; padding-bottom: 6px; }
+.row.preview-row .sub { margin-top: 0; font-size: 11.5px; }
+.row .action { flex: none; white-space: nowrap; }
+.row .action .icon { color: inherit; }
 .row.series { padding-top: 8px; padding-bottom: 8px; }
 .row.series .quiet .icon { color: var(--sage-text); }
 .series-title { padding-inline-end: var(--ink-over); font-family: var(--body-font); font-size: 19px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -151,6 +154,8 @@ input.step-value:focus { background: var(--card); outline: 2px solid color-mix(i
 .row.alarm.off .alarm-time, .row.alarm.off .alarm-label { color: var(--faded); }
 .row.empty-alarms { padding-top: 12px; padding-bottom: 12px; }
 .row.empty-alarms .sub { line-height: 1.5; font-size: 12px; }
+.row.empty-alarms { gap: 12px; padding-top: 10px; padding-bottom: 10px; }
+.row.empty-alarms .empty-cat { width: 40px; height: 40px; object-fit: contain; flex: none; user-select: none; }
 
 .alarm-editor { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; background: color-mix(in srgb, var(--sage) 5%, transparent); }
 .alarm-editor + .row, .row + .alarm-editor, .alarm-editor + .choice { border-top: 1px solid var(--rule); }
@@ -235,6 +240,26 @@ input.step-value:focus { background: var(--card); outline: 2px solid color-mix(i
 .pt-check { position: absolute; right: 5px; bottom: 5px; width: 16px; height: 16px; border-radius: 50%; display: grid; place-items: center; background: var(--sage); color: var(--on-sage); box-shadow: 0 0 0 1.5px var(--card); }
 .pt-name { max-width: 100%; font-size: 11.5px; color: var(--ink-2); text-align: center; line-height: 1.25; }
 .paper-tile[aria-checked="true"] .pt-name { color: var(--ink); font-weight: 600; }
+/* #244: the fifteen papers in two headed parts of one radio group; the notepad's tiles are drawn from the paper's own
+   colours (core/paper.ts noteSamples) with its ruling: lines, 모눈, 원고지, 줄노트's margin. */
+.paper-tiles { padding: 4px 12px 12px; }
+.paper-tiles .paper-gallery { padding: 0; }
+.pt-head { margin: 16px 2px 8px; font: 600 11px/1.3 var(--ui); color: var(--ink-3); }
+.paper-tiles .pt-head:first-child { margin-top: 6px; }
+.paper-tiles .paper-gallery:has(.pt-frame.note) { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px 8px; }
+@media (max-width: 560px) { .paper-tiles .paper-gallery:has(.pt-frame.note) { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.pt-frame.note { aspect-ratio: 1.3; background-color: var(--t-paper); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t-ink) 14%, transparent); }
+.paper-tile[aria-checked="true"] .pt-frame.note { box-shadow: inset 0 0 0 2.5px var(--sage); }
+.pt-frame.rule-lines { background-image: repeating-linear-gradient(180deg, transparent 0 11.4px, var(--t-rule) 11.4px 12px); }
+.pt-frame.rule-margin { background-image: linear-gradient(90deg, transparent 12px, var(--t-margin) 12px, var(--t-margin) 13.5px, transparent 13.5px), repeating-linear-gradient(180deg, transparent 0 11.2px, var(--t-rule) 11.2px 12px); }
+.pt-frame.rule-grid { background-image: repeating-linear-gradient(90deg, transparent 0 5.4px, var(--t-rule) 5.4px 6px), repeating-linear-gradient(180deg, transparent 0 5.4px, var(--t-rule) 5.4px 6px); }
+.pt-frame.rule-manuscript { background-image: repeating-linear-gradient(90deg, transparent 0 7.4px, var(--t-rule) 7.4px 8px), repeating-linear-gradient(180deg, transparent 0 8.4px, var(--t-rule) 8.4px 9px, transparent 9px 11.4px, var(--t-rule) 11.4px 12px); }
+.nt-tab { position: absolute; left: 8px; top: 0; width: 14px; height: 7px; border-radius: 0 0 3px 3px; background: var(--t-tab); }
+.nt-check { position: absolute; left: 7px; top: 14px; width: 6px; height: 6px; border-radius: 2px; background: var(--t-sage); }
+.nt-line { position: absolute; left: 16px; right: 10px; top: 16px; height: 3px; border-radius: 2px; background: var(--t-ink); opacity: 0.8; }
+.nt-line.short { top: 28px; right: 24px; opacity: 0.45; }
+.row.paper-night.off .glyph, .row.paper-night.off .grow > div:first-child { opacity: 0.55; }
+.row.paper-night select:disabled { opacity: 0.5; }
 
 /* 스페이스 (1.30): a row per space — the grip, its colour, its name typed over in place, its open to-dos, 지우기. */
 .row.space-row { gap: 8px; }
@@ -277,8 +302,9 @@ input.step-value:focus { background: var(--card); outline: 2px solid color-mix(i
 .space-device:focus-visible { outline: 2px solid var(--sage); outline-offset: 1px; }
 
 /* 시간 정하기 (#196): an L slip over the desk on a scrim — 바로 고르기 chips, the ranges, + 시간 더하기, the summary. */
-.device-scrim { position: fixed; inset: 0; z-index: 25; background: color-mix(in srgb, var(--ink) 8%, transparent); }
+/* #229: over the page without a scrim — the pane works around it; #228: once dragged it sits where it was put. */
 .slip.l.device-slip { position: fixed; z-index: 26; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(460px, calc(100vw - 24px)); max-height: calc(100vh - 32px); overflow-y: auto; }
+.slip.l.device-slip.moved { transform: none; }
 .device-body { display: flex; flex-direction: column; gap: 10px; }
 .device-lead { margin: 0; font-size: 12px; color: var(--ink-2); }
 .device-presets { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -326,7 +352,7 @@ input.step-value:focus { background: var(--card); outline: 2px solid color-mix(i
   --d-danger: var(--clay-text); --d-sub: var(--sage-text); --d-preview: var(--ink-2); --d-select: var(--sage); --d-hand: var(--body-font);
 }
 body > .menu { position: fixed; }
-:root[data-paper="night"] .menu { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 30px -10px rgba(0, 0, 0, 0.7); }
+:root[data-scheme="dark"] .menu { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 12px 30px -10px rgba(0, 0, 0, 0.7); }
 
 /* 글꼴 설정 (#141, as on the Mac): a popup field, a slider in steps (a sage fill to a white knob, a tick a step, 가 … 가),
    the step's name or the size beside it; 메모 글꼴's sample memo on the drawer's paper. */
@@ -360,3 +386,58 @@ select.popup { max-width: 220px; height: 28px; padding: 0 6px 0 9px; border-radi
 .dfp-ln code { font-family: var(--p-mono); font-size: var(--p-mono-size); padding: 0 3px; border-radius: 3px; background: color-mix(in srgb, var(--p-ink) 7%, transparent); }
 .dfp-box { width: 12px; height: 12px; flex: none; border-radius: 3px; border: 1.2px solid var(--p-box); display: grid; place-items: center; color: var(--p-on-check); }
 .dfp-box.on { background: var(--p-check); border-color: var(--p-check); }
+
+/* 바탕화면 위젯 (#234): a row per widget (its picture, name and how it is set, 설정…, ×), the gallery of six and the
+   settings slip. */
+.row.widget-row { padding-top: 8px; padding-bottom: 8px; }
+.row .two { display: flex; flex-direction: column; gap: 2px; }
+.row .two small { font-size: 11px; color: var(--ink-2); }
+.widget-x { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; }
+.wthumb { position: relative; flex: none; width: 52px; height: 40px; border-radius: 7px; background: var(--paper); box-shadow: 0 0 0 1px var(--rule), 0 1px 3px rgba(40, 35, 25, 0.12); display: flex; flex-direction: column; gap: 3px; padding: 7px 6px 5px; overflow: visible; }
+.wthumb .ears { position: absolute; right: 6px; top: -4px; width: 14px; height: 5px; background: linear-gradient(135deg, transparent 49%, var(--paper) 50%) left / 7px 5px no-repeat, linear-gradient(225deg, transparent 49%, var(--paper) 50%) right / 7px 5px no-repeat; }
+.wthumb .big { font-size: 14px; line-height: 1; color: var(--sage); }
+.wthumb .l { display: block; height: 3px; border-radius: 2px; background: var(--rule); }
+.wthumb .l.short { width: 60%; }
+.wthumb .l.thin { height: 2px; }
+.wthumb .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.wthumb .grid i { height: 3px; border-radius: 1px; background: var(--rule); }
+.wthumb .grid i.on { background: var(--sage); }
+.wthumb.k-month.s-detail .detail-mark { position: absolute; right: 5px; bottom: 5px; width: 10px; height: 2px; background: var(--event-blue); border-radius: 1px; }
+.widget-gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+.widget-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px 8px; border: 0; border-radius: 10px; background: var(--paper-2); font: inherit; font-size: 12px; color: var(--ink); cursor: pointer; }
+.widget-tile .wthumb { width: 86px; height: 62px; padding: 10px 9px 7px; gap: 5px; }
+.widget-tile .wthumb .big { font-size: 22px; }
+.widget-tile .name { text-align: center; line-height: 1.3; }
+.widget-tile.on { box-shadow: 0 0 0 2px var(--sage); background: var(--sage-2); }
+.widget-tile:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
+.widget-settings .card { border-radius: 12px; background: var(--card); box-shadow: 0 0 0 1px var(--rule); margin-top: 8px; }
+.widget-settings .row.off { opacity: 0.55; }
+.widget-settings input[type="range"] { width: 140px; accent-color: var(--sage); }
+.widget-pct { width: 40px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+.widget-note { font-size: 11px; color: var(--ink-3); padding: 0 14px 8px 14px; }
+/* 저장과 백업 (#240, D2 C): two choices for where the list lives, one line about the backups, the folders and 자세히 보기. */
+.storage-choices { display: flex; flex-direction: column; gap: 10px; }
+.storage-choice { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 16px; text-align: left; border-radius: 12px; background: color-mix(in srgb, var(--card) 70%, transparent); border: 1px solid var(--rule); color: var(--ink); }
+.storage-choice:hover { background: var(--card); }
+.storage-choice[aria-checked="true"] { background: var(--card); border: 1.6px solid var(--sage); padding: 11.4px 15.4px; }
+.storage-choice .sc-radio { flex: none; width: 18px; height: 18px; border-radius: 50%; border: 1.4px solid var(--check-border); }
+.storage-choice[aria-checked="true"] .sc-radio { border: 5px solid var(--sage); }
+.storage-choice .sc-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.storage-choice .sc-title { font: 600 14px/1.3 var(--ui); }
+.storage-choice .sc-detail { font: 11.5px/1.4 var(--ui); color: var(--ink-2); overflow-wrap: anywhere; }
+.backup-line { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--rule); background: var(--card); }
+.backup-line.ok { background: color-mix(in srgb, var(--sage) 9%, var(--card)); }
+.backup-line .backup-title { font-size: 13.5px; }
+.backup-line .sub { font-size: 11.5px; color: var(--ink-2); margin-top: 2px; line-height: 1.4; }
+.backup-line .sub.warn { color: var(--clay-text); }
+.backup-line .grow { flex: 1; min-width: 0; }
+.backup-line .action, .storage-links .action { flex: none; white-space: nowrap; height: 32px; padding: 0 12px; font-size: 12.5px; font-weight: 600; gap: 5px; }
+.backup-mark.ok { background: var(--sage); color: var(--on-sage); box-shadow: none; }
+.backup-mark.warn { background: var(--clay-2); color: var(--ink); box-shadow: none; }
+.backup-mark.off { background: var(--paper-2); color: var(--ink-2); }
+.storage-links { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.storage-links .spacer { flex: 1; }
+.storage-links .action .icon { color: inherit; }
+.storage-more { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 6px 2px; }
+.storage-more .icon { color: inherit; transition: transform var(--quick, 120ms) ease; }
+.storage-more[aria-expanded="true"] .icon { transform: rotate(180deg); }

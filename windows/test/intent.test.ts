@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import fs from "node:fs";
+import path from "node:path";
 import {
-  addedText, chipText, emptyIntentMemory, intentProblem, learnSwitch, preferenceKey, readIntent, switchText,
+  actionText, addedText, chipText, emptyIntentMemory, intentProblem, learnSwitch, preferenceKey, readIntent, switchText,
   type Candidate, type IntentKind, type IntentMemory, type IntentPrefer,
 } from "../src/core/intent";
 import type { Lang } from "../src/core/lang";
@@ -311,4 +313,33 @@ test("intent ranges: the Mac's rows M1–M4 (timeblock-cases.md, the 4 a.m. day)
   assert.equal(read("read chapters 2-4", "en").range, undefined);
   assert.deepEqual(read("22:00-23:30 정리").range, { day: "2026-10-08", start: 1320, end: 1410 });
   assert.equal(read("22:00-23:30 정리").reminderAt?.getHours(), 22);
+});
+
+// 빠른 입력의 버튼 (#240, D3 B): the shared cases from docs/plans/quick-entry-button-cases.json (the Mac's test-intent.sh
+// reads the same file).
+const buttonCases = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "quick-entry-button-cases.json"), "utf8")) as {
+  now: [number, number, number, number, number];
+  kinds: { kind: string; words: [string, string, string] }[];
+  lines: { case: string; lang: Lang; text: string; buttons: string[] }[];
+};
+
+test("quick entry: the button says what the picked chip makes, in ko · en · nl (shared cases)", () => {
+  const sample: Record<string, Candidate | undefined> = {
+    none: undefined,
+    todo: { kind: "todo", title: "우유" },
+    event: { kind: "event", title: "회의", day: "2026-10-09", start: 900, end: 960, allDay: false },
+    timer: { kind: "timer", minutes: 40 },
+    focus: { kind: "timer", minutes: 25, title: "보고서" },
+    alarm: { kind: "alarm", time: "07:00", days: [], label: "" },
+    memo: { kind: "memo", text: "장보기" },
+    repeat: { kind: "repeat", title: "물 마시기", rule: { kind: "daily" } },
+  };
+  for (const { kind, words } of buttonCases.kinds) {
+    (["ko", "en", "nl"] as const).forEach((language, index) => assert.equal(actionText(sample[kind], language), words[index], `${kind} ${language}`));
+  }
+  const [year, month, day, hour, minute] = buttonCases.now;
+  const at = new Date(year, month - 1, day, hour, minute);
+  for (const entry of buttonCases.lines) {
+    assert.deepEqual(readIntent(entry.text, at, entry.lang).map((candidate) => actionText(candidate, entry.lang)), entry.buttons, entry.case);
+  }
 });

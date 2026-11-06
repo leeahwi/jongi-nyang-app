@@ -1,4 +1,8 @@
 import { h, icon, paper, t } from "./api";
+import { holdWhileAsked } from "./askGuard";
+
+// #229: a question waiting holds this page up (askGuard.ts).
+holdWhileAsked();
 
 const api = paper();
 const root = document.getElementById("icon")!;
@@ -14,11 +18,16 @@ function render({ titles, remaining, total }: Summary): void {
   if (titles.length > 3) rows.push(h("div", { class: "line" }, h("span", { class: "more" }, t("외 {n}개", { n: titles.length - 2 }))));
   while (rows.length < 3) rows.push(h("div", { class: "line" }));
   lines.replaceChildren(...rows);
+  // #240 (점검 3의 29): a title too long for its line steps down a size or two before it is cut.
+  for (const line of lines.querySelectorAll<HTMLElement>(".t")) {
+    for (const size of [10.5, 9.5]) { if (line.scrollWidth <= line.clientWidth) break; line.style.fontSize = `${size}px`; }
+  }
   const done = total > 0 && remaining === 0;
   const words = total === 0 ? t("비어 있어요") : done ? t("다 했어요") : t("{count}개 남음", { count: remaining });
   caption.replaceChildren(...(done ? [icon("check", 11, 2.4), " "] : []), words);
   caption.classList.toggle("done", done);
-  root.title = `${words} · ${t("클릭해서 열기 · 드래그해서 이동")}`;
+  // The titles whole (the note's lines cut long ones, #240).
+  root.title = [words, ...titles.slice(0, 5).map((title) => `· ${title}`), t("클릭해서 열기 · 드래그해서 이동")].join("\n");
   root.setAttribute("aria-label", t("노트 열기, {state}", { state: words }));
 }
 

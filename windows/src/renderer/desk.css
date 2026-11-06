@@ -79,7 +79,9 @@ body { display: flex; height: 100vh; background: var(--paper); }
   .drow { height: 29px; }
   .dhead { margin: 8px 8px 3px; }
 }
-@media (max-width: 819px) and (max-height: 600px) {
-  .drow { height: 31px; }
+/* Folded and short: 1.48 (#240) has four groups, so one more rule between them — the rows close up a little more (the
+   page is the window less nothing: 600 of desk is 636 with the title strip). */
+@media (max-width: 819px) and (max-height: 660px) {
+  .drow { height: 30px; }
   .dhead { margin: 6px 6px 5px; }
 }

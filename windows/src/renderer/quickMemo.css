@@ -28,7 +28,7 @@ textarea.ruled::-webkit-scrollbar { width: 6px; }
 .qm-row:hover, .qm-row:focus { background: color-mix(in srgb, var(--sage) 12%, transparent); }
 .qm-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qm-tick { display: inline-flex; color: var(--sage-text); }
-:root[data-paper="night"] .qm-list { box-shadow: 0 0 0 0.5px var(--rule-strong), 0 6px 18px rgba(0, 0, 0, 0.5); }
+:root[data-scheme="dark"] .qm-list { box-shadow: 0 0 0 0.5px var(--rule-strong), 0 6px 18px rgba(0, 0, 0, 0.5); }
 /* The folders' colours as their day bookmarks (the Mac's menu squares are the same). */
 .fc-lavender { --fa: #dcd8f3; --fe: #9d92d8; }
 .fc-pink { --fa: #f2d3d6; --fe: #d79aa2; }

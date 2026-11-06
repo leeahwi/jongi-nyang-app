@@ -1,97 +1,99 @@
 import AppKit
+import PaperCore
 import SwiftUI
 
-/// The paper's colours as named tokens: "종이" (day) and "밤 종이" (night, from 1.36). Each token
-/// is one colour that resolves for the appearance it is drawn in — the app's 종이 색 setting sets
-/// `NSApp.appearance` (자동 follows macOS), so every window and every system control switch together.
-/// `scripts/check-contrast.py` reads the pairs below and checks them against WCAG AA.
+/// The paper's colours as named tokens. Since #244 each is the colour of the paper drawn (`PaperLook.shared`, one of the
+/// fifteen in `NotePalette.swift`): one colour that resolves for the appearance it is drawn in — the paper by day, and at
+/// night the paper 밤에는 picked — and a view whose `body` reads one redraws when the paper changes. 낮 · 밤 and the paper's
+/// lightness set `NSApp.appearance`, so every window and every system control switch together. The values (낮 종이 and
+/// 밤 종이 as 1.47's) are in NotePalette.swift, which `scripts/check-contrast.py` checks against WCAG AA.
 enum PaperTheme {
     // MARK: Tokens
     /// The sheet.
-    static let paper = token("#fbf9f3", night: "#2a2924")
+    static var paper: Color { PaperLook.color(.paper) }
     /// Sunken areas: chips, segmented backgrounds, the track, the desk's sidebar.
-    static let paper2 = token("#f5f1e7", night: "#33322c")
+    static var paper2: Color { PaperLook.color(.paper2) }
     /// Raised cards on the sheet: the day ribbon, the input line, settings groups.
-    static let card = token("#fffdf8", night: "#312f29")
+    static var card: Color { PaperLook.color(.card) }
     /// What's picked on a sunken surface: the desk's selected pane, a segmented control's choice
     /// (by day the card; at night a step lighter, since the night card sits below paper2).
-    static let raised = token("#fffdf8", night: "#46433b")
+    static var raised: Color { PaperLook.color(.raised) }
     /// Text: primary, secondary, faint. (1.37: ink3 darkened by day to pass AA as text — 4.5:1 on paper,
     /// paper2 and card; the old colour lives on as `faint`, for marks that aren't text.)
-    static let ink = token("#2f2e2a", night: "#ece6d6")
-    static let ink2 = token("#6b685e", night: "#bdb7a7")
-    static let ink3 = token("#726e64", night: "#9f9989")
+    static var ink: Color { PaperLook.color(.ink) }
+    static var ink2: Color { PaperLook.color(.ink2) }
+    static var ink3: Color { PaperLook.color(.ink3) }
     /// Decorative, not text: rules-ish marks, disabled glyphs, empty-state ornaments.
-    static let faint = token("#a5a195", night: "#8a8577")
+    static var faint: Color { PaperLook.color(.faint) }
     /// Ruled lines and borders.
-    static let rule = token("#e6e0d2", night: "#3e3c34")
+    static var rule: Color { PaperLook.color(.rule) }
     /// "지금 · 끝냄 · 선택".
-    static let sage = token("#5c7a5a", night: "#a3c49c")
-    static let sage2 = token("#e4ebe0", night: "#39443a")
+    static var sage: Color { PaperLook.color(.sage) }
+    static var sage2: Color { PaperLook.color(.sage2) }
     /// Sage as text (on paper, on sage2 and sage tints): a step darker by day to pass AA.
-    static let sageText = token("#546f52", night: "#a3c49c")
+    static var sageText: Color { PaperLook.color(.sageText) }
     /// Text and marks on a sage fill (the primary button, a ticked box, today's date).
-    static let onSage = token("#fffdf8", night: "#1f2a1e")
+    static var onSage: Color { PaperLook.color(.onSage) }
     /// "곧 · 늦음 · 지금 선".
-    static let clay = token("#b06a4f", night: "#e29a7c")
-    static let clay2 = token("#f6e3db", night: "#4a3630")
+    static var clay: Color { PaperLook.color(.clay) }
+    static var clay2: Color { PaperLook.color(.clay2) }
     /// Clay as text (late, `40분 뒤`, soon): a step darker by day to pass AA on paper, card and clay2.
-    static let clayText = token("#955842", night: "#e29a7c")
+    static var clayText: Color { PaperLook.color(.clayText) }
     /// A switch's knob: white by day; the ink colour at night, so it isn't the brightest thing on the page.
     /// (The off track is `rule` edged with `checkBorder`, ≥ 3:1 against paper and card.)
-    static let switchKnob = token("#ffffff", night: "#ece6d6")
+    static var switchKnob: Color { PaperLook.color(.switchKnob) }
     /// The note's red margin line (by day clay at 22% on paper; at night clay2, not a hand-mixed tint).
-    static let marginRule = token("#e7d8ce", night: "#4a3630")
+    static var marginRule: Color { PaperLook.color(.marginRule) }
     /// An open checkbox's border.
-    static let checkBorder = token("#908a7b", night: "#837e69")
+    static var checkBorder: Color { PaperLook.color(.checkBorder) }
     /// The note's tabs (1.45, solid with a 1 pt edge): 오늘 honey, 앞으로 lavender — lighter at night than the
     /// paper, so their names are in a dark ink there too (`tabInk`).
-    static let tabToday = token("#f6dc7c", night: "#c4a245")
-    static let tabAhead = token("#d6ccf6", night: "#9d92dc")
-    static let tabTodayEdge = token("#dcc062", night: "#d6b65a")
-    static let tabAheadEdge = token("#bdb0ea", night: "#b2a8ea")
+    static var tabToday: Color { PaperLook.color(.tabToday) }
+    static var tabAhead: Color { PaperLook.color(.tabAhead) }
+    static var tabTodayEdge: Color { PaperLook.color(.tabTodayEdge) }
+    static var tabAheadEdge: Color { PaperLook.color(.tabAheadEdge) }
     /// A tab's name and count, picked or not: ink by day, a dark ink on the light night tabs.
-    static let tabInk = token("#2f2e2a", night: "#1f1d18")
+    static var tabInk: Color { PaperLook.color(.tabInk) }
     /// The tabs' old softer colours, kept for what wears them under ink (light ink at night): the 꾸미기 · 알림 ·
     /// AI 연결 panes' icon tiles and the help's groups.
-    static let tintToday = token("#f5e7b2", night: "#6a5e35")
-    static let tintAhead = token("#e3ddf2", night: "#4f4868")
+    static var tintToday: Color { PaperLook.color(.tintToday) }
+    static var tintAhead: Color { PaperLook.color(.tintAhead) }
     /// 종이냥's pane tile and help group (rose).
-    static let tabMemo = token("#f3dbd7", night: "#63443f")
+    static var tabMemo: Color { PaperLook.color(.tabMemo) }
     /// Washi tape on the slips, by kind (1.45: solid with a 1 pt edge like the tabs, no stripes). Its edge is the
     /// colour a step darker by day and a step lighter at night, where the tape is lighter than the paper.
-    static let tapeHoney = token("#e9cf7a", night: "#8a7a3f")
-    static let tapeLavender = token("#cfc6ea", night: "#5d5578")
-    static let tapeSky = token("#bcd0ea", night: "#4d5f7a")
-    static let tapeMint = token("#c9dcc4", night: "#4f6650")
-    static let tapeRose = token("#ecc4bc", night: "#7a4f4a")
-    static let tapeNeutral = token("#d9d3c4", night: "#55524a")
-    static let tapeHoneyEdge = token("#c8b269", night: "#a19565")
-    static let tapeLavenderEdge = token("#b2aac9", night: "#7d7793")
-    static let tapeSkyEdge = token("#a2b3c9", night: "#717f95")
-    static let tapeMintEdge = token("#adbda9", night: "#728573")
-    static let tapeRoseEdge = token("#cba9a2", night: "#95726e")
-    static let tapeNeutralEdge = token("#bbb5a9", night: "#77756e")
+    static var tapeHoney: Color { PaperLook.color(.tapeHoney) }
+    static var tapeLavender: Color { PaperLook.color(.tapeLavender) }
+    static var tapeSky: Color { PaperLook.color(.tapeSky) }
+    static var tapeMint: Color { PaperLook.color(.tapeMint) }
+    static var tapeRose: Color { PaperLook.color(.tapeRose) }
+    static var tapeNeutral: Color { PaperLook.color(.tapeNeutral) }
+    static var tapeHoneyEdge: Color { PaperLook.color(.tapeHoneyEdge) }
+    static var tapeLavenderEdge: Color { PaperLook.color(.tapeLavenderEdge) }
+    static var tapeSkyEdge: Color { PaperLook.color(.tapeSkyEdge) }
+    static var tapeMintEdge: Color { PaperLook.color(.tapeMintEdge) }
+    static var tapeRoseEdge: Color { PaperLook.color(.tapeRoseEdge) }
+    static var tapeNeutralEdge: Color { PaperLook.color(.tapeNeutralEdge) }
     /// Event blue on a light tint (the event sheet's and alert's badge).
-    static let eventBlue = token("#5585cc", night: "#8fb1e3")
-    static let eventTint = token("#e2eaf6", night: "#313b4a")
+    static var eventBlue: Color { PaperLook.color(.eventBlue) }
+    static var eventTint: Color { PaperLook.color(.eventTint) }
     /// Memo purple on a light tint (the quick-memo badge).
-    static let memoPurple = token("#7a6aae", night: "#bcb0e2")
-    static let memoTint = token("#ebe6f6", night: "#3a3548")
+    static var memoPurple: Color { PaperLook.color(.memoPurple) }
+    static var memoTint: Color { PaperLook.color(.memoTint) }
     /// AI 연결's stamp on a row Claude added or changed today (1.42): blue-grey stamp ink.
-    static let stamp = token("#4d5b86", night: "#a9b6dc")
+    static var stamp: Color { PaperLook.color(.stamp) }
     /// 백업 목록's kind chips (#140): 업데이트 전 lavender words on memoTint, 직접 honey words on honey2 (매일 sage, the ‘before’ ones clay).
-    static let lavenderText = token("#62559a", night: "#c6bcf0")
-    static let honeyText = token("#755e12", night: "#e4c86e")
-    static let honey2 = token("#f5ebc6", night: "#463d22")
+    static var lavenderText: Color { PaperLook.color(.lavenderText) }
+    static var honeyText: Color { PaperLook.color(.honeyText) }
+    static var honey2: Color { PaperLook.color(.honey2) }
     /// The toast: an ink pill with paper text (so at night a light pill with dark text); its
     /// action and the kind word in it.
-    static let toastBack = token("#2f2e2a", night: "#ece6d6")
-    static let toastText = token("#fbf9f3", night: "#2a2924")
-    static let toastAction = token("#f6d9c7", night: "#8f4a30")
-    static let toastKind = token("#cfe3c9", night: "#3d6639")
+    static var toastBack: Color { PaperLook.color(.toastBack) }
+    static var toastText: Color { PaperLook.color(.toastText) }
+    static var toastAction: Color { PaperLook.color(.toastAction) }
+    static var toastKind: Color { PaperLook.color(.toastKind) }
     /// The desk under the snapshots of slips.
-    static let desk = token("#efeadf", night: "#3a3833")
+    static var desk: Color { PaperLook.color(.desk) }
     /// Light on a paper edge (the slips' top highlight): bright by day, a faint gleam at night.
     static let edgeLight = Color(nsColor: NSColor(name: nil) { appearance in
         NSColor.white.withAlphaComponent(appearance.isNight ? 0.06 : 0.7)
@@ -118,13 +120,22 @@ enum PaperTheme {
     /// A day colour and its night one, as one colour.
     static func token(_ day: String, night: String) -> Color { Color(nsColor: NSColor.token(day, night: night)) }
 
-    /// An event's colour: its own hue, a little dimmer at night (85% brightness) so it doesn't glare.
+    /// An event's colour on the paper drawn (#244, Q6): one of the six (`LocalEvent.Color`) is that paper's mark — a step
+    /// deeper where its own colour stood below 3:1 on the paper or a card, dimmed on a dark paper as before; any other hue
+    /// is itself, a little dimmer at night (85 % brightness) so it doesn't glare.
     static func event(_ hex: String, fallback: Color = PaperTheme.sage) -> Color {
+        if let known = LocalEvent.Color.allCases.first(where: { $0.hex == hex.lowercased() }) { return PaperLook.mark(known) }
         guard let day = NSColor(paperHex: hex) else { return fallback }
         return Color(nsColor: NSColor(name: nil) { appearance in
             guard appearance.isNight, let rgb = day.usingColorSpace(.sRGB) else { return day }
             return NSColor(hue: rgb.hueComponent, saturation: rgb.saturationComponent, brightness: rgb.brightnessComponent * 0.85, alpha: 1)
         })
+    }
+
+    /// A token as 낮 종이 and 밤 종이 draw it, whatever paper is picked: for what keeps to day and night only (4-4 — the focus
+    /// ring, the alarm's dial).
+    static func dayNight(_ token: NotePalette.Token) -> Color {
+        Color(nsColor: NSColor.token(NotePalette.day.hex(token), night: NotePalette.night.hex(token)))
     }
 
     // MARK: Older names (the same tokens)
@@ -181,6 +192,9 @@ enum Motion {
         }
     }
 
+    /// 바탕화면 위젯 (#234): solid this fast when the pointer comes onto it, and back this long after it left.
+    static let widgetSolid = 0.15
+    static let widgetFadeDelay = 0.6
     /// How far a new thing rises as it fades in (등장).
     static let rise: CGFloat = 6
     /// The pencil line starts this long after the box pops (체크 한 번, as on Windows).
@@ -191,6 +205,10 @@ enum Motion {
     static let dayStripHold = 0.45
     /// Both holds under Reduce Motion: long enough to see what was pressed.
     static let reducedHold = 0.3
+    /// 흔들기 (#229, slip-move-cases.json `nudge`): a question a click couldn't get past swings to these (pt) and settles,
+    /// in 톡's 0.3 s split evenly. Under Reduce Motion its tape blinks instead: these opacities, 살짝 (0.12 s) each.
+    static let shake: [CGFloat] = [-7, 6, -4, 2, 0]
+    static let blink: [Double] = [0.25, 1, 0.25, 1]
 
     /// Reduce Motion, for code outside a view (views read `accessibilityReduceMotion`).
     @MainActor static var reduced: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
@@ -263,7 +281,7 @@ extension NSColor {
     }
 }
 
-/// 꾸미기 → 종이 색: 자동 (follows macOS) · 낮 · 밤.
+/// 꾸미기 → 낮 · 밤: 자동 (follows macOS) · 낮 · 밤.
 enum PaperColor: String, CaseIterable, Identifiable {
     case auto, day, night
     var id: String { rawValue }
@@ -277,34 +295,60 @@ enum PaperColor: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Every window that doesn't choose its own follows the app's appearance.
+    var dayNight: PaperLook.DayNight { PaperLook.DayNight(rawValue: rawValue)! }
+
+    /// Every window that doesn't choose its own follows the app's appearance: 낮 · 밤 with the paper's lightness (#244,
+    /// `PaperLook.appearance` — a dark paper keeps the menus dark by day too).
     @MainActor func apply() {
-        NSApplication.shared.appearance = switch self {
-        case .auto: nil
-        case .day: NSAppearance(named: .aqua)
-        case .night: NSAppearance(named: .darkAqua)
-        }
+        PaperLook.shared.update(dayNight: dayNight)
     }
 }
 
 struct PaperBackground: View {
+    /// The grain is a cream texture (on average #f5f1e9, about 낮 종이's colour). On another paper it is tinted to that paper
+    /// (#244) — multiplied by the paper over the texture's average, drawn once into a bitmap and kept — so the grain shows
+    /// without washing a tinted paper (크라프트지, 재생지) toward cream. 낮 종이 keeps it as it is.
+    @MainActor static func texture(_ kind: PaperKind) -> NSImage {
+        if let made = textures[kind] { return made }
+        let texture = PaperTheme.texture
+        guard kind != .day, let paper = DrawerPalette.rgb(NotePalette.of(kind).paper),
+              let source = texture.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let context = CGContext(data: nil, width: source.width, height: source.height, bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+        else { return texture }
+        let average: [Double] = [0xf5, 0xf1, 0xe9]
+        let scale = zip(paper, average).map { CGFloat(min(1, $0 / $1)) }
+        let rect = CGRect(x: 0, y: 0, width: source.width, height: source.height)
+        context.draw(source, in: rect)
+        context.setBlendMode(.multiply)
+        context.setFillColor(CGColor(srgbRed: scale[0], green: scale[1], blue: scale[2], alpha: 1))
+        context.fill(rect)
+        guard let tinted = context.makeImage() else { return texture }
+        let made = NSImage(cgImage: tinted, size: texture.size)
+        textures[kind] = made
+        return made
+    }
+    @MainActor private static var textures: [PaperKind: NSImage] = [:]
+
     /// Increase Contrast: plain paper, no grain.
     @Environment(\.colorSchemeContrast) private var contrast
-    /// 밤 종이: plain paper too (the grain is a light texture; at night it would read as dust).
+    /// The paper drawn by day or at night: its grain (none on the dark papers — a light texture at night would read as dust).
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
+        let kind = PaperLook.shared.paper(dark: scheme == .dark)
+        let grain = kind.grain
         PaperTheme.paper
             .overlay {
-                // A very faint grain (a few percent of contrast), off with Increase Contrast and at night.
-                if contrast != .increased && scheme != .dark {
+                // A very faint grain (a few percent of contrast), off with Increase Contrast and on papers without one.
+                if contrast != .increased && grain > 0 {
                     GeometryReader { geometry in
-                        Image(nsImage: PaperTheme.texture)
+                        Image(nsImage: Self.texture(kind))
                             .resizable()
                             .scaledToFill()
                             .frame(width: geometry.size.width, height: geometry.size.height)
                             .clipped()
-                            .opacity(0.22)
+                            .opacity(grain)
                     }
                     .allowsHitTesting(false)
                 }
@@ -317,20 +361,68 @@ struct PaperBackground: View {
     }
 }
 
+/// The paper's ruling under the rows (and, from #244, in each row of the sheet): lines every row; 모눈's squares (11 pt,
+/// every fourth a row's line); 원고지's cells (a rule over and under each row's writing band and a stroke every 22 pt, in
+/// the paper's red `rule`); 하늘색 줄노트's blue lines (its red margin is the note's margin line, 2 pt). One canvas, drawn
+/// once — the squares and cells are more strokes, not more redraws.
 struct PaperRules: View {
+    /// A row's own ruling (its height), drawn over the row from its top; nil: the sheet below the rows.
+    var row: CGFloat?
+    @Environment(\.colorScheme) private var scheme
+
     var body: some View {
+        // Read here (not in the canvas) so the paper's change redraws it.
+        let ruling = PaperLook.shared.paper(dark: scheme == .dark).ruling
+        let rule = PaperTheme.rule
         Canvas { context, size in
-            var rules = Path()
-            var y = PaperTheme.rowHeight - 0.5
-            while y < size.height {
-                rules.move(to: CGPoint(x: 18, y: y))
-                rules.addLine(to: CGPoint(x: size.width - 20, y: y))
-                y += PaperTheme.rowHeight
-            }
-            context.stroke(rules, with: .color(PaperTheme.rule), lineWidth: 0.6)
+            context.stroke(PaperRules.path(ruling, size: size, row: row), with: .color(rule), lineWidth: ruling == .lines || ruling == .margin ? 0.6 : 0.5)
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    /// 원고지: the gap between one row's cells and the next row's (the band where nothing is written).
+    static let manuscriptGap: CGFloat = 8
+
+    static func path(_ ruling: PaperKind.Ruling, size: CGSize, row: CGFloat?) -> Path {
+        var path = Path()
+        let left: CGFloat = 18, right = size.width - 20
+        guard right > left else { return path }
+        func horizontal(_ y: CGFloat) {
+            path.move(to: CGPoint(x: left, y: y))
+            path.addLine(to: CGPoint(x: right, y: y))
+        }
+        func vertical(_ x: CGFloat, _ top: CGFloat, _ bottom: CGFloat) {
+            path.move(to: CGPoint(x: x, y: top))
+            path.addLine(to: CGPoint(x: x, y: bottom))
+        }
+        let rowHeight = PaperTheme.rowHeight
+        switch ruling {
+        case .lines, .margin:
+            // A row draws its own line (TaskRow); the sheet's lines carry on under the rows.
+            guard row == nil else { return path }
+            var y = rowHeight - 0.5
+            while y < size.height { horizontal(y); y += rowHeight }
+        case .grid:
+            let step = rowHeight / 4
+            var y = step - 0.5
+            while y < size.height { horizontal(y); y += step }
+            var x = left
+            while x <= right { vertical(x, 0, size.height); x += step }
+        case .manuscript:
+            let band = row ?? rowHeight
+            var top: CGFloat = 0
+            while top < size.height {
+                let bottom = top + band - 0.5, upper = top + band - manuscriptGap
+                if row == nil { horizontal(bottom) }
+                horizontal(upper)
+                var x = left
+                while x <= right { vertical(x, top, upper); x += rowHeight / 2 }
+                if row != nil { break }
+                top += rowHeight
+            }
+        }
+        return path
     }
 }
 

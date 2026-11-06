@@ -14,10 +14,16 @@ final class EventBook: ObservableObject {
     @Published var openDay: String? { didSet { preferences.set(openDay, forKey: "calendar.openDay") } }
     /// Minutes before an event to show it in a bubble; 0 = off.
     @Published var alertMinutes: Int { didSet { preferences.set(alertMinutes, forKey: "calendar.alertMinutes") } }
+    /// 음력 날짜 보이기 · 공휴일 보이기 (#234): the desk calendar and the widgets show them (this Mac's setting).
+    @Published var showsLunar: Bool { didSet { preferences.set(showsLunar, forKey: "calendar.lunar") } }
+    @Published var showsHolidays: Bool { didSet { preferences.set(showsHolidays, forKey: "calendar.holidays") } }
     /// The event sheet open over the strip (new, change, remove, or a quick-entry event to finish).
     @Published var sheet: CalendarSheetRequest?
     /// Asks the 달력 window to show this day ("yyyy-MM-dd").
     @Published var windowDay: String?
+    /// calendar-flows D3: and to open this event of that day (its occurrence key) to change or remove it — set before
+    /// `windowDay`.
+    var windowEvent: String?
     @Published private(set) var problem: String?
 
     static let alertChoices = [0, 5, 10, 15, 30]
@@ -35,6 +41,8 @@ final class EventBook: ObservableObject {
         // Until 1.39: today's event list under the ribbon, open or folded (the whole day replaces it).
         preferences.removeObject(forKey: "calendar.stripCollapsed")
         alertMinutes = preferences.object(forKey: "calendar.alertMinutes") == nil ? 10 : preferences.integer(forKey: "calendar.alertMinutes")
+        showsLunar = preferences.object(forKey: "calendar.lunar") as? Bool ?? true
+        showsHolidays = preferences.object(forKey: "calendar.holidays") as? Bool ?? true
         load()
     }
 

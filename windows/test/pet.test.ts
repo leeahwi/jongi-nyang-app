@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
-import { bubbleAbove, clampFloorX, clipMs, idleChoices, isResting, petFrame, pickWeighted, walkCycleFrames, walkSpeed, walkStride } from "../src/core/pet";
+import { bubbleAbove, bubbleShift, clampFloorX, clipFrameMs, clipMs, idleChoices, isResting, petFrame, petWindowLeft, petWindowWidth, pickWeighted, restBreathMs, walkCycleFrames, walkStepX, walkSpeed, walkStride } from "../src/core/pet";
+
+const windows = process.cwd();
 
 test("clip lengths match macOS; resting states have none", () => {
   assert.equal(clipMs({ kind: "sit" }), 0);
@@ -73,4 +77,49 @@ test("a reminder bubble sits just above the cat, inside the work area", () => {
   assert.equal(bubbleAbove({ x: 1850, y: 948, width: 92, height: 92 }, size, area).x, 1920 - 360 - 8, "kept inside on the right");
   assert.equal(bubbleAbove({ x: 10, y: 948, width: 92, height: 92 }, size, area).x, 8, "and on the left");
   assert.equal(bubbleAbove({ x: 900, y: 100, width: 92, height: 92 }, size, area).y, 0, "never above the top");
+});
+
+test("#67: the window is the cat's box with room for its bubble, the cat in its middle", () => {
+  const floor = 1440;
+  assert.equal(petWindowLeft(700), 700 - petWindowWidth / 2);
+  // The cat's 252px box, the 260px the snapshots capture, and the bubble (240px, slid inward near an edge) all fit.
+  for (const x of [70, 71.4, 200, 700, floor - 70]) {
+    const left = petWindowLeft(x);
+    assert.ok(x - 126 >= left && x + 126 <= left + petWindowWidth, `the cat's box at ${x}`);
+    assert.ok(petWindowWidth / 2 - 130 >= 0 && petWindowWidth / 2 + 130 <= petWindowWidth, "the snapshot");
+    const shift = bubbleShift(x, 240, floor);
+    assert.ok(x - 120 + shift >= left && x + 120 + shift <= left + petWindowWidth, `the bubble at ${x}`);
+  }
+});
+
+test("#67: clips are drawn only as often as they change; resting poses take one breath", () => {
+  assert.equal(clipFrameMs({ kind: "sit" }), Infinity);
+  assert.equal(clipFrameMs({ kind: "blink" }), Infinity, "a blink is one picture");
+  assert.equal(clipFrameMs({ kind: "walk", from: 0, to: 200 }), 33);
+  assert.equal(clipFrameMs({ kind: "hop" }), 0, "hops bounce at every frame");
+  // A stretch only swaps its picture: the pose is the same all through.
+  const stretch = { kind: "stretch" } as const;
+  const poses = new Set([0, 600, 1200, 1800, 2400].map((at) => JSON.stringify(petFrame(stretch, 0, 0, at).pose)));
+  assert.equal(poses.size, 1);
+  // One breath is one cycle of the CSS breath, so it ends where it began (the cat as drawn).
+  for (const file of ["pet.css", "timer.css"]) {
+    const css = fs.readFileSync(path.join(windows, "src", "renderer", file), "utf8");
+    for (const kind of ["awake", "asleep"] as const) assert.match(css, new RegExp(`breathe-${kind} ${restBreathMs[kind] / 1000}s`), `${file} ${kind}`);
+  }
+});
+
+test("#67: a walking cat's window moves once a step, with its picture", () => {
+  const walk = { kind: "walk", from: 100, to: 300 } as const;
+  const duration = clipMs(walk);
+  let last: number = walk.from;
+  for (let at = 0; at <= duration; at += 5) {
+    const x = walkStepX(walk, 0, at);
+    assert.ok(x >= last && x - last <= walkStride / walkCycleFrames + 1e-9, "forward, a step at most");
+    // The same picture, the same place.
+    const frame = petFrame(walk, 0, 100, at);
+    if (at < duration) assert.equal(Math.round((x - walk.from) / (walkStride / walkCycleFrames)) % walkCycleFrames, frame.walkFrame);
+    last = x;
+  }
+  assert.equal(walkStepX(walk, 0, duration), 300);
+  assert.ok(walkStepX({ kind: "walk", from: 300, to: 100 }, 0, duration / 2) < 300, "the other way too");
 });

@@ -581,16 +581,18 @@ private enum PresentationTests {
         }
 
         try await test("the desk: one window, its panes in sidebar order, ⌘1…⌘9 and the old entry points") {
+            // #240 (D4 B, docs/plans/desk-sidebar-cases.json): four groups of six rows or fewer.
             try expectEqual(DeskPane.allCases.map(\.rawValue),
-                            ["calendar", "history", "clock", "appearance", "notifications", "repeating", "pet", "events", "storage", "drawer", "spaces", "ai", "help"], "Sidebar order")
-            try expectEqual(DeskPane.Section.view.panes, [.calendar, .history, .clock], "보기")
-            try expectEqual(DeskPane.Section.settings.panes, [.appearance, .notifications, .repeating, .pet, .events, .storage, .drawer, .spaces, .ai], "설정")
+                            ["calendar", "history", "appearance", "notifications", "clock", "repeating", "events", "pet", "drawer", "spaces", "storage", "ai", "help"], "Sidebar order")
+            try expectEqual(DeskPane.Section.view.panes, [.calendar, .history], "보기")
+            try expectEqual(DeskPane.Section.settings.panes, [.appearance, .notifications, .clock, .repeating, .events, .pet], "설정")
+            try expectEqual(DeskPane.Section.data.panes, [.drawer, .spaces, .storage, .ai], "메모와 데이터")
             try expectEqual(DeskPane.Section.help.panes, [.help], "도움")
             try expectEqual(DeskPane.allCases.compactMap(\.shortcut), Array(1...9), "⌘1…⌘9 for the first nine")
-            // 1.43.1: 메모 서랍 joined after 저장과 백업, so ⌘1…⌘9 still open the same panes as before (and as on Windows).
+            // ⌘1…⌘9 follow the new order, 달력 to 메모 서랍 (as on Windows).
             try expectEqual((1...9).map { number in DeskPane.allCases.first { $0.shortcut == number }! },
-                            [.calendar, .history, .clock, .appearance, .notifications, .repeating, .pet, .events, .storage], "⌘1…⌘9 unchanged")
-            try expect(DeskPane.drawer.shortcut == nil && DeskPane.spaces.shortcut == nil && DeskPane.ai.shortcut == nil, "메모 서랍, 스페이스 and AI 연결 have no number")
+                            [.calendar, .history, .appearance, .notifications, .clock, .repeating, .events, .pet, .drawer], "⌘1…⌘9")
+            try expect(DeskPane.storage.shortcut == nil && DeskPane.spaces.shortcut == nil && DeskPane.ai.shortcut == nil, "스페이스, 저장과 백업 and AI 연결 have no number")
             try expect(DeskPane.help.shortcut == nil, "도움말 is ⌘? instead")
             let fixture = try Fixture(items: [])
             defer { fixture.cleanup() }
@@ -1050,6 +1052,379 @@ private enum PresentationTests {
             try expect(same(panel.frame.size, grown), "shown again: window \(panel.frame.size), slip \(grown)")
         }
 
+        // #228 · #229 (docs/plans/slip-move-cases.json): every window here is far off the screens (x −40 000) and clear
+        // (alpha 0), and the app is never brought to the front; the beep is counted, not played.
+        try await test("#228 a question slip moves by its paper and its title row; its chip, field and button still take clicks") {
+            _ = NSApplication.shared
+            SlipMotion.enabled = false
+            defer { SlipMotion.enabled = true }
+            let probe = SlipProbe()
+            let panel = ModalSlipPanel(title: "회사를 이 기기에서 보일 시간")
+            panel.alphaValue = 0
+            defer { panel.orderOut(nil) }
+            panel.show(SlipProbeView(probe: probe))
+            panel.setFrameOrigin(NSPoint(x: -40_000, y: -40_000))
+            guard let hosting = panel.contentView else { throw TestFailure(description: "no slip view") }
+            @MainActor func settle() { for _ in 0..<8 { hosting.layoutSubtreeIfNeeded(); RunLoop.main.run(until: Date().addingTimeInterval(0.03)) } }
+            settle()
+            /// What a press at (x, y) on the paper (from its top left) lands on.
+            @MainActor func hit(_ x: CGFloat, _ y: CGFloat, in window: NSWindow = panel) -> NSView? {
+                guard let view = window.contentView else { return nil }
+                let point = NSPoint(x: SlipMetrics.margin.leading + x, y: view.isFlipped ? SlipMetrics.margin.top + y : view.bounds.height - SlipMetrics.margin.top - y)
+                return view.hitTest(view.convert(point, to: view.superview))
+            }
+            for (name, x, y) in [("the title", 90.0, 30.0), ("the badge", 30, 30), ("the paper beside the chip", 250, 64), ("the paper under the button", 160, 170)] {
+                try expect(hit(x, y) is SlipDragView, "\(name) drags the slip (\(String(describing: hit(x, y))))")
+            }
+            for (name, x, y) in [("the chip", 40.0, 64.0), ("the field", 160, 99), ("the button", 160, 131)] {
+                try expect(!(hit(x, y) is SlipDragView), "\(name) takes the click")
+            }
+            // A slip that hangs from something (빠른 입력, the 오늘 창, the reminders) has no paper to drag by.
+            let still = SlipPanel(nonactivating: true)
+            still.alphaValue = 0
+            still.show(SlipProbeView(probe: SlipProbe()))
+            still.setFrameOrigin(NSPoint(x: -40_000, y: -38_000))
+            for _ in 0..<4 { still.contentView?.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(30)) }
+            try expect(!(hit(160, 170, in: still) is SlipDragView), "a slip that doesn't move has no drag area")
+
+            // A drag: the window follows the pointer (no screen has the pointer here, so nothing keeps it in).
+            try expect(hit(160, 170) is SlipDragView, "the paper")
+            @MainActor func mouse(_ type: NSEvent.EventType, _ x: CGFloat, _ y: CGFloat) -> NSEvent {
+                NSEvent.mouseEvent(with: type, location: NSPoint(x: x, y: y), modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                   windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1)!
+            }
+            @MainActor func drag(_ steps: [(CGFloat, CGFloat)]) {
+                let last = steps.last ?? (0, 0)
+                var events = steps.map { mouse(.leftMouseDragged, -39_000 + $0.0, -39_000 + $0.1) } + [mouse(.leftMouseUp, -39_000 + last.0, -39_000 + last.1)]
+                panel.dragSlip(from: mouse(.leftMouseDown, -39_000, -39_000)) { events.isEmpty ? nil : events.removeFirst() }
+            }
+            let before = panel.frame.origin
+            drag([(1, 1), (2, 0)])
+            try expectEqual(panel.frame.origin, before, "a press that moves 2 pt is a click, not a drag")
+            try expect(!panel.movedByUser, "not moved")
+            drag([(5, 2), (18, 9), (30, -20)])
+            try expectEqual(panel.frame.origin, NSPoint(x: before.x + 30, y: before.y - 20), "the window followed the pointer")
+            try expect(panel.movedByUser, "moved by the person")
+            // Taller (a time row added): it grows from where it was put — its top edge and its middle stay.
+            let top = panel.frame.maxY, middle = panel.frame.midX, height = panel.frame.height
+            probe.rows = 3
+            for _ in 0..<30 where abs(panel.frame.height - height) < 0.5 { hosting.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(30)) }
+            try expect(panel.frame.height > height + 40, "the slip grew (\(height) → \(panel.frame.height))")
+            try expect(abs(panel.frame.maxY - top) < 0.5 && abs(panel.frame.midX - middle) < 0.5, "it grew from where it was moved to")
+
+            // On a screen: the head stays on it (the Mac's y goes up; SlipMove's cases are top-down).
+            let area = NSRect(x: 0, y: 80, width: 1440, height: 795)
+            let window = NSRect(x: 400, y: 300, width: 320 + 52, height: 300)
+            let slipTop = { (origin: NSPoint) in origin.y + window.height - SlipMetrics.margin.top }
+            try expectEqual(slipTop(SlipPanel.dragged(window, by: CGVector(dx: 0, dy: 5_000), in: area)), area.maxY, "up: under the menu bar")
+            try expectEqual(slipTop(SlipPanel.dragged(window, by: CGVector(dx: 0, dy: -5_000), in: area)), area.minY + SlipMove.head, "down: the head stays")
+            let left = SlipPanel.dragged(window, by: CGVector(dx: -5_000, dy: 0), in: area)
+            try expectEqual(left.x + window.width - SlipMetrics.margin.trailing, area.minX + SlipMove.keep, "left: 80 stays")
+            try expectEqual(SlipPanel.dragged(window, by: CGVector(dx: 12, dy: -7), in: area), NSPoint(x: 412, y: 293), "inside: as dragged")
+        }
+
+        // #246: 빠른 입력 and 빠른 메모 move by their paper and title row too (far off the screens, clear, never in front).
+        try await test("#246 the quick entry and quick note slips move by their paper; their field and buttons still take clicks") {
+            _ = NSApplication.shared
+            SlipMotion.enabled = false
+            defer { SlipMotion.enabled = true }
+            let fixture = try Fixture(items: [("A", false)])
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            for (name, view) in [("quick entry", AnyView(QuickEntryView(model: model, text: "내일 3시 회의"))), // ko-only: sample text
+                                 ("quick note", AnyView(QuickMemoView(model: model, text: "장보기")))] { // ko-only: sample text
+                let panel = SlipPanel(nonactivating: true)
+                panel.movesByPaper = true
+                panel.alphaValue = 0
+                defer { panel.orderOut(nil) }
+                panel.show(view)
+                panel.setFrameOrigin(NSPoint(x: -40_000, y: -36_000))
+                for _ in 0..<8 { panel.contentView?.layoutSubtreeIfNeeded(); try await Task.sleep(for: .milliseconds(30)) }
+                @MainActor func hit(_ x: CGFloat, _ y: CGFloat) -> NSView? {
+                    guard let view = panel.contentView else { return nil }
+                    let point = NSPoint(x: SlipMetrics.margin.leading + x, y: view.isFlipped ? SlipMetrics.margin.top + y : view.bounds.height - SlipMetrics.margin.top - y)
+                    return view.hitTest(view.convert(point, to: view.superview))
+                }
+                let width = panel.slipFrame.width, height = panel.slipFrame.height
+                try expect(hit(width / 2, 30) is SlipDragView, "\(name): the title row drags it (\(String(describing: hit(width / 2, 30))))")
+                try expect(hit(width - 30, 30).map { !($0 is SlipDragView) } ?? false, "\(name): the × takes the click")
+                try expect(hit(width - 60, height - 28).map { !($0 is SlipDragView) } ?? false, "\(name): the button takes the click")
+                // The field: whatever is under the line's middle is not the paper.
+                let field = (0..<30).lazy.map { CGFloat($0) * 4 + 70 }.first { !(hit(width / 2, $0) is SlipDragView) }
+                try expect(field != nil, "\(name): the field takes the click")
+                var moved = 0
+                panel.onMoved = { moved += 1 }
+                @MainActor func mouse(_ type: NSEvent.EventType, _ x: CGFloat, _ y: CGFloat) -> NSEvent {
+                    NSEvent.mouseEvent(with: type, location: NSPoint(x: x, y: y), modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                       windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: type == .leftMouseUp ? 0 : 1)!
+                }
+                let before = panel.frame.origin
+                var events = [mouse(.leftMouseDragged, -39_990, -35_990), mouse(.leftMouseDragged, -39_960, -36_020), mouse(.leftMouseUp, -39_960, -36_020)]
+                panel.dragSlip(from: mouse(.leftMouseDown, -40_000, -36_000)) { events.isEmpty ? nil : events.removeFirst() }
+                try expectEqual(panel.frame.origin, NSPoint(x: before.x + 40, y: before.y - 20), "\(name): the window followed the pointer")
+                try expectEqual(moved, 1, "\(name): the place is kept once, at the drop")
+            }
+        }
+
+        try await test("#229 a click elsewhere while a question is up brings it forward, shakes it once and beeps once") {
+            _ = NSApplication.shared
+            let cases = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/slip-move-cases.json"))) as! [String: Any]
+            let nudge = cases["nudge"] as! [String: Any]
+            try expectEqual(Motion.shake, (nudge["shake"] as! [NSNumber]).map { CGFloat($0.doubleValue) }, "the shake")
+            try expectEqual(Motion.blink, (nudge["blink"] as! [NSNumber]).map(\.doubleValue), "the tape's blink")
+            try expectEqual([nudge["motion"] as! String, nudge["blinkStep"] as! String], ["bounce", "quick"], "the motion words")
+            var beeps = 0
+            let playing = SlipModal.beep
+            SlipModal.beep = { beeps += 1 }
+            defer { SlipModal.beep = playing }
+
+            let question = ModalSlipPanel(title: "종이냥 종료")
+            question.show(SlipAlertView(symbol: "exclamationmark.circle", title: "종이냥 종료", message: "아직 저장하지 못한 할 일이 있어요",
+                                        choices: [SlipAlert.Choice(title: "취소", isCancel: true), SlipAlert.Choice(title: "종료", role: .primary, isDefault: true)]))
+            var windows: [String: NSWindow] = ["question": question]
+            @MainActor func made(_ window: NSWindow, _ level: NSWindow.Level) -> NSWindow {
+                window.isReleasedWhenClosed = false
+                window.level = level
+                return window
+            }
+            @MainActor func plain(_ level: NSWindow.Level) -> NSWindow {
+                made(RecordingWindow(contentRect: NSRect(x: 0, y: 0, width: 40, height: 40), styleMask: [.borderless], backing: .buffered, defer: false), level)
+            }
+            windows["note"] = plain(.normal)
+            windows["desk"] = plain(.normal)
+            windows["drawer"] = plain(.floating)
+            windows["reminder"] = plain(.floating)
+            windows["pet"] = plain(.floating)
+            windows["today"] = made(SlipPanel(nonactivating: true), .popUpMenu)
+            let times = SlipPanel(nonactivating: false)
+            times.movesByPaper = true
+            windows["times"] = made(times, .floating)
+            let alarm = AlarmRingPanel(nonactivating: true)
+            alarm.worksWhenModal = true
+            windows["alarm"] = made(alarm, .statusBar)
+            for (index, window) in windows.values.enumerated() {
+                window.alphaValue = 0
+                window.setFrameOrigin(NSPoint(x: -40_000 + CGFloat(index) * 600, y: -40_000))
+                window.orderFront(nil)
+            }
+            defer { for window in windows.values { window.orderOut(nil) } }
+            @MainActor func press(_ name: String, _ type: NSEvent.EventType = .leftMouseDown) -> NSEvent {
+                NSEvent.mouseEvent(with: type, location: NSPoint(x: 10, y: 10), modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                   windowNumber: windows[name]!.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+            }
+            for entry in (cases["clicks"] as! [[String: Any]]) where entry["up"] as? String == "question" {
+                let name = entry["click"] as! String
+                try expectEqual(SlipModal.nudges(press(name), question) ? "nudge" : "works", entry["then"] as! String, entry["case"] as! String)
+                try expect(!SlipModal.nudges(press(name, .leftMouseUp), question), "\(name): only a press nudges")
+            }
+
+            // The session itself: a left and a right click on the note, one on the drawer, one on the alarm (which works),
+            // a tenth of a second apart like clicks by hand; then the answer.
+            var answered = false
+            for (index, click) in [("note", NSEvent.EventType.leftMouseDown), ("note", .rightMouseDown), ("drawer", .leftMouseDown), ("alarm", .leftMouseDown)].enumerated() {
+                let timer = Timer(timeInterval: 0.05 + 0.1 * Double(index), repeats: false) { _ in
+                    MainActor.assumeIsolated { NSApp.postEvent(press(click.0, click.1), atStart: false) }
+                }
+                RunLoop.main.add(timer, forMode: .common)
+            }
+            let answer = Timer(timeInterval: 0.6, repeats: false) { _ in MainActor.assumeIsolated { answered = true; SlipModal.wake() } }
+            RunLoop.main.add(answer, forMode: .common)
+            SlipModal.run(question) { answered }
+            absorbWake()
+            try expectEqual(question.nudges.count, 3, "each blocked press nudged the question once")
+            try expectEqual(beeps, 3 * (nudge["beeps"] as! Int), "one beep each")
+            try expect((windows["note"] as! RecordingWindow).presses == 0, "the note never got the presses")
+            try expect(NSApp.modalWindow == nil, "the session ended with the answer")
+
+            // The settings slip (보일 시간) holds nothing up: no session, the windows work (slip-move-cases.json S1–S4).
+            SlipAlert.open(id: "probe:times", title: "회사를 이 기기에서 보일 시간") { done in
+                Button("저장") { done() }
+            }
+            absorbWake()
+            try expect(NSApp.modalWindow == nil, "the times slip isn't modal")
+            for entry in (cases["clicks"] as! [[String: Any]]) where entry["up"] as? String == "settings" {
+                try expectEqual(NSApp.modalWindow == nil ? "works" : "nudge", entry["then"] as! String, entry["case"] as! String)
+            }
+            if let probe = SlipAlert.openSlip("probe:times") { SlipAlert.close(probe) }
+            absorbWake()
+        }
+
+        try await test("#229 the times slip doesn't wait for an answer, and a space has one at a time") {
+            _ = NSApplication.shared
+            SlipMotion.enabled = false
+            defer { SlipMotion.enabled = true }
+            let fixture = try Fixture(items: [])
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            let cases = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/slip-move-cases.json"))) as! [String: Any]
+            for entry in cases["open"] as! [[String: Any]] {
+                let keys = entry["keys"] as! [String]
+                var panels: [ObjectIdentifier: SlipPanel] = [:]
+                for key in keys {
+                    // Returns at once: the slip is up and the app goes on.
+                    SpaceTimesSlip.present(model: model, key: key, name: key, color: nil)
+                    absorbWake()
+                    guard let panel = SlipAlert.openSlip(SpaceTimesSlip.slipID(key)) else { throw TestFailure(description: "\(key): no slip") }
+                    try expect(panel.frame.minX < -30_000, "off the screens in a check")
+                    try expect(panel.movesByPaper && panel.level == .floating && panel.hidesOnDeactivate, "a floating slip that moves")
+                    try expect(NSApp.modalWindow == nil, "nothing waits")
+                    panels[ObjectIdentifier(panel)] = panel
+                }
+                try expectEqual(panels.count, entry["slips"] as! Int, entry["case"] as! String)
+                for key in Set(keys) {
+                    guard let panel = SlipAlert.openSlip(SpaceTimesSlip.slipID(key)) else { continue }
+                    // 취소 (Esc): the slip goes away and the space can open a new one.
+                    SlipAlert.close(panel)
+                }
+                absorbWake()
+                for key in Set(keys) { try expect(SlipAlert.openSlip(SpaceTimesSlip.slipID(key)) == nil, "\(key) closed") }
+            }
+        }
+
+        try await test("#253 the questions that replace the whole list say so where they are made (widget-ask-cases.json)") {
+            let cases = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/widget-ask-cases.json"))) as! [String: Any]
+            let folder = URL(fileURLWithPath: "Sources/PaperTodo")
+            let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil).filter { $0.pathExtension == "swift" }
+            let lines = try files.flatMap { try String(contentsOf: $0, encoding: .utf8).components(separatedBy: "\n") }
+                .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            var tagged = 0
+            for entry in cases["questions"] as! [[String: Any]] {
+                if let apps = entry["apps"] as? [String], !apps.contains("mac") { continue }
+                let message = (entry["message"] as? String) ?? (entry["message"] as! [String: String])["mac"]!
+                let found = lines.filter { $0.contains("\(message)\")") && $0.contains("message: ") }
+                let name = entry["case"] as! String
+                try expect(!found.isEmpty, "\(name): the question “\(message)” is asked")
+                for line in found {
+                    try expectEqual(line.contains("replacesList: true"), entry["replacesList"] as! Bool, "\(name): \(line.trimmingCharacters(in: .whitespaces).prefix(80))")
+                }
+                if entry["replacesList"] as! Bool { tagged += found.count }
+            }
+            try expectEqual(lines.filter { $0.contains("replacesList: true") }.count, tagged, "every replacesList: true is a question of the shared list")
+        }
+
+        try await test("#253 while a question is up the desktop widgets and their day sheet work; one that replaces the list holds 넣기") {
+            _ = NSApplication.shared
+            let cases = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/widget-ask-cases.json"))) as! [String: Any]
+            var beeps = 0
+            let playing = SlipModal.beep
+            SlipModal.beep = { beeps += 1 }
+            defer { SlipModal.beep = playing }
+            let question = ModalSlipPanel(title: "되돌리기")
+            question.show(SlipAlertView(symbol: "clock.arrow.circlepath", title: "되돌리기", message: "11월 4일 백업으로 되돌릴까요?",
+                                        choices: [SlipAlert.Choice(title: "취소", isCancel: true), SlipAlert.Choice(title: "합치기", role: .primary, isDefault: true)]))
+            let widget = CalendarWidgetPanel(size: NSSize(width: 120, height: 120))
+            widget.level = CalendarWidgetPanel.level(.top)
+            let sheet = WidgetDaySheetController().makePanel()
+            let note = RecordingWindow(contentRect: NSRect(x: 0, y: 0, width: 80, height: 80), styleMask: [.borderless], backing: .buffered, defer: false)
+            note.isReleasedWhenClosed = false
+            let windows: [NSWindow] = [question, widget, sheet, note]
+            for (index, window) in windows.enumerated() {
+                window.alphaValue = 0
+                window.setFrameOrigin(NSPoint(x: -40_000 + CGFloat(index) * 600, y: -40_000))
+                window.orderFront(nil)
+            }
+            defer { for window in windows { window.orderOut(nil) } }
+            @MainActor func press(_ window: NSWindow, _ type: NSEvent.EventType = .leftMouseDown) -> NSEvent {
+                NSEvent.mouseEvent(with: type, location: NSPoint(x: 10, y: 10), modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                                   windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+            }
+            // The widget and the sheet aren't held (their presses, hovers and keys go to them); the note still is.
+            for (name, window) in [("widget", widget as NSWindow), ("sheet", sheet as NSWindow)] {
+                try expect(window.worksWhenModal, "\(name) works while a question waits")
+                for type in [NSEvent.EventType.leftMouseDown, .rightMouseDown, .leftMouseUp, .mouseMoved] {
+                    try expect(!SlipModal.holds(press(window, type), question), "\(name): \(type) isn't held")
+                }
+                try expect(!SlipModal.nudges(press(window), question), "\(name): a press doesn't nudge")
+            }
+            try expect(SlipModal.nudges(press(note), question), "the note is still held")
+            // Z1: the question over the day sheet over a widget kept on top over the windows.
+            let levels = cases["levels"] as! [String: Any]
+            let level: [String: NSWindow.Level] = ["question": question.level, "sheet": sheet.level, "widgetOnTop": widget.level, "window": .normal]
+            let top = (levels["top"] as! [String]).map { level[$0]!.rawValue }
+            try expect(zip(top, top.dropFirst()).allSatisfy { $0 > $1 }, "\(levels["case"] as! String): \(top)")
+            // T1–T3: a widget never takes the keys, so what is being typed elsewhere keeps its text and its caret.
+            for entry in cases["typing"] as! [[String: Any]] {
+                let name = entry["case"] as! String
+                let field = NSTextView(frame: NSRect(x: 0, y: 0, width: 200, height: 40))
+                field.string = "꽃집 들러서 화분 사기"
+                field.setSelectedRange(NSRange(location: 3, length: 0))
+                let typing = NSWindow(contentRect: NSRect(x: -40_000, y: -38_000, width: 200, height: 40), styleMask: [.borderless], backing: .buffered, defer: false)
+                typing.isReleasedWhenClosed = false
+                typing.contentView = field
+                _ = typing.makeFirstResponder(field)
+                widget.sendEvent(press(widget))
+                widget.sendEvent(press(widget, .leftMouseUp))
+                try expect(!widget.canBecomeKey && widget.styleMask.contains(.nonactivatingPanel) && !widget.isKeyWindow, "\(name): the widget took no keys")
+                try expect(typing.firstResponder === field, "\(name): the field kept the keyboard")
+                try expectEqual(field.string, "꽃집 들러서 화분 사기", "\(name): the text")
+                try expectEqual(field.selectedRange(), NSRange(location: 3, length: 0), "\(name): the caret")
+                try expectEqual(entry["then"] as! String, "kept", name)
+            }
+
+            // The sessions: what is up for the widgets, and what waits (widget-ask-cases.json `presses`).
+            @MainActor func session(_ asked: SlipMove.Asked, over: NSWindow?, on panel: SlipPanel? = nil, _ steps: [@MainActor () throws -> Void]) throws {
+                var answered = false
+                var failure: Error?
+                for (index, step) in steps.enumerated() {
+                    let timer = Timer(timeInterval: 0.05 + 0.1 * Double(index), repeats: false) { _ in
+                        MainActor.assumeIsolated {
+                            do { try step() } catch { failure = failure ?? error }
+                        }
+                    }
+                    RunLoop.main.add(timer, forMode: .common)
+                }
+                let answer = Timer(timeInterval: 0.1 + 0.1 * Double(steps.count), repeats: false) { _ in MainActor.assumeIsolated { answered = true; SlipModal.wake() } }
+                RunLoop.main.add(answer, forMode: .common)
+                SlipModal.run(panel ?? question, asked: asked, over: over) { answered }
+                absorbWake()
+                if let failure { throw failure }
+            }
+            let presses = cases["presses"] as! [[String: Any]]
+            for up in [SlipMove.Asked.question, .replacesList] {
+                let start = question.nudges.count, heard = beeps
+                var expected = 0
+                try session(up, over: note, [
+                    { try expectEqual(SlipAsking.shared.up, up, "\(up): what is up") },
+                    // A press on the widget goes to it, unheld.
+                    { NSApp.postEvent(press(widget), atStart: false) },
+                    {
+                        for entry in presses where entry["up"] as? String == up.rawValue {
+                            let kind = SlipMove.WidgetPress(rawValue: entry["press"] as! String)!
+                            guard kind == .add || kind == .undo else { continue }
+                            let waits = SlipModal.waits(kind)
+                            try expectEqual(waits ? "waits" : "works", entry["then"] as! String, entry["case"] as! String)
+                            if waits { expected += 1 }
+                        }
+                    },
+                    // O1 · O2: another window comes forward under it; the window it was asked over nudges it.
+                    { SlipModal.cameForward(widget) },
+                    { SlipModal.cameForward(note); expected += 1 },
+                ])
+                try expectEqual(question.nudges.count - start, expected, "\(up): the nudges")
+                try expectEqual(beeps - heard, expected, "\(up): one beep each")
+                try expectEqual(note.presses, 0, "\(up): the note never got a press")
+                try expectEqual(SlipAsking.shared.up, .none, "\(up): answered, nothing is up")
+            }
+            // 가져오기 → 바꾸기: a question asked while another waits gives the first one back when it is answered.
+            let inner = ModalSlipPanel(title: "바꾸기")
+            inner.show(SlipAlertView(symbol: "arrow.triangle.2.circlepath", title: "바꾸기", message: "지금 것을 이 백업으로 바꿀까요?",
+                                     choices: [SlipAlert.Choice(title: "취소", isCancel: true)]))
+            inner.alphaValue = 0
+            inner.setFrameOrigin(NSPoint(x: -37_000, y: -40_000))
+            defer { inner.orderOut(nil) }
+            try session(.question, over: nil, [
+                {
+                    inner.orderFront(nil)
+                    try session(.replacesList, over: nil, on: inner, [{ try expectEqual(SlipAsking.shared.up, .replacesList, "the inner question") }])
+                    try expectEqual(SlipAsking.shared.up, .question, "the outer question again")
+                    // (The outer answer's wake may have come while the inner question was up: wake it again.)
+                    SlipModal.wake()
+                },
+            ])
+            try expectEqual(SlipAsking.shared.up, .none, "nothing is up")
+            try expect(NSApp.modalWindow == nil, "the sessions ended")
+        }
+
         try await test("메모 서랍 (1.45): a key restyles only its own lines, and the memo looks as if it were restyled whole") {
             _ = NSApplication.shared
             // #84: the same for the markdown editor, marks hidden off the caret's line (the caret moving restyles only the
@@ -1382,6 +1757,33 @@ private enum PresentationTests {
             try expectEqual(model.spaceShown, .space(work), "⌥⌘1: the first space")
         }
 
+        try await test("#250: a check's windows are left out of Mission Control, App Exposé and the window cycle") {
+            _ = NSApplication.shared
+            // Every behaviour the app's windows and panels set (their collectionBehavior lines), and none.
+            let behaviours: [NSWindow.CollectionBehavior] = [
+                [], [.fullScreenPrimary], [.fullScreenAuxiliary], [.moveToActiveSpace, .fullScreenAuxiliary],
+                [.canJoinAllSpaces, .fullScreenAuxiliary], [.canJoinAllSpaces, .fullScreenAuxiliary, .transient],
+                [.canJoinAllSpaces, .stationary, .ignoresCycle], [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle],
+                [.ignoresCycle, .fullScreenAuxiliary], [.managed, .participatesInCycle],
+            ]
+            for behaviour in behaviours {
+                let hidden = TestHooks.hiddenFromOverviews(behaviour)
+                try expect(hidden.contains(.transient) && hidden.contains(.ignoresCycle), "\(behaviour.rawValue): transient and out of the cycle")
+                try expect(hidden.isDisjoint(with: [.managed, .stationary, .participatesInCycle]), "\(behaviour.rawValue): no behaviour AppKit refuses beside them")
+                let kept: NSWindow.CollectionBehavior = [.canJoinAllSpaces, .moveToActiveSpace, .fullScreenPrimary, .fullScreenAuxiliary, .fullScreenNone]
+                try expectEqual(hidden.intersection(kept), behaviour.intersection(kept), "\(behaviour.rawValue): spaces and full screen kept")
+                try expectEqual(TestHooks.hiddenFromOverviews(hidden), hidden, "\(behaviour.rawValue): once is enough")
+                // A real panel takes it (AppKit raises on a combination it refuses).
+                let panel = NSPanel(contentRect: NSRect(x: -40_000, y: -40_000, width: 100, height: 100), styleMask: [.borderless, .nonactivatingPanel],
+                                    backing: .buffered, defer: true)
+                panel.isReleasedWhenClosed = false
+                panel.collectionBehavior = behaviour
+                panel.collectionBehavior = hidden
+                try expectEqual(panel.collectionBehavior, hidden, "\(behaviour.rawValue): the panel keeps it")
+                panel.close()
+            }
+        }
+
         print("\n\(count) checks passed.")
     }
 
@@ -1391,5 +1793,52 @@ private enum PresentationTests {
             throw TestFailure(description: "Missing item titled \(title)")
         }
         return item
+    }
+}
+
+/// #228's probe slip: a header, a chip, a field, a button and paper, at known places (from the paper's top left: the
+/// header to 44, the chip's row 44–84, the field 84–114, the button 114–148, then 40 of paper), and `rows` more rows of
+/// 30 to make it taller.
+@MainActor
+private final class SlipProbe: ObservableObject {
+    @Published var rows = 0
+}
+
+private struct SlipProbeView: View {
+    @ObservedObject var probe: SlipProbe
+    @State private var text = "장보기 목록"
+
+    var body: some View {
+        PaperSlip(kind: .confirm, width: 320) {
+            VStack(spacing: 0) {
+                SlipHeader(kind: .confirm, symbol: "clock", title: "회사를 이 기기에서 보일 시간")
+                HStack(spacing: 0) {
+                    SlipChipButton(title: "평일", action: {}).frame(width: 80, height: 40)
+                    Spacer(minLength: 0)
+                }
+                .frame(height: 40)
+                TextField("", text: $text).frame(width: 200, height: 30)
+                Button("저장") {}.buttonStyle(SlipButtonStyle(role: .primary)).frame(width: 100, height: 34)
+                ForEach(0..<probe.rows, id: \.self) { _ in Color.clear.frame(height: 30) }
+                Color.clear.frame(height: 40)
+            }
+        }
+    }
+}
+
+/// Posting an event, a modal session and bringing a window to the front wake the main run loop by stopping it; a stop left
+/// for the next turn would land on the checks' own run loop and end them. A few turns of a nested loop take it.
+@MainActor
+private func absorbWake() {
+    for _ in 0..<3 { RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.02)) }
+}
+
+/// A window that counts the presses that reach it.
+private final class RecordingWindow: NSWindow {
+    var presses = 0
+
+    override func sendEvent(_ event: NSEvent) {
+        if [.leftMouseDown, .rightMouseDown].contains(event.type) { presses += 1; return }
+        super.sendEvent(event)
     }
 }
