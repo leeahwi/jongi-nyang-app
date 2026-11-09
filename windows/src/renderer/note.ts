@@ -44,6 +44,7 @@ import { closeMenus, menuOpen, openMenu, type MenuEntry, type MenuHost } from ".
 import { badgeWords, extendSelection, oneSelected, rangeSelection, toggleSelection, type ListSelection } from "../core/selection";
 import { addToWords, boardFits, doneWords, dropHereWords, groupItems, groupOpen, groupSpace, leftWords, neighborGroup, nextWords, spaceGroups, type SpaceGroup } from "../core/spaceGroups";
 import { snoozeTitle } from "../core/snooze";
+import { noteLayers, type NoteLayer } from "../core/stayBehind";
 
 // #229: a question waiting holds this page up (askGuard.ts).
 holdWhileAsked();
@@ -72,7 +73,8 @@ const openDrawer = (extra: { memo?: string; write?: boolean } = {}) => void api.
 
 // ─── Frame: washi index tabs and the tools, then the header (#151: the cat's ears stand on the window, ears.ts) ─
 
-const pinButton = h("button", { class: "quiet pin", title: t("항상 위에 두기"), "aria-label": t("항상 위에 두기") }, icon("pin", 16));
+// #273: 노트 위치 — the pin picks 보통 · 항상 위에 두기 · 바탕화면에 두기 (a paper menu, as 모든 스페이스 ▾).
+const pinButton = h("button", { class: "quiet pin", "aria-haspopup": "menu", "aria-expanded": "false" }, icon("pin", 16));
 const tabs = h("div", { class: "index-tabs", role: "tablist" });
 // 메모 서랍 (1.28): where the memos live now, a button beside the pin (its shortcut in the tooltip).
 const drawerButton = h("button", { class: "quiet drawer-open", "aria-label": t("메모 서랍") }, icon("pawPrint", 16));
@@ -88,7 +90,7 @@ const tools = h("div", { class: "tools" },
   h("button", { class: "quiet close", title: t("닫기 (알림 영역에서 계속 실행)"), "aria-label": t("닫기") }, icon("close", 15)),
 );
 tools.querySelector(".close")!.addEventListener("click", () => api.act({ type: "window", command: "close" }));
-pinButton.addEventListener("click", () => api.act({ type: "setPref", key: "alwaysOnTop", value: !state.prefs.alwaysOnTop }));
+pinButton.addEventListener("click", (event) => openLayerMenu(event.detail === 0));
 const tabsRow = h("div", { class: "tabs-row" }, tabs, h("span", { class: "spacer" }), tools);
 
 const dateLine = h("div", { class: "date-line" });
@@ -103,6 +105,34 @@ const spaceButton = h("button", { class: "space-pick", "aria-haspopup": "menu", 
   h("span", { class: "space-dot" }), h("span", { class: "space-pick-label" }), icon("chevron", 11, 2));
 spaceButton.addEventListener("click", () => openSpacePicker());
 const titleRow = h("div", { class: "title-row" }, h("div", { class: "title-text" }, h("div", { class: "date-row" }, dateLine, spaceButton), h("div", { class: "title-line" }, title, progress)));
+
+const layerNames = (): Record<NoteLayer, string> => ({ normal: t("보통"), top: t("항상 위에 두기"), desktop: t("바탕화면에 두기") });
+const layerIcons: Record<NoteLayer, string> = { normal: "pin", top: "pin", desktop: "behind" };
+let pinDrawn: NoteLayer | undefined;
+
+/** The pin as the note's place now: its icon, and ‘노트 위치, 바탕화면에 두기’ for a screen reader and the tooltip. */
+function drawPin(layer: NoteLayer): void {
+  const words = `${t("노트 위치")}, ${layerNames()[layer]}`;
+  pinButton.title = words;
+  pinButton.setAttribute("aria-label", words);
+  pinButton.dataset.layer = layer;
+  if (pinDrawn === layer) return;
+  pinDrawn = layer;
+  pinButton.replaceChildren(icon(layerIcons[layer], 16));
+}
+
+/** 노트 위치 ▾: the three places, ✓ on the one now (a press on the pin again puts it away). */
+function openLayerMenu(keyboard = false): void {
+  if (menuOpen() && pinButton.getAttribute("aria-expanded") === "true") { closeMenus(); return; }
+  const now = state.prefs.noteLayer;
+  const names = layerNames();
+  const entries: MenuEntry[] = noteLayers.map((layer): MenuEntry => ({
+    kind: "item", label: names[layer], checked: now === layer,
+    run: () => { if (state.prefs.noteLayer !== layer) void api.act({ type: "setPref", key: "noteLayer", value: layer }); },
+  }));
+  pinButton.setAttribute("aria-expanded", "true");
+  openMenu({ ...menuHost, closed: () => pinButton.setAttribute("aria-expanded", "false") }, [{ kind: "label", text: t("노트 위치") }, ...entries], t("노트 위치"), pinButton.getBoundingClientRect(), keyboard);
+}
 
 /** 2b (H): the shortcut chips under the title while grouped — `● 회사 2 · ● 집 2 · 일반 1` (open to-dos); one line that scrolls sideways. */
 const chipsRow = h("div", { class: "schips", role: "toolbar", "aria-label": t("스페이스 바로 가기"), hidden: "" });
@@ -2307,8 +2337,8 @@ function render(): void {
   const root = document.documentElement;
   root.dataset.font = state.prefs.font;
   root.style.setProperty("--body-size", `${bodyFontSize(state.prefs.font, state.prefs.textStep)}px`);
-  pinButton.classList.toggle("on", state.prefs.alwaysOnTop);
-  pinButton.title = state.prefs.alwaysOnTop ? t("항상 위에 두기 해제") : t("항상 위에 두기");
+  pinButton.classList.toggle("on", state.prefs.noteLayer === "top");
+  drawPin(state.prefs.noteLayer);
   drawerButton.title = state.prefs.drawerShortcut ? `${t("메모 서랍")} (${shortcutLabel(state.prefs.drawerShortcut)})` : t("메모 서랍");
   renderHeader();
   editor?.refreshSpace?.();

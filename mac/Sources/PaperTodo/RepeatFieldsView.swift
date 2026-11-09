@@ -158,6 +158,8 @@ struct PaperSegmented<Value: Hashable>: View {
     /// labels of very different lengths ("Eenmalig · Herhalen · Deadline · Tijd"), so the gaps between them read even.
     /// Otherwise every segment is as wide as the others.
     var fit = false
+    /// Options shown but greyed out (a widget's size that doesn't fit its display, #271).
+    var disabled: Set<Value> = []
 
     var body: some View {
         SegmentRow(spacing: 2, fit: fit) {
@@ -181,6 +183,8 @@ struct PaperSegmented<Value: Hashable>: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .disabled(disabled.contains(option.value))
+                .opacity(disabled.contains(option.value) ? 0.4 : 1)
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }

@@ -75,6 +75,8 @@ macOS에서는 `mac/scripts/render-design.sh`가 실제 SwiftUI 뷰에 예시 �
 
 `scripts/test-presentation.sh`(47개)는 화면 상태, 키보드, 공유 폴더, 메모 합치기, 백업, 책상, 종이 색, 집중, 실제 창으로 연 쪽지의 크기(1.42.1)를 확인해요. 손글씨 제목의 마지막 글자가 잘리는지도 픽셀로 봐요('Ahead', 'coffee', '커피 coffee'). 시험용 앱은 다른 번들 ID와 저장 폴더를 쓰고, 알림은 화면 밖(`PAPERTODO_OFFSCREEN=1`)에 그려요.
 
+시험이 쓰는 설정은 끝나면 남지 않아요. macOS 시험과 렌더러는 `UserDefaults(suiteName:)`를 직접 만들지 않고 `TestDefaults("<묶음>")`(`Tests/PaperTodoTests/TestDefaults.swift`)를 써요. 이 설정은 `~/Library/Preferences`가 아니라 임시 폴더의 파일이라 `remove()`로 지우면 다시 생기지 않아요. 시험용 사본을 띄우는 스크립트는 `scripts/lib/test-defaults.sh`로 번들 ID를 먼저 확인하고, 끝날 때 그 설정과 파일을 지워요. 사용자 앱의 `com.noa.PaperTodo`는 대소문자를 바꿔도 거절해요. `scripts/test-defaults-cleanup.sh`가 이 규칙을 확인해요. Windows 시험은 임시 폴더를 `temporaryFolder()`(`windows/test/temporaryFolder.ts`)로 만들고, 시험 파일이 끝나면 지워요. 예전에 쌓인 것은 `scripts/clean-test-defaults.sh`로 한 번 휴지통에 옮겨요(기본은 목록만 보여 줘요).
+
 Windows에서는 `npm run snapshot`이 모든 창을 화면 밖에서 그리고 크기 훑기(size sweep)를 돌려요.
 
 - 창마다 가장 작은 크기부터 2560 × 1440까지, 배율 125%와 150%, 다른 글꼴(Noto, 붓, 깔끔), 밤 종이로 그려요.

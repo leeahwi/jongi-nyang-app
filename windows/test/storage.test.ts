@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { parseNotebook, serializeNotebook, UndoableNotebook } from "../src/core/notebook";
@@ -11,8 +10,9 @@ import { copyData, hasList, mergeArchive, readDataFolder, takeMoved, writeDataFo
 import { Store } from "../src/main/store";
 import { parseEvents, serializeEvents, type LocalEvent } from "../src/core/events";
 import { parseAlarms, serializeAlarms, type Alarm } from "../src/core/alarm";
+import { temporaryFolder } from "./temporaryFolder";
 
-const temporary = () => fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-test-"));
+const temporary = () => temporaryFolder("paper-todo-test-");
 const titles = (store: Store) => store.items.map((item) => item.title);
 
 /** What another computer would write: the same file with one more task. */

@@ -10,6 +10,7 @@ import { clock } from "../core/lang";
 import type { AiView, NoteNotice } from "../core/types";
 import { lang } from "../i18n";
 import type { Store } from "./store";
+import { mcpStdioFlag } from "./mcpMode";
 import { appendSafely, readTextSafely, writeFileAtomically } from "./safeFiles";
 
 /**
@@ -30,8 +31,11 @@ export interface AiHooks {
   changed(): void;
 }
 
-/** Where the bundled extension is: the server for Claude Code, the .mcpb for Claude Desktop, and the app to run it with. */
-export interface AiFiles { server: string; mcpb: string; exe: string }
+/**
+ * The .mcpb for Claude Desktop, and the program Claude Code starts with --mcp-stdio (#175): 종이냥.exe, or while
+ * developing Electron with the app's folder (`app`).
+ */
+export interface AiFiles { mcpb: string; exe: string; app?: string }
 
 export class AiConnection {
   private entries: AiLogEntry[] = [];
@@ -278,9 +282,13 @@ export class AiConnection {
     this.hooks.changed();
   }
 
-  /** The Claude Code line: the app's own Electron runs the bundled server as Node (no Node needed). */
+  /**
+   * The Claude Code line: 종이냥.exe itself runs the server built into it (#175, main/mcpMode.ts), so no Node is needed
+   * and Electron's RunAsNode stays off. The older line with ELECTRON_RUN_AS_NODE=1 still works (mcpMode.ts).
+   */
   get command(): string {
-    return `claude mcp add jongi-nyang -e ELECTRON_RUN_AS_NODE=1 -- "${this.files.exe}" "${this.files.server}"`;
+    const app = this.files.app ? ` "${this.files.app}"` : "";
+    return `claude mcp add jongi-nyang -- "${this.files.exe}"${app} ${mcpStdioFlag}`;
   }
 
   /** 복사했어요 on the button for a moment. */

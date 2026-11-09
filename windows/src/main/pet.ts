@@ -1,7 +1,7 @@
 import { BrowserWindow, Menu, ipcMain, powerMonitor, screen, type MenuItemConstructorOptions } from "electron";
 import path from "node:path";
 import {
-  clampFloorX, clipMs, idleChoices, petFrame, petSize, petWindowLeft, petWindowWidth, pickWeighted, walkStepX, sleepAfterSeconds, stripHeight, wakeWithinSeconds,
+  clampFloorX, clipMs, floorMargin, idleChoices, petSizeFor, petStripHeight, petWindowBounds, petWindowWidth, pickWeighted, walkStepX, sleepAfterSeconds, wakeWithinSeconds,
   type PetAction, type PetPayload, type Rect,
 } from "../core/pet";
 import { dayKey, groupByDay, logicalDayStart, streakMilestone, type ArchiveEntry } from "../core/archive";
@@ -9,10 +9,6 @@ import type { ChatterEvents } from "../core/calendar";
 import { isQuietHour, nextChatterDelay, pettedChatter, pickChatter, type ChatterContext, type ChatterLine, type ChatterPose } from "../core/chatter";
 import { key as dueKey } from "../core/deadline";
 import { lang, t } from "../i18n";
-import {
-  newTypingCat, typedWithin, typingChatterQuietMs, typingKey, typingLingerMs, typingReply, typingStop, typingWake,
-  type TypingDoing, type TypingPose,
-} from "../core/typingCat";
 import { offscreen, offscreenEnabled } from "./env";
 import type { PetMemory, Store } from "./store";
 
@@ -38,6 +34,8 @@ export interface PetHooks {
   alarms(): void;
   /** Everything finished (the record and the list), for the streak's cheer (#42). */
   finished(): readonly ArchiveEntry[];
+  /** 종이냥 한마디 waits while someone types (the typing cat hears it; #289: the pet itself never comes to the cushion). */
+  typingLately(): boolean;
 }
 
 const defaultHomeFraction = 0.78;
@@ -84,20 +82,14 @@ export class DesktopPet {
   /** A question of the app's own (not 한마디): what each answer does. */
   private customAnswers?: (() => void)[];
   private nextChatter = Date.now() + (5 + Math.random() * 5) * 60_000;
-  /** 치면 두드리는 고양이 (#230): the paws (core/typingCat.ts), their one timer, and the paw shown on the cushion. */
-  private typing = newTypingCat();
-  private pawTimer?: NodeJS.Timeout;
-  private cushion?: TypingPose;
 
   constructor(private readonly store: Store, private readonly rendererDirectory: string, private readonly hooks: PetHooks) {
     this.lastCompleted = store.history.completedCount;
     this.registerIPC();
     store.on("prefs", (key: string) => {
       if (key === "petVisible") this.update();
-      if (key === "petTyping" && store.prefs.petTyping === "off" && this.cushion !== undefined) {
-        this.leaveCushion();
-        this.send();
-      }
+      // #304: 크기 changed: the cat, its window and its place along the floor follow at once.
+      if (key === "petSize") this.resized();
     });
     // A task checked off anywhere gets a little cheer.
     store.on("change", () => this.checkForCompletion());
@@ -107,6 +99,11 @@ export class DesktopPet {
     setInterval(() => this.checkChatter(), 30_000);
     this.update();
   }
+
+  /** #304: the cat's size (DIP) at the chosen 크기; 92 at 보통. */
+  private get px(): number { return petSizeFor(this.store.prefs.petSize ?? "regular"); }
+  /** Keeps a centre on the floor, clear of its ends by the margin of this size. */
+  private clamp(x: number, width = this.floor().width): number { return clampFloorX(x, width, floorMargin(this.px)); }
 
   private get catShown(): boolean { return this.shown && this.window?.isVisible() === true; }
   /** The pet is out on the floor (the weekly look-back only talks then). */
@@ -120,7 +117,6 @@ export class DesktopPet {
     this.shown = show;
     this.dragging = false;
     this.stopBehaviour();
-    this.leaveCushion();
     if (!show) {
       this.dropQuestion(false);
       this.message = undefined;
@@ -145,8 +141,10 @@ export class DesktopPet {
 
   private ensureWindow(): BrowserWindow {
     if (this.window && !this.window.isDestroyed()) return this.window;
+    // #307: made with the bounds it is placed with (home on the floor; off-screen in a test run), not the default centre.
+    const floor = this.floor();
     const window = new BrowserWindow({
-      width: petWindowWidth, height: stripHeight, show: false, frame: false, transparent: true, resizable: false, minimizable: false, maximizable: false,
+      ...petWindowBounds(floor, this.clamp(floor.width * this.homeFraction, floor.width), offscreen), show: false, frame: false, transparent: true, resizable: false, minimizable: false, maximizable: false,
       fullscreenable: false, focusable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false,
       backgroundColor: "#00000000", title: t("종이냥"),
       // Off-screen runs (snapshots, tests): macOS pulls a window placed off every display back onto one unless it may be
@@ -181,14 +179,15 @@ export class DesktopPet {
   /** The floor: a strip along the bottom of the pet's display's work area (without the off-screen shift). */
   private floor(): Rect {
     const area = this.display().workArea;
-    return { x: area.x, y: area.y + area.height - stripHeight, width: area.width, height: stripHeight };
+    const height = petStripHeight(this.px);
+    return { x: area.x, y: area.y + area.height - height, width: area.width, height };
   }
 
   /** On the floor of the pet's display, at home. */
   private layout(): void {
     if (!this.window || this.window.isDestroyed() || !this.shown) return;
     const floor = this.floor();
-    this.anchorX = clampFloorX(floor.width * this.homeFraction, floor.width);
+    this.anchorX = this.clamp(floor.width * this.homeFraction, floor.width);
     this.homeX = this.anchorX;
     if (!this.dragging) this.setInteractive(false);
     this.placedAt = undefined;
@@ -199,7 +198,30 @@ export class DesktopPet {
   /** Where the cat's centre is along the floor now: dragged, walking or at home. */
   private catX(): number {
     if (this.drag) return this.drag.x;
-    return this.action.kind === "walk" ? walkStepX(this.action, this.actionStart, Date.now()) : this.homeX;
+    return this.action.kind === "walk" ? walkStepX(this.action, this.actionStart, Date.now(), this.px) : this.homeX;
+  }
+
+  /**
+   * #304: another 크기. A walk stops where the cat got to; it stays where it was along the floor (kept clear of the ends
+   * by the new size's margin), and the window takes the new height at once (the bottom stays on the floor).
+   */
+  private resized(): void {
+    if (!this.window || this.window.isDestroyed() || !this.shown) return;
+    if (this.action.kind === "walk") this.homeX = this.catX();
+    // Placed anew: the window takes the new height (a drag going on carries on in it).
+    this.placedAt = undefined;
+    if (this.drag) {
+      this.place();
+      this.send();
+      return;
+    }
+    this.stopBehaviour();
+    this.homeX = this.clamp(this.homeX);
+    this.anchorX = this.clamp(this.anchorX);
+    this.settle();
+    this.place();
+    this.send();
+    this.scheduleIdle();
   }
 
   /**
@@ -208,12 +230,12 @@ export class DesktopPet {
    */
   private place(): void {
     if (!this.window || this.window.isDestroyed() || !this.shown) return;
-    const floor = this.floor();
-    const at = { x: floor.x + petWindowLeft(this.catX()) + offscreen.x, y: floor.y + offscreen.y };
+    const bounds = petWindowBounds(this.floor(), this.catX(), offscreen);
+    const at = { x: bounds.x, y: bounds.y };
     if (this.placedAt?.x === at.x && this.placedAt.y === at.y) return;
     // A walk only moves it; the size is set when it is placed anew (shown, another display).
     if (this.placedAt) this.window.setPosition(at.x, at.y);
-    else this.window.setBounds({ ...at, width: petWindowWidth, height: stripHeight });
+    else this.window.setBounds(bounds);
     this.placedAt = at;
   }
 
@@ -238,8 +260,8 @@ export class DesktopPet {
     if (!this.window || this.window.isDestroyed() || !this.shown) return;
     const question = this.question ? { text: this.question.text, answers: this.question.answers.map((answer) => answer.label) } : undefined;
     const payload: PetPayload = {
-      homeX: this.homeX, activity: { id: this.activityID, action: this.action }, message: this.message, question, typing: this.cushion,
-      floorWidth: this.floor().width,
+      homeX: this.homeX, activity: { id: this.activityID, action: this.action }, message: this.message, question,
+      floorWidth: this.floor().width, size: this.px,
     };
     this.window.webContents.send("pet:state", payload);
   }
@@ -249,7 +271,6 @@ export class DesktopPet {
   /** Plays a short clip, then returns to resting and plans the next thing to do. */
   private play(action: PetAction): void {
     if (!this.catShown) return;
-    this.leaveCushion();
     clearTimeout(this.clipTimer);
     this.action = action;
     this.actionStart = Date.now();
@@ -279,7 +300,8 @@ export class DesktopPet {
     if (!this.catShown) return undefined;
     const floor = this.floor();
     const x = this.catX();
-    return { x: floor.x + x - petSize / 2, y: floor.y + floor.height - petSize, width: petSize, height: petSize };
+    const size = this.px;
+    return { x: floor.x + x - size / 2, y: floor.y + floor.height - size, width: size, height: size };
   }
 
   /** A small hop to say "look up here" when a reminder appears above the cat. */
@@ -332,12 +354,6 @@ export class DesktopPet {
   /** Picks what to do next. Resting between clips means no redraws most of the time. */
   private idle(): void {
     if (!this.catShown) return;
-    // On its cushion, the cat waits until the typing has stopped a while, then is its usual self again.
-    if (this.cushion !== undefined) {
-      if (typedWithin(this.typing, typingLingerMs, performance.now())) { this.scheduleIdle(); return; }
-      this.leaveCushion();
-      this.send();
-    }
     const away = powerMonitor.getSystemIdleTime();
     if (this.asleep) {
       if (away < wakeWithinSeconds) {
@@ -352,7 +368,7 @@ export class DesktopPet {
       return;
     }
     const width = this.floor().width;
-    const walkTarget = clampFloorX(this.anchorX + (Math.random() * 2 - 1) * 170, width);
+    const walkTarget = this.clamp(this.anchorX + (Math.random() * 2 - 1) * 170, width);
     const choice = pickWeighted(idleChoices({
       reduceMotion: this.reduceMotion, wanders: this.store.prefs.petWanders, homeX: this.homeX, walkTarget,
     }), Math.random());
@@ -385,7 +401,7 @@ export class DesktopPet {
     const prefs = this.store.prefs;
     if (!prefs.chatter || !this.catShown || Date.now() < this.nextChatter) return;
     // Typing: not mid-sentence. Tried again at the next check, 5 s after the last key at the earliest.
-    if (typedWithin(this.typing, typingChatterQuietMs, performance.now())) return;
+    if (this.hooks.typingLately()) return;
     if (this.asleep || this.dragging || this.hooks.isBusy() || this.message !== undefined || this.question
       || isQuietHour(new Date().getHours()) || powerMonitor.getSystemIdleTime() >= 120) {
       this.nextChatter = Date.now() + 120_000;
@@ -510,71 +526,6 @@ export class DesktopPet {
     if (more && this.catShown && !this.asleep) this.play({ kind: "cheer" });
   }
 
-  // ─── Typing (#230) ──────────────────────────────────────────────────────────
-
-  /** A key went down in one of the app's windows (`petTap`): a paw, if the setting is on and the cat can. */
-  tap(): void {
-    if (this.store.prefs.petTyping !== "app") return;
-    const reply = typingReply(this.typingDoing());
-    if (reply === "ignore") return;
-    this.prepareForTyping();
-    this.armPaw(typingKey(this.typing, performance.now(), this.reduceMotion));
-    this.cushion = this.typing.pose;
-    this.send();
-  }
-
-  private typingDoing(): TypingDoing {
-    if (!this.catShown) return "hidden";
-    if (this.dragging) return "dragging";
-    switch (this.action.kind) {
-      case "sit": return "resting";
-      case "sleep": return "sleeping";
-      case "walk": return "walking";
-      case "cheer": case "happy": case "hop": return "answering";
-      default: return "moment";
-    }
-  }
-
-  /** Stop walking where it is (stopAndType), wake up (wakeAndType), put a small moment away, and sit on the cushion. */
-  private prepareForTyping(): void {
-    if (this.action.kind === "walk") this.homeX = petFrame(this.action, this.actionStart, this.homeX, Date.now()).x;
-    this.stopFollowing();
-    clearTimeout(this.clipTimer);
-    this.clipTimer = undefined;
-    this.asleep = false;
-    if (this.action.kind !== "sit") this.settle();
-    this.place();
-    if (!this.idleTimer) this.scheduleIdle();
-  }
-
-  /** The one timer: woken at the paw's time, it puts it back, or waits on when a newer key moved the time. */
-  private armPaw(due: number | undefined): void {
-    if (due === undefined || this.pawTimer) return;
-    const wake = (at: number) => {
-      this.pawTimer = setTimeout(() => {
-        this.pawTimer = undefined;
-        const next = typingWake(this.typing, performance.now());
-        if (next !== undefined) { wake(next); return; }
-        if (this.cushion !== undefined) {
-          this.cushion = this.typing.pose;
-          this.send();
-        }
-      }, Math.max(0, at - performance.now()));
-    };
-    wake(due);
-  }
-
-  /** Off the cushion: its usual self again, the paws at rest and nothing waiting (the caller redraws). */
-  private leaveCushion(): void {
-    clearTimeout(this.pawTimer);
-    this.pawTimer = undefined;
-    typingStop(this.typing);
-    this.cushion = undefined;
-  }
-
-  /** Tests: nothing waits or runs for the paws. */
-  get typingQuiet(): boolean { return this.pawTimer === undefined && this.typing.returnAt === undefined; }
-
   // ─── Menu ───────────────────────────────────────────────────────────────────
 
   private menu(): Menu {
@@ -616,7 +567,6 @@ export class DesktopPet {
       if (!fromPet(event)) return;
       if (this.action.kind === "walk") this.homeX = this.catX();
       this.stopBehaviour();
-      this.leaveCushion();
       this.asleep = false;
       this.dragging = true;
       this.drag = { cursor: screen.getCursorScreenPoint().x, from: this.homeX, x: this.homeX };
@@ -625,7 +575,7 @@ export class DesktopPet {
     });
     ipcMain.on("pet:drag", (event) => {
       if (!fromPet(event) || !this.drag) return;
-      this.drag.x = clampFloorX(this.drag.from + screen.getCursorScreenPoint().x - this.drag.cursor, this.floor().width);
+      this.drag.x = this.clamp(this.drag.from + screen.getCursorScreenPoint().x - this.drag.cursor);
       this.place();
     });
     ipcMain.on("pet:drag-end", (event, homeX?: number) => {
@@ -639,7 +589,7 @@ export class DesktopPet {
     // Where the window is (the cursor's last move), or where the page says it let go.
     const dropped = this.drag?.x ?? homeX;
     this.drag = undefined;
-    if (Number.isFinite(dropped)) this.homeX = clampFloorX(dropped, width);
+    if (Number.isFinite(dropped)) this.homeX = this.clamp(dropped, width);
     // Dropped over another display: move there.
     const cursor = screen.getCursorScreenPoint();
     const target = screen.getAllDisplays().find(({ bounds }) =>
@@ -656,9 +606,44 @@ export class DesktopPet {
 
   // ─── Snapshots ──────────────────────────────────────────────────────────────
 
+  /** Snapshots: the bubble and any question put away. */
+  quiet(): void {
+    this.dropQuestion(true);
+    this.hush();
+  }
+
+  /**
+   * #304 (snapshots): what doesn't fit — the cat or its bubble (with a question's buttons) past the window's edges, the
+   * cat's box not its size, the window not on the floor or not the strip's height. Empty when all is well.
+   */
+  async layoutProblems(): Promise<string[]> {
+    if (!this.catShown || !this.window) return ["the cat isn't out"];
+    const problems: string[] = [];
+    const bounds = this.window.getBounds(), floor = this.floor();
+    if (bounds.height !== floor.height) problems.push(`window ${bounds.height} high, the strip ${floor.height}`);
+    if (bounds.y - offscreen.y !== floor.y) problems.push("window not on the floor");
+    const found = await this.window.webContents.executeJavaScript(`(() => {
+      const out = [];
+      const inside = (name, element) => {
+        if (!element || element.hidden) return;
+        const box = element.getBoundingClientRect();
+        if (box.left < 0 || box.top < 0 || box.right > innerWidth || box.bottom > innerHeight) out.push(name + " outside the window");
+      };
+      inside("cat", document.querySelector(".cat"));
+      inside("bubble", document.querySelector(".bubble"));
+      for (const button of document.querySelectorAll(".bubble .answer")) inside("answer", button);
+      const cat = document.querySelector(".cat").getBoundingClientRect();
+      if (Math.round(cat.width) !== ${this.px} || Math.round(cat.height) !== ${this.px}) out.push("cat " + cat.width + "×" + cat.height);
+      const bubble = document.querySelector(".bubble");
+      if (!bubble.hidden && bubble.getBoundingClientRect().bottom > cat.top + 12) out.push("bubble over the cat");
+      return out;
+    })()`) as string[];
+    return [...problems, ...found];
+  }
+
   capture(): Promise<Electron.NativeImage> | undefined {
     if (!this.catShown || !this.window) return undefined;
     // The cat sits in the middle of its window.
-    return this.window.webContents.capturePage({ x: petWindowWidth / 2 - 130, y: 0, width: 260, height: stripHeight });
+    return this.window.webContents.capturePage({ x: petWindowWidth / 2 - 130, y: 0, width: 260, height: this.floor().height });
   }
 }

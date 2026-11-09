@@ -55,7 +55,8 @@ export function readNoteShortcut(value: unknown, drawer: string): string {
  * What the note's key does (#85): the note on screen goes away at once, even with another app in front; otherwise
  * it comes forward (unfolded from the sticky note). On screen: shown, not minimised, not folded into the sticky
  * note. Windows can't tell whether other windows cover it (Electron has no occlusion state), so a covered note
- * counts as on screen here and the first press puts it away; the Mac passes `uncovered` from macOS.
+ * counts as on screen here and the first press puts it away; the Mac passes `uncovered` from macOS. A note on
+ * 바탕화면에 두기 (#273) is under the other windows unless it was summoned, so Windows passes `uncovered` for it then.
  */
 export function noteToggle(state: { visible: boolean; minimized: boolean; folded: boolean; uncovered?: boolean }): "hide" | "show" {
   return state.visible && !state.minimized && !state.folded && state.uncovered !== false ? "hide" : "show";

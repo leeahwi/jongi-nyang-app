@@ -1,20 +1,21 @@
 import { BrowserWindow, Menu, ipcMain, screen, type IpcMainEvent, type MenuItemConstructorOptions, type Rectangle } from "electron";
 import path from "node:path";
 import {
-  frameFor, hasStyles, newPlace, stylesOf, newWidgetId, placeOf, readOpacity, snap, widget as makeWidget, widgetLimit, widgetName, windowSize,
-  type Box, type WidgetKind, type WidgetScreen, type WidgetSettings, type WidgetStyle,
+  frameFor, hasStyles, newPlace, stylesOf, newWidgetId, placeOf, readOpacity, scaleFits, scaleName, shownScale, snap, widget as makeWidget, widgetLimit,
+  widgetName, widgetScales, windowSize, type Box, type WidgetKind, type WidgetScreen, type WidgetSettings, type WidgetStyle,
 } from "../core/calendarWidget";
 import { askLevels } from "../core/slipMove";
 import type { WidgetChanges } from "../core/types";
 import { lang, t } from "../i18n";
 import { offscreen, offscreenEnabled } from "./env";
+import { stayBehind } from "./stayBehind";
 import type { Store } from "./store";
 
 /**
  * 바탕화면 달력 위젯 (#234): up to four frameless, clear windows on the desktop, each one a calendar on paper with two
  * small cat ears at its top right (renderer/widget.ts). They never take the keyboard (not focusable, never in the
- * taskbar): a click on a day opens the day sheet beside the widget (widgetSheet.ts), which does. 바탕화면에 두기 is a
- * plain window that stays where other windows cover it (Electron can't put a window under the others); 항상 위에 두기
+ * taskbar): a click on a day opens the day sheet beside the widget (widgetSheet.ts), which does. 바탕화면에 두기 is
+ * sent back under the other windows whenever it may have come forward (#272, stayBehind.ts); 항상 위에 두기
  * floats. The page decides where the mouse is taken: over the paper (unless 클릭 통과, or with Ctrl held) and over the
  * ears; everywhere else the clicks go through. Each widget remembers its place per display as shares of the work area
  * (core/calendarWidget.ts) and is put back inside when displays change. Settings are this PC's (settings.json), never
@@ -181,14 +182,19 @@ export class CalendarWidgets {
     }
     for (const settings of list) {
       const entry = this.ensure(settings);
-      const resized = entry.settings.kind !== settings.kind || entry.settings.style !== settings.style;
+      // Another size (#271) or another display (whose room may draw it smaller): placed again, inside its display.
+      const resized = entry.settings.kind !== settings.kind || entry.settings.style !== settings.style || entry.settings.scale !== settings.scale
+        || entry.settings.place?.display !== settings.place?.display;
       entry.settings = settings;
       if (!entry.drag) this.place(entry, again || resized || !entry.frame);
       const top = settings.level === "top";
       if (entry.window.isAlwaysOnTop() !== top) entry.window.setAlwaysOnTop(top, askLevels.widgetOnTop.level, askLevels.widgetOnTop.relative);
+      // #272: 바탕화면에 두기 stays under the other windows when clicked or dragged, as on the Mac.
+      if (top || this.snapshots) stayBehind().release(entry.window); else stayBehind().keep(entry.window);
       this.send(entry);
       if (!this.snapshots && !entry.window.isVisible()) entry.window.showInactive();
     }
+    this.noteFits();
   }
 
   /** The widget's window (made, hidden, the first time). */
@@ -218,12 +224,13 @@ export class CalendarWidgets {
     if (!entry) return;
     if (entry.removing) clearTimeout(entry.removing);
     this.shown.delete(id);
+    stayBehind().release(entry.window);
     if (!entry.window.isDestroyed()) entry.window.destroy();
   }
 
   private send(entry: Shown): void {
     if (!entry.loaded || entry.window.isDestroyed()) return;
-    entry.window.webContents.send("widget:settings", { widget: entry.settings, room: this.room, preview: this.snapshots });
+    entry.window.webContents.send("widget:settings", { widget: entry.settings, room: this.room, preview: this.snapshots, scale: this.scaleOf(entry.settings) });
   }
 
   /** The displays, the main one first (its id and work area, off-screen offset taken out). */
@@ -233,9 +240,37 @@ export class CalendarWidgets {
       .map((display) => ({ id: String(display.id), area: display.workArea }));
   }
 
+  // ─── 크기 (#271) ─────────────────────────────────────────────────────────────
+
+  /** The work area of the display a widget is on (its remembered one, else the main one). */
+  private areaOf(settings: WidgetSettings): Box | undefined {
+    const screens = this.screens();
+    return (screens.find((one) => one.id === settings.place?.display) ?? screens[0])?.area;
+  }
+
+  /** The size a widget is drawn at: the one picked, else the largest that fits its display. Snapshots draw the one picked. */
+  private scaleOf(settings: WidgetSettings): number {
+    const area = this.areaOf(settings);
+    return this.snapshots || !area ? settings.scale : shownScale(settings.scale, settings.kind, settings.style, area);
+  }
+
+  /** The sizes that fit a widget's display (the others are greyed out in its menu and its settings). */
+  private fitting(settings: WidgetSettings): number[] {
+    const area = this.areaOf(settings);
+    return area ? widgetScales.filter((scale) => scaleFits(settings.kind, settings.style, scale, area)) : [...widgetScales];
+  }
+
+  /** The desk's settings slip hears which sizes fit (only when that changed). */
+  private noteFits(): void {
+    const fits = Object.fromEntries(this.store.prefs.calendarWidgets.map((settings) => [settings.id, this.fitting(settings)]));
+    if (JSON.stringify(fits) === JSON.stringify(this.store.widgetFits)) return;
+    this.store.widgetFits = fits;
+    this.store.changed();
+  }
+
   /** Where a widget's paper and ears go now: its place on its display (or the main one), else a new place. */
   private frameOf(settings: WidgetSettings): Box {
-    const size = windowSize(settings.kind, settings.style);
+    const size = windowSize(settings.kind, settings.style, this.scaleOf(settings));
     const screens = this.screens();
     const place = settings.place ?? (screens[0] ? newPlace(size.width, size.height, screens[0], []) : undefined);
     return place ? frameFor(place, size.width, size.height, screens) : { x: 0, y: 0, ...size };
@@ -258,7 +293,7 @@ export class CalendarWidgets {
   /** A drag let go: snapped to the work area's and the other widgets' edges (P5), remembered as shares (P1). */
   private drop(entry: Shown): void {
     const bounds = entry.window.getBounds();
-    const size = windowSize(entry.settings.kind, entry.settings.style);
+    const size = windowSize(entry.settings.kind, entry.settings.style, this.scaleOf(entry.settings));
     const frame: Box = { x: bounds.x + this.room - offscreen.x, y: bounds.y + this.room - offscreen.y, ...size };
     const screens = this.screens();
     const centre = { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 };
@@ -294,6 +329,13 @@ export class CalendarWidgets {
         })),
         { type: "separator" });
     }
+    // 크기 (#271): one that doesn't fit this display is greyed out.
+    const fitting = this.fitting(settings);
+    items.push({ label: t("크기"), enabled: false },
+      ...widgetScales.map((scale): MenuItemConstructorOptions => ({
+        label: scaleName(scale, lang()), type: "radio", checked: settings.scale === scale, enabled: fitting.includes(scale), click: () => this.change(id, { scale }),
+      })),
+      { type: "separator" });
     items.push({ label: t("불투명도"), enabled: false },
       ...[100, 85, 70, 50, 30].map((opacity): MenuItemConstructorOptions => ({ label: `${opacity}%`, type: "radio", checked: settings.opacity === opacity, click: () => this.change(id, { opacity }) })),
       { type: "separator" },
@@ -320,7 +362,7 @@ export class CalendarWidgets {
   preview(id: string, look: { wall: string; hover?: boolean; offset?: number }): BrowserWindow | undefined {
     const entry = this.shown.get(id);
     if (!entry || !entry.loaded || entry.window.isDestroyed()) return undefined;
-    entry.window.webContents.send("widget:settings", { widget: entry.settings, room: this.room, preview: true, ...look });
+    entry.window.webContents.send("widget:settings", { widget: entry.settings, room: this.room, preview: true, scale: this.scaleOf(entry.settings), ...look });
     return entry.window;
   }
 

@@ -84,9 +84,11 @@ struct CalendarWidgetsGroup: View {
         .settingsRow()
     }
 
-    /// ‘불투명도 85% · 바탕화면에 두기’, ‘… · 항상 위’, ‘… · 클릭 통과’.
+    /// ‘불투명도 85% · 바탕화면에 두기’, ‘… · 항상 위’, ‘… · 클릭 통과’; another size than 보통 first (‘크게 · 불투명도 85% · …’).
     static func summary(_ settings: CalendarWidget.Settings) -> String {
         var parts = [L("불투명도 \(settings.opacity)%"), settings.level == .top ? L("항상 위") : L("바탕화면에 두기")]
+        // 크기 (#271): said once it isn't 보통.
+        if settings.scale != CalendarWidget.defaultScale { parts.insert(CalendarWidget.scaleName(settings.scale, .current), at: 0) }
         if settings.clickThrough { parts.append(L("클릭 통과")) }
         return parts.joined(separator: " · ")
     }
@@ -186,14 +188,20 @@ struct WidgetSettingsView: View {
     @ObservedObject var widgets: CalendarWidgets
     let original: CalendarWidget.Settings
     let done: () -> Void
+    /// Snapshots: the sizes that fit, as on a small display (1280×800).
+    var previewFitting: [Double]?
     @State private var settings: CalendarWidget.Settings
 
-    init(widgets: CalendarWidgets, original: CalendarWidget.Settings, done: @escaping () -> Void) {
+    init(widgets: CalendarWidgets, original: CalendarWidget.Settings, previewFitting: [Double]? = nil, done: @escaping () -> Void) {
         self.widgets = widgets
         self.original = original
+        self.previewFitting = previewFitting
         self.done = done
         _settings = State(initialValue: original)
     }
+
+    /// 크기 (#271): the sizes that fit the widget's display; the others are greyed out.
+    private var fitting: [Double] { previewFitting ?? widgets.fitting(settings) }
 
     var body: some View {
         PaperSlip(kind: .event, width: 400) {
@@ -208,8 +216,21 @@ struct WidgetSettingsView: View {
                         line(String(localized: "모양", table: "Widget")) {
                             PaperSegmented(selection: binding(\.style), options: CalendarWidget.styles(settings.kind).map { ($0, CalendarWidget.styleName($0, .current), nil) },
                                            label: String(localized: "모양", table: "Widget"))
-                                .frame(width: CalendarWidget.styles(settings.kind).count > 2 ? 250 : 170)
+                                .frame(width: CalendarWidget.styles(settings.kind).count > 2 ? 270 : 170)
                         }
+                    }
+                    line(L("크기")) {
+                        PaperSegmented(selection: binding(\.scale), options: CalendarWidget.scales.map { ($0, CalendarWidget.scaleName($0, .current), nil) },
+                                       label: L("크기"), fit: true,
+                                       disabled: Set(CalendarWidget.scales.filter { !fitting.contains($0) }))
+                            .frame(width: 270)
+                    }
+                    if fitting.count < CalendarWidget.scales.count {
+                        Text(L("이 화면에 들어가는 크기만 고를 수 있어요."))
+                            .font(.system(size: 11))
+                            .foregroundStyle(PaperTheme.ink3)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.bottom, 4)
                     }
                     line(L("불투명도")) {
                         HStack(spacing: 8) {

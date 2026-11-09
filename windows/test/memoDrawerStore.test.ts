@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { makeBackup, mergeFiles, parseBackup, replaceFiles, summary, summaryText } from "../src/core/backup";
@@ -8,10 +7,11 @@ import { serializeMemos } from "../src/core/memo";
 import { inboxID, moveMemo, parseMemoFolders, pinnedView, placementOf, removeCheckedLines, serializeMemoFolders, setMemoPaper, visibleFolders } from "../src/core/memoDrawer";
 import { copyData } from "../src/main/storageFolder";
 import { Store } from "../src/main/store";
+import { temporaryFolder } from "./temporaryFolder";
 
 // 메모 서랍 in the store: memo-folders.json beside memos.json, read, merged, kept aside, backed up (D5, D6, D13, D15).
 
-const temporary = () => fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-drawer-"));
+const temporary = () => temporaryFolder("paper-todo-drawer-");
 const read = (directory: string) => fs.readFileSync(path.join(directory, "memo-folders.json"), "utf8");
 const stamp = (offset = 0) => new Date(Date.now() + offset).toISOString().replace(/\.\d{3}Z$/, "Z");
 

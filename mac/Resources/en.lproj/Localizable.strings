@@ -209,7 +209,8 @@
 "포스트잇 다루기" = "Using the sticky note";
 "포스트잇을 누르면 노트가 다시 펼쳐지고, 끌면 자리를 옮겨요. 옮긴 자리를 기준으로 노트가 열려요. 우클릭하면 숨기기·종료 메뉴가 있어요." = "Click the sticky note to unfold the notepad; drag it to move it. The notepad opens where you moved it. Right-click for Hide and Quit.";
 "항상 위에 두기" = "Keep on top";
-"위쪽 핀 모양 버튼을 누르면 다른 창 위에 노트가 떠 있어요. 한 번 더 누르면 풀려요." = "Click the pin at the top and the notepad floats above other windows. Click again to let go.";
+"위쪽 핀 모양 버튼을 누르고 노트를 둘 곳을 골라요.\n· 보통: 다른 창처럼 누르면 앞으로 와요.\n· 항상 위에 두기: 늘 다른 창 위에 떠 있어요.\n· 바탕화면에 두기: 늘 다른 창 뒤에 있어요. 노트를 누르거나 적어도 앞으로 오지 않아요.\n· 바탕화면에 둔 노트도 %@ 키나 메뉴 막대에서 열면 잠깐 앞으로 와요. 다른 창을 누르면 다시 뒤로 가요." = "Click the pin button at the top and choose where the notepad sits.\n· Regular: like any window, it comes forward when you click it.\n· Keep on top: it always floats above other windows.\n· On the desktop: it always stays behind other windows. Clicking or typing in it doesn't bring it forward.\n· A notepad on the desktop still comes forward for a while when you open it with %@ or from the menu bar. Click another window and it goes back.";
+"노트 위치" = "Notepad position";
 "크기와 위치" = "Size and position";
 "완료 기록" = "History";
 "한 일은 초록 칸으로 남아요" = "What you did stays as little green squares";
@@ -227,7 +228,7 @@
 "할 일 줄을 우클릭 → ‘달력에 넣기…’로 할 일을 일정으로 넣어요.\n· 할 일의 알림 시각이나 마감으로 날짜를 채워 줘요.\n· 넣은 할 일 끝에는 작은 달력이 붙어요.\n· 넣은 뒤 할 일을 고쳐도 일정은 그대로예요." = "Right-click a to-do → ‘Add to calendar…’ to put it on the calendar.\n· The date comes from the to-do’s reminder time or due date.\n· The to-do gets a little calendar at its end.\n· Editing the to-do afterwards leaves the event as it is.";
 "일정 알림" = "Event reminders";
 "달력" = "Calendar";
-"월 · 주로 일정 · 마감 · 알림을 한눈에 봐요.\n1. 노트 위쪽의 책상 버튼, ⋯ → 달력, ⌘D로 책상의 달력을 열어요.\n2. 날짜를 누르면 오른쪽에 그날 일정과 할 일이 보여요.\n3. 날짜를 두 번 누르면 새 일정을 만들어요.\n· 여러 날 일정은 첫날에 이름이 보이고, 이어지는 날로 막대가 이어져요.\n· 한 주는 시스템 설정에 맞춰 월요일이나 일요일부터 시작해요." = "See events, due dates and reminders at a glance, by month or week.\n1. Open the calendar on the Desk with the desk button at the top of the notepad, ⋯ → Calendar or ⌘D.\n2. Click a day to see its events and to-dos on the right.\n3. Double-click a day for a new event.\n· A multi-day event shows its name on the first day, and its bar runs on through the days after.\n· Weeks start on Monday or Sunday, as set on your Mac.";
+"월 · 주로 일정 · 마감 · 알림을 한눈에 봐요.\n1. 노트 위쪽의 책상 버튼, ⋯ → 달력, ⌘D로 책상의 달력을 열어요.\n2. 날짜를 누르면 오른쪽에 그날 일정과 할 일이 보여요.\n3. 날짜를 두 번 누르면 새 일정을 만들어요.\n· 여러 날 일정은 첫날에 이름이 보이고, 이어지는 날로 막대가 이어져요.\n· 한 주는 시스템 설정에 맞춰 월요일이나 일요일부터 시작해요.\n· 반복 할 일은 앞으로 돌아올 날마다 보여요. 다음 한 번만 진하고 나머지는 흐려요.\n· 매일 · 평일 반복은 달 칸에 이름 대신 날짜 옆 ⟲와 개수로 보여요. 마우스를 올리면 이름이 보여요.\n· 키보드로: 화살표로 날을 고르고 Return으로 새 일정을 만들어요. Tab을 누르면 그날 일정으로 가요. ↑↓로 고르고 Return으로 고쳐요. Esc를 누르면 달력의 그 날로 돌아가요." = "See events, due dates and reminders at a glance, by month or week.\n1. Open the calendar on the Desk with the desk button at the top of the notepad, ⋯ → Calendar or ⌘D.\n2. Click a day to see its events and to-dos on the right.\n3. Double-click a day for a new event.\n· A multi-day event shows its name on the first day, and its bar runs on through the days after.\n· Weeks start on Monday or Sunday, as set on your Mac.\n· A repeating to-do shows on every day it comes back. Only the next one is solid; the rest are faded.\n· In the month, daily and weekday repeats show as ⟲ and how many next to the date, instead of their names. Point at it to see them.\n· With the keyboard: pick a day with the arrow keys and press Return for a new event. Press Tab to go to that day’s events. Pick one with ↑↓ and press Return to change it. Press Esc to go back to that day in the calendar.";
 "어디에 저장되나요?" = "Where are they kept?";
 "일정은 할 일과 같은 저장 폴더에 있어요. 인터넷 계정에 연결하지 않아요.\n· 공유 폴더를 쓰면 다른 기기의 종이냥과 함께 써요.\n· 파일 이름은 events.json이에요." = "Events are in the same storage folder as your to-dos. No online account is involved.\n· With a shared folder, Jongi-nyang on your other devices uses them too.\n· The file is events.json.";
 "백업 · 옮기기" = "Backup & move";
@@ -240,7 +241,7 @@
 "화면 아래 작은 친구" = "Your little desktop friend";
 "종이냥 펫" = "Desktop cat";
 "펫과 놀기" = "Playing with the cat";
-"종이냥이 화면 아래(Dock 위)에서 지내요. 누르면 하트가 나오고, 두 번 누르면 노트가 열려요. 잡고 끌면 자리를 옮기고, 다른 모니터로 옮길 수도 있어요." = "Jongi-nyang lives at the bottom of your screen (above the Dock). Click it for a heart; double-click to open the notepad. Drag it to move it, even to another display.";
+"종이냥이 화면 아래(Dock 위)에서 지내요. 누르면 하트가 나오고, 두 번 누르면 노트가 열려요. 잡고 끌면 자리를 옮기고, 다른 모니터로 옮길 수도 있어요. 책상 → 종이냥 → 종이냥 펫의 ‘크기’에서 작게 · 보통 · 크게 · 아주 크게 중에 골라요. 말풍선 글자는 그대로예요." = "Jongi-nyang lives at the bottom of your screen (above the Dock). Click it for a heart; double-click to open the notepad. Drag it to move it, even to another display. In Desk → Cat → Desktop cat, pick Small, Regular, Large or Extra large under ‘Size’. The words in its bubble stay the same size.";
 "종이냥이 하는 일" = "What Jongi-nyang does";
 "가만히 있을 땐 숨을 쉬고, 가끔 깜빡이고 갸웃하고 걷고 그루밍하고 차를 마셔요.\n· Mac을 5분 넘게 안 쓰면 하품하고 잠들었다가, 돌아오면 기지개를 켜요.\n· 할 일이나 타이머를 끝내면 축하해 줘요." = "When it’s resting it breathes, and now and then it blinks, tilts its head, walks, grooms and sips tea.\n· Leave your Mac for more than 5 minutes and it yawns and falls asleep, then stretches when you’re back.\n· It cheers when you finish a to-do or a timer.";
 "우클릭 메뉴" = "Right-click menu";
@@ -358,7 +359,6 @@
 "가볍게 적고, 하나씩 마치세요.\n이 Mac에만 저장되는 작은 할 일 노트." = "Jongi-nyang (종이냥, ‘paper cat’)\nJot it down, finish one at a time.\nA little to-do note kept on this Mac.";
 /* PaperView.swift */
 "오늘 할 일을 한 줄 적어 볼까요?" = "Jot down one thing for today?";
-"항상 위에 두기 해제" = "Stop keeping on top";
 "끔" = "Off";
 "켬" = "On";
 "글꼴" = "Font";
@@ -1395,21 +1395,26 @@
 "공유 폴더로 여러 기기가 같은 목록을 써도, 기기마다 보일 스페이스를 따로 정해요.\n1. 책상 → 스페이스에서 줄 오른쪽의 ‘이 기기에서’ 팝업을 열어요.\n2. 보이기 · 숨기기 · 시간 정하기… 중에서 골라요. ‘모든 스페이스 ▾’의 ‘이 기기에서 숨기기 ▸’로도 바로 숨겨요.\n· 시간 정하기는 줄마다 요일과 시각을 정해요. 줄을 여러 개 둘 수 있고, 하나라도 맞으면 보여요. 22:00–06:00처럼 밤을 넘겨도 돼요.\n· 숨긴 스페이스의 할 일은 오늘 · 앞으로 탭, 오늘 창, 하루 띠, 저녁 정리에 나오지 않고, 이 기기에서는 알림도 울리지 않아요. 숨어 있던 동안 지난 알림은 나중에도 울리지 않아요.\n· 목록 맨 아래 ‘잠깐 보기’를 누르면 잠시 보여요. 앱을 다시 켜거나 ‘다시 숨기기’를 누르면 다시 숨어요.\n· 완료 기록에는 모두 보여요. 찾기에서는 옅게 보이고 ‘숨김’이 붙어요.\n· 이 설정은 이 기기에만 있어요. 다른 기기에는 모두 보여요. 이 기기의 종이냥 for Claude도 숨긴 스페이스의 할 일을 빼고 보여 줘요." = "Even when several devices share one list through a shared folder, each one can choose which spaces it shows.\n1. In Desk → Spaces, open the ‘On this device’ popup at the right of a row.\n2. Pick Show, Hide or Set times…. ‘Hide on this device ▸’ under ‘All spaces ▾’ hides one right away too.\n· Set times takes days and times, one row each. You can add several rows, and the space shows when any of them matches. A row like 22:00–06:00 runs past midnight.\n· To-dos in a hidden space stay off Today, Ahead, the Today window, the Day ribbon and the Evening tidy-up, and their reminders don’t ring on this device. Reminders that passed while it was hidden don’t ring later either.\n· ‘Peek’ at the end of the list shows them for a while. They hide again when the app restarts or you click ‘Hide again’.\n· History still shows everything. Search shows them faintly, marked ‘Hidden’.\n· This setting stays on this device. Other devices still see everything. Jongi-nyang for Claude on this device leaves the hidden spaces’ to-dos out too.";
 
 /* #230 치면 두드리는 고양이 (1.48) */
-"글자 칠 때 두드리기" = "Tap along while typing";
+/* #289 타닥냥, apart from the pet */
+"타닥냥" = "Tap-tap cat";
+"두드리기" = "Tap along";
+/* #304 크기 of the pet and of 타닥냥 */
+"펫 크기" = "Desktop cat size";
+"타닥냥 크기" = "Tap-tap cat size";
+"자리" = "Corner";
+"글자를 치면 화면 구석의 고양이가 방석에 기대 앞발로 두드려요. 종이냥 펫과 따로 켜고 꺼요." = "Type, and a cat in a corner of the screen taps along on its cushion. It’s turned on and off apart from the desktop cat.";
+"종이냥에서 글자를 치면 구석에 나와 두드리고, 멈추면 곧 들어가요. 무엇을 쳤는지는 보지 않아요." = "Type in this app and it comes out to tap along, then goes once you stop. It never sees what you type.";
+"다른 앱에서 칠 때도 두드려요. 어떤 키인지는 보지 않고, 눌렸다는 것만 알아요." = "It taps along in other apps too. It never looks at which key, only that one was pressed.";
+"글자를 치면 화면 구석의 고양이가 방석에 기대 앞발을 번갈아 내려요. 치기를 멈추면 곧 쉬어요. 종이냥 펫과 따로 켜고 꺼요.\n1. 책상 → 종이냥 → 타닥냥의 ‘두드리기’에서 끄기 · 종이냥에서만 · 모든 앱에서 중에 골라요.\n2. ‘자리’에서 화면의 네 구석 중 하나를 골라요. 처음은 오른쪽 아래예요.\n3. ‘크기’에서 작게 · 보통 · 크게 · 아주 크게 중에 골라요. 펫 크기와 따로예요.\n· 종이냥에서만: 종이냥 창에서 칠 때 구석에 나오고, 멈추면 몇 초 뒤 조용히 들어가요.\n· 모든 앱에서: macOS가 입력 모니터링 권한을 한 번 물어요. 허락하면 구석에 늘 있고, 다른 앱에서 칠 때도 두드려요. 전체 화면 앱 위에도 보여요.\n· 종이냥이 아는 건 키를 눌렀다는 것과 그 시각뿐이에요. 어떤 키인지, 무엇을 쳤는지는 읽지도 남기지도 않아요.\n· 키를 꾹 누르고 있거나 ⌘ · ⌃ 단축키를 쓸 때는 두드리지 않아요.\n· 클릭은 뒤 앱으로 가요. 메뉴 막대의 종이냥 얼굴을 우클릭해 ‘타닥냥’으로 바로 숨기고 다시 보여요.\n· 펫을 숨겨도 타닥냥은 그대로예요. 화면을 공유할 때도 보여요.\n· 권한이 없으면 종이냥 안에서만 두드려요. 종이냥은 아직 Apple의 정식 서명이 없어서, 업데이트하면 macOS가 권한을 다시 물을 수 있어요.\n· 손쉬운 사용의 ‘동작 줄이기’를 켜면 가만히 앉아 있어요." = "Type, and a cat in a corner of the screen leans on its cushion and puts its paws down in turn. Stop, and it soon rests. It’s turned on and off apart from the desktop cat.\n1. In Desk → Cat → Tap-tap cat, pick Off, In this app or In all apps under ‘Tap along’.\n2. Under ‘Corner’, pick one of the screen’s four corners. It starts at the bottom right.\n3. Under ‘Size’, pick Small, Regular, Large or Extra large, apart from the desktop cat’s size.\n· In this app: it comes out in its corner when you type in Jongi-nyang, and quietly goes a few seconds after you stop.\n· In all apps: macOS asks once for Input Monitoring. Allow it, and the cat stays in its corner and taps along in other apps too, over full-screen apps as well.\n· All it knows is that a key was pressed, and when. Which key, or what you typed, is never read or kept.\n· It doesn’t tap when you hold a key down or use a ⌘ or ⌃ shortcut.\n· Clicks go through to the app behind it. Right-click the cat face in the menu bar and choose ‘Tap-tap cat’ to hide it or bring it back.\n· Hiding the desktop cat leaves the tap-tap cat as it is. It also shows when you share your screen.\n· Without the permission, it taps along in this app only. Jongi-nyang isn’t fully signed by Apple yet, so macOS may ask again after an update.\n· With Accessibility’s ‘Reduce motion’ on, it sits still.";
 "종이냥에서만" = "In this app";
 "모든 앱에서" = "In all apps";
-"종이냥에서 글자를 치면 앞발로 두드려요. 무엇을 쳤는지는 보지 않아요." = "Type in this app and the cat taps along with its paws. It never sees what you type.";
-"다른 앱에서 칠 때도 두드려요. 키를 눌렀다는 것만 알고, 어떤 키인지는 몰라요." = "It taps along in other apps too. It only knows that a key was pressed, never which one.";
 "종이냥은 아직 Apple의 정식 서명이 없어서, 업데이트하면 macOS가 권한을 다시 물을 수 있어요." = "Jongi-nyang isn’t fully signed by Apple yet, so macOS may ask for permission again after an update.";
 "입력 모니터링 권한이 없어서 종이냥 안에서만 두드려요." = "Input Monitoring isn’t allowed, so the cat only taps along in this app.";
 "시스템 설정 열기" = "Open System Settings";
-"전체 화면에서 보이기" = "Show over full-screen apps";
 "왼쪽 위" = "Top left";
 "오른쪽 위" = "Top right";
 "왼쪽 아래" = "Bottom left";
 "오른쪽 아래" = "Bottom right";
-"글자 칠 때" = "While you type";
-"글자를 치면 고양이가 방석에 기대 앞발을 번갈아 내려요. 치기를 멈추면 곧 쉬어요.\n1. 책상 → 종이냥 → 종이냥 펫의 ‘글자 칠 때 두드리기’에서 끄기 · 종이냥에서만 · 모든 앱에서 중에 골라요.\n2. ‘모든 앱에서’를 고르면 macOS가 입력 모니터링 권한을 한 번 물어요. 허락하면 다른 앱에서 칠 때도 두드려요.\n· 종이냥이 아는 건 키를 눌렀다는 것과 그 시각뿐이에요. 어떤 키인지, 무엇을 쳤는지는 읽지도 남기지도 않아요.\n· 키를 꾹 누르고 있거나 ⌘ · ⌃ 단축키를 쓸 때는 두드리지 않아요.\n· ‘모든 앱에서’일 때 전체 화면 앱 위에는 Dock 위 고양이 대신 작은 고양이가 구석에 떠요. 클릭은 뒤 앱으로 가요. 펫이나 메뉴 막대의 종이냥 얼굴을 우클릭해 ‘전체 화면에서 보이기’를 끄면 숨어요.\n· 작은 고양이는 화면을 공유할 때도 보여요.\n· 권한이 없으면 종이냥 안에서만 두드려요. 종이냥은 아직 Apple의 정식 서명이 없어서, 업데이트하면 macOS가 권한을 다시 물을 수 있어요.\n· 손쉬운 사용의 ‘동작 줄이기’를 켜면 가만히 앉아 있어요." = "Type, and the cat leans on its cushion and puts its paws down in turn. Stop, and it soon rests.\n1. In Desk → Cat → Desktop cat, pick Off, In this app or In all apps under ‘Tap along while typing’.\n2. Pick ‘In all apps’ and macOS asks once for Input Monitoring. Allow it, and the cat taps along in other apps too.\n· All it knows is that a key was pressed, and when. Which key, or what you typed, is never read or kept.\n· It doesn’t tap when you hold a key down or use a ⌘ or ⌃ shortcut.\n· With ‘In all apps’, a small cat sits in a corner over full-screen apps instead of the one above the Dock. Clicks go through to the app behind it. To hide it, right-click the cat or the cat face in the menu bar and turn off ‘Show over full-screen apps’.\n· The small cat also shows when you share your screen.\n· Without the permission, it taps along in this app only. Jongi-nyang isn’t fully signed by Apple yet, so macOS may ask again after an update.\n· With Accessibility’s ‘Reduce motion’ on, it sits still.";
 
 /* 바탕화면 달력 위젯 (#234) */
 "%@ 위젯" = "%@ widget";
@@ -1448,6 +1453,7 @@
 "켜면 귀만 마우스를 받아요." = "When on, only the ears take the mouse.";
 "클릭 통과" = "Click through";
 "투명도 줄이기가 켜져 있어서 위젯이 늘 선명하게 보여요." = "Reduce transparency is on, so widgets stay solid.";
+"이 화면에 들어가는 크기만 고를 수 있어요." = "Only sizes that fit this screen can be picked.";
 "할 일 ↔ 일정" = "To-do ↔ event";
 "할 일이나 일정을 적어요" = "Type a to-do or an event";
 "항상 위" = "On top";
@@ -1505,3 +1511,9 @@
 "노트 · 달력 · 위젯 · 쪽지 · 책상이 같은 종이를 써요. 밝은 종이는 밤이 되면 ‘밤에는’에서 고른 종이로 바뀌어요." = "The notepad, calendar, widgets, slips and Desk share one paper. At night a light paper turns into the one picked under ‘At night’.";
 "종이와 낮 · 밤" = "Paper and day & night";
 "책상 → 꾸미기 → 종이에서 열다섯 종이 가운데 하나를 골라요. 노트 · 달력 · 위젯 · 쪽지 · 책상이 바로 그 종이로 바뀌어요.\n· 밝은 종이는 밤이 되면 ‘밤에는’에서 고른 종이로 바뀌어요. 처음에는 밤 종이예요. 밤에도 그 종이를 쓰려면 ‘그대로’를 골라요.\n· 어두운 종이(밤 종이 · 먹색 종이 · 밤하늘 종이 · 칠판)는 낮에도 그대로예요.\n· 낮 · 밤에서 자동 · 낮 · 밤을 골라요. 자동이면 Mac이 어두운 모드일 때 밤이 돼요.\n· 메뉴와 스크롤 막대도 보이는 종이처럼 밝거나 어두워요." = "In Desk → Appearance → Paper, pick one of fifteen papers. The notepad, calendar, widgets, slips and Desk change to it at once.\n· At night a light paper turns into the one picked under ‘At night’ — Night paper at first. To keep it at night too, pick ‘Keep this paper’.\n· The dark papers (Night paper · Ink · Night sky · Chalkboard) stay the same by day as well.\n· Under Day & night, pick Automatic · Day · Night. On Automatic it’s night while your Mac is in dark mode.\n· Menus and scroll bars are light or dark along with the paper shown.";
+/* #274 · #275: repeating to-dos in the calendar, and the desk calendar's day list by the keys. */
+"반복 할 일 보기" = "Show repeating to-dos";
+"책상 달력" = "Desk calendar";
+"그날 일정으로" = "Go to the day’s events";
+"일정 고르기" = "Pick an event";
+"달력으로 돌아가기" = "Back to the calendar";

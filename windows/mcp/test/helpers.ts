@@ -11,6 +11,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { aiExtVersion, parseAiLog, serializeAiLink, type AiLink } from "../../src/core/ai";
 import type { LocalEvent } from "../../src/core/events";
 import { parseNotebook, serializeNotebook, type TodoItem } from "../../src/core/notebook";
+import { temporaryFolder } from "../../test/temporaryFolder";
 
 /**
  * What the extension's tests share: the real bundled server, its test build (mcp/dist/server-test/index.js — the one
@@ -21,7 +22,7 @@ import { parseNotebook, serializeNotebook, type TodoItem } from "../../src/core/
 
 export const server = process.env.PAPERTODO_MCP_SERVER
   ?? path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")), "../mcp/dist/server-test/index.js");
-export const temporary = () => fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-ai-"));
+export const temporary = () => temporaryFolder("paper-todo-ai-");
 const clients: Client[] = [];
 after(async () => { for (const client of clients) await client.close(); });
 
@@ -43,10 +44,11 @@ export function setup(options: { link?: Partial<AiLink> | null; shared?: boolean
 /** What each client's server wrote to stderr (Claude's MCP log). */
 export const stderrOf = new WeakMap<Client, () => string>();
 
-export async function connect(env: Record<string, string>, command = process.execPath, name = "paper-todo-test"): Promise<Client> {
+/** `args`: what follows `command` (the server's file for Node; the app's folder and --mcp-stdio for Electron, #175). */
+export async function connect(env: Record<string, string>, command = process.execPath, name = "paper-todo-test", args = [server]): Promise<Client> {
   const client = new Client({ name, version: "1.0.0" });
-  const base = Object.fromEntries(Object.entries(process.env).filter(([key, value]) => value !== undefined && !key.startsWith("PAPERTODO_"))) as Record<string, string>;
-  const transport = new StdioClientTransport({ command, args: [server], env: { ...base, ...env }, stderr: "pipe" });
+  const base = Object.fromEntries(Object.entries(process.env).filter(([key, value]) => value !== undefined && !key.startsWith("PAPERTODO_") && key !== "ELECTRON_RUN_AS_NODE")) as Record<string, string>;
+  const transport = new StdioClientTransport({ command, args, env: { ...base, ...env }, stderr: "pipe" });
   let stderr = "";
   transport.stderr?.on("data", (chunk: Buffer) => { stderr += chunk.toString("utf8"); });
   stderrOf.set(client, () => stderr);

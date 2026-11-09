@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { aiEntry, aiExtVersion, aiLogLine, parseAiLink, parseAiLog, type AiItem, type AiLogEntry } from "../src/core/ai";
@@ -11,6 +10,7 @@ import { addFolder, memosIn, placeNew, serializeMemoFolders } from "../src/core/
 import type { NoteNotice } from "../src/core/types";
 import { AiConnection } from "../src/main/aiConnect";
 import { Store } from "../src/main/store";
+import { temporaryFolder } from "./temporaryFolder";
 
 /**
  * AI 연결, the app's side (M13–M15 of the shared AI connection spec): the link it writes, the toast and the
@@ -19,8 +19,8 @@ import { Store } from "../src/main/store";
  * are made here the way it makes them (the file, then a line in the log).
  */
 
-const temporary = () => fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-ai-app-"));
-const files = { server: "C:\\Program Files\\종이냥\\resources\\mcp\\server\\index.js", mcpb: "x.mcpb", exe: "C:\\Program Files\\종이냥\\종이냥.exe" };
+const temporary = () => temporaryFolder("paper-todo-ai-app-");
+const files = { mcpb: "x.mcpb", exe: "C:\\Program Files\\종이냥\\종이냥.exe" };
 
 function setup(visible = true) {
   const folder = temporary();
@@ -58,7 +58,8 @@ test("ai-link.json: written at launch, off by default; on, with the data folder 
   assert.equal(parseAiLink(fs.readFileSync(path.join(folder, "ai-link.json"), "utf8"))!.enabled, true);
   ai.setEnabled(false);
   assert.equal(parseAiLink(fs.readFileSync(path.join(folder, "ai-link.json"), "utf8"))!.enabled, false, "turned off: written false, not deleted");
-  assert.equal(ai.command, 'claude mcp add jongi-nyang -e ELECTRON_RUN_AS_NODE=1 -- "C:\\Program Files\\종이냥\\종이냥.exe" "C:\\Program Files\\종이냥\\resources\\mcp\\server\\index.js"');
+  // #175: the app's own program in its MCP mode; no ELECTRON_RUN_AS_NODE, no script path.
+  assert.equal(ai.command, 'claude mcp add jongi-nyang -- "C:\\Program Files\\종이냥\\종이냥.exe" --mcp-stdio');
   ai.stop();
 });
 

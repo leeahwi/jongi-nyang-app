@@ -73,6 +73,11 @@ body.wall-busy { background: repeating-linear-gradient(118deg, rgba(255,255,255,
 .mark.deadline, .mark.reminder, .mark.range { width: 6px; height: 6px; border-radius: 50%; margin: 0; }
 .mark.deadline { background: var(--w-clay); }
 .mark.reminder, .mark.range { background: var(--w-sage); }
+/* #274: a repeating to-do's days — a sage dot, and after the next one fainter with its title in --t3 (ink below 100 %, so it
+   keeps 4.5:1). */
+.mark.repeat { width: 6px; height: 6px; border-radius: 50%; margin: 0; background: var(--w-sage); }
+.ln.ahead .mark.repeat { opacity: 0.45; }
+.ln.ahead .tt { color: var(--t3); }
 .ln { display: flex; align-items: center; height: 19px; min-width: 0; }
 .ln .bk { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; padding-right: 4px; cursor: pointer; }
 .ln .tm { color: var(--t2); font-size: 11px; min-width: 34px; flex: none; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -121,6 +126,12 @@ button.more:hover { background: var(--w-sage-2); color: var(--ts); }
 .k-month.s-simple .cl .n { font-size: 12px; font-weight: 700; display: inline-flex; width: 21px; height: 21px; align-items: center; justify-content: center; }
 .k-month:not(.s-simple) .cl .head { display: flex; align-items: center; gap: 4px; height: 19px; }
 .k-month:not(.s-simple) .cl .head .bk { display: inline-flex; align-items: center; gap: 3px; padding-right: 2px; }
+/* #295: the head's parts keep their width (fitHead picks what fits; nothing is cut). #296: the folded repeats' mark. */
+.k-month:not(.s-simple) .cl .head > * { flex: none; }
+.k-month:not(.s-simple) .cl .head > [hidden] { display: none; }
+.k-month .cl .rmark { display: inline-flex; align-items: center; gap: 1px; color: var(--ts); font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.k-month.s-wall .cl .rmark { font-size: 11px; }
+.k-month .cl .rmark[hidden], .k-month .cl .rmark .rn[hidden] { display: none; }
 .k-month:not(.s-simple) .cl .n { font-size: 11.5px; font-weight: 700; display: inline-flex; min-width: 19px; height: 19px; align-items: center; justify-content: center; }
 .k-month:not(.s-simple) .cl .lines { display: flex; flex-direction: column; gap: 1px; }
 .k-month:not(.s-simple) .cl .lines .bk { display: block; padding: 0 1px; }
@@ -166,6 +177,9 @@ html:not([lang="ko"]) .k-month .cl .item.two .t, html:not([lang="ko"]) .k-month 
 .item .icon { flex: none; }
 .item.deadline .icon { color: var(--w-clay); }
 .item.reminder .icon { color: var(--w-sage); }
+.item.repeat .icon { color: var(--w-sage); }
+.item.repeat.ahead .icon { opacity: 0.45; }
+.item.repeat.ahead .t { color: var(--t3); }
 /* 오늘 목록 (200 × 360) */
 .k-agenda .sh { font-size: 10.5px; font-weight: 700; color: var(--t2); margin: 6px 0 2px; display: flex; align-items: center; min-width: 0; }
 .k-agenda .sh .bk { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

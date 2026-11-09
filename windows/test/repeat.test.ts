@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { UndoableNotebook } from "../src/core/notebook";
 import { alertOn, describe, isValidRule, nextOccurrence, occursOn, planToday, type Series } from "../src/core/repeat";
 import { Store } from "../src/main/store";
+import { temporaryFolder } from "./temporaryFolder";
 
 const local = (y: number, m: number, d: number, h = 12, min = 0) => new Date(y, m - 1, d, h, min);
 const day = (y: number, m: number, d: number) => local(y, m, d, 4);
@@ -63,7 +63,7 @@ test("placed copies survive undo of unrelated edits", () => {
 });
 
 test("store: making a row recur links it, places today's copy once, and deleting keeps the task", () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "paper-repeat-"));
+  const directory = temporaryFolder("paper-repeat-");
   try {
     const store = new Store(directory);
     const task = store.history.add("스트레칭")!;
@@ -91,7 +91,7 @@ test("store: making a row recur links it, places today's copy once, and deleting
 });
 
 test("store: a shelved copy comes back on its next day; linking is one undo step", () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "paper-repeat-"));
+  const directory = temporaryFolder("paper-repeat-");
   try {
     const store = new Store(directory);
     const task = store.history.addTo("운동", "later")!;
@@ -110,7 +110,7 @@ test("store: a shelved copy comes back on its next day; linking is one undo step
 });
 
 test("store: editing a series in Settings updates today's copy, never with a past alert", () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "paper-repeat-"));
+  const directory = temporaryFolder("paper-repeat-");
   try {
     const store = new Store(directory);
     const morning = local(2026, 9, 29, 10);
@@ -126,7 +126,7 @@ test("store: editing a series in Settings updates today's copy, never with a pas
 });
 
 test("store: an unreadable memos.json is kept aside, not overwritten", () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "paper-memo-"));
+  const directory = temporaryFolder("paper-memo-");
   try {
     fs.writeFileSync(path.join(directory, "memos.json"), "{ broken");
     const store = new Store(directory);

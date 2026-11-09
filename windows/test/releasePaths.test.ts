@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import zlib from "node:zlib";
+import { temporaryFolder } from "./temporaryFolder";
 
 // #225: the release path check (tools/check-release-paths.mjs, run by both apps' release builds) on fictional temporary
 // folders. A planted path must fail it — as text, as UTF-16LE, deflated in a zip inside a zip, as a link — and a clean
@@ -13,7 +14,7 @@ import zlib from "node:zlib";
 const script = path.resolve(process.cwd(), "..", "tools", "check-release-paths.mjs");
 const planted = "/Users/sample-builder/jongi-nyang/node_modules/zod/index.js";
 
-const temporary = () => fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-release-paths-"));
+const temporary = () => temporaryFolder("paper-todo-release-paths-");
 const put = (folder: string, name: string, data: string | Buffer) => {
   const file = path.join(folder, ...name.split("/"));
   fs.mkdirSync(path.dirname(file), { recursive: true });

@@ -1,6 +1,6 @@
 import {
-  agendaTime, cellItems, dayTasks, dayTitle, draftForDay, eventsOn, fetchRange, monthGrid, monthTitle, weekDays, weekOrder, weekTitle,
-  type CalendarEvent, type CalendarSheetRequest,
+  agendaTime, cellItems, dayTasks, dayTitle, draftForDay, eventLabel, eventsOn, fetchRange, foldedLabel, foldedRepeats, listKey, monthGrid, monthTitle, repeatWord, taskSpoken, weekDays,
+  weekOrder, weekTitle, type CalendarEvent, type CalendarSheetRequest, type DayTask, type ListKey,
 } from "../core/calendar";
 import { draftFromEvent, eventMark, expand, parseOccurrenceKey } from "../core/events";
 import { fromKey, key as dayKey } from "../core/deadline";
@@ -11,7 +11,7 @@ import { h, icon, lang, paper, t } from "./api";
 import { listenForTyping } from "./typingTap";
 import { holdWhileAsked } from "./askGuard";
 import { openEventSheet, type EventSheet } from "./eventSheet";
-import { cellDot, cellLine, dayMarks, fitTitles, hereTasks, lateOn, taskLine, weekBands } from "./calendarCells";
+import { calendarTasks, cellDot, cellLine, dayMarks, fitHead, fitTitles, lateOn, repeatMark, taskLine, weekBands } from "./calendarCells";
 import { paneSight } from "./paneSight";
 
 // #229: a question waiting holds this page up (askGuard.ts).
@@ -44,6 +44,8 @@ let selected = requestedDay && fromKey(requestedDay) ? requestedDay : dayKey(new
 /** The month on screen in the month view (1–12); the week view shows the selected day's week. */
 let shown = { year: new Date().getFullYear(), month: new Date().getMonth() + 1 };
 let sheet: EventSheet | undefined;
+/** #275: the day list's event the keys are on (Tab from the day), by its place in the list; undefined: the days have them. */
+let picked: number | undefined;
 
 const today = () => dayKey(new Date());
 const shift = (day: string, days: number) => {
@@ -66,6 +68,7 @@ function spreadEvents(): void {
 function choose(day: string, follow = true): void {
   const changed = follow && view === "month" && (monthOf(day).year !== shown.year || monthOf(day).month !== shown.month);
   const weekChanged = view === "week" && weekDays(day, lang())[0] !== weekDays(selected, lang())[0];
+  if (day !== selected) picked = undefined;
   selected = day;
   if (changed) shown = monthOf(day);
   if (changed || weekChanged) spreadEvents();
@@ -118,7 +121,8 @@ function openEventKey(key: string, anchor?: () => HTMLElement | undefined): bool
 function showSheet(request: CalendarSheetRequest, anchor: () => HTMLElement | undefined = () => undefined): void {
   if (!state) return;
   sheet?.close();
-  const opened = openEventSheet(request, anchor, () => { if (sheet === opened) sheet = undefined; }, { besideAnchor: true });
+  // #275: once it closes, the keys go back to the event they opened it from.
+  const opened = openEventSheet(request, anchor, () => { if (sheet === opened) { sheet = undefined; focusPicked(); } }, { besideAnchor: true });
   sheet = opened;
 }
 
@@ -128,6 +132,8 @@ function clickDay(day: string, element: HTMLElement): void {
   const now = Date.now();
   const double = lastClick.day === day && now - lastClick.at < 450;
   lastClick = double ? { day: "", at: 0 } : { day, at: now };
+  // #275: a click on a day gives the keys back to the days.
+  picked = undefined;
   choose(day, false);
   if (double) newEvent(day, () => app.querySelector<HTMLElement>(`[data-day="${day}"]`) ?? (element.isConnected ? element : undefined));
 }
@@ -159,17 +165,26 @@ function topBar(): HTMLElement {
 
 /**
  * The to-dos the calendar shows: #227, without the ones this PC hides now (as the 오늘 창 — a peek on the note doesn't
- * reach here). Worked out again only when the state changes or the minute turns (a time rule).
+ * reach here), and #274 the days the repeating ones come back on among the days on screen and the chosen one. Worked out
+ * again only when the state, the days or the minute change (a time rule).
  */
-let shownItems: { from?: TodosState; minute: number; items: readonly TodoItem[] } = { minute: -1, items: [] };
+let shownItems: { from?: TodosState; minute: number; days: string; items: readonly TodoItem[] } = { minute: -1, days: "", items: [] };
 function items(): readonly TodoItem[] {
   if (!state) return [];
   const now = new Date();
   const minute = Math.floor(now.getTime() / 60_000);
-  if (shownItems.from === state && shownItems.minute === minute) return shownItems.items;
-  const list = hereTasks(state, now);
-  shownItems = { from: state, minute, items: list };
+  const days = [...shownDays(), selected];
+  const daysKey = `${days[0]}|${days[days.length - 2]}|${selected}`;
+  if (shownItems.from === state && shownItems.minute === minute && shownItems.days === daysKey) return shownItems.items;
+  const list = calendarTasks(state, days, now);
+  shownItems = { from: state, minute, days: daysKey, items: list };
   return list;
+}
+
+/** A to-do's row in the note; #274 a repeat without an open copy (today's is done) opens its rule (책상 → 반복). */
+function openTask(task: DayTask): void {
+  if (task.taskId) void api.act({ type: "calendarShowTask", id: task.taskId });
+  else void api.act({ type: "openSettings", tab: "repeat" });
 }
 
 function monthView(): HTMLElement {
@@ -183,22 +198,30 @@ function monthView(): HTMLElement {
     // #234: the lunar date beside the number, and a holiday's name as the cell's first line (it takes a line's room).
     const cells = days.slice(week * 7, week * 7 + 7).map((day) => {
       const marks = dayMarks(day, state!.prefs);
-      return { day, marks, holiday: Boolean(marks.holiday) && !room.dots, ...cellItems(day, events, items(), room.dots || Math.max(1, room.cell - (marks.holiday ? 1 : 0)), lang()) };
+      // #296: the faded daily · weekday repeats are counted in the head (`folded`), not written as lines. #295: as on the Mac,
+      // "+N" is the cell's last line (one line fewer when more than fits), not in the head beside the lunar date.
+      const limit = room.dots || Math.max(1, room.cell - (marks.holiday ? 1 : 0));
+      let shownCell = cellItems(day, events, items(), limit, lang(), true);
+      if (!room.dots && shownCell.more > 0 && limit > 1) shownCell = cellItems(day, events, items(), limit - 1, lang(), true);
+      return { day, marks, holiday: Boolean(marks.holiday) && !room.dots, folded: foldedRepeats(day, items(), lang()), ...shownCell };
     });
     // calendar-flows D1: a trip's band joins along the row, its title once.
     const rowBands = room.dots ? [] : weekBands(cells);
-    cells.forEach(({ day, marks, items: lines, more }, column) => {
+    cells.forEach(({ day, marks, items: lines, more, folded }, column) => {
       const date = fromKey(day)!;
       const lead = marks.holiday ? 1 : 0;
       const cell = h("div", {
         class: ["cell", date.getDay() === 0 ? "sun" : date.getDay() === 6 ? "sat" : "", marks.holiday ? "holiday" : "", date.getMonth() + 1 !== shown.month ? "outside" : "", day === now ? "today" : "", day === selected ? "selected" : ""].filter(Boolean).join(" "),
         role: "gridcell", "data-day": day, "aria-selected": String(day === selected),
-        "aria-label": [dayTitle(day, lang()), marks.holiday, marks.lunarSpoken, lines.length + more ? t("{n}개", { n: lines.length + more }) : ""].filter(Boolean).join(", "),
+        // #296: and the repeats its head counts ("매일 반복 2개").
+        "aria-label": [dayTitle(day, lang()), marks.holiday, marks.lunarSpoken, lines.length + more ? t("{n}개", { n: lines.length + more }) : "", foldedLabel(folded, lang())].filter(Boolean).join(", "),
       },
-      h("div", { class: "cell-head" }, h("span", { class: "num" }, String(date.getDate())), more > 0 ? h("span", { class: "more" }, `+${more}`) : null,
-        marks.lunar ? h("span", { class: "lunar", title: marks.lunarSpoken, "data-lunar-day": String(marks.lunarDay ?? 0) }, marks.lunar) : null),
+      // #296: the repeat mark beside the number; #295: what the head has room for is worked out after layout (fitHead).
+      h("div", { class: "cell-head" }, h("span", { class: "num" }, String(date.getDate())), repeatMark(folded), more > 0 && room.dots ? h("span", { class: "more" }, `+${more}`) : null,
+        marks.lunar ? h("span", { class: "lunar", title: marks.lunarSpoken, "data-lunar-day": String(marks.lunarDay ?? 0), "data-full": marks.lunar, "data-short": marks.lunarShort ?? marks.lunar }, marks.lunar) : null),
       ...(marks.holiday && !room.dots ? [h("div", { class: "holiday-name", title: marks.holiday, "aria-hidden": "true" }, marks.holidayShown ?? marks.holiday)] : []),
-      ...(room.dots ? [h("div", { class: "dots" }, ...lines.map((item) => cellDot(item, day)))] : lines.map((item, index) => cellLine(item, day, rowBands[column]?.[index], index + lead))));
+      ...(room.dots ? [h("div", { class: "dots" }, ...lines.map((item) => cellDot(item, day)))] : lines.map((item, index) => cellLine(item, day, rowBands[column]?.[index], index + lead))),
+      more > 0 && !room.dots ? h("div", { class: "more-row" }, `+${more}`) : null);
       if (marks.holiday && room.dots) cell.title = marks.holiday;
       cell.addEventListener("click", () => clickDay(day, cell));
       row.append(cell);
@@ -258,10 +281,14 @@ function dayPanel(): HTMLElement {
   const dayEvents = eventsOn(selected, events);
   scroll.append(h("div", { class: "section" }, t("일정")));
   if (dayEvents.length === 0) scroll.append(h("div", { class: "nothing" }, t("일정 없음")));
-  for (const event of dayEvents) {
+  dayEvents.forEach((event, index) => {
     const bar = h("span", { class: "bar evc", "aria-hidden": "true" });
     bar.style.background = eventMark(event.color);
-    const row = h("button", { class: "ev", "data-key": event.key, title: t("고치기") },
+    // #275: its place in the day's list for the keys (a ring where they are) and for Narrator (‘일정 3개 중 1번째’).
+    const row = h("button", {
+      class: `ev${index === picked ? " picked" : ""}`, "data-key": event.key, "data-index": String(index), title: t("고치기"),
+      "aria-label": eventLabel(event.title, agendaTime(event, selected, lang()), index, dayEvents.length, lang()),
+    },
       bar,
       h("span", { class: "main" },
         h("span", { class: "first" }, h("span", { class: "time" }, agendaTime(event, selected, lang())), h("span", { class: "t" }, event.title)),
@@ -273,7 +300,7 @@ function dayPanel(): HTMLElement {
       void api.act({ type: "showEventMenu", key: event.key });
     });
     scroll.append(row);
-  }
+  });
   const add = h("button", { class: "new-event" }, icon("plus", 12, 2.2), t("새 일정"));
   add.addEventListener("click", () => newEvent(selected, () => (add.isConnected ? add : undefined)));
   scroll.append(add);
@@ -281,11 +308,16 @@ function dayPanel(): HTMLElement {
   if (tasks.length > 0) {
     scroll.append(h("div", { class: "section" }, t("할 일")));
     for (const task of tasks) {
-      const row = h("button", { class: `task-row ${task.kind}${task.kind === "deadline" && lateOn(selected) ? " late" : ""}`, title: t("노트에서 보기") },
-        task.kind === "reminder" ? icon("bell", 12, 2) : task.kind === "range" ? icon("clock", 12, 2) : icon("flag", 12, 2),
-        task.kind !== "deadline" ? h("span", { class: "time" }, task.time ?? "") : null,
+      // #274: a repeat's arrows and its time (or 반복), faded after the next one; without an open copy it opens its rule.
+      const repeat = task.kind === "repeat";
+      const row = h("button", {
+        class: `task-row ${task.kind}${task.kind === "deadline" && lateOn(selected) ? " late" : ""}${task.ahead ? " ahead" : ""}`,
+        title: repeat && !task.taskId ? t("반복 할 일 보기") : t("노트에서 보기"), ...(repeat ? { "aria-label": taskSpoken(task, lang()) } : {}),
+      },
+        task.kind === "reminder" ? icon("bell", 12, 2) : task.kind === "range" ? icon("clock", 12, 2) : repeat ? icon("repeat", 12, 2) : icon("flag", 12, 2),
+        task.kind !== "deadline" ? h("span", { class: "time" }, task.time ?? (repeat ? repeatWord(false, lang()) : "")) : null,
         h("span", { class: "t" }, task.title));
-      row.addEventListener("click", () => api.act({ type: "calendarShowTask", id: task.taskId }));
+      row.addEventListener("click", () => openTask(task));
       scroll.append(row);
     }
   }
@@ -306,14 +338,30 @@ function render(): void {
   if (scroll) scroll.scrollTop = scrollTop;
   if (measureRoom()) render();
   else fitMonth();
+  focusPicked();
+}
+
+/** #275: the keys' event row takes the focus (Narrator reads it) and shows in the list; none: the focus leaves the list. */
+function focusPicked(): void {
+  const rows = [...app.querySelectorAll<HTMLElement>(".panel .ev")];
+  if (picked !== undefined && picked >= rows.length) picked = rows.length ? rows.length - 1 : undefined;
+  rows.forEach((row, index) => row.classList.toggle("picked", index === picked));
+  const row = picked === undefined ? undefined : rows[picked];
+  if (row) {
+    if (document.activeElement !== row && !sheet) row.focus({ preventScroll: true });
+    row.scrollIntoView({ block: "nearest" });
+  } else if (document.activeElement instanceof HTMLElement && document.activeElement.closest(".panel .ev")) {
+    document.activeElement.blur();
+  }
 }
 
 /** calendar-flows D1 · D2: titles laid over their bands, and cut ones on two lines where a cell has a line to spare. */
 function fitMonth(): void {
   if (view !== "month") return;
-  // Dots in very narrow cells: no lunar date in the head (narrower than 72 anyway).
-  if (room.dots) { for (const lunar of app.querySelectorAll<HTMLElement>(".month [data-lunar-day]")) lunar.hidden = true; return; }
-  fitTitles(app, ".month .cell", () => room.cell, ".holiday-name");
+  // Dots in very narrow cells: no lunar date in the head (narrower than 72 anyway); the repeat mark as it fits.
+  if (room.dots) { for (const cell of app.querySelectorAll<HTMLElement>(".month .cell")) fitHead(cell, true); return; }
+  // (+N's own line is not a spare one.)
+  fitTitles(app, ".month .cell", (cell) => room.cell - (cell.querySelector(".more-row") ? 1 : 0), ".holiday-name");
 }
 
 /** How many lines the drawn cells (or week rows) hold; true when that changed. */
@@ -349,6 +397,22 @@ window.addEventListener("keydown", (event) => {
     if (event.code === "BracketLeft") return handled(() => page(-1));
     if (event.code === "BracketRight") return handled(() => page(1));
     return;
+  }
+  // #275: Tab from the day to its list's first event, ↑↓ · Tab · Shift+Tab between them, Enter opens one, Esc back to the day.
+  // (Shift alone, on its way to Shift+Tab, changes nothing.)
+  if (event.key === "Shift") return;
+  const key: ListKey = event.key === "Tab" ? (event.shiftKey ? "backTab" : "tab") : event.key === "ArrowUp" ? "up" : event.key === "ArrowDown" ? "down"
+    : event.key === "Enter" ? "enter" : event.key === "Escape" ? "escape" : "other";
+  if (picked !== undefined || key === "tab") {
+    const dayEvents = eventsOn(selected, events);
+    const step = listKey(key, picked, dayEvents.length);
+    picked = step.picked;
+    focusPicked();
+    if (step.open !== undefined) {
+      const row = app.querySelector<HTMLElement>(`.panel .ev[data-index="${step.open}"]`);
+      if (row) openEvent(dayEvents[step.open], row);
+    }
+    if (step.handled) return handled(() => undefined);
   }
   if (event.shiftKey) return;
   const step = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: view === "month" ? -7 : -1, ArrowDown: view === "month" ? 7 : 1 }[event.key];

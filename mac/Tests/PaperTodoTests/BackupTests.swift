@@ -140,9 +140,9 @@ private enum BackupTests {
 
         try test("#139: the first launch of a new version copies the list before it's read; once per version") {
             let storage = folder(), backups = folder()
-            let suite = "PaperTodo.BackupTests.\(UUID().uuidString)"
-            let preferences = UserDefaults(suiteName: suite)!
-            defer { preferences.removePersistentDomain(forName: suite) }
+            let suite = TestDefaults("BackupTests")
+            let preferences = suite.defaults
+            defer { suite.remove() }
             try expect(BackupBook.beforeUpdate(storage: storage, defaultFolder: backups, preferences: preferences, version: "1.45.1", now: at(10, 29, 9)) == nil, "no list yet: none")
             try write(todos("보고서 쓰기"), "todos.json", in: storage)
             try expect(BackupBook.beforeUpdate(storage: storage, defaultFolder: backups, preferences: preferences, version: "1.45.1", now: at(10, 29, 10)) == nil, "the same version: none")
@@ -155,9 +155,9 @@ private enum BackupTests {
         try test("#139: copies go to the chosen folder; while it's gone, to the default one; never inside the storage folder") {
             let storage = folder(), fallback = folder(), chosen = folder()
             try write(todos("보고서 쓰기"), "todos.json", in: storage)
-            let suite = "PaperTodo.BackupTests.\(UUID().uuidString)"
-            let preferences = UserDefaults(suiteName: suite)!
-            defer { preferences.removePersistentDomain(forName: suite) }
+            let suite = TestDefaults("BackupTests")
+            let preferences = suite.defaults
+            defer { suite.remove() }
             let book = BackupBook(storageFolder: storage, defaultFolder: fallback, preferences: preferences)
             book.now = { at(10, 30, 9, 12) }
             try expect(!book.choose(storage) && !book.choose(storage.appendingPathComponent("backups")), "the storage folder and inside it are refused")

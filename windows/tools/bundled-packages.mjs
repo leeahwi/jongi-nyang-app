@@ -29,12 +29,13 @@ async function describe(folder) {
 }
 
 const renderers = (await readdir(path.join(root, "src/renderer"))).filter((name) => name.endsWith(".ts")).map((name) => path.join(root, "src/renderer", name));
-const app = await packagesIn([path.join(root, "src/main/main.ts"), path.join(root, "src/preload.ts"), ...renderers]);
+// out/mcp.js (#175) is the extension's server again: its packages are listed under it, not here.
+const app = await packagesIn([path.join(root, "src/main/entry.ts"), path.join(root, "src/main/main.ts"), path.join(root, "src/preload.ts"), ...renderers]);
 const server = await packagesIn([path.join(root, "mcp/src/index.ts")]);
 
 console.log("App bundles (out/):");
 console.log(app.length ? (await Promise.all(app.map(describe))).map((line) => "  " + line).join("\n") : "  none: only the app's own code");
-console.log("Claude extension server (mcp/dist/server/index.js, in the .mcpb and both apps):");
+console.log("Claude extension server (mcp/dist/server/index.js, in the .mcpb and both apps; out/mcp.js in the Windows app):");
 console.log((await Promise.all(server.map(describe))).map((line) => "  " + line).join("\n"));
 console.log("Runtime:");
 console.log("  " + await describe("node_modules/electron"));

@@ -30,6 +30,9 @@ for arg in "$@"; do
 done
 [ ${#tiers[@]} -eq 0 ] && tiers=(50 500 2000 5000 long)
 bundle_id=com.noa.PaperTodo.MemoStress
+# #278: never the real app's com.noa.PaperTodo (its settings and data folder share this name).
+source "$repo/scripts/lib/test-defaults.sh"
+test_defaults_require "$bundle_id"
 mkdir -p "$out"
 out="$(cd "$out" && pwd)"
 app="$out/MemoStress.app"
@@ -69,7 +72,7 @@ cleanup() {
     stop
     rm -rf "$storage" "$HOME/Library/Saved Application State/$bundle_id.savedState" \
         "$HOME/Library/Caches/$bundle_id" "$HOME/Library/HTTPStorages/$bundle_id"
-    defaults delete "$bundle_id" >/dev/null 2>&1 || true
+    test_defaults_remove "$bundle_id"
 }
 trap cleanup EXIT
 

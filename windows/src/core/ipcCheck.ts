@@ -5,8 +5,10 @@ import { nightChoices, paperKinds } from "./paper";
 import { drawerBackdrops, drawerFonts, drawerTextSizes, drawerThemes, folderSorts, folderViews, memoPapers } from "./memoDrawer";
 import { codeFonts, drawerPoints, lineSpacings, noteScales, paragraphSpacings } from "./textSteps";
 import { checkedDeviceRules } from "./spaceDevice";
-import { readWidgets, widgetKinds, widgetLevels, widgetStyles } from "./calendarWidget";
+import { readWidgets, widgetKinds, widgetLevels, widgetScales, widgetStyles } from "./calendarWidget";
 import { timerSizes } from "./timerWidget";
+import { catSizes } from "./catSize";
+import { noteLayers } from "./stayBehind";
 import { defaultPrefs, textSizes, type Action, type IntentRequest, type Prefs } from "./types";
 import { deskFramePages, ownPage } from "./webGuard";
 
@@ -43,8 +45,8 @@ const actions = <T extends ActionType>(...types: T[]): ReadonlySet<ActionType> =
  */
 export const pageActions: Partial<Record<PageName, ReadonlySet<ActionType>>> = {
   note: actions(
-    // #230: a key went down here (typingTap.ts).
-    "petTap",
+    // #230 · #289: a key went down here (typingTap.ts), for the typing cat.
+    "typingTap",
     "aiUndo", "calendarEditEvent", "calendarNewEvent", "collapse", "copyList", "delete", "deleteSeries", "drawer", "dropAhead", "dropOnTab",
     "editingReminder", "exportList", "focus", "groupDrop", "memoRestore", "move", "moveTasks", "openCalendar", "openHelp", "openHistory",
     "openSettings", "openSpaces", "redo", "rename", "rowMenuPick", "saveSeries", "setDeadline", "setPref", "setRange", "setReminder",
@@ -58,8 +60,8 @@ export const pageActions: Partial<Record<PageName, ReadonlySet<ActionType>>> = {
     "slipBlocked",
   ),
   settings: actions(
-    // #230: a key went down here (typingTap.ts).
-    "petTap",
+    // #230 · #289: a key went down here (typingTap.ts), for the typing cat.
+    "typingTap",
     "aiClearLog", "aiConnectDesktop", "aiCopyCommand", "aiEnable", "aiUndo", "alarmDelete", "alarmSave", "backupNow", "chatterPreview",
     "chooseBackupFolder", "chooseStorage", "deleteBackup", "deleteSeries", "drawer", "exportBackup", "generalRename", "importBackup",
     "openArchiveFolder", "openBackupFolder", "openDataFolder", "openHelp", "openHistory", "previewReminder", "resetBackupFolder", "resetStorage",
@@ -71,12 +73,13 @@ export const pageActions: Partial<Record<PageName, ReadonlySet<ActionType>>> = {
     "widgetAdd", "widgetChange", "widgetRemove", "widgetRestore",
   ),
   history: actions("openArchiveFolder", "slipBlocked"),
-  calendarWindow: actions("calendarShowTask", "petTap", "setPref", "showEventMenu", "slipBlocked"),
-  quick: actions("drawer", "petTap", "slipBlocked", "slipDrag"),
+  // #274: a repeat without an open copy opens its rule (책상 → 반복: `openSettings` with tab "repeat").
+  calendarWindow: actions("calendarShowTask", "openSettings", "typingTap", "setPref", "showEventMenu", "slipBlocked"),
+  quick: actions("drawer", "typingTap", "slipBlocked", "slipDrag"),
   // #200: a to-do's title opens the note on its row (`calendarShowTask`, read as `{ id }` like the calendar window's).
   glance: actions(
-    // #230: a key went down here (typingTap.ts).
-    "petTap",
+    // #230 · #289: a key went down here (typingTap.ts), for the typing cat.
+    "typingTap",
     "calendarEditEvent", "calendarNewEvent", "calendarShowTask", "drawer", "openCalendar", "openNote", "openSettings", "setPref", "spaceLens",
     "timerCommand", "toggle",
     // #229: a press while a question waits (askGuard.ts).
@@ -84,11 +87,11 @@ export const pageActions: Partial<Record<PageName, ReadonlySet<ActionType>>> = {
   ),
   desk: actions("deskPane", "openGuide", "openSearch", "slipBlocked"),
   // #234: a desktop calendar widget and its day sheet open the desk's calendar on a day, or the note on a to-do's row.
-  widget: actions("calendarShowTask", "openCalendar", "petTap", "slipBlocked", "widgetRestore"),
-  widgetSheet: actions("calendarShowTask", "drawer", "openCalendar", "petTap", "slipBlocked"),
+  widget: actions("calendarShowTask", "openCalendar", "openSettings", "typingTap", "slipBlocked", "widgetRestore"),
+  widgetSheet: actions("calendarShowTask", "drawer", "openCalendar", "openSettings", "typingTap", "slipBlocked"),
   drawer: actions(
-    // #230: a key went down here (typingTap.ts).
-    "petTap",
+    // #230 · #289: a key went down here (typingTap.ts), for the typing cat.
+    "typingTap",
     "copyText", "drawerPaste", "drawerView", "drawerWrite", "editCommand", "folderAdd", "folderColor", "folderDelete", "folderDuplicate",
     "folderOrder", "folderRename", "folderRestore", "folderSort", "memoCheck", "memoClose", "memoDelete", "memoDuplicate", "memoMove",
     "memoPaper", "memoPin", "memoPinMany", "memoRestore", "memoSetText", "memoUpdate", "openHelp", "openLink", "openSettings", "setPref", "window",
@@ -108,8 +111,8 @@ export const pageActions: Partial<Record<PageName, ReadonlySet<ActionType>>> = {
   help: actions("slipBlocked"),
   // #230: the quick note and 직접 정하기 also send only that a key went down.
   // #246: their paper drags them.
-  quickMemo: actions("petTap", "slipBlocked", "slipDrag"),
-  timerSheet: actions("petTap", "slipBlocked"),
+  quickMemo: actions("typingTap", "slipBlocked", "slipDrag"),
+  timerSheet: actions("typingTap", "slipBlocked"),
   handle: actions("slipBlocked"),
   ears: actions("slipBlocked"),
   // #228: the question slip's paper dragged.
@@ -121,15 +124,15 @@ const prefs = (...keys: PrefKey[]): ReadonlySet<PrefKey> => new Set(keys);
 
 /** The settings each page may change with `setPref` (the settings panes nearly all; the others their own few). */
 export const pagePrefs: Partial<Record<PageName, ReadonlySet<PrefKey>>> = {
-  note: prefs("alwaysOnTop", "dayOpen", "guideSeen", "hideCompleted", "openAtLogin", "spaceDevice", "spaceGroups", "spaceGroupsDoneOpen", "spaceGroupsFolded", "starredTask", "textStep"),
+  note: prefs("dayOpen", "guideSeen", "hideCompleted", "noteLayer", "openAtLogin", "spaceDevice", "spaceGroups", "spaceGroupsDoneOpen", "spaceGroupsFolded", "starredTask", "textStep"),
   settings: prefs(
     "archiveAfterDays", "calendarAlertMinutes", "calendarHolidays", "calendarLunar", "calendarStrip", "chatter", "chatterFrequency", "chatterQuestions", "displaySeconds", "drawerBackdrop",
     "drawerCodeFont", "drawerDoneToBottom", "drawerFont", "drawerHandle", "drawerLineHeight", "drawerNight", "drawerParagraph", "drawerPinned", "drawerSameAsNote",
     "drawerShortcut", "drawerShortcutLast", "drawerShowMarks", "drawerSide", "drawerTextPt", "drawerTheme", "drawerWidth", "dueStyle", "eveningSweep",
     "eveningSweepTime", "font", "intervalMinutes", "language", "morningPick", "noteHotkey", "noteShortcut", "openAtLogin", "paper", "paperNight", "paperTheme", "petVisible",
-    "petTyping", "petWanders", "pomodoroAutoContinue", "pomodoroFocusMinutes", "pomodoroLongRestMinutes", "pomodoroRestMinutes", "pomodoroRounds", "quickEntry",
+    "petWanders", "pomodoroAutoContinue", "pomodoroFocusMinutes", "pomodoroLongRestMinutes", "pomodoroRestMinutes", "pomodoroRounds", "quickEntry",
     "quickMemo", "quickMemoClipboard", "reminderEnabled", "reminderStyle", "spaceDevice", "spaceGroupStyle", "spaceGroups", "systemNotify", "taskbarBadge",
-    "textStep", "timerSize", "timerSound",
+    "textStep", "timerSize", "timerSound", "typingCat", "typingCorner", "petSize", "typingSize",
   ),
   calendarWindow: prefs("calendarView"),
   glance: prefs("petVisible"),
@@ -204,7 +207,7 @@ const alarm: Reader = (value) => readAlarm(value) ?? bad;
 const actionFields: { [K in ActionType]: Record<string, Reader> } = {
   openDataFolder: {}, chatterPreview: {},
   // #230: a key went down in a page — an empty message, read as one.
-  petTap: {},
+  typingTap: {},
   add: { title, reminderAt: optional(iso), dueDate: optional(str(10)) },
   rename: { id, title }, toggle: { id }, delete: { id },
   move: { id, targetID: id, after: optional(bool) },
@@ -228,7 +231,7 @@ const actionFields: { [K in ActionType]: Record<string, Reader> } = {
   // The key and its value are checked together (readPref) in readAction.
   setPref: { key: str(64), value: test(() => true) },
   collapse: { anchor: optional(shape({ x: point, y: point })) },
-  openSettings: { tab: optional(oneOf("calendar", "clock", "events", "storage", "drawer", "spaces", "ai")) },
+  openSettings: { tab: optional(oneOf("calendar", "clock", "events", "storage", "drawer", "spaces", "ai", "repeat")) },
   aiEnable: { on: bool }, aiUndo: { id }, aiConnectDesktop: {}, aiCopyCommand: {}, aiClearLog: {},
   openHistory: { day: optional(day) }, openSearch: {},
   openHelp: { topic: optional(str(200)) },
@@ -284,7 +287,7 @@ const actionFields: { [K in ActionType]: Record<string, Reader> } = {
   widgetChange: {
     id, changes: shape({
       style: optional(oneOf(...widgetStyles)), opacity: optional(int(20, 100)), solidOnHover: optional(bool), clickThrough: optional(bool),
-      locked: optional(bool), level: optional(oneOf(...widgetLevels)), allSpaces: optional(bool),
+      locked: optional(bool), level: optional(oneOf(...widgetLevels)), allSpaces: optional(bool), scale: optional(oneOf(...widgetScales)),
     }),
   },
   widgetRemove: { id },
@@ -299,9 +302,13 @@ const enumPrefs: Partial<Record<PrefKey, readonly unknown[]>> = {
   systemNotify: ["missed", "always", "off"], drawerSide: ["right", "left"], drawerTheme: drawerThemes, drawerBackdrop: drawerBackdrops,
   drawerPinnedSort: folderSorts, drawerPinnedView: folderViews, drawerFont: drawerFonts, drawerTextSize: drawerTextSizes, drawerLineHeight: lineSpacings,
   drawerParagraph: paragraphSpacings, drawerCodeFont: codeFonts, spaceGroupStyle: ["card", "bookmark"],
-  textStep: noteScales.map((_, index) => index), drawerTextPt: drawerPoints, petTyping: ["off", "app"],
+  textStep: noteScales.map((_, index) => index), drawerTextPt: drawerPoints, typingCat: ["off", "app", "everywhere"], typingCorner: ["topLeft", "topRight", "bottomLeft", "bottomRight"],
+  // #304: 크기 of the pet and of 타닥냥.
+  petSize: catSizes, typingSize: catSizes,
   // #244: 종이 and 밤에는 (a light paper under 밤에는 isn't one; loadSettings reads it as 밤 종이, a page may not send it).
   paperTheme: paperKinds, paperNight: nightChoices, drawerNight: nightChoices,
+  // #273: 노트 위치 (the pin's old switch is written beside it by the store, never by a page).
+  noteLayer: noteLayers,
 };
 const prefReaders: Partial<Record<PrefKey, Reader>> = {
   drawerShortcut: pattern(/^[A-Za-z0-9+`\-=[\]\\;',./]{0,64}$/), drawerShortcutLast: pattern(/^[A-Za-z0-9+`\-=[\]\\;',./]{0,64}$/),

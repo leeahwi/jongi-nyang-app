@@ -1,5 +1,5 @@
 import { dayKey as logicalDayKey } from "./archive";
-import { agendaTime, cellItems, dateKey, dayTasks, dayTitle, draftForDay, eventsOn, localDate, monthGrid, weekDays, type CalendarEvent, type CellItem } from "./calendar";
+import { agendaTime, cellItems, dateKey, dayTasks, dayTitle, draftForDay, eventsOn, localDate, monthGrid, taskSpoken, weekDays, type CalendarEvent, type CellItem, type DayTask } from "./calendar";
 import { chipText, kindName, readIntent, slashOf, type Candidate } from "./intent";
 import { clock, dayMonth, dayWord, langIndex, shortDate, timeRange, weekdayName, weekdayShort, type Lang } from "./lang";
 import type { TodoItem } from "./notebook";
@@ -40,6 +40,8 @@ export interface WidgetSettings {
   level: WidgetLevel;
   allSpaces: boolean;
   place?: WidgetPlace;
+  /** 크기 (#271): one of `widgetScales` (보통 1, the size before #271). */
+  scale: number;
 }
 
 /** A device keeps at most four (each is a window and its own page process). */
@@ -72,13 +74,15 @@ export function widget(fields: Partial<WidgetSettings> & Pick<WidgetSettings, "i
     opacity: readOpacity(fields.opacity ?? defaultOpacity), solidOnHover: fields.solidOnHover ?? true, clickThrough: fields.clickThrough ?? false,
     locked: fields.locked ?? false, level: fields.level ?? "desktop", allSpaces: fields.allSpaces ?? true,
     ...(fields.place ? { place: { display: fields.place.display, x: share(fields.place.x), y: share(fields.place.y) } } : {}),
+    scale: readScale(fields.scale ?? defaultScale),
   };
 }
 
 /**
  * The widgets as stored (`prefs.calendarWidgets`; the Mac's `calendar.widgets`): an entry of the wrong shape is dropped
  * (S1), a value out of range is read as the nearest one, the fifth and later aren't read (S2), today and agenda are
- * always simple (S3), a missing key takes its default (S4); the same id twice keeps the first (S5).
+ * always simple (S3), a missing key takes its default (S4); the same id twice keeps the first (S5). A size that isn't a
+ * number is 보통, as a widget from before #271 (S7).
  */
 export function readWidgets(value: unknown): WidgetSettings[] {
   if (!Array.isArray(value)) return [];
@@ -103,6 +107,7 @@ export function readWidgets(value: unknown): WidgetSettings[] {
       opacity: opacity === undefined ? defaultOpacity : Math.round(opacity),
       solidOnHover: flag("solidOnHover", true), clickThrough: flag("clickThrough", false), locked: flag("locked", false),
       level: (entry.level as WidgetLevel | undefined) ?? "desktop", allSpaces: flag("allSpaces", true), ...(place ? { place } : {}),
+      scale: numberOf(entry.scale) ?? defaultScale,
     }));
   });
   return found;
@@ -144,10 +149,48 @@ export function earScale(kind: WidgetKind, style: WidgetStyle): number {
 /** The ears stand this far above the paper (the note's ears are 16 tall). */
 export const earHeightOf = (kind: WidgetKind, style: WidgetStyle): number => 16 * earScale(kind, style);
 
-/** The window: the paper and the ears above it. Placing works on this frame, so the ears stay on screen too. */
-export function windowSize(kind: WidgetKind, style: WidgetStyle): { width: number; height: number } {
+/** The window: the paper and the ears above it, at a size (`widgetScales`). Placing works on this frame, so the ears stay on screen too. */
+export function windowSize(kind: WidgetKind, style: WidgetStyle, scale = 1): { width: number; height: number } {
   const paper = widgetSize(kind, style);
-  return { width: paper.width, height: paper.height + earHeightOf(kind, style) };
+  return { width: paper.width * scale, height: (paper.height + earHeightOf(kind, style)) * scale };
+}
+
+// ─── 크기 (#271) ──────────────────────────────────────────────────────────────
+
+/**
+ * 작게 · 보통 · 크게 · 아주 크게: the whole paper (its text, cells, margins and ears) drawn this many times as big, so each
+ * cell keeps the lines it holds (`widgetSize`) — a size picked freely would cut names at some sizes and leave cells empty
+ * at others. 보통 is the size before #271.
+ */
+export const widgetScales: readonly number[] = [0.85, 1, 1.25, 1.5];
+export const defaultScale = 1;
+
+/** Read as the nearest of `widgetScales` (the smaller one when halfway) (Z1). */
+export function readScale(value: number): number {
+  if (!Number.isFinite(value)) return defaultScale;
+  return widgetScales.reduce((best, step) => (Math.abs(step - value) < Math.abs(best - value) ? step : best));
+}
+
+/** The widget, ears and all, fits in a display's work area at this size (Z4); one that doesn't is greyed out. */
+export function scaleFits(kind: WidgetKind, style: WidgetStyle, scale: number, area: Box): boolean {
+  const window = windowSize(kind, style, scale);
+  return window.width <= area.width && window.height <= area.height;
+}
+
+/**
+ * The size drawn on a display: the size picked, else the largest smaller one that fits there (a smaller display came,
+ * Z5). The size picked stays remembered, so it comes back on a display with room.
+ */
+export function shownScale(scale: number, kind: WidgetKind, style: WidgetStyle, area: Box): number {
+  const picked = readScale(scale);
+  return widgetScales.filter((step) => step <= picked && scaleFits(kind, style, step, area)).at(-1) ?? widgetScales[0];
+}
+
+/** "작게", "Small", "Klein" … (the settings slip and the menu, Z2). */
+export function scaleName(scale: number, lang: Lang = "ko"): string {
+  const names = [["작게", "Small", "Klein"], ["보통", "Regular", "Normaal"], ["크게", "Large", "Groot"], ["아주 크게", "Extra large", "Extra groot"]];
+  const index = widgetScales.indexOf(readScale(scale));
+  return names[index < 0 ? 1 : index][langIndex(lang)];
 }
 
 /** The two ears' bases, in from the window's right edge (the note's 16–48 and 62–92), scaled. */
@@ -230,11 +273,13 @@ export const edgeStrength = (drawn: number): number => Math.max(0.5, drawn / 100
 
 /** One thing on a day as a widget shows it. */
 export interface WidgetLine {
-  kind: "event" | "deadline" | "reminder" | "range";
+  /** `repeat` (#274): a day a repeating to-do comes back on. */
+  kind: "event" | "deadline" | "reminder" | "range" | "repeat";
   title: string;
   /** "10:00", "10:00 AM", "~01:00", a range "14:00–15:30"; undefined for all day and deadlines (drawn 종일 · 마감). */
   time?: string;
-  /** An event's "#rrggbb"; `clay` for a deadline, `sage` for a reminder or a range (the dots, #227). */
+  /** An event's "#rrggbb"; `clay` for a deadline, `sage` for a reminder or a range (the dots, #227); #274 `sage` for a repeat's
+   * next day, `faint` (sage, faded) for the ones after it. */
   color: string;
   allDay: boolean;
   eventKey?: string;
@@ -242,6 +287,25 @@ export interface WidgetLine {
   /** When it starts and ends; undefined for all-day events and deadlines. */
   at?: Date;
   end?: Date;
+  /** #274: a repeat's rule (it opens the rule when it has no open copy), and whether it is after the next one (faded). */
+  series?: string;
+  ahead?: boolean;
+}
+
+/** #274: a repeat's line from the calendar's (its alert on `day`, when it has one). */
+function repeatLine(task: DayTask, day: string): WidgetLine {
+  const [hour, minute] = (task.remindAt ?? "").split(":").map(Number);
+  const midnight = midnightOf(day);
+  const at = task.remindAt && Number.isInteger(hour) && Number.isInteger(minute) ? new Date(midnight.getFullYear(), midnight.getMonth(), midnight.getDate(), hour, minute) : undefined;
+  return {
+    kind: "repeat", title: task.title, ...(task.time ? { time: task.time } : {}), color: task.ahead ? "faint" : "sage", allDay: false,
+    ...(task.taskId ? { taskId: task.taskId } : {}), ...(at ? { at } : {}), ...(task.series ? { series: task.series } : {}), ahead: Boolean(task.ahead),
+  };
+}
+
+/** #274: a repeat line's spoken name ("분리수거, 09:00, 반복 예정"); undefined for the other lines (read as drawn). */
+export function lineSpoken(line: WidgetLine, lang: Lang = "ko"): string | undefined {
+  return line.kind === "repeat" ? taskSpoken({ title: line.title, kind: "repeat", ...(line.time ? { time: line.time } : {}), taskId: "", ahead: line.ahead }, lang) : undefined;
 }
 
 const hhmm = (date: Date, lang: Lang) => clock(date.getHours(), date.getMinutes(), lang);
@@ -259,7 +323,7 @@ export function lineOver(line: WidgetLine, now: Date): boolean {
     const end = line.end ?? line.at;
     return end.getTime() === line.at.getTime() ? line.at < now : end <= now;
   }
-  if (line.kind === "reminder") return line.at ? line.at <= now : false;
+  if (line.kind === "reminder" || line.kind === "repeat") return line.at ? line.at <= now : false;
   return line.end ? line.end <= now : false;
 }
 
@@ -282,8 +346,15 @@ export function dayLines(day: string, events: readonly CalendarEvent[], tasks: r
   }
   const byId = new Map(tasks.map((task) => [task.id, task]));
   const deadlines: WidgetLine[] = [];
+  // #274: a repeat with its time goes among the timed lines, one without after the deadlines.
+  const untimed: WidgetLine[] = [];
   for (const task of dayTasks(day, tasks, lang, logicalDayKey(now))) {
     if (task.kind === "deadline") { deadlines.push({ kind: "deadline", title: task.title, color: "clay", allDay: false, taskId: task.taskId }); continue; }
+    if (task.kind === "repeat") {
+      const line = repeatLine(task, day);
+      if (line.at) timed.push({ at: line.at.getTime(), order: 2, line }); else untimed.push(line);
+      continue;
+    }
     const item = byId.get(task.taskId);
     if (task.kind === "reminder") {
       const at = item?.reminderAt ? new Date(item.reminderAt) : undefined;
@@ -294,7 +365,7 @@ export function dayLines(day: string, events: readonly CalendarEvent[], tasks: r
     timed.push({ at: span?.start.getTime() ?? midnight.getTime(), order: 1, line: { kind: "range", title: task.title, time: task.time, color: "sage", allDay: false, taskId: task.taskId, ...(span ? { at: span.start, end: span.end } : {}) } });
   }
   const ordered = timed.map((entry, index) => ({ ...entry, index })).sort((a, b) => a.at - b.at || a.order - b.order || a.index - b.index).map((entry) => entry.line);
-  return [...allDay, ...ordered, ...deadlines];
+  return [...allDay, ...ordered, ...deadlines, ...untimed];
 }
 
 /** 오늘 · 이번 주 간단히: what is still to come today, the first `limit`, and how many more (K1, K2). */
@@ -310,12 +381,17 @@ export function cellLine(item: CellItem, lang: Lang = "ko"): WidgetLine {
     return { kind: "event", title: event.title, ...(event.allDay ? {} : { time: hhmm(event.start, lang), at: event.start }), end: event.end, color: event.color, allDay: event.allDay, eventKey: event.key };
   }
   const task = item.task;
+  if (task.kind === "repeat") {
+    const { at: _at, ...line } = repeatLine(task, dateKey(new Date()));
+    return line;
+  }
   return { kind: task.kind, title: task.title, ...(task.kind !== "deadline" && task.time ? { time: task.time } : {}), color: task.kind === "deadline" ? "clay" : "sage", allDay: false, taskId: task.taskId };
 }
 
 /** 간단히 (week, month): the cell's first three marks' colours, and whether there are more (K3, K5). */
-export function dots(day: string, events: readonly CalendarEvent[], tasks: readonly TodoItem[]): { colors: string[]; plus: boolean } {
-  const cell = cellItems(day, events, tasks, 3);
+export function dots(day: string, events: readonly CalendarEvent[], tasks: readonly TodoItem[], folding = false): { colors: string[]; plus: boolean } {
+  // #296 `folding` (the month's cells): no dot for a faded daily · weekday repeat.
+  const cell = cellItems(day, events, tasks, 3, "ko", folding);
   return { colors: cell.items.map((item) => cellLine(item).color), plus: cell.more > 0 };
 }
 
@@ -330,7 +406,8 @@ export const detailLines = 2;
 /** 벽 달력: four (K12). */
 export const linesOf = (style: WidgetStyle): number => (style === "wall" ? 4 : detailLines);
 export function monthCell(day: string, events: readonly CalendarEvent[], tasks: readonly TodoItem[], lang: Lang = "ko", style: WidgetStyle = "detail"): { lines: WidgetLine[]; more: number } {
-  const cell = cellItems(day, events, tasks, linesOf(style), lang);
+  // #296: a month cell folds the faded daily · weekday repeats into its head.
+  const cell = cellItems(day, events, tasks, linesOf(style), lang, true);
   return { lines: cell.items.map((item) => cellLine(item, lang)), more: cell.more };
 }
 
@@ -369,6 +446,25 @@ export const stepDay = (day: string, days: number): string => addDays(day, days)
  * only — the lunar date pushed the head and the lines out of place.
  */
 export const lunarCellWidth = 60;
+
+/**
+ * #295 · #296: what a month cell's head shows, by the widths it takes (px; 0 for what the day doesn't have): the number, the
+ * repeat mark and its count (from two folded repeats), +N, the lunar date and its short form ("10.1"), each after a `gap`.
+ * The first that fits `room`: all; the lunar date short; the mark without its count (the lunar date kept: it differs every
+ * day, the count is in the tooltip and the spoken label); no lunar date; the number and +N only. The lunar date may already
+ * be off by `showsLunar`. Same as CalendarWidget.headFit on the Mac.
+ */
+export function headFit(widths: { room: number; number: number; mark: number; count: number; more: number; lunar: number; short: number; gap: number }): { lunar: "full" | "short" | "none"; count: boolean; mark: boolean } {
+  const { room, number, mark, count, more, lunar, short, gap } = widths;
+  const width = (lunarWidth: number, shown: boolean, drawn: boolean) =>
+    number + (drawn && mark > 0 ? gap + mark + (shown ? count : 0) : 0) + (more > 0 ? gap + more : 0) + (lunarWidth > 0 ? gap + lunarWidth : 0);
+  const tries = [["full", true, true], ["short", true, true], ["full", false, true], ["short", false, true], ["none", true, true], ["none", false, true], ["none", false, false]] as const;
+  for (const [shownLunar, shown, drawn] of tries) {
+    if (shownLunar !== "none" && lunar <= 0) continue;
+    if (width(shownLunar === "full" ? lunar : shownLunar === "short" ? short : 0, shown, drawn) <= room + 0.5) return { lunar: lunar > 0 ? shownLunar : "none", count: shown && mark > 0, mark: drawn && mark > 0 };
+  }
+  return { lunar: "none", count: false, mark: false };
+}
 
 /** Whether a cell's head shows its lunar date: not in a narrow cell; with +N in the head too, only on a lunar month's first day. Same as CalendarWidget.showsLunar. */
 export function showsLunar(lunarDay: number, cellWidth: number, moreInHead: boolean): boolean {

@@ -75,8 +75,25 @@ extension View {
     }
 }
 
-/// The paper: frosted wallpaper under it on the Mac (variant C, NSVisualEffectView behind the window), the paper at its
-/// opacity, an edge that never fades below half and a hairline of paper outside it.
+/// 크기 (#271): the widget laid out at 보통, drawn `scale` times as big from its top left. At 보통 nothing is added, so
+/// the widget lays out to the same pixels as before #271.
+private struct WidgetScale: ViewModifier {
+    let scale: Double
+    let size: CGSize
+
+    func body(content: Content) -> some View {
+        if scale == 1 {
+            content
+        } else {
+            content
+                .scaleEffect(scale, anchor: .topLeading)
+                .frame(width: size.width * scale, height: size.height * scale, alignment: .topLeading)
+        }
+    }
+}
+
+/// The paper: frosted wallpaper under it on the Mac (variant C, NSVisualEffectView behind the window; snapshots draw the
+/// wallpaper blurred here), the paper at its opacity, an edge that never fades below half and a hairline of paper outside it.
 private struct WidgetPaper: View {
     let look: WidgetLook
     let frosted: Bool
@@ -89,12 +106,9 @@ private struct WidgetPaper: View {
     var body: some View {
         let edge = CalendarWidget.edgeStrength(look.drawn)
         ZStack {
-            if frosted {
-                if let previewBackdrop {
-                    previewBackdrop.blur(radius: 22).saturation(1.2).brightness(scheme == .dark ? -0.18 : 0.12).clipShape(shape)
-                } else {
-                    WidgetFrost().clipShape(shape)
-                }
+            // (On screen the window server's frost is under the whole widget: CalendarWidgetView.)
+            if frosted, let previewBackdrop {
+                previewBackdrop.blur(radius: 22).saturation(1.2).brightness(scheme == .dark ? -0.18 : 0.12).clipShape(shape)
             }
             shape.fill(palette.paper.opacity(look.paper))
             shape.strokeBorder(palette.paper.opacity(0.35 * edge), lineWidth: 1.75)
@@ -133,20 +147,39 @@ struct CalendarWidgetView: View {
     private var palette: WidgetPalette { .standard }
     @State private var backTask: Task<Void, Never>?
 
+    /// 크기 (#271): the widget is laid out at 보통 and drawn `state.scale` times as big — the text, cells, margins and ears
+    /// alike, so every cell keeps its lines. The window server's frost (an AppKit view, which a SwiftUI scale doesn't
+    /// reach) goes under it at the size drawn.
     var body: some View {
         let settings = state.settings
+        let scale = state.scale
+        let paper = CalendarWidget.size(settings.kind, settings.style)
+        let earHeight = CalendarWidget.earHeight(settings.kind, settings.style)
+        let frosted = settings.opacity < 100 && !widgets.reduceTransparency
+        widget(settings, paper: paper, earHeight: earHeight, frosted: frosted && previewBackdrop != nil)
+            .modifier(WidgetScale(scale: scale, size: CGSize(width: paper.width, height: paper.height + earHeight)))
+            .background(alignment: .topLeading) {
+                if frosted && previewBackdrop == nil {
+                    WidgetFrost()
+                        .clipShape(RoundedRectangle(cornerRadius: 13 * scale, style: .continuous))
+                        .frame(width: paper.width * scale, height: paper.height * scale)
+                        .offset(y: earHeight * scale)
+                        .opacity(state.removed ? 0 : 1)
+                }
+            }
+    }
+
+    private func widget(_ settings: CalendarWidget.Settings, paper: (width: Double, height: Double), earHeight: Double, frosted: Bool) -> some View {
         let drawn = CalendarWidget.drawn(settings.opacity, reduceTransparency: widgets.reduceTransparency,
                                          hover: state.hovering, solidOnHover: settings.solidOnHover)
         let look = makeLook(drawn)
-        let paper = CalendarWidget.size(settings.kind, settings.style)
-        let earHeight = CalendarWidget.earHeight(settings.kind, settings.style)
-        VStack(spacing: 0) {
+        return VStack(spacing: 0) {
             WidgetEars(kind: settings.kind, style: settings.style, opacity: Double(CalendarWidget.earOpacity(drawn)) / 100,
                        strongEdge: look.strongEdge, twitch: state.twitch)
                 .frame(width: paper.width, height: earHeight)
                 .zIndex(1)
             ZStack {
-                WidgetPaper(look: look, frosted: settings.opacity < 100 && !widgets.reduceTransparency, previewBackdrop: previewBackdrop)
+                WidgetPaper(look: look, frosted: frosted, previewBackdrop: previewBackdrop)
                 content(look)
                     .padding(.top, 12)
                     .padding(.horizontal, 13)
@@ -195,7 +228,7 @@ struct CalendarWidgetView: View {
 
     private func page() -> CalendarMonth.Page {
         pages.page(days: CalendarWidget.pageDays(state.settings.kind, today: today, offset: state.offset, language: language),
-                   events: feed.events, tasks: feed.tasks, now: feed.now, language: language)
+                   events: feed.events, tasks: feed.tasks, series: feed.series, now: feed.now, language: language)
     }
 
     @ViewBuilder
@@ -278,13 +311,16 @@ struct CalendarWidgetView: View {
         switch name {
         case "clay": palette.clay
         case "sage": palette.sage
+        // #274: a repeat after the next one.
+        case "faint": palette.sage.opacity(0.45)
         default: PaperTheme.event(name)
         }
     }
 
     private func timeText(_ line: CalendarWidget.Line) -> String {
-        line.time ?? (line.kind == .deadline ? L("마감") : CalendarDay.allDayText(language))
+        line.time ?? (line.kind == .deadline ? L("마감") : line.kind == .repeating ? CalendarMonth.repeatWord(ahead: false, language: language) : CalendarDay.allDayText(language))
     }
+
 
     /// A line: its mark, its time, its title — a press opens it (the event on the desk's calendar, the to-do's row in
     /// the note; no ticking off here).
@@ -300,6 +336,7 @@ struct CalendarWidgetView: View {
                     .fixedSize()
                 Text(line.title.keepingParticles)
                     .font(.system(size: 11.5))
+                    .foregroundStyle(line.ahead ? look.ink3 : palette.ink)
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
@@ -309,11 +346,12 @@ struct CalendarWidgetView: View {
         }
         .buttonStyle(.plain)
         .help(line.title)
+        .accessibilityLabel(CalendarWidget.spoken(line, language: language) ?? "\(timeText(line)) \(line.title)")
     }
 
     /// An event opens on the desk's calendar to change or remove; a to-do shows its row in the note.
     private func open(_ line: CalendarWidget.Line, day: String) {
-        if let task = line.taskId { widgets.reveal(task) } else { widgets.openCalendar(on: day, event: line.eventKey) }
+        widgets.open(line, day: day)
     }
 
     private func more(_ count: Int, _ look: WidgetLook, day: String, backed: Bool = true) -> some View {
@@ -414,8 +452,9 @@ struct CalendarWidgetView: View {
         }
     }
 
-    private func dots(_ day: String, page: CalendarMonth.Page, _ look: WidgetLook) -> some View {
-        let found = CalendarWidget.dots(day, page: page)
+    /// `folding` (#296, the month's cells): no dot for a faded daily · weekday repeat.
+    private func dots(_ day: String, page: CalendarMonth.Page, _ look: WidgetLook, folding: Bool = false) -> some View {
+        let found = CalendarWidget.dots(day, page: page, folding: folding)
         return HStack(spacing: 3) {
             ForEach(Array(found.colors.enumerated()), id: \.offset) { _, name in
                 Circle().fill(color(name)).frame(width: 5, height: 5)
@@ -596,7 +635,7 @@ struct CalendarWidgetView: View {
                         // calendar-flows D1: a multi-day event's band joins along the row (a holiday's name holds the
                         // first place).
                         let cells = detail ? week.map { day in
-                            (day, holiday(day, look), page.cell(day, limit: max(1, CalendarWidget.lines(wall ? .wall : .detail) - (holiday(day, look) == nil ? 0 : 1))))
+                            (day, holiday(day, look), page.cell(day, limit: max(1, CalendarWidget.lines(wall ? .wall : .detail) - (holiday(day, look) == nil ? 0 : 1)), folding: true))
                         } : []
                         let bands = detail ? CalendarMonth.bands(cells.map { day, holiday, cell in
                             (holiday == nil ? [] : [nil]) + cell.items.map { item in
@@ -632,7 +671,7 @@ struct CalendarWidgetView: View {
         Button { widgets.openDay(day, from: state.settings.id) } label: {
             VStack(spacing: 3) {
                 dayNumber(day, look, size: 12.5, box: 21, sunday: isSunday(day), dim: other)
-                dots(day, page: page, look).opacity(other ? 0.5 : 1)
+                dots(day, page: page, look, folding: true).opacity(other ? 0.5 : 1)
             }
             .padding(.top, 3)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -640,14 +679,18 @@ struct CalendarWidgetView: View {
         }
         .buttonStyle(.plain)
         .help(holiday(day, look) ?? "")
-        .accessibilityLabel(CalendarMonth.dayTitle(day, language: language) + (holiday(day, look).map { ", " + $0 } ?? ""))
+        // #296: the folded repeats have no dot; the screen reader says how many.
+        .accessibilityLabel([CalendarMonth.dayTitle(day, language: language), holiday(day, look),
+                             CalendarMonth.foldedLabel(page.folded(day), language: language)].compactMap { $0 }.joined(separator: ", "))
     }
 
     private func detailCell(_ day: String, page: CalendarMonth.Page, _ look: WidgetLook, other: Bool, wall: Bool, bands: [CalendarMonth.Band],
                             tileWidth: CGFloat, gap: CGFloat) -> some View {
         let style: CalendarWidget.Style = wall ? .wall : .detail
         let room = max(1, CalendarWidget.lines(style) - (holiday(day, look) == nil ? 0 : 1))
-        let shownCell = page.cell(day, limit: room)
+        // #296: the faded daily · weekday repeats are counted in the head (a mark and how many), not written as lines.
+        let shownCell = page.cell(day, limit: room, folding: true)
+        let folded = page.folded(day)
         let cell = (lines: shownCell.items.map { CalendarWidget.line($0, language: language) }, more: shownCell.more)
         let size: CGFloat = wall ? 12 : 10.5
         func band(_ index: Int) -> CalendarMonth.Band { bands.indices.contains(index) ? bands[index] : .init(run: 1, fromLeft: false, toRight: false) }
@@ -660,24 +703,25 @@ struct CalendarWidgetView: View {
             CellFit.of(DayMarks.holidayShown(day) ?? "", font: .systemFont(ofSize: holidaySize, weight: .semibold), room: tileWidth - 8 - (look.inkOnly ? holidaySize : 0) - 1, language: language)
         }
         let twos = CalendarMonth.twoLineTitles(room: CalendarWidget.lines(style), holiday: holidayFit, lines: cell.lines.indices.map { index in
-            band(index).joined ? .band : CellFit.of(cell.lines[index].title, font: font, room: textRoom, language: language)
+            // #296: a faded repeat keeps one line.
+            band(index).joined ? .band : !CalendarMonth.mayWrap(shownCell.items[index]) ? .fit
+                : CellFit.of(cell.lines[index].title, font: font, room: textRoom, language: language)
         })
         let two = twos.lines
         return ZStack(alignment: .topLeading) {
             // The cell's empty room opens the day's sheet.
             Button { widgets.openDay(day, from: state.settings.id) } label: { Color.clear.contentShape(Rectangle()) }
                 .buttonStyle(.plain)
-                .accessibilityLabel(CalendarMonth.dayTitle(day, language: language) + (holiday(day, look).map { ", " + $0 } ?? ""))
+                .accessibilityLabel([CalendarMonth.dayTitle(day, language: language), holiday(day, look),
+                                     CalendarMonth.foldedLabel(folded, language: language)].compactMap { $0 }.joined(separator: ", "))
             VStack(alignment: .leading, spacing: wall ? 2 : 1) {
-                HStack(spacing: 2) {
-                    dayNumber(day, look, size: wall ? 14 : 12, box: wall ? 22 : 19, sunday: isSunday(day), dim: other)
-                        .allowsHitTesting(false)
-                    if cell.more > 0 { more(cell.more, look, day: day, backed: false).frame(height: 19) }
-                    Spacer(minLength: 0)
-                    if CalendarWidget.showsLunar(lunarDay: KoreanCalendar.lunar(day)?.day ?? 0, cellWidth: tileWidth, moreInHead: cell.more > 0) {
-                        lunarText(day, look, size: wall ? 10.5 : 9.5).opacity(other ? 0.6 : 1)
-                    }
-                }
+                // #296: the repeat mark and how many beside the number; #295: where the head is short of room (+N beside the
+                // lunar 1st), the lunar date without its mark ("10.1"), then none, then the mark without its count.
+                let lunarShown = lunar(day, look) != nil
+                    && CalendarWidget.showsLunar(lunarDay: KoreanCalendar.lunar(day)?.day ?? 0, cellWidth: tileWidth, moreInHead: cell.more > 0)
+                tileHead(day, look, other: other, wall: wall, more: cell.more, folded: folded, lunarShown: lunarShown, room: tileWidth - 6)
+                    // Never wider than the tile (the grid stays even); its last 2 pt may go into the tile's padding.
+                    .frame(width: max(0, tileWidth - 8), alignment: .leading)
                 holidayLine(day, look, size: holidaySize, two: twos.holiday).opacity(other ? 0.6 : 1)
                 ForEach(Array(cell.lines.enumerated()), id: \.offset) { index, line in
                     let wrap = two.indices.contains(index) && two[index]
@@ -691,6 +735,8 @@ struct CalendarWidgetView: View {
                             mark(line, look).padding(.top, wrap ? 2 : 0).opacity(joined.fromLeft ? 0 : 1)
                             Text(wrap ? CalendarMonth.hyphenated(line.title.keepingParticles, language: language) : line.title.keepingParticles)
                                 .font(.system(size: size))
+                                // #274: a repeat after the next one, faded.
+                                .foregroundStyle(line.ahead ? look.ink3 : palette.ink)
                                 .lineLimit(wrap ? 2 : 1)
                                 .truncationMode(.tail)
                                 .fixedSize(horizontal: false, vertical: wrap)
@@ -720,11 +766,48 @@ struct CalendarWidgetView: View {
                     }
                     .buttonStyle(.plain)
                     .help(line.time.map { "\($0) · \(line.title)" } ?? line.title)
+                    .accessibilityLabel(CalendarWidget.spoken(line, language: language) ?? line.title)
                     .opacity(other ? 0.55 : 1)
                 }
             }
             .padding(.top, 3)
             .padding(.horizontal, 4)
+        }
+    }
+
+    /// A month tile's head: its number, #296 the repeat mark of its folded repeats (how many from two on), +N, and the lunar
+    /// date at the right — what fits `room` (`CalendarWidget.headFit`: #295 the lunar 1st without its mark, "10.1", first).
+    private func tileHead(_ day: String, _ look: WidgetLook, other: Bool, wall: Bool, more count: Int, folded: [CalendarMonth.DayTask],
+                          lunarShown: Bool, room: CGFloat) -> some View {
+        let lunarSize: CGFloat = wall ? 10.5 : 9.5, markSize: CGFloat = wall ? 8.5 : 7.5
+        let lunar = lunarShown ? KoreanCalendar.lunar(day) : nil
+        let full = lunar.map { KoreanCalendar.lunarLabel($0, language: language) }
+        let short = lunar.map { KoreanCalendar.lunarLabel($0, language: language, short: true) }
+        let mark = folded.isEmpty ? (mark: 0.0, count: 0.0) : RepeatMark.widths(count: folded.count, size: markSize)
+        let fit = CalendarWidget.headFit(room: Double(room), number: Double(wall ? 22 : 19), mark: mark.mark, count: mark.count,
+                                         more: count > 0 ? max(CalendarWidget.target, HeadText.width("+\(count)", size: 10.5, weight: .bold)) : 0,
+                                         lunar: full.map { HeadText.width($0, size: lunarSize) } ?? 0,
+                                         short: short.map { HeadText.width($0, size: lunarSize) } ?? 0, gap: 2)
+        return HStack(spacing: 2) {
+            dayNumber(day, look, size: wall ? 14 : 12, box: wall ? 22 : 19, sunday: isSunday(day), dim: other)
+                .allowsHitTesting(false)
+            if fit.mark {
+                RepeatMark(count: fit.count ? folded.count : 1, size: markSize, color: look.sageText)
+                    .opacity(other ? 0.6 : 1)
+                    .help(CalendarMonth.foldedTooltip(folded, language: language) ?? "")
+            }
+            if count > 0 { more(count, look, day: day, backed: false).frame(height: 19) }
+            Spacer(minLength: 0)
+            if fit.lunar != .none, let label = fit.lunar == .full ? full : short, let marks = self.lunar(day, look) {
+                Text(label)
+                    .font(.system(size: lunarSize).monospacedDigit())
+                    .foregroundStyle(look.ink3)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .help(marks.spoken)
+                    .accessibilityLabel(marks.spoken)
+                    .opacity(other ? 0.6 : 1)
+            }
         }
     }
 
@@ -782,6 +865,38 @@ struct CalendarWidgetView: View {
 
 /// A line's mark: an event's colour bar, a reminder's bell, a deadline's flag, a time range's outlined bar — never faded,
 /// with a ring of paper below 100 %.
+/// #296: a month cell's folded repeats (the faded daily · weekday ones) in its head — the repeat arrows, and how many from two
+/// on. The desk's calendar and the month widgets draw it; the tooltip and the screen reader say which (`CalendarMonth.folded…`).
+struct RepeatMark: View {
+    var count: Int
+    var size: CGFloat = 7.5
+    var color: Color = PaperTheme.sageText
+
+    var body: some View {
+        HStack(spacing: 1) {
+            Image(systemName: "repeat").font(.system(size: size, weight: .semibold))
+            if count > 1 { Text("\(count)").font(.system(size: size + 2, weight: .semibold).monospacedDigit()) }
+        }
+        .foregroundStyle(color)
+        .fixedSize()
+        .accessibilityHidden(true)
+    }
+
+    /// Its widths as drawn (`headFit`): the arrows, and the count with its 1 pt gap (0 below two).
+    static func widths(count: Int, size: CGFloat) -> (mark: Double, count: Double) {
+        let config = NSImage.SymbolConfiguration(pointSize: size, weight: .semibold)
+        let mark = NSImage(systemSymbolName: "repeat", accessibilityDescription: nil)?.withSymbolConfiguration(config)?.size.width ?? size * 1.4
+        return (Double(mark), count > 1 ? 1 + HeadText.width("\(count)", size: size + 2, weight: .semibold) : 0)
+    }
+}
+
+/// #295 · #296: a month head's text widths, as drawn with monospaced digits (`CalendarWidget.headFit`).
+enum HeadText {
+    static func width(_ text: String, size: CGFloat, weight: NSFont.Weight = .regular) -> Double {
+        Double((text as NSString).size(withAttributes: [.font: NSFont.monospacedDigitSystemFont(ofSize: size, weight: weight)]).width)
+    }
+}
+
 struct WidgetMark: View {
     let kind: CalendarWidget.Line.Kind
     let color: Color
@@ -796,8 +911,9 @@ struct WidgetMark: View {
                     .overlay { if halo { RoundedRectangle(cornerRadius: 2.5).strokeBorder(palette.paper, lineWidth: 1.5).padding(-1.5) } }
             case .range:
                 RoundedRectangle(cornerRadius: 1.5).strokeBorder(color, lineWidth: 1.2).frame(width: 4, height: 11)
-            case .reminder, .deadline:
-                Image(systemName: kind == .reminder ? "bell.fill" : "flag.fill")
+            case .reminder, .deadline, .repeating:
+                // #274: a repeat's arrows.
+                Image(systemName: kind == .reminder ? "bell.fill" : kind == .repeating ? "repeat" : "flag.fill")
                     .font(.system(size: 8.5, weight: .semibold))
                     .foregroundStyle(color)
                     .shadow(color: halo ? palette.paper : .clear, radius: 0.8)
@@ -855,18 +971,19 @@ final class WidgetPageCache {
         var days: [String]
         var events: [LocalEvent]
         var tasks: [TodoItem]
+        var series: [Series]
         var now: Date
         var language: AppLanguage
     }
     private var key: Key?
     private var page: CalendarMonth.Page?
 
-    func page(days: [String], events: [LocalEvent], tasks: [TodoItem], now: Date, language: AppLanguage) -> CalendarMonth.Page {
-        let key = Key(days: days, events: events, tasks: tasks, now: now, language: language)
+    func page(days: [String], events: [LocalEvent], tasks: [TodoItem], series: [Series] = [], now: Date, language: AppLanguage) -> CalendarMonth.Page {
+        let key = Key(days: days, events: events, tasks: tasks, series: series, now: now, language: language)
         if let page, key == self.key { return page }
         let range = CalendarMonth.fetchRange(days)
         let occurrences = LocalEvent.expand(events, from: range.start, to: range.end, calendar: .paper, language: .current)
-        let made = CalendarMonth.Page(days: days, events: occurrences, tasks: tasks, now: now, language: language)
+        let made = CalendarMonth.Page(days: days, events: occurrences, tasks: tasks, series: series, now: now, language: language)
         self.key = key
         page = made
         return made

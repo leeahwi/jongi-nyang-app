@@ -33,9 +33,12 @@ export function lunarOf(day: string): Lunar | undefined {
   return found;
 }
 
-/** The small label in a day's cell: "9.18"; the 1st of a lunar month marked — "음 9.1", "윤 4.1" (a leap month); en · nl "☾ 9.1". */
-export function lunarLabel(lunar: Lunar, lang: Lang = "ko"): string {
-  if (lunar.day !== 1) return `${lunar.month}.${lunar.day}`;
+/**
+ * The small label in a day's cell: "9.18"; the 1st of a lunar month marked — "음 9.1", "윤 4.1" (a leap month); en · nl "☾ 9.1".
+ * #295 `short`: without the mark ("10.1"), where the head is short of room (+N beside it).
+ */
+export function lunarLabel(lunar: Lunar, lang: Lang = "ko", short = false): string {
+  if (lunar.day !== 1 || short) return `${lunar.month}.${lunar.day}`;
   return lang === "ko" ? `${lunar.leap ? "윤" : "음"} ${lunar.month}.1` : `☾ ${lunar.month}.1`;
 }
 

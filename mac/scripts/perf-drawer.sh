@@ -30,11 +30,11 @@ swift build -c release --scratch-path .build/bench-release -Xswiftc -warnings-as
 bin_path="$(swift build -c release --scratch-path .build/bench-release --show-bin-path)"
 rm -rf "$out"/*.lproj; cp -R Resources/*.lproj "$out/"
 bench="$out/DrawerBench"
-if [ ! -x "$bench" ] || [ -n "$(find "$sources" Sources/PaperCore Tests/PaperTodoTests/DrawerBench.swift -newer "$bench" -name '*.swift' -print -quit)" ]; then
+if [ ! -x "$bench" ] || [ -n "$(find "$sources" Sources/PaperCore Tests/PaperTodoTests/DrawerBench.swift Tests/PaperTodoTests/TestDefaults.swift -newer "$bench" -name '*.swift' -print -quit)" ]; then
     swiftc -O -parse-as-library -I "$bin_path/Modules" \
         $(find "$sources" -name '*.swift' ! -name PaperTodoApp.swift | sort) \
         "$bin_path/PaperTodo.build/DerivedSources/resource_bundle_accessor.swift" \
-        "$bin_path"/PaperCore.build/*.o Tests/PaperTodoTests/DrawerBench.swift -o "$bench"
+        "$bin_path"/PaperCore.build/*.o Tests/PaperTodoTests/DrawerBench.swift Tests/PaperTodoTests/TestDefaults.swift -o "$bench"
 fi
 data="$(mktemp -d)"
 trap 'rm -rf "$data"' EXIT

@@ -39,6 +39,11 @@ extension AppModel {
     /// Every to-do but the ones this Mac hides (저녁 정리, the cat's deadlines).
     var hereItems: [TodoItem] { hiddenHere.isEmpty ? items : items.filter { !hidesHere($0) } }
 
+    /// #274: the repeating to-dos the calendar draws ahead, but the ones whose rule's space this Mac hides.
+    var hereSeries: [Series] {
+        hiddenHere.isEmpty ? series : series.filter { !hiddenHere.contains(SpaceDevice.key(todoSpaces.seriesSpaceID(of: $0.id))) }
+    }
+
     /// Today's open to-dos outside the note: the menu bar, the Dock badge, the 오늘 창, the periodic reminder.
     var hereRemainingCount: Int { peeked.isEmpty ? remainingCount : hereTodayItems.reduce(0) { $0 + ($1.isCompleted ? 0 : 1) } }
 

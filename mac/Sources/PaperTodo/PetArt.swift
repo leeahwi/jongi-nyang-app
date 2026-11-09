@@ -83,5 +83,8 @@ enum PetArt {
     }()
 
     /// Target: 120px of planted-paw travel over 62.5% of a cycle, displayed at 92/1024 scale.
-    static var walkStride: CGFloat { walkCycle?.count == 8 ? 192 * 92 / 1024 : 52 }
+    static var walkStride: CGFloat { walkStride(CatSize.petBase) }
+
+    /// #304: the stride at the cat's size (the walk's pace stays, so the planted paws don't slide).
+    static func walkStride(_ size: CGFloat) -> CGFloat { walkCycle?.count == 8 ? CatSize.stride(size) : 52 * size / CatSize.petBase }
 }

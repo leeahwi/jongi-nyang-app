@@ -22,15 +22,14 @@ private func expectEqual<T: Equatable>(_ actual: @autoclosure () throws -> T, _ 
 private struct Fixture {
     let folder: URL
     let storageURL: URL
-    let suiteName: String
+    let suite: TestDefaults
     let preferences: UserDefaults
 
     init(items: [(String, Bool)]) throws {
         folder = FileManager.default.temporaryDirectory.appendingPathComponent("PaperTodo-presentation-\(UUID().uuidString)")
         storageURL = folder.appendingPathComponent("todos.json")
-        suiteName = "PaperTodo.PresentationTests.\(UUID().uuidString)"
-        preferences = UserDefaults(suiteName: suiteName)!
-        preferences.removePersistentDomain(forName: suiteName)
+        suite = TestDefaults("PresentationTests")
+        preferences = suite.defaults
 
         var notebook = Notebook()
         for item in items {
@@ -45,7 +44,7 @@ private struct Fixture {
     }
 
     func cleanup() {
-        preferences.removePersistentDomain(forName: suiteName)
+        suite.remove()
         try? FileManager.default.removeItem(at: folder)
     }
 }

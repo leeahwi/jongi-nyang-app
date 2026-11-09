@@ -1,6 +1,6 @@
-import { allDayText, cellItems, dayTitle, fetchRange, monthGrid, monthTitle, weekDays, weekTitle, type CalendarEvent } from "../core/calendar";
+import { allDayText, cellItems, dayTitle, fetchRange, foldedLabel, foldedRepeats, monthGrid, monthTitle, repeatWord, weekDays, weekTitle, type CalendarEvent, type DayTask } from "../core/calendar";
 import {
-  agenda, backing, bolder, dayLines, dots, drawnOpacity, earHeightOf, earOpacity, earScale, edgeStrength, emptyText, floorOf, halo, inkOnly, linesOf,
+  agenda, backing, bolder, dayLines, dots, drawnOpacity, earHeightOf, earOpacity, earScale, edgeStrength, emptyText, floorOf, halo, inkOnly, lineSpoken, linesOf,
   moreLabel, nextRedraw, pageDays, pageOffset, rgbOf, shiftedMonth, stepDay, tile, upcoming, weekendTint, weekRow, widgetAddedText, widgetSize, widgetToday,
   type WidgetLine, type WidgetSettings,
 } from "../core/calendarWidget";
@@ -11,7 +11,7 @@ import type { TodoItem } from "../core/notebook";
 import type { IntentMade, TodosState } from "../core/types";
 import { dayWord, monthName, weekdayLetter, weekdayName, weekdayOrder, weekdayShort } from "../core/lang";
 import { h, icon, lang, paper, reduceMotion, t } from "./api";
-import { cellLine, dayMarks, fitTitles, hereTasks, weekBands } from "./calendarCells";
+import { calendarTasks, cellLine, dayMarks, fitTitles, repeatMark, weekBands } from "./calendarCells";
 import { listenForTyping } from "./typingTap";
 import { waitsForAnswer } from "./widgetAsk";
 
@@ -36,6 +36,8 @@ const svgNS = "http://www.w3.org/2000/svg";
 
 let settings: WidgetSettings | undefined;
 let room = 14;
+/** 크기 (#271) as drawn (the main process says: the size picked, or a smaller one where its display has no room). */
+let scale = 1;
 let preview = false;
 let state: TodosState | undefined;
 /** ‹ ›: weeks or months away from now, and when they were last pressed (2 minutes later it comes back). */
@@ -67,7 +69,7 @@ const today = () => widgetToday(new Date());
 const marksOf = (day: string) => (state ? dayMarks(day, state.prefs) : {});
 /** A holiday's name line: clay at 100 %, ink with a clay ⚑ below (the text rule); `shown` (#260): drawn with the places it may break. */
 const holidayLine = (name: string, shown = name) => h("div", { class: "hol", title: name }, h("span", { class: "hflag", "aria-hidden": "true" }, "⚑"), shown);
-const lunarOfDay = (marks: ReturnType<typeof marksOf>) => (marks.lunar ? h("span", { class: "lu", title: marks.lunarSpoken ?? "", "data-lunar-day": String(marks.lunarDay ?? 0) }, marks.lunar) : null);
+const lunarOfDay = (marks: ReturnType<typeof marksOf>) => (marks.lunar ? h("span", { class: "lu", title: marks.lunarSpoken ?? "", "data-lunar-day": String(marks.lunarDay ?? 0), "data-full": marks.lunar, "data-short": marks.lunarShort ?? marks.lunar }, marks.lunar) : null);
 /** Sunday · Saturday and holidays: the tinted tiles. */
 const weekendOf = (day: string, holiday?: string) => { const weekday = fromKey(day)!.getDay(); return weekday === 0 || weekday === 6 || Boolean(holiday); };
 
@@ -99,20 +101,30 @@ function markOf(line: WidgetLine): HTMLElement {
   return mark;
 }
 
-/** A line of 오늘 · 이번 주 · 오늘 목록: its mark, its time (종일 · 마감) and its title; a click opens it. */
+/** A line of 오늘 · 이번 주 · 오늘 목록: its mark, its time (종일 · 마감 · #274 반복) and its title; a click opens it. */
 function lineOf(line: WidgetLine, day: string): HTMLElement {
-  const time = line.time ?? (line.kind === "deadline" ? t("마감") : allDayText(lang()));
+  const time = line.time ?? (line.kind === "deadline" ? t("마감") : line.kind === "repeat" ? repeatWord(false, lang()) : allDayText(lang()));
   const inner = B(markOf(line), h("span", { class: "tm" }, time), h("span", { class: "tt" }, line.title));
   inner.title = `${time} · ${line.title}`;
+  const spoken = lineSpoken(line, lang());
+  if (spoken) inner.setAttribute("aria-label", spoken);
   inner.addEventListener("click", (event) => { event.stopPropagation(); openLine(line, day); });
-  return h("div", { class: "ln" }, inner);
+  // #274: a repeat after the next one, faded.
+  return h("div", { class: `ln${line.ahead ? " ahead" : ""}` }, inner);
 }
 
-/** A line pressed: a to-do's row in the note; an event's sheet in the desk's calendar, on its day (calendar-flows D3). */
-function openLine(line: WidgetLine, day: string): void {
+/**
+ * A line pressed: a to-do's row in the note; #274 a repeat without an open copy its rule (책상 → 반복); an event's sheet in
+ * the desk's calendar, on its day (calendar-flows D3).
+ */
+function openLine(line: Pick<WidgetLine, "kind" | "taskId" | "eventKey">, day: string): void {
   if (line.taskId) void api.act({ type: "calendarShowTask", id: line.taskId });
+  else if (line.kind === "repeat") void api.act({ type: "openSettings", tab: "repeat" });
   else void api.act({ type: "openCalendar", day, ...(line.eventKey ? { event: line.eventKey } : {}) });
 }
+const openTask = (task: DayTask, day: string) => openLine({ kind: task.kind, ...(task.taskId ? { taskId: task.taskId } : {}) }, day);
+/** The dots' colours: an event's own, clay, sage, and #274 a repeat after the next one fainter. */
+const dotColor = (color: string) => (color === "clay" ? "var(--clay)" : color === "sage" ? "var(--sage)" : color === "faint" ? "color-mix(in srgb, var(--sage) 45%, transparent)" : eventMark(color));
 
 const openDay = (day: string) => api.send("widget:day", day);
 
@@ -148,7 +160,7 @@ function model(): { days: string[]; events: CalendarEvent[]; tasks: readonly Tod
   if (!state || !settings) return undefined;
   const days = pageDays(settings.kind, today(), offset, lang());
   const { start, end } = fetchRange(days);
-  return { days, events: expand(state.events, start, end, lang()), tasks: hereTasks(state) };
+  return { days, events: expand(state.events, start, end, lang()), tasks: calendarTasks(state, days) };
 }
 
 function draw(): void {
@@ -229,7 +241,7 @@ function weekBody(data: NonNullable<ReturnType<typeof model>>, now: Date): { key
     const date = fromKey(day)!;
     const sunday = date.getDay() === 0;
     const found = dots(day, data.events, data.tasks);
-    const marks = found.colors.map((color) => { const dot = h("i"); dot.style.setProperty("--color", color === "clay" ? "var(--clay)" : color === "sage" ? "var(--sage)" : eventMark(color)); return dot; });
+    const marks = found.colors.map((color) => { const dot = h("i"); dot.style.setProperty("--color", dotColor(color)); return dot; });
     const holiday = marksOf(day).holiday;
     const column = h("div", { class: `c bk${day === today() ? " today" : ""}${weekendOf(day, holiday) ? " we" : ""}`, "data-day": day, title: holiday ?? "",
       "aria-label": [`${weekdayName(date.getDay(), lang())} ${date.getDate()}`, holiday].filter(Boolean).join(", ") },
@@ -254,33 +266,38 @@ function monthBody(data: NonNullable<ReturnType<typeof model>>): { key: string; 
   // A holiday's name takes a line's room; 벽 달력 four lines. calendar-flows D1: a trip's band joins along each week row.
   const found = days.map((day) => {
     const marks = marksOf(day);
-    return { day, marks, holiday: Boolean(marks.holiday), ...(detail ? cellItems(day, data.events, data.tasks, Math.max(1, linesOf(style) - (marks.holiday ? 1 : 0)), lang()) : { items: [], more: 0 }) };
+    // #296: the faded daily · weekday repeats are counted in the head (`folded`), not written as lines (nor dots).
+    return { day, marks, holiday: Boolean(marks.holiday), folded: foldedRepeats(day, data.tasks, lang()),
+      ...(detail ? cellItems(day, data.events, data.tasks, Math.max(1, linesOf(style) - (marks.holiday ? 1 : 0)), lang(), true) : { items: [], more: 0 }) };
   });
   const rowBands = detail ? Array.from({ length: 6 }, (_, week) => weekBands(found.slice(week * 7, week * 7 + 7))).flat() : [];
-  found.forEach(({ day, marks, items, more }, index) => {
+  found.forEach(({ day, marks, items, more, folded }, index) => {
     const date = fromKey(day)!;
     const outside = date.getMonth() + 1 !== month;
     const sunday = date.getDay() === 0 || Boolean(marks.holiday);
+    const repeats = foldedLabel(folded, lang());
     const cell = h("div", { class: `cl${outside ? " dim" : ""}${day === today() ? " today" : ""}${weekendOf(day, marks.holiday) ? " we" : ""}`, "data-day": day,
-      ...(marks.holiday ? { title: marks.holiday } : {}) });
+      ...(marks.holiday ? { title: marks.holiday } : {}), ...(repeats ? { "aria-label": [dayTitle(day, lang()), marks.holiday, repeats].filter(Boolean).join(", ") } : {}) });
     if (detail) {
-      keys.push([day, marks, items.map((item) => (item.kind === "event" ? item.event.key + item.event.color : item.task.taskId + item.task.kind)), more]);
+      keys.push([day, marks, items.map((item) => (item.kind === "event" ? item.event.key + item.event.color : item.task.taskId + item.task.kind + (item.task.ahead ? "~" : "") + (item.task.kind === "repeat" ? item.task.title : ""))), more,
+        folded.map((task) => (task.time ?? "") + task.title)]);
       const lead = marks.holiday ? 1 : 0;
       const lines = items.map((item, line) => {
         const element = cellLine(item, day, rowBands[index]?.[line], line + lead);
         element.addEventListener("click", (event) => {
           event.stopPropagation();
-          if (item.kind === "task") void api.act({ type: "calendarShowTask", id: item.task.taskId });
+          if (item.kind === "task") openTask(item.task, day);
           else void api.act({ type: "openCalendar", day, event: item.event.key });
         });
         return B(element);
       });
-      cell.append(h("div", { class: "head" }, B(numberOf(day, sunday)), more > 0 ? B(moreButton(more, day)) : null, lunarOfDay(marks)),
+      // #296: the repeat mark beside the number; #295: what the head has room for is worked out after layout (fitHead).
+      cell.append(h("div", { class: "head" }, B(numberOf(day, sunday)), folded.length ? B(repeatMark(folded)) : null, more > 0 ? B(moreButton(more, day)) : null, lunarOfDay(marks)),
         ...(marks.holiday ? [holidayLine(marks.holiday, marks.holidayShown)] : []), h("div", { class: "lines" }, ...lines));
     } else {
-      const spots = dots(day, data.events, data.tasks);
-      keys.push([day, spots, marks.holiday]);
-      const marksOfDay = spots.colors.map((color) => { const dot = h("i"); dot.style.setProperty("--color", color === "clay" ? "var(--clay)" : color === "sage" ? "var(--sage)" : eventMark(color)); return dot; });
+      const spots = dots(day, data.events, data.tasks, true);
+      keys.push([day, spots, marks.holiday, repeats]);
+      const marksOfDay = spots.colors.map((color) => { const dot = h("i"); dot.style.setProperty("--color", dotColor(color)); return dot; });
       cell.append(B(numberOf(day, sunday), h("span", { class: "dots" }, ...marksOfDay, spots.plus ? h("em", {}, "+") : null)));
     }
     cell.addEventListener("click", () => openDay(day));
@@ -322,7 +339,13 @@ function layout(): void {
   const earHeight = earHeightOf(settings.kind, settings.style);
   const k = earScale(settings.kind, settings.style);
   root.className = `wg k-${settings.kind} s-${settings.style}${settings.locked ? " locked" : ""}`;
-  Object.assign(root.style, { left: `${room}px`, top: `${room + earHeight}px`, width: `${width}px`, height: `${height}px` });
+  // 크기 (#271): laid out at 보통 and drawn `scale` times as big from the paper's top left (the ears above it too), so
+  // every cell keeps its lines; the window is that much bigger (main/calendarWidget.ts).
+  Object.assign(root.style, {
+    left: `${room}px`, top: `${room + earHeight * scale}px`, width: `${width}px`, height: `${height}px`,
+    transform: scale === 1 ? "" : `scale(${scale})`, transformOrigin: "0 0",
+  });
+  root.dataset.scale = String(scale);
   // The note's ears, scaled: drawn in the note's own numbers in a box `1/k` as wide, standing on the paper's top edge.
   const boxWidth = width / k;
   const edge = earsRoom + 16;
@@ -473,10 +496,11 @@ function toast(text: string, undo: () => void, ms = 4000, fromList = false): voi
 // ─── Wiring ───────────────────────────────────────────────────────────────────
 
 api.on("widget:settings", (payload) => {
-  const value = payload as { widget: WidgetSettings; room: number; preview?: boolean; wall?: string; hover?: boolean; offset?: number };
-  const changedShape = !settings || settings.kind !== value.widget.kind || settings.style !== value.widget.style;
+  const value = payload as { widget: WidgetSettings; room: number; preview?: boolean; scale?: number; wall?: string; hover?: boolean; offset?: number };
+  const changedShape = !settings || settings.kind !== value.widget.kind || settings.style !== value.widget.style || scale !== (value.scale ?? 1);
   settings = value.widget;
   room = value.room;
+  scale = value.scale ?? 1;
   preview = Boolean(value.preview);
   if (value.wall !== undefined) document.body.className = `widget-window${value.wall ? ` wall-${value.wall}` : ""}`;
   if (value.hover !== undefined) hovering = value.hover;

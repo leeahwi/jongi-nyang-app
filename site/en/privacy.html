@@ -109,15 +109,16 @@
         <li>Reminders and alarms ring on this computer only.</li>
       </ul>
 
-      <h2 id="typing">The cat that taps along while you type</h2>
-      <p>When you type, the cat taps along with its paws. All it knows is that a key was pressed, and when.</p>
+      <h2 id="typing">The tap-tap cat</h2>
+      <p>When you type, the tap-tap cat in a corner of the screen taps along with its paws. It’s turned on and off apart from the desktop cat. All it knows is that a key was pressed, and when.</p>
       <ul>
         <li>It never reads which key it was, what you typed, text you are still composing or the clipboard. Nothing of it is saved, logged or sent.</li>
         <li>It only checks whether you’re holding a key down or using a shortcut (⌘ or ⌃, Ctrl on Windows), and doesn’t tap then.</li>
         <li>At first it answers typing in Jongi-nyang’s own windows only. That needs no permission.</li>
         <li>On the Mac, choosing ‘In all apps’ makes it tap along in other apps too. That needs macOS’s Input Monitoring permission, so macOS asks once when you choose it. Even then, all Jongi-nyang knows is that a key was pressed. It never changes or blocks what you type in other apps.</li>
-        <li>Turn the permission off, turn the setting off, hide the cat or quit the app, and it no longer hears other apps’ keys. You can turn the permission off any time in System Settings → Privacy &amp; Security → Input Monitoring.</li>
-        <li>The Windows app never hears other apps’ keys.</li>
+        <li>Turn the permission off, turn the setting off, lock the screen or quit the app, and it no longer hears other apps’ keys. You can turn the permission off any time in System Settings → Privacy &amp; Security → Input Monitoring.</li>
+        <li>On Windows, choosing ‘In all apps’ hears other apps’ keys through a Windows keyboard hook. Even then, all Jongi-nyang knows is that a key was pressed, and when. The key’s code is looked at only briefly, to tell a held key, and never kept. Every key goes on to the app as it was, never changed or blocked.</li>
+        <li>On Windows too, turn the setting off, lock the screen or quit the app, and it stops hearing other apps’ keys at once. Keyloggers use the same method, so your antivirus may ask about it; that’s why it starts off.</li>
       </ul>
 
       <h2 id="ai">If you turn on the AI connection</h2>
@@ -216,7 +217,7 @@
     </div>
     <div class="legal">
       <span>© 2026 leeAhwi · Source code under the <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/LICENSE">Apache License 2.0</a> · <a href="privacy.html" aria-current="page">Privacy</a></span>
-      <span>Mac 1.48.0 · Windows 1.33.0</span>
+      <span>Mac 1.49.0 · Windows 1.34.0</span>
     </div>
   </div>
 </footer>

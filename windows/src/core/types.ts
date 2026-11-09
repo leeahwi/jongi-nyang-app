@@ -1,5 +1,6 @@
 import type { TimerSize } from "./timerWidget";
-import type { TypingScope } from "./typingCat";
+import type { CatSize } from "./catSize";
+import type { TypingCorner, TypingScope } from "./typingCat";
 import type { ChatterFrequency } from "./chatter";
 import type { ArchiveAfterDays } from "./archive";
 import type { TodoItem } from "./notebook";
@@ -22,6 +23,7 @@ import type { DrawerBackdrop, DrawerSide, DrawerTheme, FolderSort, FolderView, M
 import type { SpaceChoice, SpaceLens, TodoSpaces } from "./todoSpaces";
 import type { MemoTrash } from "./memoTrash";
 import type { BackupCounts, BackupReason } from "./backup";
+import type { NoteLayer } from "./stayBehind";
 import { clampNote, noteScales, type CodeFont, type LineSpacing, type ParagraphSpacing } from "./textSteps";
 
 export type NotebookFont = "pen" | "brush" | "clean";
@@ -45,7 +47,10 @@ export interface Prefs {
   textSize: TextSize;
   reminderStyle: ReminderStyle;
   hideCompleted: boolean;
+  /** Before #273 the pin's switch (항상 위에 두기); still written beside `noteLayer` (on when it is `top`) for an older version. */
   alwaysOnTop: boolean;
+  /** 노트 위치 (#273): 보통 · 항상 위에 두기 · 바탕화면에 두기 (core/stayBehind.ts). */
+  noteLayer: NoteLayer;
   reminderEnabled: boolean;
   intervalMinutes: number;
   displaySeconds: number;
@@ -55,8 +60,17 @@ export interface Prefs {
   /** 종이냥 on the floor above the taskbar. The focus timer has its own board and does not depend on it. */
   petVisible: boolean;
   petWanders: boolean;
-  /** 글자 칠 때 두드리기 (#230): the cat taps along with keys typed in the app's windows, or not. A device setting. */
-  petTyping: TypingScope;
+  /** #304: 종이냥 펫's 크기 (보통: the cat as before). */
+  petSize: CatSize;
+  /**
+   * 타닥냥 (#230 · #289): its own cat in a corner, apart from the pet — off, keys typed in the app's windows, or
+   * in every app (#288). Device settings; `typingCatLast` is what the tray's switch brings back.
+   */
+  typingCat: TypingScope;
+  typingCorner: TypingCorner;
+  /** #304: 타닥냥's 크기, apart from the pet's. */
+  typingSize: CatSize;
+  typingCatLast?: TypingScope;
   pomodoroFocusMinutes: number;
   pomodoroRestMinutes: number;
   pomodoroLongRestMinutes: number;
@@ -224,6 +238,7 @@ export const defaultPrefs: Prefs = {
   reminderStyle: "paper",
   hideCompleted: false,
   alwaysOnTop: false,
+  noteLayer: "normal",
   reminderEnabled: true,
   intervalMinutes: 30,
   displaySeconds: 15,
@@ -232,7 +247,10 @@ export const defaultPrefs: Prefs = {
   dueStyle: "dday",
   petVisible: true,
   petWanders: true,
-  petTyping: "app",
+  petSize: "regular",
+  typingCat: "app",
+  typingCorner: "bottomRight",
+  typingSize: "regular",
   pomodoroFocusMinutes: 25,
   pomodoroRestMinutes: 5,
   pomodoroLongRestMinutes: 15,
@@ -422,6 +440,8 @@ export interface AppState {
   drawerShortcutProblem?: string;
   /** 반투명 · 투명 drawn as 불투명 on this PC, and why (Windows 10, transparency effects off); none when they work. */
   drawerBackdropNote?: string;
+  /** 모든 앱에서 chosen and the keyboard hook couldn't be set (#288): why the typing cat hears this app only. */
+  typingCatNote?: string;
   /** 메모 서랍: the folders and each memo's place (memo-folders.json). */
   memoFolders: MemoFolders;
   /** 지운 메모 (#120): deleted memos kept 30 days, newest deleted first. */
@@ -450,6 +470,8 @@ export interface AppState {
   ai: AiView;
   /** 자동 백업 and 백업 목록 (책상 → 저장과 백업, #139 · #140). */
   backups: BackupsView;
+  /** 크기 (#271): the sizes each widget (by id) fits at on its display now; the others are greyed out in its settings. */
+  widgetFits?: Record<string, number[]>;
 }
 
 /** One copy in the backup folder: its file name, kind, when (ISO), size in bytes, and what it holds once known. */
@@ -606,13 +628,13 @@ export interface PopupPayload {
 }
 
 /** What the settings slip and the widget's menu change. */
-export type WidgetChanges = Partial<Pick<WidgetSettings, "style" | "opacity" | "solidOnHover" | "clickThrough" | "locked" | "level" | "allSpaces">>;
+export type WidgetChanges = Partial<Pick<WidgetSettings, "style" | "opacity" | "solidOnHover" | "clickThrough" | "locked" | "level" | "allSpaces" | "scale">>;
 
 export type Action =
   | { type: "openDataFolder" }
   | { type: "chatterPreview" }
   /** #230: a key went down in this window (nothing else: no key, no text). */
-  | { type: "petTap" }
+  | { type: "typingTap" }
   | ({ type: "add"; title: string } & ParsedWhen)
   | { type: "rename"; id: string; title: string }
   | { type: "toggle"; id: string }
@@ -650,7 +672,7 @@ export type Action =
   | { type: "setPref"; key: keyof Prefs; value: Prefs[keyof Prefs] }
   | { type: "collapse"; anchor?: { x: number; y: number } }
   /** Settings' panes on the desk ("calendar" is the old name of 일정, "events"). */
-  | { type: "openSettings"; tab?: "calendar" | "clock" | "events" | "storage" | "drawer" | "spaces" | "ai" }
+  | { type: "openSettings"; tab?: "calendar" | "clock" | "events" | "storage" | "drawer" | "spaces" | "ai" | "repeat" }
   /** 설정 › AI 연결: the switch, 되돌리기 on an entry (or its toast), Claude 데스크톱에 연결, Claude Code 명령 복사. */
   | { type: "aiEnable"; on: boolean }
   | { type: "aiUndo"; id: string }

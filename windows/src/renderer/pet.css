@@ -2,12 +2,13 @@ html, body { background: transparent; }
 #stage { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
 
 /* The pet stands on the floor (the bottom of the window). */
-#pet { position: absolute; bottom: 2px; width: 252px; display: flex; flex-direction: column; align-items: center; }
-.body { position: relative; width: 132px; height: 100px; }
+/* #304: --pet is the cat's size at the chosen 크기 and --k how much bigger than 보통 (unset at 보통: as before). */
+#pet { position: absolute; bottom: 2px; width: calc(var(--pet, 92px) + 160px); display: flex; flex-direction: column; align-items: center; }
+.body { position: relative; width: calc(var(--pet, 92px) + 40px); height: calc(var(--pet, 92px) + 8px); }
 
-.shadow { position: absolute; left: 50%; bottom: 2.8px; height: 6.4px; border-radius: 50%; transform: translateX(-50%); }
+.shadow { position: absolute; left: 50%; bottom: calc(2.8px * var(--k, 1)); height: calc(6.4px * var(--k, 1)); border-radius: 50%; transform: translateX(-50%); }
 
-.cat { position: absolute; left: 20px; bottom: 0; width: 92px; height: 92px; transform-origin: 50% 93%; cursor: default; outline: none; }
+.cat { position: absolute; left: 20px; bottom: 0; width: var(--pet, 92px); height: var(--pet, 92px); transform-origin: 50% 93%; cursor: default; outline: none; }
 .art { display: block; width: 100%; height: 100%; object-fit: contain; transform-origin: 50% 93%; pointer-events: none; }
 /* #67: held paused and moved on about 8 times a second (renderer/sampled.ts sets --t, the ms since it started), for
    one breath each time the cat settles; then it sits still (--t back to 0, the first frame: the cat as drawn). */
@@ -47,7 +48,7 @@ html, body { background: transparent; }
 
 /* Sleep can last all night: the Z's hold still, climbing from small to big (#67: rising they drew 8 times a second
    while nobody was at the PC). The same as with 동작 줄이기. */
-.zs { position: absolute; left: calc(50% + 11px); bottom: 66px; width: 44px; height: 56px; pointer-events: none; }
+.zs { position: absolute; left: calc(50% + 11px * var(--k, 1)); bottom: calc(66px * var(--k, 1)); width: 44px; height: 56px; pointer-events: none; }
 .zs span { position: absolute; left: 22px; bottom: 28px; translate: -50% 50%; font-weight: 600; color: var(--secondary); }
 .zs span:nth-child(1) { font-size: 9px; transform: translate(4px, -6px); }
 .zs span:nth-child(2) { font-size: 11px; transform: translate(7px, -13px); }

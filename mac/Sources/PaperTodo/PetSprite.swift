@@ -12,14 +12,13 @@ import SwiftUI
 struct PetSprite: NSViewRepresentable {
     let activity: PetActivity
     let homeX: CGFloat
-    let typing: TypingCat.Pose?
     let size: CGFloat
     let reduceMotion: Bool
 
     func makeNSView(context: Context) -> PetSpriteView { PetSpriteView() }
 
     func updateNSView(_ view: PetSpriteView, context: Context) {
-        view.show(PetSpriteView.Scene(activity: activity, homeX: homeX, typing: typing, size: size, reduceMotion: reduceMotion))
+        view.show(PetSpriteView.Scene(activity: activity, homeX: homeX, size: size, reduceMotion: reduceMotion))
     }
 }
 
@@ -27,7 +26,6 @@ final class PetSpriteView: NSView {
     struct Scene: Equatable {
         var activity: PetActivity
         var homeX: CGFloat
-        var typing: TypingCat.Pose?
         var size: CGFloat
         var reduceMotion: Bool
     }
@@ -101,14 +99,8 @@ final class PetSpriteView: NSView {
         floorShadow.removeAnimation(forKey: "clip.opacity")
         picture.removeAnimation(forKey: "clip")
         let size = scene.size, activity = scene.activity
-        // The cushion cat holds still between keys: no breathing, no sway, only the picture changes.
-        if let typing = scene.typing, activity.action.isResting, let image = PetArt.typing(typing) {
-            place(PetFrame(x: scene.homeX), image: image, size: size)
-            breathe(.still)
-            return
-        }
         let now = Date()
-        let frame = PetMotion.frame(activity, homeX: scene.homeX, at: scene.reduceMotion ? activity.start : now)
+        let frame = PetMotion.frame(activity, homeX: scene.homeX, at: scene.reduceMotion ? activity.start : now, size: size)
         place(frame, image: Self.image(frame), size: size)
         breathe(frame.walkFrame != nil || !activity.action.isResting ? .still : frame.sleepy ? .asleep : .awake)
         let elapsed = max(0, now.timeIntervalSince(activity.start))
@@ -116,7 +108,7 @@ final class PetSpriteView: NSView {
         PerfProbe.count("petClip." + activity.action.name)
         let count = max(2, Int((activity.duration / every).rounded(.up)) + 1)
         let frames = (0..<count).map { index in
-            PetMotion.frame(activity, homeX: scene.homeX, at: activity.start.addingTimeInterval(activity.duration * Double(index) / Double(count - 1)))
+            PetMotion.frame(activity, homeX: scene.homeX, at: activity.start.addingTimeInterval(activity.duration * Double(index) / Double(count - 1)), size: size)
         }
         let times = (0..<count).map { NSNumber(value: Double($0) / Double(count - 1)) }
         // In the layers' own time: begun `elapsed` ago, and held at its last frame until the next scene replaces it.
@@ -206,7 +198,8 @@ final class PetSpriteView: NSView {
                                         CGAffineTransform(rotationAngle: CGFloat(frame.pose.rotation * .pi / 180))))
         let flip = CGAffineTransform(a: 1, b: 0, c: 0, d: -1, tx: 0, ty: s)
         let placed = flip.concatenating(down).concatenating(flip)
-            .concatenating(CGAffineTransform(translationX: frame.x - s / 2, y: floor + frame.pose.lift))
+            // #304: a bigger cat hops as much higher (×1 at 보통).
+            .concatenating(CGAffineTransform(translationX: frame.x - s / 2, y: floor + frame.pose.lift * (s / CatSize.petBase)))
         return CATransform3DMakeAffineTransform(placed)
     }
 

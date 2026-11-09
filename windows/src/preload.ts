@@ -15,6 +15,8 @@ const listen = new Set([
   "ears:twitch", "ears:preview", "slip:asking", "confirm:nudge",
   // #234: the desktop calendar widgets and their day sheet.
   "widget:settings", "widget:made", "widget:removed", "widgetSheet:open",
+  // #289: the typing cat (a key went down — nothing else —, rest, away, and a pose for the snapshots).
+  "typingCat:key", "typingCat:rest", "typingCat:away", "typingCat:pose",
 ]);
 const send = new Set([
   "popup:interactive", "popup:complete", "popup:complete-all", "popup:snooze", "popup:snooze-until", "popup:tomorrow", "popup:event-again", "popup:sweep", "popup:open", "popup:open-event", "popup:closed",

@@ -17,5 +17,5 @@ rm -rf "$out"/*.lproj; cp -R Resources/*.lproj "$out/"
 swiftc -O -warnings-as-errors -parse-as-library -I "$bin_path/Modules" \
     $(find Sources/PaperTodo -maxdepth 1 -name '*.swift' ! -name PaperTodoApp.swift | sort) \
     "$bin_path/PaperTodo.build/DerivedSources/resource_bundle_accessor.swift" \
-    "$bin_path"/PaperCore.build/*.o Tests/PaperTodoTests/TypingCatBench.swift -o "$out/TypingCatBench"
+    "$bin_path"/PaperCore.build/*.o Tests/PaperTodoTests/TypingCatBench.swift Tests/PaperTodoTests/TestDefaults.swift -o "$out/TypingCatBench"
 "$out/TypingCatBench" "${1:-30}"

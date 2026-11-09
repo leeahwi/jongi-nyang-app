@@ -5,9 +5,9 @@
 > The **Windows version** of a to-do app that works like a single sheet of paper: write it down, check it off, done.
 > Above the taskbar sits **Jongi-nyang (종이냥, ‘paper cat’)**, a paper cat that reminds you, cheers you on and now and then has a word for you.
 
-| Today |
-| --- |
-| ![Today](../docs/screenshots/windows/en/strip.png) |
+| Today | Cat talk | Focus timer |
+| --- | --- | --- |
+| ![Today](../docs/screenshots/windows/en/note.png) | ![The cat asking a question](../docs/screenshots/windows/en/pet-question.png) | ![Focus timer](../docs/screenshots/windows/en/timer.png) |
 
 ## Why you might like it
 
@@ -51,6 +51,10 @@ The details: [Shortcuts](#shortcuts) · [Where your data lives](#where-your-data
 
 Type `meeting tomorrow at 3`, `report by friday` or `timer 40` into the input line at the bottom of the notepad. Chips show how it was read as you type; if that’s wrong, press `Tab` for another reading. From any app, `Ctrl+Alt+N` brings up the same input line on a small slip.
 
+| Typing · chips | After adding · switch | Quick add from anywhere |
+| --- | --- | --- |
+| ![Input line chips](../docs/screenshots/windows/en/note-typing-event.png) | ![Toast](../docs/screenshots/windows/en/note-toast.png) | ![Quick add](../docs/screenshots/windows/en/quick-entry.png) |
+
 <details>
 <summary>What it understands, and the keys</summary>
 
@@ -67,9 +71,9 @@ Type `meeting tomorrow at 3`, `report by friday` or `timer 40` into the input li
 
 The **day ribbon** on the Today tab shows what’s on now, large, with a ring of the time left, and the next two things below it. Click it and **your day** opens in place as a timetable: drag a block to move it, or drag its top or bottom edge to change how long it lasts.
 
-| Now · Next |
-| --- |
-| ![Day ribbon](../docs/screenshots/windows/en/strip.png) |
+| Now · Next | Your day | Night paper |
+| --- | --- | --- |
+| ![Day ribbon](../docs/screenshots/windows/en/strip.png) | ![Your day](../docs/screenshots/windows/en/strip-day.png) | ![Night day ribbon](../docs/screenshots/windows/en/night-strip.png) |
 
 <details>
 <summary>Day ribbon, timetable and to-do times in detail</summary>
@@ -92,6 +96,10 @@ The **day ribbon** on the Today tab shows what’s on now, large, with a ring of
 
 The **Ahead** tab gathers everything from tomorrow on, by date. Drag a to-do to another day and that becomes its due date. In the evening the cat asks, ‘Good work today. Move 3 to-dos to tomorrow?’
 
+| Ahead | Dragging | Evening tidy-up |
+| --- | --- | --- |
+| ![Ahead](../docs/screenshots/windows/en/ahead.png) | ![Dragging](../docs/screenshots/windows/en/ahead-drag.png) | ![Evening tidy-up](../docs/screenshots/windows/en/conv-sweep-evening.png) |
+
 <details>
 <summary>Ahead, changing dates and tidy-ups in detail</summary>
 
@@ -108,6 +116,10 @@ The **Ahead** tab gathers everything from tomorrow on, by date. Drag a to-do to 
 ### Reminders so nothing slips
 
 Give any to-do a one-time reminder, a **repeat** or a **due date**. When it’s time, the cat brings a **reminder slip** to the bottom right of the screen. Finish it right there, snooze it or move it to tomorrow. Alarms keep ringing until you stop them.
+
+| Reminder · repeat · due | Picking a snooze | When an alarm rings |
+| --- | --- | --- |
+| ![Reminder settings](../docs/screenshots/windows/note-deadline-editor.png) | ![Snooze menu](../docs/screenshots/windows/en/conv-reminder-snooze-menu.png) | ![Alarm ringing](../docs/screenshots/windows/en/ring.png) |
 
 <details>
 <summary>Reminders and alarms in detail</summary>
@@ -128,6 +140,10 @@ Give any to-do a one-time reminder, a **repeat** or a **due date**. When it’s 
 
 Jongi-nyang keeps your events itself. Type ‘meeting tomorrow at 3’ or double-click a date in the calendar. The **Calendar** on the desk (`Ctrl+D`) shows events and to-dos with due dates or reminders by month or week. To-dos and events never mix.
 
+| Desk · Calendar | Calendar · week | Event sheet |
+| --- | --- | --- |
+| ![Calendar](../docs/screenshots/windows/calendar-month.png) | ![Calendar week view](../docs/screenshots/windows/calendar-week.png) | ![Editing an event](../docs/screenshots/windows/calendar-sheet-edit.png) |
+
 <details>
 <summary>Events and the calendar in detail</summary>
 
@@ -146,26 +162,33 @@ Jongi-nyang keeps your events itself. Type ‘meeting tomorrow at 3’ or double
 
 ### A paper calendar on your desktop
 
-From 1.33 you can keep a paper calendar widget on your desktop. Click a day and its day sheet shows everything on it; type there as you would in the input line, and it goes on that day. The notepad, calendar, widgets and notes drawer share one of fifteen papers.
+In Desk → Events → **Desktop widgets**, put up to four calendar widgets on your desktop. Click a date and a **day sheet** opens beside it; type there like in the input line to add straight away. Drag the cat ears at the top right to move a widget, and click them for its menu.
 
-![A wall calendar widget for this month on the desktop: each day is a paper tile with its events and holiday names, and a cat's ears peek out at the top right](../docs/screenshots/windows/en/month-wall-100-light.png)
+<img src="../docs/screenshots/windows/en/month-wall-100-light.png" width="720" alt="This month as a wall calendar widget on the desktop: events and holiday names sit on paper tiles for each day, with cat ears peeking out at the top right">
 
 <details>
-<summary>Widgets and papers in detail</summary>
+<summary>Desktop widgets in detail</summary>
 
-- **Pick your widgets**: in Desk → Events → **Desktop widgets**, choose Today, This week, This month, Wall calendar or Today list, up to four at a time. Widget settings stay on this PC and don't change the files in a shared folder.
-- **Readable when faint**: pick an opacity from 20 to 100% (85% to start). Each day sits on a paper tile, so the text stays readable, and the widget turns solid when you hover over it.
-- **Stays on the desktop**: click another window and the widget goes under it. Each widget can be set to **Keep on top** or **Click through**. Drag a widget by its ears, and click the ears for its menu.
-- **Lunar dates and holidays**: the Desk calendar and the widgets show lunar dates and the names of Korean public holidays, worked out on this PC without the internet.
-- **Fifteen papers**: pick one in Desk → Appearance → **Paper**, and the notepad, calendar, widgets, slips, Desk and notes drawer all change to it. New are Sticky note, Manuscript paper, Blue lined notebook, Lavender, Recycled paper, Night sky and Chalkboard. A light paper switches at night to the one you pick under **At night**.
-- **Drag slips**: drag question slips and the Quick add and Quick note slips by their paper or title bar. Quick slips remember where you left them.
-- **A cat that taps along**: when you type in a Jongi-nyang window, the cat taps with its paws. It never reads or keeps which keys you pressed. Turn it off with **Tap along while typing** in Desk → Jongi-nyang.
+- **Kinds**: Today, This week (Simple · Detailed), This month (Simple · Detailed · Wall calendar) and Today list. Click the + button in Desktop widgets, pick one and click **Add**; it appears at the top right of your screen. You can have two of the same kind.
+- **Day sheet**: shows everything on that day with times, including what didn’t fit (‘+3’). Without a date it goes to the day you clicked. `Enter` adds it and `Tab` switches between to-do and event; `Shift+Enter` adds a to-do, `Ctrl+Enter` an event. `Alt+←` · `Alt+→` go a day back or forward, and `Esc` closes it. After adding, a notice like ‘Added a to-do for Saturday · Undo’ appears.
+- **Widgets don’t tick off to-dos**, so a stray click on your desktop can’t finish one. Click a to-do to see its row in the notepad, or an event to open it in the desk calendar.
+- **Widget menu**: click the ears or right-click the widget. It changes Style, Opacity, Click through and Lock position right away; **Settings…** has the rest.
+- **Opacity**: 20–100% (85% at first). Only the paper fades; the text stays. Each day has its own paper tile, so it stays readable when faint, and hovering makes it solid (**Solid on hover** in its settings). With transparency effects off in Windows, widgets stay solid.
+- **Click through** lets clicks go to the window behind the widget. Hover the ears or hold `Ctrl` to use it again. **Lock position** keeps it from moving when dragged.
+- Widgets sit on the desktop, so clicking another window puts them under it. Turn on **Keep on top** in a widget’s settings to float it above other windows. **Hide calendar widgets** in the tray menu hides them all for a while; **Show calendar widgets** or restarting the app brings them back.
+- Widgets snap to screen edges and to each other. Unplug a monitor and they move to the main screen, then go back when you plug it in again.
+- Widget settings live on this PC only and never go to the shared folder. To-dos in spaces hidden on this PC don’t show on widgets either.
+- Widgets don’t run while idle. They redraw only when the day changes or the next event starts or ends.
 
 </details>
 
 ### Focus on one to-do
 
 Right-click a to-do → **Focus on this**, and the notepad becomes a single card: that to-do and the time left. For a plain timer, the cat holds up a sign anywhere on your screen. Your focus time is saved in History.
+
+| Focus | Pomodoro · break | History · focus |
+| --- | --- | --- |
+| ![Focus card](../docs/screenshots/windows/en/focus.png) | ![Break](../docs/screenshots/windows/en/focus-break.png) | ![History with focus](../docs/screenshots/windows/en/history-focus.png) |
 
 <details>
 <summary>Focus, timers and History in detail</summary>
@@ -176,6 +199,10 @@ Right-click a to-do → **Focus on this**, and the notepad becomes a single card
 - **Timers**: 5 · 15 · 25 · 50 min, **recent lengths** (up to three), **Custom…** and **Pomodoro** (focus · break · long break). Click the sign to pause, drag to move it, right-click for 5 more min · Stop · **Size** (Small · Regular · Large · Extra large). Size only affects the timer window.
 - **Custom**: type `40`, `1:30`, `1h 30m`, `1.5h`, `anderhalf uur` or `1시간 30분` on the little slip by the pointer (any language, 1 minute to 3 hours). It shows the length it understood; `Enter` starts it. The **Custom** field in Desk → Alarms & timers → Start a timer works the same. Pomodoro focus is 1–180 minutes, breaks 1–60. −·+ step by 1 minute (5 with `Shift`), or click the number and type.
 - **History**: finished to-dos move to a monthly history file the next day (adjustable). See the days you got things done as green squares, plus monthly bars and your streak. The **Focus** pane shows your focus time and sessions, focus per day and the **to-dos you focused on longest**. On Sunday evening the cat tells you how many you finished that week.
+
+| Custom timer | Desk · Clock · Alarms | Desk · History |
+| --- | --- | --- |
+| ![Custom timer](../docs/screenshots/windows/en/timer-custom.png) | ![Alarms](../docs/screenshots/windows/en/settings-clock.png) | ![History](../docs/screenshots/windows/history.png) |
 
 </details>
 
@@ -204,9 +231,9 @@ From any app, `Ctrl+Shift+D` slides the **Notes drawer** out from the edge of th
 - **Fonts**: Desk → Notes drawer → **Note font** sets the font (Clean · Pen · Marker · Monospaced), text size, line spacing, paragraph spacing and the code font (Monospaced · D2Coding).
 - **Quick note**: `Ctrl+Alt+M` from anywhere. Write a few lines on a small sheet and `Ctrl+Enter` puts it at the top of the Notes drawer. The folder chip below picks the folder. `Esc` or a click elsewhere closes it and keeps what you wrote, even after a restart. It also opens from the cat’s right-click menu, ⋯ and the tray menu, and can be turned off in Desk → Appearance → Quick add (you’re told if another app already uses the key).
 
-| Four backdrops |
-| --- |
-| ![Backdrops — Solid · Frosted · Clear · None](../docs/screenshots/windows/en/drawer-backdrops.png) |
+| Four backdrops | Quick note |
+| --- | --- |
+| ![Backdrops — Solid · Frosted · Clear · None](../docs/screenshots/windows/en/drawer-backdrops.png) | ![Quick note](../docs/screenshots/windows/en/quick-memo.png) |
 
 </details>
 
@@ -233,7 +260,7 @@ Split your to-dos into spaces like **Work · Home · Study**. Today is still one
 
 | Hide on this device | Group by space |
 | --- | --- |
-| ![Desk → Spaces: Work hidden on this device, Study shown only during weekday hours](../docs/screenshots/windows/device-desk.png) | ![Today grouped into a small card per space](../docs/screenshots/windows/spaces2b-board.png) |
+| ![Desk → Spaces: Work hidden on this device, Study shown only during weekday hours](../docs/screenshots/windows/desk.png) | ![Today grouped into a small card per space](../docs/screenshots/windows/board.png) |
 
 </details>
 
@@ -250,8 +277,9 @@ Turn on **Jongi-nyang for Claude** to see, add and edit to-dos, events and notes
 <details>
 <summary>The AI connection in detail</summary>
 
-- **Turning it on**: in Desk → **AI connection**, switch on ‘Let Claude see and write in Jongi-nyang’. **Connect to Claude Desktop** opens the `jongi-nyang.mcpb` inside the app, and Claude Desktop asks whether to install it. **Copy Claude Code command** copies a command that runs the extension with Jongi-nyang’s own executable instead of Node, so you don’t need Node.js:
-  `claude mcp add jongi-nyang -e ELECTRON_RUN_AS_NODE=1 -- "…\종이냥.exe" "…\resources\mcp\server\index.js"`
+- **Turning it on**: in Desk → **AI connection**, switch on ‘Let Claude see and write in Jongi-nyang’. **Connect to Claude Desktop** opens the `jongi-nyang.mcpb` inside the app, and Claude Desktop asks whether to install it. **Copy Claude Code command** copies a command in which Jongi-nyang’s own executable runs the extension built into the app, so you don’t need Node.js:
+  `claude mcp add jongi-nyang -- "…\종이냥.exe" --mcp-stdio`
+  The older command with `ELECTRON_RUN_AS_NODE=1` still works. To switch to the new one, run `claude mcp remove jongi-nyang` in the folder where you pasted it, then paste the new command.
 - **What it can do**: show today; list to-dos, events, notes, focus sessions and finished to-dos; add to-dos (up to 20 at once), events (no repeats) and notes; edit to-dos and one-time events; see and filter to-dos by space, put new ones in a space and move them after a yes; attach today’s sheet, a week or one note to the conversation. A confirmation number is good for 10 minutes.
 - **Spaces hidden on this PC**: to-dos in a space you hid on this PC (Desk → Spaces) stay out of Claude’s today and lists too, with one line saying how many. Name the space or search and Claude shows them, marked hidden. Finished to-dos all show, as in History.
 - **What it doesn’t do**: delete anything, edit repeating events or alarms, edit notes, or make or delete spaces.
@@ -285,6 +313,8 @@ In Desk → Storage & backup, pick a **shared folder** such as OneDrive, Dropbox
 
 Once a day, and **before** an import, a storage-folder overwrite, a restore or an update, Jongi-nyang leaves an **automatic backup** in this device’s backup folder. Deleted something by mistake? Pick one in Desk → Storage & backup → **Your backups** and restore it. Moving to a new computer takes one **backup file (.jongi)**, Mac ↔ Windows included.
 
+![Desk → Storage & backup](../docs/screenshots/windows/settings-backup.png)
+
 <details>
 <summary>Automatic backups, restoring and exporting in detail</summary>
 
@@ -303,10 +333,17 @@ Once a day, and **before** an import, a storage-folder overwrite, a restore or a
 
 The cat sits above the taskbar breathing, blinking, walking around, sipping tea and dozing when you’re away from the PC. It cheers when you finish a to-do, and now and then asks something like ‘Have you had some water?’ and answers your button. Answer ‘You’ve done a lot. Take five?’ with ‘Break time’ and a 5-minute timer starts. Click the cat in the notification area for the **Today window**.
 
+| Today window | Folded sticky note | Reminder |
+| --- | --- | --- |
+| ![Today window](../docs/screenshots/windows/en/glance-event-soon.png) | ![Little sticky note](../docs/screenshots/windows/floating.png) | ![Reminder](../docs/screenshots/windows/reminder-paper.png) |
+
 <details>
 <summary>The cat, the Today window and the notepad window in detail</summary>
 
 - **Cat talk**: now and then it talks about what’s left today, due dates, the time of day, the weekday and today’s events — ‘‘Team meeting’ is coming up. 10 min to go.’, ‘Is ‘Team meeting’ over? Good job!’. Answer ‘10 min until your next event. Focus for 25 minutes?’ with ‘Let’s go’ and a 25-minute timer starts. It stays quiet while you focus, while a reminder is up, and at night.
+- **Tap-tap cat**: turned on and off apart from the desktop cat. In Desk → Cat → Tap-tap cat, choose Off · **In this app** (the default) · **In all apps** under ‘Tap along’, and one of the four corners of the screen your mouse is on under ‘Corner’ (bottom right at first). With In this app, it comes out in its corner when you type in a Jongi-nyang window and goes a few seconds after you stop. With In all apps, it taps along when you type in Notepad or your browser too. Clicks pass through to the window behind.
+- **Size**: chosen apart for the desktop cat and the tap-tap cat in Desk → Cat (Small · **Regular** · Large · Extra large). It changes at once; the words in the bubble stay the same size.
+- **In all apps and the keyboard hook**: other apps’ keys are heard through a Windows keyboard hook. Keyloggers use the same method and your antivirus may ask about it, so it starts off. All Jongi-nyang knows is that a key was pressed, and when; it never reads or keeps which key or what you typed. Turn it off, lock the PC or quit Jongi-nyang, and it stops at once.
 - **Today window**: click the tray icon and it opens beside the taskbar, wherever the taskbar is. The next event, timer and next alarm show as cards only when there is one, followed by ‘Next’, today’s to-dos (check them off right there) and the input line. Click elsewhere or press `Esc` to close it. Double-click the icon to open the notepad; right-click for the menu.
 - **Hover the tray icon** to see what’s within the hour (‘Jongi-nyang · Dentist 40 min’) or, while a timer runs, the time left (‘Jongi-nyang · 12:30’). With an event within the hour, the face gets a small red dot.
 - **The notepad window**: double-click the top or press `Ctrl+M` to fold it into a little sticky note with the cat peeking out. The × leaves the app in the notification area (tray), still sending reminders. `Ctrl+Alt+J` shows or hides the notepad from anywhere. ⋯ → Dock to the right / left edge (again to put it back), and pasting copied text into a quick note (a setting, off at first).
@@ -317,18 +354,26 @@ The cat sits above the taskbar breathing, blinking, walking around, sipping tea 
 
 ### Calendar, history and settings on one desk
 
-Calendar, History, Alarms & timers, Settings and Help live in one **desk** window. Open it from the desk icon on the notepad or with `Ctrl+D`. When Windows is in dark mode, everything turns to **night paper**.
+Calendar, History, Clock, Settings and Help live in one **desk** window. Open it from the desk icon on the notepad or with `Ctrl+D`. When Windows is in dark mode, everything turns to **night paper**.
+
+| Desk · Appearance | Night paper · notepad | Desk · Help |
+| --- | --- | --- |
+| ![Desk appearance](../docs/screenshots/windows/en/desk-appearance.png) | ![Night paper notepad](../docs/screenshots/windows/en/night-note.png) | ![Help](../docs/screenshots/windows/help-window.png) |
 
 <details>
 <summary>The desk, appearance and language in detail</summary>
 
-- **The desk**: the list on the left has four groups: **View** (Calendar · History) · **Settings** (Appearance · Reminders · Alarms & timers · Repeat · Events · Jongi-nyang) · **Notes & data** (Notes drawer · Spaces · Storage & backup · AI connection) · **Help** (Help · Welcome tour). Inside the desk `Ctrl+1`–`Ctrl+9` go down the list, and `↑` `↓` move in it. Narrower than 820, the list keeps only its icons. It opens at 920 × 640 (760 × 520 at the smallest) and remembers its size and place. There’s only ever one desk; the menus, the tray, the cat, the Today window and a reminder’s ‘Open in calendar’ all open the right pane of it.
+- **The desk**: the list on the left is **View** (Calendar · History · Clock) · **Settings** (Appearance · Reminders · Repeat · Cat · Events · Storage & backup · Notes drawer · Spaces · AI connection) · **Help** (Help · Welcome tour). Inside the desk `Ctrl+1`–`Ctrl+9` go down the list, and `↑` `↓` move in it. Narrower than 820, the list keeps only its icons. It opens at 920 × 640 (760 × 520 at the smallest) and remembers its size and place. There’s only ever one desk; the menus, the tray, the cat, the Today window and a reminder’s ‘Open in calendar’ all open the right pane of it.
 - **Day & night**: Desk → Appearance → **Day & night** (Automatic · Day · Night). Automatic follows Windows’ light or dark mode at once, and every open window (notepad · Today window · slips · reminders · cat · timer · sticky note · desk · drawer) changes with it. Windows start in the paper’s color, so nothing flashes white. Text passes WCAG AA contrast by day and by night.
 - **Notepad font**: Pen · Marker · Clean, in seven text sizes from Small to Extra large.
 - **App language**: **Automatic** uses the first of Korean, English or Dutch among the system’s preferred languages (otherwise English). Menus, the tray, dialogs, Help, the welcome tour, dates and times (English uses a 12-hour clock, Dutch weeks start on Monday), quick add and cat talk all follow. In English and Dutch the handwriting faces are **Caveat** (Pen) and **Kalam** (Marker), with the Korean faces behind them for Hangul.
 - **Search** `Ctrl+F` (⋯ → Search…, top left on the desk): Today, Ahead, notes, History and events in one go. Korean initials work (‘ㅂㄱㅅ’ → 보고서), and English and Dutch ignore case and accents.
 - **Help** `F1` has every topic and a search box. ⋯ → Keyboard shortcuts shows a slip with all the shortcuts.
 - In a short window (480 tall or less) the header gets smaller.
+
+| Desk · Calendar | Night paper · desk | Night paper · Today window |
+| --- | --- | --- |
+| ![Desk calendar](../docs/screenshots/windows/en/desk-calendar.png) | ![Night desk](../docs/screenshots/windows/en/night-desk-calendar.png) | ![Night Today window](../docs/screenshots/windows/en/night-glance.png) |
 
 </details>
 
@@ -438,6 +483,8 @@ The app was run with Electron on macOS to check the screens and the main behavio
 - whether `Ctrl+Shift+0` clashes with the input-language switch keys
 - the 12- or 24-hour clock read from regional settings
 - `Shift+F10` and the menu key
+- the tap-tap cat’s In all apps: tapping along in other apps, no input lag when typing fast, antivirus warnings, and after unlocking (`Win+L`)
+- whether desktop widgets stay behind other windows, how they look after `Win+D`, click-through while `Ctrl` is held, and their backdrop with transparency effects off
 
 ### Differences from the macOS version
 

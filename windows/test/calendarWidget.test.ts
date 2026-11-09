@@ -7,6 +7,7 @@ import {
   agenda, backing, bolder, floorOf, rgbOf, tile, weekendTint, candidateDay, chipParts, dayLines, dots, drawnOpacity, earOpacity, earScale, edgeStrength, emptyText, frameFor, halo, hitTarget,
   inkOnly, inside, monthCell, moreLabel, newPlace, nextRedraw, pageDays, pageOffset, placeOf, quickCandidates, readOpacity, readWidgets, sheetLines,
   sheetTitle, snap, stepDay, upcoming, weekRow, widgetAddedText, widgetName, widgetSize, widgetToday, windowSize, writeWidgets,
+  readScale, scaleFits, scaleName, shownScale, widgetScales,
   type Box, type WidgetKind, type WidgetLine, type WidgetScreen, type WidgetStyle,
 } from "../src/core/calendarWidget";
 import { colorHex, eventColors, type EventColor } from "../src/core/events";
@@ -246,6 +247,40 @@ for (const entry of placeFile.cases) {
   });
 }
 
+// 크기 (#271)
+const scaleFile = file.scale as { steps: number[]; cases: Json[] };
+const near = (got: number, want: number, name: string) => assert.ok(Math.abs(got - want) <= 0.005, `${name}: expected ${want}, got ${got}`);
+test("Z0 네 단계", () => assert.deepEqual([...widgetScales], scaleFile.steps));
+for (const entry of scaleFile.cases) {
+  test(entry.case as string, () => {
+    if (entry.read) assert.deepEqual((entry.read as number[]).map(readScale), entry.want);
+    for (const [scale, ...words] of (entry.names as [number, ...string[]][] | undefined) ?? []) {
+      langs.forEach((lang, index) => assert.equal(scaleName(scale, lang), words[index]));
+    }
+    for (const [kind, style, scale, w, h] of (entry.windows as [WidgetKind, WidgetStyle, number, number, number][] | undefined) ?? []) {
+      const window = windowSize(kind, style, scale);
+      near(window.width, w, `width ${kind} ${style} ${scale}`);
+      near(window.height, h, `height ${kind} ${style} ${scale}`);
+    }
+    if (entry.areas && entry.fits) {
+      for (const [name, area] of Object.entries(entry.areas as Record<string, number[]>)) {
+        for (const [key, want] of Object.entries(entry.fits as Record<string, boolean[]>)) {
+          const [kind, style] = key.split("-") as [WidgetKind, WidgetStyle];
+          assert.deepEqual(widgetScales.map((scale) => scaleFits(kind, style, scale, box(area))), want, `fits ${key} ${name}`);
+        }
+      }
+    }
+    for (const [kind, style, scale, want] of (entry.shown as [WidgetKind, WidgetStyle, number, number][] | undefined) ?? []) {
+      assert.equal(shownScale(scale, kind, style, box(entry.area as number[])), want, `shown ${kind} ${style} ${scale}`);
+    }
+    for (const [scale, want] of (entry.frames as [number, number[]][] | undefined) ?? []) {
+      const window = windowSize(entry.kind as WidgetKind, entry.style as WidgetStyle, scale);
+      const frame = frameFor(place(entry.place as [string, number, number]), window.width, window.height, [{ id: "1", area: box(entry.area as number[]) }]);
+      [frame.x, frame.y, frame.width, frame.height].forEach((got, index) => near(got, want[index], `frame ${scale}`));
+    }
+  });
+}
+
 const chipLine = (candidate: Candidate, now: Date, lang: Lang = "ko") => {
   const parts = chipParts(candidate, now, lang);
   return parts.when ? `${candidate.kind} ${parts.when}` : candidate.kind;
@@ -311,6 +346,7 @@ for (const entry of file.settings as Json[]) {
     const read = readWidgets(entry.read);
     if (entry.ids) assert.deepEqual(read.map((widget) => widget.id), entry.ids);
     if (entry.styles) assert.deepEqual(read.map((widget) => widget.style), entry.styles);
+    if (entry.scales) assert.deepEqual(read.map((widget) => widget.scale), entry.scales);
     if (entry.want) {
       const written = writeWidgets(read);
       assert.deepEqual(JSON.parse(JSON.stringify(written)), entry.want);

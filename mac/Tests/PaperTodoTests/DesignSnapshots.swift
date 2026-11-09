@@ -31,10 +31,10 @@ enum DesignSnapshots {
         SlipMotion.enabled = false
         let output = URL(fileURLWithPath: CommandLine.arguments[1])
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("PaperDesign-\(UUID())")
-        let suite = "PaperTodo.Design.\(UUID())"
-        let preferences = UserDefaults(suiteName: suite)!
+        let suite = TestDefaults("Design")
+        let preferences = suite.defaults
         defer {
-            preferences.removePersistentDomain(forName: suite)
+            suite.remove()
             try? FileManager.default.removeItem(at: folder)
         }
         preferences.set(false, forKey: "reminder.enabled")
@@ -501,9 +501,10 @@ enum DesignSnapshots {
         let controller = ReminderController(model: model, preferences: preferences, onOpen: {})
         let archive = ArchiveStore(model: model)
         func desk(_ pane: DeskPane, _ name: String, size: NSSize = DeskMetrics.size, alarmEditing: String? = nil,
-                  help: (topic: String, query: String)? = nil, week: Bool = false, calendarDay: String? = nil) throws {
+                  help: (topic: String, query: String)? = nil, week: Bool = false, calendarDay: String? = nil, calendarPick: Int? = nil) throws {
             try render(DeskView(state: DeskState(pane: pane), model: model, archive: archive, reminders: controller, previewTitlebar: true,
-                                previewAlarmEditing: alarmEditing, previewHelp: help, previewCalendarWeek: week, previewCalendarDay: calendarDay),
+                                previewAlarmEditing: alarmEditing, previewHelp: help, previewCalendarWeek: week, previewCalendarDay: calendarDay,
+                                previewCalendarPick: calendarPick),
                        size: size, to: output.appendingPathComponent("\(name).png"))
         }
         let full = NSSize(width: DeskMetrics.size.width, height: 1500)
@@ -517,16 +518,18 @@ enum DesignSnapshots {
             try desk(pane, "desk-\(pane.rawValue)")
             try desk(pane, "desk-\(pane.rawValue)-full", size: full)
         }
-        // #230: 글자 칠 때 두드리기 in all apps — allowed (the small cat's corner below), and not allowed (the line and its button).
+        // #289: 타닥냥, its own section — in this app (the default, in desk-pet), in all apps allowed, not allowed,
+        // and off (자리 dimmed). The pet hidden changes nothing there.
         let petWasVisible = model.petVisible
-        model.petVisible = true
-        try desk(.pet, "desk-pet-typing")
-        model.petTyping = .everywhere
-        try desk(.pet, "desk-pet-typing-everywhere")
+        model.petVisible = false
+        model.typingScope = .everywhere
+        try desk(.pet, "desk-pet-typing-everywhere", size: full)
         model.typingNoPermission = true
-        try desk(.pet, "desk-pet-typing-no-permission")
+        try desk(.pet, "desk-pet-typing-no-permission", size: full)
         model.typingNoPermission = false
-        model.petTyping = .app
+        model.typingScope = .off
+        try desk(.pet, "desk-pet-typing-off", size: full)
+        model.typingScope = .app
         model.petVisible = petWasVisible
         // #195: 저장 위치's footnote (a move copies the list there and restarts) on the narrowest desk, and the toast the
         // restarted app shows once (the sample folder's name).
@@ -716,6 +719,16 @@ enum DesignSnapshots {
         model.calendar.showForSnapshot(monthEvents)
         try desk(.calendar, "desk-calendar")
         try desk(.calendar, "desk-calendar-week", week: true)
+        // #275: Tab from the day to its list — the second event has the keys (a sage ring).
+        try desk(.calendar, "desk-calendar-keys", calendarPick: 1)
+        // #296: two daily repeats and a weekday one (with 물 마시기 above) — folded into each day's head, the events keep the lines.
+        let crowdSeries = [
+            model.saveSeries(title: t("스트레칭", "Stretch", "Rekken"), rule: RepeatRule(kind: .daily), remindAt: nil),
+            model.saveSeries(title: t("아침 운동", "Morning workout", "Ochtendtraining"), rule: RepeatRule(kind: .weekdays), remindAt: "07:30"),
+        ].compactMap { $0 }
+        try desk(.calendar, "desk-calendar-repeats")
+        try desk(.calendar, "desk-narrow-calendar-repeats", size: DeskMetrics.minimum)
+        for id in crowdSeries { model.removeSeriesQuietly(id) }
         try desk(.calendar, "desk-narrow-calendar", size: DeskMetrics.minimum)
         try desk(.calendar, "desk-narrow-calendar-week", size: DeskMetrics.minimum, week: true)
         try desk(.calendar, "desk-wide-calendar", size: NSSize(width: 1600, height: 1000))
@@ -987,30 +1000,37 @@ enum DesignSnapshots {
             ("question-eyes", { $0.question = PetChatter.pick(PetChatter.Context(hour: 16, open: 2, done: 1), questions: true, recent: ["q.mood", "q.water", "q.stretch", "q.snack", "q.walk", "q.music", "q.pet"], language: .current, random: { 0.99 }) }),
             ("question-mood", { $0.question = PetChatter.pick(PetChatter.Context(hour: 16, open: 2, done: 1), questions: true, recent: ["q.water", "q.stretch"], language: .current, random: { 0.95 }) }),
         ]
-        // #230: on its cushion — resting between keys, the left paw down, the right paw down.
+        // #289: the typing cat in its corner (its own window, 112 pt) — resting between keys, the left paw down, the right
+        // paw down — drawn at the window's size on the desktop.
         for pose in TypingCat.Pose.allCases {
-            let state = PetState()
-            state.homeX = 150
-            state.typing = pose
-            try render(DesktopPetView(state: state).background(desktop),
-                       size: NSSize(width: 300, height: 250), to: output.appendingPathComponent("pet-typing-\(pose.rawValue).png"))
+            try render(Image(nsImage: PetArt.typing(pose)!).resizable().frame(width: TypingCorner.size, height: TypingCorner.size)
+                .padding(TypingCorner.margin).background(desktop),
+                       size: nil, to: output.appendingPathComponent("typing-cat-\(pose.rawValue).png"))
         }
-        // The small cat over full-screen apps at the three sizes to compare (96 · 112 · 128 pt), each pose.
-        try render(VStack(alignment: .leading, spacing: 10) {
-            ForEach(TypingCat.Pose.allCases, id: \.self) { pose in
-                HStack(alignment: .bottom, spacing: 24) {
-                    ForEach([96, 112, 128] as [CGFloat], id: \.self) { side in
-                        Image(nsImage: PetArt.typing(pose)!).resizable().frame(width: side, height: side)
-                    }
-                }
-            }
-        }.padding(16).background(desktop), size: nil, to: output.appendingPathComponent("pet-typing-sizes.png"))
         for (name, configure) in petStates {
             let state = PetState()
             state.homeX = 150
             configure(state)
             try render(DesktopPetView(state: state).background(desktop),
                        size: NSSize(width: 300, height: 250), to: output.appendingPathComponent("pet-\(name).png"))
+        }
+        // #304: 크기 — the cat sitting, saying a line and asking a question at each size (the strip as tall as the app makes
+        // it), and 타닥냥's window at each size. 보통's are the pictures above, drawn the same way.
+        for size in CatSize.allCases {
+            let side = size.typingSize
+            try render(Image(nsImage: PetArt.typing(.left)!).resizable().frame(width: side, height: side)
+                .padding(TypingCorner.margin).background(desktop),
+                       size: nil, to: output.appendingPathComponent("typing-cat-size-\(size.rawValue).png"))
+            for (name, configure) in petStates where ["sit", "line-wrap", "question-many", "question-edge"].contains(name) {
+                let state = PetState()
+                state.size = size.petSize
+                configure(state)
+                // At the edge: as far right as the app lets this size go (CatSize.clamp).
+                state.homeX = CatSize.clamp(name == "question-edge" ? 360 : 180, width: 360, size: state.size)
+                try render(DesktopPetView(state: state).background(desktop),
+                           size: NSSize(width: 360, height: CatSize.stripHeight(state.size)),
+                           to: output.appendingPathComponent("pet-size-\(size.rawValue)-\(name).png"))
+            }
         }
         // The focus timer, a tag of its own: focusing, resting with a message, and done.
         let timerStates: [(String, (FocusTimerState) -> Void)] = [
@@ -1119,6 +1139,21 @@ enum DesignSnapshots {
         model.page = .ahead
         try render(PaperView(model: model), size: NSSize(width: 350, height: 400), to: output.appendingPathComponent("conv-header-compact-ahead.png"))
         model.page = .todos
+        // 노트 위치 (#273): the note with its pin in each place, and the pins beside what VoiceOver reads (the menu is the
+        // system's: its words are in conv-menus.txt).
+        for layer in NoteLayer.allCases {
+            model.noteLayer = layer
+            try render(PaperView(model: model), size: NSSize(width: 350, height: 400), to: output.appendingPathComponent("note-layer-\(layer.rawValue).png"))
+        }
+        model.noteLayer = .normal
+        try render(VStack(alignment: .leading, spacing: 4) {
+            ForEach(NoteLayer.allCases, id: \.self) { layer in
+                HStack(spacing: 10) {
+                    NoteLayerIcon(layer: layer).frame(width: 26, height: 26)
+                    Text(L("노트 위치") + ", " + layer.title).font(.system(size: 12)).foregroundStyle(PaperTheme.ink).fixedSize()
+                }
+            }
+        }.padding(10).frame(minWidth: 300, alignment: .leading).background(PaperTheme.paper), size: nil, to: output.appendingPathComponent("note-layer-pins.png"))
         // Toasts with 되돌리기.
         for (name, text) in [("deleted", L("할 일을 지웠어요")), ("done", L("\(3)개 끝냈어요")), ("tomorrow", DateMove.movedText(DateMove.tomorrow(now: now), now: now, language: .current)),
                              ("filed", L("\(3)개를 완료 기록으로 옮겼어요")), ("sweep", Sweep.movedText(count: 3, someday: false, language: .current))] {
@@ -1184,6 +1219,7 @@ enum DesignSnapshots {
         lines.append("evening hidden at 18:00 ▸ " + Snooze.options(now: Calendar.current.date(bySettingHour: 18, minute: 0, second: 0, of: now)!).map { $0.title(.current) }.joined(separator: " · "))
         lines.append("Dock ▸ " + [L("빠른 입력"), L("빠른 메모"), L("책상"), L("25분 집중"), L("5분 타이머")].joined(separator: " · "))
         lines.append("⋯ ▸ " + [L("검색…"), L("화면 오른쪽에 붙이기"), L("화면 왼쪽에 붙이기")].joined(separator: " · "))
+        lines.append("pin ▸ " + L("노트 위치") + ": " + NoteLayer.allCases.map(\.title).joined(separator: " · "))
         lines.append(L("시스템 알림으로도 보내기") + " ▸ " + [L("놓친 것만"), L("항상"), String(localized: "끄기", table: "Settings")].joined(separator: " · "))
         lines.append("notification ▸ " + L("종이냥 · 알림") + " [" + L("끝내기") + " · " + L("10분 뒤") + "] · " + L("알람 · \("7:00")") + " [" + L("끄기") + " · " + L("다시 알림") + "]")
         try (lines.joined(separator: "\n") + "\n").write(to: output.appendingPathComponent("conv-menus.txt"), atomically: true, encoding: .utf8)

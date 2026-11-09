@@ -119,8 +119,8 @@ final class TodayWindowController: NSObject {
     var onQuickEntry: () -> Void = {}
     var onSettings: () -> Void = {}
     var timerMenu: () -> NSMenu = { NSMenu() }
-    /// #230: 전체 화면에서 보이기 (in all apps), so the small cat can be put away from a full-screen app.
-    var companionMenuItem: () -> NSMenuItem? = { nil }
+    /// #289: 타닥냥 on or off, reachable from a full-screen app too.
+    var typingCatMenuItem: () -> NSMenuItem? = { nil }
     /// Told whenever the item is brought up to date (the folded icon's summary follows it).
     var onUpdate: () -> Void = {}
 
@@ -257,7 +257,7 @@ final class TodayWindowController: NSObject {
         timers.submenu = timerMenu()
         menu.addItem(timers)
         add(L("설정…")) { [weak self] in self?.onSettings() }
-        if let companion = companionMenuItem() { menu.addItem(companion) }
+        if let typingCat = typingCatMenuItem() { menu.addItem(typingCat) }
         menu.addItem(.separator())
         let quit = NSMenuItem(title: L("종이냥 종료"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         quit.target = NSApp

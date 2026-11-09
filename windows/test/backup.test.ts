@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { backupStatus, countsText, isDue, makeBackup, mergeFiles, notBackup, parseBackup, parseSavedName, pruneSaved, replaceFiles, savedName, savedWhen, sizeText, summary, summaryText, tooNew, unreadable, type BackupFiles } from "../src/core/backup";
@@ -11,10 +10,11 @@ import { serializeNotebook, type TodoItem } from "../src/core/notebook";
 import { serializeSeries } from "../src/core/repeat";
 import { importInto, leftoverFiles, moveData, readDataFiles, removeLeftovers, saveBeforeImport, writeDataFiles } from "../src/main/storageFolder";
 import { Store } from "../src/main/store";
+import { temporaryFolder } from "./temporaryFolder";
 
 // 백업 · 옮기기 (spec §2): the same cases as the macOS app, then whole folders exported and imported.
 
-const temporary = () => fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-backup-"));
+const temporary = () => temporaryFolder("paper-todo-backup-");
 const uuid = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const task = (n: number, title: string): TodoItem => ({ id: uuid(n), title, isCompleted: false, createdAt: "2026-10-01T09:00:00Z" });
 const todos = (...items: TodoItem[]) => serializeNotebook({ items });

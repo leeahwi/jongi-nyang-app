@@ -8,12 +8,26 @@ public enum CalendarMonth {
     /// A to-do on a day: its alert time, or its deadline.
     public struct DayTask: Equatable, Sendable {
         /// `range` (1.39): a to-do's time on that day, drawn as an outlined block; `time` is its range.
-        public enum Kind: String, Sendable { case reminder, deadline, range }
+        /// `repeating` (#274): a day a repeating to-do comes back on (`repeats`).
+        public enum Kind: String, Sendable { case reminder, deadline, range, repeating = "repeat" }
         public var title: String
         public var kind: Kind
         /// "HH:mm" for an alert.
         public var time: String?
-        public var taskId: UUID
+        /// The to-do; for a repeat, its open copy (nil while today's is done: the line opens the rule).
+        public var taskId: UUID?
+        /// #274: a repeat's rule.
+        public var seriesId: String? = nil
+        /// #274: a repeat after the next one, drawn faded.
+        public var ahead = false
+        /// #274: a repeat's alert time as written in its rule, "HH:mm" (the widgets' lines go by it).
+        public var remindAt: String? = nil
+        /// #296: a repeat's kind of rule (매일 · 평일 · 매주 · 매달).
+        public var rule: RepeatKind? = nil
+
+        /// #296: a faded repeat that comes back every day or every weekday — a month cell doesn't write its name but counts it
+        /// in its head (`folded`). The next one (solid) and weekly · monthly ones keep their line.
+        public var folds: Bool { kind == .repeating && ahead && (rule == .daily || rule == .weekdays) }
     }
 
     /// One line in a month cell.
@@ -243,11 +257,83 @@ public enum CalendarMonth {
         return found
     }
 
+    /// #274: the days a repeating to-do comes back on among `days`, from the note's today (4 a.m.) on — each a `repeating`
+    /// line with the rule's title and alert time. The next one is drawn as usual and the ones after it faded (`ahead`);
+    /// where the open copy already shows on today or later (its alert, deadline or time), the copy is the next one and
+    /// every repeat is faded. A day the copy shows on has no repeat (it isn't drawn twice), and once today's copy is done
+    /// (placed today, none open) the repeats start tomorrow. A line opens the open copy (`taskId`), or the rule when there
+    /// is none. Each day's repeats go by their time, then title (no time last). Same rule and shared cases as Windows
+    /// (calendar.ts `repeatsOn`, docs/plans/calendar-flows-cases.json `repeats`).
+    public static func repeats(on days: Set<String>, series: [Series], tasks: [TodoItem], now: Date, ranges: Bool = true,
+                               calendar: Calendar = .paper, language: AppLanguage = .ko) -> [String: [DayTask]] {
+        guard !series.isEmpty else { return [:] }
+        let today = Archive.dayKey(now, calendar: calendar)
+        let wanted = days.filter { $0 >= today }
+        guard !wanted.isEmpty, let last = wanted.max() else { return [:] }
+        var open: [String: TodoItem] = [:]
+        for task in tasks where !task.isCompleted {
+            if let id = task.seriesID, open[id] == nil { open[id] = task }
+        }
+        // The days from today to the last one asked about, worked out once for every rule: weekday (0 = Sunday), day of the
+        // month and the month's last day (Repeat.occurs, without a calendar call per rule and day).
+        var span: [(key: String, weekday: Int, day: Int, lastDay: Int)] = []
+        var moment = date(today, calendar: calendar), month = -1, lastDay = 31
+        while true {
+            let key = CalendarDraft.day(moment, calendar: calendar)
+            guard key <= last, span.count < 750 else { break }
+            let parts = calendar.dateComponents([.weekday, .day, .month], from: moment)
+            if parts.month! != month {
+                month = parts.month!
+                lastDay = calendar.range(of: .day, in: .month, for: moment)?.count ?? 31
+            }
+            span.append((key, parts.weekday! - 1, parts.day!, lastDay))
+            moment = calendar.date(byAdding: .day, value: 1, to: moment)!
+        }
+        var found: [String: [(minutes: Int, task: DayTask)]] = [:]
+        for entry in series where Repeat.isValid(entry.rule) {
+            let copy = open[entry.id]
+            // The days the open copy is drawn on already.
+            var shown: Set<String> = []
+            if let copy {
+                if let due = copy.dueDate { shown.insert(due) }
+                if let at = copy.reminderAt { shown.insert(CalendarDraft.day(at, calendar: calendar)) }
+                if ranges, copy.timeRange != nil, let day = TimeBlock.day(of: copy, now: now, calendar: calendar) { shown.insert(day) }
+            }
+            let copyAhead = shown.contains { $0 >= today }
+            let rule = entry.rule
+            func occurs(_ day: (key: String, weekday: Int, day: Int, lastDay: Int)) -> Bool {
+                switch rule.kind {
+                case .daily: true
+                case .weekdays: (1...5).contains(day.weekday)
+                case .weekly: (rule.weekdays ?? []).contains(day.weekday)
+                case .monthly: day.day == min(rule.monthDay ?? 1, day.lastDay)
+                }
+            }
+            let parts = entry.remindAt?.split(separator: ":").compactMap { Int($0) }
+            let clock = parts.flatMap { $0.count == 2 ? language.clock(hour: $0[0], minute: $0[1]) : nil }
+            let minutes = parts.flatMap { $0.count == 2 ? $0[0] * 60 + $0[1] : nil } ?? Int.max
+            // From today, or tomorrow once today's is done. The first day it occurs is the next one; when that is past the
+            // last day asked about, none of them is drawn anyway.
+            var next: String?
+            for day in span.dropFirst(entry.lastPlaced == today && copy == nil ? 1 : 0) where occurs(day) {
+                if next == nil { next = day.key }
+                guard wanted.contains(day.key), !shown.contains(day.key) else { continue }
+                found[day.key, default: []].append((minutes, DayTask(title: entry.title, kind: .repeating, time: clock, taskId: copy?.id,
+                                                                     seriesId: entry.id, ahead: copyAhead || day.key != next,
+                                                                     remindAt: clock == nil ? nil : entry.remindAt, rule: rule.kind)))
+            }
+        }
+        return found.mapValues { list in
+            list.sorted { $0.minutes != $1.minutes ? $0.minutes < $1.minutes : $0.task.title < $1.task.title }.map(\.task)
+        }
+    }
+
     /// What a month cell shows: the day's events, then its deadlines, then its reminders (#227); the first `limit` and how
     /// many more.
-    public static func cellItems(_ day: String, events: [CalendarEvent], tasks: [TodoItem], limit: Int = 3,
-                                 calendar: Calendar = .paper, language: AppLanguage = .ko) -> (items: [CellItem], more: Int) {
-        Page(days: [day], events: events, tasks: tasks, ranges: false, calendar: calendar, language: language).cell(day, limit: limit)
+    public static func cellItems(_ day: String, events: [CalendarEvent], tasks: [TodoItem], series: [Series] = [], now: Date = Date(),
+                                 limit: Int = 3, folding: Bool = false, calendar: Calendar = .paper, language: AppLanguage = .ko) -> (items: [CellItem], more: Int) {
+        Page(days: [day], events: events, tasks: tasks, series: series, now: now, ranges: false, calendar: calendar, language: language)
+            .cell(day, limit: limit, folding: folding)
     }
 
     /// A week row's to-dos (#227, as the month cell's order): the deadlines first, then the alerts and time ranges by time —
@@ -258,12 +344,55 @@ public enum CalendarMonth {
 
     /// A to-do line's tooltip in a month cell or a week row (#227): "알림 15:00 · 치과 예약", "마감 · 보고서 쓰기",
     /// "14:00–15:30 · 운동" — en "Reminder 3:00 PM · …", "Due · …"; nl "Herinnering 15:00 · …", "Deadline · …".
+    /// #274: "반복 예정 09:00 · 분리수거" (the next one "반복 09:00 · …") — en "Upcoming repeat …", "Repeat …";
+    /// nl "Komende herhaling …", "Herhaling …".
     public static func tooltip(_ task: DayTask, language: AppLanguage = .ko) -> String {
         switch task.kind {
         case .reminder: ["알림", "Reminder", "Herinnering"][language.index] + " \(task.time ?? "") · \(task.title)"
         case .deadline: ["마감", "Due", "Deadline"][language.index] + " · \(task.title)"
         case .range: "\(task.time ?? "") · \(task.title)"
+        case .repeating: repeatWord(ahead: task.ahead, language: language) + (task.time.map { " " + $0 } ?? "") + " · \(task.title)"
         }
+    }
+
+    /// #274: what a repeat's line is: "반복 예정" (faded) or "반복" (the next one) — en "Upcoming repeat" · "Repeat";
+    /// nl "Komende herhaling" · "Herhaling".
+    public static func repeatWord(ahead: Bool, language: AppLanguage = .ko) -> String {
+        ahead ? ["반복 예정", "Upcoming repeat", "Komende herhaling"][language.index] : ["반복", "Repeat", "Herhaling"][language.index]
+    }
+
+    /// #274: a repeat's spoken name: "분리수거, 오전 9:00, 반복 예정" — en "Recycling, 9:00 AM, upcoming repeat".
+    public static func spoken(_ task: DayTask, language: AppLanguage = .ko) -> String {
+        guard task.kind == .repeating else { return tooltip(task, language: language) }
+        let word = repeatWord(ahead: task.ahead, language: language)
+        return ([task.title] + (task.time.map { [$0] } ?? []) + [language == .ko ? word : word.lowercased()]).joined(separator: ", ")
+    }
+
+    /// #296: what a month cell's head says for the repeats it folds — "매일 반복 2개", "평일 반복 1개", "매일 · 평일 반복 3개";
+    /// en "2 daily repeats", "1 weekday repeat", "3 daily and weekday repeats"; nl "2 dagelijkse herhalingen",
+    /// "1 doordeweekse herhaling", "3 dagelijkse en doordeweekse herhalingen". The screen reader reads it; nil for none.
+    public static func foldedLabel(_ tasks: [DayTask], language: AppLanguage = .ko) -> String? {
+        guard !tasks.isEmpty else { return nil }
+        let daily = tasks.contains { $0.rule == .daily }, weekdays = tasks.contains { $0.rule == .weekdays }
+        let n = tasks.count, one = n == 1
+        switch language {
+        case .ko: return (daily && weekdays ? "매일 · 평일" : daily ? "매일" : "평일") + " 반복 \(n)개"
+        case .en: return "\(n) " + (daily && weekdays ? "daily and weekday" : daily ? "daily" : "weekday") + (one ? " repeat" : " repeats")
+        case .nl: return "\(n) " + (daily && weekdays ? "dagelijkse en doordeweekse" : daily ? "dagelijkse" : "doordeweekse") + (one ? " herhaling" : " herhalingen")
+        }
+    }
+
+    /// #296: the folded repeats' tooltip — the label, then each one's time and name a line: "매일 반복 2개\n08:00 약 먹기\n물 마시기".
+    public static func foldedTooltip(_ tasks: [DayTask], language: AppLanguage = .ko) -> String? {
+        guard let label = foldedLabel(tasks, language: language) else { return nil }
+        return ([label] + tasks.map { task in task.time.map { "\($0) \(task.title)" } ?? task.title }).joined(separator: "\n")
+    }
+
+    /// #296: whether a month cell's line may take a spare line (`twoLineTitles`): not a faded repeat — the spare lines go to
+    /// the events and to-dos first.
+    public static func mayWrap(_ item: CellItem) -> Bool {
+        if case .task(let task) = item, task.kind == .repeating, task.ahead { return false }
+        return true
     }
 
     /// A page of the calendar worked out once (#68): each day's events (`eventsOn`), to-dos (`dayTasks`) and month
@@ -276,14 +405,17 @@ public enum CalendarMonth {
         private var deadlines: [String: [DayTask]] = [:]
         /// #227: and the ones whose reminder is that day, by time (a to-do due the same day shows once, as its deadline).
         private var reminders: [String: [DayTask]] = [:]
+        /// #274: the days the repeating to-dos come back on (`repeats`), after the day's other to-dos.
+        private var repeats: [String: [DayTask]] = [:]
 
         /// `days`: every day asked about later (the page's, and the chosen one); another day has nothing.
-        /// `ranges: false`: the cells only (no day's own to-dos).
-        public init(days: [String], events: [CalendarEvent], tasks: [TodoItem], now: Date = Date(), ranges: Bool = true,
+        /// `ranges: false`: the cells only (no day's own to-dos). `series`: the repeating to-dos (#274).
+        public init(days: [String], events: [CalendarEvent], tasks: [TodoItem], series: [Series] = [], now: Date = Date(), ranges: Bool = true,
                     calendar: Calendar = .paper, language: AppLanguage = .ko) {
             let wanted = Set(days)
             for day in wanted { self.events[day] = CalendarMonth.eventsOn(day, events, calendar: calendar) }
             if ranges { self.tasks = CalendarMonth.dayTasks(on: wanted, tasks, now: now, calendar: calendar, language: language) }
+            repeats = CalendarMonth.repeats(on: wanted, series: series, tasks: tasks, now: now, ranges: ranges, calendar: calendar, language: language)
             // One pass for the cells, as for the day's own to-dos (#68).
             var alerts: [String: [(Date, DayTask)]] = [:]
             for task in tasks where !task.isCompleted {
@@ -304,17 +436,59 @@ public enum CalendarMonth {
         }
 
         public func events(on day: String) -> [CalendarEvent] { events[day] ?? [] }
-        public func tasks(on day: String) -> [DayTask] { tasks[day] ?? [] }
+        /// The day's to-dos (`dayTasks`), then its repeats (#274).
+        public func tasks(on day: String) -> [DayTask] { (tasks[day] ?? []) + (repeats[day] ?? []) }
 
         /// A week row's to-dos: `weekOrder` of the day's.
         public func weekTasks(on day: String) -> [DayTask] { CalendarMonth.weekOrder(tasks(on: day)) }
 
         /// What a month cell shows: the day's events, then its deadlines, then its reminders (#227: the title only, the
-        /// time is in the tooltip); the first `limit` and how many more.
-        public func cell(_ day: String, limit: Int = 3) -> (items: [CellItem], more: Int) {
+        /// time is in the tooltip), then its repeats (#274: the first to go into +N); the first `limit` and how many more.
+        /// `folding` (#296, the month's cells): without the faded daily · weekday repeats, which the head counts (`folded`).
+        public func cell(_ day: String, limit: Int = 3, folding: Bool = false) -> (items: [CellItem], more: Int) {
             let all = events(on: day).map(CellItem.event) + (deadlines[day] ?? []).map(CellItem.task) + (reminders[day] ?? []).map(CellItem.task)
+                + (repeats[day] ?? []).filter { !folding || !$0.folds }.map(CellItem.task)
             return (Array(all.prefix(limit)), max(0, all.count - limit))
         }
+
+        /// #296: the day's faded daily · weekday repeats, which a month cell folds into its head (a mark and how many).
+        public func folded(_ day: String) -> [DayTask] { (repeats[day] ?? []).filter(\.folds) }
+    }
+
+    // MARK: 날 목록을 키보드로 (#275)
+
+    /// A key in the desk calendar while the day or its list has the keys.
+    public enum ListKey: String, Sendable { case tab, backTab, up, down, enter, escape, other }
+
+    /// What a key does (#275): `picked` is the day list's event the keys are on (nil: the days have them), `count` the
+    /// day's events. From the days, Tab goes to the first event (with none it passes on). In the list, ↑ ↓ move (they stop
+    /// at the ends), Tab · ⇧Tab go to the next · previous and past the ends back to the days, Return opens the event
+    /// (`open`), Esc goes back to the days. Another key goes back to the days and is theirs (`handled: false`: ← → T move
+    /// the day as before). Same keys and shared cases as Windows (calendar.ts `listKey`).
+    public static func listKey(_ key: ListKey, picked: Int?, count: Int) -> (picked: Int?, open: Int?, handled: Bool) {
+        guard let current = picked.map({ min($0, count - 1) }), current >= 0 else {
+            return key == .tab && count > 0 ? (0, nil, true) : (nil, nil, false)
+        }
+        switch key {
+        case .down: return (min(current + 1, count - 1), nil, true)
+        case .up: return (max(current - 1, 0), nil, true)
+        case .tab: return (current + 1 < count ? current + 1 : nil, nil, true)
+        case .backTab: return (current > 0 ? current - 1 : nil, nil, true)
+        case .enter: return (current, current, true)
+        case .escape: return (nil, nil, true)
+        case .other: return (nil, nil, false)
+        }
+    }
+
+    /// #275: an event row's spoken name — "디자인 리뷰, 14:00–15:00, 일정 3개 중 1번째"; en "Design review, 2:00–3:00 PM,
+    /// event 1 of 3"; nl "Ontwerpbespreking, 14:00–15:00, afspraak 1 van 3".
+    public static func eventLabel(title: String, time: String, index: Int, count: Int, language: AppLanguage = .ko) -> String {
+        let place = switch language {
+        case .ko: "일정 \(count)개 중 \(index + 1)번째"
+        case .en: "event \(index + 1) of \(count)"
+        case .nl: "afspraak \(index + 1) van \(count)"
+        }
+        return "\(title), \(time), \(place)"
     }
 
     /// 새 일정 on a day: the next half hour if it's today (21:00 once that runs into tomorrow), else 09:00.

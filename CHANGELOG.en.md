@@ -8,6 +8,7 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 
 | Phase | Milestone | Mac | Windows |
 | --- | --- | --- | --- |
+| Widen | [Tap-tap cat · sizes to pick](#tap-tap-cat--sizes-to-pick) | 1.49.0 | 1.34.0 |
 | Widen | [Desktop calendar widgets · fifteen papers](#desktop-calendar-widgets--fifteen-papers) | 1.48.0 | 1.33.0 |
 | Widen | [Spaces per device · a new Today window](#spaces-per-device--a-new-today-window) | 1.47.0 | 1.32.0 |
 | Widen | [Group by space · automatic backups](#group-by-space--automatic-backups) | 1.45.1 – 1.46.0 | 1.30.1 – 1.31.0 |
@@ -40,6 +41,19 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 | Mac | [From a first notepad to the cat](#from-a-first-notepad-to-the-cat) | 1.0 – 1.10 | — |
 
 ---
+
+## Tap-tap cat · sizes to pick
+
+**Mac 1.49.0 · Windows 1.34.0** — the cat that taps while you type is now separate from the desktop cat, and you can pick the size of the cats and widgets from four steps. The shared case files in `docs/plans/` that both apps read are now twenty-two (new: cat sizes).
+
+![November in the Desk calendar: ⟲ and a repeat count sit next to the day numbers, and the cell lines go to events and to-dos](docs/screenshots/mac/en/desk-calendar-repeats.png)
+
+- **Tap-tap cat** — type, and a cat in a corner of the screen leans on its cushion and taps with its paws. Turn it on and off apart from the desktop cat, and pick In this app · In all apps and its corner. On Windows too, In all apps makes it tap along in other apps. It never reads or keeps which keys you pressed.
+- **Sizes to pick** — pick Small · Regular · Large · Extra large for the desktop cat, the tap-tap cat and each calendar widget. Regular is pixel for pixel what it was.
+- **A notepad on the desktop** — the notepad pin picks Regular · Keep on top · On the desktop. Widgets on Windows now stay behind other windows even when clicked.
+- **Repeats on the calendar** — repeating to-dos show faintly on every day they come back, and daily and weekday repeats fold into ⟲ and a count next to the date so they don't fill the cell. The lunar date on the date line shortens to ‘10.1’ instead of being cut off.
+- **Open events with the keyboard** — in the Desk calendar, pick a day, press Tab to reach its events and Return (Enter on Windows) to open one.
+- **Lighter** — on the Mac, moving the mouse while you work in other apps uses almost no CPU. On Windows, the Claude Code connection no longer uses the Jongi-nyang program as Node.
 
 ## Desktop calendar widgets · fifteen papers
 

@@ -21,6 +21,9 @@ case "$out" in --*) out="$repo/.build/ai-check";; esac
 build=1
 for arg in "$@"; do [ "$arg" = "--no-build" ] && build=0; done
 bundle_id=com.noa.PaperTodo.LiveTest
+# #278: never the real app's com.noa.PaperTodo (its settings and data folder share this name).
+source "$repo/scripts/lib/test-defaults.sh"
+test_defaults_require "$bundle_id"
 mcp_dist="${PAPERTODO_MCP_DIST:-$repo/../windows/mcp/dist}"
 sdk="${PAPERTODO_MCP_SDK:-$repo/../windows/node_modules/@modelcontextprotocol/sdk}"
 mkdir -p "$out"
@@ -74,7 +77,7 @@ cleanup() {
     stop
     rm -rf "$storage" "$HOME/Library/Saved Application State/$bundle_id.savedState" \
         "$HOME/Library/Caches/$bundle_id" "$HOME/Library/HTTPStorages/$bundle_id"
-    defaults delete "$bundle_id" >/dev/null 2>&1 || true
+    test_defaults_remove "$bundle_id"
 }
 trap cleanup EXIT
 

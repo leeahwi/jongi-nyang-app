@@ -364,12 +364,66 @@ private enum CalendarWidgetTests {
                 let read = CalendarWidget.read(entry["read"])
                 if let ids = entry["ids"] as? [String] { try equal(read.map(\.id), ids, "ids") }
                 if let styles = entry["styles"] as? [String] { try equal(read.map(\.style.rawValue), styles, "styles") }
+                if let scales = entry["scales"] as? [Double] { try equal(read.map(\.scale), scales, "scales") }
                 if let want = entry["want"] as? [[String: Any]] {
                     let written = CalendarWidget.write(read)
                     let a = try JSONSerialization.data(withJSONObject: written, options: [.sortedKeys])
                     let b = try JSONSerialization.data(withJSONObject: want, options: [.sortedKeys])
                     try equal(String(data: a, encoding: .utf8)!, String(data: b, encoding: .utf8)!, "settings")
                     try equal(CalendarWidget.read(written), read, "round trip")
+                }
+            }
+        }
+
+        // 크기 (#271)
+        let scaleFile = file["scale"] as! [String: Any]
+        try equal(CalendarWidget.scales, scaleFile["steps"] as! [Double], "steps")
+        func near(_ a: Double, _ b: Double, _ name: String) throws {
+            if abs(a - b) > 0.005 { throw TestFailure(description: "\(name): expected \(b), got \(a)") }
+        }
+        func kindStyle(_ text: String) -> (CalendarWidget.Kind, CalendarWidget.Style) {
+            let parts = text.split(separator: "-").map(String.init)
+            return (CalendarWidget.Kind(rawValue: parts[0])!, CalendarWidget.Style(rawValue: parts[1])!)
+        }
+        for entry in scaleFile["cases"] as! [[String: Any]] {
+            try test(entry["case"] as! String) {
+                if let read = entry["read"] as? [Double] { try equal(read.map(CalendarWidget.scale), entry["want"] as! [Double], "read") }
+                for row in entry["names"] as? [[Any]] ?? [] {
+                    for (i, language) in AppLanguage.allCases.enumerated() {
+                        try equal(CalendarWidget.scaleName(row[0] as! Double, language), row[1 + i] as! String, "name")
+                    }
+                }
+                for row in entry["windows"] as? [[Any]] ?? [] {
+                    let kind = CalendarWidget.Kind(rawValue: row[0] as! String)!, style = CalendarWidget.Style(rawValue: row[1] as! String)!
+                    let window = CalendarWidget.windowSize(kind, style, scale: row[2] as! Double)
+                    try near(window.width, row[3] as! Double, "width \(kind) \(style) \(row[2])")
+                    try near(window.height, row[4] as! Double, "height \(kind) \(style) \(row[2])")
+                }
+                if let areas = entry["areas"] as? [String: [Double]], let fits = entry["fits"] as? [String: [Bool]] {
+                    for (name, a) in areas {
+                        let area = CalendarWidget.Rect(x: a[0], y: a[1], width: a[2], height: a[3])
+                        for (key, want) in fits {
+                            let (kind, style) = kindStyle(key)
+                            try equal(CalendarWidget.scales.map { CalendarWidget.fits(kind, style, scale: $0, area: area) }, want, "fits \(key) \(name)")
+                        }
+                    }
+                }
+                if let shown = entry["shown"] as? [[Any]] {
+                    let area = rect(entry["area"]!)
+                    for row in shown {
+                        let kind = CalendarWidget.Kind(rawValue: row[0] as! String)!, style = CalendarWidget.Style(rawValue: row[1] as! String)!
+                        try equal(CalendarWidget.shownScale(row[2] as! Double, kind, style, area: area), row[3] as! Double, "shown \(kind) \(style) \(row[2])")
+                    }
+                }
+                if let frames = entry["frames"] as? [[Any]] {
+                    let kind = CalendarWidget.Kind(rawValue: entry["kind"] as! String)!, style = CalendarWidget.Style(rawValue: entry["style"] as! String)!
+                    let screen = CalendarWidget.Screen(id: "1", area: rect(entry["area"]!))
+                    for row in frames {
+                        let window = CalendarWidget.windowSize(kind, style, scale: row[0] as! Double)
+                        let frame = CalendarWidget.frame(place(entry["place"]!), width: window.width, height: window.height, screens: [screen])
+                        let want = row[1] as! [Double]
+                        for (got, value) in zip([frame.x, frame.y, frame.width, frame.height], want) { try near(got, value, "frame \(row[0])") }
+                    }
                 }
             }
         }

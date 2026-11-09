@@ -1,5 +1,6 @@
-import { logicalDayStart } from "./archive";
+import { dayKey as logicalDayKey, logicalDayStart } from "./archive";
 import type { EventColor, EventRepeat } from "./events";
+import { isValidRule, occursOn, type RepeatKind, type Series } from "./repeat";
 import { rangeOf, rangeText } from "./timeRange";
 import { clock, days as dayCount, langIndex, longDate, minutesAway, monthTitle as monthTitleIn, plural, shortDate, timeRange, weekdayLetter, weekdayOrder, weekStartsMonday, weekTitle as weekTitleIn, type Lang } from "./lang";
 
@@ -468,10 +469,27 @@ export function agendaTime(event: CalendarEvent, day: string, lang: Lang = "ko")
   return range(event.start, event.end, lang);
 }
 
-/** A task on a day: its deadline, its alert (with the time), or its hours (시간 정하기: "14:00–15:30"; `due` when it is that day's deadline too). */
-export interface DayTask { title: string; kind: "deadline" | "reminder" | "range"; time?: string; taskId: string; due?: boolean; /** A range's start alone ("14:00", the week rows' time column). */ start?: string }
+/**
+ * A task on a day: its deadline, its alert (with the time), or its hours (시간 정하기: "14:00–15:30"; `due` when it is that day's
+ * deadline too). #274 `repeat`: a day a repeating to-do comes back on (`repeatsOn`) — `taskId` its open copy ("" while today's
+ * is done: the line opens the rule), `series` its rule, `ahead` after the next one (faded), `remindAt` the rule's alert "HH:mm".
+ */
+export interface DayTask {
+  title: string; kind: "deadline" | "reminder" | "range" | "repeat"; time?: string; taskId: string; due?: boolean;
+  /** A range's start alone ("14:00", the week rows' time column). */ start?: string;
+  series?: string; ahead?: boolean; remindAt?: string;
+  /** #296: a repeat's kind of rule (매일 · 평일 · 매주 · 매달). */
+  rule?: RepeatKind;
+}
 
-type TaskLike = { id: string; title: string; isCompleted: boolean; dueDate?: string; reminderAt?: string; timeStart?: string; timeEnd?: string; shelf?: "later" | "today" };
+/**
+ * #296: a faded repeat that comes back every day or every weekday — a month cell doesn't write its name but counts it in its
+ * head (`foldedRepeats`). The next one (solid) and weekly · monthly ones keep their line. Same as DayTask.folds on the Mac.
+ */
+export const folds = (task: DayTask): boolean => task.kind === "repeat" && Boolean(task.ahead) && (task.rule === "daily" || task.rule === "weekdays");
+
+/** #274: a repeat's day as the calendar's to-dos carry it (`repeatItems`): a stand-in due that day, drawn as its line. */
+type TaskLike = { id: string; title: string; isCompleted: boolean; dueDate?: string; reminderAt?: string; timeStart?: string; timeEnd?: string; shelf?: "later" | "today"; seriesID?: string; repeatLine?: DayTask };
 
 /**
  * Unfinished tasks due that day or alerting that day (a task with both shows once, as its
@@ -481,8 +499,11 @@ type TaskLike = { id: string; title: string; isCompleted: boolean; dueDate?: str
 export function dayTasks(day: string, tasks: readonly TaskLike[], lang: Lang = "ko", today?: string): DayTask[] {
   const reminders: (DayTask & { at: number })[] = [];
   const deadlines: DayTask[] = [];
+  // #274: the day's repeats after its to-dos (they come in their order).
+  const repeats: DayTask[] = [];
   for (const task of tasks) {
     if (task.isCompleted) continue;
+    if (task.repeatLine) { if (task.dueDate === day) repeats.push(task.repeatLine); continue; }
     // 시간 정하기: a task with hours on this day (its deadline, or `today` for one on today's sheet) shows them, once.
     const hours = rangeOf(task);
     if (hours && (task.dueDate ?? (task.shelf === "later" ? undefined : today)) === day) {
@@ -498,7 +519,79 @@ export function dayTasks(day: string, tasks: readonly TaskLike[], lang: Lang = "
   }
   reminders.sort((a, b) => a.at - b.at || before(a.title, b.title));
   deadlines.sort((a, b) => before(a.title, b.title));
-  return [...reminders.map(({ at: _at, ...task }) => task), ...deadlines];
+  return [...reminders.map(({ at: _at, ...task }) => task), ...deadlines, ...repeats];
+}
+
+/**
+ * #274: the days a repeating to-do comes back on among `days`, from the note's today (4 a.m.) on — each a `repeat` line with
+ * the rule's title and alert time. The next one is drawn as usual and the ones after it faded (`ahead`); where the open copy
+ * already shows on today or later (its alert, deadline or hours), the copy is the next one and every repeat is faded. A day
+ * the copy shows on has no repeat (it isn't drawn twice), and once today's copy is done (placed today, none open) the repeats
+ * start tomorrow. A line opens the open copy (`taskId`), or the rule when there is none. Each day's repeats go by their
+ * time, then title (no time last). Same rule and shared cases as the Mac (CalendarMonth.repeats,
+ * docs/plans/calendar-flows-cases.json `repeats`).
+ */
+export function repeatsOn(days: Iterable<string>, series: readonly Series[], tasks: readonly TaskLike[], now: Date, lang: Lang = "ko"): Map<string, DayTask[]> {
+  const found = new Map<string, { minutes: number; task: DayTask }[]>();
+  if (series.length === 0) return new Map();
+  const today = logicalDayKey(now);
+  const wanted = new Set([...days].filter((day) => day >= today));
+  if (wanted.size === 0) return new Map();
+  const last = [...wanted].sort().pop()!;
+  const open = new Map<string, TaskLike>();
+  for (const task of tasks) {
+    if (!task.isCompleted && task.seriesID && !open.has(task.seriesID)) open.set(task.seriesID, task);
+  }
+  for (const entry of series) {
+    if (!isValidRule(entry.rule)) continue;
+    const copy = open.get(entry.id);
+    // The days the open copy is drawn on already.
+    const shown = new Set<string>();
+    if (copy) {
+      if (copy.dueDate) shown.add(copy.dueDate);
+      const at = copy.reminderAt ? new Date(copy.reminderAt) : undefined;
+      if (at && !Number.isNaN(at.getTime())) shown.add(dateKey(at));
+      const hoursDay = copy.dueDate ?? (copy.shelf === "later" ? undefined : today);
+      if (rangeOf(copy) && hoursDay) shown.add(hoursDay);
+    }
+    const copyAhead = [...shown].some((day) => day >= today);
+    const parts = entry.remindAt?.split(":").map(Number);
+    const timed = parts?.length === 2 && parts.every(Number.isInteger);
+    const time = timed ? clock(parts![0], parts![1], lang) : undefined;
+    const minutes = timed ? parts![0] * 60 + parts![1] : Number.MAX_SAFE_INTEGER;
+    const first = entry.lastPlaced === today && !copy ? 1 : 0;
+    const start = localDate(today)!;
+    let next: string | undefined;
+    // Day by day from the first one on to the last day asked about (within two years, as nextOccurrence).
+    for (let step = first; step < first + 750; step += 1) {
+      const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + step);
+      const day = dateKey(date);
+      if (day > last && next) break;
+      if (!occursOn(entry.rule, date)) continue;
+      next ??= day;
+      if (!wanted.has(day) || shown.has(day)) continue;
+      const line: DayTask = {
+        title: entry.title, kind: "repeat", ...(time ? { time, remindAt: entry.remindAt } : {}), taskId: copy?.id ?? "", series: entry.id,
+        ahead: copyAhead || day !== next, rule: entry.rule.kind,
+      };
+      found.set(day, [...(found.get(day) ?? []), { minutes, task: line }]);
+    }
+  }
+  return new Map([...found].map(([day, list]) => [day, list.sort((a, b) => a.minutes - b.minutes || before(a.task.title, b.task.title)).map((entry) => entry.task)]));
+}
+
+/**
+ * #274: the repeats of `days` as the calendar's to-dos carry them — a stand-in to-do due that day for each line, which
+ * `dayTasks` and `cellItems` draw as that line. The calendar, the widgets and the day sheet add them to the to-dos they show.
+ */
+export function repeatItems<T extends TaskLike>(tasks: readonly T[], series: readonly Series[], days: Iterable<string>, now: Date, lang: Lang = "ko"): (T | TaskLike)[] {
+  const found = repeatsOn(days, series, tasks, now, lang);
+  if (found.size === 0) return [...tasks];
+  const extra: TaskLike[] = [];
+  for (const [day, lines] of found) {
+    lines.forEach((line, index) => extra.push({ id: `repeat:${line.series}@${day}#${index}`, title: line.title, isCompleted: false, dueDate: day, repeatLine: line }));
+  }
+  return [...tasks, ...extra];
 }
 
 export type CellItem = { kind: "event"; event: CalendarEvent } | { kind: "task"; task: DayTask };
@@ -506,17 +599,49 @@ export type CellItem = { kind: "event"; event: CalendarEvent } | { kind: "task";
 /**
  * What a month cell shows: the day's events, then its deadlines, then its reminders (#227: the title only, the time is in
  * the tooltip and the day panel; a to-do due the same day shows once, as its deadline); the first `limit` and how many more.
+ * `folding` (#296, the month's cells): without the faded daily · weekday repeats, which the head counts (`foldedRepeats`).
  */
-export function cellItems(day: string, events: readonly CalendarEvent[], tasks: readonly TaskLike[], limit = 3, lang: Lang = "ko"): { items: CellItem[]; more: number } {
+export function cellItems(day: string, events: readonly CalendarEvent[], tasks: readonly TaskLike[], limit = 3, lang: Lang = "ko", folding = false): { items: CellItem[]; more: number } {
   const onDay = dayTasks(day, tasks, lang);
   const all: CellItem[] = [
     ...eventsOn(day, events).map((event): CellItem => ({ kind: "event", event })),
     // (A deadline with hours on it is still the day's deadline here: cells keep their flag.)
     ...onDay.filter((task) => task.kind === "deadline" || task.due).map((task): CellItem => ({ kind: "task", task: { title: task.title, kind: "deadline", taskId: task.taskId } })),
     ...onDay.filter((task) => task.kind === "reminder").map((task): CellItem => ({ kind: "task", task })),
+    // #274: the repeats last, the first to go into +N.
+    ...onDay.filter((task) => task.kind === "repeat" && !(folding && folds(task))).map((task): CellItem => ({ kind: "task", task })),
   ];
   return { items: all.slice(0, limit), more: Math.max(0, all.length - limit) };
 }
+
+/** #296: the day's faded daily · weekday repeats, which a month cell folds into its head (a mark and how many). */
+export function foldedRepeats(day: string, tasks: readonly TaskLike[], lang: Lang = "ko"): DayTask[] {
+  return dayTasks(day, tasks, lang).filter(folds);
+}
+
+/**
+ * #296: what a month cell's head says for the repeats it folds — "매일 반복 2개", "평일 반복 1개", "매일 · 평일 반복 3개"; en
+ * "2 daily repeats", "1 weekday repeat", "3 daily and weekday repeats"; nl "2 dagelijkse herhalingen", "1 doordeweekse
+ * herhaling", "3 dagelijkse en doordeweekse herhalingen". The screen reader reads it; undefined for none.
+ */
+export function foldedLabel(tasks: readonly DayTask[], lang: Lang = "ko"): string | undefined {
+  if (tasks.length === 0) return undefined;
+  const daily = tasks.some((task) => task.rule === "daily"), weekdays = tasks.some((task) => task.rule === "weekdays");
+  const n = tasks.length;
+  if (lang === "ko") return `${daily && weekdays ? "매일 · 평일" : daily ? "매일" : "평일"} 반복 ${n}개`;
+  if (lang === "en") return plural(n, `${daily && weekdays ? "daily and weekday" : daily ? "daily" : "weekday"} repeat`, `${daily && weekdays ? "daily and weekday" : daily ? "daily" : "weekday"} repeats`);
+  const kind = daily && weekdays ? "dagelijkse en doordeweekse" : daily ? "dagelijkse" : "doordeweekse";
+  return plural(n, `${kind} herhaling`, `${kind} herhalingen`);
+}
+
+/** #296: the folded repeats' tooltip — the label, then each one's time and name a line: "매일 반복 2개\n08:00 약 먹기\n물 마시기". */
+export function foldedTooltip(tasks: readonly DayTask[], lang: Lang = "ko"): string | undefined {
+  const label = foldedLabel(tasks, lang);
+  return label === undefined ? undefined : [label, ...tasks.map((task) => (task.time ? `${task.time} ${task.title}` : task.title))].join("\n");
+}
+
+/** #296: whether a month cell's line may take a spare line (`cellTwoLines`): not a faded repeat — the spare lines go to the events and to-dos first. */
+export const mayWrap = (item: CellItem): boolean => !(item.kind === "task" && item.task.kind === "repeat" && item.task.ahead);
 
 /**
  * A week row's tasks (#227, as the month cell's order): the deadlines first, then the alerts and hours by time — when the
@@ -534,7 +659,55 @@ export function taskTooltip(task: DayTask, lang: Lang = "ko"): string {
   const index = langIndex(lang);
   if (task.kind === "reminder") return `${["알림", "Reminder", "Herinnering"][index]} ${task.time ?? ""} · ${task.title}`;
   if (task.kind === "deadline") return `${["마감", "Due", "Deadline"][index]} · ${task.title}`;
+  // #274: "반복 예정 09:00 · 분리수거", the next one "반복 09:00 · …".
+  if (task.kind === "repeat") return `${repeatWord(Boolean(task.ahead), lang)}${task.time ? ` ${task.time}` : ""} · ${task.title}`;
   return `${task.time ?? ""} · ${task.title}`;
+}
+
+/** #274: what a repeat's line is: "반복 예정" (faded) or "반복" (the next one) — en "Upcoming repeat" · "Repeat"; nl "Komende herhaling" · "Herhaling". */
+export function repeatWord(ahead: boolean, lang: Lang = "ko"): string {
+  return (ahead ? ["반복 예정", "Upcoming repeat", "Komende herhaling"] : ["반복", "Repeat", "Herhaling"])[langIndex(lang)];
+}
+
+/** #274: a repeat's spoken name: "분리수거, 09:00, 반복 예정" — en "Recycling, 9:00 AM, upcoming repeat"; other lines their tooltip. */
+export function taskSpoken(task: DayTask, lang: Lang = "ko"): string {
+  if (task.kind !== "repeat") return taskTooltip(task, lang);
+  const word = repeatWord(Boolean(task.ahead), lang);
+  return [task.title, ...(task.time ? [task.time] : []), lang === "ko" ? word : word.toLowerCase()].join(", ");
+}
+
+// ─── 날 목록을 키보드로 (#275) ──────────────────────────────────────────────────
+
+export type ListKey = "tab" | "backTab" | "up" | "down" | "enter" | "escape" | "other";
+
+/**
+ * What a key does (#275): `picked` is the day list's event the keys are on (undefined: the days have them), `count` the day's
+ * events. From the days, Tab goes to the first event (with none it passes on). In the list, ↑ ↓ move (they stop at the
+ * ends), Tab · Shift+Tab go to the next · previous and past the ends back to the days, Enter opens the event (`open`), Esc
+ * goes back to the days. Another key goes back to the days and is theirs (`handled: false`: ← → T move the day as before).
+ * Same keys and shared cases as the Mac (CalendarMonth.listKey).
+ */
+export function listKey(key: ListKey, picked: number | undefined, count: number): { picked?: number; open?: number; handled: boolean } {
+  const current = picked === undefined ? -1 : Math.min(picked, count - 1);
+  if (current < 0) return key === "tab" && count > 0 ? { picked: 0, handled: true } : { handled: false };
+  switch (key) {
+    case "down": return { picked: Math.min(current + 1, count - 1), handled: true };
+    case "up": return { picked: Math.max(current - 1, 0), handled: true };
+    case "tab": return current + 1 < count ? { picked: current + 1, handled: true } : { handled: true };
+    case "backTab": return current > 0 ? { picked: current - 1, handled: true } : { handled: true };
+    case "enter": return { picked: current, open: current, handled: true };
+    case "escape": return { handled: true };
+    default: return { handled: false };
+  }
+}
+
+/**
+ * #275: an event row's spoken name — "디자인 리뷰, 14:00–15:00, 일정 3개 중 1번째"; en "Design review, 2:00–3:00 PM, event 1 of 3";
+ * nl "Ontwerpbespreking, 14:00–15:00, afspraak 1 van 3".
+ */
+export function eventLabel(title: string, time: string, index: number, count: number, lang: Lang = "ko"): string {
+  const place = lang === "ko" ? `일정 ${count}개 중 ${index + 1}번째` : lang === "en" ? `event ${index + 1} of ${count}` : `afspraak ${index + 1} van ${count}`;
+  return `${title}, ${time}, ${place}`;
 }
 
 /** "2026년 10월", "October 2026", "oktober 2026" (`month` 1–12). */

@@ -5,6 +5,8 @@
 //   node tools/perf.mjs [--quick] [--long] [--out=file.json] [--dir=folder] [--trace]
 // --quick: shorter idle windows (20 s) and use loop (1 min); --long: the full 10-minute use loop.
 // --todos=2000 --spaces=9 (1.30): today's sheet that full and that many spaces; the `spaces` step times the lens.
+// --repeats=20 (#274): that many repeating to-dos (the calendar draws the days they come back on).
+// --cat-size=extraLarge (#304): the pet and 타닥냥 at that 크기.
 // --app=<folder>: another build (a 1.29 checkout) on the same data, to alternate with. --paper=chalk: on that paper (#244).
 // --focus: the note as if focused (the caret blinking) for the idle steps; without --quick an idle window is 60 s and
 // so holds exactly one of the note's minute redraws.
@@ -41,11 +43,15 @@ const only = option("only")?.split(",");
 const want = (name) => !only || only.includes(name);
 const idleSeconds = quick ? 20 : 60;
 const useMinutes = flag("long") ? 10 : quick ? 1 : 3;
-const dataOptions = { ...(option("todos") ? { todos: Number(option("todos")) } : {}), ...(option("spaces") ? { spaces: Number(option("spaces")) } : {}),
+const dataOptions = { ...(option("repeats") ? { repeats: Number(option("repeats")) } : {}), ...(option("todos") ? { todos: Number(option("todos")) } : {}), ...(option("spaces") ? { spaces: Number(option("spaces")) } : {}),
   ...(option("history") ? { history: Number(option("history")) } : {}), ...(option("history-days") ? { historyDays: Number(option("history-days")) } : {}),
   ...(option("events") ? { events: Number(option("events")) } : {}),
   // #244: --paper=<key> runs on that paper (core/paper.ts paperKinds), to compare idle CPU with the default 낮 종이.
-  ...(option("paper") ? { prefs: { paperTheme: option("paper") } } : {}) };
+  // #304: --cat-size=extraLarge draws the pet and 타닥냥 at that 크기 (the idle CPU should be 보통's).
+  ...(option("paper") || option("cat-size") ? { prefs: {
+    ...(option("paper") ? { paperTheme: option("paper") } : {}),
+    ...(option("cat-size") ? { petSize: option("cat-size"), typingSize: option("cat-size") } : {}),
+  } } : {}) };
 const base = option("dir") ?? fs.mkdtempSync(path.join(os.tmpdir(), "paper-perf-"));
 fs.mkdirSync(base, { recursive: true });
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

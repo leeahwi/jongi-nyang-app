@@ -21,6 +21,9 @@ case "$out" in --*) out="$repo/.build/drag-check";; esac
 build=1
 for arg in "$@"; do [ "$arg" = "--no-build" ] && build=0; done
 bundle_id=com.noa.PaperTodo.LiveTest
+# #278: never the real app's com.noa.PaperTodo (its settings and data folder share this name).
+source "$repo/scripts/lib/test-defaults.sh"
+test_defaults_require "$bundle_id"
 mkdir -p "$out"
 # The copy writes its log by this path from its own folder: an absolute one.
 out="$(cd "$out" && pwd)"
@@ -56,7 +59,7 @@ cleanup() {
     fi
     rm -rf "$storage" "$HOME/Library/Saved Application State/$bundle_id.savedState" \
         "$HOME/Library/Caches/$bundle_id" "$HOME/Library/HTTPStorages/$bundle_id"
-    defaults delete "$bundle_id" >/dev/null 2>&1 || true
+    test_defaults_remove "$bundle_id"
 }
 trap cleanup EXIT
 

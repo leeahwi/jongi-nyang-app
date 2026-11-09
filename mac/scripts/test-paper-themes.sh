@@ -35,5 +35,6 @@ swiftc -warnings-as-errors -parse-as-library -I "$bin_path/Modules" \
     "$bin_path/PaperTodo.build/DerivedSources/resource_bundle_accessor.swift" \
     "$bin_path"/PaperCore.build/*.swift.o \
     Tests/PaperTodoTests/PaperThemeRedrawTests.swift \
+    Tests/PaperTodoTests/TestDefaults.swift \
     -o .build/checks/PaperThemeRedrawTests
 PAPERTODO_OFFSCREEN=1 .build/checks/PaperThemeRedrawTests

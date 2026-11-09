@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { failure } from "../src/errors";
 import { Busy, FileFailed, Unreadable } from "../src/files";
 import { Problem } from "../src/tools";
+import { temporaryFolder } from "../../test/temporaryFolder";
 
 /**
  * #109 at the source: whatever a tool throws becomes a fixed code and sentence. The errors here are real
@@ -14,7 +15,7 @@ import { Problem } from "../src/tools";
  */
 
 const user = os.userInfo().username;
-const folder = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-ai-errors-")), user, "종이냥 저장");
+const folder = path.join(temporaryFolder("paper-todo-ai-errors-"), user, "종이냥 저장");
 fs.mkdirSync(path.join(folder, "todos.json"), { recursive: true });
 
 function clean(text: string, label: string): void {

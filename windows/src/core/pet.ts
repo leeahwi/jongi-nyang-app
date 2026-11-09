@@ -1,5 +1,5 @@
+import { scaledSize, type CatSize } from "./catSize";
 import { restPose, type MascotPose } from "./motion";
-import type { TypingPose } from "./typingCat";
 
 /**
  * The desktop pet (종이냥), ported from macOS `PetMotion` / `DesktopPet`. Actions are short
@@ -21,10 +21,10 @@ export interface PetPayload {
   message?: string;
   /** 종이냥 한마디 asking something: the bubble shows these answer buttons. */
   question?: { text: string; answers: string[] };
-  /** #230: on its cushion with this paw down (resting only); absent while it is its usual self. */
-  typing?: TypingPose;
   /** #67: the floor's width (the window is only the cat's box now; its bubble still keeps to the screen). */
   floorWidth: number;
+  /** #304: the cat's drawn size (DIP) at the chosen 크기; `petSize` at 보통. */
+  size: number;
 }
 
 /** What to draw for one moment of an activity. */
@@ -41,14 +41,27 @@ export interface PetFrame {
   sparkles?: number;
 }
 
-/** Drawn size of the cat, in CSS pixels. */
+/** Drawn size of the cat, in CSS pixels (보통; #304: `petSizeFor` at the chosen 크기). */
 export const petSize = 92;
 export const walkSpeed = 24; // px per second
 export const walkCycleFrames = 8;
 /** 120px of planted-paw travel over 62.5% of a cycle, drawn at 92/1024 scale. */
 export const walkStride = (192 * petSize) / 1024;
-/** The floor strip above the taskbar. */
+/** The floor strip above the taskbar (보통; #304: `petStripHeight` at the chosen 크기). */
 export const stripHeight = 250;
+
+// ─── #304: 크기 (docs/plans/cat-size-cases.json) ─────────────────────────────
+
+/** The cat's size (DIP) at a step: 74 · 92 · 115 · 138. */
+export const petSizeFor = (size: CatSize): number => scaledSize(petSize, size);
+/** How much bigger than 보통 (1 at 보통, exactly). */
+export const petScaleOf = (px: number): number => px / petSize;
+/** The paws' stride follows the size (the walk's pace, 24 DIP a second, stays), so the planted paws never slide. */
+export const walkStrideFor = (px: number): number => (192 * px) / 1024;
+/** The window grows by what the cat grew, so a question's bubble and buttons still fit above it. */
+export const petStripHeight = (px: number): number => stripHeight + Math.max(0, px - petSize);
+/** How far the cat's centre keeps from the floor's ends (70 at 보통). */
+export const floorMargin = (px: number): number => Math.round((70 * px) / petSize);
 /** Seconds of no input before the pet dozes off, and before it notices the person is back. */
 export const sleepAfterSeconds = 300;
 export const wakeWithinSeconds = 5;
@@ -67,14 +80,21 @@ export const petWindowWidth = 360;
 export const petWindowLeft = (x: number): number => Math.round(x - petWindowWidth / 2);
 
 /**
+ * #307: the window over the cat whose centre is at `x` along `floor` (screen coordinates), moved by `shift` (off-screen
+ * runs). The window is made with these bounds and placed with them (Electron's default is the display's centre).
+ */
+export const petWindowBounds = (floor: Rect, x: number, shift: { x: number; y: number } = { x: 0, y: 0 }): Rect =>
+  ({ x: floor.x + petWindowLeft(x) + shift.x, y: floor.y + shift.y, width: petWindowWidth, height: floor.height });
+
+/**
  * Where a walking cat's window is: the walk's place held for each of its eight pictures, so the window moves once a
  * step with the picture (about 11 times a second, 2 px a time) and the paws drawn on the ground stay put between.
  */
-export function walkStepX(action: Extract<PetAction, { kind: "walk" }>, start: number, now: number): number {
+export function walkStepX(action: Extract<PetAction, { kind: "walk" }>, start: number, now: number, px = petSize): number {
   const u = Math.min(1, Math.max(0, now - start) / clipMs(action));
   if (u >= 1) return action.to;
   const distance = Math.abs(action.to - action.from);
-  const step = walkStride / walkCycleFrames;
+  const step = walkStrideFor(px) / walkCycleFrames;
   const travelled = Math.floor((distance * (0.5 - 0.5 * Math.cos(Math.PI * u))) / step) * step;
   return action.from + Math.sign(action.to - action.from) * travelled;
 }
@@ -117,7 +137,7 @@ export function clipMs(action: PetAction): number {
   }
 }
 
-export function petFrame(action: PetAction, start: number, homeX: number, now: number): PetFrame {
+export function petFrame(action: PetAction, start: number, homeX: number, now: number, px = petSize): PetFrame {
   const duration = clipMs(action);
   const t = Math.max(0, now - start) / 1000;
   const u = duration > 0 ? Math.min(1, (t * 1000) / duration) : 1;
@@ -173,7 +193,7 @@ export function petFrame(action: PetAction, start: number, homeX: number, now: n
       frame.x = action.from + (action.to - action.from) * eased;
       frame.facingRight = action.to > action.from;
       // Paw lifts are drawn into each frame; a global bounce would lift planted paws too.
-      frame.walkFrame = Math.floor((travelled / walkStride) * walkCycleFrames) % walkCycleFrames;
+      frame.walkFrame = Math.floor((travelled / walkStrideFor(px)) * walkCycleFrames) % walkCycleFrames;
       break;
     }
   }
@@ -218,8 +238,8 @@ export function pickWeighted<T>(choices: [T, number][], random: number): T {
   return choices[choices.length - 1][0];
 }
 
-/** Keeps the pet's centre on the floor strip, clear of both ends. */
-export const clampFloorX = (x: number, width: number): number => Math.min(Math.max(x, 70), Math.max(70, width - 70));
+/** Keeps the pet's centre on the floor strip, clear of both ends (`margin`: `floorMargin` of its size, 70 at 보통). */
+export const clampFloorX = (x: number, width: number, margin = 70): number => Math.min(Math.max(x, margin), Math.max(margin, width - margin));
 
 export interface Rect { x: number; y: number; width: number; height: number }
 

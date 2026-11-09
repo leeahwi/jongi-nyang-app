@@ -108,12 +108,20 @@ Windows installer and ZIP (windows/, electron-builder)
         Copyright (C) 2020 by Marijn Haverbeke
       w3c-keyname 2.2.8
         Copyright (C) 2016 by Marijn Haverbeke and others
+  - Koffi 3.3.7, the prebuilt Windows x64 binary only (@koromix/koffi-win32-x64,
+    MIT License, see the MIT text below), as resources/native/koffi.node: the
+    app calls Windows functions through it (SetWindowPos, to keep a window
+    under the others, and a low-level keyboard hook, only while the tap-tap
+    cat is set to tap along in all apps).
+        Copyright (C) 2026 Niels Martignène
   - The fonts listed above (windows/assets/fonts/) and Jongi-nyang for Claude
-    (resources/mcp/).
+    (resources/mcp/ for Claude Desktop, and out/mcp.js inside the app for
+    Claude Code).
   - This NOTICE, as resources/NOTICE.txt.
 
 Jongi-nyang for Claude (windows/mcp/ → mcp/dist/server/index.js, packed into
-jongi-nyang.mcpb; shipped in both apps)
+jongi-nyang.mcpb; shipped in both apps; the Windows app also carries the same
+code as out/mcp.js)
   Bundled by esbuild, with these npm packages:
       @modelcontextprotocol/sdk 1.32.2   MIT    Copyright (c) 2024 Anthropic, PBC
       ajv 8.20.0                         MIT    Copyright (c) 2015-2021 Evgeny Poberezkin

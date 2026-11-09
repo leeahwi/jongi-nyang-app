@@ -1,7 +1,5 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import { serialize } from "node:v8";
 import { test } from "node:test";
 import { groupByDay } from "../src/core/archive";
@@ -13,6 +11,7 @@ import { readDataFiles } from "../src/main/storageFolder";
 import { Store } from "../src/main/store";
 // @ts-expect-error: a plain ES module of the tools (no types)
 import { writePerfData } from "../tools/perf-data.mjs";
+import { temporaryFolder } from "./temporaryFolder";
 
 // Perf audit 2 (docs/perf-audit-2.md): the main process's own work on a perf data set, without Electron. As a test:
 // 2,000 to-dos, each step under a generous ceiling. `AUDIT_BENCH=1 node --test out-test/auditBench.test.js` prints the
@@ -27,7 +26,7 @@ function time(runs: number, work: () => void): number {
 
 function measure(options: Record<string, number>, runs: number): Map<string, number> {
   const out = new Map<string, number>();
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "paper-audit-"));
+  const directory = temporaryFolder("paper-audit-");
   try {
     writePerfData(directory, new Date(), options);
     const store = new Store(directory);

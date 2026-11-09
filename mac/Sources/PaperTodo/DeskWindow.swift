@@ -293,6 +293,8 @@ struct DeskView: View {
     var previewCalendarWeek = false
     /// Design snapshots (#260): the calendar on this day's month (October 2026's holidays, February 2027's 설날).
     var previewCalendarDay: String?
+    /// Design snapshots (#275): the day list's event the keys are on.
+    var previewCalendarPick: Int?
     /// Snapshots: 완료 기록 filtered by a space (spaces 2c, H1).
     var previewHistorySpace: SpaceFilter = .all
     @State private var width: CGFloat = DeskMetrics.size.width
@@ -337,9 +339,9 @@ struct DeskView: View {
         switch state.pane {
         case .calendar:
             if let day = previewCalendarDay {
-                CalendarWindowView(model: model, today: day, mode: previewCalendarWeek ? .week : .month)
-            } else if previewCalendarWeek {
-                CalendarWindowView(model: model, today: CalendarDraft.day(Date()), mode: .week)
+                CalendarWindowView(model: model, today: day, mode: previewCalendarWeek ? .week : .month, pick: previewCalendarPick)
+            } else if previewCalendarWeek || previewCalendarPick != nil {
+                CalendarWindowView(model: model, today: CalendarDraft.day(Date()), mode: previewCalendarWeek ? .week : .month, pick: previewCalendarPick)
             } else {
                 CalendarWindowView(model: model)
             }

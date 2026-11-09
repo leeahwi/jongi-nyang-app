@@ -20,7 +20,6 @@ final class DesktopPetController {
     private var panel: NSPanel?
     /// `--offscreen` (the performance check): the strip far off every screen, out of the user's way (#64).
     var offscreen = false
-    private var monitors: [Any] = []
     private var clipTask: Task<Void, Never>?
     private var idleTask: Task<Void, Never>?
     private var messageTask: Task<Void, Never>?
@@ -30,7 +29,8 @@ final class DesktopPetController {
     /// The spot the person chose (by dragging); wandering stays near it.
     private var anchorX: CGFloat = 0
     private var lastCompleted: Int
-    private static let stripHeight: CGFloat = 250
+    /// The strip above the Dock: 250 points, taller by what a bigger cat grew (#304), so a question still fits above it.
+    private var stripHeight: CGFloat { CatSize.stripHeight(state.size) }
     /// 종이냥 한마디: busy elsewhere (focus timer running, a reminder up) means later.
     var isBusy: () -> Bool = { false }
     /// ‘쉴래요’ on the rest question: a five-minute timer.
@@ -40,15 +40,19 @@ final class DesktopPetController {
     private var chatterTimer: Timer?
     private var nextChatter = Date().addingTimeInterval(Double.random(in: 300...600))
     private var questionTask: Task<Void, Never>?
-    /// 치면 두드리는 고양이 (#230): the paws for typing, and the small cat over full-screen apps.
-    let typing: PetTyping
+    /// 종이냥 한마디 waits while someone types (the typing cat hears it; #289: the pet itself never comes to the cushion).
+    var typingLately: () -> Bool = { false }
 
-    init(model: AppModel, preferences: UserDefaults, inputMonitoring: InputMonitoringAccess, onOpenNote: @escaping () -> Void) {
+    init(model: AppModel, preferences: UserDefaults, onOpenNote: @escaping () -> Void) {
         self.model = model
         self.preferences = preferences
         self.onOpenNote = onOpenNote
-        typing = PetTyping(model: model, preferences: preferences, access: inputMonitoring)
         lastCompleted = model.totalCompletedCount
+        state.size = model.petSize.petSize
+        // #304: 크기 changes the cat at once, where it is.
+        model.$petSize.dropFirst().removeDuplicates().sink { [weak self] size in
+            DispatchQueue.main.async { self?.resize(to: size) }
+        }.store(in: &subscriptions)
         model.$petVisible.removeDuplicates().sink { [weak self] visible in
             DispatchQueue.main.async { self?.setVisible(visible) }
         }.store(in: &subscriptions)
@@ -62,14 +66,6 @@ final class DesktopPetController {
         model.$chatterEnabled.removeDuplicates().sink { [weak self] _ in
             DispatchQueue.main.async { self?.updateChatterTimer() }
         }.store(in: &subscriptions)
-        typing.attach(PetTyping.Host(
-            isVisible: { [weak self] in self?.isVisible == true },
-            isCovered: { [weak self] in guard let self else { return false }; return self.isVisible && !self.onScreen },
-            doing: { [weak self] in self?.typingDoing() ?? .hidden },
-            prepare: { [weak self] reply in self?.prepareForTyping(reply) },
-            show: { [weak self] pose in self?.showTyping(pose) },
-            screen: { [weak self] in self?.savedScreen() ?? NSScreen.main }
-        ))
     }
 
     var isVisible: Bool { panel?.isVisible == true }
@@ -102,9 +98,7 @@ final class DesktopPetController {
             idleTask?.cancel(); idleTask = nil
             clipTask?.cancel(); clipTask = nil
             dragOrigin = nil
-            leaveCushion()
         }
-        typing.refresh()
     }
 
     private func makePanel() -> NSPanel {
@@ -153,7 +147,6 @@ final class DesktopPetController {
 
     private func occlusionChanged() {
         guard isVisible else { return }
-        defer { typing.refresh() }
         if onScreen {
             installMouseMonitors()
             if idleTask == nil && clipTask == nil { scheduleIdle() }
@@ -162,7 +155,6 @@ final class DesktopPetController {
             idleTask?.cancel(); idleTask = nil
             clipTask?.cancel(); clipTask = nil
             dragOrigin = nil
-            leaveCushion()
             settle()
         }
     }
@@ -176,9 +168,10 @@ final class DesktopPetController {
         guard let panel else { return }
         let screen = savedScreen() ?? NSScreen.main ?? NSScreen.screens.first
         guard let area = screen?.visibleFrame else { return }
-        panel.setFrame(NSRect(x: area.minX + (offscreen ? 40_000 : 0), y: area.minY, width: area.width, height: Self.stripHeight), display: true)
+        panel.setFrame(NSRect(x: area.minX + (offscreen ? 40_000 : 0), y: area.minY, width: area.width, height: stripHeight), display: true)
         anchorX = clampX(area.width * homeFraction)
         state.homeX = anchorX
+        if PointerWatch.shared.watches("pet") { PointerWatch.shared.refresh() }
     }
 
     private func savedScreen() -> NSScreen? {
@@ -187,32 +180,60 @@ final class DesktopPetController {
     }
 
     private func clampX(_ x: CGFloat) -> CGFloat {
-        let width = panel?.frame.width ?? 800
-        return min(max(x, 70), width - 70)
+        CatSize.clamp(x, width: panel?.frame.width ?? 800, size: state.size)
+    }
+
+    /// #304: another 크기. A walk or a clip stops where the cat got to; it stays there along the floor (kept clear of the
+    /// ends by the new size's margin), and the strip takes its new height at once, its bottom on the Dock.
+    private func resize(to size: CatSize) {
+        guard state.size != size.petSize else { return }
+        stopWalking()
+        clipTask?.cancel(); clipTask = nil
+        state.size = size.petSize
+        guard let panel, isVisible else { return }
+        var frame = panel.frame
+        frame.size.height = stripHeight
+        panel.setFrame(frame, display: true)
+        anchorX = clampX(anchorX)
+        state.homeX = clampX(state.homeX)
+        if dragOrigin == nil { settle() }
+        if onScreen { scheduleIdle() }
+        if PointerWatch.shared.watches("pet") { PointerWatch.shared.refresh() }
     }
 
     // MARK: Mouse: click-through except over the cat
 
+    /// #64: through the app's one mouse ear (PointerWatch), which looks away for a moment while the pointer is far from
+    /// the cat and its question.
     private func installMouseMonitors() {
-        guard monitors.isEmpty else { return }
-        let update: (NSEvent) -> Void = { [weak self] _ in self?.updateInteractivity() }
-        if let global = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .leftMouseDragged], handler: update) { monitors.append(global) }
-        if let local = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved], handler: { event in update(event); return event }) { monitors.append(local) }
+        guard !PointerWatch.shared.watches("pet") else { return }
+        PointerWatch.shared.watch("pet", duringDrag: true, distance: { [weak self] point in
+            self?.distance(to: point) ?? .infinity
+        }, moved: { [weak self] point in
+            self?.updateInteractivity(at: point)
+        })
     }
 
     private func removeMouseMonitors() {
-        monitors.forEach(NSEvent.removeMonitor)
-        monitors.removeAll()
+        PointerWatch.shared.stop("pet")
     }
 
-    private func updateInteractivity() {
-        PerfProbe.count("petMouse")
+    /// Points from the pointer to where the strip would take the mouse (the cat, its question).
+    private func distance(to point: NSPoint) -> Double {
+        let areas = [anchorFrame.map { $0.insetBy(dx: -8, dy: 0) }, questionFrame].compactMap { $0 }
+        return areas.map { PointerPace.distance(from: point, to: $0) }.min() ?? .infinity
+    }
+
+    private func updateInteractivity(at point: NSPoint? = nil) {
+        let point = point ?? PointerWatch.shared.pointer()
         guard let panel, dragOrigin == nil else { return }
-        let point = NSEvent.mouseLocation
         let over = (anchorFrame.map { $0.insetBy(dx: -8, dy: 0).contains(point) } ?? false)
             || (questionFrame?.contains(point) ?? false)
         if panel.ignoresMouseEvents == over { panel.ignoresMouseEvents = !over }
     }
+
+    /// The bench: whether clicks pass through the strip (true) or the cat takes them.
+    var passesClicks: Bool { panel?.ignoresMouseEvents ?? true }
 
     // MARK: Behaviour
 
@@ -222,7 +243,6 @@ final class DesktopPetController {
     /// Plays a short clip, then returns to resting and plans the next thing to do.
     func play(_ action: PetAction) {
         guard isVisible else { return }
-        leaveCushion()
         clipTask?.cancel()
         stopWalking()
         let activity = PetActivity(action)
@@ -260,11 +280,6 @@ final class DesktopPetController {
     /// Picks what to do next. Resting between clips means no redraws most of the time.
     private func idle() {
         guard isVisible else { return }
-        // On its cushion, the cat waits until the typing has stopped a while, then is its usual self again.
-        if state.typing != nil {
-            if typing.typedLately { scheduleIdle(); return }
-            leaveCushion()
-        }
         // `--offscreen`: someone is always at the Mac, so the check measures a cat at work even while nobody is (#64).
         let away = offscreen ? 0 : systemIdleSeconds()
         if asleep {
@@ -295,42 +310,6 @@ final class DesktopPetController {
             }
             pick -= weight
         }
-    }
-
-    // MARK: Typing (#230)
-
-    /// What the cat is doing, for a key (TypingCat.reply).
-    private func typingDoing() -> TypingCat.Doing {
-        guard isVisible, onScreen else { return .hidden }
-        if dragOrigin != nil { return .dragging }
-        switch state.activity.action {
-        case .sit: return .resting
-        case .sleep: return .sleeping
-        case .walk: return .walking
-        case .cheer, .happy, .hop: return .answering
-        case .blink, .tilt, .stretch, .groom, .yawn, .tea: return .moment
-        }
-    }
-
-    /// A key came: stop walking where it is, wake up, put a small moment away, and sit on the cushion.
-    private func prepareForTyping(_ reply: TypingCat.Reply) {
-        stopWalking()
-        clipTask?.cancel(); clipTask = nil
-        asleep = false
-        if state.activity.action != .sit { state.activity = PetActivity(.sit) }
-        typing.onCushion = true
-        if idleTask == nil { scheduleIdle() }
-    }
-
-    private func showTyping(_ pose: TypingCat.Pose?) {
-        typing.onCushion = pose != nil
-        if state.typing != pose { state.typing = pose }
-    }
-
-    /// Off the cushion: its usual self again, the paws at rest.
-    private func leaveCushion() {
-        typing.stopPaws()
-        showTyping(nil)
     }
 
     private func systemIdleSeconds() -> TimeInterval {
@@ -375,7 +354,6 @@ final class DesktopPetController {
             clipTask?.cancel(); clipTask = nil
             idleTask?.cancel(); idleTask = nil
             asleep = false
-            leaveCushion()
             settle()
         }
         state.homeX = clampX(dragOrigin! + dx)
@@ -435,7 +413,7 @@ final class DesktopPetController {
     private func checkChatter() {
         guard model.chatterEnabled, isVisible, Date() >= nextChatter else { return }
         // Typing: not mid-sentence. Tried again at the next check, 5 s after the last key at the earliest.
-        if typing.chatterWaits { return }
+        if typingLately() { return }
         let now = Date()
         guard !asleep, dragOrigin == nil, !isBusy(), state.message == nil, state.question == nil,
               !PetChatter.isQuietHour(Calendar.paper.component(.hour, from: now)), systemIdleSeconds() < 120 else {
@@ -469,6 +447,8 @@ final class DesktopPetController {
         state.message = nil
         sitDownToSpeak()
         withAnimation(Motion.animation(.bounce, reduce: reduceMotion)) { state.question = line }
+        // Its answer buttons take clicks now, maybe right under a pointer the app was looking away from (#64).
+        if PointerWatch.shared.watches("pet") { PointerWatch.shared.refresh() }
         play(reduceMotion ? .tilt : .hop)
         questionTask?.cancel()
         // Unanswered, it quietly goes away.
@@ -556,20 +536,8 @@ final class DesktopPetController {
         let wander = PetMenuItem(L("돌아다니기")) { [weak self] in self?.model.petWanders.toggle() }
         wander.state = model.petWanders ? .on : .off
         menu.addItem(wander)
-        if let companion = companionMenuItem() { menu.addItem(companion) }
         menu.addItem(PetMenuItem(L("펫 숨기기")) { [weak self] in self?.model.petVisible = false })
         return menu
-    }
-}
-
-extension DesktopPetController {
-    /// In all apps: the small cat over full-screen apps, on or off (also in the menu bar's menu, reachable from a
-    /// full-screen app).
-    func companionMenuItem() -> NSMenuItem? {
-        guard model.petTyping == .everywhere else { return nil }
-        let item = PetMenuItem(L("전체 화면에서 보이기")) { [weak self] in self?.model.petCompanion.toggle() }
-        item.state = model.petCompanion ? .on : .off
-        return item
     }
 }
 
@@ -594,4 +562,11 @@ final class PetMenuItem: NSMenuItem {
     required init(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     @objc private func run() { handler() }
+}
+
+extension CatSize {
+    /// 크기's words in the app's language (#304): the timer's (`TimerSize.title`).
+    func title(_ language: AppLanguage) -> String {
+        names[[AppLanguage.ko, .en, .nl].firstIndex(of: language) ?? 0]
+    }
 }

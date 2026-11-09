@@ -1,9 +1,10 @@
 import CoreGraphics
 import Foundation
 
-/// 치면 두드리는 고양이 (#230, docs/plans/typing-cat.md): the cat on its cushion puts a paw down for each key — the viewer's
-/// left paw first, then the other, back to rest 0.12 s after the last key. The same rules as the Windows app's
-/// `src/core/typingCat.ts`; both run the cases in docs/plans/typing-cat-cases.json.
+/// 치면 두드리는 고양이 (#230 · #289, docs/plans/typing-cat.md): a cat of its own, apart from the desktop pet, in a
+/// corner of the screen on its cushion. It puts a paw down for each key — the viewer's left paw first, then the other,
+/// back to rest 0.12 s after the last key. The same rules as the Windows app's `src/core/typingCat.ts`; both run the
+/// cases in docs/plans/typing-cat-cases.json.
 ///
 /// What it is given is only that a key went down and when (a monotonic clock, in seconds). It never sees which key,
 /// and it keeps nothing of one: two poses, a time and a deadline.
@@ -11,18 +12,28 @@ public struct TypingCat: Equatable, Sendable {
     /// The three pictures (left · right as the viewer sees them).
     public enum Pose: String, CaseIterable, Sendable { case idle, left, right }
 
-    /// 책상 → 종이냥 → 글자 칠 때 두드리기 (`pet.typing`, a device setting): `app` unless changed.
+    /// 책상 → 종이냥 → 타닥냥 → 두드리기 (`typing.scope`, a device setting): `app` unless changed.
     public enum Scope: String, CaseIterable, Sendable {
         case off, app, everywhere
         public static let fallback = Scope.app
         public init(saved: String?) { self = saved.flatMap(Scope.init(rawValue:)) ?? .fallback }
+
+        /// #289: the setting as saved now, or else as the pet's ‘글자 칠 때 두드리기’ (`pet.typing`) left it.
+        public init(saved: String?, before: String?) { self.init(saved: saved ?? before) }
+
+        /// The menu bar's 타닥냥: on, it is turned off and the choice remembered (`last`); off, the remembered
+        /// choice comes back (종이냥에서만 if none). Settings shows the same 끄기, so there is one switch, not two.
+        public static func toggled(_ scope: Scope, last: Scope?) -> (scope: Scope, last: Scope?) {
+            if scope == .off { return (last.flatMap { $0 == .off ? nil : $0 } ?? .fallback, last) }
+            return (.off, scope)
+        }
     }
 
     /// How long a paw stays down after its key (the first value to try on real typing).
     public static let hold: Double = 0.12
-    /// The cat stays on its cushion this long after the last key before the pet's usual moments come back.
+    /// 종이냥에서만: the cat stays in its corner this long after the last key, then quietly goes.
     public static let linger: Double = 3
-    /// 종이냥 한마디 waits this long after the last key (a bubble doesn't pop up mid-sentence).
+    /// 종이냥 한마디 (the pet's) waits this long after the last key (a bubble doesn't pop up mid-sentence).
     public static let chatterQuiet: Double = 5
 
     public private(set) var pose: Pose = .idle
@@ -77,55 +88,16 @@ public struct TypingCat: Equatable, Sendable {
     public static func counts(isRepeat: Bool, command: Bool, control: Bool) -> Bool {
         !isRepeat && !command && !control
     }
-
-    // MARK: Beside the pet's other moments
-
-    /// What the desktop pet is doing when a key comes.
-    public enum Doing: String, CaseIterable, Sendable {
-        /// Sitting (or already on its cushion).
-        case resting
-        /// Dozing after five minutes away.
-        case sleeping
-        case walking
-        /// One of the small moments (a blink, a look, a stretch, grooming, a yawn, tea).
-        case moment
-        /// Answering something: a cheer (a task or a timer done), hearts (petted, an answer), a hop (a reminder, a question).
-        case answering
-        /// Being dragged.
-        case dragging
-        /// Hidden, or out of sight (a full-screen app over it, the screen off).
-        case hidden
-    }
-
-    /// What a key does to the pet.
-    public enum Reply: String, Sendable {
-        /// Nothing (no catching up later either).
-        case ignore
-        /// A paw goes down.
-        case type
-        /// It stops where it is, sits on its cushion and types.
-        case stopAndType
-        /// It wakes up and types (the person is back).
-        case wakeAndType
-    }
-
-    public static func reply(to doing: Doing) -> Reply {
-        switch doing {
-        case .resting, .moment: .type
-        case .walking: .stopAndType
-        case .sleeping: .wakeAndType
-        case .answering, .dragging, .hidden: .ignore
-        }
-    }
 }
 
-/// Where typing is heard from, and who shows it (Mac). In this app: a key-down watcher while the cat is out. In all
-/// apps: a listen-only key-down tap, only once the person turned it on and macOS's Input Monitoring allows it.
+/// Where typing is heard from. In this app: a key-down watcher. In all apps: a listen-only key-down tap, only once the
+/// person chose it and macOS's Input Monitoring allows it (Windows: the low-level key hook could be set). Nothing while
+/// the screen is locked. The desktop pet plays no part: hiding it leaves the tap-tap cat as it is (#289).
 public enum TypingSource: String, Sendable {
     case none, app, everywhere
 
-    public static func of(scope: TypingCat.Scope, granted: Bool, petShown: Bool) -> TypingSource {
-        guard petShown else { return .none }
+    public static func of(scope: TypingCat.Scope, granted: Bool, locked: Bool) -> TypingSource {
+        guard !locked else { return .none }
         switch scope {
         case .off: return .none
         case .app: return .app
@@ -147,21 +119,29 @@ public enum TypingSource: String, Sendable {
     }
 }
 
-/// The small cat over full-screen apps (Mac): in all apps, allowed, the person didn't turn it off, the pet is out and its
-/// spot above the Dock can't be seen (a full-screen app covers it). Never both at once: one of them shows.
-public enum TypingCompanion {
+/// The typing cat's own small window (#289): a corner of the screen in use, over full-screen apps too, clicks passing
+/// through. In all apps it is always there; in this app only it comes with a key and goes `TypingCat.linger` after the
+/// last one.
+public enum TypingCorner {
     public enum Corner: String, CaseIterable, Sendable {
         case topLeft, topRight, bottomLeft, bottomRight
         public static let fallback = Corner.bottomRight
         public init(saved: String?) { self = saved.flatMap(Corner.init(rawValue:)) ?? .fallback }
+        /// #289: as saved now, or else as the Mac's 전체 화면에서 보이기 corner (`pet.companion.corner`) left it.
+        public init(saved: String?, before: String?) { self.init(saved: saved ?? before) }
     }
 
-    /// Its first size (points); 96 and 128 are the ones to compare on a real screen.
+    /// Its size (points).
     public static let size: CGFloat = 112
     public static let margin: CGFloat = 20
 
-    public static func shows(source: TypingSource, enabled: Bool, petShown: Bool, dockCovered: Bool, locked: Bool) -> Bool {
-        source == .everywhere && enabled && petShown && dockCovered && !locked
+    /// Whether the cat is in its corner now: heard in all apps (always), or in this app within `linger` of the last key.
+    public static func shows(source: TypingSource, lastKey: Double?, now: Double) -> Bool {
+        switch source {
+        case .none: return false
+        case .everywhere: return true
+        case .app: return lastKey.map { now - $0 < TypingCat.linger } ?? false
+        }
     }
 
     /// Its frame in a screen's corner, kept inside the screen (under a notch or menu bar at the top: `topInset`).

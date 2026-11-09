@@ -7,6 +7,7 @@ cd "$task_root"
 mkdir -p .build/checks
 swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/GlobalShortcut.swift \
+    Sources/PaperCore/NoteLayer.swift \
     Tests/PaperCoreTests/ShortcutTests.swift \
     -o .build/checks/ShortcutTests
 .build/checks/ShortcutTests

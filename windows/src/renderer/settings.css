@@ -412,6 +412,8 @@ select.popup { max-width: 220px; height: 28px; padding: 0 6px 0 9px; border-radi
 .widget-tile:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
 .widget-settings .card { border-radius: 12px; background: var(--card); box-shadow: 0 0 0 1px var(--rule); margin-top: 8px; }
 .widget-settings .row.off { opacity: 0.55; }
+/* 크기 (#271): a size that doesn't fit the widget's display, greyed out. */
+.widget-settings .segmented button:disabled { opacity: 0.4; cursor: default; }
 .widget-settings input[type="range"] { width: 140px; accent-color: var(--sage); }
 .widget-pct { width: 40px; text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
 .widget-note { font-size: 11px; color: var(--ink-3); padding: 0 14px 8px 14px; }

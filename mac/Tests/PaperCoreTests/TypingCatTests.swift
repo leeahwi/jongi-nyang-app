@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 
-// 치면 두드리는 고양이 (#230, TypingCat.swift): the shared cases from docs/plans/typing-cat-cases.json (the Windows app's
+// 치면 두드리는 고양이 (#230 · #289, TypingCat.swift): the shared cases from docs/plans/typing-cat-cases.json (the Windows app's
 // test/typingCat.test.ts reads the same file), and a privacy check — the rules and the key watcher keep nothing of a key.
 private struct TestFailure: Error, CustomStringConvertible {
     let description: String
@@ -116,22 +116,6 @@ private enum TypingCatTests {
                           entry["counts"] as! Bool, "counts")
             }
         }
-        for entry in file["priorities"] as! [[String: Any]] {
-            try test(entry["case"] as! String) {
-                try equal(TypingCat.reply(to: TypingCat.Doing(rawValue: entry["doing"] as! String)!).rawValue, entry["reply"] as! String, "reply")
-            }
-        }
-        try test("every pet moment has a case") {
-            let listed = Set((file["priorities"] as! [[String: Any]]).map { $0["doing"] as! String })
-            try equal(listed, Set(TypingCat.Doing.allCases.map(\.rawValue)), "moments")
-        }
-        for entry in file["linger"] as! [[String: Any]] {
-            try test(entry["case"] as! String) {
-                var cat = TypingCat()
-                if let last = entry["lastKey"] as? Int { cat.key(at: Double(last) / 1000, reduceMotion: false) }
-                try equal(cat.typed(within: TypingCat.linger, of: Double(entry["now"] as! Int) / 1000), entry["within"] as! Bool, "within")
-            }
-        }
         for entry in file["chatter"] as! [[String: Any]] {
             try test(entry["case"] as! String) {
                 var cat = TypingCat()
@@ -139,15 +123,42 @@ private enum TypingCatTests {
                 try equal(cat.typed(within: TypingCat.chatterQuiet, of: Double(entry["now"] as! Int) / 1000), entry["quiet"] as! Bool, "quiet")
             }
         }
-
-        let mac = file["mac"] as! [String: Any]
-        for entry in mac["sources"] as! [[String: Any]] {
+        // #289: the pet plays no part — `petShown` is in the cases to say so, and isn't asked.
+        for entry in file["sources"] as! [[String: Any]] {
             try test(entry["case"] as! String) {
                 let source = TypingSource.of(scope: TypingCat.Scope(rawValue: entry["scope"] as! String)!, granted: entry["granted"] as! Bool,
-                                             petShown: entry["petShown"] as! Bool)
+                                             locked: entry["locked"] as! Bool)
                 try equal(source.rawValue, entry["source"] as! String, "source")
             }
         }
+        for entry in file["shows"] as! [[String: Any]] {
+            try test(entry["case"] as! String) {
+                let last = (entry["lastKey"] as? Int).map { Double($0) / 1000 }
+                try equal(TypingCorner.shows(source: TypingSource(rawValue: entry["source"] as! String)!, lastKey: last,
+                                             now: Double(entry["now"] as! Int) / 1000), entry["shows"] as! Bool, "shows")
+            }
+        }
+        let moving = file["moving"] as! [String: Any]
+        for entry in moving["scope"] as! [[String: Any]] {
+            try test(entry["case"] as! String) {
+                try equal(TypingCat.Scope(saved: entry["now"] as? String, before: entry["before"] as? String).rawValue, entry["scope"] as! String, "scope")
+            }
+        }
+        for entry in moving["corner"] as! [[String: Any]] {
+            try test(entry["case"] as! String) {
+                try equal(TypingCorner.Corner(saved: entry["now"] as? String, before: entry["before"] as? String).rawValue, entry["corner"] as! String, "corner")
+            }
+        }
+        for entry in file["toggle"] as! [[String: Any]] {
+            try test(entry["case"] as! String) {
+                let toggled = TypingCat.Scope.toggled(TypingCat.Scope(rawValue: entry["scope"] as! String)!,
+                                                      last: (entry["last"] as? String).flatMap(TypingCat.Scope.init(rawValue:)))
+                try equal(toggled.scope.rawValue, entry["scopeAfter"] as! String, "scope")
+                if let last = entry["lastAfter"] as? String { try equal(toggled.last?.rawValue, last, "remembered") }
+            }
+        }
+
+        let mac = file["mac"] as! [String: Any]
         for entry in mac["asking"] as! [[String: Any]] {
             try test(entry["case"] as! String) {
                 let scope = TypingCat.Scope(rawValue: entry["scope"] as! String)!
@@ -157,18 +168,11 @@ private enum TypingCatTests {
                 try equal(TypingSource.showsNoPermission(scope: scope, granted: granted), entry["note"] as! Bool, "note")
             }
         }
-        for entry in mac["companion"] as! [[String: Any]] {
-            try test(entry["case"] as! String) {
-                try equal(TypingCompanion.shows(source: TypingSource(rawValue: entry["source"] as! String)!, enabled: entry["enabled"] as! Bool,
-                                                petShown: entry["petShown"] as! Bool, dockCovered: entry["dockCovered"] as! Bool,
-                                                locked: entry["locked"] as! Bool), entry["shows"] as! Bool, "shows")
-            }
-        }
-        for entry in mac["frames"] as! [[String: Any]] {
+        for entry in file["frames"] as! [[String: Any]] {
             try test(entry["case"] as! String) {
                 let s = (entry["screen"] as! [Double]).map { CGFloat($0) }, f = (entry["frame"] as! [Double]).map { CGFloat($0) }
                 let screen = CGRect(x: s[0], y: s[1], width: s[2], height: s[3])
-                let frame = TypingCompanion.frame(corner: TypingCompanion.Corner(rawValue: entry["corner"] as! String)!, screen: screen,
+                let frame = TypingCorner.frame(corner: TypingCorner.Corner(rawValue: entry["corner"] as! String)!, screen: screen,
                                                   topInset: CGFloat(entry["topInset"] as! Double))
                 try equal(frame, CGRect(x: f[0], y: f[1], width: f[2], height: f[3]), "frame")
                 try expect(screen.contains(frame), "inside the screen")
@@ -176,9 +180,9 @@ private enum TypingCatTests {
         }
         try test("G every corner of every screen stays inside it") {
             for screen in [CGRect(x: 0, y: 0, width: 1440, height: 900), CGRect(x: 2560, y: -400, width: 1080, height: 1920), CGRect(x: 0, y: 0, width: 800, height: 600)] {
-                for corner in TypingCompanion.Corner.allCases {
+                for corner in TypingCorner.Corner.allCases {
                     for inset: CGFloat in [0, 24, 38] {
-                        try expect(screen.contains(TypingCompanion.frame(corner: corner, screen: screen, topInset: inset)), "\(corner) in \(screen)")
+                        try expect(screen.contains(TypingCorner.frame(corner: corner, screen: screen, topInset: inset)), "\(corner) in \(screen)")
                     }
                 }
             }
@@ -187,8 +191,9 @@ private enum TypingCatTests {
             try equal(TypingCat.Scope(saved: nil), .app, "scope")
             try equal(TypingCat.Scope(saved: "loud"), .app, "scope")
             try equal(TypingCat.Scope(saved: "everywhere"), .everywhere, "scope")
-            try equal(TypingCompanion.Corner(saved: nil), .bottomRight, "corner")
-            try equal(TypingCompanion.Corner(saved: "middle"), .bottomRight, "corner")
+            try equal(TypingCorner.Corner(saved: nil), .bottomRight, "corner")
+            try equal(TypingCorner.Corner(saved: "middle"), .bottomRight, "corner")
+            try equal(TypingCorner.size, 112, "size")
         }
 
         // Privacy: the rules hold two poses, a deadline and a time — no text, no key code, nothing else.

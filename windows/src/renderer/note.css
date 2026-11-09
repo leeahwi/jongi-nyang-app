@@ -42,6 +42,8 @@
 .tools .quiet { width: 28px; height: 28px; color: var(--ink-2); }
 .tools .pin.on { color: var(--clay-text); }
 .tools .pin.on .icon { transform: rotate(-25deg); }
+/* #273: 바탕화면에 두기 — the layers icon, coloured like the pin when it's on. */
+.tools .pin[data-layer="desktop"] { color: var(--clay-text); }
 .tools .close:hover { background: #c4412f; color: white; }
 
 /* Header: the date as a small sage eyebrow, the page title in the hand, and on 오늘 a donut with "2 / 5 끝냈어요". */

@@ -8,7 +8,7 @@
 
 Mac · Windows · 무료 · 계정 없이
 
-[**Mac 내려받기**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.48.0) · [**Windows 내려받기**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.33.0) · [소개 페이지](https://leeahwi.github.io/jongi-nyang-app/) · [40초 소개 영상](site/assets/promo-ko.mp4) · [변경 기록](CHANGELOG.md)
+[**Mac 내려받기**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.49.0) · [**Windows 내려받기**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.34.0) · [소개 페이지](https://leeahwi.github.io/jongi-nyang-app/) · [40초 소개 영상](site/assets/promo-ko.mp4) · [변경 기록](CHANGELOG.md)
 
 [![Mac 최신 버전](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=mac-*&label=Mac&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![Windows 최신 버전](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=windows-*&label=Windows&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![CI](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml/badge.svg)](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml)
 
@@ -99,7 +99,9 @@ Mac 1.48 · Windows 1.33부터 바탕화면에 종이 달력 위젯을 둬요. �
 - 불투명도는 20–100%에서 골라요. 날마다 종이 타일이 깔려서 옅게 둬도 글자가 읽혀요.
 - 책상 달력과 위젯에 음력 날짜와 한국 공휴일 이름이 보여요. 인터넷 없이 그 기기에서 셈해요.
 - 책상 → 꾸미기 → 종이에서 고르면 노트, 달력, 위젯, 쪽지, 책상, 메모 서랍이 같은 종이로 바뀌어요. 노란 메모지, 원고지, 하늘색 줄노트, 라벤더 종이, 재생지, 밤하늘 종이, 칠판이 새로 생겼어요.
-- 종이냥에서 글자를 치면 고양이가 앞발로 두드려요. 어떤 키를 쳤는지는 읽지도 남기지도 않아요.
+- Mac 1.49 · Windows 1.34부터 위젯마다 크기를 작게 · 보통 · 크게 · 아주 크게 중에서 골라요. 노트도 핀으로 ‘바탕화면에 두기’를 고르면 위젯처럼 다른 창 뒤에 있어요.
+- 반복 할 일은 돌아올 날마다 달력에 흐리게 보이고, 매일 반복은 날짜 옆 ⟲와 개수로 접혀요.
+- 글자를 치면 화면 구석의 **타닥냥**이 앞발로 두드려요. 펫과 따로 켜고, ‘모든 앱에서’를 고르면 다른 앱에서 칠 때도 두드려요. 어떤 키를 쳤는지는 읽지도 남기지도 않아요.
 
 </details>
 

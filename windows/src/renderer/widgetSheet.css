@@ -10,9 +10,10 @@
 .wsheet .dl { display: flex; align-items: center; gap: 7px; min-height: 24px; padding: 2px 6px; border: 0; border-radius: 7px; background: none; font: inherit; font-size: 12.5px; color: var(--ink); text-align: left; cursor: pointer; }
 .wsheet .dl:hover, .wsheet .dl:focus-visible { background: var(--sage-2); }
 .wsheet .dl .mark { flex: none; width: 3px; height: 13px; margin: 0 2px; border-radius: 2px; background: var(--color, var(--sage)); }
-.wsheet .dl .mark.deadline, .wsheet .dl .mark.reminder, .wsheet .dl .mark.range { width: 7px; height: 7px; border-radius: 50%; margin: 0; }
 .wsheet .dl .mark.deadline { background: var(--clay); }
-.wsheet .dl .mark.reminder, .wsheet .dl .mark.range { background: var(--sage); }
+/* #274: a repeat's days a sage dot, as a reminder's. */
+.wsheet .dl .mark.deadline, .wsheet .dl .mark.reminder, .wsheet .dl .mark.range, .wsheet .dl .mark.repeat { width: 7px; height: 7px; border-radius: 50%; margin: 0; }
+.wsheet .dl .mark.reminder, .wsheet .dl .mark.range, .wsheet .dl .mark.repeat { background: var(--sage); }
 .wsheet .dl .tm { flex: none; min-width: 42px; color: var(--ink-2); font-size: 11.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .wsheet .dl .tt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wsheet .slip-inp .typed { font-size: 22px; }

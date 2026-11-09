@@ -32,9 +32,9 @@ private enum ComposeBench {
         _ = NSApplication.shared
         NSApp.setActivationPolicy(.accessory)
         try NotebookFile(url: data.appendingPathComponent("todos.json")).save(Notebook())
-        let suite = "PaperTodo.ComposeBench.\(UUID())"
-        let preferences = UserDefaults(suiteName: suite)!
-        defer { preferences.removePersistentDomain(forName: suite) }
+        let suite = TestDefaults("ComposeBench")
+        let preferences = suite.defaults
+        defer { suite.remove() }
         let model = AppModel(storageURL: data.appendingPathComponent("todos.json"), isolated: true, preferences: preferences)
         let drawer = model.drawer
         drawer.theme = .grid

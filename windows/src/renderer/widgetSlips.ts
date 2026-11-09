@@ -1,11 +1,13 @@
-import { hasStyles, readOpacity, styleName, stylesOf, widgetLimit, widgetName, type WidgetKind, type WidgetSettings, type WidgetStyle } from "../core/calendarWidget";
+import {
+  defaultScale, hasStyles, readOpacity, scaleName, styleName, stylesOf, widgetLimit, widgetName, widgetScales, type WidgetKind, type WidgetSettings, type WidgetStyle,
+} from "../core/calendarWidget";
 import type { WidgetChanges } from "../core/types";
 import { h, lang, t } from "./api";
 import { appear, keyCap, slipButton, slipHead, tape } from "./slip";
 
 /**
  * 책상 → 일정 → 바탕화면 위젯 (#234): the rows of this PC's widgets, the slip that adds one (six kinds, pictured) and each
- * widget's settings slip — 모양, 불투명도 (shown on the widget at once, 취소 puts it back), 마우스를 올리면 선명하게,
+ * widget's settings slip — 모양, 크기 (#271: the sizes that don't fit its display greyed out), 불투명도 (shown on the widget at once, 취소 puts it back), 마우스를 올리면 선명하게,
  * 클릭 통과, 위치 고정, 항상 위에 두기 and 위젯 제거. ‘모든 데스크톱에’ isn't offered on Windows (Electron has no way to
  * do it there; it waits until it can be checked on a real PC — the plan's cut order 3).
  */
@@ -87,11 +89,14 @@ export function openWidgetGallery(options: { add: (kind: WidgetKind, style: Widg
  */
 export function openWidgetSettings(options: {
   widget: WidgetSettings; change: (changes: WidgetChanges) => void; remove: () => void; closed?: () => void;
+  /** 크기 (#271): the sizes that fit the widget's display (all when not known). */
+  fits?: readonly number[];
 }): SlipHandle {
   const original: WidgetChanges = {
     style: options.widget.style, opacity: options.widget.opacity, solidOnHover: options.widget.solidOnHover, clickThrough: options.widget.clickThrough,
-    locked: options.widget.locked, level: options.widget.level,
+    locked: options.widget.locked, level: options.widget.level, scale: options.widget.scale,
   };
+  const fits = options.fits ?? widgetScales;
   let now: WidgetChanges = { ...original };
   let kept = false;
   const reduced = window.matchMedia("(prefers-reduced-transparency: reduce)").matches;
@@ -115,6 +120,14 @@ export function openWidgetSettings(options: {
       }));
       rows.push(h("div", { class: "row" }, h("span", { class: "grow" }, t("모양", undefined, "widget")), seg));
     }
+    const sizes = h("div", { class: "segmented", role: "radiogroup", "aria-label": t("크기") }, ...widgetScales.map((scale) => {
+      const button = h("button", { role: "radio", "aria-checked": String((now.scale ?? defaultScale) === scale) }, scaleName(scale, lang()));
+      button.toggleAttribute("disabled", !fits.includes(scale));
+      button.addEventListener("click", () => set({ scale }));
+      return button;
+    }));
+    rows.push(h("div", { class: "row" }, h("span", { class: "grow" }, t("크기")), sizes));
+    if (fits.length < widgetScales.length) rows.push(h("div", { class: "widget-note" }, t("이 화면에 들어가는 크기만 고를 수 있어요.")));
     const opacity = reduced ? 100 : now.opacity ?? 85;
     const slider = h("input", { type: "range", min: "20", max: "100", step: "5", value: String(opacity), "aria-label": t("불투명도") }) as HTMLInputElement;
     slider.disabled = reduced;
@@ -143,9 +156,10 @@ export function openWidgetSettings(options: {
   return handle;
 }
 
-/** The desk's row under a widget's name: ‘불투명도 85% · 바탕화면에 두기’ (and ‘클릭 통과’ when on). */
+/** The desk's row under a widget's name: ‘불투명도 85% · 바탕화면에 두기’ (and ‘클릭 통과’ when on); another size than 보통 first. */
 export function widgetSummary(widget: WidgetSettings): string {
   const parts = [t("불투명도 {n}%", { n: widget.opacity }), widget.level === "top" ? t("항상 위") : t("바탕화면에 두기")];
+  if (widget.scale !== defaultScale) parts.unshift(scaleName(widget.scale, lang()));
   if (widget.clickThrough) parts.push(t("클릭 통과"));
   return parts.join(" · ");
 }

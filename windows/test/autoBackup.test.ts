@@ -1,14 +1,14 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { parseBackup } from "../src/core/backup";
 import { AutoBackup, isInside, readBackupState } from "../src/main/autoBackup";
+import { temporaryFolder } from "./temporaryFolder";
 
 // 자동 백업 (#139): the daily copy, the copy before an update, the backup folder — in fictional temporary folders only.
 
-const temporary = () => fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-autobackup-"));
+const temporary = () => temporaryFolder("paper-todo-autobackup-");
 const todos = (...titles: string[]) => JSON.stringify({ items: titles.map((title, index) => ({ id: `00000000-0000-4000-8000-00000000000${index}`, title, isCompleted: false, createdAt: "2026-10-01T09:00:00Z" })) }, null, 2) + "\n";
 
 function setUp(): { settings: string; data: string; backups: AutoBackup } {

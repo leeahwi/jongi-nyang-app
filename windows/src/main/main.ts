@@ -29,10 +29,15 @@ import { FloatingNote } from "./floating";
 import { NoteEars, earsPreview } from "./noteEars";
 import { GlanceWindow } from "./glanceWindow";
 import { CalendarWidgets } from "./calendarWidget";
-import { lunarCellWidth, widget as makeWidget, type WidgetKind, type WidgetStyle } from "../core/calendarWidget";
+import { stayBehind } from "./stayBehind";
+import { lunarCellWidth, scaleFits, widget as makeWidget, widgetScales, type WidgetKind, type WidgetStyle } from "../core/calendarWidget";
 import { WidgetSheet } from "./widgetSheet";
 import { layoutCheckScript, type LayoutCheckOptions, type LayoutReport } from "./layoutCheck";
 import { DesktopPet } from "./pet";
+import { TypingCatWindow } from "./typingCat";
+import { loadKeyHook } from "./keyHook";
+import { typingChatterQuietMs } from "../core/typingCat";
+import { catSizes, type CatSize } from "../core/catSize";
 import { ReminderPopup } from "./popup";
 import { QuickEntry } from "./quick";
 import { QuickMemo } from "./quickMemo";
@@ -96,6 +101,8 @@ let floating: FloatingNote;
 /** The cat's ears on the note's top edge (#151). */
 let noteEars: NoteEars;
 let pet: DesktopPet | undefined;
+/** 치면 두드리는 고양이 (#289): its own cat in a corner, apart from the pet. */
+let typingCat: TypingCatWindow | undefined;
 let focusTimer: FocusTimerWidget;
 let focusLog: FocusLog;
 let taskReminders: TaskReminders;
@@ -130,6 +137,8 @@ let settingsDirectory: string;
 function directories(): { data: string; settings: string; folder?: string; unavailable?: string } {
   if (demo) {
     const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-demo-"));
+    // #278: a demo run's folder goes when the run ends (snapshots used to leave one behind each time).
+    process.once("exit", () => { try { fs.rmSync(temporary, { recursive: true, force: true }); } catch { /* left for the system */ } });
     // `npm run perf`: a demo run on a prepared data set (tools/perf-data.mjs), copied so the run may change it.
     const seed = process.env.PAPERTODO_DEMO_DATA;
     if (seed && !snapshotDirectory && fs.existsSync(seed)) fs.cpSync(seed, temporary, { recursive: true });
@@ -393,7 +402,7 @@ function createNote(): BrowserWindow {
     minWidth: 350, minHeight: 400, maxWidth: noteWidthCap(), maxHeight: 1200,
     frame: false, show: false, maximizable: false, fullscreenable: false,
     backgroundColor: paperBackground[paperLookNow().shown], title: t("종이냥"), icon: path.join(assetsDirectory, "cat.png"),
-    alwaysOnTop: store.prefs.alwaysOnTop,
+    alwaysOnTop: store.prefs.noteLayer === "top",
     webPreferences: webPreferences(), enableLargerThanScreen: Boolean(snapshotDirectory) || offscreenEnabled,
   });
   if (saved && !offscreenEnabled && !screen.getAllDisplays().some((display) => intersects(display.workArea, saved))) window.center();
@@ -423,6 +432,24 @@ function createNote(): BrowserWindow {
   return window;
 }
 
+/**
+ * 노트 위치 (#273): 항상 위에 두기 floats; 바탕화면에 두기 keeps the note under the other windows (stayBehind.ts) — a
+ * click or typing on it doesn't bring it forward, being summoned does, until another window is clicked. Not while a
+ * question waits over it: Windows keeps the question just above the note and would take it down too.
+ */
+function applyNoteLayer(): void {
+  const layer = store.prefs.noteLayer;
+  if (note.isAlwaysOnTop() !== (layer === "top")) note.setAlwaysOnTop(layer === "top", "floating");
+  if (layer === "desktop") {
+    stayBehind().keep(note, {
+      summonable: true,
+      pointerInside: () => { const point = screen.getCursorScreenPoint(); return intersects(note.getBounds(), { ...point, width: 1, height: 1 }); },
+      holds: () => confirmSlip?.over === note,
+    });
+  } else stayBehind().release(note);
+  noteEars?.sync();
+}
+
 function intersects(a: Electron.Rectangle, b: Electron.Rectangle): boolean {
   return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }
@@ -440,9 +467,11 @@ function showNote(): void {
   collapseAnchorInNote = undefined;
   floating.hide();
   if (note.isMinimized()) note.restore();
+  // #273: 바탕화면에 두기 — summoned, it comes forward until another window is clicked.
+  stayBehind().summon(note);
   // Off-screen runs show it without taking the keyboard from the app in front (as it starts).
   if (offscreenEnabled) note.showInactive();
-  else { note.show(); note.focus(); }
+  else { note.show(); note.focus(); if (stayBehind().isKept(note)) note.moveTop(); }
   noteEars.sync();
   focusTimer?.noteShown(); // 집중: the card is back, the board goes
 }
@@ -507,8 +536,8 @@ function openCalendar(day?: string, event?: string): void {
 }
 
 /**
- * ⋯ → 키보드 단축키 (#86): the app's keys on a slip, in six groups — 입력 · 이동 · 고른 할 일 on the left, 어디서든 · 집중
- * · 메모 서랍 on the right — each row what it does and its keys, one cap each (Ctrl + N). The changeable keys (the
+ * ⋯ → 키보드 단축키 (#86): the app's keys on a slip, in groups — 입력 · 이동 · 책상 달력 (#275) · 고른 할 일 · 어디서든 · 집중
+ * · 메모 서랍, then the drawer's own two — each row what it does and its keys, one cap each (Ctrl + N). The changeable keys (the
  * note's, the drawer's) show the one chosen, or ‘끔’. The same groups, order and words as on the Mac (ShortcutList.swift).
  */
 function shortcutQuestion(): ConfirmQuestion {
@@ -529,6 +558,14 @@ function shortcutQuestion(): ConfirmQuestion {
       { title: t("검색"), keys: ["Ctrl", "F"] },
       { title: t("포스트잇으로 접기"), keys: ["Ctrl", "M"] },
       { title: t("책상"), keys: ["Ctrl", "D"] },
+    ] },
+    // #275: the desk's calendar — a new event on the picked day, and the day's events by the keys.
+    { title: t("책상 달력"), rows: [
+      { title: t("새 일정"), keys: ["Enter"] },
+      { title: t("그날 일정으로"), keys: ["Tab"] },
+      { title: t("일정 고르기"), keys: ["↑"], also: ["↓"] },
+      { title: t("일정 고치기"), keys: ["Enter"] },
+      { title: t("달력으로 돌아가기"), keys: ["Esc"] },
     ] },
     { title: t("고른 할 일"), rows: [
       { title: t("하루 뒤로"), keys: ["Alt", "→"] },
@@ -782,6 +819,8 @@ function moreMenu(): Menu {
 function petMenu(): MenuItemConstructorOptions[] {
   return [
     { label: t("종이냥 펫"), type: "checkbox", checked: store.prefs.petVisible, click: () => store.setPref("petVisible", !store.prefs.petVisible) },
+    // #289: the typing cat on or off, apart from the pet (off remembers what it was).
+    { label: t("타닥냥"), type: "checkbox", checked: store.prefs.typingCat !== "off", click: () => typingCat?.toggle() },
     { label: t("타이머"), submenu: focusTimer.timerMenu() },
   ];
 }
@@ -795,15 +834,18 @@ function notice(value: NoteNotice): boolean {
 
 // ─── AI 연결 ──────────────────────────────────────────────────────────────────
 
-/** The bundled 종이냥 for Claude: resources\mcp in the installed app, mcp/dist while developing. */
+/**
+ * The bundled 종이냥 for Claude: the .mcpb in resources\mcp in the installed app (mcp/dist while developing), and
+ * the program for Claude Code's `--mcp-stdio` (#175: the server itself is out/mcp.js, inside the app).
+ */
 function aiFiles(): AiFiles {
   // Snapshots show where the installed app keeps it (a per-user install), not this checkout.
   if (snapshotDirectory) {
     const installed = "C:\\Users\\me\\AppData\\Local\\Programs\\종이냥"; // i18n-ok: a folder name
-    return { server: `${installed}\\resources\\mcp\\server\\index.js`, mcpb: `${installed}\\resources\\mcp\\jongi-nyang.mcpb`, exe: `${installed}\\종이냥.exe` }; // i18n-ok
+    return { mcpb: `${installed}\\resources\\mcp\\jongi-nyang.mcpb`, exe: `${installed}\\종이냥.exe` }; // i18n-ok
   }
-  const folder = app.isPackaged ? path.join(process.resourcesPath, "mcp") : path.join(app.getAppPath(), "mcp", "dist");
-  return { server: path.join(folder, "server", "index.js"), mcpb: path.join(folder, "jongi-nyang.mcpb"), exe: process.execPath };
+  if (app.isPackaged) return { mcpb: path.join(process.resourcesPath, "mcp", "jongi-nyang.mcpb"), exe: process.execPath };
+  return { mcpb: path.join(app.getAppPath(), "mcp", "dist", "jongi-nyang.mcpb"), exe: process.execPath, app: app.getAppPath() };
 }
 
 /**
@@ -1514,7 +1556,7 @@ function handle(action: Action, sender: Electron.WebContents, frame?: WebFrameMa
     case "focus": return focusCommand(action.command);
     case "chatterPreview": return pet?.speakUp();
     // #230: a key went down in one of the app's windows; the cat decides whether to tap along.
-    case "petTap": return pet?.tap();
+    case "typingTap": return typingCat?.tap();
     case "openHistory": return openHistory(action.day);
     case "openSearch": return openSearch();
     case "openCalendar": return openCalendar(action.day, action.event);
@@ -2464,6 +2506,18 @@ async function runSnapshots(directory: string): Promise<void> {
   if (process.env.PAPERTODO_SNAPSHOT_ONLY === "spaces2c") {
     return finishSnapshots(await spaces2cShots(directory, save, wait, settled));
   }
+  // `npm run snapshot -- layer`: 노트 위치 (#273) — the pin in each place and its menu, day and night, into layer/.
+  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "layer") {
+    return finishSnapshots(await layerShots(directory, save, wait, settled));
+  }
+  // `npm run snapshot -- typing`: 타닥냥 (#289) — its settings section in each state and the cat in its corner, day and night.
+  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "typing") {
+    return finishSnapshots(await typingShots(directory, save, wait));
+  }
+  // `npm run snapshot -- catsize`: 크기 of the pet and of 타닥냥 (#304) — the settings rows, and each cat at each size.
+  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "catsize") {
+    return finishSnapshots(await catSizeShots(directory, save, wait));
+  }
   // `npm run snapshot -- ears`: the note with the cat's ears on its top edge (#151), day and night.
   if (process.env.PAPERTODO_SNAPSHOT_ONLY === "ears") {
     calendar.showSample();
@@ -2692,6 +2746,9 @@ async function runSnapshots(directory: string): Promise<void> {
   pet?.speakUp(() => 0.99);
   await wait(800);
   await save("pet-question", pet?.capture());
+  // #289: the typing cat in its corner — resting, the left paw down, the right paw down.
+  for (const pose of ["idle", "left", "right"] as const) await save(`typing-cat-${pose}`, typingCat?.preview(pose));
+  typingCat?.refresh();
   focusTimer.command({ kind: "pomodoro" });
   await wait(1200);
   await save("timer", focusTimer.capture());
@@ -3852,8 +3909,10 @@ async function deskShots(save: Save, wait: Wait, settled: (window: BrowserWindow
     // calendar-flows 11: a wide cell without +N in its head keeps its lunar date.
     for (const cell of document.querySelectorAll(".month .cell")) {
       const lunar = cell.querySelector("[data-lunar-day]");
-      if (lunar && lunar.hidden && cell.clientWidth >= ${lunarCellWidth} && !cell.querySelector(".more")) { out.push("lunar hidden " + cell.dataset.day + " w" + cell.clientWidth); break; }
+      if (lunar && lunar.hidden && cell.clientWidth >= ${lunarCellWidth} && !cell.querySelector(".more") && !cell.querySelector(".rmark:not([hidden])")) { out.push("lunar hidden " + cell.dataset.day + " w" + cell.clientWidth); break; }
     }
+    // #295: nothing in a cell's head is cut (the lunar date, +N, #296 the repeat mark).
+    for (const head of document.querySelectorAll(".cell-head")) if (head.scrollWidth > head.clientWidth + 1) out.push("head cut " + head.parentElement.dataset.day);
     return out.join("; ");
   })()`;
   const calendarShot = async (name: string) => {
@@ -3870,6 +3929,15 @@ async function deskShots(save: Save, wait: Wait, settled: (window: BrowserWindow
   await inPane("calendar", `document.body.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))`);
   await calendarShot("calendar-month-new");
   await inPane("calendar", `document.querySelector(".event-sheet")?.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
+  // #275: Tab from the day to its list and ↓ to the next event — the ring, the focus and what Narrator reads; Esc back.
+  await wait(300);
+  const calendarKey = (key: string) => inPane("calendar", `document.body.dispatchEvent(new KeyboardEvent("keydown", { key: ${JSON.stringify(key)}, bubbles: true }))`);
+  await calendarKey("Tab");
+  await calendarKey("ArrowDown");
+  console.log(`calendar keys: ${await inPane("calendar", `(() => { const row = document.querySelector(".panel .ev.picked"); return row ? row.getAttribute("aria-label") + (document.activeElement === row ? " · focused" : " · NOT FOCUSED") : "NO RING"; })()`)}`);
+  await calendarShot("calendar-keys");
+  await calendarKey("Escape");
+  console.log(`calendar keys after Esc: ${await inPane("calendar", `document.querySelector(".panel .ev.picked") ? "STILL PICKED" : "back to the day"`)}`);
   const ahead = new Date(); ahead.setDate(ahead.getDate() + 40);
   const aheadKey = dayKey(ahead);
   openCalendar(aheadKey);
@@ -3882,10 +3950,22 @@ async function deskShots(save: Save, wait: Wait, settled: (window: BrowserWindow
   for (const pane of deskPanes.filter((entry) => entry !== "calendar")) {
     await showDeskPane(pane, wait);
     await shot(`desk-${pane}`, pane);
-    if (pane === "appearance" || pane === "notifications") {
+    if (pane === "appearance" || pane === "notifications" || pane === "pet") {
       await inPane("settings", `document.querySelector(".content").scrollTop = 1e6`);
       await wait(300);
       await shot(`settings-${pane}-end`, pane);
+      // #289: 타닥냥 off (자리 dimmed), with the pet hidden (nothing of it changes).
+      if (pane === "pet") {
+        store.setPref("typingCat", "off");
+        store.setPref("petVisible", false);
+        await wait(400);
+        await inPane("settings", `document.querySelector(".content").scrollTop = 1e6`);
+        await wait(200);
+        await shot("settings-pet-typing-off", pane);
+        store.setPref("typingCat", "app");
+        store.setPref("petVisible", true);
+        await wait(400);
+      }
       await inPane("settings", `document.querySelector(".content").scrollTop = 0`);
     }
     if (pane === "storage") {
@@ -4154,6 +4234,8 @@ async function nightShots(directory: string, save: Save, wait: Wait, settled: (w
   pet?.speakUp(() => 0.99);
   await wait(800);
   await save(name("pet-question"), pet?.capture());
+  for (const pose of ["idle", "left", "right"] as const) await save(name(`typing-cat-${pose}`), typingCat?.preview(pose));
+  typingCat?.refresh();
   focusTimer.command({ kind: "pomodoro" });
   await wait(1200);
   await save(name("timer"), focusTimer.capture());
@@ -5588,6 +5670,8 @@ async function widgetShots(directory: string, save: Save, wait: Wait): Promise<n
     for (const el of document.querySelectorAll(".tt, .t, .tm, .w, .n, .sh, .empty, .m")) {
       if (el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).textOverflow !== "ellipsis" && el.clientWidth > 0) out.push("cut: " + el.textContent);
     }
+    // #295: nothing in a month tile's head is cut (the lunar date, +N, #296 the repeat mark).
+    for (const head of document.querySelectorAll(".cl .head")) if (head.scrollWidth > head.clientWidth + 1) out.push("head cut " + head.parentElement.dataset.day);
     // A Korean word split across two lines.
     const range = document.createRange();
     // (The today widget's month and weekday are two lines on purpose.)
@@ -5641,6 +5725,43 @@ async function widgetShots(directory: string, save: Save, wait: Wait): Promise<n
         }
       }
     }
+    // 크기 (#271): every kind at 작게 · 크게 · 아주 크게 (보통 is above) — the same lines in each cell, nothing cut — and the
+    // month at 아주 크게 and 40 % over the busy wallpaper (the floors hold at any size).
+    for (const [scale, word] of [[0.85, "small"], [1.25, "large"], [1.5, "xlarge"]] as const) {
+      for (const { kind, style } of kinds) {
+        store.setPref("calendarWidgets", [makeWidget({ id: "snap", kind, style, scale, place: { display: "0", x: 1, y: 0 } })]);
+        widgets.sync();
+        offsetNow = pageTo(kind);
+        await shot(`${prefix}${kind}-${style}-size-${word}`, paper === "day" ? "light" : "dark");
+      }
+    }
+    // #296: this month with two daily repeats and a weekday one — folded into each tile's head, no dot in 간단히; #295: today
+    // busy (+N beside its lunar date).
+    const itemsBefore = new Set(store.items.map((item) => item.id));
+    const crowd = [
+      store.saveSeries({ title: t("물 마시기"), rule: { kind: "daily" } }),
+      store.saveSeries({ title: t("스트레칭"), rule: { kind: "daily" } }),
+      store.saveSeries({ title: t("아침 운동"), rule: { kind: "weekdays" }, remindAt: "07:30" }),
+    ].filter((id): id is string => Boolean(id));
+    store.mutate((history) => {
+      for (const [title, hour] of [[t("빨래 개기"), 20], [t("화분 물 주기"), 21], [t("엄마한테 전화하기"), 22]] as const) history.addTo(title, undefined, new Date(), undefined, at(0, hour).toISOString());
+    });
+    for (const style of ["simple", "detail", "wall"] as const) {
+      for (const scale of style === "detail" ? [1, 0.85] : [1]) {
+        store.setPref("calendarWidgets", [makeWidget({ id: "snap", kind: "month", style, scale, place: { display: "0", x: 1, y: 0 } })]);
+        widgets.sync();
+        offsetNow = 0;
+        await shot(`${prefix}month-${style}-repeats${scale === 1 ? "" : "-small"}`, paper === "day" ? "light" : "dark");
+      }
+    }
+    for (const id of crowd) store.deleteSeries(id);
+    // The busy day's to-dos and today's copies.
+    const added = store.items.filter((item) => !itemsBefore.has(item.id)).map((item) => item.id);
+    store.mutate((history) => { for (const id of added) history.delete(id); });
+    store.setPref("calendarWidgets", [makeWidget({ id: "snap", kind: "month", style: "detail", opacity: 40, scale: 1.5, place: { display: "0", x: 1, y: 0 } })]);
+    widgets.sync();
+    offsetNow = pageTo("month");
+    await shot(`${prefix}month-detail-size-xlarge-40-busy`, "busy");
     // Hovered: solid, with ‹ 오늘 ›.
     store.setPref("calendarWidgets", [makeWidget({ id: "snap", kind: "month", style: "detail", opacity: 40, place: { display: "0", x: 1, y: 0 } })]);
     widgets.sync();
@@ -5668,6 +5789,17 @@ async function widgetShots(directory: string, save: Save, wait: Wait): Promise<n
     await inPane("settings", `document.querySelector(".widget-row .action.small")?.click()`);
     await wait(500);
     await save(`widgets/${prefix}settings`, captureDesk(wait));
+    await inPane("settings", `document.querySelector(".device-scrim")?.click()`);
+    await wait(300);
+    // #271: 벽 달력 on a 1280×800 display — 크게 · 아주 크게 don't fit there and are greyed out.
+    store.setPref("calendarWidgets", [makeWidget({ id: "snap", kind: "month", style: "wall", place: { display: "0", x: 1, y: 0 } })]);
+    widgets.sync();
+    store.widgetFits = { snap: widgetScales.filter((scale) => scaleFits("month", "wall", scale, { x: 0, y: 0, width: 1280, height: 752 })) };
+    store.changed();
+    await wait(500);
+    await inPane("settings", `document.querySelector(".widget-row .action.small")?.click()`);
+    await wait(500);
+    await save(`widgets/${prefix}settings-small-screen`, captureDesk(wait));
     await inPane("settings", `document.querySelector(".device-scrim")?.click()`);
     await wait(300);
     // The desk's 달력 on October 2026: holidays and lunar dates in the month and in the week.
@@ -5886,8 +6018,13 @@ async function calendarReminderShots(directory: string, save: Save, wait: Wait):
     const out = [];
     for (const cell of document.querySelectorAll(".cell, .day-row")) if (cell.scrollHeight > cell.clientHeight + 1) out.push("overflow " + cell.dataset.day);
     for (const t of document.querySelectorAll(".item .t, .line .t")) if (t.scrollWidth > t.clientWidth + 1 && getComputedStyle(t).textOverflow !== "ellipsis") out.push("cut: " + t.textContent);
+    // #295: nothing in a cell's head is cut (the lunar date, +N, #296 the repeat mark).
+    for (const head of document.querySelectorAll(".cell-head")) if (head.scrollWidth > head.clientWidth + 1) out.push("head cut " + head.parentElement.dataset.day);
     const bells = document.querySelectorAll(".item.reminder, .dot.reminder, .line.task.reminder").length;
-    return out.length ? out.join("; ") : "ok · " + bells + " reminders";
+    // #295 · #296: today's head (the lunar date, +N), the cells' repeat marks and the repeat lines still written.
+    const today = document.querySelector(".cell.today .cell-head");
+    const head = today ? [...today.children].filter((el) => !el.hidden).map((el) => el.textContent).join(" ") : "";
+    return (out.length ? out.join("; ") : "ok · " + bells + " reminders") + " · today [" + head + "] · " + document.querySelectorAll(".rmark:not([hidden])").length + " marks · " + document.querySelectorAll(".item.repeat").length + " repeat lines";
   })()`;
   const shot = async (name: string) => {
     await wait(400);
@@ -5912,6 +6049,22 @@ async function calendarReminderShots(directory: string, save: Save, wait: Wait):
     desk.browserWindow!.setContentSize(760, 520 + deskTitleBar);
     await shot(`${prefix}month-small`);
     desk.browserWindow!.setContentSize(920, 640 + deskTitleBar);
+    // #296: two more daily repeats and a weekday one (with 물 마시기) — folded into each day's head; the events keep the lines.
+    const itemsBefore = new Set(store.items.map((item) => item.id));
+    const crowd = [
+      store.saveSeries({ title: t("스트레칭"), rule: { kind: "daily" } }),
+      store.saveSeries({ title: t("아침 운동"), rule: { kind: "weekdays" }, remindAt: "07:30" }),
+    ].filter((id): id is string => Boolean(id));
+    await shot(`${prefix}month-repeats`);
+    desk.browserWindow!.setContentSize(760, 520 + deskTitleBar);
+    await shot(`${prefix}month-repeats-small`);
+    desk.browserWindow!.setContentSize(1280, 820 + deskTitleBar);
+    await shot(`${prefix}month-repeats-wide`);
+    desk.browserWindow!.setContentSize(920, 640 + deskTitleBar);
+    for (const id of crowd) store.deleteSeries(id);
+    // (Today's copies too.)
+    const copies = store.items.filter((item) => !itemsBefore.has(item.id)).map((item) => item.id);
+    store.mutate((history) => { for (const id of copies) history.delete(id); });
   }
   store.mutate((history) => { for (const id of made) history.delete(id); });
   store.setPref("paper", "day");
@@ -6726,6 +6879,146 @@ const noteLayoutChecks: LayoutCheckOptions = {
  * first checks its header: no cat left in it, the header as tall as before (78 px, 58 when short) and nothing cut.
  * The pictures are put together in a hidden window (ears.html#preview); nothing is shown.
  */
+/**
+ * 노트 위치 (#273): the pin as each place shows it (보통 · 항상 위에 두기 · 바탕화면에 두기) with its words for a screen
+ * reader, and its menu open, at the usual and the smallest size, day and night. A cut label or a menu out of the note
+ * counts as a problem.
+ */
+/**
+ * 타닥냥 (#289 · #288): 책상 → 종이냥 scrolled to its section — in this app, off (자리 dimmed) with the pet hidden,
+ * in all apps without a keyboard hook (the line saying so) — and
+ * the cat in its corner (resting, the left paw down, the right paw down), in typing/ and typing/night/. Each pane is
+ * checked for text cut short.
+ */
+async function typingShots(directory: string, save: Save, wait: Wait): Promise<number> {
+  let problems = 0;
+  const cut = `(() => [...document.querySelectorAll(".group .row, .group .label, .group .foot")].filter((element) => [element, ...element.querySelectorAll("*")]
+    .some((part) => part.clientWidth && part.scrollWidth > part.clientWidth + 1)).map((element) => element.textContent.trim().slice(0, 40)))()`;
+  fs.mkdirSync(path.join(directory, "typing", "night"), { recursive: true });
+  for (const paper of ["day", "night"] as const) {
+    const prefix = paper === "night" ? "typing/night/" : "typing/";
+    store.setPref("paper", paper);
+    // #288: 모든 앱에서 — off-screen there is no keyboard hook, so this draws the line that says the cat hears this app only.
+    for (const [name, scope, petShown] of [["settings-pet-typing", "app", true], ["settings-pet-typing-off", "off", false],
+      ["settings-pet-typing-everywhere-no-hook", "everywhere", true]] as const) {
+      store.setPref("typingCat", scope);
+      store.setPref("petVisible", petShown);
+      await showDeskPane("pet", wait);
+      await inPane("settings", `document.querySelector(".content").scrollTop = 1e6`);
+      await wait(400);
+      const found = await inPane("settings", cut) as string[] | undefined;
+      console.log(`typing ${prefix}${name}: ${found?.length ? `cut: ${found.join(" · ")}` : "ok"}`);
+      problems += found?.length ?? 0;
+      await save(`${prefix}${name}`, captureDesk(wait));
+    }
+    store.setPref("typingCat", "app");
+    store.setPref("petVisible", true);
+    for (const pose of ["idle", "left", "right"] as const) await save(`${prefix}typing-cat-${pose}`, typingCat?.preview(pose));
+    typingCat?.refresh();
+  }
+  store.setPref("paper", "day");
+  return problems;
+}
+
+/**
+ * 크기 (#304): 책상 → 종이냥 with each section's 크기 row (the pet's at the top, 타닥냥's scrolled to), then the pet sitting
+ * and asking a question, and 타닥냥 resting and with a paw down, at each size — in catsize/ and catsize/night/. A cut
+ * label, a cat or bubble out of its window, or a window off the floor counts as a problem. 보통 is drawn first and again
+ * after the other sizes: the two must be the same picture.
+ */
+async function catSizeShots(directory: string, save: Save, wait: Wait): Promise<number> {
+  let problems = 0;
+  const cut = `(() => [...document.querySelectorAll(".group .row, .group .label, .group .foot")].filter((element) => [element, ...element.querySelectorAll("*")]
+    .some((part) => part.clientWidth && part.scrollWidth > part.clientWidth + 1)).map((element) => element.textContent.trim().slice(0, 40)))()`;
+  fs.mkdirSync(path.join(directory, "catsize", "night"), { recursive: true });
+  const report = (what: string, found: string[] | undefined) => {
+    console.log(`catsize ${what}: ${found?.length ? found.join(" · ") : "ok"}`);
+    problems += found?.length ?? 0;
+  };
+  for (const paper of ["day", "night"] as const) {
+    const prefix = paper === "night" ? "catsize/night/" : "catsize/";
+    store.setPref("paper", paper);
+    store.setPref("petVisible", true);
+    store.setPref("typingCat", "app");
+    store.setPref("petSize", "large");
+    store.setPref("typingSize", "large");
+    for (const [name, scroll] of [["settings-pet-size", "0"], ["settings-typing-size", "1e6"]] as const) {
+      await showDeskPane("pet", wait);
+      await inPane("settings", `document.querySelector(".content").scrollTop = ${scroll}`);
+      await wait(400);
+      report(`${prefix}${name}`, await inPane("settings", cut) as string[] | undefined);
+      await save(`${prefix}${name}`, captureDesk(wait));
+    }
+    const sizes: CatSize[] = ["regular", ...catSizes.filter((step) => step !== "regular"), "regular"];
+    for (const size of sizes) {
+      const again = size === "regular" && store.prefs.petSize !== "large" ? "-again" : "";
+      store.setPref("petSize", size);
+      store.setPref("typingSize", size);
+      pet?.quiet();
+      await wait(3200); // the one breath after it settles
+      report(`${prefix}pet-${size}${again}`, await pet?.layoutProblems());
+      await save(`${prefix}pet-${size}${again}`, pet?.capture());
+      pet?.speakUp(() => 0.99);
+      await wait(800);
+      report(`${prefix}pet-question-${size}${again}`, await pet?.layoutProblems());
+      await save(`${prefix}pet-question-${size}${again}`, pet?.capture());
+      for (const pose of ["idle", "left"] as const) await save(`${prefix}typing-cat-${size}-${pose}${again}`, typingCat?.preview(pose));
+      typingCat?.refresh();
+    }
+  }
+  store.setPref("paper", "day");
+  return problems;
+}
+
+async function layerShots(directory: string, save: Save, wait: Wait, settled: (window: BrowserWindow) => Promise<unknown>): Promise<number> {
+  let problems = 0;
+  const check = `(() => {
+    const out = [];
+    const pin = document.querySelector(".tools .pin");
+    out.push("label " + pin.getAttribute("aria-label"));
+    const menu = document.querySelector(".menu");
+    if (menu) {
+      const box = menu.getBoundingClientRect();
+      if (box.left < 0 || box.top < 0 || box.right > window.innerWidth || box.bottom > window.innerHeight) out.push("PROBLEM menu outside the note");
+      for (const row of menu.querySelectorAll(".label, [role^=menuitem]")) {
+        for (const element of [row, ...row.querySelectorAll("*")]) {
+          if (element.clientWidth && element.scrollWidth > element.clientWidth + 1) out.push("PROBLEM cut: " + row.textContent.trim());
+        }
+      }
+    }
+    return out;
+  })()`;
+  fs.mkdirSync(path.join(directory, "layer", "night"), { recursive: true });
+  for (const paper of ["day", "night"] as const) {
+    const prefix = paper === "night" ? "layer/night/" : "layer/";
+    store.setPref("paper", paper);
+    for (const [width, height] of [[420, 560], [350, 400]] as const) {
+      note.setSize(width, height);
+      for (const layer of ["normal", "top", "desktop"] as const) {
+        store.setPref("noteLayer", layer);
+        await wait(300);
+        await settled(note);
+        const name = `${prefix}note-layer-${layer}${width === 350 ? "-small" : ""}`;
+        const found = await note.webContents.executeJavaScript(check).catch((error: Error) => [`PROBLEM script failed: ${error.message}`]) as string[];
+        await save(name, note.webContents.capturePage());
+        await note.webContents.executeJavaScript(`document.querySelector(".tools .pin").click()`);
+        await wait(300);
+        await settled(note);
+        const open = await note.webContents.executeJavaScript(check).catch((error: Error) => [`PROBLEM script failed: ${error.message}`]) as string[];
+        await save(`${name}-menu`, note.webContents.capturePage());
+        await note.webContents.executeJavaScript(`document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))`);
+        const lines = [...found, ...open.filter((line) => !line.startsWith("label"))];
+        console.log(`layer ${name}: ${lines.join("; ")}`);
+        problems += lines.filter((line) => line.startsWith("PROBLEM")).length;
+      }
+    }
+  }
+  store.setPref("noteLayer", "normal");
+  store.setPref("paper", "day");
+  note.setSize(420, 560);
+  return problems;
+}
+
 async function earsShots(directory: string, save: Save, wait: Wait, settled: (window: BrowserWindow) => Promise<unknown>): Promise<number> {
   let problems = 0;
   const check = `(() => {
@@ -7134,6 +7427,8 @@ async function sizeSweep(directory: string, save: Save, wait: Wait, settled: (wi
       inside: [".top", ".top > *", ".panel", ".calendar-body"],
       rows: [".top", ".panel-head", ".calendar-body"],
       oneLine: [".top .title", ".top .today", ".view-seg button", ".top-new", ".panel-head .date", ".new-event", ".section"],
+      // #295: nothing in a month cell's head is cut at any size (the lunar date, #296 the repeat mark).
+      whole: [".cell-head"],
     },
     help: {
       ignore: ".topics, .ph-cat",
@@ -7382,7 +7677,8 @@ function updateNoteHotkey(): void {
  * note, so a covered one goes away too and the next press brings it forward (noteToggle in core/shortcuts.ts).
  */
 function toggleNote(): void {
-  if (noteToggle({ visible: note.isVisible(), minimized: note.isMinimized(), folded: floating.isVisible }) === "hide") {
+  // #273: a note kept behind the other windows is taken for covered unless it was summoned (it comes forward).
+  if (noteToggle({ visible: note.isVisible(), minimized: note.isMinimized(), folded: floating.isVisible, uncovered: stayBehind().inFront(note) }) === "hide") {
     note.webContents.send("note:commit-editing");
     note.hide();
     focusTimer?.noteShown();
@@ -7393,7 +7689,7 @@ function toggleNote(): void {
 
 app.on("second-instance", (_event, argv) => secondLaunch(argv));
 app.on("before-quit", () => { quitting = true; store?.flush(); });
-app.on("will-quit", () => { store?.flush(); quick?.dispose(); quickMemo?.dispose(); drawer?.dispose(); if (noteHotkeyHeld) globalShortcut.unregister(noteHotkeyHeld); globalShortcut.unregisterAll(); store?.unwatch(); ai?.stop(); });
+app.on("will-quit", () => { typingCat?.dispose(); store?.flush(); quick?.dispose(); quickMemo?.dispose(); drawer?.dispose(); if (noteHotkeyHeld) globalShortcut.unregister(noteHotkeyHeld); globalShortcut.unregisterAll(); store?.unwatch(); ai?.stop(); });
 app.on("window-all-closed", () => undefined);
 
 app.whenReady().then(() => {
@@ -7473,6 +7769,7 @@ app.whenReady().then(() => {
   const moved = demo ? undefined : takeMoved(place.settings);
   if (moved) note.webContents.once("did-finish-load", () => setTimeout(() => notice({ icon: "folder", text: storageMovedText(moved) }), 1200));
   noteEars = new NoteEars(note, rendererDirectory, Boolean(snapshotDirectory));
+  applyNoteLayer();
   floating = new FloatingNote(store, rendererDirectory, showNote, quit);
   const live = !snapshotDirectory && !offscreenEnabled;
   // A timer started, paused or ended: every window hears it (the 오늘 창's card), and the tray.
@@ -7528,7 +7825,10 @@ app.whenReady().then(() => {
     drawer: () => drawer.show(),
     alarms: () => openSettings("clock"),
     finished: () => archive?.all() ?? [],
+    typingLately: () => typingCat?.typedWithin(typingChatterQuietMs) ?? false,
   });
+  // #288: the keyboard hook for 모든 앱에서 is loaded only when it is chosen (never in --mcp-stdio, which loads none of this).
+  typingCat = new TypingCatWindow(store, rendererDirectory, { changed: updateTray }, loadKeyHook);
   // 시계 알람: every device rings its own; snapshots never ring.
   alarmClock = new AlarmClock(store, rendererDirectory, { petAnchor: () => pet?.anchor(), changed: updateTray, rang: alarmNotice }, live);
   ReminderPopup.petAnchor = () => pet?.anchor();
@@ -7577,7 +7877,7 @@ app.whenReady().then(() => {
   store.on("change", applyNoteWidthCap);
   store.on("prefs", (key: keyof Prefs) => {
     if (key === "spaceGroups") applyNoteWidthCap();
-    if (key === "alwaysOnTop") note.setAlwaysOnTop(store.prefs.alwaysOnTop, "floating");
+    if (key === "noteLayer") applyNoteLayer();
     // Started at sign-in with --at-login, so a launch by hand can be told apart (the cat's question).
     if (key === "openAtLogin" && !demo) app.setLoginItemSettings({ openAtLogin: store.prefs.openAtLogin, ...(process.platform === "win32" ? { args: [loginFlag] } : {}) });
     if (key === "taskbarBadge") updateTaskbar();

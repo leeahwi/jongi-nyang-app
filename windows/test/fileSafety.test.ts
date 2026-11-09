@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { backupMessages, makeBackup, type BackupFiles } from "../src/core/backup";
@@ -10,6 +9,7 @@ import { AutoBackup } from "../src/main/autoBackup";
 import { checkFile, readChosenText, readTextSafely, RefusedFile, temporaryPath, writeFileAtomically } from "../src/main/safeFiles";
 import { importInto, mergeArchive, readDataFiles } from "../src/main/storageFolder";
 import { Store } from "../src/main/store";
+import { temporaryFolder } from "./temporaryFolder";
 
 // #173 (security review L-04 · L-05 · I-08): links, sizes and temporary files — the shared cases L1… Z1… T1… of
 // docs/plans/file-safety-cases.json (the Mac's Tests/PaperTodoTests/BackupTests.swift reads the same file). Fictional
@@ -23,7 +23,7 @@ const cases = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs
   messages: { tooLarge: Record<"ko" | "en" | "nl", string> };
 };
 
-const temporary = () => fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-safety-"));
+const temporary = () => temporaryFolder("paper-todo-safety-");
 const todos = (title: string) => serializeNotebook({ items: [{ id: "00000000-0000-4000-8000-000000000001", title, isCompleted: false, createdAt: "2026-10-01T09:00:00Z" }] });
 const put = (folder: string, name: string, text: string) => {
   const file = path.join(folder, ...name.split("/"));

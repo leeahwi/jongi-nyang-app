@@ -1,4 +1,5 @@
 import Foundation
+import PaperCore
 import SwiftUI
 
 /// Everything the desktop pet can do. Actions are short clips; `sit` and `sleep` are resting
@@ -77,7 +78,8 @@ enum PetMotion {
         }
     }
 
-    static func frame(_ activity: PetActivity, homeX: CGFloat, at now: Date) -> PetFrame {
+    /// `size`: the cat's (#304: its stride follows it; where it is along the floor doesn't).
+    static func frame(_ activity: PetActivity, homeX: CGFloat, at now: Date, size: CGFloat = CatSize.petBase) -> PetFrame {
         let t = max(0, now.timeIntervalSince(activity.start))
         let u = activity.duration > 0 ? min(1, t / activity.duration) : 1
         var frame = PetFrame(x: homeX)
@@ -132,7 +134,7 @@ enum PetMotion {
             frame.x = from + (to - from) * CGFloat(eased)
             frame.facingRight = to > from
             if let cycle = PetArt.walkCycle {
-                frame.walkFrame = Int(travelled / PetArt.walkStride * CGFloat(cycle.count)) % cycle.count
+                frame.walkFrame = Int(travelled / PetArt.walkStride(size) * CGFloat(cycle.count)) % cycle.count
                 // Paw lifts are drawn into each frame. Global bounce would lift planted paws too.
             } else {
                 frame.pose = MascotMotion.step(Double(travelled) / 16, strength: min(1, u * 6, (1 - u) * 6))

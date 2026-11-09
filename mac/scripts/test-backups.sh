@@ -42,6 +42,7 @@ swiftc -warnings-as-errors -parse-as-library \
     "$resource_accessor" \
     "${core_objects[@]}" \
     Tests/PaperTodoTests/BackupTests.swift \
+    Tests/PaperTodoTests/TestDefaults.swift \
     -o .build/checks/PaperTodoBackupTests
 
 .build/checks/PaperTodoBackupTests

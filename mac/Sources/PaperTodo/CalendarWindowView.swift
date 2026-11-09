@@ -15,6 +15,10 @@ struct CalendarWindowView: View {
     @State private var page: String
     @State private var sheet: CalendarSheetRequest?
     @FocusState private var focused: Bool
+    /// #275: the day list's event the keys are on (Tab from the days), by its place in the list; nil: the days have them.
+    @State private var picked: Int?
+    /// VoiceOver goes along with it.
+    @AccessibilityFocusState private var spoken: Int?
     @State private var width: CGFloat = 820
     /// The day panel grows a little on a wide window.
     private var panelWidth: CGFloat { min(360, max(260, width * 0.34)) }
@@ -39,10 +43,11 @@ struct CalendarWindowView: View {
         _page = State(initialValue: day)
     }
 
-    /// Design snapshots: a given page and view.
-    init(model: AppModel, today: String, mode: Mode) {
+    /// Design snapshots: a given page and view (`pick`: the day list's event the keys are on, #275).
+    init(model: AppModel, today: String, mode: Mode, pick: Int? = nil) {
         self.init(model: model, today: today)
         _mode = State(initialValue: mode)
+        _picked = State(initialValue: pick)
     }
 
     /// Today, worked out again when the day turns (`dayTurns`: the today ring and badge move at midnight).
@@ -60,7 +65,7 @@ struct CalendarWindowView: View {
 
     private func makePage() -> CalendarMonth.Page {
         // #227: without the to-dos this Mac hides now (as the 오늘 창: a peek on the note doesn't reach here).
-        pages.page(days: days, selected: selected, events: calendar.events, tasks: model.hereItems, now: now, language: language)
+        pages.page(days: days, selected: selected, events: calendar.events, tasks: model.hereItems, series: model.hereSeries, now: now, language: language)
     }
 
     var body: some View {
@@ -101,9 +106,12 @@ struct CalendarWindowView: View {
         .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged).merge(with:
             NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange),
             NotificationCenter.default.publisher(for: .NSSystemClockDidChange)).receive(on: RunLoop.main)) { _ in dayTurns += 1 }
-        .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow, .return, "t", "T"]) { press in
-            key(press.key)
+        // #275: Tab · ⇧Tab (it comes as ‘\u{19}’) and Esc for the day list's events.
+        .onKeyPress(keys: [.leftArrow, .rightArrow, .upArrow, .downArrow, .return, .tab, "\u{19}", .escape, "t", "T"]) { press in
+            key(press.key, events: data.events(on: selected).count)
         }
+        .onChange(of: selected) { picked = nil }
+        .onChange(of: picked) { spoken = picked }
     }
 
     // MARK: Top bar
@@ -196,7 +204,8 @@ struct CalendarWindowView: View {
                                 let dayBands = Array(bands[column].dropFirst(content.holiday == nil || dots ? 0 : 1))
                                 let two = dots ? (holiday: false, lines: []) : twoLines(content, day: day, bands: dayBands, cellWidth: cellWidth)
                                 Keyed(key: MonthCellKey(day: day, inMonth: inMonth(day), selected: day == selected, today: today, lines: lines,
-                                                        dots: dots, all: data.cell(day, limit: 99), marks: marksKey(day), bands: dayBands, two: two.lines,
+                                                        dots: dots, all: data.cell(day, limit: 99, folding: true), folded: data.folded(day), marks: marksKey(day),
+                                                        bands: dayBands, two: two.lines,
                                                         twoHoliday: two.holiday, width: (cellWidth * 2).rounded())) {
                                     monthCell(day, data: data, content: content, dots: dots, bands: dayBands, two: two.lines, twoHoliday: two.holiday,
                                               cellWidth: cellWidth)
@@ -227,6 +236,8 @@ struct CalendarWindowView: View {
         var lines: Int
         var dots: Bool
         var all: (items: [CalendarMonth.CellItem], more: Int)
+        /// #296: the faded daily · weekday repeats its head counts.
+        var folded: [CalendarMonth.DayTask]
         /// #234: the lunar date and the holiday it shows.
         var marks: String
         /// calendar-flows D1 · D2: how its lines join the days beside it, which titles take two lines, and the cell's
@@ -238,7 +249,7 @@ struct CalendarWindowView: View {
         var width: CGFloat
         static func == (a: Self, b: Self) -> Bool {
             a.day == b.day && a.inMonth == b.inMonth && a.selected == b.selected && a.today == b.today && a.lines == b.lines
-                && a.dots == b.dots && a.all.items == b.all.items && a.all.more == b.all.more && a.marks == b.marks
+                && a.dots == b.dots && a.all.items == b.all.items && a.all.more == b.all.more && a.folded == b.folded && a.marks == b.marks
                 && a.bands == b.bands && a.two == b.two && a.twoHoliday == b.twoHoliday && a.width == b.width
         }
     }
@@ -256,8 +267,9 @@ struct CalendarWindowView: View {
         // #234: a holiday's name takes a line.
         let holiday = holidayName(day)
         let room = holiday != nil && !dots ? max(1, lines - 1) : lines
-        var cell = data.cell(day, limit: room)
-        if cell.more > 0 && room > 1 { cell = data.cell(day, limit: room - 1) }
+        // #296: the faded daily · weekday repeats are counted in the head, not written as lines.
+        var cell = data.cell(day, limit: room, folding: true)
+        if cell.more > 0 && room > 1 { cell = data.cell(day, limit: room - 1, folding: true) }
         return CellContent(holiday: holiday, lines: lines, room: room, cell: cell)
     }
 
@@ -273,6 +285,8 @@ struct CalendarWindowView: View {
         let font = NSFont.systemFont(ofSize: 10.5)
         let fits: [CalendarMonth.LineFit] = content.cell.items.enumerated().map { index, item in
             if bands.indices.contains(index), bands[index].joined { return .band }
+            // #296: a faded repeat keeps one line; the spare lines go to the events and to-dos.
+            if !CalendarMonth.mayWrap(item) { return .fit }
             let title: String, inset: CGFloat
             switch item {
             // The cell's padding, the colour bar (and a tinted band's own padding) · the flag or bell.
@@ -293,21 +307,15 @@ struct CalendarWindowView: View {
         let holiday = content.holiday
         let cell = content.cell
         let runs = bands.contains { $0.run > 1 }
+        let folded = data.folded(day)
+        let lunarShown = !dots && lunar(day) != nil
+            && CalendarWidget.showsLunar(lunarDay: KoreanCalendar.lunar(day)?.day ?? 0, cellWidth: cellWidth, moreInHead: false)
         return VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 2) {
-                dayNumber(day, size: 12)
-                Spacer(minLength: 0)
-                if let lunar = lunar(day), !dots,
-                   CalendarWidget.showsLunar(lunarDay: KoreanCalendar.lunar(day)?.day ?? 0, cellWidth: cellWidth, moreInHead: false) {
-                    Text(lunar.label)
-                        .font(.system(size: 9.5).monospacedDigit())
-                        .foregroundStyle(PaperTheme.ink3)
-                        .lineLimit(1)
-                        .fixedSize()
-                        .help(lunar.spoken)
-                        .padding(.trailing, 2)
-                }
-            }
+            // #296: the repeat mark and how many beside the number; #295: where the head is short of room, the lunar 1st
+            // without its mark ("10.1"), then no lunar date, then the mark without its count.
+            // Never wider than the cell (the grid stays even); its last 2 pt may go into the cell's padding.
+            cellHead(day, folded: folded, lunarShown: lunarShown, room: cellWidth - 6)
+                .frame(width: max(0, cellWidth - 8), alignment: .leading)
             if let holiday, !dots {
                 Text(twoHoliday ? shownHoliday(day) ?? holiday : holiday)
                     .font(.system(size: 10, weight: .semibold))
@@ -320,12 +328,12 @@ struct CalendarWindowView: View {
             }
             if dots {
                 // Too narrow for words: a dot per item, then "+N".
-                let all = data.cell(day, limit: 99).items
+                let all = data.cell(day, limit: 99, folding: true).items
                 HStack(spacing: 2.5) {
                     ForEach(Array(all.prefix(4).enumerated()), id: \.offset) { _, item in
                         if case .task(let task) = item {
-                            // A deadline: a small flag, as on Windows; a reminder (#227): a small bell.
-                            Image(systemName: task.kind == .deadline ? "flag.fill" : "bell.fill").font(.system(size: 6.5))
+                            // A deadline: a small flag, as on Windows; a reminder (#227): a small bell; a repeat (#274): its arrows.
+                            Image(systemName: Self.symbol(task)).font(.system(size: 6.5))
                                 .foregroundStyle(dotColor(item, day: day))
                                 .help(CalendarMonth.tooltip(task, language: language))
                         } else {
@@ -370,8 +378,40 @@ struct CalendarWindowView: View {
         .onTapGesture { select(day) }
         .accessibilityElement(children: .combine)
         // #260: the holiday's whole name, even where the cell cuts it.
-        .accessibilityLabel(CalendarMonth.dayTitle(day, language: language) + (holiday.map { ", " + $0 } ?? ""))
+        // #296: and the repeats its head counts ("매일 반복 2개").
+        .accessibilityLabel(([CalendarMonth.dayTitle(day, language: language), holiday, CalendarMonth.foldedLabel(folded, language: language)])
+            .compactMap { $0 }.joined(separator: ", "))
         .accessibilityAddTraits(day == selected ? .isSelected : [])
+    }
+
+    /// A month cell's head: the day's number, #296 the repeat mark of its folded repeats (with how many from two on), and
+    /// the lunar date at the right — what fits `room` (`CalendarWidget.headFit`: #295 the 1st without its mark first).
+    private func cellHead(_ day: String, folded: [CalendarMonth.DayTask], lunarShown: Bool, room: CGFloat) -> some View {
+        let lunar = lunarShown ? KoreanCalendar.lunar(day) : nil
+        let full = lunar.map { KoreanCalendar.lunarLabel($0, language: language) }
+        let short = lunar.map { KoreanCalendar.lunarLabel($0, language: language, short: true) }
+        let mark = folded.isEmpty ? (mark: 0.0, count: 0.0) : RepeatMark.widths(count: folded.count, size: 7.5)
+        // (The lunar date's 2 pt at its right may go into the cell's padding.)
+        let fit = CalendarWidget.headFit(room: Double(room), number: 20, mark: mark.mark, count: mark.count, more: 0,
+                                         lunar: full.map { HeadText.width($0, size: 9.5) } ?? 0,
+                                         short: short.map { HeadText.width($0, size: 9.5) } ?? 0, gap: 2)
+        return HStack(spacing: 2) {
+            dayNumber(day, size: 12)
+            if fit.mark {
+                RepeatMark(count: fit.count ? folded.count : 1, size: 7.5)
+                    .help(CalendarMonth.foldedTooltip(folded, language: language) ?? "")
+            }
+            Spacer(minLength: 0)
+            if fit.lunar != .none, let label = fit.lunar == .full ? full : short, let marks = self.lunar(day) {
+                Text(label)
+                    .font(.system(size: 9.5).monospacedDigit())
+                    .foregroundStyle(PaperTheme.ink3)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .help(marks.spoken)
+                    .padding(.trailing, 2)
+            }
+        }
     }
 
     @ViewBuilder
@@ -413,16 +453,18 @@ struct CalendarWindowView: View {
             .help(cellTime(event, on: day).map { $0 + " " + event.title } ?? event.title)
         case .task(let task):
             // Clay only when it's due today or late; a deadline still ahead is a quiet ink flag. A reminder (#227): a sage
-            // bell and the title, without its time (that's in the tooltip and the day panel).
+            // bell and the title, without its time (that's in the tooltip and the day panel). A repeat (#274): sage arrows,
+            // faded after the next one.
             let late = task.kind == .deadline && day <= today
             HStack(alignment: two ? .top : .center, spacing: 2) {
-                Image(systemName: task.kind == .deadline ? "flag.fill" : "bell.fill").font(.system(size: 7))
+                Image(systemName: Self.symbol(task)).font(.system(size: 7))
                     .foregroundStyle(late ? PaperTheme.clayText : task.kind == .deadline ? PaperTheme.ink3 : PaperTheme.sage)
+                    .opacity(task.ahead ? 0.5 : 1)
                     .padding(.top, two ? 3 : 0)
                 Text(two ? CalendarMonth.hyphenated(task.title.keepingParticles, language: language) : task.title.keepingParticles)
                     .font(.system(size: 10.5)).lineLimit(two ? 2 : 1)
                     .fixedSize(horizontal: false, vertical: two)
-                    .foregroundStyle(late ? PaperTheme.clayText : PaperTheme.ink2)
+                    .foregroundStyle(late ? PaperTheme.clayText : task.ahead ? PaperTheme.ink3 : PaperTheme.ink2)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .help(CalendarMonth.tooltip(task, language: language))
@@ -432,8 +474,18 @@ struct CalendarWindowView: View {
     private func dotColor(_ item: CalendarMonth.CellItem, day: String) -> Color {
         switch item {
         case .event(let event): color(event)
+        case .task(let task) where task.ahead: PaperTheme.sage.opacity(0.5)
         case .task(let task) where task.kind != .deadline: PaperTheme.sage
         case .task: day <= today ? PaperTheme.clay : PaperTheme.ink3
+        }
+    }
+
+    /// A to-do line's mark: a deadline's flag, a reminder's bell, a repeat's arrows (#274).
+    static func symbol(_ task: CalendarMonth.DayTask) -> String {
+        switch task.kind {
+        case .deadline: "flag.fill"
+        case .repeating: "repeat"
+        case .reminder, .range: "bell.fill"
         }
     }
 
@@ -586,12 +638,14 @@ struct CalendarWindowView: View {
                     .frame(width: 10, height: size - 2)
                     .frame(width: 12)
             } else {
-                Image(systemName: task.kind == .deadline ? "flag.fill" : "bell.fill")
+                Image(systemName: Self.symbol(task))
                     .font(.system(size: size - 4, weight: .semibold))
                     .foregroundStyle(task.kind == .deadline ? (late ? PaperTheme.clay : PaperTheme.ink3) : PaperTheme.sage)
+                    .opacity(task.ahead ? 0.5 : 1)
                     .frame(width: 12)
             }
-            Text(task.time ?? L("마감"))
+            // #274: a repeat without a time says 반복.
+            Text(task.time ?? (task.kind == .repeating ? CalendarMonth.repeatWord(ahead: false, language: language) : L("마감")))
                 .font(.system(size: size - 1, weight: .medium).monospacedDigit())
                 .foregroundStyle(late ? PaperTheme.clayText : PaperTheme.secondary)
                 .lineLimit(1)
@@ -599,7 +653,10 @@ struct CalendarWindowView: View {
                 .frame(minWidth: timeWidth ?? agendaWidth, alignment: .leading)
                 .fixedSize(horizontal: task.kind == .range, vertical: false)
             Text(task.title).font(.system(size: size)).lineLimit(1)
+                .foregroundStyle(task.ahead ? PaperTheme.ink3 : PaperTheme.ink)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(CalendarMonth.spoken(task, language: language))
     }
 
     // MARK: The day
@@ -627,13 +684,15 @@ struct CalendarWindowView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.bottom, 10)
             }
-            ScrollView {
+            ScrollViewReader { scroller in ScrollView {
                 VStack(alignment: .leading, spacing: 6) {
                     section(L("일정"))
                     if dayEvents.isEmpty {
                         Text("일정 없음").font(.system(size: 12)).foregroundStyle(PaperTheme.faded)
                     }
-                    ForEach(dayEvents, id: \.key) { event in panelEvent(event) }
+                    ForEach(Array(dayEvents.enumerated()), id: \.element.key) { index, event in
+                        panelEvent(event, index: index, count: dayEvents.count)
+                    }
                     Button { newEvent(on: selected) } label: {
                         Label("새 일정", systemImage: "plus").font(.system(size: 12, weight: .medium))
                     }
@@ -644,14 +703,19 @@ struct CalendarWindowView: View {
                         section(L("할 일")).padding(.top, 12)
                         // With a time range among them, the column is wide enough for "14:00–15:30" on every line.
                         let timeWidth = tasks.contains { $0.kind == .range } ? panelRangeWidth : panelTimeWidth
-                        ForEach(tasks, id: \.taskId) { task in
-                            Button { model.reveal(task.taskId) } label: { taskLine(task, size: 12.5, day: selected, timeWidth: timeWidth).contentShape(Rectangle()) }
+                        ForEach(Array(tasks.enumerated()), id: \.offset) { _, task in
+                            Button { open(task) } label: { taskLine(task, size: 12.5, day: selected, timeWidth: timeWidth).contentShape(Rectangle()) }
                                 .buttonStyle(.plain)
-                                .help("노트에서 보기")
+                                .help(task.taskId == nil ? L("반복 할 일 보기") : L("노트에서 보기"))
                         }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                // #275: room for the focus ring; the list stays where it was.
+                .padding(5)
+            }
+            .padding(-5)
+            .onChange(of: picked) { if let picked { withAnimation(.easeOut(duration: 0.15)) { scroller.scrollTo("event-\(picked)") } } }
             }
         }
         .padding(16)
@@ -661,8 +725,9 @@ struct CalendarWindowView: View {
         Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(PaperTheme.secondary)
     }
 
-    private func panelEvent(_ event: CalendarEvent) -> some View {
-        Button { sheet = .edit(event, in: calendar) } label: {
+    /// `index` of `count`: its place in the day's list (#275: the keys' focus ring, and VoiceOver's ‘일정 3개 중 1번째’).
+    private func panelEvent(_ event: CalendarEvent, index: Int, count: Int) -> some View {
+        Button { picked = nil; sheet = .edit(event, in: calendar) } label: {
             HStack(alignment: .top, spacing: 8) {
                 RoundedRectangle(cornerRadius: 1.5).fill(color(event)).frame(width: 3, height: event.location == nil ? 18 : 30)
                 VStack(alignment: .leading, spacing: 2) {
@@ -684,13 +749,31 @@ struct CalendarWindowView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // #275: the event the keys are on — a sage ring around it (Return opens it, Esc goes back to the day).
+        .overlay {
+            if picked == index {
+                RoundedRectangle(cornerRadius: 7, style: .continuous).strokeBorder(PaperTheme.sage, lineWidth: 2).padding(-5)
+            }
+        }
         .help("눌러서 고치기")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(CalendarMonth.eventLabel(title: event.title, time: CalendarMonth.agendaTime(event, on: selected, language: language),
+                                                     index: index, count: count, language: language))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { picked = nil; sheet = .edit(event, in: calendar) }
+        .accessibilityFocused($spoken, equals: index)
         .contextMenu { TodayEventsStrip.menu(event, calendar: calendar, onAddTask: { model.add($0, literal: true) }) { sheet = $0 } }
+        .id("event-\(index)")
     }
 
     // MARK: Doing
 
     private func color(_ event: CalendarEvent) -> Color { PaperTheme.event(event.color, fallback: PaperTheme.sage) }
+
+    /// A to-do's row in the note; a repeat without an open copy (#274: today's is done) opens its rule (책상 → 반복).
+    private func open(_ task: CalendarMonth.DayTask) {
+        if let id = task.taskId { model.reveal(id) } else { model.showRepeatSettings() }
+    }
 
     private func select(_ day: String) {
         selected = day
@@ -714,8 +797,26 @@ struct CalendarWindowView: View {
         go(to: CalendarMonth.parts(today).month == CalendarMonth.parts(day).month && CalendarMonth.parts(today).year == CalendarMonth.parts(day).year ? today : day)
     }
 
-    private func key(_ key: KeyEquivalent) -> KeyPress.Result {
+    private func key(_ key: KeyEquivalent, events count: Int) -> KeyPress.Result {
         guard sheet == nil else { return .ignored }
+        // #275: Tab from the day to its list's first event, ↑ ↓ · Tab between them, Return opens one, Esc back to the day.
+        let listKey: CalendarMonth.ListKey = switch key {
+        case .tab: .tab
+        case "\u{19}": .backTab
+        case .upArrow: .up
+        case .downArrow: .down
+        case .return: .enter
+        case .escape: .escape
+        default: .other
+        }
+        let step = CalendarMonth.listKey(listKey, picked: picked, count: count)
+        picked = step.picked
+        if let open = step.open {
+            let event = makePage().events(on: selected)[open]
+            sheet = .edit(event, in: calendar)
+        }
+        if step.handled { return .handled }
+        if key == .tab || key == "\u{19}" || key == .escape { return .ignored }
         switch key {
         case .leftArrow: move(-1)
         case .rightArrow: move(1)
@@ -776,6 +877,7 @@ final class CalendarPageCache {
         var selected: String
         var events: [LocalEvent]
         var tasks: [TodoItem]
+        var series: [Series]
         var today: String
         var language: AppLanguage
         var calendar: Calendar
@@ -800,15 +902,17 @@ final class CalendarPageCache {
         return shownDays
     }
 
-    func page(days: [String], selected: String, events: [LocalEvent], tasks: [TodoItem], now: Date, language: AppLanguage) -> CalendarMonth.Page {
+    func page(days: [String], selected: String, events: [LocalEvent], tasks: [TodoItem], series: [Series] = [], now: Date,
+              language: AppLanguage) -> CalendarMonth.Page {
         let calendar = Calendar.paper
-        let key = Key(days: days, selected: selected, events: events, tasks: tasks, today: Archive.dayKey(now, calendar: calendar),
+        let key = Key(days: days, selected: selected, events: events, tasks: tasks, series: series, today: Archive.dayKey(now, calendar: calendar),
                       language: language, calendar: calendar)
         if let page, key == self.key { return page }
         let range = CalendarMonth.fetchRange(days, calendar: calendar)
         // As EventBook.occurrences.
         let occurrences = LocalEvent.expand(events, from: range.start, to: range.end, calendar: calendar, language: .current)
-        let made = CalendarMonth.Page(days: days + [selected], events: occurrences, tasks: tasks, now: now, calendar: calendar, language: language)
+        let made = CalendarMonth.Page(days: days + [selected], events: occurrences, tasks: tasks, series: series, now: now, calendar: calendar,
+                                      language: language)
         self.key = key
         page = made
         return made

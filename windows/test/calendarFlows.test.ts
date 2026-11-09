@@ -2,13 +2,17 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { bandKey, bands, cellTwoLines, eventsOn, hyphenates, lineFit, monthGrid, twoLineTitles, weekDays, weekdayLabels, type Band, type CalendarEvent, type LineFit } from "../src/core/calendar";
-import { holidayWord, lineOver, sheetLines, showsLunar } from "../src/core/calendarWidget";
+import {
+  bandKey, bands, cellItems, cellTwoLines, dateKey, dayTasks, eventLabel, eventsOn, foldedLabel, foldedRepeats, foldedTooltip, hyphenates, lineFit, listKey, mayWrap, monthGrid, repeatItems, repeatsOn, taskSpoken,
+  taskTooltip, twoLineTitles, weekDays, weekdayLabels, type Band, type CalendarEvent, type DayTask, type LineFit, type ListKey,
+} from "../src/core/calendar";
+import { headFit, holidayWord, lineOver, monthCell, sheetLines, showsLunar } from "../src/core/calendarWidget";
 import { dayFor } from "../src/core/deadline";
 import { colorHex, type EventColor } from "../src/core/events";
-import { holidayLabel, holidayName, holidayShown, type HolidayName } from "../src/core/koreanCalendar";
+import { holidayLabel, holidayName, holidayShown, lunarLabel, type HolidayName } from "../src/core/koreanCalendar";
 import { firstDayFromIntl, firstDayFromRegistry, setWeekStart, weekStartFrom, weekStartsMonday, type Lang } from "../src/core/lang";
 import type { TodoItem } from "../src/core/notebook";
+import type { RepeatKind, Series } from "../src/core/repeat";
 
 // 달력을 실제로 쓰는 흐름 (docs/plans/calendar-flows.md): the shared cases from docs/plans/calendar-flows-cases.json (the
 // Mac's scripts/test-calendar-flows.sh reads the same file) — the all-day order that keeps a trip's band in place, which
@@ -143,3 +147,121 @@ test(file.sheet.over.case, () => {
 for (const entry of file.lunar.cases) {
   test(entry.case, () => assert.equal(showsLunar(entry.lunarDay, entry.width, entry.moreInHead), entry.shows));
 }
+
+// #274: the days a repeating to-do comes back on.
+type SeriesEntry = { title: string; rule: { kind: RepeatKind; weekdays?: number[]; monthDay?: number }; remindAt?: string; lastPlaced?: string; copy?: { reminderAt?: string; dueDate?: string } };
+const seriesOf = (entries: SeriesEntry[], at: Date): { series: Series[]; tasks: TodoItem[] } => {
+  const series: Series[] = [], tasks: TodoItem[] = [];
+  entries.forEach((entry, index) => {
+    const id = `S${index + 1}`;
+    series.push({ id, title: entry.title, rule: entry.rule, ...(entry.remindAt ? { remindAt: entry.remindAt } : {}), createdAt: at.toISOString(), ...(entry.lastPlaced ? { lastPlaced: entry.lastPlaced } : {}) });
+    if (entry.copy) {
+      tasks.push({
+        id: `C${index + 1}`, title: entry.title, isCompleted: false, createdAt: at.toISOString(), seriesID: id,
+        ...(entry.copy.dueDate ? { dueDate: entry.copy.dueDate } : {}), ...(entry.copy.reminderAt ? { reminderAt: moment(entry.copy.reminderAt).toISOString() } : {}),
+      });
+    }
+  });
+  return { series, tasks };
+};
+const span = (from: string, to: string) => {
+  const days = [from];
+  for (let date = moment(`${from}T12:00:00`); days[days.length - 1] < to;) { date.setDate(date.getDate() + 1); days.push(dateKey(date)); }
+  return days;
+};
+const repeatWritten = (day: string, task: DayTask) => `${day} ${task.ahead ? "ahead" : "next"}${task.time ? ` ${task.time}` : ""} ${task.title}${task.taskId ? " (copy)" : ""}`;
+
+for (const entry of file.repeats.cases) {
+  test(entry.case, () => {
+    const at = entry.now ? moment(entry.now) : now;
+    const made = seriesOf(entry.series, at);
+    const days = span(entry.from, entry.to);
+    const found = repeatsOn(days, made.series, made.tasks, at);
+    assert.deepEqual(days.flatMap((day) => (found.get(day) ?? []).map((task) => repeatWritten(day, task))), entry.lines);
+    // The calendar's to-dos carry them: the day's list gives the same, after its to-dos.
+    const carried = repeatItems(made.tasks, made.series, days, at);
+    for (const day of days) assert.deepEqual(dayTasks(day, carried).filter((task) => task.kind === "repeat"), found.get(day) ?? [], `list ${day}`);
+  });
+}
+
+test(file.repeats.cell.case, () => {
+  const cell = file.repeats.cell;
+  const events = (cell.events as string[]).map((name) => eventOf(name, pool[name]));
+  const todos = (cell.todos as { title: string; dueDate?: string; reminderAt?: string }[]).map((entry, index) => ({
+    id: `T${index + 1}`, title: entry.title, isCompleted: false, createdAt: now.toISOString(),
+    ...(entry.dueDate ? { dueDate: entry.dueDate } : {}), ...(entry.reminderAt ? { reminderAt: moment(entry.reminderAt).toISOString() } : {}),
+  }) as TodoItem);
+  const made = seriesOf(cell.series, now);
+  const carried = repeatItems([...todos, ...made.tasks], made.series, [cell.day], now);
+  const titles = (found: ReturnType<typeof cellItems>) => found.items.map((item) => (item.kind === "event" ? item.event.title : item.task.title));
+  const shown = cellItems(cell.day, events, carried, cell.limit);
+  assert.deepEqual(titles(shown), cell.titles);
+  assert.equal(shown.more, cell.more);
+  assert.deepEqual(titles(cellItems(cell.day, events, carried, 99)), cell.roomy);
+});
+
+test(file.repeats.words.case, () => {
+  const words = file.repeats.words;
+  langs.forEach((lang, index) => {
+    for (const ahead of [true, false]) {
+      const task: DayTask = { title: words.title, kind: "repeat", time: words.time, taskId: "", ahead };
+      const name = ahead ? "ahead" : "next";
+      assert.equal(taskTooltip(task, lang), words.tooltip[name][index], `tooltip ${name} ${lang}`);
+      assert.equal(taskSpoken(task, lang), words.spoken[name][index], `spoken ${name} ${lang}`);
+    }
+    assert.equal(taskSpoken({ title: words.title, kind: "repeat", taskId: "", ahead: true }, lang), words.untimed[index], `untimed ${lang}`);
+  });
+});
+
+// #296: the faded daily · weekday repeats a month cell folds into its head.
+for (const entry of file.repeats.fold.cases) {
+  test(entry.case, () => {
+    const events = (entry.events as string[]).map((name) => eventOf(name, pool[name]));
+    const made = seriesOf(entry.series as SeriesEntry[], now);
+    const carried = repeatItems(made.tasks, made.series, [entry.day], now);
+    const titles = (items: ReturnType<typeof cellItems>["items"]) => items.map((item) => (item.kind === "event" ? item.event.title : item.task.title));
+    const cell = cellItems(entry.day, events, carried, entry.limit, "ko", true);
+    assert.deepEqual(titles(cell.items), entry.titles);
+    assert.equal(cell.more, entry.more);
+    const folded = foldedRepeats(entry.day, carried);
+    assert.deepEqual(folded.map((task) => task.title), entry.folded);
+    langs.forEach((lang, index) => assert.equal(foldedLabel(folded, lang) ?? null, entry.label[index], `label ${lang}`));
+    assert.equal(foldedTooltip(folded) ?? null, entry.tooltip);
+    // The week, the day's list and the sheet still show every one.
+    assert.deepEqual(dayTasks(entry.day, carried).filter((task) => task.kind === "repeat").map((task) => task.title), entry.list);
+    // The widget's month cell folds them too.
+    assert.deepEqual(monthCell(entry.day, events, carried as TodoItem[], "ko", "wall").lines.map((line) => line.title), entry.titles);
+  });
+}
+
+test(file.repeats.fold.wrap.case, () => {
+  const wrap = file.repeats.fold.wrap;
+  assert.deepEqual(wrap.lines.map((line: { kind: string; ahead: boolean }) => mayWrap({ kind: "task", task: { title: "분리수거", kind: line.kind as DayTask["kind"], taskId: "", ahead: line.ahead } })), wrap.wraps);
+});
+
+// #295: the lunar 1st without its mark where the head is short of room.
+for (const entry of file.lunar.short.cases) {
+  test(entry.case, () => {
+    langs.forEach((lang, index) => {
+      assert.equal(lunarLabel({ month: entry.month, day: entry.day, leap: entry.leap }, lang), entry.labels[index], `label ${lang}`);
+      assert.equal(lunarLabel({ month: entry.month, day: entry.day, leap: entry.leap }, lang, true), entry.short[index], `short ${lang}`);
+    });
+  });
+}
+
+for (const entry of file.lunar.short.head.cases) {
+  test(entry.case, () => assert.deepEqual(headFit(entry), entry.then));
+}
+
+// #275: the desk calendar's day list by the keys.
+for (const entry of file.keys.cases) {
+  test(entry.case, () => {
+    const step = listKey(entry.key as ListKey, entry.picked ?? undefined, entry.count);
+    assert.deepEqual({ picked: step.picked ?? null, open: step.open ?? null, handled: step.handled }, entry.then);
+  });
+}
+
+test(file.keys.label.case, () => {
+  const label = file.keys.label;
+  langs.forEach((lang, index) => assert.equal(eventLabel(label.title, label.time, label.index, label.count, lang), label.spoken[index], lang));
+});

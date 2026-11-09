@@ -164,6 +164,29 @@ private enum CalendarFlowsTests {
             }
         }
 
+        // #295: the lunar 1st without its mark where the head is short of room.
+        for entry in ((file["lunar"] as! [String: Any])["short"] as! [String: Any])["cases"] as! [[String: Any]] {
+            try test(entry["case"] as! String) {
+                let lunar = KoreanCalendar.Lunar(month: entry["month"] as! Int, day: entry["day"] as! Int, leap: entry["leap"] as! Bool)
+                for (index, language) in languages.enumerated() {
+                    try equal(KoreanCalendar.lunarLabel(lunar, language: language), (entry["labels"] as! [String])[index], "label \(language)")
+                    try equal(KoreanCalendar.lunarLabel(lunar, language: language, short: true), (entry["short"] as! [String])[index], "short \(language)")
+                }
+            }
+        }
+
+        for entry in (((file["lunar"] as! [String: Any])["short"] as! [String: Any])["head"] as! [String: Any])["cases"] as! [[String: Any]] {
+            try test(entry["case"] as! String) {
+                func w(_ key: String) -> Double { Double(entry[key] as! Int) }
+                let fit = CalendarWidget.headFit(room: w("room"), number: w("number"), mark: w("mark"), count: w("count"), more: w("more"),
+                                                 lunar: w("lunar"), short: w("short"), gap: w("gap"))
+                let then = entry["then"] as! [String: Any]
+                try equal(fit.lunar.rawValue, then["lunar"] as! String, "lunar")
+                try equal(fit.count, then["count"] as! Bool, "count")
+                try equal(fit.mark, then["mark"] as! Bool, "mark")
+            }
+        }
+
         // The day sheet.
         let sheet = file["sheet"] as! [String: Any]
         for entry in sheet["holiday"] as! [[String: Any]] {
@@ -189,6 +212,150 @@ private enum CalendarFlowsTests {
             let lines = CalendarWidget.sheetLines(day, page: page, tasks: tasks, now: now, calendar: calendar)
             try equal(lines.map(\.title), over["lines"] as! [String], "lines")
             try equal(lines.map { $0.over(now) }, over["over"] as! [Bool], "over")
+        }
+
+        // #274: the days a repeating to-do comes back on.
+        let repeats = file["repeats"] as! [String: Any]
+        func series(_ entries: [[String: Any]], now: Date) -> (series: [Series], tasks: [TodoItem]) {
+            var found: [Series] = [], tasks: [TodoItem] = []
+            for (index, entry) in entries.enumerated() {
+                let rule = entry["rule"] as! [String: Any]
+                let id = "S\(index + 1)"
+                found.append(Series(id: id, title: entry["title"] as! String,
+                                    rule: RepeatRule(kind: RepeatKind(rawValue: rule["kind"] as! String)!, weekdays: rule["weekdays"] as? [Int],
+                                                     monthDay: rule["monthDay"] as? Int),
+                                    remindAt: entry["remindAt"] as? String, createdAt: now, lastPlaced: entry["lastPlaced"] as? String))
+                if let copy = entry["copy"] as? [String: Any] {
+                    var item = TodoItem(title: entry["title"] as! String, reminderAt: (copy["reminderAt"] as? String).map(moment), seriesID: id)
+                    item.dueDate = copy["dueDate"] as? String
+                    tasks.append(item)
+                }
+            }
+            return (found, tasks)
+        }
+        func span(_ from: String, _ to: String) -> [String] {
+            var days = [from]
+            while days.last! < to { days.append(CalendarMonth.adding(1, to: days.last!, calendar: calendar)) }
+            return days
+        }
+        for entry in repeats["cases"] as! [[String: Any]] {
+            try test(entry["case"] as! String) {
+                let at = (entry["now"] as? String).map(moment) ?? now
+                let made = series(entry["series"] as! [[String: Any]], now: at)
+                let days = span(entry["from"] as! String, entry["to"] as! String)
+                let found = CalendarMonth.repeats(on: Set(days), series: made.series, tasks: made.tasks, now: at, calendar: calendar)
+                func written(_ day: String, _ task: CalendarMonth.DayTask) -> String {
+                    let kind: String = task.ahead ? "ahead" : "next"
+                    let time: String = task.time.map { " " + $0 } ?? ""
+                    let copy: String = task.taskId == nil ? "" : " (copy)"
+                    return day + " " + kind + time + " " + task.title + copy
+                }
+                let lines: [String] = days.flatMap { day in (found[day] ?? []).map { written(day, $0) } }
+                try equal(lines, entry["lines"] as! [String], "lines")
+                // The page gives the same to the day's list (after its to-dos) and to the cells.
+                let page = CalendarMonth.Page(days: days, events: [], tasks: made.tasks, series: made.series, now: at, calendar: calendar)
+                for day in days {
+                    try equal(page.tasks(on: day).filter { $0.kind == .repeating }, found[day] ?? [], "page \(day)")
+                }
+            }
+        }
+        let repeatCell = repeats["cell"] as! [String: Any]
+        try test(repeatCell["case"] as! String) {
+            let day = repeatCell["day"] as! String
+            let events = (repeatCell["events"] as! [String]).map { event($0, pool[$0]!) }
+            let tasks = (repeatCell["todos"] as! [[String: Any]]).map { value -> TodoItem in
+                var item = TodoItem(title: value["title"] as! String, reminderAt: (value["reminderAt"] as? String).map(moment))
+                item.dueDate = value["dueDate"] as? String
+                return item
+            }
+            let made = series(repeatCell["series"] as! [[String: Any]], now: now)
+            func titles(_ cell: (items: [CalendarMonth.CellItem], more: Int)) -> [String] {
+                cell.items.map { item in
+                    switch item {
+                    case .event(let event): event.title
+                    case .task(let task): task.title
+                    }
+                }
+            }
+            let page = CalendarMonth.Page(days: [day], events: events, tasks: tasks + made.tasks, series: made.series, now: now, ranges: false,
+                                          calendar: calendar)
+            let cell = page.cell(day, limit: repeatCell["limit"] as! Int)
+            try equal(titles(cell), repeatCell["titles"] as! [String], "titles")
+            try equal(cell.more, repeatCell["more"] as! Int, "more")
+            try equal(titles(page.cell(day, limit: 99)), repeatCell["roomy"] as! [String], "roomy")
+        }
+        let words = repeats["words"] as! [String: Any]
+        try test(words["case"] as! String) {
+            for (index, language) in languages.enumerated() {
+                for ahead in [true, false] {
+                    let task = CalendarMonth.DayTask(title: words["title"] as! String, kind: .repeating, time: words["time"] as? String, ahead: ahead)
+                    let name = ahead ? "ahead" : "next"
+                    try equal(CalendarMonth.tooltip(task, language: language), ((words["tooltip"] as! [String: [String]])[name]!)[index], "tooltip \(name) \(language)")
+                    try equal(CalendarMonth.spoken(task, language: language), ((words["spoken"] as! [String: [String]])[name]!)[index], "spoken \(name) \(language)")
+                }
+                let untimed = CalendarMonth.DayTask(title: words["title"] as! String, kind: .repeating, ahead: true)
+                try equal(CalendarMonth.spoken(untimed, language: language), (words["untimed"] as! [String])[index], "untimed \(language)")
+            }
+        }
+
+        // #296: the faded daily · weekday repeats a month cell folds into its head.
+        let fold = repeats["fold"] as! [String: Any]
+        for entry in fold["cases"] as! [[String: Any]] {
+            try test(entry["case"] as! String) {
+                let day = entry["day"] as! String
+                let events = (entry["events"] as! [String]).map { event($0, pool[$0]!) }
+                let made = series(entry["series"] as! [[String: Any]], now: now)
+                func titles(_ items: [CalendarMonth.CellItem]) -> [String] {
+                    items.map { item in
+                        switch item {
+                        case .event(let event): event.title
+                        case .task(let task): task.title
+                        }
+                    }
+                }
+                let page = CalendarMonth.Page(days: [day], events: events, tasks: made.tasks, series: made.series, now: now, ranges: false, calendar: calendar)
+                let cell = page.cell(day, limit: entry["limit"] as! Int, folding: true)
+                try equal(titles(cell.items), entry["titles"] as! [String], "titles")
+                try equal(cell.more, entry["more"] as! Int, "more")
+                let folded = page.folded(day)
+                try equal(folded.map(\.title), entry["folded"] as! [String], "folded")
+                for (index, language) in languages.enumerated() {
+                    try equal(CalendarMonth.foldedLabel(folded, language: language), (entry["label"] as! [Any])[index] as? String, "label \(language)")
+                }
+                try equal(CalendarMonth.foldedTooltip(folded), entry["tooltip"] as? String, "tooltip")
+                // The week, the day's list and the sheet still show every one.
+                try equal(page.tasks(on: day).filter { $0.kind == .repeating }.map(\.title), entry["list"] as! [String], "list")
+                // The widget's month cell folds them too.
+                try equal(CalendarWidget.monthCell(day, page: page, style: .wall).lines.map(\.title), entry["titles"] as! [String], "widget")
+            }
+        }
+        let wrap = fold["wrap"] as! [String: Any]
+        try test(wrap["case"] as! String) {
+            let found = (wrap["lines"] as! [[String: Any]]).map { line in
+                CalendarMonth.mayWrap(.task(CalendarMonth.DayTask(title: "분리수거", kind: line["kind"] as! String == "repeat" ? .repeating : .reminder,
+                                                                  ahead: line["ahead"] as! Bool)))
+            }
+            try equal(found, wrap["wraps"] as! [Bool], "wraps")
+        }
+
+        // #275: the desk calendar's day list by the keys.
+        let keys = file["keys"] as! [String: Any]
+        for entry in keys["cases"] as! [[String: Any]] {
+            try test(entry["case"] as! String) {
+                let then = entry["then"] as! [String: Any]
+                let step = CalendarMonth.listKey(CalendarMonth.ListKey(rawValue: entry["key"] as! String)!, picked: entry["picked"] as? Int,
+                                                 count: entry["count"] as! Int)
+                try equal(step.picked, then["picked"] as? Int, "picked")
+                try equal(step.open, then["open"] as? Int, "open")
+                try equal(step.handled, then["handled"] as! Bool, "handled")
+            }
+        }
+        let label = keys["label"] as! [String: Any]
+        try test(label["case"] as! String) {
+            for (index, language) in languages.enumerated() {
+                try equal(CalendarMonth.eventLabel(title: label["title"] as! String, time: label["time"] as! String, index: label["index"] as! Int,
+                                                   count: label["count"] as! Int, language: language), (label["spoken"] as! [String])[index], "\(language)")
+            }
         }
         print("\(count) calendar flow cases passed")
     }

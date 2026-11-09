@@ -2,7 +2,7 @@ import AppKit
 import PaperCore
 import SwiftUI
 
-/// ⋯ → 키보드 단축키 (#86): the app's keys on a slip, in eight groups — 입력 · 이동 · 고른 할 일 · 어디서든 · 집중 · 메모 서랍 on
+/// ⋯ → 키보드 단축키 (#86): the app's keys on a slip, in nine groups — 입력 · 이동 · 책상 달력 · 고른 할 일 · 어디서든 · 집중 · 메모 서랍 on
 /// the left, 메모 서랍 안에서 · 메모 고치기 on the right (#118) — each row what it does and its keys, one cap per key (⌘ N; a
 /// second key after a gap, ⌘N ⌘F). The keys that can be changed (the note's, the drawer's) show the one chosen, or ‘끔’.
 /// Taller than the screen, the groups scroll. ⌘/ in the drawer shows its two groups alone. The same groups, order and
@@ -39,6 +39,14 @@ enum ShortcutList {
                 Row(title: L("검색"), caps: ["⌘", "F"]),
                 Row(title: L("포스트잇으로 접기"), caps: ["⌘", "M"]),
                 Row(title: L("책상"), caps: ["⌘", "D"]),
+            ]),
+            // #275: the desk's calendar — a new event on the picked day, and the day's events by the keys.
+            Group(title: L("책상 달력"), rows: [
+                Row(title: L("새 일정"), caps: ["↩"]),
+                Row(title: L("그날 일정으로"), caps: ["Tab"]),
+                Row(title: L("일정 고르기"), caps: ["↑"], also: ["↓"]),
+                Row(title: L("일정 고치기"), caps: ["↩"]),
+                Row(title: L("달력으로 돌아가기"), caps: ["Esc"]),
             ]),
             Group(title: L("고른 할 일"), rows: [
                 Row(title: L("하루 뒤로"), caps: ["⌥", "→"]),

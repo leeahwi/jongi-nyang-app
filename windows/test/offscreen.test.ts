@@ -48,6 +48,7 @@ function fakeWindow(start: Box) {
   const reached: { call: string; bounds: Box }[] = [];
   const parents: unknown[] = [];
   const overviews: boolean[] = [];
+  const spaces: boolean[] = [];
   const window: GuardedWindow = {
     getBounds: () => ({ ...bounds }),
     setBounds: (next) => { bounds = { ...bounds, ...next }; reached.push({ call: "setBounds", bounds: { ...bounds } }); },
@@ -61,12 +62,13 @@ function fakeWindow(start: Box) {
     focus: () => reached.push({ call: "focus", bounds: { ...bounds } }),
     setParentWindow: (parent) => { parents.push(parent); },
     setHiddenInMissionControl: (hidden) => { overviews.push(hidden); },
+    setVisibleOnAllWorkspaces: (visible) => { spaces.push(visible); },
     isDestroyed: () => false,
     getTitle: () => "Jongi-nyang",
     on: (event, listener) => { (listeners[event] ??= []).push(listener); },
   };
   return {
-    window, reached, parents, overviews,
+    window, reached, parents, overviews, spaces,
     /** The system moves it (a display change, macOS pulling it back) and says so. */
     systemMoves: (to: Partial<Box>, event = "move") => { bounds = { ...bounds, ...to }; for (const listener of listeners[event] ?? []) listener(); },
     get bounds() { return bounds; },
@@ -77,7 +79,7 @@ test("offscreen guard: every place, size, show and focus the app asks for stays 
   const putBack: string[] = [];
   // Made where the system put it: centred on the main display.
   const fake = fakeWindow({ x: 645, y: 210, width: 420, height: 560 });
-  guardWindow(fake.window, { displays: () => displays, home, noOwners: false, hideFromOverviews: false, putBack: (_bounds, why) => putBack.push(why) });
+  guardWindow(fake.window, { displays: () => displays, home, noOwners: false, hideFromOverviews: false, oneSpace: false, putBack: (_bounds, why) => putBack.push(why) });
   assert.equal(nearDisplay(fake.bounds, displays), false, "made: away before anything else");
   const asks: [string, () => void][] = [
     ["setBounds on the screen", () => fake.window.setBounds({ x: 1200, y: 900, width: 781, height: 114 })],
@@ -105,7 +107,7 @@ test("offscreen guard: every place, size, show and focus the app asks for stays 
 test("offscreen guard: a window the system moves, resizes or shows near a display goes back at once, and says so", () => {
   const putBack: string[] = [];
   const fake = fakeWindow({ x: -39_900, y: -39_900, width: 420, height: 560 });
-  guardWindow(fake.window, { displays: () => displays, home, noOwners: false, hideFromOverviews: false, putBack: (_bounds, why) => putBack.push(why) });
+  guardWindow(fake.window, { displays: () => displays, home, noOwners: false, hideFromOverviews: false, oneSpace: false, putBack: (_bounds, why) => putBack.push(why) });
   fake.systemMoves({ x: 1200, y: 900 });
   assert.deepEqual({ x: fake.bounds.x, y: fake.bounds.y }, home);
   fake.systemMoves({ x: 51, y: 191, width: 156, height: 365 }, "resize");
@@ -117,12 +119,12 @@ test("offscreen guard: a window the system moves, resizes or shows near a displa
 
 test("offscreen guard: on a Mac no window keeps an owner, so none is shown as another's child", () => {
   const fake = fakeWindow({ x: -39_900, y: -39_900, width: 468, height: 260 });
-  guardWindow(fake.window, { displays: () => displays, home, noOwners: true, hideFromOverviews: false });
+  guardWindow(fake.window, { displays: () => displays, home, noOwners: true, hideFromOverviews: false, oneSpace: false });
   assert.deepEqual(fake.parents, [null], "made with an owner: let go of it");
   fake.window.setParentWindow(null);
   assert.deepEqual(fake.parents, [null], "a later owner never reaches the system");
   const elsewhere = fakeWindow({ x: -39_900, y: -39_900, width: 468, height: 260 });
-  guardWindow(elsewhere.window, { displays: () => displays, home, noOwners: false, hideFromOverviews: false });
+  guardWindow(elsewhere.window, { displays: () => displays, home, noOwners: false, hideFromOverviews: false, oneSpace: false });
   assert.deepEqual(elsewhere.parents, []);
 });
 
@@ -149,14 +151,29 @@ test("offscreen: no window is placed, sized or shown by a call the guard doesn't
 test("offscreen guard: on a Mac every window stays out of Mission Control and App Exposé", () => {
   // They draw a Space's windows shrunk onto the screen, the off-screen ones too (#250: the cat at 791×116, 0.46 of 1710×250).
   const fake = fakeWindow({ x: -39_900, y: -39_900, width: 1710, height: 250 });
-  guardWindow(fake.window, { displays: () => displays, home, noOwners: true, hideFromOverviews: true });
+  guardWindow(fake.window, { displays: () => displays, home, noOwners: true, hideFromOverviews: true, oneSpace: false });
   assert.deepEqual(fake.overviews, [true]);
   fake.window.setHiddenInMissionControl(false);
   assert.deepEqual(fake.overviews, [true], "never shown there again");
   const windows = fakeWindow({ x: -39_900, y: -39_900, width: 334, height: 780 });
-  guardWindow(windows.window, { displays: () => displays, home, noOwners: false, hideFromOverviews: false });
+  guardWindow(windows.window, { displays: () => displays, home, noOwners: false, hideFromOverviews: false, oneSpace: false });
   assert.deepEqual(windows.overviews, []);
   assert.match(fs.readFileSync(path.join(process.cwd(), "src/main/offscreenGuard.ts"), "utf8"), /hideFromOverviews: process\.platform === "darwin"/);
+});
+
+test("offscreen guard: on a Mac every window stays on one Space", () => {
+  // #307: the system moves a window that is on every Space on its own: a perf run's cat, kept at -38846 by the app, was
+  // caught on the screen shrunk to 3×2 at (773, 454).
+  const fake = fakeWindow({ x: -38_846, y: -39_143, width: 360, height: 250 });
+  guardWindow(fake.window, { displays: () => displays, home, noOwners: true, hideFromOverviews: true, oneSpace: true });
+  fake.window.setVisibleOnAllWorkspaces(true);
+  fake.window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  assert.deepEqual(fake.spaces, [], "never on every Space");
+  const elsewhere = fakeWindow({ x: -38_846, y: -39_143, width: 360, height: 250 });
+  guardWindow(elsewhere.window, { displays: () => displays, home, noOwners: false, hideFromOverviews: false, oneSpace: false });
+  elsewhere.window.setVisibleOnAllWorkspaces(true);
+  assert.deepEqual(elsewhere.spaces, [true]);
+  assert.match(fs.readFileSync(path.join(process.cwd(), "src/main/offscreenGuard.ts"), "utf8"), /oneSpace: process\.platform === "darwin"/);
 });
 
 test("offscreen: a snapshot run fails when the guard had to put a window back", () => {

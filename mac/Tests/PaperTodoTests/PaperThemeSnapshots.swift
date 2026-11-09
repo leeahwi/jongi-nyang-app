@@ -29,10 +29,10 @@ enum PaperThemeSnapshots {
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         let papers = (ProcessInfo.processInfo.environment["PAPERTODO_PAPERS"].map { $0.split(separator: ",").compactMap { PaperKind(rawValue: String($0)) } }) ?? PaperKind.allCases
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("PaperThemes-\(UUID())")
-        let suite = "PaperTodo.PaperThemes.\(UUID())"
-        let preferences = UserDefaults(suiteName: suite)!
+        let suite = TestDefaults("PaperThemes")
+        let preferences = suite.defaults
         defer {
-            preferences.removePersistentDomain(forName: suite)
+            suite.remove()
             try? FileManager.default.removeItem(at: folder)
         }
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

@@ -11,6 +11,7 @@ import {
   readDrawerBackdrop, readDrawerFont, readDrawerTextSize, readSort, readView, serializeMemoFolders, type MemoFolders, type MemoPlacement,
 } from "../core/memoDrawer";
 import { mergeText } from "../core/textMerge";
+import { readNoteLayer } from "../core/stayBehind";
 import { drawerLegacyName, drawerPoint, noteLegacyName, noteStep, readCodeFont, readLineSpacing, readParagraphSpacing } from "../core/textSteps";
 import { toggleDone } from "../core/memoEdits";
 import { emptyAll, emptyTrash, memoTrashFileName, mergeTrash, parseMemoTrash, pruneTrash, serializeMemoTrash, trashMemo, untrash, type MemoTrash } from "../core/memoTrash";
@@ -36,6 +37,8 @@ import { megabytes } from "../core/fileLimits";
 import { checkedDeviceRules, cleanedDeviceRules, deviceKey, deviceRings, hiddenSpaces, readDeviceRules, storedDeviceRules, type StoredRules } from "../core/spaceDevice";
 
 import type { SlipPlace } from "../core/slipMove";
+import { readTypingCorner, readTypingScope, typingScopes } from "../core/typingCat";
+import { readCatSize } from "../core/catSize";
 
 export interface WindowMemory {
   bounds?: { x: number; y: number; width: number; height: number };
@@ -156,6 +159,10 @@ export class Store extends EventEmitter {
   /** The same for 메모 서랍's shortcut (Ctrl+Shift+D unless changed). */
   drawerShortcutProblem?: string;
   drawerBackdropNote?: string;
+  /** 모든 앱에서 chosen and the keyboard hook couldn't be set (#288): Settings says the cat hears this app only. */
+  typingCatNote?: string;
+  /** 크기 (#271): the sizes each widget fits at on its display (set by calendarWidget.ts). */
+  widgetFits: Record<string, number[]> = {};
   storage = { label: t("이 PC (기본)"), custom: false, path: "", archivePath: "", home: "" };
   /** The focus timer as the windows draw it (set by main). */
   timerView: () => TimerView | undefined = () => undefined;
@@ -310,6 +317,8 @@ export class Store extends EventEmitter {
       noteShortcutProblem: this.noteShortcutProblem,
       drawerShortcutProblem: this.drawerShortcutProblem,
       drawerBackdropNote: this.drawerBackdropNote,
+      typingCatNote: this.typingCatNote,
+      widgetFits: { ...this.widgetFits },
       memoFolders: { ...this.memoFolders, folders: this.memoFolders.folders.map((folder) => ({ ...folder })), placement: { ...this.memoFolders.placement } },
       memoTrash: { ...this.memoTrash, entries: this.memoTrash.entries.map((entry) => ({ ...entry, memo: { ...entry.memo } })) },
       todoSpaces: { ...this.todoSpaces, spaces: this.todoSpaces.spaces.map((space) => ({ ...space })), items: {} },
@@ -1087,7 +1096,9 @@ export class Store extends EventEmitter {
     const legacy: Partial<Prefs> = key === "textStep" ? { textSize: noteLegacyName(value as number) }
       : key === "drawerTextPt" ? { drawerTextSize: drawerLegacyName(value as number) }
       // #244: the drawer's own paper and 밤에는, with 1.32's keys (drawerTheme `auto`, drawerNightPaper) beside them.
-      : key === "drawerTheme" || key === "drawerNight" || key === "drawerNightPaper" ? drawerWrite(this.prefs, key, value) : {};
+      : key === "drawerTheme" || key === "drawerNight" || key === "drawerNightPaper" ? drawerWrite(this.prefs, key, value)
+      // #273: 노트 위치 with the pin's old switch beside it (an older version keeps 항상 위에 두기).
+      : key === "noteLayer" ? { alwaysOnTop: value === "top" } : {};
     this.prefs = { ...this.prefs, [key]: value, ...legacy };
     this.saveSettingsSoon();
     this.emit("prefs", key);
@@ -1420,8 +1431,11 @@ export class Store extends EventEmitter {
         // The note's key (#85): before 1.30.1 there was none saved (Ctrl+Alt+J); the switch, noteHotkey, is read as it was.
         noteShortcut: readNoteShortcut(known.noteShortcut, readDrawerShortcut(known.drawerShortcut)),
         drawerSide: known.drawerSide === "left" ? "left" : "right",
-        // #230: 글자 칠 때 두드리기 (anything else: on, in the app's windows).
-        petTyping: known.petTyping === "off" ? "off" : "app",
+        // #289: 타닥냥, moved from the pet's 글자 칠 때 두드리기 (`petTyping`) the first time.
+        typingCat: readTypingScope(known.typingCat, (saved.prefs as Record<string, unknown> | undefined)?.petTyping),
+        typingCorner: readTypingCorner(known.typingCorner), typingCatLast: readTypingLast((saved.prefs as Record<string, unknown> | undefined)?.typingCatLast),
+        // #304: 크기 of the pet and of 타닥냥 (anything odd: 보통).
+        petSize: readCatSize(known.petSize), typingSize: readCatSize(known.typingSize),
         drawerBackdrop: readDrawerBackdrop(known.drawerBackdrop), drawerPinnedSort: readSort(known.drawerPinnedSort), drawerPinnedView: readView(known.drawerPinnedView),
         drawerFont: readDrawerFont(known.drawerFont), drawerTextSize: readDrawerTextSize(known.drawerTextSize),
         // #141: the steps (from 1.30's four names when this version hasn't written them yet), 줄 간격 · 문단 간격.
@@ -1440,6 +1454,8 @@ export class Store extends EventEmitter {
         spaceDeviceShown: readShown(known.spaceDeviceShown),
         // #234: this PC's desktop calendar widgets, as read (an entry of the wrong shape dropped, four at most).
         calendarWidgets: readWidgets(known.calendarWidgets),
+        // #273: 노트 위치 (before, the pin's switch: on was 항상 위에 두기), with the switch kept beside it.
+        noteLayer: readNoteLayer(known.noteLayer, known.alwaysOnTop), alwaysOnTop: readNoteLayer(known.noteLayer, known.alwaysOnTop) === "top",
         drawerHandleY: typeof known.drawerHandleY === "number" && known.drawerHandleY >= 0 && known.drawerHandleY <= 1 ? known.drawerHandleY : defaultPrefs.drawerHandleY,
       };
       this.memory = saved.memory ?? {};
@@ -1474,4 +1490,9 @@ export class Store extends EventEmitter {
     }
     return text;
   }
+}
+
+/** The tray's remembered 타닥냥 choice (#289), when one reads. */
+function readTypingLast(saved: unknown) {
+  return typingScopes.find((scope) => scope === saved);
 }

@@ -90,6 +90,25 @@ private enum ShortcutTests {
             try expect(NoteToggle.action(visible: true, minimized: false, folded: false, uncovered: false) == .bringForward, "covered")
             try expect(NoteToggle.action(visible: true, minimized: false, folded: true, uncovered: true) == .bringForward, "folded wins")
         }
+        try test("S15 (#273): a note on 바탕화면에 두기 is taken for covered unless summoned, so the key brings it forward") {
+            let desktop = NoteLayer.desktop
+            try expect(!desktop.uncovered(occlusionVisible: true, summoned: false), "behind, showing a corner")
+            try expect(desktop.uncovered(occlusionVisible: true, summoned: true), "summoned and showing")
+            try expect(NoteLayer.normal.uncovered(occlusionVisible: true, summoned: false), "보통 as before")
+            try expect(NoteToggle.action(visible: true, minimized: false, folded: false, uncovered: desktop.uncovered(occlusionVisible: true, summoned: false)) == .bringForward, "comes forward")
+        }
+        try test("L1 (#273): 노트 위치 as saved — the choice, else the pin's old switch (on: 항상 위에 두기), else 보통") {
+            try expect(NoteLayer.saved("desktop", legacyOnTop: true) == .desktop, "the choice wins")
+            try expect(NoteLayer.saved(nil, legacyOnTop: true) == .top, "1.48's pin on")
+            try expect(NoteLayer.saved(nil, legacyOnTop: false) == .normal, "1.48's pin off")
+            try expect(NoteLayer.saved("floating", legacyOnTop: false) == .normal, "unknown")
+            try expect(NoteLayer.top.legacyOnTop && !NoteLayer.desktop.legacyOnTop && !NoteLayer.normal.legacyOnTop, "the old switch written beside it")
+        }
+        try test("L2 (#273): only 바탕화면에 두기 stays behind, and not while summoned") {
+            try expect(NoteLayer.desktop.staysBehind(summoned: false), "desktop")
+            try expect(!NoteLayer.desktop.staysBehind(summoned: true), "summoned")
+            try expect(!NoteLayer.top.staysBehind(summoned: false) && !NoteLayer.normal.staysBehind(summoned: false), "the others")
+        }
         print("\(count) shortcut tests passed")
     }
 }

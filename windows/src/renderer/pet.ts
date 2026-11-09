@@ -1,5 +1,4 @@
-import { bubblePointer, bubbleShift, clampFloorX, clipFrameMs, clipMs, isResting, petFrame, petSize, petWindowWidth, restBreathMs, walkCycleFrames, type PetFrame, type PetImage, type PetPayload } from "../core/pet";
-import type { TypingPose } from "../core/typingCat";
+import { bubblePointer, bubbleShift, clampFloorX, clipFrameMs, clipMs, floorMargin, isResting, petFrame, petScaleOf, petSize, petWindowWidth, restBreathMs, walkCycleFrames, type PetFrame, type PetImage, type PetPayload } from "../core/pet";
 import { wrapBubble } from "../core/bubbleText";
 import { lang, paper, reduceMotion, t } from "./api";
 import { holdWhileAsked } from "./askGuard";
@@ -17,19 +16,18 @@ const fx = pet.querySelector<HTMLElement>(".fx")!;
 const zs = pet.querySelector<HTMLElement>(".zs")!;
 const bubble = pet.querySelector<HTMLElement>(".bubble")!;
 
-const size = petSize;
-const petWidth = 252;
+/** #304: the cat's size at the chosen 크기 (92 at 보통), and its box with room for the bubble beside it. */
+let size = petSize;
+let petWidth = size + 160;
 
 // ─── Art ──────────────────────────────────────────────────────────────────────
 
 const imageURL = (image: PetImage) => image === "idle" ? "../../assets/cat.png" : `../../assets/pet/256/${image}.png`;
 const walkURL = (index: number) => `../../assets/pet/256/walk-cycle-0${index + 1}.png`;
-/** #230: the cat on its cushion — its own three pictures, one canvas and baseline, swapped with nothing trimmed or fitted. */
-const typingURL = (pose: TypingPose) => `../../assets/pet/256/typing-${pose}.png`;
 // Decoded up front so switching poses mid-clip never flickers.
 const preloaded: HTMLImageElement[] = [];
 for (const url of [...(["idle", "blink", "happy", "sleep", "yawn", "stretch", "cheer", "curious", "groom", "tea"] as PetImage[]).map(imageURL),
-  ...Array.from({ length: walkCycleFrames }, (_, index) => walkURL(index)), ...(["idle", "left", "right"] as TypingPose[]).map(typingURL)]) {
+  ...Array.from({ length: walkCycleFrames }, (_, index) => walkURL(index))]) {
   const image = new Image();
   image.src = url;
   preloaded.push(image);
@@ -89,8 +87,23 @@ function showBubble(next: PetPayload): void {
   bubble.hidden = false;
 }
 
+/** #304: the page drawn at another 크기 (nothing set at 보통, so it draws as before). */
+function resize(next: number): void {
+  if (next === size) return;
+  size = next;
+  petWidth = size + 160;
+  if (size === petSize) {
+    pet.style.removeProperty("--pet");
+    pet.style.removeProperty("--k");
+  } else {
+    pet.style.setProperty("--pet", `${size}px`);
+    pet.style.setProperty("--k", String(petScaleOf(size)));
+  }
+}
+
 function receive(next: PetPayload): void {
   state = next;
+  resize(Number.isFinite(next.size) && next.size > 0 ? next.size : petSize);
   showBubble(next);
   if (next.activity.id !== activityID) {
     activityID = next.activity.id;
@@ -132,7 +145,7 @@ function startLoop(): void {
 function draw(now: number): void {
   if (!state) return;
   const action = state.activity.action;
-  const frame = petFrame(action, activityStart, dragX ?? state.homeX, reduceMotion() ? activityStart : now);
+  const frame = petFrame(action, activityStart, dragX ?? state.homeX, reduceMotion() ? activityStart : now, size);
   // #67: the window moves along the floor with the cat (main/pet.ts), so the cat always sits in its middle.
   pet.style.left = `${petWindowWidth / 2 - petWidth / 2}px`;
   if (!bubble.hidden) {
@@ -144,16 +157,15 @@ function draw(now: number): void {
     bubble.style.setProperty("--pointer", `${bubblePointer(shift, width)}px`);
   }
   zs.hidden = !frame.sleepy;
-  // On its cushion (resting only) the cat holds still between keys: no breathing, no sway, only the picture changes.
-  const typing = state.typing !== undefined && isResting(action) ? state.typing : undefined;
-  const url = typing !== undefined ? typingURL(typing) : frame.walkFrame !== undefined ? walkURL(frame.walkFrame) : imageURL(frame.image);
+  const url = frame.walkFrame !== undefined ? walkURL(frame.walkFrame) : imageURL(frame.image);
   if (art.getAttribute("src") !== url) art.setAttribute("src", url);
   const { pose } = frame;
   const flip = frame.facingRight && frame.walkFrame !== undefined ? " scaleX(-1)" : "";
   cat.style.transformOrigin = `${pose.pivotX * 100}% ${pose.pivotY * 100}%`;
-  cat.style.transform = `translateY(${-pose.lift}px) rotate(${pose.rotation}deg) scale(${pose.scaleX}, ${pose.scaleY})${flip}`;
+  // #304: a bigger cat hops as much higher (×1 at 보통).
+  cat.style.transform = `translateY(${-pose.lift * petScaleOf(size)}px) rotate(${pose.rotation}deg) scale(${pose.scaleX}, ${pose.scaleY})${flip}`;
   // Breathing and swaying only while resting (walking frames and clips carry their own motion).
-  const breathing = typing !== undefined || frame.walkFrame !== undefined || !isResting(action) ? "" : frame.sleepy ? "asleep" : "awake";
+  const breathing = frame.walkFrame !== undefined || !isResting(action) ? "" : frame.sleepy ? "asleep" : "awake";
   art.classList.toggle("awake", breathing === "awake");
   art.classList.toggle("asleep", breathing === "asleep");
   // #67: one breath each time it settles (a new activity), then still.
@@ -232,7 +244,7 @@ function movePress(event: PointerEvent): void {
     api.send("pet:drag-start");
   }
   if (!press.dragging) return;
-  dragX = clampFloorX(press.originX + event.screenX - press.x, state.floorWidth);
+  dragX = clampFloorX(press.originX + event.screenX - press.x, state.floorWidth, floorMargin(size));
   api.send("pet:drag");
   if (!bubble.hidden) draw(performance.now());
 }

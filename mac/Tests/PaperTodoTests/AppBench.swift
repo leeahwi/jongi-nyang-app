@@ -29,9 +29,9 @@ enum AppBench {
         HandwritingFont.register()
         SlipMotion.enabled = false
         GPU.warmUp()
-        let suite = "PaperTodo.Bench.\(UUID())"
-        let preferences = UserDefaults(suiteName: suite)!
-        defer { preferences.removePersistentDomain(forName: suite) }
+        let suite = TestDefaults("Bench")
+        let preferences = suite.defaults
+        defer { suite.remove() }
         preferences.set(false, forKey: "reminder.enabled")
         let storage = folder.appendingPathComponent("todos.json")
         let model = AppModel(storageURL: storage, isolated: true, preferences: preferences)

@@ -63,6 +63,11 @@ export function writePerfData(folder, now = new Date(), options = {}) {
     { id: id(), title: "카드값", rule: { kind: "monthly", monthDay: 15 }, createdAt: created },
     { id: id(), title: "화분 물 주기", rule: { kind: "weekly", weekdays: [0, 3] }, createdAt: created },
   ];
+  // #274: `repeats` rules in all (e.g. 20 for the calendar's repeats): every kind in turn, half of them with a time.
+  const kinds = [{ kind: "daily" }, { kind: "weekdays" }, ...[1, 2, 3, 4, 5, 6, 0].map((weekday) => ({ kind: "weekly", weekdays: [weekday] })), ...[1, 10, 31].map((monthDay) => ({ kind: "monthly", monthDay }))];
+  for (let index = series.length; index < (options.repeats ?? 0); index += 1) {
+    series.push({ id: id(), title: `${words[index % words.length]} ${index + 1}`, rule: kinds[index % kinds.length], ...(index % 2 ? { remindAt: `${pad(7 + (index % 12))}:30` } : {}), createdAt: created });
+  }
   // Today's copies count as placed already (a copy placed at launch with a past time would ring at once).
   for (const entry of series) entry.lastPlaced = key(day(0));
   fs.writeFileSync(path.join(folder, "repeats.json"), JSON.stringify({ series }, null, 2) + "\n");

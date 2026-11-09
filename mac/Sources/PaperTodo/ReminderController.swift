@@ -1090,9 +1090,18 @@ struct PetSettingsPanel: View {
                     .disabled(!model.petVisible)
                     .opacity(model.petVisible ? 1 : 0.45)
                 SettingsSeparator()
-                typingRows
-                    .disabled(!model.petVisible)
-                    .opacity(model.petVisible ? 1 : 0.45)
+                // #304: 크기, the timer's four steps.
+                HStack(spacing: 12) {
+                    SettingsLabel(L("크기"), systemImage: "arrow.up.left.and.arrow.down.right")
+                    Spacer(minLength: 8)
+                    PaperSegmented(selection: $model.petSize,
+                                   options: CatSize.allCases.map { ($0, $0.title(.current), nil) },
+                                   label: L("펫 크기"), fit: true)
+                        .frame(width: 300)
+                }
+                .settingsRow()
+                .disabled(!model.petVisible)
+                .opacity(model.petVisible ? 1 : 0.45)
             }
 
             SettingsGroup(title: L("종이냥 한마디"), more: "pet", footer: L("가끔 응원하거나 말을 걸어요. 집중할 때와 밤 11시–아침 7시에는 조용해요.")) {
@@ -1124,70 +1133,76 @@ struct PetSettingsPanel: View {
                 }
                 .settingsRow()
             }
+
+            typingGroup
     }
 
-    /// 글자 칠 때 두드리기 (#230): off · in this app · in all apps, what it hears, and (in all apps) the small cat over
-    /// full-screen apps.
+    /// 타닥냥 (#230 · #289): its own section, apart from the pet — off · in this app · in all apps, what it
+    /// hears, and the corner it sits in.
     @ViewBuilder
-    private var typingRows: some View {
-        HStack(spacing: 12) {
-            SettingsLabel(L("글자 칠 때 두드리기"), systemImage: "keyboard")
-            Spacer(minLength: 8)
-            PaperSegmented(selection: $model.petTyping,
-                           options: TypingCat.Scope.allCases.map { ($0, Self.typingTitle($0), nil) },
-                           label: L("글자 칠 때 두드리기"), fit: true)
-                .frame(width: 300)
-        }
-        .settingsRow()
-        if model.petTyping != .off {
-            VStack(alignment: .leading, spacing: 6) {
-                if model.typingNoPermission {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(L("입력 모니터링 권한이 없어서 종이냥 안에서만 두드려요."))
-                            .foregroundStyle(PaperTheme.ink)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Spacer(minLength: 4)
-                        Button(L("시스템 설정 열기"), action: model.openInputMonitoringSettings)
-                            .buttonStyle(PaperActionButtonStyle())
-                    }
-                } else {
-                    Text(model.petTyping == .everywhere ? L("다른 앱에서 칠 때도 두드려요. 키를 눌렀다는 것만 알고, 어떤 키인지는 몰라요.")
-                         : L("종이냥에서 글자를 치면 앞발로 두드려요. 무엇을 쳤는지는 보지 않아요."))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                if model.petTyping == .everywhere {
-                    Text(L("종이냥은 아직 Apple의 정식 서명이 없어서, 업데이트하면 macOS가 권한을 다시 물을 수 있어요."))
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .font(.system(size: 11.5))
-            .foregroundStyle(PaperTheme.ink2)
-            .padding(.leading, FolderPath.indent)
-            .padding(.bottom, 10)
-            .settingsCaption()
-        }
-        if model.petTyping == .everywhere {
-            SettingsSeparator()
+    private var typingGroup: some View {
+        SettingsGroup(title: L("타닥냥"), more: "pet", footer: L("글자를 치면 화면 구석의 고양이가 방석에 기대 앞발로 두드려요. 종이냥 펫과 따로 켜고 꺼요.")) {
             HStack(spacing: 12) {
-                SettingsLabel(L("전체 화면에서 보이기"), systemImage: "rectangle.inset.bottomright.filled")
+                SettingsLabel(L("두드리기"), systemImage: "keyboard")
                 Spacer(minLength: 8)
-                PaperMenuPicker(selection: companionCorner,
-                                options: [(nil, String(localized: "끄기", table: "Settings"))] + TypingCompanion.Corner.allCases.map { ($0, Self.cornerTitle($0)) },
-                                label: L("전체 화면에서 보이기"))
+                PaperSegmented(selection: $model.typingScope,
+                               options: TypingCat.Scope.allCases.map { ($0, Self.typingTitle($0), nil) },
+                               label: L("두드리기"), fit: true)
+                    .frame(width: 300)
             }
             .settingsRow()
-            .disabled(model.typingNoPermission)
-            .opacity(model.typingNoPermission ? 0.45 : 1)
+            if model.typingScope != .off {
+                VStack(alignment: .leading, spacing: 6) {
+                    if model.typingNoPermission {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(L("입력 모니터링 권한이 없어서 종이냥 안에서만 두드려요."))
+                                .foregroundStyle(PaperTheme.ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 4)
+                            Button(L("시스템 설정 열기"), action: model.openInputMonitoringSettings)
+                                .buttonStyle(PaperActionButtonStyle())
+                        }
+                    } else {
+                        Text(model.typingScope == .everywhere ? L("다른 앱에서 칠 때도 두드려요. 어떤 키인지는 보지 않고, 눌렸다는 것만 알아요.")
+                             : L("종이냥에서 글자를 치면 구석에 나와 두드리고, 멈추면 곧 들어가요. 무엇을 쳤는지는 보지 않아요."))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if model.typingScope == .everywhere {
+                        Text(L("종이냥은 아직 Apple의 정식 서명이 없어서, 업데이트하면 macOS가 권한을 다시 물을 수 있어요."))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .font(.system(size: 11.5))
+                .foregroundStyle(PaperTheme.ink2)
+                .padding(.leading, FolderPath.indent)
+                .padding(.bottom, 10)
+                .settingsCaption()
+            }
+            SettingsSeparator()
+            HStack(spacing: 12) {
+                SettingsLabel(L("자리"), systemImage: "rectangle.inset.bottomright.filled")
+                Spacer(minLength: 8)
+                PaperMenuPicker(selection: $model.typingCorner,
+                                options: TypingCorner.Corner.allCases.map { ($0, Self.cornerTitle($0)) },
+                                label: L("자리"))
+            }
+            .settingsRow()
+            .disabled(model.typingScope == .off)
+            .opacity(model.typingScope == .off ? 0.45 : 1)
+            SettingsSeparator()
+            // #304: its own 크기, apart from the pet's.
+            HStack(spacing: 12) {
+                SettingsLabel(L("크기"), systemImage: "arrow.up.left.and.arrow.down.right")
+                Spacer(minLength: 8)
+                PaperSegmented(selection: $model.typingSize,
+                               options: CatSize.allCases.map { ($0, $0.title(.current), nil) },
+                               label: L("타닥냥 크기"), fit: true)
+                    .frame(width: 300)
+            }
+            .settingsRow()
+            .disabled(model.typingScope == .off)
+            .opacity(model.typingScope == .off ? 0.45 : 1)
         }
-    }
-
-    /// 끄기, or the corner it sits in.
-    private var companionCorner: Binding<TypingCompanion.Corner?> {
-        Binding(get: { model.petCompanion ? model.petCompanionCorner : nil },
-                set: { corner in
-                    model.petCompanion = corner != nil
-                    if let corner { model.petCompanionCorner = corner }
-                })
     }
 
     static func typingTitle(_ scope: TypingCat.Scope) -> String {
@@ -1198,7 +1213,7 @@ struct PetSettingsPanel: View {
         }
     }
 
-    static func cornerTitle(_ corner: TypingCompanion.Corner) -> String {
+    static func cornerTitle(_ corner: TypingCorner.Corner) -> String {
         switch corner {
         case .topLeft: L("왼쪽 위")
         case .topRight: L("오른쪽 위")

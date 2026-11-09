@@ -8,7 +8,7 @@
 
 Mac · Windows · free · no account
 
-[**Download for Mac**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.48.0) · [**Download for Windows**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.33.0) · [Project site](https://leeahwi.github.io/jongi-nyang-app/en/) · [40-second intro video](site/assets/promo-en.mp4) · [Changelog](CHANGELOG.en.md)
+[**Download for Mac**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.49.0) · [**Download for Windows**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.34.0) · [Project site](https://leeahwi.github.io/jongi-nyang-app/en/) · [40-second intro video](site/assets/promo-en.mp4) · [Changelog](CHANGELOG.en.md)
 
 [![Latest Mac release](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=mac-*&label=Mac&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![Latest Windows release](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=windows-*&label=Windows&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![CI](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml/badge.svg)](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml)
 
@@ -99,7 +99,9 @@ From Mac 1.48 and Windows 1.33 you can put a paper calendar widget on your deskt
 - Pick an opacity from 20 to 100%. Each day sits on a paper tile, so the text stays readable when the widget is faint.
 - The Desk calendar and the widgets show lunar dates and the names of Korean public holidays, worked out on the device without the internet.
 - Pick a paper in Desk → Appearance → Paper, and the notepad, calendar, widgets, slips, Desk and notes drawer all change to it. New are Sticky note, Manuscript paper, Blue lined notebook, Lavender, Recycled paper, Night sky and Chalkboard.
-- When you type in Jongi-nyang, the cat taps along with its paws. It never reads or keeps which keys you pressed.
+- From Mac 1.49 and Windows 1.34, pick Small · Regular · Large · Extra large for each widget. Set the notepad's pin to On the desktop and it stays behind other windows like a widget.
+- Repeating to-dos show faintly on every day they come back, and daily repeats fold into ⟲ and a count next to the date.
+- When you type, the **tap-tap cat** in a corner of the screen taps along with its paws. It's separate from the desktop cat, and with In all apps it taps along in other apps too. It never reads or keeps which keys you pressed.
 
 </details>
 

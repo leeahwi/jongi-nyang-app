@@ -15,7 +15,7 @@ mkdir -p .build/checks
 sources=()
 while IFS= read -r source; do sources+=("$source"); done < <(find Sources/PaperTodo -maxdepth 1 -name '*.swift' ! -name 'PaperTodoApp.swift' -print | sort)
 swiftc -O -parse-as-library -I "$bin_path/Modules" "${sources[@]}" "$bin_path/PaperTodo.build/DerivedSources/resource_bundle_accessor.swift" \
-    "$bin_path"/PaperCore.build/*.swift.o "$(dirname "$0")/../Tests/PaperTodoTests/ComposeBench.swift" -o .build/checks/ComposeBench 2>&1 | grep -v "warning:" || true
+    "$bin_path"/PaperCore.build/*.swift.o "$(dirname "$0")/../Tests/PaperTodoTests/ComposeBench.swift" "$(dirname "$0")/../Tests/PaperTodoTests/TestDefaults.swift" -o .build/checks/ComposeBench 2>&1 | grep -v "warning:" || true
 data="$(mktemp -d)"
 trap 'rm -rf "$data"' EXIT
 tiers=("$@")

@@ -21,9 +21,8 @@ final class PetState: ObservableObject {
     @Published var question: PetChatter.Line?
     /// How wide the bubble above the cat is (for keeping it on screen and for its clickable area).
     var bubbleWidth: CGFloat = 0
-    /// 치면 두드리는 고양이 (#230): on its cushion, which paw is down; nil while it is its usual self.
-    @Published var typing: TypingCat.Pose?
-    let size: CGFloat = 92
+    /// #304: the cat's size at the chosen 크기 (92 at 보통); everything around it is laid out from it.
+    @Published var size: CGFloat = CatSize.petBase
 }
 
 /// The pet and its effects, drawn inside the transparent floor strip. The cat itself is `PetSprite` (Core Animation,
@@ -42,7 +41,7 @@ struct DesktopPetView: View {
         let _ = PerfProbe.count("petLayout")
         GeometryReader { geometry in
             ZStack {
-                PetSprite(activity: state.activity, homeX: state.homeX, typing: state.typing, size: state.size, reduceMotion: reduceMotion)
+                PetSprite(activity: state.activity, homeX: state.homeX, size: state.size, reduceMotion: reduceMotion)
                 // No bubble comes up while the cat walks (DesktopPetController), so it stays over where the cat sits.
                 pet(shift: PetBubble.shift(centerX: state.homeX, width: bubbleWidth, stripWidth: geometry.size.width))
                     .position(x: path.middle, y: geometry.size.height - petHeight / 2 - 2)
@@ -57,7 +56,7 @@ struct DesktopPetView: View {
         return (state.homeX, 0)
     }
 
-    /// Taller while a question with answer buttons is up (still inside the 250-point strip).
+    /// Taller while a question with answer buttons is up (still inside the strip: 250 points, more for a bigger cat).
     private var petHeight: CGFloat { state.size + (state.question == nil ? 70 : 150) }
 
     /// `shift` moves the bubble sideways so it stays on screen when the cat sits near an edge.

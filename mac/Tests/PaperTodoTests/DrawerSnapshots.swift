@@ -84,9 +84,9 @@ extension DesignSnapshots {
                        at(daysAgo: 20, 9, 0)), folder: MemoFolders.inbox, pinned: false, paper: nil, now: at(daysAgo: 12, 11, 0))
         try Data(trash.encoded().utf8).write(to: data.appendingPathComponent(MemoTrash.fileName))
 
-        let suite = "PaperTodo.Drawer.\(UUID())"
-        let preferences = UserDefaults(suiteName: suite)!
-        defer { preferences.removePersistentDomain(forName: suite) }
+        let suite = TestDefaults("Drawer")
+        let preferences = suite.defaults
+        defer { suite.remove() }
         let model = AppModel(storageURL: storage, isolated: true, preferences: preferences)
         keptModels.append(model)
         model.paperColor = night ? .night : .day
@@ -573,6 +573,18 @@ extension DesignSnapshots {
         drawer.shortcutRegistered = false
         try render(settings(MemoDrawerSettingsGroup(drawer: drawer)), size: nil, to: output.appendingPathComponent("drawer-settings-taken.png"))
         drawer.shortcutRegistered = true
+        // #277 (site video): 서랍 종이 alone — 노트와 같은 종이 on (the 1.48 default), then off: 낮 종이 as it was, then three
+        // new papers picked (원고지 is left out: in the drawer it looks almost like 낮 종이).
+        if !night {
+            drawer.sameAsNote = true
+            try render(settings(DrawerPaperGroup(drawer: drawer)), size: nil, to: output.appendingPathComponent("drawer-paper-same.png"))
+            drawer.sameAsNote = false
+            for theme in [MemoDrawer.Theme.day, .memo, .lined, .lavender] {
+                drawer.theme = theme
+                try render(settings(DrawerPaperGroup(drawer: drawer)), size: nil, to: output.appendingPathComponent("drawer-paper-\(theme.rawValue).png"))
+            }
+            drawer.theme = .day
+        }
 
         // The note with two tabs (the 메모 tab became the drawer) and its paw button; narrow, middle, wide.
         model.page = .todos

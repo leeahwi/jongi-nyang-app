@@ -32,10 +32,10 @@ private enum WidgetSnapshots {
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("PaperWidgets-\(UUID())")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let suite = "PaperTodo.Widgets.\(UUID())"
-        let preferences = UserDefaults(suiteName: suite)!
+        let suite = TestDefaults("Widgets")
+        let preferences = suite.defaults
         defer {
-            preferences.removePersistentDomain(forName: suite)
+            suite.remove()
             try? FileManager.default.removeItem(at: folder)
         }
         preferences.set(false, forKey: "reminder.enabled")
@@ -62,6 +62,15 @@ private enum WidgetSnapshots {
         todo(t("우편물 부치기", "Post the letters", "Brieven posten"), reminder: at(22, 10))
         let storage = folder.appendingPathComponent("todos.json")
         try NotebookFile(url: storage).save(notebook)
+        // #274: two repeating to-dos — every Monday, and Fridays at 17:00 — on the days they come back (the next one solid).
+        struct Repeats: Encodable { var series: [Series] }
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        try encoder.encode(Repeats(series: [
+            Series(id: "R1", title: t("분리수거", "Recycling", "Oud papier"), rule: RepeatRule(kind: .weekly, weekdays: [1]), createdAt: at(1, 9)),
+            Series(id: "R2", title: t("주간 회고", "Weekly review", "Weekoverzicht"), rule: RepeatRule(kind: .weekly, weekdays: [5]), remindAt: "17:00",
+                   createdAt: at(1, 9)),
+        ])).write(to: folder.appendingPathComponent("repeats.json"))
         let model = AppModel(storageURL: storage, isolated: true, preferences: preferences)
         model.paperColor = night ? .night : .day
         func event(_ id: String, _ title: String, _ color: LocalEvent.Color, day: Int, _ hour: Int, _ minute: Int = 0, length: Int = 60,
@@ -87,6 +96,7 @@ private enum WidgetSnapshots {
         let widgets = CalendarWidgets.shared
         widgets.feed.events = events
         widgets.feed.tasks = model.hereItems
+        widgets.feed.series = model.hereSeries
         widgets.feed.now = now
 
         let kinds: [(CalendarWidget.Kind, CalendarWidget.Style, String)] = [
@@ -99,6 +109,31 @@ private enum WidgetSnapshots {
             try scene(kind, style, opacity: 40, wall: .busy, to: output.appendingPathComponent("widget-\(name)-40-busy.png"))
         }
         try scene(.month, .simple, opacity: 40, wall: night ? .light : .dark, to: output.appendingPathComponent("widget-month-simple-40-other.png"))
+        // #296: two daily repeats and a weekday one fold into each day's head; #295: 11 October (음 9.1) busy, so its head has
+        // +N beside the lunar date and the repeat mark.
+        let quiet = (series: widgets.feed.series, tasks: widgets.feed.tasks)
+        widgets.feed.series += [
+            Series(id: "R3", title: t("물 마시기", "Drink water", "Water drinken"), rule: RepeatRule(kind: .daily), createdAt: at(1, 9)),
+            Series(id: "R4", title: t("잠깐, 바깥 공기 쐬기", "Step outside for a moment", "Even naar buiten"), rule: RepeatRule(kind: .daily), createdAt: at(1, 9)),
+            Series(id: "R5", title: t("아침 운동", "Morning workout", "Ochtendtraining"), rule: RepeatRule(kind: .weekdays), remindAt: "07:30", createdAt: at(1, 9)),
+        ]
+        widgets.feed.tasks += [(t("빨래 개기", "Fold the laundry", "Was vouwen"), 10), (t("화분 물 주기", "Water the plants", "Planten water geven"), 14),
+                               (t("엄마한테 전화하기", "Call Mum", "Mama bellen"), 19), (t("택배 받기", "Pick up the parcel", "Pakket ophalen"), 20)]
+            .map { TodoItem(title: $0.0, reminderAt: at(11, $0.1)) }
+        for (style, name) in [(CalendarWidget.Style.simple, "simple"), (.detail, "detail"), (.wall, "wall")] {
+            try scene(.month, style, opacity: 100, wall: plain, to: output.appendingPathComponent("widget-month-\(name)-repeats.png"))
+        }
+        try scene(.month, .detail, opacity: 100, wall: plain, scale: 0.85, to: output.appendingPathComponent("widget-month-detail-repeats-small.png"))
+        widgets.feed.series = quiet.series
+        widgets.feed.tasks = quiet.tasks
+        // 크기 (#271): every kind at 작게 · 크게 · 아주 크게 (보통 is above) — the same lines in each cell, nothing cut; and the
+        // month at 아주 크게 and 40 % over the busy wallpaper (the floors hold at any size).
+        for (scale, word) in [(0.85, "small"), (1.25, "large"), (1.5, "xlarge")] {
+            for (kind, style, name) in kinds {
+                try scene(kind, style, opacity: 100, wall: plain, scale: scale, to: output.appendingPathComponent("widget-\(name)-size-\(word).png"))
+            }
+        }
+        try scene(.month, .detail, opacity: 40, wall: .busy, scale: 1.5, to: output.appendingPathComponent("widget-month-detail-size-xlarge-40-busy.png"))
         try scene(.month, .detail, opacity: 40, wall: .busy, hover: true, to: output.appendingPathComponent("widget-month-detail-hover.png"))
         // #244: the widget follows the paper picked — a few papers by day (light ones and dark ones), at 100 % and 40 % over
         // the busy wallpaper, where each paper's own floor keeps the tiles readable.
@@ -141,6 +176,12 @@ private enum WidgetSnapshots {
         let month = CalendarWidget.Settings(id: "w-1", kind: .month, style: .simple)
         let today = CalendarWidget.Settings(id: "w-2", kind: .today, style: .simple, opacity: 70, clickThrough: true)
         try panelSlip(WidgetSettingsView(widgets: widgets, original: month, done: {}), to: output.appendingPathComponent("widget-settings.png"))
+        // #271: 벽 달력 on a 1280×800 display — 크게 · 아주 크게 don't fit there and are greyed out.
+        let wall = CalendarWidget.Settings(id: "w-3", kind: .month, style: .wall)
+        let small = CalendarWidget.Rect(x: 0, y: 25, width: 1280, height: 775)
+        try panelSlip(WidgetSettingsView(widgets: widgets, original: wall,
+                                         previewFitting: CalendarWidget.scales.filter { CalendarWidget.fits(.month, .wall, scale: $0, area: small) }, done: {}),
+                      to: output.appendingPathComponent("widget-settings-small-screen.png"))
         widgets.showForSnapshot([month, today])
         let reminders = ReminderController(model: model, preferences: preferences, onOpen: {})
         let archive = ArchiveStore(model: model)
@@ -155,17 +196,19 @@ private enum WidgetSnapshots {
     /// A widget at `opacity` on a wallpaper, 28 pt in from its left and 24 pt from its top.
     @MainActor
     static func scene(_ kind: CalendarWidget.Kind, _ style: CalendarWidget.Style, opacity: Int, wall: Wallpaper.Kind, hover: Bool = false,
-                      toast: PaperToast? = nil, to url: URL) throws {
-        let window = CalendarWidget.windowSize(kind, style)
+                      toast: PaperToast? = nil, scale: Double = 1, to url: URL) throws {
+        let window = CalendarWidget.windowSize(kind, style, scale: scale)
         let inset = CGPoint(x: 28, y: 24)
         let size = CGSize(width: window.width + 56, height: window.height + 48 + (toast == nil ? 0 : 0))
-        let state = WidgetState(settings: CalendarWidget.Settings(id: "snap", kind: kind, style: style, opacity: opacity))
+        let state = WidgetState(settings: CalendarWidget.Settings(id: "snap", kind: kind, style: style, opacity: opacity, scale: scale))
         state.hovering = hover
         state.toast = toast
-        let paperTop = inset.y + CalendarWidget.earHeight(kind, style)
+        state.scale = scale
+        // The wallpaper under the paper in the paper's own (보통) points: the widget draws it `scale` times as big.
+        let paperTop = (inset.y + CalendarWidget.earHeight(kind, style) * scale) / scale
         let paper = CalendarWidget.size(kind, style)
-        let backdrop = Wallpaper(kind: wall).frame(width: size.width, height: size.height)
-            .offset(x: -inset.x, y: -paperTop)
+        let backdrop = Wallpaper(kind: wall).frame(width: size.width / scale, height: size.height / scale)
+            .offset(x: -inset.x / scale, y: -paperTop)
             .frame(width: paper.width, height: paper.height, alignment: .topLeading)
             .clipped()
         let view = ZStack(alignment: .topLeading) {

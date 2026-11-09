@@ -29,6 +29,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     private var noteEars: NoteEarsController!
     private var archive: ArchiveStore!
     private var pet: DesktopPetController!
+    /// 치면 두드리는 고양이 (#289): its own cat in a corner, apart from the pet.
+    private var typingCat: TypingCatController!
     private var focusTimer: FocusTimerController!
     private var quickEntry: QuickEntryController!
     private var quickMemo: QuickMemoController!
@@ -221,11 +223,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         // #230: macOS's Input Monitoring is only ever asked for by the app itself (its own bundle), never by a preview, a
         // test copy or an off-screen run.
         let asksInputMonitoring = !isolated && !arguments.contains("--offscreen") && Bundle.main.bundleIdentifier == "com.noa.PaperTodo"
-        pet = DesktopPetController(model: model, preferences: preferences,
-                                   inputMonitoring: asksInputMonitoring ? InputMonitoring.System() : InputMonitoring.NeverAsks(),
-                                   onOpenNote: { [weak self] in self?.showWindow() })
+        pet = DesktopPetController(model: model, preferences: preferences, onOpenNote: { [weak self] in self?.showWindow() })
         pet.offscreen = arguments.contains("--offscreen")
-        pet.typing.offscreen = arguments.contains("--offscreen")
+        typingCat = TypingCatController(model: model, preferences: preferences,
+                                        access: asksInputMonitoring ? InputMonitoring.System() : InputMonitoring.NeverAsks())
+        typingCat.offscreen = arguments.contains("--offscreen")
+        typingCat.start()
+        pet.typingLately = { [weak self] in self?.typingCat.chatterWaits == true }
         model.onInputMonitoringSettings = { NSWorkspace.shared.open(InputMonitoring.settingsURL) }
         if PerfProbe.isOn { model.objectWillChange.sink { _ in PerfProbe.count("model") }.store(in: &subscriptions) }
         focusTimer = FocusTimerController(model: model, preferences: preferences)
@@ -320,7 +324,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         installHeaderDoubleClick()
         installAI()
         PerfProbe.mark("controllers")
-        window.level = model.alwaysOnTop ? .floating : .normal
+        // 노트 위치 (#273): opening the app counts as summoning the note (바탕화면에 두기 goes back once another window is clicked).
+        model.noteSummoned = true
+        model.applyNoteLevel()
+        NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification, object: window)
+            .receive(on: RunLoop.main).sink { [weak self] _ in self?.model.noteSummoned = false }.store(in: &subscriptions)
         // `--offscreen` (the performance check): the note far off every screen, out of the user's way.
         if arguments.contains("--offscreen") {
             window.animationBehavior = .none // as the desk's (#217)
@@ -381,7 +389,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 
     /// #230: no key is heard any more (the key tap goes with the app anyway; this lets it go first).
     func applicationWillTerminate(_ notification: Notification) {
-        pet?.typing.shutDown()
+        typingCat?.shutDown()
     }
 
     private func buildMenu() {
@@ -532,7 +540,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         todayWindow.onQuickEntry = { [weak self] in self?.quickEntry.show() }
         todayWindow.onSettings = { [weak self] in self?.desk.show(.appearance) }
         todayWindow.timerMenu = { [weak self] in self?.focusTimer.menu() ?? NSMenu() }
-        todayWindow.companionMenuItem = { [weak self] in self?.pet.companionMenuItem() }
+        todayWindow.typingCatMenuItem = { [weak self] in self?.typingCat.menuItem() }
         todayWindow.onUpdate = { [weak self] in self?.updateFoldedSummary() }
         updateFoldedSummary()
     }
@@ -625,8 +633,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     /// The note's key (⌃⌥J unless changed): the note on screen goes away at once, even with another app in front (#85);
     /// hidden, folded, in the Dock or covered by other windows, it comes forward (NoteToggle in PaperCore).
     private func toggleNote() {
+        // #273: a note kept behind the other windows is taken for covered unless it was summoned (it comes forward).
         let action = NoteToggle.action(visible: window.isVisible, minimized: window.isMiniaturized, folded: floatingMascot?.isVisible == true,
-                                       uncovered: window.occlusionState.contains(.visible))
+                                       uncovered: model.noteLayer.uncovered(occlusionVisible: window.occlusionState.contains(.visible), summoned: model.noteSummoned))
         switch action {
         case .hide:
             model.commitEditing()
@@ -791,6 +800,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         collapseAnchorInNote = nil
         floatingMascot?.hide()
         if window.isMiniaturized { window.deminiaturize(nil) }
+        // 바탕화면에 두기 (#273): summoned, it comes forward until another window is clicked.
+        model.noteSummoned = true
         window.makeKeyAndOrderFront(nil)
         noteEars?.sync()
         TestHooks.activate()

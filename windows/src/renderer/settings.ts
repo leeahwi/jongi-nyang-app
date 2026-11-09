@@ -6,7 +6,7 @@ import { codeFonts, drawerMetrics, drawerPoints, faceSize, lineSpacings, paragra
 import { d2codingFamily, monoFamily, paperSamples } from "../core/drawerPapers";
 import { archiveChoicesIn, logicalDayStart } from "../core/archive";
 import type { TimerCommand } from "../core/focusTimer";
-import type { TypingScope } from "../core/typingCat";
+import { typingCorners, type TypingCorner, type TypingScope } from "../core/typingCat";
 import { nativeName, shortDate, spokenTime, weekdayOrder, weekdayShort, type LanguageSetting } from "../core/lang";
 import { alarmSounds, daysText, newAlarm, nextFire, normalTime, snoozeSettings, timeParts, timeText, untilText, type Alarm, type AlarmSound } from "../core/alarm";
 import { durationText, maxTimerMinutes, parseDuration } from "../core/duration";
@@ -22,6 +22,7 @@ import { isSettingsTab, readPane, type PaperSetting, type SettingsTab } from "..
 import { paneTitle } from "./deskPanes";
 import { chatterFrequencyTitles } from "../core/chatter";
 import { timerSizes, timerSizeTitles } from "../core/timerWidget";
+import { catSizes, catSizeTitles } from "../core/catSize";
 import { sweepTimes } from "../core/sweep";
 import { defaultDrawerShortcut, drawerWidth, readShortcut, shortcutLabel, type DrawerBackdrop, type MemoPaper } from "../core/memoDrawer";
 import { darkKinds, drawerKindOf, isDarkPaper, lightKinds, nightChoices, noteSamples, paperKinds, paperRuling, readPaperKind, shownPaper, type NightChoice, type PaperKind } from "../core/paper";
@@ -882,12 +883,9 @@ function pet(): Node[] {
     toggle(prefs.petVisible, t("펫 보이기"), (value) => set("petVisible", value)));
   const wanderRow = h("div", { class: `row${prefs.petVisible ? "" : " disabled"}` }, glyph("footprints"), h("span", { class: "grow" }, t("돌아다니기")),
     toggle(prefs.petWanders, t("돌아다니기"), (value) => set("petWanders", value)));
-  // #230: 글자 칠 때 두드리기 — keys typed in the app's windows only (no other app's keys on Windows).
-  const typing = segmented([{ value: "off", title: t("끄기", undefined, "setting") }, { value: "app", title: t("종이냥에서만") }] as { value: TypingScope; title: string }[],
-    prefs.petTyping, (value) => set("petTyping", value), t("글자 칠 때 두드리기"));
-  const typingRow = h("div", { class: `row${prefs.petVisible ? "" : " disabled"}` }, glyph("keyboard"),
-    h("div", { class: "grow" }, h("div", {}, t("글자 칠 때 두드리기")), h("div", { class: "sub" }, t("종이냥에서 글자를 치면 앞발로 두드려요. 무엇을 쳤는지는 보지 않아요."))),
-    typing);
+  // #304: 크기, the timer's four steps.
+  const petSizeRow = h("div", { class: `row${prefs.petVisible ? "" : " disabled"}` }, glyph("expand"), h("span", { class: "grow" }, t("크기")),
+    segmented(catSizes.map((value) => ({ value, title: catSizeTitles[lang()][value] })), prefs.petSize, (value) => set("petSize", value), t("펫 크기")));
   // 종이냥 한마디
   const off = prefs.chatter ? "" : " disabled";
   const chatterRow = h("div", { class: "row" }, glyph("chat"), h("span", { class: "grow" }, t("가끔 말 걸기")),
@@ -902,12 +900,37 @@ function pet(): Node[] {
   preview.addEventListener("click", () => api.act({ type: "chatterPreview" }));
   const previewRow = h("div", { class: "row" }, glyph("quote"), h("span", { class: "grow" }, t("지금 한마디 듣기")), preview);
   return [
-    group(t("종이냥 펫"), [showRow, wanderRow, typingRow],
+    group(t("종이냥 펫"), [showRow, wanderRow, petSizeRow],
       t("작업 표시줄 위에 앉아 눈을 깜빡이고, 가끔 걸어 다녀요. 끌어서 옮기고, 우클릭하면 메뉴가 나와요."), false, "pet"),
     group(t("종이냥 한마디"), [chatterRow, frequencyRow, questionRow, previewRow],
       t("가끔 응원하거나 말을 걸어요. 집중할 때와 밤 11시–아침 7시에는 조용해요."), false, "pet"),
+    typingGroup(),
   ];
 }
+
+/** 타닥냥 (#230 · #289 · #288): its own section, apart from the pet — what it hears, and the corner it sits in. */
+function typingGroup(): HTMLElement {
+  const { prefs } = state;
+  const scopes: { value: TypingScope; title: string }[] = [
+    { value: "off", title: t("끄기", undefined, "setting") }, { value: "app", title: t("종이냥에서만") }, { value: "everywhere", title: t("모든 앱에서") },
+  ];
+  const scope = segmented(scopes, prefs.typingCat, (value) => set("typingCat", value), t("두드리기"));
+  // #288: 모든 앱에서 says in one line what it hears; if the keyboard hook couldn't be set, that instead.
+  const said = prefs.typingCat === "off" ? undefined
+    : state.typingCatNote ?? (prefs.typingCat === "everywhere" ? t("다른 앱에서 칠 때도 두드려요. 어떤 키인지는 보지 않고, 눌렸다는 것만 알아요.")
+      : t("종이냥에서 글자를 치면 구석에 나와 두드리고, 멈추면 곧 들어가요. 무엇을 쳤는지는 보지 않아요."));
+  const caption = said === undefined ? null : h("div", { class: `sub${state.typingCatNote ? " warn" : ""}` }, said);
+  const scopeRow = h("div", { class: "row" }, glyph("keyboard"), h("div", { class: "grow" }, h("div", {}, t("두드리기")), caption), scope);
+  const corner = popup(typingCorners.map((value) => ({ value, title: cornerTitles()[value] })), prefs.typingCorner, (value) => set("typingCorner", value), t("자리"));
+  corner.disabled = prefs.typingCat === "off";
+  const cornerRow = h("div", { class: `row${prefs.typingCat === "off" ? " disabled" : ""}` }, glyph("corner"), h("span", { class: "grow" }, t("자리")), corner);
+  // #304: its own 크기, apart from the pet's.
+  const sizeRow = h("div", { class: `row${prefs.typingCat === "off" ? " disabled" : ""}` }, glyph("expand"), h("span", { class: "grow" }, t("크기")),
+    segmented(catSizes.map((value) => ({ value, title: catSizeTitles[lang()][value] })), prefs.typingSize, (value) => set("typingSize", value), t("타닥냥 크기")));
+  return group(t("타닥냥"), [scopeRow, cornerRow, sizeRow], t("글자를 치면 화면 구석의 고양이가 방석에 기대 앞발로 두드려요. 종이냥 펫과 따로 켜고 꺼요."), false, "pet");
+}
+
+const cornerTitles = (): Record<TypingCorner, string> => ({ topLeft: t("왼쪽 위"), topRight: t("오른쪽 위"), bottomLeft: t("왼쪽 아래"), bottomRight: t("오른쪽 아래") });
 
 // ─── 시계: alarms, then the focus timer ───────────────────────────────────────
 
@@ -1160,6 +1183,7 @@ function openWidget(id: string): void {
   const index = state.prefs.calendarWidgets.indexOf(widget);
   openWidgetSettings({
     widget,
+    fits: state.widgetFits?.[id],
     change: (changes) => void api.act({ type: "widgetChange", id, changes }),
     remove: () => removeWidget(widget, index),
     closed: () => { widgetSlipFor = undefined; },

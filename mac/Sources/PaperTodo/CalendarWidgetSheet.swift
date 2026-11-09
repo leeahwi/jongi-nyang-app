@@ -107,8 +107,8 @@ struct WidgetDaySheetView: View {
     private var lines: [CalendarWidget.Line] {
         let range = CalendarMonth.fetchRange([day])
         let tasks = model.hereItems
-        let page = CalendarMonth.Page(days: [day], events: model.calendar.occurrences(from: range.start, to: range.end), tasks: tasks, now: now,
-                                      language: language)
+        let page = CalendarMonth.Page(days: [day], events: model.calendar.occurrences(from: range.start, to: range.end), tasks: tasks,
+                                      series: model.hereSeries, now: now, language: language)
         return CalendarWidget.sheetLines(day, page: page, tasks: tasks, now: now, language: language)
     }
 
@@ -236,17 +236,19 @@ struct WidgetDaySheetView: View {
     }
 
     private func row(_ line: CalendarWidget.Line) -> some View {
-        // calendar-flows: what is over by now is drawn faded (all-day events and deadlines last the whole day).
-        let over = line.over(now)
+        // calendar-flows: what is over by now is drawn faded (all-day events and deadlines last the whole day); #274: a
+        // repeat after the next one too.
+        let over = line.over(now) || line.ahead
+        let time = line.time ?? (line.kind == .deadline ? L("마감") : line.kind == .repeating ? CalendarMonth.repeatWord(ahead: false, language: language) : CalendarDay.allDayText(language))
         return Button {
-            if let task = line.taskId { controller.widgets?.reveal(task) } else { controller.widgets?.openCalendar(on: day, event: line.eventKey) }
+            controller.widgets?.open(line, day: day)
             controller.close()
         } label: {
             HStack(spacing: 7) {
-                WidgetMark(kind: line.kind, color: line.color == "clay" ? PaperTheme.clay : line.color == "sage" ? PaperTheme.sage : PaperTheme.event(line.color),
-                           halo: false)
+                WidgetMark(kind: line.kind, color: line.color == "clay" ? PaperTheme.clay : line.color == "sage" || line.color == "faint" ? PaperTheme.sage
+                           : PaperTheme.event(line.color), halo: false)
                     .opacity(over ? 0.45 : 1)
-                Text(line.time ?? (line.kind == .deadline ? L("마감") : CalendarDay.allDayText(language)))
+                Text(time)
                     .font(.system(size: 11.5).monospacedDigit())
                     .foregroundStyle(PaperTheme.ink3)
                     .frame(minWidth: 40, alignment: .leading)
@@ -262,7 +264,8 @@ struct WidgetDaySheetView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(line.taskId == nil ? L("달력에서 열기") : L("노트에서 보기"))
+        .help(line.taskId != nil ? L("노트에서 보기") : line.kind == .repeating ? L("반복 할 일 보기") : L("달력에서 열기"))
+        .accessibilityLabel(CalendarWidget.spoken(line, language: language) ?? "\(time) \(line.title)")
     }
 
     /// Return: the picked reading; ⇧Return the text as a to-do on the day; ⌘Return as an event.

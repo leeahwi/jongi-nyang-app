@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { isBackupName, mergeFiles, parseBackup, makeBackup, readable, replaceFiles, summary, summaryText } from "../src/core/backup";
@@ -11,6 +10,7 @@ import { glanceCards, glanceText, type GlanceTimer } from "../src/core/glance";
 import { isoDate } from "../src/core/notebook";
 import type { Lang } from "../src/core/lang";
 import { copyData, mergeArchive, readDataFiles } from "../src/main/storageFolder";
+import { temporaryFolder } from "./temporaryFolder";
 
 /**
  * 집중 기록 (focus.jsonl): the shared cases of focus-cases.md (written by the
@@ -141,7 +141,7 @@ test("FB3–FB4 backup: 합치기 merges focus by id, 바꾸기 takes the backup
 });
 
 test("FB5 storage: a move to another folder adds the sessions it lacks, by id", () => {
-  const temporary = () => fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-focus-"));
+  const temporary = () => temporaryFolder("paper-todo-focus-");
   const source = temporary(), target = temporary();
   fs.writeFileSync(path.join(source, "focus.jsonl"), focusText(3));
   fs.writeFileSync(path.join(target, "focus.jsonl"), focusText(1));

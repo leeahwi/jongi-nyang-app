@@ -6,6 +6,7 @@
 #   scripts/perf-idle.sh [out-folder] [--no-build] [seconds]      PERF_DATA_ARGS for another data size;
 #   scripts/perf-idle.sh --self-test      only the on-screen check against sample lines of perf-probe (no build, no app)
 #   PERF_PAPER=kraft (#244) draws the test copy on that paper (the idle CPU should be the default paper's).
+#   PERF_PET_SIZE=extraLarge (#304) draws the cat and 타닥냥 at that 크기 (the idle CPU should be 보통's).
 #
 # 1. the cat off, 2. the cat on (it wanders and blinks as in the app; 한마디 on; awake even when nobody is at the Mac,
 # frames counted per clip: petFrame.walk …), 3. 완료 기록 opened once (⌘Y) and the desk closed (⌘W), then 8 checks
@@ -53,6 +54,9 @@ for arg in "$@"; do
     [[ "$arg" =~ ^[0-9]+$ ]] && seconds="$arg"
 done
 bundle_id=${PERF_BUNDLE_ID:-com.noa.PaperTodo.Perf2}
+# #278: never the real app's com.noa.PaperTodo (its settings and data folder share this name).
+source "$repo/scripts/lib/test-defaults.sh"
+test_defaults_require "$bundle_id"
 mkdir -p "$out"
 # The app opens the log and the commands by these paths from its own folder: absolute ones.
 out="$(cd "$out" && pwd)"
@@ -90,7 +94,7 @@ cleanup() {
     stop
     rm -rf "$storage" "$HOME/Library/Saved Application State/$bundle_id.savedState" \
         "$HOME/Library/Caches/$bundle_id" "$HOME/Library/HTTPStorages/$bundle_id"
-    defaults delete "$bundle_id" >/dev/null 2>&1 || true
+    test_defaults_remove "$bundle_id"
 }
 trap cleanup EXIT
 
@@ -114,6 +118,7 @@ run() {
     defaults write "$bundle_id" systemNotices off
     defaults write "$bundle_id" AppleLanguages -array ko
     if [ -n "${PERF_PAPER:-}" ]; then defaults write "$bundle_id" paper.theme -string "$PERF_PAPER"; fi
+    if [ -n "${PERF_PET_SIZE:-}" ]; then defaults write "$bundle_id" pet.size -string "$PERF_PET_SIZE"; defaults write "$bundle_id" typing.size -string "$PERF_PET_SIZE"; fi
     : > "$log"; : > "$commands"
     open -g -n --env PAPERTODO_OFFSCREEN=1 "$app" --args --perf-log "$log" --offscreen --perf-drive "$commands"
     for _ in $(seq 1 100); do pid=$(pgrep -f "$app/Contents/MacOS/PaperTodo" | head -1 || true); [ -n "$pid" ] && break; sleep 0.05; done

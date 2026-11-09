@@ -209,7 +209,8 @@
 "포스트잇 다루기" = "Het plakbriefje gebruiken";
 "포스트잇을 누르면 노트가 다시 펼쳐지고, 끌면 자리를 옮겨요. 옮긴 자리를 기준으로 노트가 열려요. 우클릭하면 숨기기·종료 메뉴가 있어요." = "Klik op het briefje om het notitieblok weer uit te klappen; sleep het om het te verplaatsen. Het notitieblok opent op de plek waar je het neerzette. Rechtsklik voor Verbergen en Stoppen.";
 "항상 위에 두기" = "Altijd bovenop";
-"위쪽 핀 모양 버튼을 누르면 다른 창 위에 노트가 떠 있어요. 한 번 더 누르면 풀려요." = "Klik op de punaise bovenaan en het notitieblok blijft boven andere vensters. Klik nog eens om dat op te heffen.";
+"위쪽 핀 모양 버튼을 누르고 노트를 둘 곳을 골라요.\n· 보통: 다른 창처럼 누르면 앞으로 와요.\n· 항상 위에 두기: 늘 다른 창 위에 떠 있어요.\n· 바탕화면에 두기: 늘 다른 창 뒤에 있어요. 노트를 누르거나 적어도 앞으로 오지 않아요.\n· 바탕화면에 둔 노트도 %@ 키나 메뉴 막대에서 열면 잠깐 앞으로 와요. 다른 창을 누르면 다시 뒤로 가요." = "Klik op de punaise bovenaan en kies waar het notitieblok ligt.\n· Normaal: zoals elk venster komt het naar voren als je erop klikt.\n· Altijd bovenop: het zweeft altijd boven andere vensters.\n· Op het bureaublad: het blijft altijd achter andere vensters. Klikken of typen brengt het niet naar voren.\n· Een notitieblok op het bureaublad komt toch even naar voren als je het opent met %@ of via de menubalk. Klik op een ander venster en het gaat weer terug.";
+"노트 위치" = "Positie van het notitieblok";
 "크기와 위치" = "Grootte en plek";
 "완료 기록" = "Geschiedenis";
 "한 일은 초록 칸으로 남아요" = "Wat je deed, blijft als groene vakjes";
@@ -227,7 +228,7 @@
 "할 일 줄을 우클릭 → ‘달력에 넣기…’로 할 일을 일정으로 넣어요.\n· 할 일의 알림 시각이나 마감으로 날짜를 채워 줘요.\n· 넣은 할 일 끝에는 작은 달력이 붙어요.\n· 넣은 뒤 할 일을 고쳐도 일정은 그대로예요." = "Rechtsklik op een taak → ‘In kalender zetten…’ om hem in de kalender te zetten.\n· De datum komt van de herinneringstijd of deadline van de taak.\n· De taak krijgt een kalendertje aan het eind.\n· Wijzig je de taak daarna, dan blijft de afspraak zoals hij is.";
 "일정 알림" = "Herinneringen voor afspraken";
 "달력" = "Kalender";
-"월 · 주로 일정 · 마감 · 알림을 한눈에 봐요.\n1. 노트 위쪽의 책상 버튼, ⋯ → 달력, ⌘D로 책상의 달력을 열어요.\n2. 날짜를 누르면 오른쪽에 그날 일정과 할 일이 보여요.\n3. 날짜를 두 번 누르면 새 일정을 만들어요.\n· 여러 날 일정은 첫날에 이름이 보이고, 이어지는 날로 막대가 이어져요.\n· 한 주는 시스템 설정에 맞춰 월요일이나 일요일부터 시작해요." = "Zie afspraken, deadlines en herinneringen in één oogopslag, per maand of week.\n1. Open de kalender op het Bureau met de bureauknop bovenaan het notitieblok, ⋯ → Kalender of ⌘D.\n2. Klik op een dag om rechts de afspraken en taken van die dag te zien.\n3. Dubbelklik op een dag voor een nieuwe afspraak.\n· Een afspraak van meer dagen toont de naam op de eerste dag, en de balk loopt door over de dagen erna.\n· Een week begint op maandag of zondag, zoals op je Mac is ingesteld.";
+"월 · 주로 일정 · 마감 · 알림을 한눈에 봐요.\n1. 노트 위쪽의 책상 버튼, ⋯ → 달력, ⌘D로 책상의 달력을 열어요.\n2. 날짜를 누르면 오른쪽에 그날 일정과 할 일이 보여요.\n3. 날짜를 두 번 누르면 새 일정을 만들어요.\n· 여러 날 일정은 첫날에 이름이 보이고, 이어지는 날로 막대가 이어져요.\n· 한 주는 시스템 설정에 맞춰 월요일이나 일요일부터 시작해요.\n· 반복 할 일은 앞으로 돌아올 날마다 보여요. 다음 한 번만 진하고 나머지는 흐려요.\n· 매일 · 평일 반복은 달 칸에 이름 대신 날짜 옆 ⟲와 개수로 보여요. 마우스를 올리면 이름이 보여요.\n· 키보드로: 화살표로 날을 고르고 Return으로 새 일정을 만들어요. Tab을 누르면 그날 일정으로 가요. ↑↓로 고르고 Return으로 고쳐요. Esc를 누르면 달력의 그 날로 돌아가요." = "Zie afspraken, deadlines en herinneringen in één oogopslag, per maand of week.\n1. Open de kalender op het Bureau met de bureauknop bovenaan het notitieblok, ⋯ → Kalender of ⌘D.\n2. Klik op een dag om rechts de afspraken en taken van die dag te zien.\n3. Dubbelklik op een dag voor een nieuwe afspraak.\n· Een afspraak van meer dagen toont de naam op de eerste dag, en de balk loopt door over de dagen erna.\n· Een week begint op maandag of zondag, zoals op je Mac is ingesteld.\n· Een herhalende taak staat op elke dag dat hij terugkomt. Alleen de volgende is vol; de rest is vaag.\n· In de maand staan dagelijkse en doordeweekse herhalingen als ⟲ met het aantal naast de datum, in plaats van hun namen. Wijs ernaar om ze te zien.\n· Met het toetsenbord: kies een dag met de pijltjestoetsen en druk op Return voor een nieuwe afspraak. Druk op Tab om naar de afspraken van die dag te gaan. Kies er een met ↑↓ en druk op Return om hem te wijzigen. Druk op Esc om terug te gaan naar die dag in de kalender.";
 "어디에 저장되나요?" = "Waar worden ze bewaard?";
 "일정은 할 일과 같은 저장 폴더에 있어요. 인터넷 계정에 연결하지 않아요.\n· 공유 폴더를 쓰면 다른 기기의 종이냥과 함께 써요.\n· 파일 이름은 events.json이에요." = "Afspraken staan in dezelfde opslagmap als je taken. Er komt geen online account aan te pas.\n· Met een gedeelde map gebruikt Jongi-nyang op je andere apparaten ze ook.\n· Het bestand heet events.json.";
 "백업 · 옮기기" = "Back-up & verhuizen";
@@ -240,7 +241,7 @@
 "화면 아래 작은 친구" = "Je kleine bureaubladvriend";
 "종이냥 펫" = "Bureaubladkat";
 "펫과 놀기" = "Spelen met de kat";
-"종이냥이 화면 아래(Dock 위)에서 지내요. 누르면 하트가 나오고, 두 번 누르면 노트가 열려요. 잡고 끌면 자리를 옮기고, 다른 모니터로 옮길 수도 있어요." = "Jongi-nyang woont onderaan je scherm (boven het Dock). Klik voor een hartje; dubbelklik om het notitieblok te openen. Sleep hem om hem te verplaatsen, zelfs naar een ander scherm.";
+"종이냥이 화면 아래(Dock 위)에서 지내요. 누르면 하트가 나오고, 두 번 누르면 노트가 열려요. 잡고 끌면 자리를 옮기고, 다른 모니터로 옮길 수도 있어요. 책상 → 종이냥 → 종이냥 펫의 ‘크기’에서 작게 · 보통 · 크게 · 아주 크게 중에 골라요. 말풍선 글자는 그대로예요." = "Jongi-nyang woont onderaan je scherm (boven het Dock). Klik voor een hartje; dubbelklik om het notitieblok te openen. Sleep hem om hem te verplaatsen, zelfs naar een ander scherm. Kies in Bureau → Kat → Bureaubladkat bij ‘Grootte’ Klein, Normaal, Groot of Extra groot. De tekst in zijn ballonnetje blijft even groot.";
 "종이냥이 하는 일" = "Wat de kat doet";
 "가만히 있을 땐 숨을 쉬고, 가끔 깜빡이고 갸웃하고 걷고 그루밍하고 차를 마셔요.\n· Mac을 5분 넘게 안 쓰면 하품하고 잠들었다가, 돌아오면 기지개를 켜요.\n· 할 일이나 타이머를 끝내면 축하해 줘요." = "Als hij stilzit, ademt hij, en af en toe knippert hij, houdt hij zijn kopje schuin, loopt hij, poetst hij zich en drinkt hij thee.\n· Laat je je Mac langer dan 5 minuten met rust, dan gaapt hij en valt hij in slaap. Als je terugkomt, rekt hij zich uit.\n· Hij juicht als je een taak of timer afrondt.";
 "우클릭 메뉴" = "Rechtsklikmenu";
@@ -358,7 +359,6 @@
 "가볍게 적고, 하나씩 마치세요.\n이 Mac에만 저장되는 작은 할 일 노트." = "Jongi-nyang (종이냥, ‘papieren kat’)\nSchrijf het op, rond het één voor één af.\nEen klein takenbriefje dat op deze Mac blijft.";
 /* PaperView.swift */
 "오늘 할 일을 한 줄 적어 볼까요?" = "Eén ding opschrijven voor vandaag?";
-"항상 위에 두기 해제" = "Niet meer bovenop houden";
 "끔" = "Uit";
 "켬" = "Aan";
 "글꼴" = "Lettertype";
@@ -1396,21 +1396,26 @@
 "공유 폴더로 여러 기기가 같은 목록을 써도, 기기마다 보일 스페이스를 따로 정해요.\n1. 책상 → 스페이스에서 줄 오른쪽의 ‘이 기기에서’ 팝업을 열어요.\n2. 보이기 · 숨기기 · 시간 정하기… 중에서 골라요. ‘모든 스페이스 ▾’의 ‘이 기기에서 숨기기 ▸’로도 바로 숨겨요.\n· 시간 정하기는 줄마다 요일과 시각을 정해요. 줄을 여러 개 둘 수 있고, 하나라도 맞으면 보여요. 22:00–06:00처럼 밤을 넘겨도 돼요.\n· 숨긴 스페이스의 할 일은 오늘 · 앞으로 탭, 오늘 창, 하루 띠, 저녁 정리에 나오지 않고, 이 기기에서는 알림도 울리지 않아요. 숨어 있던 동안 지난 알림은 나중에도 울리지 않아요.\n· 목록 맨 아래 ‘잠깐 보기’를 누르면 잠시 보여요. 앱을 다시 켜거나 ‘다시 숨기기’를 누르면 다시 숨어요.\n· 완료 기록에는 모두 보여요. 찾기에서는 옅게 보이고 ‘숨김’이 붙어요.\n· 이 설정은 이 기기에만 있어요. 다른 기기에는 모두 보여요. 이 기기의 종이냥 for Claude도 숨긴 스페이스의 할 일을 빼고 보여 줘요." = "Ook als meerdere apparaten via een gedeelde map één lijst gebruiken, kiest elk apparaat welke ruimtes het toont.\n1. Open in Bureau → Ruimtes de keuzelijst ‘Op dit apparaat’ rechts in een rij.\n2. Kies Tonen, Verbergen of Tijden instellen…. Met ‘Verbergen op dit apparaat ▸’ onder ‘Alle ruimtes ▾’ verberg je er ook meteen een.\n· Bij Tijden instellen kies je per rij dagen en tijden. Je kunt meerdere rijen toevoegen; de ruimte is zichtbaar als er één klopt. Een rij als 22:00–06:00 loopt door na middernacht.\n· Taken in een verborgen ruimte staan niet in Vandaag, Vooruit, het Vandaag-venster, de Daglint en de Avondopruiming, en hun herinneringen gaan op dit apparaat niet af. Herinneringen die voorbijgingen terwijl de ruimte verborgen was, gaan ook later niet af.\n· Met ‘Even kijken’ onderaan de lijst zie je ze even. Ze verdwijnen weer als de app opnieuw start of je op ‘Weer verbergen’ klikt.\n· Geschiedenis toont alles. Zoeken toont ze vaag, met ‘Verborgen’.\n· Deze instelling blijft op dit apparaat. Andere apparaten zien alles nog. Jongi-nyang for Claude op dit apparaat laat de taken van verborgen ruimtes ook weg.";
 
 /* #230 치면 두드리는 고양이 (1.48) */
-"글자 칠 때 두드리기" = "Meetikken tijdens typen";
+/* #289 타닥냥, apart from the pet */
+"타닥냥" = "Tiktakkat";
+"두드리기" = "Meetikken";
+/* #304 크기 of the pet and of 타닥냥 */
+"펫 크기" = "Grootte bureaubladkat";
+"타닥냥 크기" = "Grootte tiktakkat";
+"자리" = "Hoek";
+"글자를 치면 화면 구석의 고양이가 방석에 기대 앞발로 두드려요. 종이냥 펫과 따로 켜고 꺼요." = "Typ je, dan tikt een kat in een hoek van het scherm mee op zijn kussen. Je zet hem los van de bureaubladkat aan en uit.";
+"종이냥에서 글자를 치면 구석에 나와 두드리고, 멈추면 곧 들어가요. 무엇을 쳤는지는 보지 않아요." = "Typ je in deze app, dan komt hij meetikken en gaat hij weer als je stopt. Wat je typt, ziet hij nooit.";
+"다른 앱에서 칠 때도 두드려요. 어떤 키인지는 보지 않고, 눌렸다는 것만 알아요." = "Hij tikt ook mee in andere apps. Welke toets het is, ziet hij niet, alleen dat er een is ingedrukt.";
+"글자를 치면 화면 구석의 고양이가 방석에 기대 앞발을 번갈아 내려요. 치기를 멈추면 곧 쉬어요. 종이냥 펫과 따로 켜고 꺼요.\n1. 책상 → 종이냥 → 타닥냥의 ‘두드리기’에서 끄기 · 종이냥에서만 · 모든 앱에서 중에 골라요.\n2. ‘자리’에서 화면의 네 구석 중 하나를 골라요. 처음은 오른쪽 아래예요.\n3. ‘크기’에서 작게 · 보통 · 크게 · 아주 크게 중에 골라요. 펫 크기와 따로예요.\n· 종이냥에서만: 종이냥 창에서 칠 때 구석에 나오고, 멈추면 몇 초 뒤 조용히 들어가요.\n· 모든 앱에서: macOS가 입력 모니터링 권한을 한 번 물어요. 허락하면 구석에 늘 있고, 다른 앱에서 칠 때도 두드려요. 전체 화면 앱 위에도 보여요.\n· 종이냥이 아는 건 키를 눌렀다는 것과 그 시각뿐이에요. 어떤 키인지, 무엇을 쳤는지는 읽지도 남기지도 않아요.\n· 키를 꾹 누르고 있거나 ⌘ · ⌃ 단축키를 쓸 때는 두드리지 않아요.\n· 클릭은 뒤 앱으로 가요. 메뉴 막대의 종이냥 얼굴을 우클릭해 ‘타닥냥’으로 바로 숨기고 다시 보여요.\n· 펫을 숨겨도 타닥냥은 그대로예요. 화면을 공유할 때도 보여요.\n· 권한이 없으면 종이냥 안에서만 두드려요. 종이냥은 아직 Apple의 정식 서명이 없어서, 업데이트하면 macOS가 권한을 다시 물을 수 있어요.\n· 손쉬운 사용의 ‘동작 줄이기’를 켜면 가만히 앉아 있어요." = "Typ je, dan leunt een kat in een hoek van het scherm op zijn kussen en tikt hij om de beurt met zijn pootjes. Stop je, dan rust hij al snel. Je zet hem los van de bureaubladkat aan en uit.\n1. Kies in Bureau → Kat → Tiktakkat bij ‘Meetikken’ voor Uit, In deze app of In alle apps.\n2. Kies bij ‘Hoek’ een van de vier hoeken van het scherm. Eerst is dat rechtsonder.\n3. Kies bij ‘Grootte’ Klein, Normaal, Groot of Extra groot, los van de grootte van de bureaubladkat.\n· In deze app: hij komt in zijn hoek als je in Jongi-nyang typt en gaat een paar seconden nadat je stopt stilletjes weer weg.\n· In alle apps: macOS vraagt één keer om Invoermonitoring. Sta je het toe, dan blijft de kat in zijn hoek en tikt hij ook mee in andere apps, ook boven schermvullende apps.\n· Hij weet alleen dát er een toets is ingedrukt, en wanneer. Welke toets of wat je typt, wordt nooit gelezen of bewaard.\n· Hij tikt niet mee als je een toets ingedrukt houdt of een ⌘- of ⌃-sneltoets gebruikt.\n· Klikken gaan door naar de app erachter. Klik met rechts op het kattengezicht in de menubalk en kies ‘Tiktakkat’ om hem te verbergen of terug te halen.\n· Verberg je de bureaubladkat, dan blijft de tiktakkat gewoon. Hij is ook te zien als je je scherm deelt.\n· Zonder toestemming tikt hij alleen in deze app mee. Jongi-nyang is nog niet volledig door Apple ondertekend, dus macOS kan na een update opnieuw vragen.\n· Met ‘Verminder beweging’ in Toegankelijkheid zit hij stil.";
 "종이냥에서만" = "In deze app";
 "모든 앱에서" = "In alle apps";
-"종이냥에서 글자를 치면 앞발로 두드려요. 무엇을 쳤는지는 보지 않아요." = "Typ je in deze app, dan tikt de kat mee met zijn pootjes. Wat je typt, ziet hij nooit.";
-"다른 앱에서 칠 때도 두드려요. 키를 눌렀다는 것만 알고, 어떤 키인지는 몰라요." = "Hij tikt ook mee in andere apps. Hij weet alleen dat je een toets indrukt, nooit welke.";
 "종이냥은 아직 Apple의 정식 서명이 없어서, 업데이트하면 macOS가 권한을 다시 물을 수 있어요." = "Jongi-nyang is nog niet volledig door Apple ondertekend, dus macOS kan na een update opnieuw om toestemming vragen.";
 "입력 모니터링 권한이 없어서 종이냥 안에서만 두드려요." = "Invoermonitoring is niet toegestaan, dus de kat tikt alleen in deze app mee.";
 "시스템 설정 열기" = "Systeeminstellingen openen";
-"전체 화면에서 보이기" = "Tonen boven schermvullende apps";
 "왼쪽 위" = "Linksboven";
 "오른쪽 위" = "Rechtsboven";
 "왼쪽 아래" = "Linksonder";
 "오른쪽 아래" = "Rechtsonder";
-"글자 칠 때" = "Tijdens het typen";
-"글자를 치면 고양이가 방석에 기대 앞발을 번갈아 내려요. 치기를 멈추면 곧 쉬어요.\n1. 책상 → 종이냥 → 종이냥 펫의 ‘글자 칠 때 두드리기’에서 끄기 · 종이냥에서만 · 모든 앱에서 중에 골라요.\n2. ‘모든 앱에서’를 고르면 macOS가 입력 모니터링 권한을 한 번 물어요. 허락하면 다른 앱에서 칠 때도 두드려요.\n· 종이냥이 아는 건 키를 눌렀다는 것과 그 시각뿐이에요. 어떤 키인지, 무엇을 쳤는지는 읽지도 남기지도 않아요.\n· 키를 꾹 누르고 있거나 ⌘ · ⌃ 단축키를 쓸 때는 두드리지 않아요.\n· ‘모든 앱에서’일 때 전체 화면 앱 위에는 Dock 위 고양이 대신 작은 고양이가 구석에 떠요. 클릭은 뒤 앱으로 가요. 펫이나 메뉴 막대의 종이냥 얼굴을 우클릭해 ‘전체 화면에서 보이기’를 끄면 숨어요.\n· 작은 고양이는 화면을 공유할 때도 보여요.\n· 권한이 없으면 종이냥 안에서만 두드려요. 종이냥은 아직 Apple의 정식 서명이 없어서, 업데이트하면 macOS가 권한을 다시 물을 수 있어요.\n· 손쉬운 사용의 ‘동작 줄이기’를 켜면 가만히 앉아 있어요." = "Typ je, dan leunt de kat op zijn kussen en zet hij om de beurt een pootje neer. Stop je, dan rust hij al snel.\n1. Kies in Bureau → Kat → Bureaubladkat bij ‘Meetikken tijdens typen’ Uit, In deze app of In alle apps.\n2. Kies je ‘In alle apps’, dan vraagt macOS één keer om Invoermonitoring. Sta je het toe, dan tikt de kat ook mee in andere apps.\n· Hij weet alleen dat je een toets indrukt, en wanneer. Welke toets of wat je typt, wordt nooit gelezen of bewaard.\n· Houd je een toets ingedrukt of gebruik je een sneltoets met ⌘ of ⌃, dan tikt hij niet.\n· Met ‘In alle apps’ zit er boven schermvullende apps een kleine kat in een hoek, in plaats van die boven het Dock. Klikken gaan door naar de app erachter. Verbergen doe je door met rechts op de kat of op het kattengezichtje in de menubalk te klikken en ‘Tonen boven schermvullende apps’ uit te zetten.\n· De kleine kat is ook te zien als je je scherm deelt.\n· Zonder toestemming tikt hij alleen in deze app mee. Jongi-nyang is nog niet volledig door Apple ondertekend, dus macOS kan na een update opnieuw vragen.\n· Met ‘Beweging verminderen’ aan in Toegankelijkheid zit hij stil.";
 
 /* 바탕화면 달력 위젯 (#234) */
 "%@ 위젯" = "Widget %@";
@@ -1449,6 +1454,7 @@
 "켜면 귀만 마우스를 받아요." = "Als dit aan staat, reageren alleen de oortjes op de muis.";
 "클릭 통과" = "Klikken doorlaten";
 "투명도 줄이기가 켜져 있어서 위젯이 늘 선명하게 보여요." = "Transparantie verminderen staat aan, dus widgets blijven helder.";
+"이 화면에 들어가는 크기만 고를 수 있어요." = "Je kunt alleen formaten kiezen die op dit scherm passen.";
 "할 일 ↔ 일정" = "Taak ↔ afspraak";
 "할 일이나 일정을 적어요" = "Typ een taak of afspraak";
 "항상 위" = "Bovenop";
@@ -1506,3 +1512,9 @@
 "노트 · 달력 · 위젯 · 쪽지 · 책상이 같은 종이를 써요. 밝은 종이는 밤이 되면 ‘밤에는’에서 고른 종이로 바뀌어요." = "Notitieblok, agenda, widgets, briefjes en Bureau gebruiken hetzelfde papier. ’s Nachts wordt een licht papier het papier dat je bij ’s Nachts kiest.";
 "종이와 낮 · 밤" = "Papier en dag & nacht";
 "책상 → 꾸미기 → 종이에서 열다섯 종이 가운데 하나를 골라요. 노트 · 달력 · 위젯 · 쪽지 · 책상이 바로 그 종이로 바뀌어요.\n· 밝은 종이는 밤이 되면 ‘밤에는’에서 고른 종이로 바뀌어요. 처음에는 밤 종이예요. 밤에도 그 종이를 쓰려면 ‘그대로’를 골라요.\n· 어두운 종이(밤 종이 · 먹색 종이 · 밤하늘 종이 · 칠판)는 낮에도 그대로예요.\n· 낮 · 밤에서 자동 · 낮 · 밤을 골라요. 자동이면 Mac이 어두운 모드일 때 밤이 돼요.\n· 메뉴와 스크롤 막대도 보이는 종이처럼 밝거나 어두워요." = "Kies in Bureau → Weergave → Papier een van de vijftien papieren. Notitieblok, agenda, widgets, briefjes en Bureau krijgen het meteen.\n· ’s Nachts wordt een licht papier het papier dat je bij ’s Nachts kiest — eerst Nachtpapier. Wil je het ook ’s nachts houden, kies dan ‘Dit papier houden’.\n· De donkere papieren (Nachtpapier · Inkt · Nachthemel · Schoolbord) blijven ook overdag hetzelfde.\n· Bij Dag & nacht kies je Automatisch · Dag · Nacht. Op Automatisch is het nacht als je Mac in de donkere modus staat.\n· Menu’s en schuifbalken worden licht of donker met het papier mee.";
+/* #274 · #275: herhalende taken in de kalender, en de dagenlijst van de bureaukalender met het toetsenbord. */
+"반복 할 일 보기" = "Herhalende taken tonen";
+"책상 달력" = "Bureaukalender";
+"그날 일정으로" = "Naar de afspraken van die dag";
+"일정 고르기" = "Afspraak kiezen";
+"달력으로 돌아가기" = "Terug naar de kalender";

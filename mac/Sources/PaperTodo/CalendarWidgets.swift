@@ -16,6 +16,8 @@ import SwiftUI
 final class WidgetFeed: ObservableObject {
     @Published var events: [LocalEvent] = []
     @Published var tasks: [TodoItem] = []
+    /// #274: this Mac's repeating to-dos (`hereSeries`), drawn on the days they come back.
+    @Published var series: [Series] = []
     @Published var now = Date()
     /// 음력 · 공휴일 (책상 → 일정 → 달력).
     @Published var showsLunar = true
@@ -55,6 +57,8 @@ final class WidgetState: ObservableObject {
     @Published var hovering = false
     /// ‹ › on a week or month: weeks or months away from now.
     @Published var offset = 0
+    /// 크기 (#271) as drawn: the size picked, or a smaller one where its display has no room (CalendarWidget.shownScale).
+    @Published var scale = CalendarWidget.defaultScale
     /// The toast at its foot (넣었어요 · 되돌리기, 위젯을 제거했어요 · 되돌리기).
     @Published var toast: PaperToast?
     /// Removed: only its toast is left, until the toast goes.
@@ -132,7 +136,7 @@ final class CalendarWidgets: ObservableObject {
         sheet.widgets = self
         list = CalendarWidget.read(preferences.array(forKey: Self.key))
         // The data: only when it changes (the note's typing doesn't reach here until a to-do changes).
-        model.$history.combineLatest(model.$hiddenHere, model.$todoSpaces)
+        model.$history.combineLatest(model.$hiddenHere, model.$todoSpaces, model.$series)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.refreshTasks() }
             .store(in: &subscriptions)
@@ -174,6 +178,8 @@ final class CalendarWidgets: ObservableObject {
         guard let model else { return }
         let tasks = model.hereItems
         if feed.tasks != tasks { feed.tasks = tasks }
+        let series = model.hereSeries
+        if feed.series != series { feed.series = series }
         scheduleTick()
     }
 
@@ -204,8 +210,10 @@ final class CalendarWidgets: ObservableObject {
         change(&settings)
         settings = CalendarWidget.Settings(id: settings.id, kind: settings.kind, style: settings.style, opacity: settings.opacity,
                                            solidOnHover: settings.solidOnHover, clickThrough: settings.clickThrough, locked: settings.locked,
-                                           level: settings.level, allSpaces: settings.allSpaces, place: settings.place)
-        let resized = settings.style != list[index].style
+                                           level: settings.level, allSpaces: settings.allSpaces, place: settings.place, scale: settings.scale)
+        let old = list[index]
+        // Another size (#271), or dropped on another display (whose room may draw it smaller): placed again, inside.
+        let resized = settings.style != old.style || settings.scale != old.scale || settings.place?.display != old.place?.display
         list[index] = settings
         states[id]?.settings = settings
         if saving { save() }
@@ -288,12 +296,13 @@ final class CalendarWidgets: ObservableObject {
     }
 
     private func makePanel(_ settings: CalendarWidget.Settings) -> CalendarWidgetPanel {
-        let size = CalendarWidget.windowSize(settings.kind, settings.style)
+        let size = windowSize(settings)
         let panel = CalendarWidgetPanel(size: NSSize(width: size.width, height: size.height))
         panel.title = CalendarWidget.name(settings.kind, settings.style, .current)
         let state = states[settings.id] ?? WidgetState(settings: settings)
         state.settings = settings
         states[settings.id] = state
+        state.scale = shownScale(settings)
         let view = CalendarWidgetView(state: state, feed: feed, widgets: self)
         let hosting = CalendarWidgetHostingView(rootView: AnyView(view), id: settings.id, widgets: self)
         hosting.sizingOptions = []
@@ -309,7 +318,7 @@ final class CalendarWidgets: ObservableObject {
         // Not over a full-screen app (a film, a talk): no .fullScreenAuxiliary, as the pet.
         let behavior: NSWindow.CollectionBehavior = settings.allSpaces ? [.canJoinAllSpaces, .stationary, .ignoresCycle] : [.ignoresCycle]
         if panel.collectionBehavior != behavior { panel.collectionBehavior = behavior }
-        let size = CalendarWidget.windowSize(settings.kind, settings.style)
+        let size = windowSize(settings)
         if panel.frame.size != NSSize(width: size.width, height: size.height) {
             panel.setContentSize(NSSize(width: size.width, height: size.height))
             panel.contentView?.frame = NSRect(origin: .zero, size: panel.frame.size)
@@ -329,6 +338,33 @@ final class CalendarWidgets: ObservableObject {
     /// UUID, which stays the same when it comes back.
     func screens() -> [CalendarWidget.Screen] {
         NSScreen.screens.map { CalendarWidget.Screen(id: Self.id(of: $0), area: Self.rect($0.visibleFrame)) }
+    }
+
+    // MARK: 크기 (#271)
+
+    /// The display a widget is on (its remembered one, else the main one).
+    private func screen(of settings: CalendarWidget.Settings) -> CalendarWidget.Screen? {
+        let all = screens()
+        return all.first { $0.id == settings.place?.display } ?? all.first
+    }
+
+    /// The size a widget is drawn at: the one picked, else the largest that fits its display. Snapshots draw the one picked.
+    func shownScale(_ settings: CalendarWidget.Settings) -> Double {
+        guard let area = screen(of: settings)?.area else { return settings.scale }
+        return CalendarWidget.shownScale(settings.scale, settings.kind, settings.style, area: area)
+    }
+
+    /// The window at the size drawn; the widget's view hears that size.
+    private func windowSize(_ settings: CalendarWidget.Settings) -> (width: Double, height: Double) {
+        let scale = shownScale(settings)
+        if let state = states[settings.id], state.scale != scale { state.scale = scale }
+        return CalendarWidget.windowSize(settings.kind, settings.style, scale: scale)
+    }
+
+    /// The sizes that fit the widget's display (the others are greyed out in its menu and its settings).
+    func fitting(_ settings: CalendarWidget.Settings) -> [Double] {
+        guard let area = screen(of: settings)?.area else { return CalendarWidget.scales }
+        return CalendarWidget.scales.filter { CalendarWidget.fits(settings.kind, settings.style, scale: $0, area: area) }
     }
 
     static func id(of screen: NSScreen) -> String {
@@ -354,14 +390,17 @@ final class CalendarWidgets: ObservableObject {
     /// remembered, so it goes back when that display returns).
     func place(_ id: String) {
         guard let panel = panels[id], let settings = list.first(where: { $0.id == id }) else { return }
-        let size = CalendarWidget.windowSize(settings.kind, settings.style)
+        let size = windowSize(settings)
         let all = screens()
         let place = settings.place ?? all.first.map {
             CalendarWidget.newPlace(width: size.width, height: size.height, screen: $0, others: [])
         } ?? CalendarWidget.Place(display: "", x: 1, y: 0)
         let frame = Self.frame(CalendarWidget.frame(place, width: size.width, height: size.height, screens: all))
             .offsetBy(dx: offscreenShift.x, dy: offscreenShift.y)
-        if panel.frame != frame { panel.setFrame(frame, display: true) }
+        if panel.frame != frame {
+            panel.setFrame(frame, display: true)
+            panel.contentView?.frame = NSRect(origin: .zero, size: panel.frame.size)
+        }
     }
 
     /// The displays changed (one came or went, a new resolution, the Dock moved): every widget again.
@@ -398,7 +437,7 @@ final class CalendarWidgets: ObservableObject {
         if list.contains(where: { $0.kind != .month }) {
             let page = CalendarMonth.Page(days: [today], events: LocalEvent.expand(feed.events, from: Calendar.paper.startOfDay(for: now), to: next,
                                                                                     language: .current),
-                                          tasks: feed.tasks, now: now)
+                                          tasks: feed.tasks, series: feed.series, now: now)
             let lines = CalendarWidget.dayLines(today, page: page, tasks: feed.tasks, now: now)
             next = min(next, CalendarWidget.nextRedraw(.today, now: now, lines: lines))
         }
@@ -418,40 +457,57 @@ final class CalendarWidgets: ObservableObject {
     // MARK: The mouse while clicks pass through
 
     /// Watched only while a widget lets clicks through: over its ears, or with ⌥ held over it, it takes the mouse and
-    /// is drawn solid; off it, clicks pass again. The modifier flags come with each mouse move (no key watching, no
-    /// permission).
+    /// is drawn solid; off it, clicks pass again. The moves come through the app's one mouse ear (PointerWatch, #64:
+    /// it looks away for a moment while the pointer is far from every widget); ⌥ going down or up is heard at once
+    /// (no key watching, no permission).
     private func updateMouseMonitors() {
         let needed = list.contains { $0.clickThrough } && !allHidden
         if needed, mouseMonitors.isEmpty {
-            let update: (NSEvent) -> Void = { [weak self] event in
+            let watch = PointerWatch.shared
+            watch.watch("widgets", distance: { [weak self] point in
+                self?.distance(to: point) ?? .infinity
+            }, moved: { [weak self] point in
+                self?.pointerMoved(at: point, option: PointerWatch.shared.modifiers().contains(.option))
+            })
+            let flags: (NSEvent) -> Void = { [weak self] event in
                 let option = event.modifierFlags.contains(.option)
-                MainActor.assumeIsolated { self?.pointerMoved(option: option) }
+                MainActor.assumeIsolated { self?.pointerMoved(at: PointerWatch.shared.pointer(), option: option) }
             }
-            if let global = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved, .flagsChanged], handler: update) { mouseMonitors.append(global) }
-            if let local = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved, .flagsChanged], handler: { update($0); return $0 }) { mouseMonitors.append(local) }
+            if watch.systemWide, let global = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: flags) { mouseMonitors.append(global) }
+            if let local = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged, handler: { flags($0); return $0 }) { mouseMonitors.append(local) }
         } else if !needed, !mouseMonitors.isEmpty {
+            PointerWatch.shared.stop("widgets")
             mouseMonitors.forEach(NSEvent.removeMonitor)
             mouseMonitors.removeAll()
         }
     }
 
-    private func pointerMoved(option: Bool) {
-        let point = NSEvent.mouseLocation
+    /// Points from the pointer to the nearest widget that lets clicks through.
+    private func distance(to point: NSPoint) -> Double {
+        list.filter(\.clickThrough).compactMap { panels[$0.id] }.filter(\.isVisible)
+            .map { PointerPace.distance(from: point, to: $0.frame) }.min() ?? .infinity
+    }
+
+    /// The bench: whether a widget's clicks pass through it now.
+    func passesClicks(_ id: String) -> Bool { panels[id]?.ignoresMouseEvents ?? true }
+
+    private func pointerMoved(at point: NSPoint, option: Bool) {
         for settings in list where settings.clickThrough {
             guard let panel = panels[settings.id], let state = states[settings.id] else { continue }
             let inside = panel.frame.contains(point)
-            let ears = Self.earRects(settings, in: panel.frame).contains { $0.insetBy(dx: -4, dy: -4).contains(point) }
+            let ears = earRects(settings, in: panel.frame).contains { $0.insetBy(dx: -4, dy: -4).contains(point) }
             let takes = inside && (ears || option || (state.hovering && !panel.ignoresMouseEvents))
             if panel.ignoresMouseEvents == takes { panel.ignoresMouseEvents = !takes }
             if state.hovering != takes { state.hovering = takes }
         }
     }
 
-    /// The ears' boxes on screen.
-    static func earRects(_ settings: CalendarWidget.Settings, in frame: NSRect) -> [NSRect] {
-        let height = CalendarWidget.earHeight(settings.kind, settings.style)
+    /// The ears' boxes on screen (at the size drawn).
+    func earRects(_ settings: CalendarWidget.Settings, in frame: NSRect) -> [NSRect] {
+        let k = states[settings.id]?.scale ?? 1
+        let height = CalendarWidget.earHeight(settings.kind, settings.style) * k
         return CalendarWidget.ears(settings.kind, settings.style).map { ear in
-            NSRect(x: frame.maxX - ear.far, y: frame.maxY - height - 2, width: ear.far - ear.near, height: height + 2)
+            NSRect(x: frame.maxX - ear.far * k, y: frame.maxY - height - 2, width: (ear.far - ear.near) * k, height: height + 2)
         }
     }
 
@@ -468,6 +524,19 @@ final class CalendarWidgets: ObservableObject {
     func reveal(_ task: UUID) {
         model?.reveal(task)
         SlipModal.cameForward(Self.frontWindow)
+    }
+
+    /// A line pressed: a to-do's row in the note; a repeat without an open copy (#274) its rule on the desk (책상 → 반복);
+    /// an event on the desk's calendar, on its day (calendar-flows D3).
+    func open(_ line: CalendarWidget.Line, day: String) {
+        if let task = line.taskId {
+            reveal(task)
+        } else if line.kind == .repeating {
+            model?.showRepeatSettings()
+            SlipModal.cameForward(Self.frontWindow)
+        } else {
+            openCalendar(on: day, event: line.eventKey)
+        }
     }
 
     /// The app's window in front now (the note or the desk just shown), not a panel.
@@ -507,6 +576,16 @@ final class CalendarWidgets: ObservableObject {
             }
             menu.addItem(.separator())
         }
+        // 크기 (#271): one that doesn't fit this display is greyed out.
+        menu.addItem(NSMenuItem.sectionHeader(title: L("크기")))
+        let fitting = fitting(settings)
+        for scale in CalendarWidget.scales {
+            add(CalendarWidget.scaleName(scale, .current), checked: settings.scale == scale, indent: true) { [weak self] in
+                self?.update(id) { $0.scale = scale }
+            }
+            menu.items.last?.isEnabled = fitting.contains(scale)
+        }
+        menu.addItem(.separator())
         menu.addItem(NSMenuItem.sectionHeader(title: L("불투명도")))
         for value in [100, 85, 70, 50, 30] {
             add("\(value)%", checked: settings.opacity == value, indent: true) { [weak self] in self?.update(id) { $0.opacity = value } }
@@ -602,13 +681,14 @@ final class CalendarWidgetHostingView: NSHostingView<AnyView> {
     private enum Grip { case ears, header }
 
     private func grip(at point: NSPoint) -> Grip? {
-        guard let settings = widgets?.state(id)?.settings, widgets?.state(id)?.removed == false else { return nil }
-        let earHeight = CalendarWidget.earHeight(settings.kind, settings.style)
+        guard let state = widgets?.state(id), !state.removed else { return nil }
+        let settings = state.settings, k = state.scale
+        let earHeight = CalendarWidget.earHeight(settings.kind, settings.style) * k
         let width = bounds.width
         for ear in CalendarWidget.ears(settings.kind, settings.style)
-        where point.y <= earHeight + 2 && point.x >= width - ear.far - 4 && point.x <= width - ear.near + 4 { return .ears }
+        where point.y <= earHeight + 2 && point.x >= width - ear.far * k - 4 && point.x <= width - ear.near * k + 4 { return .ears }
         // The header row, left of ‹ 오늘 › (오늘 · 오늘 목록: the big date and the heading).
-        if point.y > earHeight, point.y < earHeight + 38, point.x < width - 100 { return .header }
+        if point.y > earHeight, point.y < earHeight + 38 * k, point.x < width - 100 * k { return .header }
         return nil
     }
 

@@ -1,12 +1,12 @@
-import { allDayText, fetchRange } from "../core/calendar";
-import { candidateDay, holidayWord, lineOver, quickCandidates, sheetLines, sheetTitle, stepDay, widgetChip, type WidgetLine } from "../core/calendarWidget";
+import { allDayText, fetchRange, repeatWord } from "../core/calendar";
+import { candidateDay, holidayWord, lineOver, lineSpoken, quickCandidates, sheetLines, sheetTitle, stepDay, widgetChip, type WidgetLine } from "../core/calendarWidget";
 import { expand } from "../core/events";
 import type { Candidate } from "../core/intent";
 import { addedHidden, deviceLens, hiddenSpaces, readDeviceRules } from "../core/spaceDevice";
 import { activeLens } from "../core/todoSpaces";
 import { bodyFontSize, type IntentMade, type TodosState } from "../core/types";
 import { h, icon, lang, paper, t } from "./api";
-import { dayMarks, hereTasks } from "./calendarCells";
+import { calendarTasks, dayMarks } from "./calendarCells";
 import { InputLine } from "./inputLine";
 import { toWire } from "./intentFlow";
 import { appear, keyCap, slipHead, tape } from "./slip";
@@ -90,7 +90,7 @@ function drawList(): void {
   if (!state || !day) { list.replaceChildren(); return; }
   const { start, end } = fetchRange([day]);
   const now = new Date();
-  const lines = sheetLines(day, expand(state.events, start, end, lang()), hereTasks(state), now, lang());
+  const lines = sheetLines(day, expand(state.events, start, end, lang()), calendarTasks(state, [day], now), now, lang());
   // calendar-flows: the holiday's name first (‘공휴일 · 한글날’), as a month cell's first line.
   const holiday = dayMarks(day, state.prefs).holiday;
   const first = holiday ? [h("div", { class: "dl holiday", role: "listitem" }, h("span", { class: "hflag", "aria-hidden": "true" }, "⚑"), h("span", { class: "tm" }, holidayWord(lang())), h("span", { class: "tt" }, holiday))] : [];
@@ -98,14 +98,23 @@ function drawList(): void {
   list.replaceChildren(...first, ...lines.map((entry) => row(entry, now)));
 }
 
-/** A line of the day; what is over by now quieter (calendar-flows). An event opens its sheet in the desk's calendar (D3). */
+/**
+ * A line of the day; what is over by now quieter (calendar-flows), and #274 a repeat after the next one. An event opens its
+ * sheet in the desk's calendar (D3); a repeat without an open copy its rule (책상 → 반복).
+ */
 function row(entry: WidgetLine, now: Date): HTMLElement {
-  const time = entry.time ?? (entry.kind === "deadline" ? t("마감") : allDayText(lang()));
+  const repeatRule = entry.kind === "repeat" && !entry.taskId;
+  const time = entry.time ?? (entry.kind === "deadline" ? t("마감") : entry.kind === "repeat" ? repeatWord(false, lang()) : allDayText(lang()));
   const mark = h("span", { class: `mark ${entry.kind === "event" ? "" : entry.kind}`.trim(), "aria-hidden": "true" });
   if (entry.kind === "event") mark.style.setProperty("--color", entry.color);
-  const element = h("button", { class: `dl${lineOver(entry, now) ? " over" : ""}`, role: "listitem", title: entry.taskId ? t("노트에서 보기") : t("달력에서 열기") }, mark, h("span", { class: "tm" }, time), h("span", { class: "tt" }, entry.title));
+  const spoken = lineSpoken(entry, lang());
+  const element = h("button", {
+    class: `dl${lineOver(entry, now) || entry.ahead ? " over" : ""}`, role: "listitem",
+    title: entry.taskId ? t("노트에서 보기") : repeatRule ? t("반복 할 일 보기") : t("달력에서 열기"), ...(spoken ? { "aria-label": spoken } : {}),
+  }, mark, h("span", { class: "tm" }, time), h("span", { class: "tt" }, entry.title));
   element.addEventListener("click", () => {
     if (entry.taskId) void api.act({ type: "calendarShowTask", id: entry.taskId });
+    else if (repeatRule) void api.act({ type: "openSettings", tab: "repeat" });
     else void api.act({ type: "openCalendar", day, ...(entry.eventKey ? { event: entry.eventKey } : {}) });
     close();
   });

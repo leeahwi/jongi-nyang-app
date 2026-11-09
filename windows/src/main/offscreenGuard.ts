@@ -45,6 +45,7 @@ function keepAway(window: BrowserWindow): void {
   const made = window.getBounds();
   guardWindow(window, {
     displays, home, noOwners: process.platform === "darwin", hideFromOverviews: process.platform === "darwin",
+    oneSpace: process.platform === "darwin",
     putBack: (now, why) => {
       console.log(`offscreen guard: "${window.getTitle()}" was at ${place(now)} (${why}), put back`);
       note(`put back ${number(window)} "${window.getTitle()}" ${place(now)} (${why})`);

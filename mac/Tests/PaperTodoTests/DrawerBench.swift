@@ -66,13 +66,11 @@ private enum DrawerBench {
         // closing with one would stay half gone).
         SlipMotion.enabled = false
         try NotebookFile(url: data.appendingPathComponent("todos.json")).save(Notebook())
-        let suite = "PaperTodo.DrawerBench.\(UUID())"
-        let preferences = UserDefaults(suiteName: suite)!
+        let suite = TestDefaults("DrawerBench")
+        let preferences = suite.defaults
         /// The run's own preferences go, file and all (also before `exit`, which skips a `defer`).
         func forgetPreferences() {
-            preferences.removePersistentDomain(forName: suite)
-            let file = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Preferences/\(suite).plist")
-            try? FileManager.default.removeItem(at: file)
+            suite.remove()
         }
         defer { forgetPreferences() }
         let model = AppModel(storageURL: data.appendingPathComponent("todos.json"), isolated: true, preferences: preferences)

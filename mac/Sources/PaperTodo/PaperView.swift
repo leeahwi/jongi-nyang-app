@@ -252,18 +252,8 @@ struct PaperView: View {
     /// Pin, 책상 and ⋯ (접기 and the rest are in the ⋯ menu).
     @ViewBuilder
     func toolbarIcons(desk: Bool = true) -> some View {
-                Button {
-                    model.alwaysOnTop.toggle()
-                } label: {
-                    Image(systemName: model.alwaysOnTop ? "pin.fill" : "pin")
-                        .font(.system(size: 12.5, weight: .regular))
-                        .rotationEffect(.degrees(model.alwaysOnTop ? -25 : 0))
-                        .foregroundStyle(model.alwaysOnTop ? PaperTheme.sage : PaperTheme.ink2)
-                }
-                .buttonStyle(QuietButtonStyle(size: 26))
-                .help(model.alwaysOnTop ? L("항상 위에 두기 해제") : L("항상 위에 두기"))
-                .accessibilityLabel("항상 위에 두기")
-                .accessibilityValue(model.alwaysOnTop ? L("켬") : L("끔"))
+                // #273: 노트 위치 — the pin picks 보통 · 항상 위에 두기 · 바탕화면에 두기.
+                NoteLayerButton(model: model)
 
                 // 1.43: 메모 서랍 (where the 메모 tab's memos went).
                 Button(action: model.toggleMemoDrawer) {
@@ -1322,5 +1312,93 @@ struct StripMarkTag: View {
             .background(PaperTheme.sage2, in: Capsule())
             .help(mode == .now ? L("하루 띠의 ‘지금’에도 있어요") : L("하루 띠의 ‘다음’에도 있어요"))
             .accessibilityLabel(word)
+    }
+}
+
+extension NoteLayer {
+    /// The place's name, as the pin's menu and its words for VoiceOver say it.
+    var title: String {
+        switch self {
+        case .normal: L("보통")
+        case .top: L("항상 위에 두기")
+        case .desktop: L("바탕화면에 두기")
+        }
+    }
+}
+
+/// 노트 위치 ▾ (#273): the pin, a quiet button that opens the system's menu of the three places just under it (a SwiftUI
+/// Menu would draw the pin flat, without its tilt and colour).
+struct NoteLayerButton: View {
+    @ObservedObject var model: AppModel
+    @State private var anchor = MenuAnchor()
+
+    var body: some View {
+        Button {
+            let menu = NSMenu()
+            menu.addItem(.sectionHeader(title: L("노트 위치")))
+            for layer in NoteLayer.allCases {
+                let item = NoteLayerMenuItem(layer.title) { [model] in model.noteLayer = layer }
+                item.state = model.noteLayer == layer ? .on : .off
+                menu.addItem(item)
+            }
+            anchor.pop(menu)
+        } label: {
+            NoteLayerIcon(layer: model.noteLayer)
+        }
+        .buttonStyle(QuietButtonStyle(size: 26))
+        .background(MenuAnchorView(anchor: anchor))
+        .help(L("노트 위치") + ", " + model.noteLayer.title)
+        .accessibilityLabel(L("노트 위치"))
+        .accessibilityValue(model.noteLayer.title)
+    }
+}
+
+/// Where a button's menu opens: the button's own view, found through a view behind it.
+@MainActor
+final class MenuAnchor {
+    weak var view: NSView?
+
+    func pop(_ menu: NSMenu) {
+        guard let view else { return }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: view.isFlipped ? view.bounds.maxY + 4 : -4), in: view)
+    }
+}
+
+struct MenuAnchorView: NSViewRepresentable {
+    let anchor: MenuAnchor
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        anchor.view = view
+        return view
+    }
+    func updateNSView(_ nsView: NSView, context: Context) { anchor.view = nsView }
+}
+
+@MainActor
+private final class NoteLayerMenuItem: NSMenuItem {
+    private let handler: () -> Void
+
+    init(_ title: String, handler: @escaping () -> Void) {
+        self.handler = handler
+        super.init(title: title, action: #selector(run), keyEquivalent: "")
+        target = self
+    }
+
+    @available(*, unavailable)
+    required init(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    @objc private func run() { handler() }
+}
+
+/// The pin as the note's place now (#273): a plain pin (보통), the pin tilted in sage (항상 위에 두기), or the lower of two
+/// sheets filled (바탕화면에 두기).
+struct NoteLayerIcon: View {
+    let layer: NoteLayer
+
+    var body: some View {
+        Image(systemName: layer == .desktop ? "square.2.layers.3d.bottom.filled" : layer == .top ? "pin.fill" : "pin")
+            .font(.system(size: 12.5, weight: .regular))
+            .rotationEffect(.degrees(layer == .top ? -25 : 0))
+            .foregroundStyle(layer == .normal ? PaperTheme.ink2 : PaperTheme.sage)
     }
 }

@@ -16,6 +16,9 @@ for arg in "$@"; do
     [[ "$arg" =~ ^[0-9]+$ ]] && seconds="$arg"
 done
 bundle_id=com.noa.PaperTodo.PerfWidgets
+# #278: never the real app's com.noa.PaperTodo (its settings and data folder share this name).
+source "$repo/scripts/lib/test-defaults.sh"
+test_defaults_require "$bundle_id"
 mkdir -p "$out"
 app="$out/PerfWidgets.app"; probe="$out/perf-probe"
 storage="$HOME/Library/Application Support/$bundle_id"
@@ -51,7 +54,7 @@ cleanup() {
     stop
     rm -rf "$storage" "$HOME/Library/Saved Application State/$bundle_id.savedState" \
         "$HOME/Library/Caches/$bundle_id" "$HOME/Library/HTTPStorages/$bundle_id"
-    defaults delete "$bundle_id" >/dev/null 2>&1 || true
+    test_defaults_remove "$bundle_id"
 }
 trap cleanup EXIT
 

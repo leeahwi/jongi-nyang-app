@@ -37,14 +37,21 @@ final class AppModel: ObservableObject {
     }
     @Published var petVisible: Bool { didSet { preferences.set(petVisible, forKey: "pet.visible") } }
     @Published var petWanders: Bool { didSet { preferences.set(petWanders, forKey: "pet.wanders") } }
-    /// 글자 칠 때 두드리기 (#230): off · in this app (the default) · in all apps (Input Monitoring). A device setting.
-    @Published var petTyping: TypingCat.Scope { didSet { preferences.set(petTyping.rawValue, forKey: "pet.typing") } }
-    /// In all apps: the small cat over full-screen apps (on unless turned off) and its corner.
-    @Published var petCompanion: Bool { didSet { preferences.set(petCompanion, forKey: "pet.companion") } }
-    @Published var petCompanionCorner: TypingCompanion.Corner {
-        didSet { preferences.set(petCompanionCorner.rawValue, forKey: "pet.companion.corner") }
+    /// #304: 종이냥 펫's 크기 and 타닥냥's, apart (보통: the cats as before). Device settings.
+    @Published var petSize: CatSize { didSet { preferences.set(petSize.rawValue, forKey: "pet.size") } }
+    @Published var typingSize: CatSize { didSet { preferences.set(typingSize.rawValue, forKey: "typing.size") } }
+    /// 치면 두드리는 고양이 (#230 · #289), apart from the pet: off · in this app (the default) · in all apps (Input
+    /// Monitoring), and the corner it sits in. Device settings.
+    @Published var typingScope: TypingCat.Scope { didSet { preferences.set(typingScope.rawValue, forKey: "typing.scope") } }
+    @Published var typingCorner: TypingCorner.Corner { didSet { preferences.set(typingCorner.rawValue, forKey: "typing.corner") } }
+    /// The menu bar's 타닥냥: off, or back to what it was before (`typing.scope.last`).
+    func toggleTypingCat() {
+        let last = preferences.string(forKey: "typing.scope.last").map { TypingCat.Scope(saved: $0) }
+        let next = TypingCat.Scope.toggled(typingScope, last: last)
+        if let remembered = next.last { preferences.set(remembered.rawValue, forKey: "typing.scope.last") }
+        typingScope = next.scope
     }
-    /// Set by the pet: in all apps is chosen but macOS's Input Monitoring doesn't allow it (Settings says so).
+    /// Set by the typing cat: in all apps is chosen but macOS's Input Monitoring doesn't allow it (Settings says so).
     @Published var typingNoPermission = false
     /// Set by the app: System Settings → Input Monitoring.
     var onInputMonitoringSettings: (() -> Void)?
@@ -592,11 +599,26 @@ final class AppModel: ObservableObject {
     @Published var hideCompleted: Bool {
         didSet { preferences.set(hideCompleted, forKey: "hideCompleted") }
     }
-    @Published var alwaysOnTop: Bool {
+    /// 노트 위치 (#273): 보통 · 항상 위에 두기 · 바탕화면에 두기, with the pin's old switch (`alwaysOnTop`) written beside it
+    /// for an older version.
+    @Published var noteLayer: NoteLayer {
         didSet {
-            preferences.set(alwaysOnTop, forKey: "alwaysOnTop")
-            window?.level = alwaysOnTop ? .floating : .normal
+            preferences.set(noteLayer.rawValue, forKey: "noteLayer")
+            preferences.set(noteLayer.legacyOnTop, forKey: "alwaysOnTop")
+            applyNoteLevel()
         }
+    }
+    /// 바탕화면에 두기: the note was summoned (its key, the menu bar, the Dock) and hasn't lost the keyboard since — it is an
+    /// ordinary window until then (PaperTodoApp.swift sets and clears it).
+    var noteSummoned = false {
+        didSet { if noteSummoned != oldValue { applyNoteLevel() } }
+    }
+    /// The note's level now: 항상 위에 두기 floats; 바탕화면에 두기 is just above the desktop's icons, as the widgets.
+    var noteLevel: NSWindow.Level {
+        noteLayer == .top ? .floating : noteLayer.staysBehind(summoned: noteSummoned) ? CalendarWidgetPanel.desktopLevel : .normal
+    }
+    func applyNoteLevel() {
+        if let window, window.level != noteLevel { window.level = noteLevel }
     }
     weak var window: NSWindow?
     let file: NotebookFile
@@ -645,9 +667,11 @@ final class AppModel: ObservableObject {
         petVisible = flag("pet.visible", !isolated)
         showsGuide = !isolated && !store.bool(forKey: "guide.seen")
         petWanders = flag("pet.wanders", true)
-        petTyping = TypingCat.Scope(saved: store.string(forKey: "pet.typing"))
-        petCompanion = flag("pet.companion", true)
-        petCompanionCorner = TypingCompanion.Corner(saved: store.string(forKey: "pet.companion.corner"))
+        petSize = CatSize(saved: store.string(forKey: "pet.size"))
+        typingSize = CatSize(saved: store.string(forKey: "typing.size"))
+        // #289: moved from the pet's ‘글자 칠 때 두드리기’ and the full-screen cat's corner (those keys are left as they were).
+        typingScope = TypingCat.Scope(saved: store.string(forKey: "typing.scope"), before: store.string(forKey: "pet.typing"))
+        typingCorner = TypingCorner.Corner(saved: store.string(forKey: "typing.corner"), before: store.string(forKey: "pet.companion.corner"))
         chatterEnabled = flag("chatter.enabled", true)
         chatterFrequency = PetChatter.Frequency(rawValue: store.string(forKey: "chatter.frequency") ?? "") ?? .normal
         chatterQuestions = flag("chatter.questions", true)
@@ -680,7 +704,7 @@ final class AppModel: ObservableObject {
         reminderStyle = ReminderPresentationStyle(rawValue: preferences.string(forKey: "reminderStyle") ?? "") ?? .paper
         remindersShownHere = Set(preferences.stringArray(forKey: "taskReminders.shownHere") ?? [])
         hideCompleted = isolated ? false : preferences.bool(forKey: "hideCompleted")
-        alwaysOnTop = isolated ? false : preferences.bool(forKey: "alwaysOnTop")
+        noteLayer = isolated ? .normal : NoteLayer.saved(preferences.string(forKey: "noteLayer"), legacyOnTop: preferences.bool(forKey: "alwaysOnTop"))
         loadRepeats()
         let memosFile = file.url.deletingLastPathComponent().appendingPathComponent("memos.json")
         do {

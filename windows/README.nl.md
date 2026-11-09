@@ -5,9 +5,9 @@
 > De **Windows-versie** van een takenapp die werkt als één blaadje papier: opschrijven, afvinken, klaar.
 > Boven de taakbalk zit **Jongi-nyang (종이냥, ‘papieren kat’)**, een papieren kat die je herinnert, aanmoedigt en af en toe iets tegen je zegt.
 
-| Vandaag |
-| --- |
-| ![Vandaag](../docs/screenshots/windows/en/strip.png) |
+| Vandaag | Kattenpraat | Focustimer |
+| --- | --- | --- |
+| ![Vandaag](../docs/screenshots/windows/nl/note.png) | ![De kat stelt een vraag](../docs/screenshots/windows/nl/pet-question.png) | ![Focustimer](../docs/screenshots/windows/nl/timer.png) |
 
 ## Waarom je het fijn vindt
 
@@ -51,6 +51,10 @@ De details: [Sneltoetsen](#sneltoetsen) · [Waar je gegevens staan](#waar-je-geg
 
 Typ `overleg morgen om 3 uur`, `verslag tot vrijdag` of `timer 40` in de invoerregel onder in het notitieblok. Terwijl je typt, laten chips zien hoe het begrepen is; klopt dat niet, dan kies je met `Tab` een andere lezing. Vanuit elke app haalt `Ctrl+Alt+N` dezelfde invoerregel op een klein briefje tevoorschijn.
 
+| Typen · chips | Na toevoegen · omzetten | Overal snel toevoegen |
+| --- | --- | --- |
+| ![Chips bij de invoerregel](../docs/screenshots/windows/nl/note-typing-event.png) | ![Melding](../docs/screenshots/windows/nl/note-toast.png) | ![Snel toevoegen](../docs/screenshots/windows/nl/quick-entry.png) |
+
 <details>
 <summary>Wat de app begrijpt, en de toetsen</summary>
 
@@ -67,9 +71,9 @@ Typ `overleg morgen om 3 uur`, `verslag tot vrijdag` of `timer 40` in de invoerr
 
 Het **daglint** boven het tabblad Vandaag toont groot wat er nu is, met een ring van de resterende tijd, en daaronder de volgende twee dingen. Klik erop en je dagschema klapt ter plekke open: sleep een blok om het te verplaatsen, of sleep de boven- of onderrand om de duur te wijzigen.
 
-| Nu · Volgende |
-| --- |
-| ![Daglint](../docs/screenshots/windows/en/strip.png) |
+| Nu · Volgende | Je dagschema | Nachtpapier |
+| --- | --- | --- |
+| ![Daglint](../docs/screenshots/windows/nl/strip.png) | ![Dagschema](../docs/screenshots/windows/nl/strip-day.png) | ![Daglint op nachtpapier](../docs/screenshots/windows/nl/night-strip.png) |
 
 <details>
 <summary>Daglint, dagschema en tijden voor taken in detail</summary>
@@ -92,6 +96,10 @@ Het **daglint** boven het tabblad Vandaag toont groot wat er nu is, met een ring
 
 Het tabblad **Vooruit** verzamelt alles vanaf morgen, per datum. Sleep een taak naar een andere dag en die dag wordt haar deadline. ’s Avonds vraagt de kat: ‘Goed gedaan vandaag. 3 taken naar morgen?’
 
+| Vooruit | Slepen | Avondopruiming |
+| --- | --- | --- |
+| ![Vooruit](../docs/screenshots/windows/nl/ahead.png) | ![Slepen](../docs/screenshots/windows/nl/ahead-drag.png) | ![Avondopruiming](../docs/screenshots/windows/nl/conv-sweep-evening.png) |
+
 <details>
 <summary>Vooruit, datums wijzigen en opruimen in detail</summary>
 
@@ -108,6 +116,10 @@ Het tabblad **Vooruit** verzamelt alles vanaf morgen, per datum. Sleep een taak 
 ### Herinneringen, zodat je niets vergeet
 
 Geef een taak een herinnering, een **herhaling** of een **deadline**. Als het zover is, brengt de kat een **herinneringsbriefje** rechtsonder op je scherm. Vink het meteen af, stel het uit of schuif het naar morgen. Een wekker blijft gaan tot je hem stopt.
+
+| Herinnering · herhalen · deadline | Sluimertijd kiezen | Als de wekker gaat |
+| --- | --- | --- |
+| ![Herinneringsinstellingen](../docs/screenshots/windows/note-deadline-editor.png) | ![Sluimermenu](../docs/screenshots/windows/nl/conv-reminder-snooze-menu.png) | ![Wekker gaat](../docs/screenshots/windows/nl/ring.png) |
 
 <details>
 <summary>Herinneringen en wekkers in detail</summary>
@@ -128,6 +140,10 @@ Geef een taak een herinnering, een **herhaling** of een **deadline**. Als het zo
 
 Jongi-nyang bewaart je afspraken zelf. Typ ‘overleg morgen om 3 uur’ of dubbelklik op een datum in de kalender. De **Kalender** op het bureau (`Ctrl+D`) toont afspraken en taken met een deadline of herinnering per maand of week. Taken en afspraken lopen niet door elkaar.
 
+| Bureau · Kalender | Kalender · week | Afspraakkaartje |
+| --- | --- | --- |
+| ![Kalender](../docs/screenshots/windows/calendar-month.png) | ![Weekweergave](../docs/screenshots/windows/calendar-week.png) | ![Afspraak bewerken](../docs/screenshots/windows/calendar-sheet-edit.png) |
+
 <details>
 <summary>Afspraken en de kalender in detail</summary>
 
@@ -146,26 +162,33 @@ Jongi-nyang bewaart je afspraken zelf. Typ ‘overleg morgen om 3 uur’ of dubb
 
 ### Een papieren kalender op je bureaublad
 
-Vanaf 1.33 zet je een papieren kalenderwidget op je bureaublad. Klik op een dag en het dagbriefje toont alles van die dag; typ je erin zoals in de invoerregel, dan komt het op die dag. Het notitieblok, de kalender, de widgets en de Notitielade delen een van vijftien papiersoorten.
+Zet in Bureau → Afspraken → **Bureaubladwidgets** tot vier kalenderwidgets op je bureaublad. Klik op een datum en ernaast opent een **dagbriefje**; typ daar zoals in de invoerregel en het staat er meteen in. Sleep de kattenoortjes rechtsboven om een widget te verplaatsen, en klik erop voor het menu.
 
-![Een wandkalenderwidget van deze maand op het bureaublad: elke dag is een papieren tegel met afspraken en namen van feestdagen, en rechtsboven steken de oren van een kat uit](../docs/screenshots/windows/nl/month-wall-100-light.png)
+<img src="../docs/screenshots/windows/nl/month-wall-100-light.png" width="720" alt="Deze maand als wandkalender-widget op het bureaublad: afspraken en namen van feestdagen staan op papieren tegels per dag, met kattenoortjes rechtsboven">
 
 <details>
-<summary>Widgets en papier in detail</summary>
+<summary>Bureaubladwidgets in detail</summary>
 
-- **Widgets kiezen**: in Bureau → Afspraken → **Bureaubladwidgets** kies je Vandaag, Deze week, Deze maand, de wandkalender of Lijst van vandaag, tot vier tegelijk. De widgetinstellingen blijven op deze pc en veranderen niets aan de bestanden in een gedeelde map.
-- **Ook licht goed leesbaar**: kies een dekking van 20 tot 100% (eerst 85%). Elke dag staat op een papieren tegel, zodat de tekst leesbaar blijft, en met de muis erboven wordt de widget weer helder.
-- **Blijft op het bureaublad**: klik je op een ander venster, dan gaat de widget eronder. Per widget zet je **Altijd bovenop** of **Klikken doorlaten** aan. Sleep een widget aan zijn oren, en klik op de oren voor het menu.
-- **Maankalender en feestdagen**: de bureaukalender en de widgets tonen maandatums en de namen van Koreaanse feestdagen, berekend op deze pc zonder internet.
-- **Vijftien papiersoorten**: kies er een in Bureau → Weergave → **Papier**, en het notitieblok, de kalender, de widgets, de briefjes, het bureau en de Notitielade krijgen allemaal dat papier. Nieuw zijn Plakbriefje, Manuscriptpapier, Blauw lijntjesschrift, Lavendel, Kringlooppapier, Nachthemel en Schoolbord. Licht papier wordt ’s nachts het papier dat je kiest bij **’s Nachts**.
-- **Briefjes verslepen**: sleep vraagbriefjes en de briefjes voor snel toevoegen en snelle notitie aan hun papier of titelbalk. De snelle briefjes onthouden waar je ze liet.
-- **Een kat die meetikt**: typ je in een venster van Jongi-nyang, dan tikt de kat mee met zijn pootjes. Welke toetsen je indrukt, leest of bewaart hij nooit. Zet het uit met **Meetikken tijdens typen** in Bureau → Jongi-nyang.
+- **Soorten**: Vandaag, Deze week (Eenvoudig · Uitgebreid), Deze maand (Eenvoudig · Uitgebreid · Wandkalender) en Lijst van vandaag. Klik in Bureaubladwidgets op de knop met +, kies er een en klik op **Toevoegen**; hij verschijnt rechtsboven op je scherm. Twee van dezelfde soort mag ook.
+- **Dagbriefje**: toont alles van die dag met tijden, ook wat niet in het vak paste (‘+3’). Zonder datum komt het op de dag waarop je klikte. `Enter` voegt het toe en `Tab` wisselt tussen taak en afspraak; `Shift+Enter` voegt een taak toe, `Ctrl+Enter` een afspraak. `Alt+←` · `Alt+→` gaan een dag terug of vooruit, en `Esc` sluit het. Na het toevoegen verschijnt een melding als ‘Taak toegevoegd voor zaterdag · Ongedaan maken’.
+- **Widgets vinken geen taken af**, zodat een verdwaalde klik op je bureaublad niets afrondt. Klik op een taak om die regel in het notitieblok te zien, of op een afspraak om hem in de bureaukalender te openen.
+- **Widgetmenu**: klik op de oortjes of rechtsklik op de widget. Daarin verander je meteen Weergave, Dekking, Klikken doorlaten en Positie vastzetten; **Instellingen…** heeft de rest.
+- **Dekking**: 20–100% (eerst 85%). Alleen het papier wordt lichter; de tekst blijft. Elke dag heeft een eigen papieren tegel, zodat het leesbaar blijft als het licht is, en aanwijzen maakt hem helder (**Helder bij aanwijzen** in zijn instellingen). Staan transparantie-effecten in Windows uit, dan blijven widgets helder.
+- **Klikken doorlaten** stuurt klikken naar het venster achter de widget. Wijs de oortjes aan of houd `Ctrl` ingedrukt om hem weer te gebruiken. **Positie vastzetten** houdt hem op zijn plek als je sleept.
+- Widgets liggen op het bureaublad, dus als je op een ander venster klikt, gaan ze eronder. Zet **Altijd bovenop** aan in de instellingen van een widget om hem boven andere vensters te laten zweven. **Kalenderwidgets verbergen** in het systeemvakmenu verbergt ze even allemaal; met **Kalenderwidgets tonen** of door de app opnieuw te starten komen ze terug.
+- Widgets klikken vast aan schermranden en aan elkaar. Haal je een monitor los, dan gaan ze naar het hoofdscherm en komen terug als je hem weer aansluit.
+- Widgetinstellingen staan alleen op deze pc en gaan nooit naar de gedeelde map. Taken in ruimtes die op deze pc verborgen zijn, staan ook niet op widgets.
+- Widgets draaien niet als je niets doet. Ze tekenen alleen opnieuw als de dag wisselt of de volgende afspraak begint of eindigt.
 
 </details>
 
 ### Focus op één taak
 
 Rechtsklik op een taak → **Hierop focussen**, en het notitieblok wordt één kaartje: die taak en de resterende tijd. Wil je alleen een timer, dan houdt de kat een bordje omhoog, waar je maar wilt op je scherm. Je focustijd komt in Geschiedenis.
+
+| Focus | Pomodoro · pauze | Geschiedenis · focus |
+| --- | --- | --- |
+| ![Focuskaartje](../docs/screenshots/windows/nl/focus.png) | ![Pauze](../docs/screenshots/windows/nl/focus-break.png) | ![Geschiedenis met focus](../docs/screenshots/windows/nl/history-focus.png) |
 
 <details>
 <summary>Focus, timers en Geschiedenis in detail</summary>
@@ -176,6 +199,10 @@ Rechtsklik op een taak → **Hierop focussen**, en het notitieblok wordt één k
 - **Timers**: 5 · 15 · 25 · 50 min, **recente duren** (tot drie), **Zelf instellen…** en **Pomodoro** (focus · pauze · lange pauze). Klik op het bordje om te pauzeren, sleep om het te verplaatsen, rechtsklik voor 5 min extra · Stoppen · **Grootte** (Klein · Normaal · Groot · Extra groot). De grootte geldt alleen voor het timervenster.
 - **Zelf instellen**: typ `40`, `1:30`, `anderhalf uur`, `1h 30m`, `1.5h` of `1시간 30분` op het briefje bij de muis (in elke taal, 1 minuut tot 3 uur). Je ziet meteen welke duur begrepen is; `Enter` start. Het veld **Zelf** in Bureau → Wekkers & timers → Timer starten werkt hetzelfde. Pomodoro-focus is 1–180 minuten, pauzes 1–60. −·+ gaan per minuut (met `Shift` per 5), of klik op het getal en typ.
 - **Geschiedenis**: afgevinkte taken gaan de volgende dag (instelbaar) naar een geschiedenisbestand per maand. Je ziet de dagen waarop je iets afmaakte als groene vakjes, plus balken per maand en je reeks. Het vak **Focus** toont je focustijd en sessies, de focus per dag en de **taken waarop je het langst focuste**. Op zondagavond vertelt de kat hoeveel je die week hebt afgemaakt.
+
+| Zelf ingestelde timer | Bureau · Klok · Wekkers | Bureau · Geschiedenis |
+| --- | --- | --- |
+| ![Zelf ingestelde timer](../docs/screenshots/windows/nl/timer-custom.png) | ![Wekkers](../docs/screenshots/windows/nl/settings-clock.png) | ![Geschiedenis](../docs/screenshots/windows/history.png) |
 
 </details>
 
@@ -204,9 +231,9 @@ Vanuit elke app schuift `Ctrl+Shift+D` de **Notitielade** uit de rand van je sch
 - **Lettertypen**: Bureau → Notitielade → **Lettertype van notities** kiest het lettertype (Strak · Pen · Stift · Vaste breedte), de tekstgrootte, regelafstand, alinea-afstand en het codelettertype (Vaste breedte · D2Coding).
 - **Snelle notitie**: `Ctrl+Alt+M`, vanuit elke app. Schrijf een paar regels op een klein velletje en `Ctrl+Enter` zet het bovenaan de Notitielade. Met de mapchip eronder kies je de map. `Esc` of ergens anders klikken sluit het en bewaart wat je schreef, ook na een herstart. Je opent het ook via rechtsklik op de kat, ⋯ en het systeemvakmenu, en je zet het uit in Bureau → Weergave → Snel toevoegen (je hoort het als een andere app de toets al gebruikt).
 
-| Vier achtergronden |
-| --- |
-| ![Achtergronden — Dekkend · Mat · Helder · Geen](../docs/screenshots/windows/nl/drawer-backdrops.png) |
+| Vier achtergronden | Snelle notitie |
+| --- | --- |
+| ![Achtergronden — Dekkend · Mat · Helder · Geen](../docs/screenshots/windows/nl/drawer-backdrops.png) | ![Snelle notitie](../docs/screenshots/windows/nl/quick-memo.png) |
 
 </details>
 
@@ -233,7 +260,7 @@ Verdeel je taken over ruimtes als **Werk · Thuis · Studie**. Vandaag blijft é
 
 | Verbergen op dit apparaat | Groeperen per ruimte |
 | --- | --- |
-| ![Bureau → Ruimtes: Werk verborgen op dit apparaat, Studie alleen zichtbaar op doordeweekse uren](../docs/screenshots/windows/device-desk.png) | ![Vandaag gegroepeerd in een klein kaartje per ruimte](../docs/screenshots/windows/spaces2b-board.png) |
+| ![Bureau → Ruimtes: Werk verborgen op dit apparaat, Studie alleen zichtbaar op doordeweekse uren](../docs/screenshots/windows/desk.png) | ![Vandaag gegroepeerd in een klein kaartje per ruimte](../docs/screenshots/windows/board.png) |
 
 </details>
 
@@ -250,8 +277,9 @@ Zet **Jongi-nyang for Claude** aan om taken, afspraken en notities te bekijken, 
 <details>
 <summary>De AI-koppeling in detail</summary>
 
-- **Aanzetten**: zet in Bureau → **AI-koppeling** ‘Claude Jongi-nyang laten lezen en schrijven’ aan. **Verbinden met Claude Desktop** opent de `jongi-nyang.mcpb` in de app, en Claude Desktop vraagt of je hem wilt installeren. **Claude Code-opdracht kopiëren** kopieert een opdracht die de extensie met het programma van Jongi-nyang zelf draait in plaats van met Node, dus Node.js is niet nodig:
-  `claude mcp add jongi-nyang -e ELECTRON_RUN_AS_NODE=1 -- "…\종이냥.exe" "…\resources\mcp\server\index.js"`
+- **Aanzetten**: zet in Bureau → **AI-koppeling** ‘Claude Jongi-nyang laten lezen en schrijven’ aan. **Verbinden met Claude Desktop** opent de `jongi-nyang.mcpb` in de app, en Claude Desktop vraagt of je hem wilt installeren. **Claude Code-opdracht kopiëren** kopieert een opdracht waarin het programma van Jongi-nyang zelf de extensie in de app draait, dus Node.js is niet nodig:
+  `claude mcp add jongi-nyang -- "…\종이냥.exe" --mcp-stdio`
+  De oudere opdracht met `ELECTRON_RUN_AS_NODE=1` werkt nog. Wil je de nieuwe, voer dan `claude mcp remove jongi-nyang` uit in de map waar je hem plakte en plak de nieuwe opdracht.
 - **Wat het kan**: vandaag tonen; taken, afspraken, notities, focussessies en afgevinkte taken laten zien; taken (tot 20 tegelijk), afspraken (zonder herhaling) en notities toevoegen; taken en eenmalige afspraken bewerken; taken per ruimte bekijken en filteren, nieuwe in een ruimte zetten en ze na een ja verplaatsen; vandaag, een week of één notitie aan het gesprek toevoegen. Een bevestigingsnummer is 10 minuten geldig.
 - **Op deze pc verborgen ruimtes**: taken in een ruimte die je op deze pc verbergt (Bureau → Ruimtes), laat Claude ook weg uit vandaag en lijsten, met één regel die zegt hoeveel. Noem de ruimte of zoek en Claude toont ze, gemarkeerd als verborgen. Afgevinkte taken staan er allemaal, zoals in Geschiedenis.
 - **Wat het niet doet**: iets verwijderen, herhalende afspraken of wekkers bewerken, notities bewerken, of ruimtes maken of verwijderen.
@@ -285,6 +313,8 @@ Kies in Bureau → Opslag & back-up een **gedeelde map**, zoals OneDrive, Dropbo
 
 Eén keer per dag, en **vóór** een import, het overschrijven van de opslagmap, terugzetten of een update, maakt Jongi-nyang een **automatische back-up** in de back-upmap van dit apparaat. Per ongeluk iets weggegooid? Kies er een in Bureau → Opslag & back-up → **Je back-ups** en zet hem terug. Verhuizen naar een nieuwe computer gaat met één **back-upbestand (.jongi)**, ook tussen Mac en Windows.
 
+![Bureau → Opslag & back-up](../docs/screenshots/windows/settings-backup.png)
+
 <details>
 <summary>Automatische back-ups, terugzetten en exporteren in detail</summary>
 
@@ -303,10 +333,17 @@ Eén keer per dag, en **vóór** een import, het overschrijven van de opslagmap,
 
 De kat zit boven de taakbalk, ademt, knippert, loopt rond, drinkt thee en dommelt in als je niet achter de pc zit. Hij juicht als je een taak afmaakt, en vraagt af en toe iets als ‘Heb je al water gedronken?’ en antwoordt op je knop. Antwoord ‘Je hebt veel gedaan. Vijf minuten pauze?’ met ‘Pauze’ en er start een timer van 5 minuten. Klik op de kat in het systeemvak voor het **Vandaag-venster**.
 
+| Vandaag-venster | Ingeklapt plakbriefje | Herinnering |
+| --- | --- | --- |
+| ![Vandaag-venster](../docs/screenshots/windows/nl/glance-event-soon.png) | ![Klein plakbriefje](../docs/screenshots/windows/floating.png) | ![Herinnering](../docs/screenshots/windows/reminder-paper.png) |
+
 <details>
 <summary>De kat, het Vandaag-venster en het notitieblok in detail</summary>
 
 - **Kattenpraat**: af en toe praat de kat over wat er vandaag nog ligt, deadlines, het tijdstip, de dag van de week en de afspraken van vandaag: ‘Zo meteen ‘Teamoverleg’. Nog 10 min.’, ‘Is ‘Teamoverleg’ voorbij? Goed gedaan!’. Antwoord ‘Nog 50 min tot je volgende afspraak. 25 minuten focussen?’ met ‘Doen we’ en er start een timer van 25 minuten. Tijdens focus, als er een herinnering openstaat en ’s nachts is hij stil.
+- **Tiktakkat**: zet je los van de bureaubladkat aan en uit. Kies in Bureau → Kat → Tiktakkat bij ‘Meetikken’ Uit · **In deze app** (standaard) · **In alle apps**, en bij ‘Hoek’ een van de vier hoeken van het scherm waar je muis is (eerst rechtsonder). Met In deze app komt hij in zijn hoek als je in een Jongi-nyang-venster typt en gaat hij een paar seconden nadat je stopt weer weg. Met In alle apps tikt hij ook mee als je in Kladblok of je browser typt. Klikken gaan door naar het venster erachter.
+- **Grootte**: kies je los voor de bureaubladkat en de tiktakkat in Bureau → Kat (Klein · **Normaal** · Groot · Extra groot). Het verandert meteen; de tekst in het ballonnetje blijft even groot.
+- **In alle apps en de toetsenbordhook**: toetsen van andere apps worden gehoord via een Windows-toetsenbordhook. Keyloggers gebruiken dezelfde methode en je virusscanner kan ernaar vragen, daarom staat het eerst uit. Jongi-nyang weet alleen dát er een toets is ingedrukt, en wanneer; welke toets of wat je typte, leest en bewaart hij nooit. Zet je het uit, vergrendel je de pc of sluit je Jongi-nyang, dan stopt het meteen.
 - **Vandaag-venster**: klik op het systeemvakicoon en het opent naast de taakbalk, waar die ook staat. De volgende afspraak, de timer en de volgende wekker staan er alleen als kaartje als ze er zijn, gevolgd door ‘Volgende’, de taken van vandaag (meteen af te vinken) en de invoerregel. Klik ergens anders of druk op `Esc` om het te sluiten. Dubbelklik op het icoon om het notitieblok te openen; rechtsklik voor het menu.
 - **Ga met de muis over het systeemvakicoon** om te zien wat er binnen het uur is (‘Jongi-nyang · Tandarts 40 min’) of, als er een timer loopt, de resterende tijd (‘Jongi-nyang · 12:30’). Is er binnen het uur een afspraak, dan krijgt het gezichtje een rood stipje.
 - **Het notitieblok**: dubbelklik op de bovenkant of druk op `Ctrl+M` om het in te klappen tot een klein plakbriefje waar de kat overheen gluurt. Met × blijft de app in het systeemvak en blijft hij herinneringen sturen. `Ctrl+Alt+J` toont of verbergt het notitieblok vanuit elke app. ⋯ → Rechts / links aan de rand zetten (nog eens om het terug te zetten), en gekopieerde tekst in een snelle notitie plakken (een instelling, eerst uit).
@@ -317,18 +354,26 @@ De kat zit boven de taakbalk, ademt, knippert, loopt rond, drinkt thee en dommel
 
 ### Kalender, geschiedenis en instellingen op één bureau
 
-Kalender, Geschiedenis, Wekkers & timers, Instellingen en Help staan samen in één venster: het **bureau**. Open het met het bureau-icoon op het notitieblok of met `Ctrl+D`. Staat Windows in de donkere modus, dan wordt alles **nachtpapier**.
+Kalender, Geschiedenis, Klok, Instellingen en Help staan samen in één venster: het **bureau**. Open het met het bureau-icoon op het notitieblok of met `Ctrl+D`. Staat Windows in de donkere modus, dan wordt alles **nachtpapier**.
+
+| Bureau · Weergave | Nachtpapier · notitieblok | Bureau · Help |
+| --- | --- | --- |
+| ![Bureau weergave](../docs/screenshots/windows/nl/desk-appearance.png) | ![Notitieblok op nachtpapier](../docs/screenshots/windows/nl/night-note.png) | ![Help](../docs/screenshots/windows/help-window.png) |
 
 <details>
 <summary>Het bureau, de weergave en de taal in detail</summary>
 
-- **Het bureau**: de lijst links heeft vier groepen: **Bekijken** (Kalender · Geschiedenis) · **Instellingen** (Weergave · Herinneringen · Wekkers & timers · Herhalen · Afspraken · Jongi-nyang) · **Notities & gegevens** (Notitielade · Ruimtes · Opslag & back-up · AI-koppeling) · **Help** (Help · Rondleiding). In het bureau gaan `Ctrl+1`–`Ctrl+9` de lijst af, en `↑` `↓` bewegen erin. Smaller dan 820 houdt de lijst alleen de icoontjes. Het opent op 920 × 640 (op zijn kleinst 760 × 520) en onthoudt grootte en plek. Er is altijd maar één bureau; de menu’s, het systeemvak, de kat, het Vandaag-venster en ‘Openen in kalender’ bij een herinnering openen allemaal het juiste vak.
+- **Het bureau**: de lijst links is **Weergave** (Kalender · Geschiedenis · Klok) · **Instellingen** (Weergave · Herinneringen · Herhalen · Jongi-nyang · Afspraken · Opslag & back-up · Notitielade · Ruimtes · AI-koppeling) · **Help** (Help · Rondleiding). In het bureau gaan `Ctrl+1`–`Ctrl+9` de lijst af, en `↑` `↓` bewegen erin. Smaller dan 820 houdt de lijst alleen de icoontjes. Het opent op 920 × 640 (op zijn kleinst 760 × 520) en onthoudt grootte en plek. Er is altijd maar één bureau; de menu’s, het systeemvak, de kat, het Vandaag-venster en ‘Openen in kalender’ bij een herinnering openen allemaal het juiste vak.
 - **Dag & nacht**: Bureau → Weergave → **Dag & nacht** (Automatisch · Dag · Nacht). Automatisch volgt meteen de lichte of donkere modus van Windows, en elk open venster (notitieblok · Vandaag-venster · briefjes · herinneringen · kat · timer · plakbriefje · bureau · lade) verandert mee. Vensters beginnen in de kleur van het papier, dus er flitst niets wit. Tekst haalt het WCAG AA-contrast, overdag en ’s nachts.
 - **Lettertype notitieblok**: Pen · Stift · Strak, in zeven tekstgroottes van Klein tot Extra groot.
 - **Taal van de app**: **Automatisch** neemt de eerste van Koreaans, Engels of Nederlands uit de voorkeurstalen van het systeem (anders Engels). Menu’s, het systeemvak, dialogen, Help, de rondleiding, datums en tijden (Engels met een 12-uursklok, Nederlandse weken beginnen op maandag), snel toevoegen en kattenpraat volgen allemaal. In het Engels en Nederlands zijn de handschriftletters **Caveat** (Pen) en **Kalam** (Stift), met de Koreaanse letters erachter voor Hangul.
 - **Zoeken** `Ctrl+F` (⋯ → Zoeken…, linksboven op het bureau): Vandaag, Vooruit, notities, Geschiedenis en afspraken in één keer. Hoofdletters en accenten maken in het Engels en Nederlands niet uit, en Koreaanse beginklanken werken ook (‘ㅂㄱㅅ’ → 보고서).
 - **Help** `F1` heeft alle onderwerpen en een zoekvak. ⋯ → Sneltoetsen toont een briefje met alle sneltoetsen.
 - In een laag venster (480 of minder) wordt de kop kleiner.
+
+| Bureau · Kalender | Nachtpapier · bureau | Nachtpapier · Vandaag-venster |
+| --- | --- | --- |
+| ![Bureaukalender](../docs/screenshots/windows/nl/desk-calendar.png) | ![Bureau op nachtpapier](../docs/screenshots/windows/nl/night-desk-calendar.png) | ![Vandaag-venster op nachtpapier](../docs/screenshots/windows/nl/night-glance.png) |
 
 </details>
 
@@ -438,6 +483,8 @@ De app is met Electron op macOS gedraaid om de schermen en het belangrijkste ged
 - of `Ctrl+Shift+0` botst met de toetsen om van invoertaal te wisselen
 - de 12- of 24-uursklok uit de landinstellingen
 - `Shift+F10` en de menutoets
+- In alle apps bij de tiktakkat: meetikken in andere apps, geen vertraging bij snel typen, waarschuwingen van de virusscanner, en na ontgrendelen (`Win+L`)
+- of bureaubladwidgets achter andere vensters blijven, hoe ze eruitzien na `Win+D`, doorklikken terwijl je `Ctrl` vasthoudt, en hun achtergrond als transparantie-effecten uit staan
 
 ### Verschillen met de macOS-versie
 

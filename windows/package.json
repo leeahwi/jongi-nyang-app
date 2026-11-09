@@ -1,7 +1,7 @@
 {
   "name": "paper-todo-windows",
   "productName": "종이냥",
-  "version": "1.33.0",
+  "version": "1.34.0",
   "description": "종이 한 장처럼 작게 꺼내 쓰는 Windows 할 일 앱",
   "author": "leeAhwi",
   "main": "out/main.js",
@@ -14,10 +14,10 @@
     "snapshot": "npm run build && node tools/snapshot.mjs",
     "perf": "npm run build && node tools/perf.mjs",
     "mcp:build": "node mcp/build.mjs",
-    "mcp:test": "node mcp/build.mjs --tests && node --test out-test-mcp/",
+    "mcp:test": "node mcp/build.mjs --tests && node tools/build.mjs && node --test out-test-mcp/",
     "pet-art": "electron tools/pet-art.cjs",
     "tray-icon": "electron tools/tray-icon.cjs",
-    "dist": "npm run typecheck && npm test && npm run mcp:test && node tools/build.mjs --production && electron-builder --win --x64 && node tools/check-release.mjs && node tools/checksums.mjs"
+    "dist": "npm run typecheck && npm test && npm run mcp:test && node tools/build.mjs --production && node tools/native.mjs && electron-builder --win --x64 && node tools/check-release.mjs && node tools/checksums.mjs"
   },
   "build": {
     "appId": "com.noa.PaperTodo",
@@ -40,17 +40,20 @@
         "from": "mcp/dist",
         "to": "mcp",
         "filter": [
-          "server/index.js",
           "jongi-nyang.mcpb"
         ]
       },
       {
         "from": "../NOTICE",
         "to": "NOTICE.txt"
+      },
+      {
+        "from": "node_modules/@koromix/koffi-win32-x64/win32_x64/koffi.node",
+        "to": "native/koffi.node"
       }
     ],
     "electronFuses": {
-      "runAsNode": true,
+      "runAsNode": false,
       "enableNodeOptionsEnvironmentVariable": false,
       "enableNodeCliInspectArguments": false,
       "enableEmbeddedAsarIntegrityValidation": true,
@@ -88,5 +91,8 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "optionalDependencies": {
+    "@koromix/koffi-win32-x64": "3.3.7"
   }
 }

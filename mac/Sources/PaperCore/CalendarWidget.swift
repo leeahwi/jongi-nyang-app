@@ -47,14 +47,18 @@ public enum CalendarWidget {
         public var level: Level
         public var allSpaces: Bool
         public var place: Place?
+        /// 크기 (#271): one of `scales` (보통 1, the size before #271).
+        public var scale: Double
 
         public init(id: String, kind: Kind, style: Style = .simple, opacity: Int = CalendarWidget.defaultOpacity, solidOnHover: Bool = true,
-                    clickThrough: Bool = false, locked: Bool = false, level: Level = .desktop, allSpaces: Bool = true, place: Place? = nil) {
+                    clickThrough: Bool = false, locked: Bool = false, level: Level = .desktop, allSpaces: Bool = true, place: Place? = nil,
+                    scale: Double = CalendarWidget.defaultScale) {
             self.id = id; self.kind = kind
             self.style = CalendarWidget.styles(kind).contains(style) ? style : (style == .wall && kind == .week ? .detail : .simple)
             self.opacity = CalendarWidget.opacity(opacity)
             self.solidOnHover = solidOnHover; self.clickThrough = clickThrough; self.locked = locked
             self.level = level; self.allSpaces = allSpaces; self.place = place
+            self.scale = CalendarWidget.scale(scale)
         }
     }
 
@@ -76,6 +80,7 @@ public enum CalendarWidget {
     /// The settings as stored (`calendar.widgets` on the Mac, `prefs.calendarWidgets` on Windows): an entry of the wrong
     /// shape is dropped (S1), a value out of range is read as the nearest one, the fifth and later aren't read (S2),
     /// today and agenda are always simple (S3), and a missing key takes its default (S4). The same id twice: the first.
+    /// A size that isn't a number is 보통, as a widget from before #271 (S7).
     public static func read(_ value: Any?) -> [Settings] {
         guard let list = value as? [Any] else { return [] }
         var found: [Settings] = []
@@ -103,7 +108,8 @@ public enum CalendarWidget {
             func flag(_ key: String, _ fallback: Bool) -> Bool { entry[key] as? Bool ?? fallback }
             found.append(Settings(id: id, kind: kind, style: style, opacity: number(entry["opacity"]).map { Int($0.rounded()) } ?? defaultOpacity,
                                   solidOnHover: flag("solidOnHover", true), clickThrough: flag("clickThrough", false),
-                                  locked: flag("locked", false), level: level, allSpaces: flag("allSpaces", true), place: place))
+                                  locked: flag("locked", false), level: level, allSpaces: flag("allSpaces", true), place: place,
+                                  scale: number(entry["scale"]) ?? defaultScale))
         }
         return found
     }
@@ -113,7 +119,7 @@ public enum CalendarWidget {
         settings.prefix(limit).map { s in
             var entry: [String: Any] = ["id": s.id, "kind": s.kind.rawValue, "style": s.style.rawValue, "opacity": s.opacity,
                                         "solidOnHover": s.solidOnHover, "clickThrough": s.clickThrough, "locked": s.locked,
-                                        "level": s.level.rawValue, "allSpaces": s.allSpaces]
+                                        "level": s.level.rawValue, "allSpaces": s.allSpaces, "scale": s.scale]
             if let place = s.place { entry["place"] = ["display": place.display, "x": place.x, "y": place.y] }
             return entry
         }
@@ -164,10 +170,46 @@ public enum CalendarWidget {
     /// The ears stand this far above the paper (the note's ears are 16 pt tall).
     public static func earHeight(_ kind: Kind, _ style: Style) -> Double { 16 * earScale(kind, style) }
 
-    /// The window: the paper and the ears above it. Placing works on this frame, so the ears stay on screen too.
-    public static func windowSize(_ kind: Kind, _ style: Style) -> (width: Double, height: Double) {
+    /// The window: the paper and the ears above it, at a size (`scales`). Placing works on this frame, so the ears stay
+    /// on screen too.
+    public static func windowSize(_ kind: Kind, _ style: Style, scale: Double = 1) -> (width: Double, height: Double) {
         let paper = size(kind, style)
-        return (paper.width, paper.height + earHeight(kind, style))
+        return (paper.width * scale, (paper.height + earHeight(kind, style)) * scale)
+    }
+
+    // MARK: 크기 (#271)
+
+    /// 작게 · 보통 · 크게 · 아주 크게: the whole paper (its text, cells, margins and ears) drawn this many times as big, so
+    /// each cell keeps the lines it holds (`size`) — a size picked freely would cut names at some sizes and leave cells
+    /// empty at others. 보통 is the size before #271.
+    public static let scales: [Double] = [0.85, 1, 1.25, 1.5]
+    public static let defaultScale = 1.0
+
+    /// Read as the nearest of `scales` (the smaller one when halfway) (Z1).
+    public static func scale(_ value: Double) -> Double {
+        guard value.isFinite else { return defaultScale }
+        return scales.min { abs($0 - value) < abs($1 - value) } ?? defaultScale
+    }
+
+    /// The widget, ears and all, fits in a display's usable area at this size (Z3). One that doesn't is greyed out in the
+    /// settings and the menu.
+    public static func fits(_ kind: Kind, _ style: Style, scale: Double, area: Rect) -> Bool {
+        let window = windowSize(kind, style, scale: scale)
+        return window.width <= area.width && window.height <= area.height
+    }
+
+    /// The size drawn on a display: the size picked, else the largest smaller one that fits there (a smaller display
+    /// came, Z4). The size picked stays remembered, so it comes back on a display with room.
+    public static func shownScale(_ scale: Double, _ kind: Kind, _ style: Style, area: Rect) -> Double {
+        let picked = CalendarWidget.scale(scale)
+        return scales.filter { $0 <= picked && fits(kind, style, scale: $0, area: area) }.last ?? scales[0]
+    }
+
+    /// "작게", "Small", "Klein" … (the settings slip and the menu, Z2).
+    public static func scaleName(_ scale: Double, _ language: AppLanguage = .ko) -> String {
+        let names = [["작게", "Small", "Klein"], ["보통", "Regular", "Normaal"], ["크게", "Large", "Groot"], ["아주 크게", "Extra large", "Extra groot"]]
+        let index = scales.firstIndex(of: CalendarWidget.scale(scale)) ?? 1
+        return names[index][language.index]
     }
 
     /// Where the two ears stand, from the window's right edge inward (the note's ears: 16–48 and 62–92), scaled.
@@ -260,13 +302,15 @@ public enum CalendarWidget {
 
     /// One thing on a day as a widget shows it.
     public struct Line: Equatable, Sendable {
-        public enum Kind: String, Sendable { case event, deadline, reminder, range }
+        /// `repeating` (#274): a day a repeating to-do comes back on.
+        public enum Kind: String, Sendable { case event, deadline, reminder, range, repeating = "repeat" }
         public var kind: Kind
         public var title: String
         /// The clock ("10:00", "10:00 AM"), "~01:00" for an event from the day before, a to-do's range ("14:00–15:30");
         /// nil for an all-day event and a deadline (drawn as 종일 · 마감).
         public var time: String?
-        /// An event's "#RRGGBB"; `clay` for a deadline, `sage` for a reminder or a time range (the dots' colours, #227).
+        /// An event's "#RRGGBB"; `clay` for a deadline, `sage` for a reminder or a time range (the dots' colours, #227);
+        /// #274: `sage` for a repeat's next day, `faint` (sage, faded) for the ones after it.
         public var color: String
         public var allDay: Bool
         public var eventKey: String?
@@ -274,11 +318,23 @@ public enum CalendarWidget {
         /// When it starts (the event, the reminder, the range) and ends; nil for all-day events and deadlines.
         public var at: Date?
         public var end: Date?
+        /// #274: a repeat's rule (it opens the rule when it has no open copy), and whether it is after the next one (faded).
+        public var seriesId: String?
+        public var ahead: Bool
 
         public init(kind: Kind, title: String, time: String? = nil, color: String, allDay: Bool = false, eventKey: String? = nil,
-                    taskId: UUID? = nil, at: Date? = nil, end: Date? = nil) {
+                    taskId: UUID? = nil, at: Date? = nil, end: Date? = nil, seriesId: String? = nil, ahead: Bool = false) {
             self.kind = kind; self.title = title; self.time = time; self.color = color; self.allDay = allDay
             self.eventKey = eventKey; self.taskId = taskId; self.at = at; self.end = end
+            self.seriesId = seriesId; self.ahead = ahead
+        }
+
+        /// #274: a repeat's line from the calendar's (its alert on `day`, when it has one).
+        static func repeating(_ task: CalendarMonth.DayTask, on day: String, calendar: Calendar) -> Line {
+            let parts = task.remindAt?.split(separator: ":").compactMap { Int($0) } ?? []
+            let at = parts.count == 2 ? calendar.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: CalendarMonth.date(day, calendar: calendar)) : nil
+            return Line(kind: .repeating, title: task.title, time: task.time, color: task.ahead ? "faint" : "sage", taskId: task.taskId, at: at,
+                        seriesId: task.seriesId, ahead: task.ahead)
         }
 
         /// Gone by at `now`: an event or a range once it ended, a reminder once its time came (all-day events and
@@ -290,7 +346,7 @@ public enum CalendarWidget {
                 guard !allDay, let at else { return false }
                 let end = end ?? at
                 return end == at ? at < now : end <= now
-            case .reminder: return (at ?? .distantFuture) <= now
+            case .reminder, .repeating: return (at ?? .distantFuture) <= now
             case .range: return (end ?? .distantFuture) <= now
             }
         }
@@ -316,17 +372,23 @@ public enum CalendarWidget {
         }
         let byId = Dictionary(tasks.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         var deadlines: [Line] = []
+        // #274: a repeat with its time goes among the timed lines, one without after the deadlines.
+        var untimed: [Line] = []
         for task in page.tasks(on: day) {
+            let item = task.taskId.flatMap { byId[$0] }
             switch task.kind {
             case .deadline:
                 deadlines.append(Line(kind: .deadline, title: task.title, color: "clay", taskId: task.taskId))
             case .reminder:
-                let at = byId[task.taskId]?.reminderAt
+                let at = item?.reminderAt
                 timed.append((at ?? midnight, 1, Line(kind: .reminder, title: task.title, time: task.time, color: "sage", taskId: task.taskId, at: at)))
             case .range:
-                let span = byId[task.taskId].flatMap { TimeBlock.interval(of: $0, now: now, calendar: calendar) }
+                let span = item.flatMap { TimeBlock.interval(of: $0, now: now, calendar: calendar) }
                 timed.append((span?.start ?? midnight, 1, Line(kind: .range, title: task.title, time: task.time, color: "sage", taskId: task.taskId,
                                                                at: span?.start, end: span?.end)))
+            case .repeating:
+                let line = Line.repeating(task, on: day, calendar: calendar)
+                if let at = line.at { timed.append((at, 2, line)) } else { untimed.append(line) }
             }
         }
         let ordered = timed.enumerated().sorted { a, b in
@@ -334,7 +396,7 @@ public enum CalendarWidget {
             if a.element.1 != b.element.1 { return a.element.1 < b.element.1 }
             return a.offset < b.offset
         }.map(\.element.2)
-        return allDay + ordered + deadlines
+        return allDay + ordered + deadlines + untimed
     }
 
     /// 오늘 · 이번 주 간단히: what is still to come today, the first `limit`, and how many more (K1, K2).
@@ -350,16 +412,26 @@ public enum CalendarWidget {
         case .event(let event):
             return Line(kind: .event, title: event.title, time: event.allDay ? nil : clock(event.start, calendar: calendar, language: language),
                         color: event.color, allDay: event.allDay, eventKey: event.key, at: event.allDay ? nil : event.start, end: event.end)
+        case .task(let task) where task.kind == .repeating:
+            return Line(kind: .repeating, title: task.title, time: task.time, color: task.ahead ? "faint" : "sage", taskId: task.taskId,
+                        seriesId: task.seriesId, ahead: task.ahead)
         case .task(let task):
             return Line(kind: task.kind == .deadline ? .deadline : task.kind == .reminder ? .reminder : .range, title: task.title,
                         time: task.kind == .deadline ? nil : task.time, color: task.kind == .deadline ? "clay" : "sage", taskId: task.taskId)
         }
     }
 
+    /// #274: a repeat's spoken name ("분리수거, 09:00, 반복 예정"); nil for the other lines (read as drawn).
+    public static func spoken(_ line: Line, language: AppLanguage = .ko) -> String? {
+        guard line.kind == .repeating else { return nil }
+        return CalendarMonth.spoken(CalendarMonth.DayTask(title: line.title, kind: .repeating, time: line.time, ahead: line.ahead), language: language)
+    }
+
     /// 간단히 (week, month): the cell's first three marks' colours, and whether there are more (a small + instead of a
     /// fourth dot) (K3, K5).
-    public static func dots(_ day: String, page: CalendarMonth.Page) -> (colors: [String], plus: Bool) {
-        let cell = page.cell(day, limit: 3)
+    /// #296 `folding` (the month's cells): no dot for a faded daily · weekday repeat.
+    public static func dots(_ day: String, page: CalendarMonth.Page, folding: Bool = false) -> (colors: [String], plus: Bool) {
+        let cell = page.cell(day, limit: 3, folding: folding)
         return (cell.items.map { line($0).color }, cell.more > 0)
     }
 
@@ -376,7 +448,8 @@ public enum CalendarWidget {
     public static func lines(_ style: Style) -> Int { style == .wall ? 4 : detailLines }
     public static func monthCell(_ day: String, page: CalendarMonth.Page, style: Style = .detail, calendar: Calendar = .paper,
                                  language: AppLanguage = .ko) -> (lines: [Line], more: Int) {
-        let cell = page.cell(day, limit: lines(style))
+        // #296: a month cell folds the faded daily · weekday repeats into its head.
+        let cell = page.cell(day, limit: lines(style), folding: true)
         return (cell.items.map { line($0, calendar: calendar, language: language) }, cell.more)
     }
 
@@ -431,6 +504,29 @@ public enum CalendarWidget {
     public static func showsLunar(lunarDay: Int, cellWidth: Double, moreInHead: Bool) -> Bool {
         guard cellWidth >= lunarCellWidth else { return false }
         return !moreInHead || lunarDay == 1
+    }
+
+    /// #295 · #296: what a month cell's head shows, by the widths it takes (pt on the Mac, px on Windows; 0 for what the day
+    /// doesn't have): the number, the repeat mark and its count (from two folded repeats), +N, the lunar date and its short
+    /// form ("10.1"), each after a `gap`. The first that fits `room`: all; the lunar date short; the mark without its count
+    /// (the lunar date kept: it differs every day, the count is in the tooltip and the spoken label); no lunar date; the
+    /// number and +N only. The lunar date may already be off by `showsLunar`. Same as Windows (calendarWidget.ts `headFit`).
+    public enum HeadLunar: String, Sendable { case full, short, none }
+    public static func headFit(room: Double, number: Double, mark: Double, count: Double, more: Double, lunar: Double, short: Double,
+                               gap: Double) -> (lunar: HeadLunar, count: Bool, mark: Bool) {
+        func width(_ lunarWidth: Double, count shown: Bool, mark drawn: Bool) -> Double {
+            number + (drawn && mark > 0 ? gap + mark + (shown ? count : 0) : 0) + (more > 0 ? gap + more : 0) + (lunarWidth > 0 ? gap + lunarWidth : 0)
+        }
+        let tries: [(HeadLunar, Bool, Bool)] = [(.full, true, true), (.short, true, true), (.full, false, true), (.short, false, true),
+                                                (.none, true, true), (.none, false, true), (.none, false, false)]
+        for (lunarShown, shown, drawn) in tries {
+            let lunarWidth = lunarShown == .full ? lunar : lunarShown == .short ? short : 0
+            if lunarShown != .none && lunar <= 0 { continue }
+            if width(lunarWidth, count: shown, mark: drawn) <= room + 0.5 {
+                return (lunar > 0 ? lunarShown : .none, shown && mark > 0, drawn && mark > 0)
+            }
+        }
+        return (.none, false, false)
     }
 
     /// The sheet's first line on a holiday (calendar-flows): ‘공휴일’ in the time's column and the holiday's name beside

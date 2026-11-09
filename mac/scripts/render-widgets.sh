@@ -21,13 +21,13 @@ mkdir -p "$checks" "$output"
 rm -rf "$checks"/*.lproj
 cp -R Resources/*.lproj "$checks/"
 renderer="$checks/PaperTodoWidgetSnapshots"
-if [ -x "$renderer" ] && [ -z "$(find Sources Tests/PaperTodoTests/WidgetSnapshots.swift "$bin_path"/PaperCore.build -newer "$renderer" \( -name '*.swift' -o -name '*.o' \) -print -quit)" ]; then
+if [ -x "$renderer" ] && [ -z "$(find Sources Tests/PaperTodoTests/WidgetSnapshots.swift Tests/PaperTodoTests/TestDefaults.swift "$bin_path"/PaperCore.build -newer "$renderer" \( -name '*.swift' -o -name '*.o' \) -print -quit)" ]; then
     echo "Renderer is up to date."
 else
     swiftc -warnings-as-errors -parse-as-library -I "$bin_path/Modules" \
         $(find Sources/PaperTodo -name '*.swift' ! -name 'PaperTodoApp.swift' | sort) \
         "$bin_path/PaperTodo.build/DerivedSources/resource_bundle_accessor.swift" \
-        "$bin_path"/PaperCore.build/*.swift.o Tests/PaperTodoTests/WidgetSnapshots.swift \
+        "$bin_path"/PaperCore.build/*.swift.o Tests/PaperTodoTests/WidgetSnapshots.swift Tests/PaperTodoTests/TestDefaults.swift \
         -o "$renderer"
 fi
 PAPERTODO_LANG="$language" PAPERTODO_PAPER="$paper" "$renderer" "$output"

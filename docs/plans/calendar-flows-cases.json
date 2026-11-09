@@ -1,6 +1,6 @@
 {
-  "about": "달력을 실제로 쓰는 흐름(docs/plans/calendar-flows.md)에서 정한 규칙의 공유 사례예요. Mac은 scripts/test-calendar-flows.sh(Tests/PaperCoreTests/CalendarFlowsTests.swift), Windows는 test/calendarFlows.test.ts가 같은 파일을 읽어요. 기준 시각은 2026-11-06(금) 15:00, 이 기기의 벽시계예요. 예시는 모두 지어낸 것이에요.",
-  "status": "2026-11-06, 두 앱에 넣었어요.",
+  "about": "달력을 실제로 쓰는 흐름(docs/plans/calendar-flows.md)에서 정한 규칙의 공유 사례예요. Mac은 scripts/test-calendar-flows.sh(Tests/PaperCoreTests/CalendarFlowsTests.swift), Windows는 test/calendarFlows.test.ts가 같은 파일을 읽어요. 기준 시각은 2026-11-06(금) 15:00, 이 기기의 벽시계예요(반복 묶음은 사례마다 다를 수 있어요). 예시는 모두 지어낸 것이에요.",
+  "status": "2026-11-06, 두 앱에 넣었어요. 반복(repeats)과 키(keys)는 2026-11-09에 더했어요(#274 · #275). 접은 반복(repeats.fold)과 줄인 음력(lunar.short)도 같은 날 더했어요(#296 · #295).",
   "now": "2026-11-06T15:00:00",
   "events": {
     "trip": { "title": "제주 여행", "allDay": true, "start": "2026-11-08T00:00:00", "end": "2026-11-11T00:00:00", "color": "sage" },
@@ -124,7 +124,27 @@
       { "case": "L4 +N이 있으면 초하루만", "lunarDay": 27, "width": 120, "moreInHead": true, "shows": false },
       { "case": "L5 +N이 있어도 초하루는 보여요", "lunarDay": 1, "width": 120, "moreInHead": true, "shows": true },
       { "case": "L6 60은 넉넉한 칸이에요(보통 크기의 책상)", "lunarDay": 5, "width": 60, "moreInHead": false, "shows": true }
-    ]
+    ],
+    "short": {
+      "about": "#295: 날짜 줄에 +N(위젯)이나 반복 표시(#296)가 함께 있어 자리가 모자라면, 음력은 표시 없이 ‘10.1’로 줄여요. 그래도 모자라면 반복 개수를 빼고(음력은 날마다 달라서 먼저 지켜요), 그다음 음력, 반복 표시 차례로 빼요. 자리는 그린 뒤 재요(Mac ViewThatFits, Windows 넘침 검사). 줄인 꼴은 다른 날의 음력과 같아요. 책상 달력은 두 앱 모두 +N을 칸의 마지막 줄에 둬요(Windows는 #295 전에 날짜 줄에 두어 음력이 잘렸어요).",
+      "cases": [
+        { "case": "L7 초하루를 줄이면 ‘10.1’", "month": 10, "day": 1, "leap": false, "labels": ["음 10.1", "☾ 10.1", "☾ 10.1"], "short": ["10.1", "10.1", "10.1"] },
+        { "case": "L8 윤달 초하루도 ‘4.1’", "month": 4, "day": 1, "leap": true, "labels": ["윤 4.1", "☾ 4.1", "☾ 4.1"], "short": ["4.1", "4.1", "4.1"] },
+        { "case": "L9 다른 날은 그대로", "month": 9, "day": 18, "leap": false, "labels": ["9.18", "9.18", "9.18"], "short": ["9.18", "9.18", "9.18"] }
+      ],
+      "head": {
+        "about": "날짜 줄에 무엇을 둘지 너비로 정해요(앱마다 그린 너비를 재서 넣어요). 차례: 모두 → 음력을 줄여서 → 반복 개수 없이(음력은 그대로, 줄여서) → 음력 없이 → 반복 개수도 없이 → 날짜와 +N만. 너비는 room(줄의 너비), number, mark(반복 표시), count(개수), more(+N), lunar, short(줄인 음력), gap(사이)이고 없으면 0이에요.",
+        "cases": [
+          { "case": "L10 넉넉하면 모두", "room": 120, "number": 20, "mark": 9, "count": 6, "more": 0, "lunar": 28, "short": 18, "gap": 2, "then": {"lunar": "full", "count": true, "mark": true} },
+          { "case": "L11 위젯 칸(#295): +N 옆에 ‘음 10.1’이 모자라면 ‘10.1’", "room": 62, "number": 20, "mark": 0, "count": 0, "more": 14, "lunar": 28, "short": 18, "gap": 2, "then": {"lunar": "short", "count": false, "mark": false} },
+          { "case": "L12 줄여도 모자라면 음력을 빼요", "room": 50, "number": 20, "mark": 0, "count": 0, "more": 14, "lunar": 28, "short": 18, "gap": 2, "then": {"lunar": "none", "count": false, "mark": false} },
+          { "case": "L13 그래도 모자라면 반복 개수를 빼고 표시만", "room": 35, "number": 20, "mark": 9, "count": 6, "more": 0, "lunar": 0, "short": 0, "gap": 2, "then": {"lunar": "none", "count": false, "mark": true} },
+          { "case": "L14 아주 좁으면 날짜와 +N만", "room": 36, "number": 20, "mark": 9, "count": 6, "more": 14, "lunar": 0, "short": 0, "gap": 2, "then": {"lunar": "none", "count": false, "mark": false} },
+          { "case": "L15 음력이 없는 날(꺼 두었거나 좁은 칸)은 반복과 +N만 재요", "room": 60, "number": 20, "mark": 9, "count": 6, "more": 14, "lunar": 0, "short": 0, "gap": 2, "then": {"lunar": "none", "count": true, "mark": true} },
+          { "case": "L16 보통 책상의 칸(#296): 음력을 지키려고 반복 개수를 먼저 빼요", "room": 55, "number": 20, "mark": 10, "count": 7, "more": 0, "lunar": 20, "short": 20, "gap": 2, "then": {"lunar": "full", "count": false, "mark": true} }
+        ]
+      }
+    }
   },
   "sheet": {
     "about": "날짜 쪽지(위젯의 날짜를 누르면 뜨는 쪽지)의 첫 줄은 그날의 공휴일 이름이에요. 시각 칸에 ‘공휴일’, 이름 칸에 공휴일 이름이에요(달 칸에서 공휴일 이름이 첫 줄인 것과 같아요). 지난 일은 흐리게 그려요(기준 시각에 끝났거나 지난 것, 종일 · 마감은 그날 내내 흐리지 않아요).",
@@ -147,5 +167,55 @@
       "lines": ["생일", "약 먹기", "팀 회의", "치과", "보고서 보내기"],
       "over": [false, true, true, false, false]
     }
+  },
+  "repeats": {
+    "about": "#274: 반복 할 일이 달력에 돌아오는 날이에요. 노트의 오늘(새벽 4시에 바뀌어요)부터 보이는 날 안에서 규칙(매일 · 평일 · 매주 · 매달)이 맞는 날마다 한 줄이에요. 다음 한 번(next)은 진하게, 그 뒤는 흐리게(ahead) 그려요. 열린 사본이 이미 오늘이나 그 뒤의 날에 보이면(알림 · 마감 · 시간) 그 사본이 다음 한 번이라 반복 줄은 모두 흐려요. 사본이 보이는 날에는 반복 줄을 또 그리지 않아요. 오늘 것을 끝냈으면(오늘 놓았고 열린 사본이 없으면) 내일부터예요. 줄을 누르면 열린 사본을 열어요(copy). 사본이 없으면 반복 설정을 열어요. 한 날의 반복 줄은 시각 순, 같으면 제목 순, 시각 없는 것은 맨 뒤예요. 줄은 ‘날 next|ahead [시각] 제목 [(copy)]’로 적어요. 달 칸에서는 일정 · 마감 · 알림 뒤에 와서 ‘+N’에 먼저 들어가요.",
+    "cases": [
+      { "case": "P1 매일 · 오늘 놓은 사본이 알림 없이 열려 있으면 오늘이 다음 한 번이에요", "from": "2026-11-04", "to": "2026-11-09", "series": [{"title": "물 마시기", "rule": {"kind": "daily"}, "lastPlaced": "2026-11-06", "copy": {}}], "lines": ["2026-11-06 next 물 마시기 (copy)", "2026-11-07 ahead 물 마시기 (copy)", "2026-11-08 ahead 물 마시기 (copy)", "2026-11-09 ahead 물 마시기 (copy)"] },
+      { "case": "P2 매일 09:00 · 오늘 사본이 오늘 알림으로 보이면 그날은 비우고 모두 흐려요", "from": "2026-11-06", "to": "2026-11-08", "series": [{"title": "약 먹기", "rule": {"kind": "daily"}, "remindAt": "09:00", "lastPlaced": "2026-11-06", "copy": {"reminderAt": "2026-11-06T09:00:00"}}], "lines": ["2026-11-07 ahead 09:00 약 먹기 (copy)", "2026-11-08 ahead 09:00 약 먹기 (copy)"] },
+      { "case": "P3 매일 · 오늘 것을 끝냈으면 내일부터예요", "from": "2026-11-06", "to": "2026-11-08", "series": [{"title": "물 마시기", "rule": {"kind": "daily"}, "lastPlaced": "2026-11-06"}], "lines": ["2026-11-07 next 물 마시기", "2026-11-08 ahead 물 마시기"] },
+      { "case": "P4 매주 월 · 11월 달력: 지난 월요일은 없고, 다음 월요일만 진해요", "from": "2026-11-01", "to": "2026-12-12", "series": [{"title": "분리수거", "rule": {"kind": "weekly", "weekdays": [1]}, "lastPlaced": "2026-11-02"}], "lines": ["2026-11-09 next 분리수거", "2026-11-16 ahead 분리수거", "2026-11-23 ahead 분리수거", "2026-11-30 ahead 분리수거", "2026-12-07 ahead 분리수거"] },
+      { "case": "P5 매주 월 · 지난 월요일 사본이 아직 열려 있으면(알림 없이) 다음 월요일이 그 사본을 열어요", "from": "2026-11-01", "to": "2026-11-21", "series": [{"title": "분리수거", "rule": {"kind": "weekly", "weekdays": [1]}, "lastPlaced": "2026-11-02", "copy": {}}], "lines": ["2026-11-09 next 분리수거 (copy)", "2026-11-16 ahead 분리수거 (copy)"] },
+      { "case": "P6 매주 월 · 사본에 다음 월요일 마감이 있으면 그 사본이 다음 한 번이에요", "from": "2026-11-01", "to": "2026-11-28", "series": [{"title": "분리수거", "rule": {"kind": "weekly", "weekdays": [1]}, "lastPlaced": "2026-11-02", "copy": {"dueDate": "2026-11-09"}}], "lines": ["2026-11-16 ahead 분리수거 (copy)", "2026-11-23 ahead 분리수거 (copy)"] },
+      { "case": "P7 평일 · 오늘(금) 것을 끝냈으면 주말을 건너 월요일이 다음 한 번이에요", "from": "2026-11-06", "to": "2026-11-13", "series": [{"title": "아침 운동", "rule": {"kind": "weekdays"}, "remindAt": "07:30", "lastPlaced": "2026-11-06"}], "lines": ["2026-11-09 next 07:30 아침 운동", "2026-11-10 ahead 07:30 아침 운동", "2026-11-11 ahead 07:30 아침 운동", "2026-11-12 ahead 07:30 아침 운동", "2026-11-13 ahead 07:30 아침 운동"] },
+      { "case": "P8 매달 31일 · 짧은 달은 마지막 날이에요(12월 달력)", "from": "2026-11-29", "to": "2027-01-09", "series": [{"title": "카드값 확인", "rule": {"kind": "monthly", "monthDay": 31}}], "lines": ["2026-11-30 next 카드값 확인", "2026-12-31 ahead 카드값 확인"] },
+      { "case": "P9 매달 15일 · 다음 한 번이 보이는 달 밖이면 보이는 것은 모두 흐려요(1월 달력)", "from": "2026-12-27", "to": "2027-02-06", "series": [{"title": "관리비 내기", "rule": {"kind": "monthly", "monthDay": 15}}], "lines": ["2027-01-15 ahead 관리비 내기"] },
+      { "case": "P10 새벽 2시는 아직 어제예요: 토요일 02:00의 오늘은 금요일", "now": "2026-11-07T02:00:00", "from": "2026-11-06", "to": "2026-11-07", "series": [{"title": "물 마시기", "rule": {"kind": "daily"}, "lastPlaced": "2026-11-06", "copy": {}}], "lines": ["2026-11-06 next 물 마시기 (copy)", "2026-11-07 ahead 물 마시기 (copy)"] },
+      { "case": "P11 한 날의 반복은 시각 순, 시각 없는 것은 맨 뒤(매일 것은 오늘이 다음 한 번이라 월요일엔 흐려요)", "from": "2026-11-09", "to": "2026-11-09", "series": [{"title": "분리수거", "rule": {"kind": "weekly", "weekdays": [1]}}, {"title": "물 마시기", "rule": {"kind": "daily"}, "remindAt": "23:30"}, {"title": "약 먹기", "rule": {"kind": "daily"}, "remindAt": "08:00"}], "lines": ["2026-11-09 ahead 08:00 약 먹기", "2026-11-09 ahead 23:30 물 마시기", "2026-11-09 next 분리수거"] },
+      { "case": "P12 요일이 없는 매주 규칙은 돌아오지 않아요", "from": "2026-11-01", "to": "2026-12-12", "series": [{"title": "빈 규칙", "rule": {"kind": "weekly", "weekdays": []}}], "lines": [] }
+    ],
+    "cell": { "case": "P13 달 칸: 일정 · 마감 · 알림 뒤라 세 줄이면 반복이 ‘+1’로 가요", "day": "2026-11-09", "limit": 3, "events": ["standup"], "todos": [{"title": "보고서 보내기", "dueDate": "2026-11-09"}, {"title": "치과 예약", "reminderAt": "2026-11-09T15:00:00"}], "series": [{"title": "분리수거", "rule": {"kind": "weekly", "weekdays": [1]}}], "titles": ["아침 회의", "보고서 보내기", "치과 예약"], "more": 1, "roomy": ["아침 회의", "보고서 보내기", "치과 예약", "분리수거"] },
+    "words": { "case": "P14 흐린 줄의 말과 화면 읽기", "title": "분리수거", "time": "09:00", "tooltip": {"ahead": ["반복 예정 09:00 · 분리수거", "Upcoming repeat 09:00 · 분리수거", "Komende herhaling 09:00 · 분리수거"], "next": ["반복 09:00 · 분리수거", "Repeat 09:00 · 분리수거", "Herhaling 09:00 · 분리수거"]}, "spoken": {"ahead": ["분리수거, 09:00, 반복 예정", "분리수거, 09:00, upcoming repeat", "분리수거, 09:00, komende herhaling"], "next": ["분리수거, 09:00, 반복", "분리수거, 09:00, repeat", "분리수거, 09:00, herhaling"]}, "untimed": ["분리수거, 반복 예정", "분리수거, upcoming repeat", "분리수거, komende herhaling"] },
+    "fold": {
+      "about": "#296: 매일 · 평일 반복은 달 칸마다 같은 이름이 들어가 칸을 다 써서, 달 칸은 흐린 매일 · 평일 반복(folds)의 이름을 쓰지 않아요. 날 머리에 반복 표시(⟲) 하나와 개수만 두고, 마우스를 올리면 이름이 보여요(tooltip). 화면 읽기 프로그램은 label로 읽어요. 다음 한 번(진한 줄)과 매주 · 매달 반복은 지금처럼 이름을 써요. 주 보기 · 날 목록 · 날짜 쪽지는 모두 보여요(list). 위젯의 달 칸도 같아요(간단히의 점도 접은 반복은 빼요). titles · more는 칸의 줄과 ‘+N’, folded는 머리에 접은 반복이에요.",
+      "cases": [
+        { "case": "P15 매일 둘 · 평일 하나 · 매주 하나: 칸에는 일정과 매주 반복만, 머리에 ⟲3이라 ‘+N’이 없어요", "day": "2026-11-09", "limit": 3, "events": ["standup"], "series": [{"title": "물 마시기", "rule": {"kind": "daily"}}, {"title": "잠깐, 바깥 공기 쐬기", "rule": {"kind": "daily"}}, {"title": "아침 운동", "rule": {"kind": "weekdays"}, "remindAt": "07:30"}, {"title": "분리수거", "rule": {"kind": "weekly", "weekdays": [1]}}], "titles": ["아침 회의", "분리수거"], "more": 0, "folded": ["아침 운동", "물 마시기", "잠깐, 바깥 공기 쐬기"], "label": ["매일 · 평일 반복 3개", "3 daily and weekday repeats", "3 dagelijkse en doordeweekse herhalingen"], "tooltip": "매일 · 평일 반복 3개\n07:30 아침 운동\n물 마시기\n잠깐, 바깥 공기 쐬기", "list": ["아침 운동", "물 마시기", "분리수거", "잠깐, 바깥 공기 쐬기"] },
+        { "case": "P16 다음 한 번(오늘, 진한 줄)은 이름을 써요", "day": "2026-11-06", "limit": 3, "events": [], "series": [{"title": "물 마시기", "rule": {"kind": "daily"}}, {"title": "아침 운동", "rule": {"kind": "weekdays"}, "remindAt": "07:30"}], "titles": ["아침 운동", "물 마시기"], "more": 0, "folded": [], "label": [null, null, null], "tooltip": null, "list": ["아침 운동", "물 마시기"] },
+        { "case": "P17 평일 반복 하나", "day": "2026-11-10", "limit": 3, "events": [], "series": [{"title": "아침 운동", "rule": {"kind": "weekdays"}, "remindAt": "07:30"}], "titles": [], "more": 0, "folded": ["아침 운동"], "label": ["평일 반복 1개", "1 weekday repeat", "1 doordeweekse herhaling"], "tooltip": "평일 반복 1개\n07:30 아침 운동", "list": ["아침 운동"] },
+        { "case": "P18 매일 반복 둘은 시각 순, 시각 없는 것은 뒤", "day": "2026-11-10", "limit": 3, "events": [], "series": [{"title": "물 마시기", "rule": {"kind": "daily"}}, {"title": "약 먹기", "rule": {"kind": "daily"}, "remindAt": "08:00"}], "titles": [], "more": 0, "folded": ["약 먹기", "물 마시기"], "label": ["매일 반복 2개", "2 daily repeats", "2 dagelijkse herhalingen"], "tooltip": "매일 반복 2개\n08:00 약 먹기\n물 마시기", "list": ["약 먹기", "물 마시기"] },
+        { "case": "P19 매달 반복은 흐려도 이름을 써요", "day": "2026-12-31", "limit": 3, "events": [], "series": [{"title": "카드값 확인", "rule": {"kind": "monthly", "monthDay": 31}}, {"title": "물 마시기", "rule": {"kind": "daily"}}], "titles": ["카드값 확인"], "more": 0, "folded": ["물 마시기"], "label": ["매일 반복 1개", "1 daily repeat", "1 dagelijkse herhaling"], "tooltip": "매일 반복 1개\n물 마시기", "list": ["물 마시기", "카드값 확인"] }
+      ],
+      "wrap": { "case": "P20 흐린 반복 줄은 두 줄이 되지 않아요(남는 줄은 일정과 할 일이 먼저 써요)", "lines": [{"kind": "repeat", "ahead": true}, {"kind": "repeat", "ahead": false}, {"kind": "reminder", "ahead": false}], "wraps": [false, true, true] }
+    }
+  },
+  "keys": {
+    "about": "#275: 책상 달력에서 날과 그날 일정 목록을 키로 다녀요. picked는 키가 머문 일정의 자리(0부터), null은 날에 있어요. 날에서 Tab은 첫 일정으로 가요(일정이 없으면 넘겨요). 목록에서 ↑↓는 옮기고 끝에서 멈춰요. Tab · ⇧Tab은 다음 · 앞 일정으로, 끝을 넘으면 날로 돌아가요. Return은 그 일정의 고치기 쪽지를 열어요(open). Esc는 날로 돌아가요. 다른 키(← → T)는 날로 돌아가 날이 받아요(handled: false). 일정 수가 줄었으면 마지막 일정에 머물러요.",
+    "cases": [
+      { "case": "K1 날에서 Tab: 첫 일정으로", "count": 3, "picked": null, "key": "tab", "then": {"picked": 0, "open": null, "handled": true} },
+      { "case": "K2 일정이 없는 날의 Tab은 넘겨요", "count": 0, "picked": null, "key": "tab", "then": {"picked": null, "open": null, "handled": false} },
+      { "case": "K3 날에서 ↓는 날이 받아요(한 주 아래)", "count": 3, "picked": null, "key": "down", "then": {"picked": null, "open": null, "handled": false} },
+      { "case": "K4 ↓로 다음 일정", "count": 3, "picked": 0, "key": "down", "then": {"picked": 1, "open": null, "handled": true} },
+      { "case": "K5 마지막에서 ↓는 멈춰요", "count": 3, "picked": 2, "key": "down", "then": {"picked": 2, "open": null, "handled": true} },
+      { "case": "K6 처음에서 ↑는 멈춰요", "count": 3, "picked": 0, "key": "up", "then": {"picked": 0, "open": null, "handled": true} },
+      { "case": "K7 Tab으로 다음 일정", "count": 3, "picked": 1, "key": "tab", "then": {"picked": 2, "open": null, "handled": true} },
+      { "case": "K8 마지막에서 Tab은 날로", "count": 3, "picked": 2, "key": "tab", "then": {"picked": null, "open": null, "handled": true} },
+      { "case": "K9 처음에서 ⇧Tab은 날로", "count": 3, "picked": 0, "key": "backTab", "then": {"picked": null, "open": null, "handled": true} },
+      { "case": "K10 Return은 그 일정을 열어요", "count": 3, "picked": 1, "key": "enter", "then": {"picked": 1, "open": 1, "handled": true} },
+      { "case": "K11 Esc는 날로", "count": 3, "picked": 1, "key": "escape", "then": {"picked": null, "open": null, "handled": true} },
+      { "case": "K12 ← → T는 날로 돌아가 날이 받아요", "count": 3, "picked": 1, "key": "other", "then": {"picked": null, "open": null, "handled": false} },
+      { "case": "K13 날에서 Esc는 넘겨요", "count": 3, "picked": null, "key": "escape", "then": {"picked": null, "open": null, "handled": false} },
+      { "case": "K14 일정이 줄었으면 마지막 것에서부터 움직여요", "count": 2, "picked": 4, "key": "up", "then": {"picked": 0, "open": null, "handled": true} }
+    ],
+    "label": { "case": "K15 화면 읽기: 제목, 시각, 몇 번째", "title": "디자인 리뷰", "time": "14:00–15:00", "index": 0, "count": 3, "spoken": ["디자인 리뷰, 14:00–15:00, 일정 3개 중 1번째", "디자인 리뷰, 14:00–15:00, event 1 of 3", "디자인 리뷰, 14:00–15:00, afspraak 1 van 3"] }
   }
 }

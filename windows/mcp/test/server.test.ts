@@ -345,13 +345,17 @@ test("the app's Store and the extension write todos.json at the same time, 100 r
   store.unwatch();
 });
 
-test("the Claude Code command: the app's own Electron runs the server as Node", async () => {
+test("the Claude Code command (#175): the app's own Electron with --mcp-stdio runs the server built into the app, no RunAsNode", async () => {
   const electron = createRequire(import.meta.url)("electron") as unknown as string;
+  const app = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")), "..");
+  assert.ok(fs.existsSync(path.join(app, "out", "mcp.js")), "out/mcp.js: npm run mcp:test builds the app first");
   const { env, home } = setup();
-  const client = await connect({ ...env, ELECTRON_RUN_AS_NODE: "1" }, electron, "claude-code");
+  const client = await connect(env, electron, "claude-code", [app, "--mcp-stdio"]);
   assert.equal(client.getServerVersion()?.name, "jongi-nyang");
+  assert.equal((await client.listTools()).tools.length, allTools.length);
   assert.equal((await call(client, "add_todos", { items: [{ title: "Electron으로" }] })).error, false);
   assert.equal(logOf(home)[0].client, "Claude Code");
+  assert.doesNotMatch(stderrOf.get(client)!(), /error/i, "nothing wrong said on stderr");
 });
 
 test("M32: tools/list marks reading, adding and changing; apply_changes asks a person on every call in Claude Code", async () => {

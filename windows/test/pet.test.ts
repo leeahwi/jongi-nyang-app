@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { bubbleAbove, bubbleShift, clampFloorX, clipFrameMs, clipMs, idleChoices, isResting, petFrame, petWindowLeft, petWindowWidth, pickWeighted, restBreathMs, walkCycleFrames, walkStepX, walkSpeed, walkStride } from "../src/core/pet";
+import { bubbleAbove, bubbleShift, clampFloorX, clipFrameMs, clipMs, idleChoices, isResting, petFrame, petWindowBounds, petWindowLeft, petWindowWidth, pickWeighted, restBreathMs, walkCycleFrames, walkStepX, walkSpeed, walkStride } from "../src/core/pet";
 
 const windows = process.cwd();
 
@@ -122,4 +122,18 @@ test("#67: a walking cat's window moves once a step, with its picture", () => {
   }
   assert.equal(walkStepX(walk, 0, duration), 300);
   assert.ok(walkStepX({ kind: "walk", from: 300, to: 100 }, 0, duration / 2) < 300, "the other way too");
+});
+
+test("pet window: made and placed with its whole bounds on the floor, never at the system's default spot (#307)", () => {
+  const floor = { x: 0, y: 858, width: 1710, height: 250 };
+  assert.deepEqual(petWindowBounds(floor, 1334), { x: 1154, y: 858, width: petWindowWidth, height: 250 });
+  // Off-screen runs: the same place moved far off every display.
+  assert.deepEqual(petWindowBounds(floor, 1334, { x: -40_000, y: -40_000 }), { x: -38_846, y: -39_142, width: petWindowWidth, height: 250 });
+  // 아주 크게: the strip's height, whatever it is.
+  assert.equal(petWindowBounds({ ...floor, height: 318 }, 70).height, 318);
+  // Made with them (not centred first, then moved), and placed with them.
+  const source = (file: string) => fs.readFileSync(path.join(process.cwd(), file), "utf8");
+  assert.match(source("src/main/pet.ts"), /new BrowserWindow\(\{\s*\.\.\.petWindowBounds\(/);
+  assert.match(source("src/main/pet.ts"), /setBounds\(bounds\)/);
+  assert.match(source("src/main/typingCat.ts"), /new BrowserWindow\(\{\s*\.\.\.this\.frame\(\)/);
 });

@@ -31,9 +31,9 @@ public enum KoreanCalendar {
     }
 
     /// The small label in a day's cell: "9.18"; the 1st of a lunar month marked — "음 9.1", "윤 4.1" (a leap month);
-    /// en · nl "☾ 9.1".
-    public static func lunarLabel(_ lunar: Lunar, language: AppLanguage = .ko) -> String {
-        guard lunar.day == 1 else { return "\(lunar.month).\(lunar.day)" }
+    /// en · nl "☾ 9.1". #295 `short`: without the mark ("10.1"), where the head is short of room (+N beside it).
+    public static func lunarLabel(_ lunar: Lunar, language: AppLanguage = .ko, short: Bool = false) -> String {
+        guard lunar.day == 1, !short else { return "\(lunar.month).\(lunar.day)" }
         switch language {
         case .ko: return (lunar.leap ? "윤 " : "음 ") + "\(lunar.month).1"
         case .en, .nl: return "☾ \(lunar.month).1"

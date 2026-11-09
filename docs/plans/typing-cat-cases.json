@@ -1,5 +1,5 @@
 {
-  "about": "치면 두드리는 고양이 (#230): the cases both apps run — Mac scripts/test-typing-cat.sh (PaperCore/TypingCat.swift), Windows test/typingCat.test.ts (src/core/typingCat.ts). Times are milliseconds on a monotonic clock. A step with `key` is a key going down; `stop` is the cat hidden, the setting turned off or the permission gone; any other step moves the clock to `at` (the one timer fires on the way) and checks what is drawn: `pose`, `next` (the paw for the next key) and `timer` (whether a wake is still waiting).",
+  "about": "치면 두드리는 고양이 (#230 · #289 · #288): the cases both apps run — Mac scripts/test-typing-cat.sh (PaperCore/TypingCat.swift), Windows test/typingCat.test.ts (src/core/typingCat.ts). The typing cat is its own window in a corner, apart from the desktop pet. Times are milliseconds on a monotonic clock. A step with `key` is a key going down; `stop` is the cat put away (the setting turned off, the screen locked, the permission gone); any other step moves the clock to `at` (the one timer fires on the way) and checks what is drawn: `pose`, `next` (the paw for the next key) and `timer` (whether a wake is still waiting).",
   "holdMs": 120,
   "lingerMs": 3000,
   "chatterQuietMs": 5000,
@@ -71,10 +71,10 @@
       ]
     },
     {
-      "case": "T7 hidden with a paw down: it rests at once and nothing waits; the next paw is kept",
+      "case": "T7 put away with a paw down: it rests at once and nothing waits; the next paw is kept",
       "steps": [
         { "at": 0, "key": true },
-        { "at": 50, "stop": "hidden" },
+        { "at": 50, "stop": "away" },
         { "at": 50, "pose": "idle", "next": "right", "timer": false },
         { "at": 300, "pose": "idle", "timer": false }
       ]
@@ -89,7 +89,7 @@
       ]
     },
     {
-      "case": "T9 the permission taken back (Mac, in all apps) with a paw down",
+      "case": "T9 the permission taken back (Mac) or the screen locked with a paw down",
       "steps": [
         { "at": 0, "key": true },
         { "at": 10, "key": true },
@@ -105,33 +105,58 @@
     { "case": "a ⌃ shortcut (⌃C)", "repeat": false, "command": false, "control": true, "counts": false },
     { "case": "a held ⌘ shortcut", "repeat": true, "command": true, "control": false, "counts": false }
   ],
-  "priorities": [
-    { "case": "P1 sitting: a paw goes down", "doing": "resting", "reply": "type" },
-    { "case": "P2 a small moment (blink, look, stretch, grooming, yawn, tea) gives way", "doing": "moment", "reply": "type" },
-    { "case": "P3 walking: it stops where it is and types", "doing": "walking", "reply": "stopAndType" },
-    { "case": "P4 dozing: the person is back, it wakes and types", "doing": "sleeping", "reply": "wakeAndType" },
-    { "case": "P5 cheering, hearts or a hop: it finishes, and keys meanwhile aren't caught up later", "doing": "answering", "reply": "ignore" },
-    { "case": "P6 being dragged: no paws", "doing": "dragging", "reply": "ignore" },
-    { "case": "P7 hidden or out of sight: nothing", "doing": "hidden", "reply": "ignore" }
+  "sources": [
+    { "case": "M1 in this app (the default)", "scope": "app", "granted": false, "locked": false, "petShown": true, "source": "app" },
+    { "case": "M2 in all apps, allowed (Mac: Input Monitoring; Windows: the key hook is set)", "scope": "everywhere", "granted": true, "locked": false, "petShown": true, "source": "everywhere" },
+    { "case": "M3 in all apps, not allowed: in this app only (never pretended)", "scope": "everywhere", "granted": false, "locked": false, "petShown": true, "source": "app" },
+    { "case": "M4 turned off", "scope": "off", "granted": true, "locked": false, "petShown": true, "source": "none" },
+    { "case": "M5 the pet hidden: the typing cat still hears, in this app", "scope": "app", "granted": false, "locked": false, "petShown": false, "source": "app" },
+    { "case": "M6 the pet hidden: the typing cat still hears, in all apps", "scope": "everywhere", "granted": true, "locked": false, "petShown": false, "source": "everywhere" },
+    { "case": "M7 the screen locked: nothing is heard", "scope": "everywhere", "granted": true, "locked": true, "petShown": true, "source": "none" },
+    { "case": "M8 the screen locked, in this app", "scope": "app", "granted": false, "locked": true, "petShown": true, "source": "none" }
   ],
-  "linger": [
-    { "case": "L1 still on its cushion 2.9 s after the last key", "lastKey": 0, "now": 2900, "within": true },
-    { "case": "L2 back to its usual moments 3 s after", "lastKey": 0, "now": 3000, "within": false },
-    { "case": "L3 never typed", "now": 0, "within": false }
+  "shows": [
+    { "case": "S1 in this app: not in its corner before a key", "source": "app", "now": 0, "shows": false },
+    { "case": "S2 in this app: out at once with a key", "source": "app", "lastKey": 1000, "now": 1000, "shows": true },
+    { "case": "S3 in this app: still there 2.9 s after the last key", "source": "app", "lastKey": 1000, "now": 3900, "shows": true },
+    { "case": "S4 in this app: quietly gone 3 s after the last key", "source": "app", "lastKey": 1000, "now": 4000, "shows": false },
+    { "case": "S5 in all apps: always in its corner, typed or not", "source": "everywhere", "now": 0, "shows": true },
+    { "case": "S6 in all apps: still there long after the last key", "source": "everywhere", "lastKey": 0, "now": 600000, "shows": true },
+    { "case": "S7 off (or locked): never", "source": "none", "lastKey": 1000, "now": 1000, "shows": false }
   ],
   "chatter": [
-    { "case": "C1 종이냥 한마디 waits while typing", "lastKey": 1000, "now": 5999, "quiet": true },
+    { "case": "C1 the pet's 종이냥 한마디 waits while typing", "lastKey": 1000, "now": 5999, "quiet": true },
     { "case": "C2 …and speaks 5 s after the last key", "lastKey": 1000, "now": 6000, "quiet": false }
   ],
-  "mac": {
-    "sources": [
-      { "case": "M1 in this app (the default)", "scope": "app", "granted": false, "petShown": true, "source": "app" },
-      { "case": "M2 in all apps, allowed", "scope": "everywhere", "granted": true, "petShown": true, "source": "everywhere" },
-      { "case": "M3 in all apps, not allowed: in this app only (never pretended)", "scope": "everywhere", "granted": false, "petShown": true, "source": "app" },
-      { "case": "M4 turned off", "scope": "off", "granted": true, "petShown": true, "source": "none" },
-      { "case": "M5 the pet hidden: nothing is heard", "scope": "everywhere", "granted": true, "petShown": false, "source": "none" },
-      { "case": "M6 the pet hidden, in this app", "scope": "app", "granted": false, "petShown": false, "source": "none" }
+  "moving": {
+    "about": "#289: the settings as saved now (`now`: Mac typing.scope · typing.corner, Windows typingCat · typingCorner) or else as the pet's old ones left them (`before`: Mac pet.typing · pet.companion.corner, Windows petTyping).",
+    "scope": [
+      { "case": "V1 nothing saved: in this app", "scope": "app" },
+      { "case": "V2 the pet's ‘글자 칠 때 두드리기’ was off: off", "before": "off", "scope": "off" },
+      { "case": "V3 it was in all apps (Mac): in all apps", "before": "everywhere", "scope": "everywhere" },
+      { "case": "V4 the new setting wins over the old one", "now": "off", "before": "everywhere", "scope": "off" },
+      { "case": "V5 something unknown: in this app", "now": "loud", "scope": "app" }
     ],
+    "corner": [
+      { "case": "K1 nothing saved: bottom right", "corner": "bottomRight" },
+      { "case": "K2 the Mac's 전체 화면에서 보이기 corner comes along", "before": "topLeft", "corner": "topLeft" },
+      { "case": "K3 the new setting wins", "now": "bottomLeft", "before": "topLeft", "corner": "bottomLeft" },
+      { "case": "K4 something unknown: bottom right", "now": "middle", "corner": "bottomRight" }
+    ]
+  },
+  "toggle": [
+    { "case": "H1 hidden from the menu in all apps: off, and in all apps remembered", "scope": "everywhere", "scopeAfter": "off", "lastAfter": "everywhere" },
+    { "case": "H2 shown again: back to in all apps", "scope": "off", "last": "everywhere", "scopeAfter": "everywhere", "lastAfter": "everywhere" },
+    { "case": "H3 shown with nothing remembered (turned off in Settings): in this app", "scope": "off", "scopeAfter": "app" },
+    { "case": "H4 hidden from in this app", "scope": "app", "last": "everywhere", "scopeAfter": "off", "lastAfter": "app" }
+  ],
+  "frames": [
+    { "case": "G1 bottom right of a 1440×900 screen", "corner": "bottomRight", "screen": [0, 0, 1440, 900], "topInset": 0, "frame": [1308, 20, 112, 112] },
+    { "case": "G2 top left under a 38 pt notch", "corner": "topLeft", "screen": [0, 0, 1512, 982], "topInset": 38, "frame": [20, 812, 112, 112] },
+    { "case": "G3 a second screen to the left, below the first", "corner": "topRight", "screen": [-1920, -300, 1920, 1080], "topInset": 0, "frame": [-132, 648, 112, 112] },
+    { "case": "G4 a tiny screen: smaller, still inside", "corner": "bottomLeft", "screen": [0, 0, 120, 100], "topInset": 0, "frame": [20, 20, 60, 60] }
+  ],
+  "mac": {
     "asking": [
       { "case": "A1 just chose in all apps, never asked in this build: ask once (the line shows beside macOS's question)", "scope": "everywhere", "granted": false, "asked": false, "chosenNow": true, "ask": true, "note": true },
       { "case": "A2 asked and refused, chosen again: no second ask, the line with a button to System Settings", "scope": "everywhere", "granted": false, "asked": true, "chosenNow": true, "ask": false, "note": true },
@@ -140,20 +165,6 @@
       { "case": "A5 turned off after a refusal: the line goes", "scope": "off", "granted": false, "asked": true, "chosenNow": true, "ask": false, "note": false },
       { "case": "A6 after an update (this build never asked), still in all apps: no question at launch, only the line", "scope": "everywhere", "granted": false, "asked": false, "chosenNow": false, "ask": false, "note": true },
       { "case": "A7 the permission taken back: no question, the line", "scope": "everywhere", "granted": false, "asked": true, "chosenNow": false, "ask": false, "note": true }
-    ],
-    "companion": [
-      { "case": "F1 a full-screen app covers the pet: the small cat shows", "source": "everywhere", "enabled": true, "petShown": true, "dockCovered": true, "locked": false, "shows": true },
-      { "case": "F2 the pet above the Dock can be seen: only it shows", "source": "everywhere", "enabled": true, "petShown": true, "dockCovered": false, "locked": false, "shows": false },
-      { "case": "F3 in this app only: never over full-screen apps", "source": "app", "enabled": true, "petShown": true, "dockCovered": true, "locked": false, "shows": false },
-      { "case": "F4 turned off from the pet's menu", "source": "everywhere", "enabled": false, "petShown": true, "dockCovered": true, "locked": false, "shows": false },
-      { "case": "F5 the pet hidden", "source": "none", "enabled": true, "petShown": false, "dockCovered": true, "locked": false, "shows": false },
-      { "case": "F6 the screen locked", "source": "everywhere", "enabled": true, "petShown": true, "dockCovered": true, "locked": true, "shows": false }
-    ],
-    "frames": [
-      { "case": "G1 bottom right of a 1440×900 screen", "corner": "bottomRight", "screen": [0, 0, 1440, 900], "topInset": 0, "frame": [1308, 20, 112, 112] },
-      { "case": "G2 top left under a 38 pt notch", "corner": "topLeft", "screen": [0, 0, 1512, 982], "topInset": 38, "frame": [20, 812, 112, 112] },
-      { "case": "G3 a second screen to the left, below the first", "corner": "topRight", "screen": [-1920, -300, 1920, 1080], "topInset": 0, "frame": [-132, 648, 112, 112] },
-      { "case": "G4 a tiny screen: smaller, still inside", "corner": "bottomLeft", "screen": [0, 0, 120, 100], "topInset": 0, "frame": [20, 20, 60, 60] }
     ]
   }
 }

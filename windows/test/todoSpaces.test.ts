@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { makeBackup, mergeFiles, parseBackup, replaceFiles } from "../src/core/backup";
@@ -17,6 +16,7 @@ import { boardFits, groupItems, groupOpen, groupSpace, movedOrder, narrowNote, n
 import type { CalendarEvent } from "../src/core/calendar";
 import { stripItems, stripState } from "../src/core/dayStrip";
 import { Store } from "../src/main/store";
+import { temporaryFolder } from "./temporaryFolder";
 
 // 할 일 스페이스: the shared cases S1–S22, verbatim from docs/plans/spaces-phase1.md §6 (the Mac's TodoSpacesTests.swift).
 // 준비: 회사(s-a) · 집(s-b) · 공부(s-c) in that order; A업무(s-d) is made later.
@@ -309,7 +309,7 @@ test("S20: the name ‘A 업무’, typed #A업무 or #a → A 업무 (spaces an
 test("S21: a file that can't be read is kept aside as .unreadable-* and the spaces start empty", () => {
   assert.throws(() => parseTodoSpaces("{ broken"));
   assert.throws(() => parseTodoSpaces('{"spaces": {}}'));
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-spaces-"));
+  const directory = temporaryFolder("paper-todo-spaces-");
   fs.writeFileSync(path.join(directory, "todo-spaces.json"), "{ broken", "utf8");
   const store = new Store(directory);
   assert.equal(liveSpaces(store.todoSpaces).length, 0);
@@ -377,7 +377,7 @@ test("ids, colours, digits, lens filter and particles", () => {
 });
 
 test("store: todo-spaces.json beside todos.json; todos.json keeps its shape; another device's file merges", () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-spaces-"));
+  const directory = temporaryFolder("paper-todo-spaces-");
   const store = new Store(directory);
   let todoID = "";
   store.mutate((history) => { todoID = history.add("견적서 보내기")!.id; });
@@ -671,7 +671,7 @@ test("shared fixture: the groups — order, inside a group, empty ones hidden, t
 });
 
 test("rules' spaces in the store: a line's repeat, its new to-do, the rule's editor, a rule deleted", () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-series-"));
+  const directory = temporaryFolder("paper-todo-series-");
   const store = new Store(directory);
   store.changeSpaces((data) => addSpace(addSpace(data, "회사", "s-a", "pink"), "집", "s-b", "mint"));
   const now = new Date();
@@ -699,7 +699,7 @@ test("rules' spaces in the store: a line's repeat, its new to-do, the rule's edi
 });
 
 test("일반 in the store: renamed through the shared folder, the later name wins (S25)", () => {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "paper-todo-spaces-"));
+  const directory = temporaryFolder("paper-todo-spaces-");
   const store = new Store(directory);
   store.changeSpaces((data) => addSpace(data, "회사", "s-a", "pink"));
   store.changeSpaces((data) => renameGeneral(data, "기타", at("2026-10-28T10:00:00Z")));

@@ -32,6 +32,7 @@ export interface GuardedWindow {
   focus(): void;
   setParentWindow(parent: null): void;
   setHiddenInMissionControl(hidden: boolean): void;
+  setVisibleOnAllWorkspaces(visible: boolean, options?: { visibleOnFullScreen?: boolean }): void;
   isDestroyed(): boolean;
   getTitle(): string;
   on(event: "move" | "resize" | "show", listener: () => void): unknown;
@@ -51,6 +52,13 @@ export interface GuardOptions {
    * 437×321) came up there on the person's screen, and the watch stopped the run each time.
    */
   hideFromOverviews: boolean;
+  /**
+   * macOS (#307): on one Space only. The system moves a window that is on every Space (setVisibleOnAllWorkspaces) on
+   * its own: a perf run's cat, which the app kept far off-screen (its window log has no put back), was caught on the
+   * screen shrunk to 3×2 at (773, 454), and a window made like it was seen sliding up to 690 pt sideways at -38846. On a
+   * Mac the call also gives the app a Dock icon or takes it away (Electron's DockShow · DockHide). Windows ignores it.
+   */
+  oneSpace: boolean;
   /** A window found near a display, before it is put back (`why`: what moved it). */
   putBack?: (bounds: Box, why: string) => void;
 }
@@ -102,6 +110,8 @@ export function guardWindow(window: GuardedWindow, options: GuardOptions): void 
     // (Kept so: the app never shows a window there in an off-screen run.)
     window.setHiddenInMissionControl = () => undefined;
   }
+  // (Never on every Space in an off-screen run.)
+  if (options.oneSpace) window.setVisibleOnAllWorkspaces = () => undefined;
   // Moved, resized or shown by the system (a display change, macOS pulling a window back): back at once.
   window.on("move", () => check("moved"));
   window.on("resize", () => check("resized"));

@@ -49,10 +49,10 @@ private enum PaperThemeRedrawTests {
         }
 
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("PaperThemes-\(UUID())")
-        let suite = "PaperTodo.PaperThemes.\(UUID())"
-        let preferences = UserDefaults(suiteName: suite)!
+        let suite = TestDefaults("PaperThemes")
+        let preferences = suite.defaults
         defer {
-            preferences.removePersistentDomain(forName: suite)
+            suite.remove()
             try? FileManager.default.removeItem(at: folder)
         }
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

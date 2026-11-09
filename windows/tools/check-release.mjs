@@ -20,6 +20,13 @@ if (!existsSync(unpacked) || !shipped.some((file) => file.endsWith(".exe")) || !
   process.exit(2);
 }
 
+// #272 · #273: 바탕화면에 두기 needs Koffi's binary beside the app (main/stayBehind.ts); without it the windows stay ordinary.
+if (!existsSync(path.join(unpacked, "resources", "native", "koffi.node"))) {
+  for (const file of [...artifacts, path.join(dist, "SHA256SUMS.txt")]) rmSync(file, { force: true });
+  console.error(`check-release: resources/native/koffi.node is missing from dist/win-unpacked (node tools/native.mjs); removed the ${version} installer, zip and checksums from dist/.`);
+  process.exit(1);
+}
+
 const extension = ["server/index.js", "jongi-nyang.mcpb"].map((file) => path.join(root, "mcp", "dist", file));
 const code = await checkReleasePaths([unpacked, ...shipped, ...extension]);
 if (code !== 0) {
