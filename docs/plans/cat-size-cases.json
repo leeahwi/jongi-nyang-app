@@ -1,0 +1,69 @@
+{
+  "about": "종이냥 펫과 타닥냥의 크기예요. 둘 다 책상 → 종이냥에서 따로 골라요(작게 · 보통 · 크게 · 아주 크게). 단계 · 배율 · 이름은 타이머 크기(Mac TimerSize · Windows timerWidget.ts)와 같아요. 보통은 배율 1이라 크기를 고르기 전과 픽셀까지 같아요. 크기는 기본 크기 × 배율을 반올림한 값(pt · DIP)이고, 보폭 · 바닥 끝의 여백 · 뛰어오르는 높이도 같은 배율을 따라요. 걷는 빠르기(24/초)와 말풍선 글자는 그대로예요. 펫의 띠(Mac은 Dock 위, Windows는 작업 표시줄 위 창)의 높이는 고양이가 커진 만큼 높아져서, 질문 버튼이 있는 말풍선까지 들어가요. 타닥냥의 창은 한 변이 크기이고 고른 구석에 여백 20만큼 떨어져 붙어요(작은 화면에서는 들어가는 만큼만). Mac의 사례는 화면 좌표(아래가 0)이고, Windows는 같은 규칙을 위아래로 뒤집어 읽어요. 저장 이름은 Mac pet.size · typing.size, Windows petSize · typingSize이고 값은 아래 steps의 id예요. 모르는 값이나 없으면 보통이에요.",
+  "steps": [
+    { "id": "small", "scale": 0.8, "names": ["작게", "Small", "Klein"] },
+    { "id": "regular", "scale": 1, "names": ["보통", "Regular", "Normaal"] },
+    { "id": "large", "scale": 1.25, "names": ["크게", "Large", "Groot"] },
+    { "id": "extraLarge", "scale": 1.5, "names": ["아주 크게", "Extra large", "Extra groot"] }
+  ],
+  "default": "regular",
+  "prefs": {
+    "mac": { "pet": "pet.size", "typing": "typing.size" },
+    "windows": { "pet": "petSize", "typing": "typingSize" }
+  },
+  "read": [
+    { "case": "R1 저장된 단계", "saved": "large", "want": "large" },
+    { "case": "R2 없으면 보통", "saved": null, "want": "regular" },
+    { "case": "R3 모르는 이름은 보통", "saved": "huge", "want": "regular" },
+    { "case": "R4 숫자는 보통(배율은 저장하지 않아요)", "saved": 1.25, "want": "regular" }
+  ],
+  "pet": {
+    "base": 92,
+    "strideBase": 17.25,
+    "stripBase": 250,
+    "marginBase": 70,
+    "sizes": [
+      { "case": "P1 작게", "step": "small", "size": 74, "stride": 13.875, "strip": 250, "margin": 56 },
+      { "case": "P2 보통: 크기를 고르기 전과 같아요", "step": "regular", "size": 92, "stride": 17.25, "strip": 250, "margin": 70 },
+      { "case": "P3 크게", "step": "large", "size": 115, "stride": 21.5625, "strip": 273, "margin": 88 },
+      { "case": "P4 아주 크게", "step": "extraLarge", "size": 138, "stride": 25.875, "strip": 296, "margin": 105 }
+    ],
+    "about_strip": "질문 말풍선이 있을 때 고양이와 말풍선이 쓰는 높이(크기 + 150)가 띠 안에 들어가요: 74+150, 92+150, 115+150, 138+150 ≤ 250, 250, 273, 296.",
+    "clamp": [
+      { "case": "F1 바닥의 왼쪽 끝: 여백까지", "step": "extraLarge", "x": 10, "width": 1440, "want": 105 },
+      { "case": "F2 바닥의 오른쪽 끝", "step": "extraLarge", "x": 1435, "width": 1440, "want": 1335 },
+      { "case": "F3 보통은 크기를 고르기 전과 같아요", "step": "regular", "x": 10, "width": 1440, "want": 70 },
+      { "case": "F4 작게", "step": "small", "x": 1439, "width": 1440, "want": 1384 },
+      { "case": "F5 다른 화면으로 옮겨 기억한 자리(비율)가 끝이면 끝의 여백까지", "step": "large", "x": 1920, "width": 1920, "want": 1832 }
+    ],
+    "anchor": [
+      { "case": "A1 저녁 정리 · 알림 쪽지가 위에 오는 자리: 고양이가 앉은 칸(가운데 x, 바닥에서 크기만큼)", "step": "extraLarge", "homeX": 400, "rect": [331, 0, 138, 138] },
+      { "case": "A2 보통", "step": "regular", "homeX": 400, "rect": [354, 0, 92, 92] },
+      { "case": "A3 작게", "step": "small", "homeX": 400, "rect": [363, 0, 74, 74] }
+    ],
+    "lift": [
+      { "case": "L1 뛰어오르는 높이도 크기를 따라요(보통 10 → 아주 크게 15)", "step": "extraLarge", "lift": 10, "want": 15 },
+      { "case": "L2 보통은 그대로", "step": "regular", "lift": 10, "want": 10 }
+    ]
+  },
+  "typing": {
+    "base": 112,
+    "margin": 20,
+    "sizes": [
+      { "step": "small", "size": 90 },
+      { "step": "regular", "size": 112 },
+      { "step": "large", "size": 140 },
+      { "step": "extraLarge", "size": 168 }
+    ],
+    "frames": [
+      { "case": "T1 작게, 오른쪽 아래", "step": "small", "corner": "bottomRight", "screen": [0, 0, 1440, 900], "topInset": 0, "frame": [1330, 20, 90, 90] },
+      { "case": "T2 보통, 오른쪽 아래: 크기를 고르기 전과 같아요", "step": "regular", "corner": "bottomRight", "screen": [0, 0, 1440, 900], "topInset": 0, "frame": [1308, 20, 112, 112] },
+      { "case": "T3 크게, 오른쪽 아래", "step": "large", "corner": "bottomRight", "screen": [0, 0, 1440, 900], "topInset": 0, "frame": [1280, 20, 140, 140] },
+      { "case": "T4 아주 크게, 오른쪽 아래", "step": "extraLarge", "corner": "bottomRight", "screen": [0, 0, 1440, 900], "topInset": 0, "frame": [1252, 20, 168, 168] },
+      { "case": "T5 아주 크게, 왼쪽 위(노치 38 아래)", "step": "extraLarge", "corner": "topLeft", "screen": [0, 0, 1512, 982], "topInset": 38, "frame": [20, 756, 168, 168] },
+      { "case": "T6 아주 크게, 오른쪽 위", "step": "extraLarge", "corner": "topRight", "screen": [0, 0, 1920, 1080], "topInset": 0, "frame": [1732, 892, 168, 168] },
+      { "case": "T7 아주 크게, 왼쪽 아래, 왼쪽에 있는 화면", "step": "extraLarge", "corner": "bottomLeft", "screen": [-1280, 200, 1280, 800], "topInset": 0, "frame": [-1260, 220, 168, 168] },
+      { "case": "T8 작은 화면에서는 들어가는 만큼만", "step": "extraLarge", "corner": "bottomRight", "screen": [0, 0, 200, 180], "topInset": 0, "frame": [40, 20, 140, 140] }
+    ]
+  }
+}
