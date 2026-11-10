@@ -77,7 +77,7 @@ final class FocusTimerController {
         return sheet
     }()
     /// The window at 보통; other sizes scale it.
-    static let size = NSSize(width: 250, height: 250)
+    static let size = NSSize(width: TimerWindow.side, height: TimerWindow.side)
     private var currentSize: NSSize { NSSize(width: Self.size.width * state.scale, height: Self.size.height * state.scale) }
 
     init(model: AppModel, preferences: UserDefaults) {
@@ -384,14 +384,14 @@ final class FocusTimerController {
         return panel
     }
 
-    /// Where the person last put it, or the lower right corner above the Dock.
+    /// Where the person last put it, or the lower right corner above the Dock of the display with the pointer.
     private func place() {
         guard let panel else { return }
         let origin: NSPoint
         if preferences.object(forKey: "timer.x") != nil {
             origin = NSPoint(x: preferences.double(forKey: "timer.x"), y: preferences.double(forKey: "timer.y"))
         } else {
-            let area = (NSScreen.main ?? NSScreen.screens.first)?.visibleFrame ?? .zero
+            let area = NSScreen.withPointer?.visibleFrame ?? .zero
             origin = NSPoint(x: area.maxX - currentSize.width - 24, y: area.minY + 150)
         }
         // #217: in a check's run (perf.sh's ‘타이머 25’), the tag far off every screen.
@@ -413,15 +413,11 @@ final class FocusTimerController {
         }
     }
 
-    /// Keeps the tag itself (the lower part of the window) on a screen.
+    /// Keeps the cat and its tag (the window less its empty top) on the display they are mostly on — up to that
+    /// display's top edge (#327, TimerWindow).
     private func clamped(_ frame: NSRect) -> NSRect {
         if TestHooks.staysBehind, !NSScreen.screens.contains(where: { $0.frame.intersects(frame) }) { return frame }
-        let center = NSPoint(x: frame.midX, y: frame.minY + 40)
-        guard let area = (NSScreen.screens.first { $0.frame.contains(center) } ?? NSScreen.main)?.visibleFrame else { return frame }
-        var result = frame
-        result.origin.x = min(max(frame.minX, area.minX - 40), area.maxX - frame.width + 40)
-        result.origin.y = min(max(frame.minY, area.minY - 10), area.maxY - frame.height)
-        return result
+        return TimerWindow.kept(frame, scale: state.scale, focusing: state.isFocusing, in: NSScreen.fitDisplays)
     }
 
     /// Moves the window with the mouse (a translation would drift as the window moves).

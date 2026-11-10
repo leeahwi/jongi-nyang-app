@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <defs>
+    <linearGradient id="track" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fb48a"/><stop offset=".55" stop-color="#5f8a5c"/><stop offset="1" stop-color="#43623f"/></linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f3e2d" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity=".25"/></linearGradient>
+    <linearGradient id="trackGloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".5"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <radialGradient id="knob" cx=".38" cy=".3" r=".75"><stop offset="0" stop-color="#ffffff"/><stop offset=".55" stop-color="#f4efe2"/><stop offset="1" stop-color="#cfc6b1"/></radialGradient>
+    <radialGradient id="knobShadow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#1c2a1b" stop-opacity=".55"/><stop offset="1" stop-color="#1c2a1b" stop-opacity="0"/></radialGradient>
+    <radialGradient id="shadow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#000" stop-opacity=".45"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+  </defs>
+  <ellipse cx="120" cy="178" rx="100" ry="13" fill="url(#shadow)"/>
+  <rect x="18" y="68" width="204" height="104" rx="52" fill="url(#track)"/>
+  <rect x="19" y="69" width="202" height="102" rx="51" fill="none" stroke="url(#rim)" stroke-width="3"/>
+  <path d="M60 76h120a40 40 0 0 1 36 22H24a40 40 0 0 1 36-22z" fill="url(#trackGloss)" opacity=".7"/>
+  <circle cx="72" cy="120" r="7" fill="none" stroke="#e8f0e4" stroke-opacity=".75" stroke-width="3"/>
+  <ellipse cx="170" cy="134" rx="50" ry="42" fill="url(#knobShadow)"/>
+  <circle cx="168" cy="120" r="44" fill="url(#knob)"/>
+  <ellipse cx="154" cy="100" rx="18" ry="10" fill="#fff" opacity=".8" transform="rotate(-25 154 100)"/>
+</svg>

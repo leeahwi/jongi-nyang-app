@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { earPaths, earsBounds, earsHeight, earsShow, earsWidth, mayTwitch, workAreaUnder } from "../src/core/noteEars";
+import {
+  EarsSizeCheck, earPaths, earsBounds, earsHeight, earsShow, earsSizeTries, earsWidth, earsWindowFits, mayTwitch, workAreaUnder,
+} from "../src/core/noteEars";
 
 // 노트 창 위의 고양이 귀 (#151): the same cases as the Mac app's (mac/Tests/PaperTodoTests/NoteEarsTests.swift).
 const work = { x: 0, y: 40, width: 1920, height: 1000 };
@@ -64,4 +66,48 @@ test("one twitch a second at most", () => {
   assert.equal(mayTwitch(undefined, 5000), true);
   assert.equal(mayTwitch(5000, 5999), false);
   assert.equal(mayTwitch(5000, 6000), true);
+});
+
+// #312: on a Windows PC the ears' window came out opaque and about 100 × 56 — a grey box over the note's buttons.
+const asked = earsBounds(note);
+const seen = { ...asked, height: 56 };
+
+test("E9 the ears' window fits only at the size asked for, give or take a pixel of rounding", () => {
+  assert.equal(earsWindowFits(asked, asked), true);
+  assert.equal(earsWindowFits(asked, { ...asked, x: asked.x + 30, y: asked.y - 7 }), true, "the place is set again, not the size");
+  assert.equal(earsWindowFits(asked, { ...asked, width: 101, height: 19 }), true, "125 % / 150 % rounding");
+  assert.equal(earsWindowFits(asked, seen), false, "the grey box of #312");
+  assert.equal(earsWindowFits(asked, { ...asked, height: 22 }), false);
+  assert.equal(earsWindowFits(asked, { ...asked, width: 136 }), false);
+});
+
+test("E10 a wrong size hides the ears and places them again; three in a row leave them off", () => {
+  const sizes = new EarsSizeCheck();
+  assert.equal(earsSizeTries, 3);
+  assert.equal(sizes.check(asked, asked), "show");
+  assert.equal(sizes.check(asked, seen), "retry");
+  assert.equal(sizes.check(asked, seen), "retry");
+  assert.equal(sizes.off, false);
+  assert.equal(sizes.check(asked, seen), "off");
+  assert.equal(sizes.off, true);
+  assert.equal(sizes.check(asked, asked), "off", "off stays off, even at the right size");
+});
+
+test("E11 a right size in between starts the count again", () => {
+  const sizes = new EarsSizeCheck();
+  assert.equal(sizes.check(asked, seen), "retry");
+  assert.equal(sizes.check(asked, seen), "retry");
+  assert.equal(sizes.check(asked, asked), "show");
+  assert.equal(sizes.check(asked, seen), "retry");
+  assert.equal(sizes.check(asked, seen), "retry");
+  assert.equal(sizes.off, false);
+});
+
+test("E12 a display change lets the ears try again", () => {
+  const sizes = new EarsSizeCheck();
+  for (let i = 0; i < earsSizeTries; i++) sizes.check(asked, seen);
+  assert.equal(sizes.off, true);
+  sizes.reset();
+  assert.equal(sizes.off, false);
+  assert.equal(sizes.check(asked, asked), "show");
 });

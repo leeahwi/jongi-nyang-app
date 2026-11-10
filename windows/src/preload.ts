@@ -30,6 +30,8 @@ const send = new Set([
   "ears:interactive", "ears:twitch", "desk:shown",
   "widget:ready", "widget:interactive", "widget:menu", "widget:day", "widget:drag-start", "widget:drag", "widget:drag-end",
   "widgetSheet:close", "widgetSheet:size", "widgetSheet:made",
+  // #331: the typing cat: the pointer over the drawn cat or not, and a drag.
+  "typingCat:interactive", "typingCat:drag-start", "typingCat:drag", "typingCat:drag-end",
 ]);
 
 /** The app's language, asked once as the page loads (the main process chose it at launch). */

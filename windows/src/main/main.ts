@@ -36,6 +36,7 @@ import { layoutCheckScript, type LayoutCheckOptions, type LayoutReport } from ".
 import { DesktopPet } from "./pet";
 import { TypingCatWindow } from "./typingCat";
 import { loadKeyHook } from "./keyHook";
+import { NoteCaptionClicks } from "./captionClicks";
 import { typingChatterQuietMs } from "../core/typingCat";
 import { catSizes, type CatSize } from "../core/catSize";
 import { ReminderPopup } from "./popup";
@@ -130,6 +131,8 @@ let quitting = false;
 let toldAboutTray = false;
 /** Where the icon sat on the note when it was folded, so unfolding mirrors it. */
 let collapseAnchorInNote: Point | undefined;
+/** Windows: double-clicking the note's header folds it (#323). */
+let noteCaptionClicks: NoteCaptionClicks | undefined;
 
 /** Settings live in %APPDATA%\PaperTodo; the data there too, unless a shared folder was chosen (see storageFolder.ts). */
 let settingsDirectory: string;
@@ -424,11 +427,8 @@ function createNote(): BrowserWindow {
       tray?.displayBalloon({ title: t("종이냥은 계속 실행 중이에요"), content: t("알림 영역의 종이냥을 누르면 다시 열려요."), iconType: "info" });
     }
   });
-  // Double-clicking the header folds the note into the post-it, where the click happened.
-  if (process.platform === "win32") {
-    const WM_NCLBUTTONDBLCLK = 0x00a3;
-    window.hookWindowMessage(WM_NCLBUTTONDBLCLK, () => collapse(screen.getCursorScreenPoint()));
-  }
+  // Double-clicking the header folds the note into the post-it, where the click happened (#323: main/captionClicks.ts).
+  if (process.platform === "win32") noteCaptionClicks = new NoteCaptionClicks(window, (point) => collapse(point));
   return window;
 }
 
@@ -2485,7 +2485,7 @@ async function runSnapshots(directory: string): Promise<void> {
     return finishSnapshots(await spacesShots(directory, save, wait, settled));
   }
   // `npm run snapshot -- spaces2b`: only 스페이스별로 묶기's shots (1.31), day and night.
-  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "spaces2b") {
+  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "spaces2b" || process.env.PAPERTODO_SNAPSHOT_ONLY === "spacepapers") {
     return finishSnapshots(await spaces2bShots(directory, save, wait, settled));
   }
   // `npm run snapshot -- device`: 기기마다 보일 스페이스 (#196), day and night.
@@ -5202,6 +5202,35 @@ async function spaces2bShots(directory: string, save: Save, wait: Wait, settled:
   store.setPref("spaceGroups", true);
   send("page-today");
   await run(`window.ribbonNow = ${JSON.stringify(ribbonNow.toISOString())}; window.dispatchEvent(new Event("ribbon-now"))`);
+  // `npm run snapshot -- spacepapers` (#332): the ruled papers by space — 메모지, 책갈피 and 칸 보기 (one row picked in it),
+  // with 낮 종이 and 밤 종이 beside them, into spaces2b/papers/.
+  if (process.env.PAPERTODO_SNAPSHOT_ONLY === "spacepapers") {
+    fs.mkdirSync(path.join(directory, "spaces2b", "papers"), { recursive: true });
+    const top = `document.querySelector(".sheet").scrollTop = 0`;
+    store.setPref("spaceGroupsDoneOpen", []);
+    store.setPref("spaceGroupsFolded", []);
+    for (const theme of ["grid", "manuscript", "lined", "day", "night"] as const) {
+      store.setPref("paper", theme === "night" ? "night" : "day");
+      store.setPref("paperTheme", theme === "night" ? "day" : theme);
+      await wait(450);
+      for (const style of ["card", "bookmark"] as const) {
+        store.setPref("spaceGroupStyle", style);
+        note.setSize(420, 720);
+        await run(top);
+        await shot(`${theme}-${style}`, "papers/");
+      }
+      store.setPref("spaceGroupStyle", "card");
+      note.setSize(1200, 640);
+      await shot(`${theme}-board`, "papers/");
+      await run(`document.querySelector('.lines.board .row[data-id="${made.report}"]')?.dispatchEvent(new MouseEvent("click", { bubbles: true }))`);
+      await shot(`${theme}-board-picked`, "papers/");
+      await run(`document.querySelector('.lines.board .row[data-id="${made.report}"]')?.dispatchEvent(new MouseEvent("click", { bubbles: true, ctrlKey: true }))`);
+    }
+    store.setPref("paper", "day");
+    store.setPref("paperTheme", "day");
+    note.setSize(420, 720);
+    return problems;
+  }
   for (const paper of ["day", "night"] as const) {
     const prefix = paper === "night" ? "night/" : "";
     store.setPref("paper", paper);
@@ -6913,7 +6942,31 @@ async function typingShots(directory: string, save: Save, wait: Wait): Promise<n
     }
     store.setPref("typingCat", "app");
     store.setPref("petVisible", true);
+    // #331: dragged somewhere — 자리 reads 옮긴 자리 (a made-up place on a made-up display).
+    store.setPref("typingPlace", { screen: "1", x: 0.62, y: 0.4, centerX: 893, centerY: 344 });
+    store.setPref("typingCorner", "moved");
+    await showDeskPane("pet", wait);
+    await inPane("settings", `document.querySelector(".content").scrollTop = 1e6`);
+    await wait(400);
+    const found = await inPane("settings", cut) as string[] | undefined;
+    console.log(`typing ${prefix}settings-pet-typing-moved: ${found?.length ? `cut: ${found.join(" · ")}` : "ok"}`);
+    problems += found?.length ?? 0;
+    await save(`${prefix}settings-pet-typing-moved`, captureDesk(wait));
+    store.setPref("typingCorner", "bottomRight");
+    store.setPref("typingPlace", undefined);
     for (const pose of ["idle", "left", "right"] as const) await save(`${prefix}typing-cat-${pose}`, typingCat?.preview(pose));
+    // #331: a drag as the page makes one, off the screens: let go, it is wholly in a work area and 자리 is 옮긴 자리.
+    if (paper === "day" && typingCat) {
+      typingCat.dragBy(-300, -200);
+      const bounds = typingCat.bounds;
+      const inside = bounds !== undefined && screen.getAllDisplays().some(({ workArea: area }) => bounds.x - offscreen.x >= area.x && bounds.y - offscreen.y >= area.y
+        && bounds.x - offscreen.x + bounds.width <= area.x + area.width && bounds.y - offscreen.y + bounds.height <= area.y + area.height);
+      const moved = store.prefs.typingCorner === "moved" && store.prefs.typingPlace !== undefined && inside;
+      console.log(`typing drag: ${moved ? "ok" : `problem: ${store.prefs.typingCorner} ${JSON.stringify(bounds)}`}`);
+      if (!moved) problems += 1;
+      store.setPref("typingCorner", "bottomRight");
+      store.setPref("typingPlace", undefined);
+    }
     typingCat?.refresh();
   }
   store.setPref("paper", "day");
@@ -6966,6 +7019,22 @@ async function catSizeShots(directory: string, save: Save, wait: Wait): Promise<
       typingCat?.refresh();
     }
   }
+  // #313: the cat stays on the floor after a wander there and back, hidden and shown again, and a display change — at
+  // each size (the window's place is logged against the work area).
+  for (const size of catSizes) {
+    store.setPref("petSize", size);
+    pet?.quiet();
+    await pet?.walkForSnapshot(-170);
+    await pet?.walkForSnapshot(170);
+    report(`catsize/floor-${size}-walked (${pet?.floorLog()})`, await pet?.layoutProblems());
+    store.setPref("petVisible", false);
+    store.setPref("petVisible", true);
+    await wait(600);
+    pet?.displayChangedForSnapshot();
+    await wait(300);
+    report(`catsize/floor-${size}-shown-again (${pet?.floorLog()})`, await pet?.layoutProblems());
+  }
+  store.setPref("petSize", "regular");
   store.setPref("paper", "day");
   return problems;
 }
@@ -7689,7 +7758,7 @@ function toggleNote(): void {
 
 app.on("second-instance", (_event, argv) => secondLaunch(argv));
 app.on("before-quit", () => { quitting = true; store?.flush(); });
-app.on("will-quit", () => { typingCat?.dispose(); store?.flush(); quick?.dispose(); quickMemo?.dispose(); drawer?.dispose(); if (noteHotkeyHeld) globalShortcut.unregister(noteHotkeyHeld); globalShortcut.unregisterAll(); store?.unwatch(); ai?.stop(); });
+app.on("will-quit", () => { typingCat?.dispose(); noteCaptionClicks?.dispose(); store?.flush(); quick?.dispose(); quickMemo?.dispose(); drawer?.dispose(); if (noteHotkeyHeld) globalShortcut.unregister(noteHotkeyHeld); globalShortcut.unregisterAll(); store?.unwatch(); ai?.stop(); });
 app.on("window-all-closed", () => undefined);
 
 app.whenReady().then(() => {

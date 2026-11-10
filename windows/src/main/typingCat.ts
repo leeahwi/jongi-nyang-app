@@ -1,10 +1,10 @@
-import { BrowserWindow, powerMonitor, screen } from "electron";
+import { BrowserWindow, ipcMain, powerMonitor, screen } from "electron";
 import path from "node:path";
 import { t } from "../i18n";
 import { scaledSize } from "../core/catSize";
 import {
-  toggledTypingScope, typingCatFrame, typingCatSize, typingLingerMs, typingShows, typingSource, typedWithin, type TypingCat, type TypingPose,
-  type TypingSource,
+  lastTouch, toggledTypingScope, typingCatFrameFor, typingCatSize, typingDropped, typingLingerMs, typingShows, typingSource, typedWithin,
+  type TypingCat, type TypingPose, type TypingScreen, type TypingSource,
 } from "../core/typingCat";
 import { GlobalKeys, hookWanted, type KeyHookNative } from "../core/keyHook";
 import { offscreen, offscreenEnabled } from "./env";
@@ -26,6 +26,10 @@ const fadeMs = 250;
  *   keys too). If the hook can't be set, it hears this app only and Settings says so.
  * - Off: no window at all, no hook. Hiding the pet changes nothing here; the pet never comes to the cushion.
  *
+ * - #331: pressed on the drawn cat and dragged, the window follows (setBounds, its size kept); let go, it stays there (옮긴
+ *   자리, `typingPlace`), wholly on that display. Clicks anywhere clear still go to the window behind: the page hears the
+ *   pointer through the click-through window (`forward`) and says when it is over the cat.
+ *
  * At rest nothing runs: no timer, no animation, one still picture (or no window).
  */
 export class TypingCatWindow {
@@ -41,6 +45,12 @@ export class TypingCatWindow {
   private source: TypingSource = "none";
   /** 모든 앱에서: the hook, loaded the first time it is wanted. */
   private keys?: GlobalKeys;
+  /** #331: a drag going on — where the cursor and the window were when it started. */
+  private drag?: { cursor: Electron.Point; bounds: Electron.Rectangle };
+  /** When it was last let go: 종이냥에서만 keeps it `typingLingerMs` from then, as after a key. */
+  private droppedAt?: number;
+  /** Whether the window takes the mouse now (over the drawn cat). */
+  private interactive = false;
 
   /** `loadHook` gives the hook's native side (main/keyHook.ts), asked only when 모든 앱에서 is chosen. */
   constructor(private readonly store: Store, private readonly rendererDirectory: string, hooks: { changed(): void },
@@ -54,6 +64,8 @@ export class TypingCatWindow {
     powerMonitor.on("unlock-screen", () => this.setLocked(false));
     screen.on("display-removed", () => this.place());
     screen.on("display-metrics-changed", () => this.place());
+    screen.on("display-added", () => this.place());
+    this.registerIPC();
     this.refresh();
   }
 
@@ -117,7 +129,7 @@ export class TypingCatWindow {
   }
 
   private update(): void {
-    if (typingShows(this.source, this.lastKey, performance.now())) this.show();
+    if (typingShows(this.source, this.lastKey, performance.now(), this.drag !== undefined, this.droppedAt)) this.show();
     else this.hide();
   }
 
@@ -127,6 +139,9 @@ export class TypingCatWindow {
     const window = new BrowserWindow({
       ...this.frame(), show: false, frame: false, transparent: true, resizable: false, minimizable: false, maximizable: false,
       fullscreenable: false, focusable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false,
+      // #313 · #312: no WS_THICKFRAME (Electron drops it for a transparent window; said outright, as for the note's ears), so
+      // Windows keeps no resize frame or minimum size of its own on this window.
+      thickFrame: false,
       backgroundColor: "#00000000", title: t("타닥냥"),
       enableLargerThanScreen: offscreenEnabled,
       webPreferences: { preload: path.join(__dirname, "preload.js"), sandbox: true, contextIsolation: true, backgroundThrottling: false },
@@ -134,7 +149,9 @@ export class TypingCatWindow {
     // Over full-screen apps too (the pet stays off those), and clicks pass through to the window behind.
     window.setAlwaysOnTop(true, "screen-saver");
     window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    window.setIgnoreMouseEvents(true);
+    // #331: clicks pass through, but the page still hears the pointer move (`forward`) and says when it is over the cat.
+    window.setIgnoreMouseEvents(true, { forward: true });
+    this.interactive = false;
     this.ready = false;
     window.webContents.once("did-finish-load", () => {
       this.ready = true;
@@ -150,16 +167,23 @@ export class TypingCatWindow {
   /** #304: the window's side at the chosen 크기 (112 DIP at 보통). */
   private get side(): number { return scaledSize(typingCatSize, this.store.prefs.typingSize ?? "regular"); }
 
-  /** The corner of the display the cursor is on (its work area: above the taskbar). */
+  /** The displays as the kept place sees them (their work areas: above the taskbar). */
+  private screens(): TypingScreen[] {
+    return screen.getAllDisplays().map((display) => ({ id: String(display.id), frame: display.bounds, visible: display.workArea }));
+  }
+
+  /** 옮긴 자리 when chosen and kept; otherwise the corner of the display the cursor is on (its work area). */
   private frame(): Electron.Rectangle {
     const display = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
-    const frame = typingCatFrame(this.store.prefs.typingCorner, display.workArea, 0, this.side);
+    const { typingCorner, typingPlace } = this.store.prefs;
+    const frame = typingCatFrameFor(typingCorner, typingPlace, display.workArea, 0, this.side, this.screens());
     return { x: Math.round(frame.x + offscreen.x), y: Math.round(frame.y + offscreen.y), width: Math.round(frame.width), height: Math.round(frame.height) };
   }
 
+  /** Put in its place — never while it is held (a key or a display change mid-drag leaves it in the hand). */
   private place(): void {
     const window = this.window;
-    if (!window || window.isDestroyed()) return;
+    if (!window || window.isDestroyed() || this.drag) return;
     const frame = this.frame();
     const now = window.getBounds();
     if (now.x !== frame.x || now.y !== frame.y || now.width !== frame.width || now.height !== frame.height) window.setBounds(frame);
@@ -179,6 +203,8 @@ export class TypingCatWindow {
   /** Quietly away: the page fades, then the window hides (kept for the next key). */
   private hide(): void {
     this.clearGo();
+    this.drag = undefined;
+    this.setInteractive(false);
     const window = this.window;
     if (!window || window.isDestroyed() || !window.isVisible() || this.hideTimer !== undefined) return;
     window.webContents.send("typingCat:away", true);
@@ -188,17 +214,76 @@ export class TypingCatWindow {
     }, offscreenEnabled ? 0 : fadeMs);
   }
 
+  /** 종이냥에서만: one wait until `typingLingerMs` after the last key or drop. Held by a drag it waits; letting go starts it again. */
   private armGo(): void {
     if (this.goTimer !== undefined) return;
     const wake = () => {
-      const last = this.lastKey ?? 0;
+      const last = lastTouch(this.lastKey, this.droppedAt) ?? 0;
       this.goTimer = setTimeout(() => {
         this.goTimer = undefined;
-        if (this.source === "app" && this.lastKey !== undefined && performance.now() - this.lastKey < typingLingerMs) { wake(); return; }
+        if (this.drag) return;
+        const touched = lastTouch(this.lastKey, this.droppedAt);
+        if (this.source === "app" && touched !== undefined && performance.now() - touched < typingLingerMs) { wake(); return; }
         this.update();
       }, Math.max(0, last + typingLingerMs - performance.now()));
     };
     wake();
+  }
+
+  // ─── Moving it (#331) ───────────────────────────────────────────────────────
+
+  private setInteractive(interactive: boolean): void {
+    const window = this.window;
+    if (this.interactive === interactive || !window || window.isDestroyed()) return;
+    this.interactive = interactive;
+    window.setIgnoreMouseEvents(!interactive, { forward: true });
+  }
+
+  private registerIPC(): void {
+    const fromCat = (event: Electron.IpcMainEvent) => this.window !== undefined && !this.window.isDestroyed() && event.sender === this.window.webContents;
+    // Only the drawn cat takes the mouse; everywhere else clicks fall through.
+    ipcMain.on("typingCat:interactive", (event, interactive: unknown) => { if (fromCat(event) && !this.drag) this.setInteractive(interactive === true); });
+    ipcMain.on("typingCat:drag-start", (event) => {
+      if (!fromCat(event) || !this.window || !this.isShown) return;
+      this.drag = { cursor: screen.getCursorScreenPoint(), bounds: this.window.getBounds() };
+    });
+    ipcMain.on("typingCat:drag", (event) => {
+      if (!fromCat(event) || !this.window || !this.drag) return;
+      const cursor = screen.getCursorScreenPoint(), { bounds } = this.drag;
+      // #316: the whole bounds, never setPosition (it re-reads the size, which 125 % · 150 % can round up a pixel a move).
+      this.window.setBounds({ x: Math.round(bounds.x + cursor.x - this.drag.cursor.x), y: Math.round(bounds.y + cursor.y - this.drag.cursor.y),
+        width: bounds.width, height: bounds.height });
+    });
+    ipcMain.on("typingCat:drag-end", (event) => { if (fromCat(event)) this.dragEnded(); });
+  }
+
+  /** Let go: kept wholly on the display it is mostly on, and that place kept as 옮긴 자리 (chosen in Settings now). */
+  private dragEnded(): void {
+    const window = this.window, drag = this.drag;
+    if (!window || window.isDestroyed() || !drag) return;
+    this.drag = undefined;
+    this.droppedAt = performance.now();
+    const now = window.getBounds();
+    // Always the size it had, so a DPI change mid-drag can't make a drifted size stick.
+    const size = { width: drag.bounds.width, height: drag.bounds.height };
+    const dropped = typingDropped({ x: now.x - offscreen.x, y: now.y - offscreen.y, ...size }, this.screens());
+    if (dropped) {
+      this.store.setPref("typingPlace", dropped.place);
+      if (this.store.prefs.typingCorner !== "moved") this.store.setPref("typingCorner", "moved");
+      window.setBounds({ x: Math.round(dropped.frame.x + offscreen.x), y: Math.round(dropped.frame.y + offscreen.y), ...size });
+    }
+    // 종이냥에서만: it stays `typingLingerMs` from now, then goes.
+    this.update();
+  }
+
+  /** Snapshots and tests: a drag as the page makes one — pressed, the window moved by `dx` · `dy`, let go. */
+  dragBy(dx: number, dy: number): void {
+    const window = this.window;
+    if (!window || window.isDestroyed() || !this.isShown) return;
+    const bounds = window.getBounds();
+    this.drag = { cursor: { x: 0, y: 0 }, bounds };
+    window.setBounds({ ...bounds, x: bounds.x + dx, y: bounds.y + dy });
+    this.dragEnded();
   }
 
   private clearGo(): void {
@@ -224,6 +309,11 @@ export class TypingCatWindow {
 
   /** Whether the keyboard hook is set now. */
   get hooked(): boolean { return this.keys?.listening === true; }
+
+  /** Snapshots: where the window is now (off-screen in a test run). */
+  get bounds(): Electron.Rectangle | undefined {
+    return this.window && !this.window.isDestroyed() ? this.window.getBounds() : undefined;
+  }
 
   /** Tests: nothing waits or runs (the page's paw timer is the page's). */
   get quiet(): boolean { return this.goTimer === undefined && this.hideTimer === undefined; }

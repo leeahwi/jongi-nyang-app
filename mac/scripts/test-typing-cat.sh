@@ -8,6 +8,7 @@ task_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$task_root"
 mkdir -p .build/checks
 swiftc -warnings-as-errors -parse-as-library \
+    Sources/PaperCore/ScreenFit.swift \
     Sources/PaperCore/TypingCat.swift \
     Tests/PaperCoreTests/TypingCatTests.swift \
     -o .build/checks/TypingCatTests

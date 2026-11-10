@@ -57,6 +57,44 @@ export function workAreaUnder(note: Rect, displays: readonly { bounds: Rect; wor
   return best?.area;
 }
 
+/**
+ * #312: on a Windows PC the ears' window was seen opaque grey and about 56 px tall instead of 20 — a box over the
+ * note's top right that covered its buttons. Why Windows gave it another size isn't known yet (no Windows PC here), but
+ * the size can be read back. The window is 100 × 20 and is never resized on purpose, so any other size is Windows' doing
+ * and the window can't be trusted to be the clear strip it should be: placed again, it may show only once it is the
+ * size asked for, give or take `earsSizeSlack` (a pixel of rounding at 125 % or 150 % scale).
+ */
+export const earsSizeSlack = 1;
+/** Placings in a row that may come out the wrong size before the ears are left off. */
+export const earsSizeTries = 3;
+
+export function earsWindowFits(asked: Rect, actual: Rect): boolean {
+  return Math.abs(actual.width - asked.width) <= earsSizeSlack && Math.abs(actual.height - asked.height) <= earsSizeSlack;
+}
+
+/**
+ * What to do after placing the ears' window and reading its size back: `show` it (the size asked for), `retry` (wrong
+ * this time: stay hidden, place it again next time), or leave the ears `off` — Windows kept it the wrong size
+ * `earsSizeTries` times in a row. Off lasts until `reset` (a display change: another scale may let it be small again).
+ */
+export class EarsSizeCheck {
+  private misses = 0;
+  private gaveUp = false;
+
+  get off(): boolean { return this.gaveUp; }
+
+  check(asked: Rect, actual: Rect): "show" | "retry" | "off" {
+    if (this.gaveUp) return "off";
+    if (earsWindowFits(asked, actual)) { this.misses = 0; return "show"; }
+    this.misses += 1;
+    if (this.misses < earsSizeTries) return "retry";
+    this.gaveUp = true;
+    return "off";
+  }
+
+  reset(): void { this.misses = 0; this.gaveUp = false; }
+}
+
 export interface EarPaths { a: number; b: number; ear: string; sides: string; inner: string }
 
 /**

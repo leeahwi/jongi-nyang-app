@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Privacy — Jongi-nyang</title>
-<meta name="description" content="What Jongi-nyang keeps, where, and when anything can leave your computer. No account, no server, no usage statistics.">
+<meta name="description" content="What Jongi-nyang keeps, where, who can see it, and when anything can leave your computer — with ways to check it yourself.">
 <meta name="theme-color" content="#fbf9f3" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#2a2924" media="(prefers-color-scheme: dark)">
 <link rel="icon" type="image/png" href="../assets/favicon.png">
@@ -13,7 +13,7 @@
 <link rel="alternate" hreflang="en" href="https://leeahwi.github.io/jongi-nyang-app/en/privacy.html">
 <meta property="og:type" content="article">
 <meta property="og:title" content="Privacy — Jongi-nyang">
-<meta property="og:description" content="No account, no server, no statistics: files on your own computer.">
+<meta property="og:description" content="No account, no server, no statistics: files on your own computer. And you can check it.">
 <meta property="og:image" content="https://leeahwi.github.io/jongi-nyang-app/assets/og-en.png">
 <meta property="og:url" content="https://leeahwi.github.io/jongi-nyang-app/en/privacy.html">
 <script>(function(d){d.className=d.className.replace("no-js","js");try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t)}catch(e){}})(document.documentElement)</script>
@@ -23,20 +23,18 @@
 <style>:root { --hand: "Caveat", "HanJang Pen", cursive; }</style>
 <script src="../assets/site.js" defer></script>
 </head>
-<body>
+<body class="privacy">
 <a class="skip" href="#main">Skip to content</a>
 
-<header class="top">
-  <div class="wrap">
-    <a class="brand" href="./" aria-label="Jongi-nyang home"><img src="../assets/cat.webp" alt="" width="30" height="30">Jongi-nyang</a>
+<header class="bar" data-bar>
+  <div class="bar-in">
+    <a class="brand" href="./" aria-label="Jongi-nyang home"><img src="../assets/cat.webp" alt="" width="34" height="34">Jongi-nyang</a>
     <nav class="nav" aria-label="Main">
       <a href="./#tour">Tour</a>
       <a href="./#features">Features</a>
-      <a href="./#spaces">Spaces</a>
       <a href="./#drawer">Notes drawer</a>
-      <a href="./#built">How it's built</a>
+      <a href="privacy.html" aria-current="page">Privacy</a>
       <a href="./#faq">FAQ</a>
-      <a href="https://github.com/leeahwi/jongi-nyang-app">GitHub</a>
     </nav>
     <div class="tools">
       <div class="theme" role="group" aria-label="Appearance">
@@ -46,123 +44,365 @@
       </div>
       <a class="lang" href="../privacy.html" hreflang="ko" lang="ko">한국어</a>
       <a class="btn primary small" href="./#download">Download</a>
+      <button class="menu-btn" type="button" aria-expanded="false" aria-controls="menu" aria-label="Menu"><span></span><span></span></button>
     </div>
   </div>
 </header>
+<div class="menu" id="menu">
+  <a href="./#tour">Tour</a>
+  <a href="./#features">Features</a>
+  <a href="./#drawer">Notes drawer</a>
+  <a href="privacy.html" aria-current="page">Privacy</a>
+  <a href="./#faq">FAQ</a>
+  <div class="menu-tools">
+    <div class="theme" role="group" aria-label="Appearance">
+      <button type="button" data-theme-set="auto" aria-pressed="true" title="Match the system"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg><span class="sr">Match the system</span></button>
+      <button type="button" data-theme-set="light" aria-pressed="false" title="Day paper"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="2.8"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg><span class="sr">Day paper</span></button>
+      <button type="button" data-theme-set="dark" aria-pressed="false" title="Night paper"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M13.5 9.6A5.6 5.6 0 0 1 6.4 2.5a5.6 5.6 0 1 0 7.1 7.1z"/></svg><span class="sr">Night paper</span></button>
+    </div>
+    <a class="lang" href="../privacy.html" hreflang="ko" lang="ko">한국어</a>
+  </div>
+</div>
 
+<div class="sheet">
 <main id="main">
-  <section class="hero page-hero" aria-labelledby="page-title">
-    <div class="wrap">
+  <section class="page-top" aria-labelledby="page-title">
+    <div class="page-stage">
+      <img class="obj q1" src="../assets/objects/folder.svg" alt="" width="240" height="240">
+      <img class="obj q2" src="../assets/objects/toggle.svg" alt="" width="240" height="240">
+      <img class="obj q3" src="../assets/objects/lens.svg" alt="" width="240" height="240">
       <p class="eyebrow">Privacy</p>
       <h1 id="page-title">Your lists stay<br><span class="hand">on your computer.</span></h1>
-      <p class="lede">Jongi-nyang has no account and no server, so it collects nothing. Here is everything it keeps, where, and when anything can leave your computer.</p>
-      <p class="alt">As of Mac 1.48 and Windows 1.33 · 7 November 2026</p>
+      <p class="lede">Jongi-nyang has no account and no server, so it collects nothing. Here is everything it keeps, where, who can see it, and when anything can leave your computer — and how you can check it for yourself.</p>
+      <p class="alt">As of Mac 1.49.1 and Windows 1.34.1 · 10 November 2026</p>
     </div>
   </section>
 
-  <section aria-label="Privacy">
-    <div class="wrap doc">
-      <ul class="points">
-        <li><strong>Nothing collected</strong><span>No sign-up, usage statistics, crash reports or ads. The app never goes online by itself.</span></li>
-        <li><strong>Plain files</strong><span>Your to-dos, notes and events are files in a folder on your computer. You choose the folder.</span></li>
-        <li><strong>AI only when you turn it on</strong><span>It's off at first. Once on, what Claude reads goes to Claude with the conversation.</span></li>
-        <li><strong>A quiet site too</strong><span>No cookies, no analytics, and the fonts and images come from this site.</span></li>
+  <section class="promises-band" aria-label="Four promises">
+    <div class="wrap">
+      <ul class="promises">
+        <li>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M8 13.5h8"/></svg>
+          <h2>Plain files on your computer</h2>
+          <p>Your to-dos, notes and events are files in a folder you choose. There’s no server to send them to.</p>
+          <a href="#stored">Where things are kept<span aria-hidden="true"> →</span></a>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M6 18 18 6"/></svg>
+          <h2>Nothing collected</h2>
+          <p>No sign-up, usage statistics, crash reports, ads or update checks. The app never goes online by itself.</p>
+          <a href="#who">Who can see what<span aria-hidden="true"> →</span></a>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="8" width="18" height="8" rx="4"/><circle cx="8" cy="12" r="2.2"/></svg>
+          <h2>Out only when you open the way</h2>
+          <p>The only ways out are a shared folder, the AI connection and a backup file you export. All three start closed.</p>
+          <a href="#leaves">The ways out<span aria-hidden="true"> →</span></a>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5.5 5.5M8 10.5l2 2 3.5-4"/></svg>
+          <h2>Yours to check</h2>
+          <p>The source code is public. You can check the downloaded file and the network connections on your own computer.</p>
+          <a href="#verify">How to check<span aria-hidden="true"> →</span></a>
+        </li>
       </ul>
+    </div>
+  </section>
 
-      <h2 id="stored">Where things are kept</h2>
-      <p>All of it stays on your computer. Not even the person who made Jongi-nyang can see it.</p>
+  <nav class="subnav" aria-label="On this page">
+    <div class="wrap">
+      <a href="#who">Who can see what</a>
+      <a href="#stored">Where things are kept</a>
+      <a href="#leaves">The ways out</a>
+      <a href="#typing">Tap-tap cat</a>
+      <a href="#ai">AI connection</a>
+      <a href="#limits">Worth knowing</a>
+      <a href="#verify">Check it yourself</a>
+      <a href="#delete">Removing everything</a>
+      <a href="#questions">Questions</a>
+    </div>
+  </nav>
+
+  <section class="psec" id="who" aria-labelledby="who-title">
+    <div class="wrap doc">
+      <h2 id="who-title">Who can see what</h2>
+      <p>Four parties can reach your lists while you use Jongi-nyang, each at a different time.</p>
+      <ul class="who">
+        <li>
+          <span class="when">Always</span>
+          <h3>Jongi-nyang on this computer</h3>
+          <p>Reads and writes the to-dos, notes and events in your storage folder. With no account and no server, it keeps them on this computer.</p>
+        </li>
+        <li class="never">
+          <span class="when">Can’t see it</span>
+          <h3>The person who made Jongi-nyang</h3>
+          <p>There’s no server to receive your lists, and no usage statistics or crash reports arrive. All they see is what you write in a GitHub issue yourself.</p>
+        </li>
+        <li>
+          <span class="when">Only with the AI connection on</span>
+          <h3>Claude</h3>
+          <p>Reads what a conversation needs, and what it reads goes to Anthropic with the conversation. It has no way to delete anything.</p>
+        </li>
+        <li>
+          <span class="when">Only with a shared folder</span>
+          <h3>Your shared-folder service</h3>
+          <p>iCloud Drive, OneDrive, Dropbox or the like moves the files to your other devices, under that service’s own policy.</p>
+        </li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="psec" id="stored" aria-labelledby="stored-title">
+    <div class="wrap doc">
+      <h2 id="stored-title">Where things are kept</h2>
+      <p>All of it stays on your computer. Here it is, down to the file names.</p>
       <dl class="where">
         <div>
           <dt>To-dos, notes, events, alarms, repeats, spaces, history and focus records</dt>
           <dd>
-            <p>JSON files in the storage folder. At first that's the app's folder; you can pick another one in Desk → Storage &amp; backup.</p>
+            <p>JSON files in the storage folder. At first that’s the app’s folder; you can pick another one.</p>
             <p>Mac <code>~/Library/Application Support/com.noa.PaperTodo/</code></p>
             <p>Windows <code>%APPDATA%\PaperTodo\</code></p>
+            <p class="inapp"><span>In the app</span>Desk › Storage &amp; backup</p>
           </dd>
         </div>
         <div>
           <dt>Settings</dt>
           <dd>
-            <p>Font, reminders, the folder you picked, desktop widgets, lunar dates and holidays, and other settings are kept per device and never go to the shared folder.</p>
+            <p>Font, reminders, the folder you picked, desktop widgets, lunar dates and holidays, and other settings are kept per device and never go to the shared folder. Lunar dates and holidays are worked out inside the app.</p>
             <p>Mac <code>~/Library/Preferences/com.noa.PaperTodo.plist</code></p>
             <p>Windows <code>%APPDATA%\PaperTodo\settings.json</code>, <code>storage.json</code></p>
           </dd>
         </div>
         <div>
           <dt>AI connection settings and record</dt>
-          <dd><p><code>ai-link.json</code> and <code>ai-log.jsonl</code>. They stay in this device's app folder (the default folder above), even with a shared folder.</p></dd>
+          <dd>
+            <p><code>ai-link.json</code> and <code>ai-log.jsonl</code>. They stay in this device’s app folder (the default folder above), even with a shared folder.</p>
+            <p class="inapp"><span>In the app</span>Desk › AI connection › Recent AI work</p>
+          </dd>
         </div>
         <div>
           <dt>Automatic backups</dt>
-          <dd><p>Once a day, and before anything overwrites the storage folder (an import or a restore, say), the app saves a backup file (.jongi) to <code>backups</code> in its folder. It keeps 14 daily backups and 10 of each kind made before overwriting. They stay on this device even when you use a shared folder.</p></dd>
+          <dd>
+            <p>Once a day, the first time you open a new version, and before anything overwrites your lists (an import, a restore or a folder switch), the app saves a backup file (.jongi) to <code>backups</code> in its folder. It keeps 14 daily backups and 10 of each other kind. They stay on this device even with a shared folder.</p>
+            <p class="inapp"><span>In the app</span>Desk › Storage &amp; backup</p>
+          </dd>
         </div>
         <div>
           <dt>Window state on Windows</dt>
           <dd><p>Electron, which the Windows app is built on, keeps window state such as the last tab you opened, and its caches, in <code>%APPDATA%\종이냥\</code>.</p></dd>
         </div>
       </dl>
+    </div>
+  </section>
 
-      <h2 id="not-sent">What never leaves</h2>
+  <section class="psec" id="leaves" aria-labelledby="leaves-title">
+    <div class="wrap doc">
+      <h2 id="leaves-title">The ways out</h2>
+      <p>There are only three ways your lists can leave this computer. All three start closed, and only you can open them.</p>
+      <figure class="flow">
+        <div class="flow-src">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg>
+          <b>Storage folder</b>
+          <span>this computer</span>
+        </div>
+        <ol class="flow-routes">
+          <li>
+            <span class="gate">You pick a shared folder</span>
+            <span class="to"><b>Shared-folder service</b><span>iCloud Drive, OneDrive or Dropbox moves it to your other devices</span></span>
+          </li>
+          <li>
+            <span class="gate">You turn on AI</span>
+            <span class="to"><b>Claude</b><span>What it reads goes with the conversation</span></span>
+          </li>
+          <li>
+            <span class="gate">You export a backup</span>
+            <span class="to"><b>Wherever you save it</b><span>Anyone you hand it to can read all of it</span></span>
+          </li>
+          <li class="closed">
+            <span class="gate">On its own</span>
+            <span class="to"><b>The maker, or any server</b><span>There is no way there</span></span>
+          </li>
+        </ol>
+        <figcaption>The three ways out of the storage folder open only when you pick a shared folder, turn on the AI connection or export a backup. The app opens none by itself.</figcaption>
+      </figure>
       <ul>
         <li>Neither app has any code that connects to the internet: no usage statistics, crash reports, ads or update checks.</li>
         <li>Your browser opens only when you click a link, such as a link in a note or the Claude Desktop download page.</li>
         <li>Reminders and alarms ring on this computer only.</li>
+        <li>With a shared folder, Jongi-nyang doesn’t sign in to that service or talk to it. It only reads and writes the files in the folder.</li>
       </ul>
+    </div>
+  </section>
 
-      <h2 id="typing">The tap-tap cat</h2>
-      <p>When you type, the tap-tap cat in a corner of the screen taps along with its paws. It’s turned on and off apart from the desktop cat. All it knows is that a key was pressed, and when.</p>
+  <section class="psec" id="typing" aria-labelledby="typing-title">
+    <div class="wrap doc">
+      <h2 id="typing-title">The tap-tap cat</h2>
+      <p>When you type, the tap-tap cat in a corner of the screen taps along with its paws. It’s turned on and off apart from the desktop cat.</p>
+      <div class="knows">
+        <div>
+          <h3>What Jongi-nyang knows</h3>
+          <ul>
+            <li>That a key was pressed, and when</li>
+            <li>Whether a key is being held down</li>
+            <li>Whether it’s a shortcut (⌘ or ⌃, Ctrl on Windows)</li>
+          </ul>
+        </div>
+        <div class="not">
+          <h3>What it doesn’t</h3>
+          <ul>
+            <li>Which key it was</li>
+            <li>What you typed, or text you’re still composing</li>
+            <li>The clipboard</li>
+          </ul>
+        </div>
+      </div>
+      <p class="inapp"><span>In the app</span>Desk › Jongi-nyang › Tap-tap cat › Tap along</p>
       <ul>
-        <li>It never reads which key it was, what you typed, text you are still composing or the clipboard. Nothing of it is saved, logged or sent.</li>
-        <li>It only checks whether you’re holding a key down or using a shortcut (⌘ or ⌃, Ctrl on Windows), and doesn’t tap then.</li>
+        <li>Even what it knows is never saved, logged or sent. It looks at shortcuts and held keys only so it doesn’t tap then.</li>
         <li>At first it answers typing in Jongi-nyang’s own windows only. That needs no permission.</li>
-        <li>On the Mac, choosing ‘In all apps’ makes it tap along in other apps too. That needs macOS’s Input Monitoring permission, so macOS asks once when you choose it. Even then, all Jongi-nyang knows is that a key was pressed. It never changes or blocks what you type in other apps.</li>
-        <li>Turn the permission off, turn the setting off, lock the screen or quit the app, and it no longer hears other apps’ keys. You can turn the permission off any time in System Settings → Privacy &amp; Security → Input Monitoring.</li>
-        <li>On Windows, choosing ‘In all apps’ hears other apps’ keys through a Windows keyboard hook. Even then, all Jongi-nyang knows is that a key was pressed, and when. The key’s code is looked at only briefly, to tell a held key, and never kept. Every key goes on to the app as it was, never changed or blocked.</li>
+        <li>On the Mac, choosing ‘In all apps’ makes it tap along in other apps too. That needs macOS’s Input Monitoring permission, so macOS asks once when you choose it. It only listens, so it never changes or blocks what you type in other apps.</li>
+        <li>On the Mac, turn the permission off, turn the setting off, lock the screen or quit the app, and it no longer hears other apps’ keys. You can turn the permission off any time in System Settings › Privacy &amp; Security › Input Monitoring.</li>
+        <li>On Windows, choosing ‘In all apps’ hears other apps’ keys through a Windows keyboard hook. The key’s code is looked at only briefly, to tell a held key, and never kept. Every key goes on to the app as it was, never changed or blocked.</li>
         <li>On Windows too, turn the setting off, lock the screen or quit the app, and it stops hearing other apps’ keys at once. Keyloggers use the same method, so your antivirus may ask about it; that’s why it starts off.</li>
       </ul>
+    </div>
+  </section>
 
-      <h2 id="ai">If you turn on the AI connection</h2>
-      <p>Jongi-nyang for Claude lets you look at and add to your lists while talking with Claude Desktop or Claude Code. It's off at first; turn it on in Desk → AI connection.</p>
+  <section class="psec" id="ai" aria-labelledby="ai-title">
+    <div class="wrap doc">
+      <h2 id="ai-title">If you turn on the AI connection</h2>
+      <p>Jongi-nyang for Claude lets you look at and add to your lists while talking with Claude Desktop or Claude Code. It’s off at first.</p>
+      <div class="knows">
+        <div>
+          <h3>What Claude does</h3>
+          <ul>
+            <li>Reads to-dos, repeats, events, alarms, notes, focus records and history</li>
+            <li>Adds to-dos, events and notes</li>
+            <li>Shows the before and after, and changes things once you say yes</li>
+          </ul>
+        </div>
+        <div class="not">
+          <h3>What it doesn’t</h3>
+          <ul>
+            <li>Delete anything</li>
+            <li>Go online by itself</li>
+            <li>Read or write while the switch is off</li>
+          </ul>
+        </div>
+      </div>
+      <p class="inapp"><span>In the app</span>Desk › AI connection</p>
       <ul>
-        <li>While it's on, Claude runs Jongi-nyang for Claude on this computer when a conversation needs it. It reads the to-dos, events, alarms, notes, focus records and history in your storage folder, and adds to-dos, events and notes. For to-dos and one-off events it shows the before and after and changes them only once you say yes. It never deletes anything.</li>
-        <li><strong>What Claude reads goes to Claude as part of the conversation.</strong> That conversation is handled under your Claude account settings and Anthropic's privacy policy.</li>
-        <li>Jongi-nyang for Claude never goes online by itself. It reads and writes only the files in Jongi-nyang's storage folder and app folder.</li>
+        <li>While it’s on, Claude runs Jongi-nyang for Claude on this computer when a conversation needs it. For to-dos and one-off events it shows the before and after and changes them only once you say yes.</li>
+        <li><strong>What Claude reads goes to Claude as part of the conversation.</strong> That conversation is handled under your Claude account settings and Anthropic’s privacy policy.</li>
+        <li>Jongi-nyang for Claude reads and writes only the files in Jongi-nyang’s storage folder and app folder.</li>
         <li>Each thing Claude adds or changes is written to <code>ai-log.jsonl</code> as one line with the before and after. Undo and Recent AI work use it. It stays on this device; past 1 MB only the last 30 days are kept.</li>
-        <li>To-dos in spaces hidden on this device stay out of Claude’s Today and lists. Name the space and Claude shows them, marked as hidden. This only keeps them out of view; it doesn’t stop Claude from reading them.</li>
-        <li>Turn the switch off and Claude can't read or write any of Jongi-nyang's files.</li>
+        <li>The switch is read again every time Claude calls, so from the moment you turn it off Claude can’t read or write any of Jongi-nyang’s files.</li>
       </ul>
+    </div>
+  </section>
 
-      <h2 id="shared">Shared folders and backup files</h2>
-      <ul>
-        <li>If you pick a shared folder such as iCloud Drive, OneDrive or Dropbox as the storage folder, that service moves the files between devices, under its own terms and privacy policy.</li>
-        <li>Jongi-nyang doesn't sign in to that service or talk to it. It only reads and writes the files in the folder.</li>
-        <li>A backup file (.jongi) is saved where you choose. It holds all your to-dos, notes, events and history, so anyone you send it to can read all of it.</li>
-      </ul>
+  <section class="psec dark" id="limits" aria-labelledby="limits-title">
+    <div class="wrap doc">
+      <h2 id="limits-title">Worth knowing</h2>
+      <p>A page of only good news wouldn’t be much of a guide, so here is what Jongi-nyang does not protect.</p>
+      <dl class="limits">
+        <div>
+          <dt>Files aren’t encrypted</dt>
+          <dd>The files in the storage folder are readable JSON. Anyone or any program that can get into your account on this computer can read them. In case you lose the computer, it’s worth turning on disk encryption (FileVault on the Mac, BitLocker or Device encryption on Windows).</dd>
+        </div>
+        <div>
+          <dt>A backup file holds everything</dt>
+          <dd>Exported backup files (.jongi) aren’t encrypted either. They hold all your to-dos, notes, events and history, so whoever you give one to can read all of it.</dd>
+        </div>
+        <div>
+          <dt>A hidden space isn’t a lock</dt>
+          <dd>To-dos in spaces hidden on this device stay out of Claude’s Today and lists too. But name the space and Claude shows them, marked as hidden. It only keeps them out of view; it doesn’t stop them being read.</dd>
+        </div>
+        <div>
+          <dt>Inside a shared folder, the service is in charge</dt>
+          <dd>While files move through a shared folder and sit on the service’s servers, that service protects them — not Jongi-nyang.</dd>
+        </div>
+        <div>
+          <dt>The apps aren’t code-signed</dt>
+          <dd>Neither app is code-signed. Check that a downloaded file is exactly the one published with its <a href="./#check">checksum</a>.</dd>
+        </div>
+      </dl>
+    </div>
+  </section>
 
-      <h2 id="site">This site</h2>
+  <section class="psec dark" id="verify" aria-labelledby="verify-title">
+    <div class="wrap doc">
+      <h2 id="verify-title">Check it yourself</h2>
+      <p>You don’t have to take this page’s word for it. Anyone can do these three things.</p>
+      <ol class="checks">
+        <li>
+          <h3>Read the code</h3>
+          <p>All of the source code is public. The ways out of the app sit in a few files.</p>
+          <ul class="files">
+            <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/windows/src/main/security.ts">Windows: where links go to the browser</a></li>
+            <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/windows/src/core/webGuard.ts">Windows: which links open, which windows are refused</a></li>
+            <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/mac/Sources/PaperTodo/TypingKeys.swift">Mac: where the tap-tap cat hears keys</a></li>
+            <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/windows/src/main/keyHook.ts">Windows: the tap-tap cat’s keyboard hook</a></li>
+            <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/windows/mcp/src/files.ts">Claude extension: where the switch is read</a></li>
+          </ul>
+        </li>
+        <li>
+          <h3>Match the downloaded file</h3>
+          <p>Each release lists every file’s SHA-256 value. If your download’s value is the same, it’s exactly the file that was published.</p>
+          <p><a href="./#check">How to check a download<span aria-hidden="true"> →</span></a></p>
+        </li>
+        <li>
+          <h3>Watch the connections</h3>
+          <p>Leave Jongi-nyang running and watch the network. Bytes sent and received should stay at 0.</p>
+          <ul class="files">
+            <li>Mac: in Activity Monitor › Network, look at Jongi-nyang’s Sent Bytes and Rcvd Bytes. In Terminal, <code>lsof -nP -i -a -c PaperTodo</code> should print nothing.</li>
+            <li>Windows: find Jongi-nyang in Resource Monitor › Network.</li>
+          </ul>
+        </li>
+      </ol>
+      <div class="tested">
+        <h3>What we checked <small>10 November 2026 · Mac 1.49.1 · Windows 1.34.1</small></h3>
+        <ul>
+          <li>We searched both apps and the Claude extension for anything that connects to the internet. The only thing is handing a clicked link to your default browser; no code connects by itself.</li>
+          <li>All 22 page files of the Windows app may load only the app’s own files (Content Security Policy).</li>
+          <li>We ran a test copy of the Mac app off-screen for 1 minute 45 seconds and looked at its connections 100 times, once a second. While it wrote to the notepad and opened history, it opened 0 internet connections.</li>
+          <li>We haven’t yet watched the Windows app’s connections on a real Windows PC. We’ll add it here when we do.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="psec" id="site" aria-labelledby="site-title">
+    <div class="wrap doc">
+      <h2 id="site-title">This site</h2>
       <ul>
         <li>No cookies and no analytics.</li>
         <li>Fonts, images and videos all come from this site. Opening a page sends no request anywhere else.</li>
         <li>If you pick day or night paper, only that choice is kept in this browser (localStorage). Match the system clears it.</li>
         <li>The site is served by GitHub Pages, and the download and document links lead to GitHub. GitHub handles those visits under its own policy.</li>
       </ul>
+    </div>
+  </section>
 
-      <h2 id="delete">Removing everything</h2>
+  <section class="psec" id="delete" aria-labelledby="delete-title">
+    <div class="wrap doc">
+      <h2 id="delete-title">Removing everything</h2>
       <p>The folders and settings above are all Jongi-nyang leaves behind. Follow these steps and nothing is left. Removing only the app keeps your lists.</p>
       <h3>Mac</h3>
       <ol>
-        <li>If you used the AI connection, disconnect it in Claude first. Remove ‘Jongi-nyang for Claude’ in Claude Desktop’s Settings → Extensions, and if you connected Claude Code, run <code>claude mcp remove -s user jongi-nyang</code>.</li>
-        <li>Turn off ‘Open Jongi-nyang at login’ in Desk → Appearance → Startup. If the app is already gone, remove it in System Settings → General → Login Items.</li>
+        <li>If you used the AI connection, disconnect it in Claude first. Remove ‘Jongi-nyang for Claude’ in Claude Desktop’s Settings › Extensions, and if you connected Claude Code, run <code>claude mcp remove -s user jongi-nyang</code>.</li>
+        <li>Turn off ‘Open Jongi-nyang at login’ in Desk › Appearance › Startup. If the app is already gone, remove it in System Settings › General › Login Items.</li>
         <li>Quit Jongi-nyang and move it from the Applications folder to the Trash.</li>
-        <li>Delete the <code>~/Library/Application Support/com.noa.PaperTodo/</code> folder. Your lists, the AI connection record and the automatic copies are all in it.</li>
+        <li>Delete the <code>~/Library/Application Support/com.noa.PaperTodo/</code> folder. Your lists, the AI connection record and the automatic backups are all in it.</li>
         <li>Delete the settings: run <code>defaults delete com.noa.PaperTodo</code> in Terminal, which removes <code>~/Library/Preferences/com.noa.PaperTodo.plist</code>.</li>
       </ol>
       <h3>Windows</h3>
       <ol>
-        <li>If you used the AI connection, disconnect it in Claude first. Remove ‘Jongi-nyang for Claude’ in Claude Desktop’s Settings → Extensions, and if you pasted the connect command into Claude Code, run <code>claude mcp remove jongi-nyang</code> in that same folder.</li>
-        <li>Turn off ‘Open Jongi-nyang when Windows starts’ in Desk → Appearance → Startup. If the app is already gone, turn it off in Task Manager → Startup apps.</li>
-        <li>Quit Jongi-nyang from the notification area, then uninstall it in Settings → Apps → Installed apps. For the ZIP version, delete the folder you unzipped. Uninstalling keeps your lists.</li>
-        <li>Delete the <code>%APPDATA%\PaperTodo\</code> folder. Your lists, settings, the AI connection record and the automatic copies are all in it.</li>
+        <li>If you used the AI connection, disconnect it in Claude first. Remove ‘Jongi-nyang for Claude’ in Claude Desktop’s Settings › Extensions, and if you pasted the connect command into Claude Code, run <code>claude mcp remove jongi-nyang</code> in that same folder.</li>
+        <li>Turn off ‘Open Jongi-nyang when Windows starts’ in Desk › Appearance › Startup. If the app is already gone, turn it off in Task Manager › Startup apps.</li>
+        <li>Quit Jongi-nyang from the notification area, then uninstall it in Settings › Apps › Installed apps. For the ZIP version, delete the folder you unzipped. Uninstalling keeps your lists.</li>
+        <li>Delete the <code>%APPDATA%\PaperTodo\</code> folder. Your lists, settings, the AI connection record and the automatic backups are all in it.</li>
         <li>Delete the <code>%APPDATA%\종이냥\</code> folder (window state and caches).</li>
       </ol>
       <h3>Both apps</h3>
@@ -170,26 +410,49 @@
         <li>If you used a shared folder, delete <code>todos.json</code>, <code>memos.json</code>, <code>repeats.json</code>, <code>memo-folders.json</code>, <code>todo-spaces.json</code>, <code>events.json</code>, <code>alarms.json</code>, <code>focus.jsonl</code> and the <code>archive</code> folder there. The lists disappear on every device using that folder too.</li>
         <li>Delete any backup files (.jongi) you exported, wherever you saved them.</li>
       </ul>
+    </div>
+  </section>
 
-      <h2 id="contact">Questions</h2>
+  <section class="psec" id="questions" aria-labelledby="questions-title">
+    <div class="wrap doc">
+      <h2 id="questions-title">Questions people ask</h2>
+      <div class="faq">
+        <details><summary>Can the person who made Jongi-nyang see my to-dos?</summary><p>No. Jongi-nyang has no server that receives your lists, and the app never goes online by itself. All the maker sees is what you write in a GitHub issue yourself.</p></details>
+        <details><summary>Does everything work offline?</summary><p>Yes. To-dos, notes, events, alarms and backups all work without the internet. Only the other services you connect, such as a shared folder or Claude, need it.</p></details>
+        <details><summary>How do I find out about a new version?</summary><p>The app doesn’t check, since it never goes online. Look on this site or on GitHub Releases. The first time you open a new version, it backs up your lists first.</p></details>
+        <details><summary>Can Claude delete my notes or change things behind my back?</summary><p>It has no way to delete. For to-dos and one-off events it shows the before and after and changes them only once you say yes. When Claude adds or changes something, a notice appears and you can undo it right away.</p></details>
+        <details><summary>Can the tap-tap cat learn my passwords?</summary><p>No. Jongi-nyang never reads which key you pressed — only that a key was pressed, and when. It’s the same in a password field.</p></details>
+        <details><summary>Is my data encrypted in a shared folder?</summary><p>Jongi-nyang doesn’t encrypt it. While it moves and sits on the service’s servers, that service protects it. Check the service’s settings and policy.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="psec" id="contact" aria-labelledby="contact-title">
+    <div class="wrap doc">
+      <h2 id="contact-title">Asking a question</h2>
       <p>Open a <a href="https://github.com/leeahwi/jongi-nyang-app/issues">GitHub issue</a>. Anyone can read it, so please leave out personal details.</p>
-
-      <h2 id="changes">When this page changes</h2>
-      <p>If what the app handles changes, this page is updated along with the date at the top. Every edit stays in the GitHub repository's history.</p>
+      <h3>When this page changes</h3>
+      <p>If what the app handles changes, this page is updated along with the date at the top. Every edit stays in the GitHub repository’s history.</p>
     </div>
   </section>
 </main>
+</div>
 
-<footer>
-  <div class="wrap">
+<footer class="curtain">
+  <div class="curtain-in">
+    <h2>A to-do app you take out<br><span class="hand">like a sheet of paper</span></h2>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.49.1">Download for Mac</a>
+      <a class="btn glass" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.34.1">Download for Windows</a>
+    </div>
     <div class="foot">
       <div class="about">
         <a class="brand" href="./"><img src="../assets/cat.webp" alt="" width="30" height="30" loading="lazy">Jongi-nyang</a>
         <p>A to-do app you take out like a sheet of paper, with a paper cat. For macOS and Windows.</p>
       </div>
-      <div>
+      <div class="apps">
         <h4>App</h4>
-        <ul>
+        <ul class="two">
           <li><a href="./#tour">Tour</a></li>
           <li><a href="./#features">Features</a></li>
           <li><a href="./#spaces">Spaces</a></li>
@@ -217,8 +480,15 @@
     </div>
     <div class="legal">
       <span>© 2026 leeAhwi · Source code under the <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/LICENSE">Apache License 2.0</a> · <a href="privacy.html" aria-current="page">Privacy</a></span>
-      <span>Mac 1.49.0 · Windows 1.34.0</span>
+      <span>Mac 1.49.1 · Windows 1.34.1</span>
     </div>
+  </div>
+  <div class="ground" aria-hidden="true">
+    <img class="obj g1" src="../assets/objects/sheet.svg" alt="" width="200" height="240" loading="lazy">
+    <img class="obj g2" src="../assets/objects/note-yellow.svg" alt="" width="200" height="200" loading="lazy">
+    <img class="obj g3" src="../assets/cat.webp" alt="" width="320" height="320" loading="lazy">
+    <img class="obj g4" src="../assets/objects/folder.svg" alt="" width="240" height="240" loading="lazy">
+    <img class="obj g5" src="../assets/objects/note-lavender.svg" alt="" width="200" height="200" loading="lazy">
   </div>
 </footer>
 </body>

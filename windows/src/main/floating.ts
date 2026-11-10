@@ -23,8 +23,9 @@ export class FloatingNote {
     ipcMain.on("floating:drag", (event) => {
       if (!fromIcon(event) || !this.window || !this.dragStart) return;
       const cursor = screen.getCursorScreenPoint();
-      this.window.setPosition(Math.round(this.dragStart.origin.x + cursor.x - this.dragStart.cursor.x),
-        Math.round(this.dragStart.origin.y + cursor.y - this.dragStart.cursor.y));
+      // #316: the whole bounds, not setPosition (it re-reads the size, which 125 % · 150 % can round up a pixel a move).
+      this.window.setBounds({ x: Math.round(this.dragStart.origin.x + cursor.x - this.dragStart.cursor.x),
+        y: Math.round(this.dragStart.origin.y + cursor.y - this.dragStart.cursor.y), ...size });
     });
     ipcMain.on("floating:drag-end", (event) => {
       if (!fromIcon(event) || !this.window) return;
@@ -33,7 +34,7 @@ export class FloatingNote {
       // (Off-screen runs, #250: worked out on the displays, then put back off them like `show`.)
       const center = { x: x - offscreen.x + size.width / 2, y: y - offscreen.y + size.height / 2 };
       const origin = iconOrigin(center, size, screen.getAllDisplays().map((display) => display.workArea), padding);
-      this.window.setPosition(Math.round(origin.x + offscreen.x), Math.round(origin.y + offscreen.y));
+      this.window.setBounds({ x: Math.round(origin.x + offscreen.x), y: Math.round(origin.y + offscreen.y), ...size });
       store.remember({ floatingOrigin: origin });
     });
     ipcMain.on("floating:click", (event) => { if (fromIcon(event)) this.onRestore(); });

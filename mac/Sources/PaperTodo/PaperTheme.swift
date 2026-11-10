@@ -368,6 +368,8 @@ struct PaperBackground: View {
 struct PaperRules: View {
     /// A row's own ruling (its height), drawn over the row from its top; nil: the sheet below the rows.
     var row: CGFloat?
+    /// Below the rows, a line (or 원고지's band) this often: the sheet's row; a board column's shorter one (#328).
+    var pitch: CGFloat = PaperTheme.rowHeight
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
@@ -375,7 +377,7 @@ struct PaperRules: View {
         let ruling = PaperLook.shared.paper(dark: scheme == .dark).ruling
         let rule = PaperTheme.rule
         Canvas { context, size in
-            context.stroke(PaperRules.path(ruling, size: size, row: row), with: .color(rule), lineWidth: ruling == .lines || ruling == .margin ? 0.6 : 0.5)
+            context.stroke(PaperRules.path(ruling, size: size, row: row, pitch: pitch), with: .color(rule), lineWidth: ruling == .lines || ruling == .margin ? 0.6 : 0.5)
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -384,7 +386,7 @@ struct PaperRules: View {
     /// 원고지: the gap between one row's cells and the next row's (the band where nothing is written).
     static let manuscriptGap: CGFloat = 8
 
-    static func path(_ ruling: PaperKind.Ruling, size: CGSize, row: CGFloat?) -> Path {
+    static func path(_ ruling: PaperKind.Ruling, size: CGSize, row: CGFloat?, pitch: CGFloat = PaperTheme.rowHeight) -> Path {
         var path = Path()
         let left: CGFloat = 18, right = size.width - 20
         guard right > left else { return path }
@@ -401,8 +403,8 @@ struct PaperRules: View {
         case .lines, .margin:
             // A row draws its own line (TaskRow); the sheet's lines carry on under the rows.
             guard row == nil else { return path }
-            var y = rowHeight - 0.5
-            while y < size.height { horizontal(y); y += rowHeight }
+            var y = pitch - 0.5
+            while y < size.height { horizontal(y); y += pitch }
         case .grid:
             let step = rowHeight / 4
             var y = step - 0.5
@@ -410,7 +412,7 @@ struct PaperRules: View {
             var x = left
             while x <= right { vertical(x, 0, size.height); x += step }
         case .manuscript:
-            let band = row ?? rowHeight
+            let band = row ?? pitch
             var top: CGFloat = 0
             while top < size.height {
                 let bottom = top + band - 0.5, upper = top + band - manuscriptGap
@@ -419,7 +421,7 @@ struct PaperRules: View {
                 var x = left
                 while x <= right { vertical(x, top, upper); x += rowHeight / 2 }
                 if row != nil { break }
-                top += rowHeight
+                top += pitch
             }
         }
         return path

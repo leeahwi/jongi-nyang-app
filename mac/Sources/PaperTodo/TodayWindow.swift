@@ -189,7 +189,7 @@ final class TodayWindowController: NSObject {
         focus += 1
         let itemFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
         // #200: the to-do rows follow the room under the menu bar on the item's screen (TodayGlance.rowCap).
-        let screen = NSScreen.screens.first { $0.frame.contains(NSPoint(x: itemFrame.midX, y: itemFrame.midY)) } ?? NSScreen.main
+        let screen = NSScreen.holding(itemFrame)
         panel.show(TodayWindowView(model: model, timer: timer, alarms: model.alarms, calendar: model.calendar, focus: focus,
                                    rowRoom: screen.map { Double($0.visibleFrame.height) },
                                    onOpenNote: { [weak self] in self?.close(); self?.onOpenNote() },

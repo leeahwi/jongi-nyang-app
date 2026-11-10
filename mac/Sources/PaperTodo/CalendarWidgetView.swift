@@ -2,11 +2,12 @@ import AppKit
 import PaperCore
 import SwiftUI
 
-// 바탕화면 달력 위젯 (#234): one widget as it is drawn — the ears, the paper (only the paper fades; on the Mac the
-// wallpaper behind it is frosted first), and one of the kinds. Each day is a frosted paper tile that never fades below its
-// paper's floor (ink keeps 4.5:1 on it over any wallpaper); weekends and holidays are tinted with the paper's clay2; text
-// off the tiles gets a backing at the floor once the paper is fainter. Below 100 % the text is ink and the marks keep a
-// ring of paper (docs/plans/calendar-widget.md 4장 · 4-6; the rules are CalendarWidget's).
+// 바탕화면 달력 위젯 (#234): one widget as it is drawn — the ears, the paper, and one of the kinds. Each day is a paper
+// tile; weekends and holidays are tinted with the paper's clay2. #321: the paper, its tiles and the ears fade together
+// (the ears never below half), and the desktop shows through them as it is — no frost. Once the paper is fainter than
+// its floor (where ink on it alone would miss 4.5:1 over the worst wallpaper) every text gets an outline of solid paper,
+// and below 100 % the text is ink and the marks keep a ring of paper (docs/plans/calendar-widget.md 4장 · 4-6; the rules
+// are CalendarWidget's).
 
 /// How the widget is drawn at its opacity now.
 struct WidgetLook {
@@ -16,18 +17,16 @@ struct WidgetLook {
     let bolder: Bool
     let halo: Bool
     let strongEdge: Bool
-    /// The paper's floor and the weekend tint's (CalendarWidget.floor), and the tint itself.
+    /// The paper's floor (CalendarWidget.floor) and the weekend tint.
     var floor = 60
-    var tintFloor = 65
     var tint = Color.clear
     var showsLunar = true
     var showsHolidays = true
 
-    init(drawn: Int, contrast: Bool, palette: WidgetPalette = .standard, floor: Int = 60, tintFloor: Int = 65, tint: Color = .clear) {
+    init(drawn: Int, contrast: Bool, palette: WidgetPalette = .standard, floor: Int = 60, tint: Color = .clear) {
         self.drawn = drawn
         self.palette = palette
         self.floor = floor
-        self.tintFloor = tintFloor
         self.tint = tint
         backing = CalendarWidget.backing(drawn, floor: floor)
         inkOnly = CalendarWidget.inkOnly(drawn)
@@ -42,12 +41,33 @@ struct WidgetLook {
     var ink3: Color { inkOnly ? palette.ink : palette.ink3 }
     var sageText: Color { inkOnly ? palette.ink : palette.sageText }
     var clayText: Color { inkOnly ? palette.ink : palette.clayText }
-    /// The backing under text off the tiles: the paper's floor (대비 증가: 95 %).
-    var backingPaper: Double { strongEdge ? 0.95 : Double(floor) / 100 }
-    /// A day's tile: the paper as drawn, never fainter than its floor (the tinted ones their own).
-    func tileOpacity(tinted: Bool) -> Double {
-        let value = Double(CalendarWidget.tile(drawn, floor: tinted ? tintFloor : floor)) / 100
+    /// The text's outline of paper (#321): while the paper is fainter than its floor, not with 대비 증가 (whose tiles and
+    /// backings stay solid).
+    var outline: Bool { backing && !strongEdge }
+    /// A day's tile: the paper as drawn (#321: it fades with the paper); 대비 증가 keeps it at 95 %.
+    var tileOpacity: Double {
+        let value = Double(CalendarWidget.tile(drawn)) / 100
         return strongEdge ? max(value, 0.95) : value
+    }
+}
+
+/// #321: an outline of solid paper, 1 pt round each letter and mark (the view drawn four times in the paper's colour, a point
+/// to each side, under it), so ink keeps the paper's own contrast (day 12.9:1, night 11.7:1) on any wallpaper while the
+/// desktop shows through the faint paper and tiles. Not a blur: every point next to a letter is the paper itself.
+private struct PaperOutline: ViewModifier {
+    let on: Bool
+    @Environment(\.widgetPalette) private var palette
+
+    func body(content: Content) -> some View {
+        if on {
+            content
+                .shadow(color: palette.paper, radius: 0, x: 1, y: 0)
+                .shadow(color: palette.paper, radius: 0, x: -1, y: 0)
+                .shadow(color: palette.paper, radius: 0, x: 0, y: 1)
+                .shadow(color: palette.paper, radius: 0, x: 0, y: -1)
+        } else {
+            content
+        }
     }
 }
 
@@ -61,17 +81,25 @@ private struct BackingModifier: ViewModifier {
         content
             .padding(.horizontal, 3)
             .background {
-                if on && look.backing {
-                    RoundedRectangle(cornerRadius: radius, style: .continuous).fill(palette.paper.opacity(look.backingPaper))
+                // 대비 증가: a block of paper at 95 % behind the text off the tiles, as before #321.
+                if on && look.backing && look.strongEdge {
+                    RoundedRectangle(cornerRadius: radius, style: .continuous).fill(palette.paper.opacity(0.95))
                 }
             }
+            .modifier(PaperOutline(on: look.outline))
     }
 }
 
 extension View {
-    /// One backing per cell or line (not per word: on a busy wallpaper that read as confetti).
+    /// A line or a cell's text: its outline of paper below the floor (#321). `on: false` (on a tile) only leaves out the
+    /// block 대비 증가 draws off the tiles.
     func widgetBacking(_ look: WidgetLook, radius: CGFloat = 6, on: Bool = true) -> some View {
         modifier(BackingModifier(look: look, radius: radius, on: on))
+    }
+
+    /// The outline of paper alone, for text and marks laid out tight (a tile's number, its lunar date, a holiday's name).
+    func widgetOutline(_ look: WidgetLook, on: Bool = true) -> some View {
+        modifier(PaperOutline(on: on && look.outline))
     }
 }
 
@@ -92,43 +120,21 @@ private struct WidgetScale: ViewModifier {
     }
 }
 
-/// The paper: frosted wallpaper under it on the Mac (variant C, NSVisualEffectView behind the window; snapshots draw the
-/// wallpaper blurred here), the paper at its opacity, an edge that never fades below half and a hairline of paper outside it.
+/// The paper at its opacity (#321: the desktop shows through it as it is, no frost), an edge that never fades below half and
+/// a hairline of paper outside it.
 private struct WidgetPaper: View {
     let look: WidgetLook
-    let frosted: Bool
-    /// Snapshots: the wallpaper drawn blurred under the paper instead of the window server's.
-    var previewBackdrop: AnyView?
-    @Environment(\.colorScheme) private var scheme
     @Environment(\.widgetPalette) private var palette
     private let shape = RoundedRectangle(cornerRadius: 13, style: .continuous)
 
     var body: some View {
         let edge = CalendarWidget.edgeStrength(look.drawn)
         ZStack {
-            // (On screen the window server's frost is under the whole widget: CalendarWidgetView.)
-            if frosted, let previewBackdrop {
-                previewBackdrop.blur(radius: 22).saturation(1.2).brightness(scheme == .dark ? -0.18 : 0.12).clipShape(shape)
-            }
             shape.fill(palette.paper.opacity(look.paper))
             shape.strokeBorder(palette.paper.opacity(0.35 * edge), lineWidth: 1.75)
             shape.strokeBorder(look.strongEdge ? palette.ink3 : palette.edge.opacity(edge), lineWidth: look.strongEdge ? 1 : 0.75)
         }
     }
-}
-
-/// The window server's frosted glass behind the paper (the wallpaper and, kept on top, the windows behind blurred).
-/// 투명도 줄이기 makes it solid by itself.
-private struct WidgetFrost: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        view.material = .popover
-        view.blendingMode = .behindWindow
-        view.state = .active
-        return view
-    }
-
-    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
 }
 
 // MARK: - The widget
@@ -137,7 +143,6 @@ struct CalendarWidgetView: View {
     @ObservedObject var state: WidgetState
     @ObservedObject var feed: WidgetFeed
     @ObservedObject var widgets: CalendarWidgets
-    var previewBackdrop: AnyView?
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.colorScheme) private var scheme
     @Environment(\.self) private var environment
@@ -148,28 +153,16 @@ struct CalendarWidgetView: View {
     @State private var backTask: Task<Void, Never>?
 
     /// 크기 (#271): the widget is laid out at 보통 and drawn `state.scale` times as big — the text, cells, margins and ears
-    /// alike, so every cell keeps its lines. The window server's frost (an AppKit view, which a SwiftUI scale doesn't
-    /// reach) goes under it at the size drawn.
+    /// alike, so every cell keeps its lines.
     var body: some View {
         let settings = state.settings
-        let scale = state.scale
         let paper = CalendarWidget.size(settings.kind, settings.style)
         let earHeight = CalendarWidget.earHeight(settings.kind, settings.style)
-        let frosted = settings.opacity < 100 && !widgets.reduceTransparency
-        widget(settings, paper: paper, earHeight: earHeight, frosted: frosted && previewBackdrop != nil)
-            .modifier(WidgetScale(scale: scale, size: CGSize(width: paper.width, height: paper.height + earHeight)))
-            .background(alignment: .topLeading) {
-                if frosted && previewBackdrop == nil {
-                    WidgetFrost()
-                        .clipShape(RoundedRectangle(cornerRadius: 13 * scale, style: .continuous))
-                        .frame(width: paper.width * scale, height: paper.height * scale)
-                        .offset(y: earHeight * scale)
-                        .opacity(state.removed ? 0 : 1)
-                }
-            }
+        widget(settings, paper: paper, earHeight: earHeight)
+            .modifier(WidgetScale(scale: state.scale, size: CGSize(width: paper.width, height: paper.height + earHeight)))
     }
 
-    private func widget(_ settings: CalendarWidget.Settings, paper: (width: Double, height: Double), earHeight: Double, frosted: Bool) -> some View {
+    private func widget(_ settings: CalendarWidget.Settings, paper: (width: Double, height: Double), earHeight: Double) -> some View {
         let drawn = CalendarWidget.drawn(settings.opacity, reduceTransparency: widgets.reduceTransparency,
                                          hover: state.hovering, solidOnHover: settings.solidOnHover)
         let look = makeLook(drawn)
@@ -177,9 +170,11 @@ struct CalendarWidgetView: View {
             WidgetEars(kind: settings.kind, style: settings.style, opacity: Double(CalendarWidget.earOpacity(drawn)) / 100,
                        strongEdge: look.strongEdge, twitch: state.twitch)
                 .frame(width: paper.width, height: earHeight)
+                // #320: removed, the ears go with the paper; only the toast is left.
+                .opacity(state.removed ? 0 : 1)
                 .zIndex(1)
             ZStack {
-                WidgetPaper(look: look, frosted: frosted, previewBackdrop: previewBackdrop)
+                WidgetPaper(look: look)
                 content(look)
                     .padding(.top, 12)
                     .padding(.horizontal, 13)
@@ -191,7 +186,9 @@ struct CalendarWidgetView: View {
                 if let toast = state.toast {
                     ToastView(toast: toast) { [id = settings.id] in widgets.toastDone(id) }
                         .padding(.horizontal, 10)
-                        .padding(.bottom, 10)
+                        // #322: once the widget is removed nothing is under the toast, so its own shadow (10 pt, 6 pt down)
+                        // gets room inside the window: cut at the window's edge, it would show a hard line.
+                        .padding(.bottom, state.removed ? 26 : 10)
                         .id(toast.id)
                 }
             }
@@ -214,7 +211,6 @@ struct CalendarWidgetView: View {
         let tint = CalendarWidget.weekendTint(clay2: rgb(palette.clay2), paper: paper)
         var look = WidgetLook(drawn: drawn, contrast: contrast == .increased, palette: palette,
                               floor: CalendarWidget.floor(paper: paper, ink: ink, dark: dark),
-                              tintFloor: CalendarWidget.floor(paper: tint, ink: ink, dark: dark),
                               tint: Color(red: tint.0, green: tint.1, blue: tint.2))
         look.showsLunar = feed.showsLunar
         look.showsHolidays = feed.showsHolidays
@@ -384,6 +380,7 @@ struct CalendarWidgetView: View {
         return Text("\(number)")
             .font(.system(size: size, weight: isToday || look.bolder ? .heavy : weight).monospacedDigit())
             .foregroundStyle(isToday ? palette.onSage : red ? look.clayText : palette.ink)
+            .widgetOutline(look, on: !isToday)
             .frame(width: box, height: box)
             .background {
                 if isToday {
@@ -406,13 +403,13 @@ struct CalendarWidgetView: View {
     private func holiday(_ day: String, _ look: WidgetLook) -> String? { look.showsHolidays ? DayMarks.holiday(day) : nil }
     private func lunar(_ day: String, _ look: WidgetLook) -> (label: String, spoken: String)? { look.showsLunar ? DayMarks.lunar(day) : nil }
 
-    /// A day's frosted paper tile: the paper (weekends and holidays its clay2 tint) at the tile's opacity; today with a
+    /// A day's paper tile: the paper (weekends and holidays its clay2 tint) at the tile's opacity; today with a
     /// sage outline and, below 100 %, a ring of paper inside it.
     private func tile(_ day: String, _ look: WidgetLook, radius: CGFloat = 7) -> some View {
         let tinted = isWeekend(day) || holiday(day, look) != nil
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
         return ZStack {
-            shape.fill((tinted ? look.tint : palette.paper).opacity(look.tileOpacity(tinted: tinted)))
+            shape.fill((tinted ? look.tint : palette.paper).opacity(look.tileOpacity))
             if day == today {
                 if CalendarWidget.todayRing(look.drawn) { shape.strokeBorder(palette.paper, lineWidth: 3) }
                 shape.strokeBorder(palette.sage, lineWidth: 1.5)
@@ -429,6 +426,7 @@ struct CalendarWidgetView: View {
                 .foregroundStyle(look.ink3)
                 .lineLimit(1)
                 .fixedSize()
+                .widgetOutline(look)
                 .help(lunar.spoken)
                 .accessibilityLabel(lunar.spoken)
         }
@@ -461,7 +459,7 @@ struct CalendarWidgetView: View {
                     .overlay { if look.halo { Circle().strokeBorder(palette.paper, lineWidth: 1.5).padding(-1.5) } }
             }
             if found.plus {
-                Text("+").font(.system(size: 8.5, weight: .bold)).foregroundStyle(look.ink2)
+                Text("+").font(.system(size: 8.5, weight: .bold)).foregroundStyle(look.ink2).widgetOutline(look)
             }
         }
         .frame(height: 6)
@@ -544,6 +542,7 @@ struct CalendarWidgetView: View {
                             Text(language.weekdayLetter(Calendar.paper.component(.weekday, from: CalendarMonth.date(day)) - 1))
                                 .font(.system(size: 10.5))
                                 .foregroundStyle(isSunday(day) || holiday(day, look) != nil ? look.clayText : look.ink2)
+                                .widgetOutline(look)
                             dayNumber(day, look, size: 14, sunday: isSunday(day))
                             dots(day, page: page, look)
                         }
@@ -587,10 +586,11 @@ struct CalendarWidgetView: View {
                                 .foregroundStyle(day == today ? look.sageText : red ? look.clayText : palette.ink)
                                 .frame(width: 20, alignment: .leading)
                         }
+                        .widgetOutline(look)
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    if holiday(day, look) != nil { holidayLine(day, look, size: 10).fixedSize() }
+                    if holiday(day, look) != nil { holidayLine(day, look, size: 10).fixedSize().widgetOutline(look) }
                     if let first = row.first {
                         lineView(first, look, day: day, height: 15, timeWidth: 30, backed: false)
                     }
@@ -722,7 +722,7 @@ struct CalendarWidgetView: View {
                 tileHead(day, look, other: other, wall: wall, more: cell.more, folded: folded, lunarShown: lunarShown, room: tileWidth - 6)
                     // Never wider than the tile (the grid stays even); its last 2 pt may go into the tile's padding.
                     .frame(width: max(0, tileWidth - 8), alignment: .leading)
-                holidayLine(day, look, size: holidaySize, two: twos.holiday).opacity(other ? 0.6 : 1)
+                holidayLine(day, look, size: holidaySize, two: twos.holiday).widgetOutline(look).opacity(other ? 0.6 : 1)
                 ForEach(Array(cell.lines.enumerated()), id: \.offset) { index, line in
                     let wrap = two.indices.contains(index) && two[index]
                     let joined = band(index)
@@ -742,12 +742,15 @@ struct CalendarWidgetView: View {
                                 .fixedSize(horizontal: false, vertical: wrap)
                                 .opacity(joined.run == 1 ? 1 : 0)
                         }
+                        // Not the band's tint below (outlined, it would turn to paper).
+                        .widgetOutline(look)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .frame(minHeight: wall ? 17 : 15)
                         .overlay(alignment: .leading) {
                             if joined.run > 1 {
                                 // The title over the days the band runs on (their clicks go to them).
                                 Text(line.title.keepingParticles).font(.system(size: size)).lineLimit(1)
+                                    .widgetOutline(look)
                                     .frame(width: max(0, CGFloat(joined.run) * (tileWidth + gap) - gap - 8 - 13 - 2), alignment: .leading)
                                     .padding(.leading, 13)
                                     .allowsHitTesting(false)
@@ -793,6 +796,7 @@ struct CalendarWidgetView: View {
                 .allowsHitTesting(false)
             if fit.mark {
                 RepeatMark(count: fit.count ? folded.count : 1, size: markSize, color: look.sageText)
+                    .widgetOutline(look)
                     .opacity(other ? 0.6 : 1)
                     .help(CalendarMonth.foldedTooltip(folded, language: language) ?? "")
             }
@@ -804,6 +808,7 @@ struct CalendarWidgetView: View {
                     .foregroundStyle(look.ink3)
                     .lineLimit(1)
                     .fixedSize()
+                    .widgetOutline(look)
                     .help(marks.spoken)
                     .accessibilityLabel(marks.spoken)
                     .opacity(other ? 0.6 : 1)
@@ -924,8 +929,8 @@ struct WidgetMark: View {
     }
 }
 
-/// The ears: the note's ears (CatEars, NoteEar) at the widget's scale, at least 85 % (the paper may fade more), one
-/// twitch after something is put in.
+/// The ears: the note's ears (CatEars, NoteEar) at the widget's scale, fading with the paper but never below half
+/// (CalendarWidget.earOpacity, #321), one twitch after something is put in.
 struct WidgetEars: View {
     let kind: CalendarWidget.Kind
     let style: CalendarWidget.Style
@@ -942,7 +947,7 @@ struct WidgetEars: View {
             ForEach(0..<CatEars.bases.count, id: \.self) { index in
                 let base = CatEars.base(index, width: width, right: true)
                 let flick: CGFloat = index == 0 ? -4 : 4
-                NoteEar(a: base.a, b: base.b, edge: edge, strongEdge: strongEdge, fill: opacity,
+                NoteEar(a: base.a, b: base.b, edge: edge, strongEdge: strongEdge,
                         colors: (palette.earPaper, palette.earInner, palette.earEdge))
                     .keyframeAnimator(initialValue: CGFloat(0), trigger: index == 1 ? twitch : 0) { content, tip in
                         content.modifier(EarFlick(tip: tip, edge: edge))
@@ -956,6 +961,9 @@ struct WidgetEars: View {
             }
         }
         .frame(width: width, height: edge, alignment: .topLeading)
+        // #321: the whole ear fades — its paper, edge and pink — as one (it was only the paper, never below 85 %).
+        .compositingGroup()
+        .opacity(opacity)
         .scaleEffect(scale, anchor: .topLeading)
         .frame(width: width * scale, height: edge * scale, alignment: .topLeading)
         .accessibilityElement(children: .ignore)

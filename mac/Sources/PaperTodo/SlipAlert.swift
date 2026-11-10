@@ -123,7 +123,7 @@ enum SlipAlert {
         // A tall slip: its top near the top of the screen (above the window in front), so all of it is on screen.
         let anchor = (NSApp.keyWindow ?? NSApp.mainWindow).flatMap { $0.isVisible ? $0 : nil }
         let point = anchor.map { NSPoint(x: $0.frame.midX, y: $0.frame.maxY) } ?? NSEvent.mouseLocation
-        if let area = (NSScreen.screens.first { $0.frame.contains(point) } ?? NSScreen.main)?.visibleFrame {
+        if let area = NSScreen.at(point)?.visibleFrame {
             panel.placeSlip(topCenter: NSPoint(x: anchor?.frame.midX ?? area.midX, y: area.maxY - 24))
         }
     }
@@ -141,7 +141,7 @@ enum SlipAlert {
         let anchor = NSApp.keyWindow ?? NSApp.mainWindow
         if let anchor, anchor.isVisible {
             panel.placeSlip(topCenter: NSPoint(x: anchor.frame.midX, y: anchor.frame.maxY - 90))
-        } else if let area = (NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main)?.visibleFrame {
+        } else if let area = NSScreen.withPointer?.visibleFrame {
             panel.placeSlip(topCenter: NSPoint(x: area.midX, y: area.maxY - area.height / 4))
         }
     }

@@ -46,6 +46,8 @@ private enum TypingCatTests {
         let arguments = CommandLine.arguments.dropFirst()
         let path = arguments.first ?? "../docs/plans/typing-cat-cases.json"
         let watcher = arguments.dropFirst().first ?? "Sources/PaperTodo/TypingKeys.swift"
+        // #331: the place cases sit beside the others.
+        let placesPath = URL(fileURLWithPath: path).deletingLastPathComponent().appendingPathComponent("typing-cat-place-cases.json").path
         let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
         var count = 0
         func test(_ name: String, _ action: () throws -> Void) throws {
@@ -135,7 +137,8 @@ private enum TypingCatTests {
             try test(entry["case"] as! String) {
                 let last = (entry["lastKey"] as? Int).map { Double($0) / 1000 }
                 try equal(TypingCorner.shows(source: TypingSource(rawValue: entry["source"] as! String)!, lastKey: last,
-                                             now: Double(entry["now"] as! Int) / 1000), entry["shows"] as! Bool, "shows")
+                                             now: Double(entry["now"] as! Int) / 1000, dragging: entry["dragging"] as? Bool ?? false,
+                                             dropped: (entry["dropped"] as? Int).map { Double($0) / 1000 }), entry["shows"] as! Bool, "shows")
             }
         }
         let moving = file["moving"] as! [String: Any]
@@ -223,6 +226,98 @@ private enum TypingCatTests {
             try expect(code.contains(".listenOnly"), "the tap only listens")
             try expect(code.contains("return event") && code.contains("passUnretained(event)"), "events pass through unchanged")
         }
+        try placeCases(placesPath, test)
         print("\(count) typing-cat checks passed")
+    }
+
+    /// #331 (docs/plans/typing-cat-place-cases.json): the drawn area, letting go, the kept place read back after a relaunch,
+    /// a size change, a display change or one unplugged, and 자리 as chosen.
+    static func placeCases(_ path: String, _ test: (String, () throws -> Void) throws -> Void) throws {
+        let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
+        func rect(_ value: Any?) -> CGRect? {
+            guard let parts = value as? [Double], parts.count == 4 else { return nil }
+            return CGRect(x: parts[0], y: parts[1], width: parts[2], height: parts[3])
+        }
+        func near(_ actual: CGRect?, _ expected: CGRect?, _ name: String) throws {
+            guard let actual, let expected else { return try expect(actual == nil && expected == nil, "\(name): expected \(String(describing: expected)), got \(String(describing: actual))") }
+            let off = [actual.minX - expected.minX, actual.minY - expected.minY, actual.width - expected.width, actual.height - expected.height]
+            try expect(off.allSatisfy { abs($0) < 1e-6 }, "\(name): expected \(expected), got \(actual)")
+        }
+        func samePlace(_ actual: TypingPlace?, _ expected: Any?, _ name: String) throws {
+            guard let expected = expected as? [String: Any], let want = TypingPlace(saved: expected) else {
+                return try expect(actual == nil, "\(name): expected nothing, got \(String(describing: actual))")
+            }
+            guard let actual else { throw TestFailure(description: "\(name): expected \(want), got nothing") }
+            try equal(actual.screen, want.screen, "\(name) screen")
+            for (a, b, part) in [(actual.x, want.x, "x"), (actual.y, want.y, "y"), (actual.centerX, want.centerX, "centerX"), (actual.centerY, want.centerY, "centerY")] {
+                try expect(abs(a - b) < 1e-6, "\(name) \(part): expected \(b), got \(a)")
+            }
+        }
+        func screens(_ value: Any?) -> [TypingCorner.Screen] {
+            (value as! [[String: Any]]).map {
+                TypingCorner.Screen(id: $0["id"] as! String, display: ScreenFit.Display(frame: rect($0["frame"])!, visible: rect($0["visible"])!))
+            }
+        }
+        let drawn = file["drawn"] as! [String: Any]
+        try test("D the drawn area is the app's") {
+            let bands = (drawn["bands"] as! [Any]).map { ($0 as? [Double]).map { $0[0]...$0[1] } }
+            try equal(bands, TypingCorner.drawn, "bands")
+            let box = drawn["box"] as! [String: [Double]], frame = CGRect(x: 100, y: 200, width: 160, height: 160)
+            let expected = CGRect(x: 100 + 160 * box["across"]![0], y: 200 + 160 * (1 - box["down"]![1]),
+                                  width: 160 * (box["across"]![1] - box["across"]![0]), height: 160 * (box["down"]![1] - box["down"]![0]))
+            try near(TypingCorner.catBox(in: frame), expected, "box")
+        }
+        for entry in drawn["hits"] as! [[String: Any]] {
+            try test(entry["case"] as! String) {
+                let at = entry["at"] as! [Double], frame = CGRect(x: 100, y: 200, width: 160, height: 160)
+                // [across, down] → the Mac's y-up point.
+                let point = CGPoint(x: frame.minX + frame.width * at[0], y: frame.maxY - frame.height * at[1])
+                try equal(TypingCorner.isOnCat(point, frame: frame), entry["on"] as! Bool, "on the cat")
+            }
+        }
+        let all = screens(file["screens"])
+        for entry in file["dropped"] as! [[String: Any]] {
+            try test(entry["case"] as! String) {
+                let dropped = TypingCorner.dropped(rect(entry["frame"])!, on: all)
+                try near(dropped?.frame, rect(entry["kept"]), "kept")
+                try samePlace(dropped?.place, entry["place"], "place")
+                // Wholly inside its display, and read back where it was let go.
+                if let dropped {
+                    try expect(all.contains { $0.display.visible.contains(dropped.frame) }, "inside a display")
+                    try near(TypingCorner.frame(place: dropped.place, size: dropped.frame.width, on: all), dropped.frame, "read back")
+                }
+            }
+        }
+        for entry in file["restored"] as! [[String: Any]] {
+            try test(entry["case"] as! String) {
+                let place = TypingPlace(saved: entry["place"] as? [String: Any])!
+                let on = entry["screens"].map(screens) ?? all
+                try near(TypingCorner.frame(place: place, size: CGFloat(entry["size"] as! Double), on: on), rect(entry["frame"]), "frame")
+            }
+        }
+        let chosen = file["chosen"] as! [String: Any], area = rect(chosen["area"])!
+        for entry in chosen["cases"] as! [[String: Any]] {
+            try test(entry["case"] as! String) {
+                let size = CGFloat(entry["size"] as? Double ?? 112)
+                let frame = TypingCorner.frame(corner: TypingCorner.Corner(rawValue: entry["corner"] as! String)!,
+                                               place: TypingPlace(saved: entry["place"] as? [String: Any]), screen: area, topInset: 0,
+                                               size: size, on: all)
+                let expected = (entry["sameAs"] as? String).map {
+                    TypingCorner.frame(corner: TypingCorner.Corner(rawValue: $0)!, screen: area, topInset: 0, size: size)
+                } ?? rect(entry["frame"])
+                try near(frame, expected, "frame")
+            }
+        }
+        for entry in file["saved"] as! [[String: Any]] {
+            try test(entry["case"] as! String) {
+                let place = TypingPlace(saved: entry["saved"] as? [String: Any])
+                try samePlace(place, entry["place"], "place")
+                if let place { try samePlace(TypingPlace(saved: place.saved), entry["place"], "saved again") }
+            }
+        }
+        try test("P the four corners and 옮긴 자리, apart") {
+            try equal(TypingCorner.Corner.corners, [.topLeft, .topRight, .bottomLeft, .bottomRight], "corners")
+            try equal(TypingCorner.Corner(saved: "moved"), .moved, "moved")
+        }
     }
 }

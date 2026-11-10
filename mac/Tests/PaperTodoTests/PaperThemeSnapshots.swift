@@ -4,6 +4,8 @@ import SwiftUI
 
 /// 종이 테마 (#244): each of the fifteen papers drawn on the note, the desk's month calendar and the drawer (노트와 같은 종이),
 /// and the 꾸미기 → 종이 tiles with 밤에는, the drawer's 서랍 종이 — off-screen, from made-up data, never the user's notes.
+/// #328: 모눈 · 원고지 · 줄노트 also grouped by space, as 메모지 cards and as the wide note's columns (`PAPERTODO_BOARDS=all`:
+/// every paper drawn, to look at).
 /// scripts/render-paper-themes.sh [ko|en|nl] [day|night] [papers]
 @main
 @MainActor
@@ -86,6 +88,47 @@ enum PaperThemeSnapshots {
         let drawer = model.drawer
         drawer.now = { now }
         drawer.refreshForSnapshot()
+        // #328: a second notebook grouped by space (회사 · 집 · 공부, made up): two to-dos in 회사, one with a time; one in 집;
+        // three in 공부, one done. Made before any paper is picked: a model reads the paper as it starts.
+        let boardSuite = TestDefaults("PaperThemesBoard")
+        defer { boardSuite.remove() }
+        boardSuite.defaults.set(false, forKey: "reminder.enabled")
+        let boardStorage = folder.appendingPathComponent("board/todos.json")
+        try FileManager.default.createDirectory(at: boardStorage.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try NotebookFile(url: boardStorage).save(Notebook())
+        let board = AppModel(storageURL: boardStorage, isolated: true, preferences: boardSuite.defaults)
+        board.notebookFont = .pen
+        let work = board.addTodoSpace(name: t("회사", "Work", "Werk"), color: .pink)!
+        let home = board.addTodoSpace(name: t("집", "Home", "Thuis"), color: .mint)!
+        let study = board.addTodoSpace(name: t("공부", "Study", "Studie"), color: .sky)!
+        for (title, space, done) in [
+            (t("발표 자료 마무리", "Finish the slides", "Presentatie afmaken"), work, false),
+            (t("주간 보고서 초안", "Draft the weekly report", "Weekrapport opzetten"), work, false),
+            (t("우체국 들르기", "Stop by the post office", "Langs het postkantoor"), home, false),
+            (t("미뤄 둔 책 10쪽 읽기", "Read 10 pages of that book", "10 bladzijden lezen"), study, false),
+            (t("단어 스무 개 외우기", "Learn twenty words", "Twintig woordjes leren"), study, false),
+            (t("강의 하나 듣기", "Watch one lecture", "Eén college kijken"), study, true),
+        ] {
+            board.add(title, literal: true)
+            let id = board.items.last!.id
+            board.moveTodo(id, toSpace: space, toast: false)
+            if done { board.toggle(id) }
+        }
+        let boardNow = Calendar.current.date(bySettingHour: 12, minute: 40, second: 0, of: now)!
+        board.setTimeRange(board.items[0].id, to: TimeRange(start: 15 * 60, end: 16 * 60), now: boardNow)
+        board.toast = nil
+        board.selectedTaskID = nil
+        board.groupBySpace = true
+        let boards = ProcessInfo.processInfo.environment["PAPERTODO_BOARDS"] == "all"
+        func boardShots(_ name: String) throws {
+            let isDark = dark()
+            board.groupStyle = .card
+            try render(PaperView(model: board, previewNow: boardNow), size: NSSize(width: 420, height: 720), dark: isDark,
+                       to: output.appendingPathComponent("\(name)-cards.png"))
+            try render(PaperView(model: board, previewNow: boardNow), size: NSSize(width: 760, height: 560), dark: isDark,
+                       to: output.appendingPathComponent("\(name)-board.png"))
+        }
+
         let controller = ReminderController(model: model, preferences: preferences, onOpen: {})
         let archive = ArchiveStore(model: model)
         let screen = { (dark: Bool) in dark ? Color(white: 0.14) : Color(red: 0.86, green: 0.87, blue: 0.89) }
@@ -121,11 +164,20 @@ enum PaperThemeSnapshots {
                 for paper in papers where paper.isDark {
                     use(paper)
                     try shots(paper.rawValue)
+                    if boards { try boardShots(paper.rawValue) }
+                }
+                // #328: what 밤에는 turns 모눈 · 원고지 · 줄노트 into (밤 종이's lines), and the three kept (그대로).
+                use(.grid)
+                try boardShots("day-at-night")
+                for paper in papers where paper.ruling != .lines {
+                    use(paper, .keep)
+                    try boardShots("\(paper.rawValue)-kept")
                 }
             } else {
                 for paper in papers {
                     use(paper)
                     try shots(paper.rawValue)
+                    if boards || paper.ruling != .lines { try boardShots(paper.rawValue) }
                 }
             }
         }

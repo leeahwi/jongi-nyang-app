@@ -176,14 +176,14 @@ final class AlarmController {
     /// Centred on the screen with the pointer, or just above the pet (`size`: the window's, the
     /// slip and its margins).
     private func frame(size: NSSize) -> NSRect {
-        if let pet = petAnchor(), let screen = (NSScreen.screens.first { $0.frame.intersects(pet) } ?? NSScreen.main) {
+        if let pet = petAnchor(), let screen = NSScreen.holding(pet) {
             let area = screen.visibleFrame
             let x = min(max(pet.midX - size.width / 2, area.minX + 12), area.maxX - size.width - 12)
             let y = min(max(pet.maxY + 8, area.minY + 12), area.maxY - size.height - 12)
             return NSRect(origin: NSPoint(x: x, y: y), size: size)
         }
         let mouse = NSEvent.mouseLocation
-        let area = (NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main)?.visibleFrame ?? NSRect(origin: .zero, size: size)
+        let area = (NSScreen.at(mouse))?.visibleFrame ?? NSRect(origin: .zero, size: size)
         return NSRect(x: area.midX - size.width / 2, y: area.midY - size.height / 2, width: size.width, height: size.height)
     }
 

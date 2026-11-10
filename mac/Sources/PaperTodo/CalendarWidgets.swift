@@ -158,6 +158,7 @@ final class CalendarWidgets: ObservableObject {
         observe(center, NSApplication.didChangeScreenParametersNotification) { $0.placeAll() }
         observe(workspace, NSWorkspace.accessibilityDisplayOptionsDidChangeNotification) {
             $0.reduceTransparency = NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+            for settings in $0.list { $0.castsShadow(settings.id) }
         }
         // Waking, a new day, another time zone: the page is worked out again.
         observe(workspace, NSWorkspace.didWakeNotification) { $0.tick() }
@@ -224,7 +225,7 @@ final class CalendarWidgets: ObservableObject {
         updateMouseMonitors()
     }
 
-    /// 위젯 제거: gone at once; its toast stays where it was for 4 seconds with 되돌리기.
+    /// 위젯 제거: gone at once — the paper and the ears; its toast stays where it was for 4 seconds with 되돌리기.
     func remove(_ id: String) {
         guard let index = list.firstIndex(where: { $0.id == id }) else { return }
         let settings = list.remove(at: index)
@@ -237,6 +238,7 @@ final class CalendarWidgets: ObservableObject {
         toast.action = L("되돌리기")
         toast.perform = { [weak self] in self?.restore(settings, at: index) }
         state.toast = toast
+        castsShadow(id)
         updateMouseMonitors()
     }
 
@@ -249,6 +251,21 @@ final class CalendarWidgets: ObservableObject {
             state.toast = nil
         }
         sync()
+        castsShadow(settings.id)
+    }
+
+    /// The window's shadow is the shape of what it draws, and it shows through what is faint. So only a solid paper casts
+    /// one (#321: below 100 % it lay under the faint paper — darker tiles, a soft shadow under every letter and a hard dark
+    /// line round the edge; the edge line, never below half, marks the widget there). A removed widget's window holds only
+    /// its toast, whose own soft shadow the window server would ring with a rough dark line, so it casts none either (#322;
+    /// the toast keeps its own, as every toast). Worked out again once the widget has redrawn (#320: without the ears'
+    /// shadow left behind). Not on hover (마우스를 올리면 선명하게): the paper at rest decides.
+    func castsShadow(_ id: String) {
+        guard let panel = panels[id], let state = states[id] else { return }
+        let solid = CalendarWidget.drawn(state.settings.opacity, reduceTransparency: reduceTransparency, hover: false, solidOnHover: false) == 100
+        let casts = solid && !state.removed
+        if panel.hasShadow != casts { panel.hasShadow = casts }
+        DispatchQueue.main.async { panel.invalidateShadow() }
     }
 
     /// The removed widget's toast went: its window goes too.
@@ -324,8 +341,7 @@ final class CalendarWidgets: ObservableObject {
             panel.contentView?.frame = NSRect(origin: .zero, size: panel.frame.size)
         }
         panel.ignoresMouseEvents = settings.clickThrough && states[settings.id]?.hovering != true
-        // The shadow follows the paper's opacity.
-        panel.invalidateShadow()
+        castsShadow(settings.id)
     }
 
     /// The panel of a widget (the sheet goes beside it).

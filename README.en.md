@@ -8,7 +8,7 @@
 
 Mac · Windows · free · no account
 
-[**Download for Mac**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.49.0) · [**Download for Windows**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.34.0) · [Project site](https://leeahwi.github.io/jongi-nyang-app/en/) · [40-second intro video](site/assets/promo-en.mp4) · [Changelog](CHANGELOG.en.md)
+[**Download for Mac**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.49.1) · [**Download for Windows**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.34.1) · [Project site](https://leeahwi.github.io/jongi-nyang-app/en/) · [40-second intro video](site/assets/promo-en.mp4) · [Changelog](CHANGELOG.en.md)
 
 [![Latest Mac release](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=mac-*&label=Mac&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![Latest Windows release](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=windows-*&label=Windows&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![CI](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml/badge.svg)](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml)
 

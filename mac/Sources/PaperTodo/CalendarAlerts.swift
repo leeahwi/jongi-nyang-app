@@ -80,7 +80,7 @@ final class CalendarAlertController {
             image: model.mascotImage,
             tasks: due.map { ReminderPopupTask(title: $0.title, scheduledAt: $0.start, endsAt: $0.end, location: $0.location) },
             duration: duration(),
-            screen: NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main,
+            screen: NSScreen.withPointer,
             snoozeEnabled: false,
             scheduled: true,
             notebookFont: model.notebookFont,

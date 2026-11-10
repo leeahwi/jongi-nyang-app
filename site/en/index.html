@@ -27,18 +27,15 @@
 <body>
 <a class="skip" href="#main">Skip to content</a>
 
-<header class="top">
-  <div class="wrap">
-    <a class="brand" href="./" aria-label="Jongi-nyang home"><img src="../assets/cat.webp" alt="" width="30" height="30">Jongi-nyang</a>
+<header class="bar" data-bar>
+  <div class="bar-in">
+    <a class="brand" href="./" aria-label="Jongi-nyang home"><img src="../assets/cat.webp" alt="" width="34" height="34">Jongi-nyang</a>
     <nav class="nav" aria-label="Main">
       <a href="#tour">Tour</a>
       <a href="#features">Features</a>
-      <a href="#widget">Widgets</a>
-      <a href="#spaces">Spaces</a>
       <a href="#drawer">Notes drawer</a>
-      <a href="#built">How it's built</a>
+      <a href="#privacy">Privacy</a>
       <a href="#faq">FAQ</a>
-      <a href="https://github.com/leeahwi/jongi-nyang-app">GitHub</a>
     </nav>
     <div class="tools">
       <div class="theme" role="group" aria-label="Appearance">
@@ -48,123 +45,151 @@
       </div>
       <a class="lang" href="../" hreflang="ko" lang="ko">한국어</a>
       <a class="btn primary small" href="#download">Download</a>
+      <button class="menu-btn" type="button" aria-expanded="false" aria-controls="menu" aria-label="Menu"><span></span><span></span></button>
     </div>
   </div>
 </header>
+<div class="menu" id="menu">
+  <a href="#tour">Tour</a>
+  <a href="#features">Features</a>
+  <a href="#drawer">Notes drawer</a>
+  <a href="#privacy">Privacy</a>
+  <a href="#faq">FAQ</a>
+  <div class="menu-tools">
+    <div class="theme" role="group" aria-label="Appearance">
+      <button type="button" data-theme-set="auto" aria-pressed="true" title="Match the system"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></svg><span class="sr">Match the system</span></button>
+      <button type="button" data-theme-set="light" aria-pressed="false" title="Day paper"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="8" cy="8" r="2.8"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg><span class="sr">Day paper</span></button>
+      <button type="button" data-theme-set="dark" aria-pressed="false" title="Night paper"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M13.5 9.6A5.6 5.6 0 0 1 6.4 2.5a5.6 5.6 0 1 0 7.1 7.1z"/></svg><span class="sr">Night paper</span></button>
+    </div>
+    <a class="lang" href="../" hreflang="ko" lang="ko">한국어</a>
+  </div>
+</div>
 
+<div class="sheet flush">
 <main id="main">
   <section class="hero" aria-labelledby="hero-title">
-    <div class="wrap">
-      <a class="badge" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.49.0"><span class="dot" aria-hidden="true"></span>New · Tap-tap cat, resizable cats and widgets<span class="go" aria-hidden="true">→</span></a>
-      <h1 id="hero-title">Today's to-dos,<br>on <span class="hand">one sheet of paper.</span></h1>
-      <p class="lede">A notepad for writing down to-dos and ticking them off. The top shows what's on now and how long is left, and a paper cat brings your reminders. There's no account; everything is saved as files on your computer.</p>
-      <div class="cta">
-        <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.49.0">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>
-          Download for Mac <small>1.49.0</small>
-        </a>
-        <div class="line" role="img" aria-label="Input line example: ‘meeting tomorrow 3pm’ is read as ‘Event · tomorrow 3:00 PM’" data-line='[["meeting tomorrow 3pm","Event · tomorrow 3:00 PM"],["report by Friday","To-do · due Friday"],["timer 40","40-minute timer"],["alarm 7am weekdays","Alarm · weekdays 7:00 AM","clay"]]'>
-          <span class="pen" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg></span>
-          <span class="typed" aria-hidden="true">meeting tomorrow 3pm</span>
-          <span class="chip" aria-hidden="true">Event · tomorrow 3:00 PM</span>
+    <div class="stage">
+      <img class="obj o1" src="../assets/objects/note-yellow.svg" alt="" width="200" height="200">
+      <img class="obj far o2" src="../assets/objects/note-blue.svg" alt="" width="200" height="200">
+      <img class="obj far o3" src="../assets/objects/note-lavender.svg" alt="" width="200" height="200">
+      <img class="obj o4" src="../assets/objects/pencil.svg" alt="" width="240" height="60">
+      <img class="obj o5" src="../assets/objects/sheet.svg" alt="" width="200" height="240">
+      <img class="obj far o6" src="../assets/objects/note-yellow.svg" alt="" width="200" height="200">
+      <div class="hero-text">
+        <h1 id="hero-title">Today's to-dos,<br>on <span class="hand">one sheet of paper.</span></h1>
+        <p class="hero-sub">A paper notepad for your to-dos.<br>A paper cat brings your reminders.</p>
+        <div class="hero-cta">
+          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.49.1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>Download for Mac <small>1.49.1</small></a>
+          <a class="btn glass" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.34.1">Download for Windows <small>1.34.1</small></a>
         </div>
+        <div class="line-wrap">
+          <div class="line" role="img" aria-label="Input line example: ‘meeting tomorrow 3pm’ is read as ‘Event · tomorrow 3:00 PM’" data-line='[["meeting tomorrow 3pm","Event · tomorrow 3:00 PM"],["report by Friday","To-do · due Friday"],["timer 40","40-minute timer"],["alarm 7am weekdays","Alarm · weekdays 7:00 AM","clay"]]'>
+            <span class="pen" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l3 3L6 13H3v-3z"/></svg></span>
+            <span class="typed" aria-hidden="true">meeting tomorrow 3pm</span>
+            <span class="chip" aria-hidden="true">Event · tomorrow 3:00 PM</span>
+          </div>
+        </div>
+        <p class="hero-note"><span lang="ko">종이냥</span> (<i>jongi-nyang</i>) means ‘paper cat’.</p>
       </div>
-      <p class="alt">Also for Windows 10/11: <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.34.0">Download for Windows 1.34.0</a> · <span lang="ko">종이냥</span> (<i>jongi-nyang</i>) means ‘paper cat’.</p>
+      <figure class="hero-shot">
+        <picture><source media="(max-width: 700px)" srcset="../assets/note-en.webp" width="640" height="975"><img src="../assets/group-en.webp" width="1200" height="700" fetchpriority="high" alt="The Jongi-nyang notepad. The day ribbon at the top shows what’s on now or next and the time left, with today’s to-dos below. On a wide screen the to-dos sit in four columns: Work, Home, Study and General"></picture>
+        <img class="cat" src="../assets/cat.webp" alt="" width="320" height="320">
+      </figure>
+      <a class="chev" href="#tour" aria-label="Down to the tour"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></a>
     </div>
   </section>
 
-  <section class="film" aria-label="Jongi-nyang intro video">
-    <div class="wrap reveal">
-      <div class="stage">
-        <div class="film-frame">
-          <video class="film-video" data-film src="../assets/promo-en.mp4" poster="../assets/promo-en.webp" width="1280" height="720" muted loop playsinline autoplay preload="metadata" aria-label="A 40-second intro: to-dos, events, timers and notes fold into one sheet of paper, then the video shows the notepad with ears on top of its window, three things typed on the input line, the notepad widened into Work, Home and Study columns, a device that shows Work only during work hours, the today window in the menu bar and the notes drawer coming out of the screen’s edge. No sound."></video>
-          <button class="film-toggle" type="button" data-film-toggle aria-label="Pause video" data-label-pause="Pause video" data-label-play="Play video"><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><rect x="4" y="3" width="3" height="10" rx="1"/><rect x="9" y="3" width="3" height="10" rx="1"/></svg><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M5 3.2v9.6a.6.6 0 0 0 .9.5l7.6-4.8a.6.6 0 0 0 0-1L5.9 2.7a.6.6 0 0 0-.9.5z"/></svg></button>
-        </div>
-      </div>
-    </div>
-  </section>
+  <div class="zone" data-zone>
+    <div class="backdrop-wrap" aria-hidden="true"><div class="backdrop"><div class="bd-dim"></div><div class="bd-dark"></div></div></div>
 
-  <section id="tour" class="tour" aria-labelledby="tour-title">
-    <div class="head reveal">
-      <p class="eyebrow">Tour</p>
-      <h2 id="tour-title">One screen at a time</h2>
-    </div>
-    <div class="wrap reveal" data-tabs>
-      <div class="stage">
+    <section id="tour" aria-labelledby="tour-title">
+      <div class="head reveal">
+        <p class="eyebrow">Tour</p>
+        <h2 id="tour-title">One notepad<br>to run your day</h2>
+      </div>
+      <div class="show" data-show>
+        <div class="show-decor" aria-hidden="true">
+          <img class="obj p1" src="../assets/objects/note-yellow.svg" alt="" width="200" height="200" loading="lazy">
+          <img class="obj far p2" src="../assets/objects/sheet.svg" alt="" width="200" height="240" loading="lazy">
+          <img class="obj p3" src="../assets/objects/note-lavender.svg" alt="" width="200" height="200" loading="lazy">
+          <img class="obj far p4" src="../assets/objects/note-blue.svg" alt="" width="200" height="200" loading="lazy">
+          <img class="obj far p5" src="../assets/objects/pencil.svg" alt="" width="240" height="60" loading="lazy">
+        </div>
+        <div class="chips" data-scroller>
+          <div role="tablist" aria-label="Screens">
+            <button class="chip-btn" type="button" role="tab" id="t-note" aria-controls="s-note" aria-selected="true" style="--tone: var(--tape-todo)"><span class="fill"></span><span class="dot"></span><span class="t">Notepad</span></button>
+            <button class="chip-btn" type="button" role="tab" id="t-day" aria-controls="s-day" aria-selected="false" tabindex="-1" style="--tone: var(--tape-event)"><span class="fill"></span><span class="dot"></span><span class="t">Timetable</span></button>
+            <button class="chip-btn" type="button" role="tab" id="t-focus" aria-controls="s-focus" aria-selected="false" tabindex="-1" style="--tone: var(--tape-timer)"><span class="fill"></span><span class="dot"></span><span class="t">Focus</span></button>
+            <button class="chip-btn" type="button" role="tab" id="t-alarm" aria-controls="s-alarm" aria-selected="false" tabindex="-1" style="--tone: var(--tape-alarm)"><span class="fill"></span><span class="dot"></span><span class="t">Alarms</span></button>
+            <button class="chip-btn" type="button" role="tab" id="t-ahead" aria-controls="s-ahead" aria-selected="false" tabindex="-1" style="--tone: var(--tape-memo)"><span class="fill"></span><span class="dot"></span><span class="t">Ahead</span></button>
+            <button class="chip-btn" type="button" role="tab" id="t-desk" aria-controls="s-desk" aria-selected="false" tabindex="-1" style="--tone: var(--tape-todo)"><span class="fill"></span><span class="dot"></span><span class="t">Desk</span></button>
+          </div>
+        </div>
         <div class="slides">
-          <article class="slide" id="s-note" role="tabpanel" aria-labelledby="t-note">
-            <div>
+          <article class="slide on" id="s-note" role="tabpanel" aria-labelledby="t-note">
+            <figure><img src="../assets/note-en.webp" width="640" height="975" alt="The Jongi-nyang notepad on a Mac: the day ribbon shows ‘Team meeting’ now with 30 minutes left, then what's next and today's list" loading="lazy"></figure>
+            <div class="caption">
               <p class="kicker">01 · The notepad</p>
               <h3>A notepad that puts now first</h3>
               <p>One sheet of paper with Today and Ahead tabs. The day ribbon at the top writes what's on now in large handwriting, with the time left in a ring beside it. What's next and today's list follow below.</p>
             </div>
-            <figure class="shot" style="margin:0"><img src="../assets/note-en.webp" width="640" height="975" alt="The Jongi-nyang notepad on a Mac: the day ribbon shows ‘Team meeting’ now with 30 minutes left, then what's next and today's list"></figure>
           </article>
-          <article class="slide" id="s-day" role="tabpanel" aria-labelledby="t-day" hidden>
-            <div>
+          <article class="slide" id="s-day" role="tabpanel" aria-labelledby="t-day">
+            <figure><img src="../assets/day-en.webp" width="640" height="613" alt="The unfolded day timetable: events as color blocks and to-dos outlined in green" loading="lazy"></figure>
+            <div class="caption">
               <p class="kicker">02 · Timetable</p>
               <h3>Your day, unfolded</h3>
               <p>Click the day ribbon and the day unfolds into a timetable right there. Drag a block and it follows the mouse, then settles on a quarter hour. Drag its top or bottom edge to change its length.</p>
             </div>
-            <figure class="shot" style="margin:0"><img src="../assets/day-en.webp" width="640" height="613" alt="The unfolded day timetable: events as color blocks and to-dos outlined in green" loading="lazy"></figure>
           </article>
-          <article class="slide" id="s-focus" role="tabpanel" aria-labelledby="t-focus" hidden>
-            <div>
+          <article class="slide" id="s-focus" role="tabpanel" aria-labelledby="t-focus">
+            <figure><img src="../assets/focus-en.webp" width="640" height="853" alt="The focus card: 12:30 left in the ring, with the pause button inside it, above the to-do ‘Sort out what has to happen today’" loading="lazy"></figure>
+            <div class="caption">
               <p class="kicker">03 · Focus</p>
               <h3>Focus on one thing</h3>
               <p>Type ‘report 25 min focus’ and the notepad turns into a single card. When time is up, pick Done, 5 more min or Not now. It can run Pomodoro rounds too.</p>
             </div>
-            <figure class="shot" style="margin:0"><img src="../assets/focus-en.webp" width="640" height="853" alt="The focus card: 12:30 left in the ring, with the pause button inside it, above the to-do ‘Sort out what has to happen today’" loading="lazy"></figure>
           </article>
-          <article class="slide" id="s-alarm" role="tabpanel" aria-labelledby="t-alarm" hidden>
-            <div>
+          <article class="slide" id="s-alarm" role="tabpanel" aria-labelledby="t-alarm">
+            <figure><img src="../assets/alarm-en.webp" width="600" height="766" alt="The ringing alarm slip: 7:00 AM, a Stop button and snooze for 5, 10 or 15 minutes" loading="lazy"></figure>
+            <div class="caption">
               <p class="kicker">04 · Alarms</p>
               <h3>Alarms on a paper slip</h3>
               <p>Pick the days, the sound and the snooze. When it's time, a slip pops up with the cat shaking a bell. For the first 1.5 seconds it ignores the keyboard, so you can't dismiss it by accident while typing somewhere else.</p>
             </div>
-            <figure class="shot" style="margin:0"><img src="../assets/alarm-en.webp" width="600" height="766" alt="The ringing alarm slip: 7:00 AM, a Stop button and snooze for 5, 10 or 15 minutes" loading="lazy"></figure>
           </article>
-          <article class="slide" id="s-ahead" role="tabpanel" aria-labelledby="t-ahead" hidden>
-            <div>
+          <article class="slide" id="s-ahead" role="tabpanel" aria-labelledby="t-ahead">
+            <figure><img src="../assets/ahead-en.webp" width="640" height="1158" alt="Dragging a to-do to another day in the Ahead tab" loading="lazy"></figure>
+            <div class="caption">
               <p class="kicker">05 · Ahead</p>
               <h3>Drag to reschedule</h3>
               <p>This week and next, day by day, with events and due dates in one place. Drag a to-do onto another day and its due date moves with it.</p>
             </div>
-            <figure class="shot" style="margin:0"><img src="../assets/ahead-en.webp" width="640" height="1158" alt="Dragging a to-do to another day in the Ahead tab" loading="lazy"></figure>
           </article>
-          <article class="slide wide" id="s-desk" role="tabpanel" aria-labelledby="t-desk" hidden>
-            <div>
+          <article class="slide" id="s-desk" role="tabpanel" aria-labelledby="t-desk">
+            <figure><img src="../assets/desk-en.webp" width="1200" height="835" alt="The Desk window’s calendar: on the left, the list in four groups (View, Settings, Notes &amp; data, Help); in the middle, October with a lunar date on each day and National Foundation Day, a substitute holiday and Hangul Day; on the right, the selected day’s events" loading="lazy"></figure>
+            <div class="caption">
               <p class="kicker">06 · Desk</p>
               <h3>Calendar and settings on the Desk</h3>
               <p>Calendar, history, settings and help live in the Desk window. Keep the notepad small on screen, and open the Desk when you need to look further ahead. The calendar also shows lunar dates and holiday names.</p>
             </div>
-            <figure class="shot" style="margin:0"><img src="../assets/desk-en.webp" width="1200" height="835" alt="The Desk window’s calendar: on the left, the list in four groups (View, Settings, Notes &amp; data, Help); in the middle, October with a lunar date on each day and National Foundation Day, a substitute holiday and Hangul Day; on the right, the selected day’s events" loading="lazy"></figure>
           </article>
         </div>
       </div>
-      <div class="deckbar">
-        <div role="tablist" aria-label="Screens">
-          <button class="pill" type="button" role="tab" id="t-note" aria-controls="s-note" aria-selected="true">Notepad</button>
-          <button class="pill" type="button" role="tab" id="t-day" aria-controls="s-day" aria-selected="false" tabindex="-1">Timetable</button>
-          <button class="pill" type="button" role="tab" id="t-focus" aria-controls="s-focus" aria-selected="false" tabindex="-1">Focus</button>
-          <button class="pill" type="button" role="tab" id="t-alarm" aria-controls="s-alarm" aria-selected="false" tabindex="-1">Alarms</button>
-          <button class="pill" type="button" role="tab" id="t-ahead" aria-controls="s-ahead" aria-selected="false" tabindex="-1">Ahead</button>
-          <button class="pill" type="button" role="tab" id="t-desk" aria-controls="s-desk" aria-selected="false" tabindex="-1">Desk</button>
-        </div>
-        <span class="count" data-count aria-hidden="true">01 / 06</span>
-        <div class="arrows">
-          <button type="button" data-prev aria-label="Previous screen"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 5 8l5 5"/></svg></button>
-          <button type="button" data-next aria-label="Next screen"><svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 3 5 5-5 5"/></svg></button>
+      <div class="film-block reveal">
+        <h3>See it all<br>in 40 seconds</h3>
+        <div class="film-frame">
+          <video class="film-video" data-film data-film-lazy src="../assets/promo-en.mp4" poster="../assets/promo-en.webp" width="1280" height="720" muted loop playsinline preload="none" aria-label="A 40-second intro: to-dos, events, timers and notes fold into one sheet of paper, then the video shows the notepad with ears on top of its window, three things typed on the input line, the notepad widened into Work, Home and Study columns, a device that shows Work only during work hours, the today window in the menu bar and the notes drawer coming out of the screen’s edge. No sound."></video>
+          <button class="film-toggle" type="button" data-film-toggle aria-label="Pause video" data-label-pause="Pause video" data-label-play="Play video"><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><rect x="4" y="3" width="3" height="10" rx="1"/><rect x="9" y="3" width="3" height="10" rx="1"/></svg><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M5 3.2v9.6a.6.6 0 0 0 .9.5l7.6-4.8a.6.6 0 0 0 0-1L5.9 2.7a.6.6 0 0 0-.9.5z"/></svg></button>
         </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section id="how" aria-labelledby="how-title">
+<section id="how" aria-labelledby="how-title">
     <div class="wrap">
       <div class="head reveal">
         <p class="eyebrow">A day with it</p>
-        <h2 id="how-title">Write it, see it, tidy it.</h2>
+        <h2 id="how-title">Write it, see it,<br>tidy it</h2>
         <p>Jot things down in the morning. During the day it shows what's on now, and in the evening it helps you sort out what's left.</p>
       </div>
       <div class="steps">
@@ -198,23 +223,17 @@
           </div>
         </article>
       </div>
-    </div>
-  </section>
-
-  <section id="features" aria-labelledby="features-title">
-    <div class="wrap">
-      <div class="head reveal">
-        <p class="eyebrow">Features</p>
-        <h2 id="features-title">Type anything on one line.<br>The notepad works it out.</h2>
+      <div class="subhead reveal">
+        <h3>Type anything on one line.<br>The notepad works it out.</h3>
         <p>To-dos, events, timers and alarms all go into one input line. If it reads you wrong, press <kbd>Tab</kbd>. If you already added it, click ‘Switch’ in the message that appears.</p>
       </div>
       <div class="panel reveal" data-tabs>
         <div class="panel-top">
           <div role="tablist" aria-label="Input examples">
-            <button class="pill" type="button" role="tab" id="k-event" aria-controls="p-event" aria-selected="true">Event</button>
-            <button class="pill" type="button" role="tab" id="k-todo" aria-controls="p-todo" aria-selected="false" tabindex="-1">To-do</button>
-            <button class="pill" type="button" role="tab" id="k-timer" aria-controls="p-timer" aria-selected="false" tabindex="-1">Timer</button>
-            <button class="pill" type="button" role="tab" id="k-alarm" aria-controls="p-alarm" aria-selected="false" tabindex="-1">Alarm</button>
+            <button class="tab" type="button" role="tab" id="k-event" aria-controls="p-event" aria-selected="true">Event</button>
+            <button class="tab" type="button" role="tab" id="k-todo" aria-controls="p-todo" aria-selected="false" tabindex="-1">To-do</button>
+            <button class="tab" type="button" role="tab" id="k-timer" aria-controls="p-timer" aria-selected="false" tabindex="-1">Timer</button>
+            <button class="tab" type="button" role="tab" id="k-alarm" aria-controls="p-alarm" aria-selected="false" tabindex="-1">Alarm</button>
           </div>
           <span class="note">Reads English, Korean and Dutch</span>
         </div>
@@ -243,17 +262,46 @@
           </div>
         </div>
       </div>
+    </div>
+  </section>
 
+<section id="features" aria-labelledby="features-title">
+    <div class="wrap">
+      <div class="head reveal">
+        <p class="eyebrow">Features</p>
+        <h2 id="features-title">Take out<br>only what you need</h2>
+        <p>Sort your to-dos, see what comes back, pick a paper, and keep backups.</p>
+      </div>
       <div class="bento">
-        <article class="tile reveal" style="--t: var(--tape-todo)">
-          <div class="art"><img src="../assets/sweep-en.webp" width="600" height="484" alt="The evening tidy-up slip: the to-dos left today, with To tomorrow, To Someday and Leave as is" loading="lazy"></div>
-          <div class="copy"><h3>Evening tidy-up</h3><p>Go through what's left one by one: move it to tomorrow, put it off to Someday, or leave it where it is.</p></div>
+        <article class="tile reveal" id="tapcat" style="--t: var(--tape-memo)">
+          <div class="art"><img src="../assets/tapcat-en.webp" width="1200" height="700" alt="Four tap-tap cats with their paws on cushions, Small, Regular, Large and Extra large. Below is the Tap-tap cat section in Desk → Cat: Tap along is set to In all apps, Corner to Bottom right and Size to Regular" loading="lazy"></div>
+          <div class="copy"><h3>A cat taps along as you type</h3><p>The tap-tap cat in a corner of the screen taps with its paws. Choose In this app or In all apps; it never knows which key.</p></div>
         </article>
-        <article class="tile reveal" style="--t: var(--tape-event)">
+        <article class="tile reveal" id="spaces" style="--t: var(--tape-todo)">
+          <div class="art"><img src="../assets/spaces-en.webp" width="1200" height="700" alt="Two Today sheets. On the left, to-do rows carry a space’s color band at their edge; on the right, the same sheet shows Work only, with ‘4 more in other spaces · Show all’ under the list" loading="lazy"></div>
+          <div class="copy" id="group"><h3>Sorted, still one sheet</h3><p>Sort to-dos into spaces like Work, Home and Study, and Today still shows them all. Write ‘#work’ and it goes into Work, or gather each space into a column of its own.</p></div>
+        </article>
+        <article class="tile reveal" id="night" style="--t: var(--tape-event)">
+          <div class="art top"><img src="../assets/note-night.webp" width="640" height="975" alt="The same notepad on night paper (Korean interface)" loading="lazy"></div>
+          <div class="copy"><h3>Night paper at night</h3><p>When the system is in dark mode, every window turns the color of paper in a room with the lights off. Text contrast meets the web accessibility standard (WCAG AA) by day and by night.</p></div>
+        </article>
+        <article class="tile reveal" id="repeats" style="--t: var(--tape-timer)">
+          <div class="art"><img src="../assets/repeats-en.webp" width="1200" height="835" alt="The Desk calendar for November 2026. November 9 shows lunar 10/1, Mom’s birthday, Morning study and +9, and the later days carry a repeat count such as ⟲3 next to the date. Repeating to-dos are drawn faint, and on the right is the list of the day’s events and to-dos" loading="lazy"></div>
+          <div class="copy"><h3>Repeats on the days ahead</h3><p>A repeating to-do like ‘Recycling every Monday’ shows on each day it comes back, on the calendar and the widgets. Only the next one is bold.</p></div>
+        </article>
+        <article class="tile reveal" id="themes" style="--t: var(--tape-alarm)">
+          <div class="art"><img src="../assets/themes-en.webp" width="1200" height="700" alt="Desk → Appearance → Paper with eleven light papers, four dark papers and the At night menu below. Sticky note is picked, so the notepad and the Today widget on the right are on Sticky note too" loading="lazy"></div>
+          <div class="copy"><h3>Fifteen papers</h3><p>Pick one of eleven light papers or four dark ones, and the notepad, calendar, widgets and notes drawer all change to it.</p></div>
+        </article>
+        <article class="tile reveal" id="backup" style="--t: var(--tape-todo)">
+          <div class="art"><img src="../assets/backup-en.webp" width="1200" height="700" alt="‘Where should your to-dos live?’ and ‘Backed up today 9:12 AM’ in Desk → Storage &amp; backup, and the ‘Restore the backup from Oct 28, 8:55 AM?’ slip with Replace and Merge buttons" loading="lazy"></div>
+          <div class="copy"><h3>Backed up once a day</h3><p>Once a day, and before anything overwrites your list. Pick a backup to merge it in or to replace your list with it.</p></div>
+        </article>
+        <article class="tile reveal" id="pet" style="--t: var(--tape-event)">
           <div class="art"><img src="../assets/pet-ko.webp" width="600" height="500" alt="The cat asking a question in a speech bubble with answer buttons (Korean interface)" loading="lazy"></div>
-          <div class="copy"><h3>A cat for company</h3><p>It breathes and wanders above the Dock (the taskbar on Windows), and walks over with a to-do when its reminder is due. Finish one and it celebrates. Now and then it asks ‘A 5-minute break?’; answer with a button and a 5-minute timer starts.</p></div>
+          <div class="copy"><h3>A paper cat nearby</h3><p>It walks along the Dock (the taskbar on Windows) and brings your to-do when a reminder is due. Finish everything and it cheers you on.</p></div>
         </article>
-        <article class="tile reveal" style="--t: var(--tape-timer)">
+        <article class="tile reveal" id="sync" style="--t: var(--tape-timer)">
           <div class="art" aria-hidden="true">
             <div class="sync">
               <div class="device"><div class="screen"><i></i><i></i><i></i></div>Mac</div>
@@ -261,246 +309,93 @@
               <div class="device"><div class="screen"><i></i><i></i><i></i></div>Windows</div>
             </div>
           </div>
-          <div class="copy"><h3>Mac and Windows, one list</h3><p>Choose the same shared folder as the storage location on both computers and they share one list. Edits made at almost the same time are all kept, and a note changed on both is merged. Your cloud service moves the files.</p></div>
+          <div class="copy"><h3>Mac and Windows, one list</h3><p>Pick the same shared folder on both computers and they share one list. Your cloud service moves the files.</p></div>
         </article>
-        <article class="tile reveal" style="--t: var(--tape-memo)">
-          <div class="art top"><img src="../assets/note-night.webp" width="640" height="975" alt="The same notepad on night paper (Korean interface)" loading="lazy"></div>
-          <div class="copy"><h3>Night paper</h3><p>When the system is in dark mode, every window turns the color of paper in a room with the lights off. You can also fix it to day or night under Desk → Appearance → Day &amp; night. Text contrast meets the web accessibility standard (WCAG AA) by day and by night.</p></div>
-        </article>
+      </div>
+      <div class="more">
+        <a class="more-link" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/README.en.md">All features<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></a>
+        <a class="more-link" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/CHANGELOG.en.md">Changelog<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></a>
       </div>
     </div>
   </section>
 
-  <section id="tapcat" aria-labelledby="tapcat-title">
-    <div class="wrap">
-      <div class="head reveal">
-        <p class="eyebrow">Tap-tap cat</p>
-        <h2 id="tapcat-title">Type, and a cat taps along in the corner</h2>
-        <p>The tap-tap cat sits on a cushion in a corner of the screen and taps with its paws while you type. You set it up in Desk → Cat, apart from the desktop cat.</p>
+    <section id="widget" aria-labelledby="widget-title">
+      <div class="split flip fade-ink reveal">
+        <div class="split-media"><img src="../assets/widget-en.webp" width="1200" height="700" alt="A wall calendar widget for October on the desktop. Each day is a paper tile with its events, a lunar date and holiday names such as Hangul Day, and a cat’s ears peek out at the top right. In front, the day slip for October 16 shows an event chip for ‘team meeting at 3pm’" loading="lazy"></div>
+        <div class="split-text">
+          <p class="eyebrow">Calendar widgets</p>
+          <h2 id="widget-title">A paper calendar<br>on your desktop</h2>
+          <p>Pick from seven widgets, from Today to a wall calendar for the month, and keep up to four. Lunar dates and Korean public holidays show from the start. Add them in Desk → Events → Desktop widgets.</p>
+        </div>
       </div>
-      <div class="stage reveal">
-        <div class="film-frame"><img src="../assets/tapcat-en.webp" width="1200" height="700" alt="Four tap-tap cats with their paws on cushions, Small, Regular, Large and Extra large. Below is the Tap-tap cat section in Desk → Cat: Tap along is set to In all apps, Corner to Bottom right and Size to Regular" loading="lazy" style="display:block;width:100%;height:auto"></div>
-      </div>
-      <ul class="points">
-        <li class="reveal"><strong>Where it taps along</strong><span>Under Tap along, pick Off, In this app or In all apps. With In this app it comes out while you type and slips away 3 seconds after you stop.</span></li>
-        <li class="reveal"><strong>Any of four corners</strong><span>Pick a corner of the screen under Corner. Clicks go through to the window behind, so it never gets in the way, and it shows over full-screen apps too.</span></li>
-        <li class="reveal"><strong>Cats in four sizes</strong><span>The tap-tap cat and the desktop cat can each be Small, Regular, Large or Extra large, apart from each other. When the desktop cat grows, its speech bubble and question buttons move with it.</span></li>
-        <li class="reveal"><strong>It never knows which key</strong><span>It only knows that a key was pressed, and never reads or keeps what you typed. ‘In all apps’ needs Input Monitoring permission on the Mac, and hasn’t been tried on a real Windows PC yet. The <a href="privacy.html#typing">privacy page</a> has the details.</span></li>
-      </ul>
-    </div>
-  </section>
-
-  <section id="widget" aria-labelledby="widget-title">
-    <div class="wrap">
-      <div class="head reveal">
-        <p class="eyebrow">Calendar widgets</p>
-        <h2 id="widget-title">A paper calendar on your desktop</h2>
-        <p>Pick from seven widgets, from Today to a wall calendar for the month, and keep up to four. Lunar dates and Korean public holidays show from the start. Add them in Desk → Events → Desktop widgets.</p>
-      </div>
-      <div class="stage reveal">
-        <div class="film-frame"><img src="../assets/widget-en.webp" width="1200" height="700" alt="A wall calendar widget for October on the desktop. Each day is a paper tile with its events, a lunar date and holiday names such as Hangul Day, and a cat’s ears peek out at the top right. In front, the day slip for October 16 shows an event chip for ‘team meeting at 3pm’" loading="lazy" style="display:block;width:100%;height:auto"></div>
-      </div>
-      <ul class="points">
+      <ul class="points fade-ink">
         <li class="reveal"><strong>Click a day for its slip</strong><span>Click a day on a widget to see everything on it. Type there as you would in the notepad’s input line, and it goes straight in.</span></li>
         <li class="reveal"><strong>Four sizes</strong><span>Each widget can be Small, Regular, Large or Extra large. Text, cells and margins all scale together, so a large widget doesn’t leave cells empty or cut names short. Sizes that don’t fit your screen are dimmed.</span></li>
-        <li class="reveal"><strong>Readable when faded</strong><span>Pick an opacity from 20 to 100%. Each day sits on a paper tile, so the text stays readable when the widget is faint. How it looks on your own wallpaper hasn’t been checked on a real screen yet.</span></li>
         <li class="reveal"><strong>Drag it by the ears</strong><span>Drag the cat’s ears at the top right to move a widget, or click them for a menu with Size and Keep on top. Widgets sit on the desktop, below other windows, at first.</span></li>
+        <li class="reveal"><strong>Keep the notepad on the desktop</strong><span>The pin at the top of the notepad offers Regular, Keep on top and On the desktop. On the desktop, the notepad stays behind other windows like a widget, and comes forward only for a moment when you open it with its shortcut.</span></li>
       </ul>
-    </div>
-  </section>
+    </section>
 
-  <section id="repeats" aria-labelledby="repeats-title">
-    <div class="wrap">
-      <div class="head reveal">
-        <p class="eyebrow">Repeats on the calendar</p>
-        <h2 id="repeats-title">Repeats show on the days ahead</h2>
-        <p>A repeating to-do like ‘Recycling every Monday’ shows on every day it comes back. The Desk calendar, the widgets, the day slip and the wall calendar all show it.</p>
-      </div>
-      <div class="stage reveal">
-        <div class="film-frame"><img src="../assets/repeats-en.webp" width="1200" height="835" alt="The Desk calendar for November 2026. November 9 shows lunar 10/1, Mom’s birthday, Morning study and +9, and the later days carry a repeat count such as ⟲3 next to the date. Repeating to-dos are drawn faint, and on the right is the list of the day’s events and to-dos" loading="lazy" style="display:block;width:100%;height:auto"></div>
-      </div>
-      <ul class="points">
-        <li class="reveal"><strong>Only the next one is bold</strong><span>The next time you’ll do it is bold, and the ones after it are faint. Click a faint line and the notepad shows that to-do.</span></li>
-        <li class="reveal"><strong>Daily repeats fold into ⟲</strong><span>Daily and weekday repeats show as ⟲ and a count next to the date instead of their names, so events and deadlines get the lines first. Hover over ⟲ to see the names.</span></li>
-        <li class="reveal"><strong>Open events from the keyboard</strong><span>Pick a day on the Desk calendar and press <kbd>Tab</kbd> to go to its first event. Move with <kbd>↑</kbd> <kbd>↓</kbd> and press <kbd>Return</kbd> (<kbd>Enter</kbd> on Windows) to open its edit slip. <kbd>Esc</kbd> takes you back to the day.</span></li>
-        <li class="reveal"><strong>Lunar dates stay whole</strong><span>When the date line runs short of room, the lunar date shortens to ‘10.1’, and the repeat count goes first if it’s still too tight. Nothing spills out of the cell.</span></li>
-      </ul>
-    </div>
-  </section>
-
-  <section id="themes" aria-labelledby="themes-title">
-    <div class="wrap">
-      <div class="head reveal">
-        <p class="eyebrow">Fifteen papers</p>
-        <h2 id="themes-title">Pick a paper, and every window follows</h2>
-        <p>Choose one in Desk → Appearance → Paper, and the notepad, calendar, widgets, slips, Desk and notes drawer all change to it. There are eleven light papers and four dark ones.</p>
-      </div>
-      <div class="stage reveal">
-        <div class="film-frame"><img src="../assets/themes-en.webp" width="1200" height="700" alt="Desk → Appearance → Paper with eleven light papers, four dark papers and the At night menu below. Sticky note is picked, so the notepad and the Today widget on the right are on Sticky note too" loading="lazy" style="display:block;width:100%;height:auto"></div>
-      </div>
-      <ul class="points">
-        <li class="reveal"><strong>Seven new papers</strong><span>Sticky note, Manuscript paper, Blue lined notebook, Lavender, Recycled paper, Night sky and Chalkboard. Whether Sticky note and Chalkboard are easy on the eyes over time hasn’t been checked yet.</span></li>
-        <li class="reveal"><strong>At night</strong><span>A light paper changes at night to the one you pick under At night: Night paper, Ink, Night sky, Chalkboard, or no change.</span></li>
-        <li class="reveal"><strong>A paper of its own for the drawer</strong><span>The notes drawer starts on the notepad’s paper. Turn off Same as the notepad in Desk → Notes drawer to pick one just for the drawer.</span></li>
-        <li class="reveal"><strong>Nothing changes when you update</strong><span>You start with Day paper, and Night paper at night. A paper you already picked for the notes drawer stays.</span></li>
-      </ul>
-    </div>
-  </section>
-
-  <section id="spaces" aria-labelledby="spaces-title">
-    <div class="wrap">
-      <div class="head reveal">
-        <p class="eyebrow">To-do spaces</p>
-        <h2 id="spaces-title">Sorted, still one sheet</h2>
-        <p>Sort your to-dos into spaces such as Work, Home and Study. Today still shows them all on one sheet, with only the space’s color band at the left of each row.</p>
-      </div>
-      <div class="stage reveal">
-        <div class="film-frame"><img src="../assets/spaces-en.webp" width="1200" height="700" alt="Two Today sheets. On the left, to-do rows carry a space’s color band at their edge; on the right, the same sheet shows Work only, with ‘4 more in other spaces · Show all’ under the list" loading="lazy" style="display:block;width:100%;height:auto"></div>
-      </div>
-      <ul class="points">
-        <li class="reveal"><strong>Show one space</strong><span>Pick it from ‘All spaces ▾’ in the header, or press <kbd>⌥⌘1</kbd>–<kbd>9</kbd> (<kbd>Ctrl+Shift+1</kbd>–<kbd>9</kbd> on Windows). Everything shows again at 4 a.m. the next day.</span></li>
-        <li class="reveal"><strong># as you type</strong><span>Write ‘send the quote by Friday #work’ and it goes into Work. The start of the name, like ‘#wo’, is enough.</span></li>
-        <li class="reveal"><strong>Move and manage</strong><span>Right-click a to-do to move it to another space. Set names, colors and order under Desk → Spaces.</span></li>
-        <li class="reveal"><strong>Nothing changes until you make one</strong><span>With no spaces, the notepad looks just as before. While you look at one space, reminders from the others still come.</span></li>
-      </ul>
-    </div>
-  </section>
-
-  <section id="group" aria-labelledby="group-title">
-    <div class="wrap">
-      <div class="head reveal">
-        <p class="eyebrow">Group by space</p>
-        <h2 id="group-title">Work, home and study at a glance</h2>
-        <p>Gather today’s to-dos by space. Turn it on from ‘All spaces ▾’ in the header, or press <kbd>⌥⌘G</kbd> (<kbd>Ctrl+Shift+G</kbd> on Windows).</p>
-      </div>
-      <div class="stage reveal">
-        <div class="film-frame"><img src="../assets/group-en.webp" width="1200" height="700" alt="A wide notepad showing today’s to-dos in four columns: Work, Home, Study and General, each with a line such as ‘+ Add to Work’ at the bottom" loading="lazy" style="display:block;width:100%;height:auto"></div>
-      </div>
-      <ul class="points">
-        <li class="reveal"><strong>Cards or bookmarks</strong><span>Each space gathers on a small card, or in a group with a bookmark at its head. Pick the style under Desk → Spaces.</span></li>
-        <li class="reveal"><strong>Columns when it’s wide</strong><span>While grouped, the notepad can be up to 1,200px wide. With room to spare, each space gets its own column, and ‘+ Add to Work’ at the bottom writes straight into it.</span></li>
-        <li class="reveal"><strong>Drag to move</strong><span>Drag a to-do onto another group to change its space, or use <kbd>⌥⌘↑</kbd> <kbd>⌥⌘↓</kbd> (<kbd>Ctrl+Alt+↑</kbd> <kbd>Ctrl+Alt+↓</kbd> on Windows). Pick several to move them at once.</span></li>
-        <li class="reveal"><strong>Repeating to-dos too</strong><span>Write ‘Drink water every day #home’ and each day’s to-do goes into that space. To-dos in no space gather under General.</span></li>
-      </ul>
-    </div>
-  </section>
-
-  <section id="backup" aria-labelledby="backup-title">
-    <div class="wrap">
-      <div class="head reveal">
-        <p class="eyebrow">Automatic backups</p>
-        <h2 id="backup-title">Backed up once a day, by itself</h2>
-        <p>The storage folder is saved as a backup file (.jongi) once a day, and once more before anything overwrites your list, such as an import or a restore.</p>
-      </div>
-      <div class="stage reveal">
-        <div class="film-frame"><img src="../assets/backup-en.webp" width="1200" height="700" alt="‘Where should your to-dos live?’ and ‘Backed up today 9:12 AM’ in Desk → Storage &amp; backup, and the ‘Restore the backup from Oct 28, 8:55 AM?’ slip with Replace and Merge buttons" loading="lazy" style="display:block;width:100%;height:auto"></div>
-      </div>
-      <ul class="points">
-        <li class="reveal"><strong>Storage and backups in one place</strong><span>Desk → Storage &amp; backup starts with ‘Where should your to-dos live?’ and tells you in one line when the last backup was. The backup list, export and import are under Show details.</span></li>
-        <li class="reveal"><strong>Pick one to restore</strong><span>Choose a backup, then Merge or Replace. Merge keeps what’s here and brings back only what was deleted since. Either way, what’s here now is backed up first.</span></li>
-        <li class="reveal"><strong>Only on this computer</strong><span>Backups go to this computer’s backups folder, not the storage folder, so they don’t travel to other devices even with a shared folder. Up to 14 daily backups are kept.</span></li>
-        <li class="reveal"><strong>When you move the folder</strong><span>Picking another storage folder tells you first that your current list moves there. Overwriting backs up the list from before.</span></li>
-      </ul>
-    </div>
-  </section>
-
-  <section id="drawer" aria-labelledby="drawer-title">
-    <div class="wrap">
-      <div class="head reveal">
-        <p class="eyebrow">Notes drawer</p>
-        <h2 id="drawer-title">Notes live in a drawer at the screen’s edge</h2>
-        <p>Pull the drawer out from the edge of the screen in any app to read a note, jot one down, or edit it in place. Notes from the notepad’s old Notes tab are in the drawer’s Notes folder.</p>
-      </div>
-      <div class="stage reveal">
-        <div class="film-frame">
+    <section id="drawer" class="scene-dim" data-scene="dim" aria-labelledby="drawer-title">
+      <div class="split reveal">
+        <div class="split-media">
           <video class="film-video" data-film data-film-lazy src="../assets/drawer-en.mp4" poster="../assets/drawer-en.webp" width="1280" height="720" muted loop playsinline preload="none" aria-label="A 26-second clip: the notes drawer slides out from the right edge of the screen, and a ticked checklist item moves to the bottom. Then the ⌘K link field, Big view widening the drawer, search results grouped by folder, Titles only, and deleted notes kept for 30 days. Last, in Drawer paper, Same as the notepad is turned off and Sticky note, Blue lined notebook and Lavender are picked, and the drawer changes with each. No sound."></video>
           <button class="film-toggle" type="button" data-film-toggle aria-label="Pause the video" data-label-pause="Pause the video" data-label-play="Play the video"><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><rect x="4" y="3" width="3" height="10" rx="1"/><rect x="9" y="3" width="3" height="10" rx="1"/></svg><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor"><path d="M5 3.2v9.6a.6.6 0 0 0 .9.5l7.6-4.8a.6.6 0 0 0 0-1L5.9 2.7a.6.6 0 0 0-.9.5z"/></svg></button>
+        </div>
+        <div class="split-text">
+          <p class="eyebrow">Notes drawer</p>
+          <h2 id="drawer-title">Notes live in a drawer<br>at the screen’s edge</h2>
+          <p>Pull the drawer out from the edge of the screen in any app to read a note, jot one down, or edit it in place. Notes from the notepad’s old Notes tab are in the drawer’s Notes folder.</p>
+          <a class="more-link" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/README.en.md">All features<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></a>
         </div>
       </div>
       <ul class="points">
         <li class="reveal"><strong>Out from any app</strong><span>Press <kbd>⇧⌘D</kbd> (<kbd>Ctrl+Shift+D</kbd> on Windows) or click the cat-paw handle at the edge. Clicking another app doesn’t close it.</span></li>
         <li class="reveal"><strong>Folders are bookmarks</strong><span>Each bookmark beside the drawer is a folder. Notes are grouped into Pinned, Today, Yesterday, Last week and then by month, and a link or phone number shows as a small label on the card.</span></li>
-        <li class="reveal"><strong>Right-click to sort</strong><span>A note, a bookmark and empty drawer space each have a menu. Move to a folder, duplicate and sort from there, or give a single note its own paper.</span></li>
+        <li class="reveal"><strong>Search by folder</strong><span>Found notes are grouped by folder. Filter them with the Unticked, Links and Pinned chips, or search only the folder you’re in.</span></li>
+        <li class="reveal"><strong>Deleted notes for 30 days</strong><span>Deleted notes stay for 30 days. Deleted notes in the folder name ▾ menu puts them back in their folder.</span></li>
+        <li class="reveal"><strong>Looks the way you write</strong><span>Bold, headings, lists, checkboxes and code look that way as you type. Change them with the format (Aa) button on an open note or keys such as <kbd>⌘B</kbd>.</span></li>
         <li class="reveal"><strong>Paper and backdrop</strong><span>The fifteen papers are the same as the notepad’s. The backdrop is Solid by default, with Frosted, Clear and None to choose from. Frosted on Windows hasn’t been seen on a real PC yet.</span></li>
       </ul>
-    </div>
-  </section>
+    </section>
 
-  <section id="drawer-more" aria-labelledby="drawer-more-title">
-    <div class="wrap">
-      <div class="head reveal">
-        <p class="eyebrow">Notes drawer</p>
-        <h2 id="drawer-more-title">A wider drawer, easier to search</h2>
-        <p>1.46 (Windows 1.31) polishes the notes drawer. In the Larger view it widens toward the screen, and the bottom line shows the character count.</p>
+    <section id="privacy" class="trust scene-dark" data-scene="dark" aria-labelledby="privacy-title">
+      <div class="col reveal">
+        <svg class="mark" viewBox="0 0 48 48" aria-hidden="true"><path d="M7 15a4 4 0 0 1 4-4h8l4 4h14a4 4 0 0 1 4 4v18a4 4 0 0 1-4 4H11a4 4 0 0 1-4-4z"/><rect x="18.5" y="25" width="11" height="9" rx="2"/><path d="M20.5 25v-2.5a3.5 3.5 0 0 1 7 0V25"/></svg>
+        <h2 id="privacy-title">Your lists stay<br>on your computer</h2>
+        <p class="lead">No account and no server, so nothing is collected.<br>Your lists leave this computer only when you open the way.</p>
+        <div class="pills">
+          <a class="btn light" href="privacy.html">Read the privacy page</a>
+          <a class="btn outline" href="https://github.com/leeahwi/jongi-nyang-app">See the code <span class="ext" aria-hidden="true">↗</span></a>
+        </div>
       </div>
-      <div class="stage reveal">
-        <div class="film-frame"><img src="../assets/drawer-new-en.webp" width="1200" height="700" alt="Three notes drawers. On the left, results for ‘Search all folders’ grouped by folder, with Unticked, Links and Pinned chips; in the middle, Titles only, one note per line; on the right, ‘Deleted notes, kept for 30 days’ with Restore buttons" loading="lazy" style="display:block;width:100%;height:auto"></div>
-      </div>
-      <ul class="points">
-        <li class="reveal"><strong>Search by folder</strong><span>Found notes are grouped by folder. Filter them with the Unticked, Links and Pinned chips, or search only the folder you’re in.</span></li>
-        <li class="reveal"><strong>Titles only</strong><span>In the folder name ▾ menu (<kbd>⌘L</kbd>, <kbd>Ctrl+L</kbd> on Windows), choose Titles only to show each note on one line. Pick the sort order there too; each folder remembers its view.</span></li>
-        <li class="reveal"><strong>Deleted notes for 30 days</strong><span>Deleted notes stay for 30 days. Deleted notes in the folder name ▾ menu puts them back in their folder.</span></li>
-        <li class="reveal"><strong>Checkboxes and the link box</strong><span>Checkboxes show while you edit a note, and they’re bigger to click. Select text and press <kbd>⌘K</kbd> (<kbd>Ctrl+K</kbd> on Windows) to add a link in a small box under the note.</span></li>
+      <ul class="tiles">
+        <li class="reveal">
+          <a class="dtile" href="privacy.html#stored">
+            <span class="art"><img src="../assets/objects/folder.svg" alt="" width="240" height="240" loading="lazy"></span>
+            <div class="foot"><div><span class="label">Where things are kept</span><h3>Plain files</h3><p>To-dos, notes and events are files in a folder you choose. Not even the maker can see them.</p></div><svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></div>
+          </a>
+        </li>
+        <li class="reveal">
+          <a class="dtile" href="privacy.html#leaves">
+            <span class="art"><img src="../assets/objects/toggle.svg" alt="" width="240" height="240" loading="lazy"></span>
+            <div class="foot"><div><span class="label">The ways out</span><h3>Out only when you say</h3><p>A shared folder, the AI connection, a backup you export. All three start closed.</p></div><svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></div>
+          </a>
+        </li>
+        <li class="reveal">
+          <a class="dtile" href="privacy.html#verify">
+            <span class="art"><img src="../assets/objects/lens.svg" alt="" width="240" height="240" loading="lazy"></span>
+            <div class="foot"><div><span class="label">How to check</span><h3>Yours to check</h3><p>The source code is public, and you can check the download and the network connections on your own computer.</p></div><svg class="arrow" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"/></svg></div>
+          </a>
+        </li>
       </ul>
-    </div>
-  </section>
+    </section>
 
-  <section id="papers" aria-labelledby="papers-title">
-    <div class="wrap">
-      <div class="head reveal">
-        <p class="eyebrow">Note font</p>
-        <h2 id="papers-title">Choose the note font and spacing</h2>
-        <p>Under Note font in Desk → Notes drawer, pick the font, code font, text size, line spacing and paragraph spacing. They apply to every note in the drawer and on its cards.</p>
-      </div>
-      <div class="stage reveal">
-        <div class="film-frame"><img src="../assets/papers-en.webp" width="1200" height="700" alt="The preview and the Note font settings (font, code font, text size, line spacing, paragraph spacing) in Desk → Notes drawer, and on the right the notes drawer on Kraft paper, where the Groceries note’s ‘1/3’ chip has a bar filling inside it" loading="lazy" style="display:block;width:100%;height:auto"></div>
-      </div>
-      <ul class="points">
-        <li class="reveal"><strong>Same as the notepad</strong><span>The notepad and the notes drawer lay out their font settings the same way, so once you know one, you know the other.</span></li>
-        <li class="reveal"><strong>Code font</strong><span>D2Coding can be the code font. A Korean letter is two Latin letters wide in it, so code lines keep their columns.</span></li>
-        <li class="reveal"><strong>Looks the way you write</strong><span>Bold, headings, lists, checkboxes and code look that way as you type. Change them with the format (Aa) button on an open note or keys such as <kbd>⌘B</kbd>.</span></li>
-        <li class="reveal"><strong>Checklist chip</strong><span>On a note card, a bar inside the ‘2/4’ chip shows how much of the checklist is done.</span></li>
-      </ul>
-    </div>
-  </section>
-
-  <section id="more" aria-labelledby="more-title">
-    <div class="wrap">
-      <div class="head reveal">
-        <p class="eyebrow">Also new</p>
-        <h2 id="more-title">What else changed</h2>
-        <p>Mac 1.49 and Windows 1.34 also touch the notepad, the widgets, speed and the Claude connection.</p>
-      </div>
-      <ul class="points">
-        <li class="reveal"><strong>Keep the notepad on the desktop</strong><span>The pin at the top of the notepad offers Regular, Keep on top and On the desktop. On the desktop, the notepad stays behind other windows like a widget, and comes forward only for a moment when you open it with its shortcut.</span></li>
-        <li class="reveal"><strong>Quiet while you move the mouse</strong><span>On the Mac, moving the mouse in other apps hardly wakes Jongi-nyang anymore. While the pointer is far from the cats and widgets, it checks where it is only a few times a second.</span></li>
-        <li class="reveal"><strong>Windows widgets stay on the desktop</strong><span>A widget with Keep on top turned off no longer jumps over other windows when you click it. It stays on the desktop, as on the Mac.</span></li>
-        <li class="reveal"><strong>A new Claude Code command</strong><span>On Windows, the Claude Code connection command now runs through Jongi-nyang itself, and other programs can no longer use Jongi-nyang as if it were Node. Commands you copied before still work.</span></li>
-      </ul>
-    </div>
-  </section>
-
-  <section id="design" aria-labelledby="design-title">
-    <div class="wrap">
-      <div class="head reveal">
-        <p class="eyebrow">Design</p>
-        <h2 id="design-title">The day ribbon, drawn three times</h2>
-        <p>I spent more time on how to show today above the list than on anything else. Rounds 1 and 2 showed the whole day. Using it, I found that what I needed was what's on now and how long is left.</p>
-      </div>
-      <div class="rounds reveal">
-        <div class="round"><span class="n">01</span><div><h3>Round 1</h3><p>The whole day as one bar, with now and next in one sentence.</p></div><div class="shot"><img src="../assets/round1.webp" width="720" height="189" alt="Day ribbon, round 1: a bar inside a card and a now-and-next sentence (Korean interface)" loading="lazy"></div></div>
-        <div class="round"><span class="n">02</span><div><h3>Round 2</h3><p>Six-hour ticks, with timed to-dos placed under the bar.</p></div><div class="shot"><img src="../assets/round2.webp" width="720" height="189" alt="Day ribbon, round 2: six-hour ticks (Korean interface)" loading="lazy"></div></div>
-        <div class="round"><span class="n">03</span><div><h3>Round 3</h3><p>No card, and what's on now written large. The whole day only opens when you click.</p></div><div class="shot"><img src="../assets/round3.webp" width="720" height="296" alt="Day ribbon, round 3: a thin bar, a 30-minutes-left ring, the current event in large handwriting and the next two rows (Korean interface)" loading="lazy"></div></div>
-      </div>
-      <div class="more"><a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/design-process.md">Read the design process (Korean) <span class="ext" aria-hidden="true">↗</span></a></div>
-    </div>
-  </section>
-
-  <section id="built" aria-labelledby="built-title">
+<section id="built" class="scene-dark" data-scene="dark" aria-labelledby="built-title">
     <div class="wrap">
       <div class="head reveal">
         <p class="eyebrow">How it's built</p>
-        <h2 id="built-title">Built twice, kept identical</h2>
+        <h2 id="built-title">Built twice,<br>kept identical</h2>
         <p>Swift (SwiftUI + AppKit) on the Mac, Electron + TypeScript on Windows, built separately. They share no code. Both have to pass the same tables of test cases, which keeps their behavior the same.</p>
       </div>
       <div class="stats reveal">
@@ -515,82 +410,90 @@
         <li class="reveal"><strong>Where the 61% CPU came from</strong><span>The blinking ‘now’ line in the day ribbon was redrawing the whole notepad every frame. Drawing that line on its own brought idle CPU down to 0.7%. In the same release, typing latency on the Mac fell from 0.46 s to 0.01 s and launch from 2.7 s to 1.0 s. On Windows, version 1.24 cut memory after 10 minutes from 692 MB to 457 MB (measured in Electron on macOS).</span></li>
         <li class="reveal"><strong>Not done yet</strong><span>The Windows version has only run in Electron on macOS, never on a real Windows PC. Neither app is code-signed.</span></li>
       </ul>
-      <div class="more">
-        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/README.en.md">Repository overview <span class="ext" aria-hidden="true">↗</span></a>
-        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/one-pager-en.md">One-pager <span class="ext" aria-hidden="true">↗</span></a>
-        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/troubleshooting.en.md">Troubleshooting log <span class="ext" aria-hidden="true">↗</span></a>
-        <a class="btn ghost" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/ai-collaboration.md#english">How I worked with AI <span class="ext" aria-hidden="true">↗</span></a>
+      <div class="links">
+        <a class="btn outline" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/design-process.md">Design process (Korean) <span class="ext" aria-hidden="true">↗</span></a>
+        <a class="btn outline" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/README.en.md">Repository overview <span class="ext" aria-hidden="true">↗</span></a>
+        <a class="btn outline" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/one-pager-en.md">One-pager <span class="ext" aria-hidden="true">↗</span></a>
+        <a class="btn outline" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/troubleshooting.en.md">Troubleshooting log <span class="ext" aria-hidden="true">↗</span></a>
+        <a class="btn outline" href="https://github.com/leeahwi/jongi-nyang-app/blob/main/portfolio/ai-collaboration.md#english">How I worked with AI <span class="ext" aria-hidden="true">↗</span></a>
       </div>
     </div>
   </section>
 
-  <section id="faq" aria-labelledby="faq-title">
-    <div class="wrap">
-      <div class="head reveal">
-        <p class="eyebrow">FAQ</p>
-        <h2 id="faq-title">Questions, answered</h2>
-      </div>
-      <div class="faq reveal">
+    <section id="faq" class="scene-dark" data-scene="dark" aria-labelledby="faq-title">
+      <div class="faq-wrap reveal">
+        <div class="faq-head">
+          <h2 id="faq-title">Questions, answered</h2>
+          <a class="more-link" href="privacy.html#questions">More privacy questions<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg></a>
+        </div>
+        <div class="faq">
         <details><summary>Is it really free?</summary><p>Yes. No payments and no locked features. The source code is on GitHub under the Apache License 2.0.</p></details>
         <details><summary>Do I need an account? Where are my notes kept?</summary><p>No account and no server. Everything is saved as files in Jongi-nyang’s folder on your computer, or in a folder you choose. The <a href="privacy.html">privacy page</a> has the details. Change it under Desk → Storage &amp; backup.</p></details>
         <details><summary>Can I use it on a Mac and a Windows PC together?</summary><p>Yes. Choose the same shared folder (iCloud Drive, OneDrive, Dropbox and so on) as the storage location on both. Each device can also decide which spaces it shows.</p></details>
         <details><summary>Does it connect to Google Calendar?</summary><p>No. I built it over five releases and it worked, but I took it out. I didn't want work plans mixing into my personal space, and the people testing it said the same. The full reasoning is in the <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/decisions.md">decision log</a> (Korean).</p></details>
         <details><summary>Why is it blocked the first time I open it?</summary><p>The builds aren't code-signed. On the Mac, right-click the app in Applications and choose Open; if it’s still blocked, click Open Anyway in System Settings → Privacy &amp; Security. On Windows, choose More info → Run anyway in SmartScreen.</p></details>
         <details><summary>Which languages and systems?</summary><p>Korean, English and Dutch. It runs on macOS 14 or later on Apple Silicon, and on Windows 10/11 x64. The Windows version has only been checked in Electron on macOS, not yet on a real Windows PC.</p></details>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section id="download" class="final" aria-labelledby="download-title">
-    <div class="wrap">
-      <div class="reveal">
+    <section id="download" class="scene-dark last" data-scene="dark" aria-labelledby="download-title">
+      <div class="head reveal">
+        <p class="eyebrow">Download</p>
         <h2 id="download-title">Today's to-dos,<br><span class="hand">write them down now.</span></h2>
-        <p class="lede">Free. The builds aren't code-signed, so allow them once on first launch.</p>
+        <p>Free. The builds aren't code-signed, so allow them once on first launch.</p>
       </div>
       <div class="downloads">
         <div class="dl reveal">
           <h3>Mac</h3>
-          <p class="meta">1.49.0 · macOS 14 or later · Apple Silicon&nbsp;·&nbsp;DMG</p>
+          <p class="meta">1.49.1 · macOS 14 or later · Apple Silicon&nbsp;·&nbsp;DMG</p>
           <ol>
             <li>Open the DMG and drag <strong>Jongi-nyang</strong> into Applications.</li>
             <li>In Applications, <strong>right-click → Open</strong>. If it's blocked: System Settings → Privacy &amp; Security → <strong>Open Anyway</strong>.</li>
           </ol>
-          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.49.0/JongiNyang-1.49.0.dmg">Download for Mac</a>
-          <p class="files"><a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.49.0/jongi-nyang.mcpb">Claude Desktop extension</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.49.0/SHA256SUMS-1.49.0.txt">Checksums</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.49.0">Release notes</a></p>
+          <a class="btn light" href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.49.1/JongiNyang-1.49.1.dmg">Download for Mac</a>
+          <p class="files"><a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.49.1/jongi-nyang.mcpb">Claude Desktop extension</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.49.1/SHA256SUMS-1.49.1.txt">Checksums</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.49.1">Release notes</a></p>
         </div>
         <div class="dl reveal">
           <h3>Windows</h3>
-          <p class="meta">1.34.0 · Windows 10/11 x64 · installer or portable zip</p>
+          <p class="meta">1.34.1 · Windows 10/11 x64 · installer or portable zip</p>
           <ol>
-            <li>Run <code>JongiNyang-1.34.0-x64.exe</code>.</li>
+            <li>Run <code>JongiNyang-1.34.1-x64.exe</code>.</li>
             <li>If SmartScreen appears: <strong>More info → Run anyway</strong>.</li>
           </ol>
-          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.34.0/JongiNyang-1.34.0-x64.exe">Download for Windows</a>
-          <p class="files"><a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.34.0/JongiNyang-1.34.0-x64.zip">Portable zip</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.34.0/jongi-nyang.mcpb">Claude Desktop extension</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.34.0/SHA256SUMS.txt">Checksums</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.34.0">Release notes</a></p>
+          <a class="btn light" href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.34.1/JongiNyang-1.34.1-x64.exe">Download for Windows</a>
+          <p class="files"><a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.34.1/JongiNyang-1.34.1-x64.zip">Portable zip</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.34.1/jongi-nyang.mcpb">Claude Desktop extension</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.34.1/SHA256SUMS.txt">Checksums</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.34.1">Release notes</a></p>
         </div>
         <div class="dl check reveal" id="check">
           <h3>Check what you downloaded</h3>
           <p>Each release lists the SHA-256 value of every file, in the checksums file (SHA256SUMS) and in the release notes. If your file gives the same value, it’s the one we uploaded. If it differs, don’t open it; delete it.</p>
           <ul>
-            <li>Mac Terminal: <code>shasum -a 256 ~/Downloads/JongiNyang-1.49.0.dmg</code></li>
-            <li>Windows PowerShell: <code>Get-FileHash "$HOME\Downloads\JongiNyang-1.34.0-x64.exe" -Algorithm SHA256</code></li>
+            <li>Mac Terminal: <code>shasum -a 256 ~/Downloads/JongiNyang-1.49.1.dmg</code></li>
+            <li>Windows PowerShell: <code>Get-FileHash "$HOME\Downloads\JongiNyang-1.34.1-x64.exe" -Algorithm SHA256</code></li>
           </ul>
         </div>
       </div>
-    </div>
-  </section>
-</main>
+    </section>
 
-<footer>
-  <div class="wrap">
+  </div>
+</main>
+</div>
+
+<footer class="curtain">
+  <div class="curtain-in">
+    <h2>A to-do app you take out<br><span class="hand">like a sheet of paper</span></h2>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.49.1">Download for Mac</a>
+      <a class="btn glass" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.34.1">Download for Windows</a>
+    </div>
     <div class="foot">
       <div class="about">
         <a class="brand" href="./"><img src="../assets/cat.webp" alt="" width="30" height="30" loading="lazy">Jongi-nyang</a>
         <p>A to-do app you take out like a sheet of paper, with a paper cat. For macOS and Windows.</p>
       </div>
-      <div>
+      <div class="apps">
         <h4>App</h4>
-        <ul>
+        <ul class="two">
           <li><a href="#tour">Tour</a></li>
           <li><a href="#features">Features</a></li>
           <li><a href="#tapcat">Tap-tap cat</a></li>
@@ -624,9 +527,17 @@
     </div>
     <div class="legal">
       <span>© 2026 leeAhwi · Source code under the <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/LICENSE">Apache License 2.0</a> · <a href="privacy.html">Privacy</a></span>
-      <span>Mac 1.49.0 · Windows 1.34.0</span>
+      <span>Mac 1.49.1 · Windows 1.34.1</span>
     </div>
   </div>
+  <div class="ground" aria-hidden="true">
+    <img class="obj g1" src="../assets/objects/sheet.svg" alt="" width="200" height="240" loading="lazy">
+    <img class="obj g2" src="../assets/objects/note-yellow.svg" alt="" width="200" height="200" loading="lazy">
+    <img class="obj g3" src="../assets/cat.webp" alt="" width="320" height="320" loading="lazy">
+    <img class="obj g4" src="../assets/objects/folder.svg" alt="" width="240" height="240" loading="lazy">
+    <img class="obj g5" src="../assets/objects/note-lavender.svg" alt="" width="200" height="200" loading="lazy">
+  </div>
 </footer>
+
 </body>
 </html>

@@ -44,23 +44,29 @@ export function timerWindowSizeFor(size: TimerSize): { width: number; height: nu
 export function resizedTimerOrigin(origin: Point, from: { width: number; height: number }, to: { width: number; height: number }): Point {
   return { x: Math.round(origin.x + from.width / 2 - to.width / 2), y: origin.y + from.height - to.height };
 }
-/** How far the window may hang past a side, and above the top: that part of it is empty. */
+/** How far the window may hang past a side: that part of it is empty. */
 const sideSlack = 40;
-const topSlack = 40;
+/**
+ * #327: the window's top is empty too (room for the bubble): at 보통 the cat's ears are this far below it (the board
+ * 8px up and 64px tall, the cat 92px overlapping it by 29px, its picture's clear top 7px). That much may go past the
+ * work area's top, so the cat reaches the top of any display; it used to stop about 80px below it.
+ */
+export const timerEmptyTop = 118;
 /** The reminder bubbles' corner (the widest style plus its gutter) that the default spot keeps clear of. */
 export const reminderReserve = 470;
 const gap = 8;
 /** Lines the board up with the bottom of the reminder bubbles. */
 const bottomMargin = 26;
 
-/** Keeps the window on the display under its centre (or the nearest one), the board fully on screen. */
+/** Keeps the cat and its board on the display under their middle (or the nearest one), up to its top. */
 export function clampTimer(origin: Point, areas: Rect[], size = timerWindowSize): Point {
   const { width, height } = size;
-  const area = nearestArea({ x: origin.x + width / 2, y: origin.y + height / 2 }, areas);
+  const top = Math.round(timerEmptyTop * height / timerWindowSize.height);
+  const area = nearestArea({ x: origin.x + width / 2, y: origin.y + (top + height) / 2 }, areas);
   if (!area) return origin;
   return {
     x: clamp(origin.x, area.x - sideSlack, area.x + area.width - width + sideSlack),
-    y: clamp(origin.y, area.y - topSlack, area.y + area.height - height),
+    y: clamp(origin.y, area.y - top, area.y + area.height - height),
   };
 }
 

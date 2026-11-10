@@ -593,8 +593,13 @@ struct TaskRow: View {
     @Binding var rowDrop: TaskRowDrop?
     /// Design snapshots draw a row as if hovered.
     var previewHover = false
-    /// The 오늘 list draws each row's own rule (its groups break the paper's even lines).
+    /// The 오늘 list draws each row's own rule (its groups break the paper's even lines), and 모눈's squares and 원고지's
+    /// cells under it.
     var ruled = false
+    /// #328: a ruled row's line at its foot — not on a card's last row, whose edge closes it (its squares stay).
+    var footLine = true
+    /// #328: the row being dragged in its group or column — faded, and its paper's ruling not with it.
+    var dimmed = false
     /// Rows in 다음 sit by time: no handle.
     var draggable = true
     /// In 다음: when it's due today (a reminder, or a repeat's time).
@@ -628,8 +633,11 @@ struct TaskRow: View {
     init(item: TodoItem, onShelf: Bool = false, model: AppModel, rowDrop: Binding<TaskRowDrop?>, previewHover: Bool = false,
          ruled: Bool = false, draggable: Bool = true, nextTime: Date? = nil, stripMark: DayStrip.Mode? = nil, groupRows: [UUID]? = nil,
          edges: RowEdges? = nil, shared: TaskRowShared? = nil, style: TaskRowStyle = .sheet, aheadMeta: AheadMeta? = nil,
-         onDragPoint: ((CGPoint) -> Void)? = nil, onDragEnd: ((Bool) -> Void)? = nil, band: Bool = true, metaBelow: Bool = false) {
+         onDragPoint: ((CGPoint) -> Void)? = nil, onDragEnd: ((Bool) -> Void)? = nil, band: Bool = true, metaBelow: Bool = false,
+         footLine: Bool = true, dimmed: Bool = false) {
         self.band = band
+        self.footLine = footLine
+        self.dimmed = dimmed
         self.metaBelow = metaBelow
         self.item = item
         self.onShelf = onShelf
@@ -717,8 +725,10 @@ struct TaskRow: View {
                 SpaceBand(space: space, height: style.height, faded: item.isCompleted)
             }
         }
+        // #328: the row fades while it's dragged; the paper's line and squares under it don't.
+        .opacity(dimmed || rowDrop?.source == item.id ? 0.55 : 1)
         .overlay(alignment: .bottom) {
-            if ruled {
+            if ruled && footLine {
                 Rectangle().fill(PaperTheme.rule).frame(height: 0.6)
                     .padding(.leading, 18).padding(.trailing, 20)
                     .allowsHitTesting(false)
@@ -730,7 +740,6 @@ struct TaskRow: View {
                 PaperRules(row: showsMetaBelow ? style.height + 16 : style.height)
             }
         }
-        .opacity(rowDrop?.source == item.id ? 0.55 : 1)
         .onHover { hovering = $0 }
         .onTapGesture {
             // A click on the row's empty area picks it for the keyboard; #168: ⌘ adds or takes it away, ⇧ a range.

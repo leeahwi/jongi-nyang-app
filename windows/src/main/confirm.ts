@@ -130,7 +130,8 @@ export class SlipConfirm {
     // (An off-screen run's slip lives away from every display: nothing to keep it on.)
     const display = offscreenEnabled ? undefined : screen.getAllDisplays().find(({ bounds: area }) => x >= area.x && x < area.x + area.width && y >= area.y && y < area.y + area.height);
     const to = draggedSlip(slip, x - drag.x, y - drag.y, display?.workArea);
-    window.setPosition(Math.round(to.x - 24), Math.round(to.y - 16));
+    // #316: the whole bounds, not setPosition (it re-reads the size, which 125 % · 150 % can round up a pixel a move).
+    window.setBounds({ x: Math.round(to.x - 24), y: Math.round(to.y - 16), width: bounds.width, height: bounds.height });
   }
 
   /** Shown and given the keys — but never brought to the front in an off-screen run (the person's app stays in front). */

@@ -8,6 +8,7 @@ cd "$task_root"
 mkdir -p .build/checks
 swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/CatSize.swift \
+    Sources/PaperCore/ScreenFit.swift \
     Sources/PaperCore/TypingCat.swift \
     Tests/PaperCoreTests/CatSizeTests.swift \
     -o .build/checks/CatSizeTests

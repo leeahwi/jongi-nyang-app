@@ -1,9 +1,9 @@
-/* 바탕화면 달력 위젯 (#234): a calendar on paper on the desktop, two small cat ears at its top right. Only the paper fades
-   (--op, 20–100 %); the text never does. Each day of the week and the month is a paper tile (--tile) that never fades below
-   the paper's floor (--floor: ink keeps 4.5:1 on it over any wallpaper; 4-6 서리 종이 타일), weekends and holidays tinted with
-   the paper's clay, today outlined in sage. Below 100 % the secondary inks are ink (--t2 …); text off the tiles sits on a
-   backing at the floor once the paper is fainter than that (.pl .bk); the marks keep a ring of solid paper and the day
-   numbers are a step bolder. The edge line never fades below half and a soft shadow lifts the paper off any wallpaper. The window is clear
+/* 바탕화면 달력 위젯 (#234): a calendar on paper on the desktop, two small cat ears at its top right. The paper, its day
+   tiles (--tile) and the ears fade (--op, 20–100 %; the ears never below half); the text never does. Weekends and holidays
+   are tinted with the paper's clay, today outlined in sage. Below 100 % the secondary inks are ink (--t2 …); #321: once the
+   paper is fainter than its floor (--floor: where ink on it alone would miss 4.5:1 over the worst wallpaper) every text gets
+   an outline of solid paper (.pl), so the desktop shows through the paper and the tiles; the marks keep a ring of solid paper
+   and the day numbers are a step bolder. The edge line never fades below half and a soft shadow lifts the paper off any wallpaper. The window is clear
    around the paper (room for the shadow); the page decides where it takes the mouse (widget.ts). */
 :root { --widget-edge: 47, 46, 42; --widget-edge-a: 0.26; --widget-shadow: rgba(40, 35, 25, 0.22); --backing-more: 0%; }
 :root[data-scheme="dark"] { --widget-edge: 236, 230, 214; --widget-edge-a: 0.24; --widget-shadow: rgba(0, 0, 0, 0.42); }
@@ -25,7 +25,7 @@ body.wall-light { background: radial-gradient(circle at 80% 20%, #fffbe9 0 8%, t
 body.wall-dark { background: radial-gradient(circle at 78% 22%, #3a4766 0 10%, transparent 34%), linear-gradient(180deg, #0f1522 0%, #1b2536 55%, #2b3142 100%); }
 body.wall-busy { background: repeating-linear-gradient(118deg, rgba(255,255,255,0) 0 22px, rgba(255,255,255,.85) 22px 27px), repeating-linear-gradient(28deg, rgba(0,0,0,0) 0 34px, rgba(0,0,0,.7) 34px 40px), radial-gradient(circle at 20% 30%, #e8453c 0 18%, transparent 19%), radial-gradient(circle at 70% 70%, #2a62d6 0 22%, transparent 23%), radial-gradient(circle at 85% 20%, #f3c623 0 14%, transparent 15%), linear-gradient(135deg, #1d8a4e, #f08a24 50%, #6b2bb8); }
 
-.wg { position: absolute; color: var(--w-ink); font-size: 11.5px; line-height: 1.25; --tile: 1; --tile-we: 1; --floor: 0.6; --t2: var(--w-ink-2); --t3: var(--w-ink-3); --ts: var(--w-sage-text); --tc: var(--w-clay-text); }
+.wg { position: absolute; color: var(--w-ink); font-size: 11.5px; line-height: 1.25; --tile: 1; --tile-min: 0; --floor: 0.6; --t2: var(--w-ink-2); --t3: var(--w-ink-3); --ts: var(--w-sage-text); --tc: var(--w-clay-text); }
 .wg.fd { --t2: var(--w-ink); --t3: var(--w-ink); --ts: var(--w-ink); --tc: var(--w-ink); }
 .wg .note-ears { position: absolute; left: 0; overflow: visible; }
 .wg .note-ears .ear { pointer-events: visiblePainted; cursor: grab; }
@@ -34,12 +34,20 @@ body.wall-busy { background: repeating-linear-gradient(118deg, rgba(255,255,255,
   box-shadow: 0 0 0 0.75px rgba(var(--w-edge), calc(var(--w-edge-a) * var(--edge))), 0 0 0 1.75px color-mix(in srgb, var(--w-paper) calc(35% * var(--edge)), transparent), 0 4px 14px var(--w-shadow);
   transition: background-color var(--motion-change) var(--ease-out); }
 .wg .in { position: absolute; inset: 0; padding: 12px 13px 11px; overflow: hidden; }
-/* Fainter than the floor: one backing per line off the tiles, at the floor (대비 증가: 20 % more). */
-.wg.pl .bk { --bk: min(100%, calc(var(--floor) * 100% + var(--backing-more))); background: color-mix(in srgb, var(--w-paper) var(--bk), transparent); border-radius: 6px; box-shadow: 0 0 0 2px color-mix(in srgb, var(--w-paper) var(--bk), transparent); }
-/* The day tiles: the paper at --tile; weekends and holidays with the paper's clay mixed in; today a sage outline. Text on a
-   tile needs no backing of its own. */
-.mgrid .cl, .wkcols .c, .wkrows .r { background: color-mix(in srgb, var(--w-paper) calc(var(--tile) * 100%), transparent); }
-.mgrid .cl.we, .wkcols .c.we, .wkrows .r.we { background: color-mix(in srgb, color-mix(in srgb, var(--w-clay-2) 55%, var(--w-paper)) calc(var(--tile-we) * 100%), transparent); }
+/* #321: fainter than the floor, every text gets an outline of solid paper, 1px round each letter (not a blur: every pixel
+   next to a letter is the paper itself, so ink keeps the paper's own contrast on any wallpaper). The toast is ink of its own. */
+.wg.pl { --o: var(--w-paper); text-shadow: 1px 0 0 var(--o), -1px 0 0 var(--o), 0 1px 0 var(--o), 0 -1px 0 var(--o), 1px 1px 0 var(--o), -1px 1px 0 var(--o), 1px -1px 0 var(--o), -1px -1px 0 var(--o); }
+.wg.pl .wtoast { text-shadow: none; }
+/* 대비 증가: solid paper instead — one backing per line off the tiles (the floor and 20 % more), the tiles at 95 %. */
+@media (prefers-contrast: more) {
+  .wg.pl { text-shadow: none; }
+  .wg.pl .bk { --bk: min(100%, calc(var(--floor) * 100% + var(--backing-more))); background: color-mix(in srgb, var(--w-paper) var(--bk), transparent); border-radius: 6px; box-shadow: 0 0 0 2px color-mix(in srgb, var(--w-paper) var(--bk), transparent); }
+  .wg { --tile-min: 0.95; }
+}
+/* The day tiles: the paper at --tile (#321: fading with it); weekends and holidays with the paper's clay mixed in; today a
+   sage outline. */
+.mgrid .cl, .wkcols .c, .wkrows .r { background: color-mix(in srgb, var(--w-paper) calc(max(var(--tile), var(--tile-min)) * 100%), transparent); }
+.mgrid .cl.we, .wkcols .c.we, .wkrows .r.we { background: color-mix(in srgb, color-mix(in srgb, var(--w-clay-2) 55%, var(--w-paper)) calc(max(var(--tile), var(--tile-min)) * 100%), transparent); }
 /* Today: a sage outline; below 100 % with a ring of solid paper inside it (as every mark), so it shows on a faint tile. */
 .mgrid .cl.today, .wkcols .c.today, .wkrows .r.today { box-shadow: inset 0 0 0 1.5px var(--w-sage); }
 .wg.ha .mgrid .cl.today, .wg.ha .wkcols .c.today, .wg.ha .wkrows .r.today { box-shadow: inset 0 0 0 1.5px var(--w-sage), inset 0 0 0 3px var(--w-paper); }

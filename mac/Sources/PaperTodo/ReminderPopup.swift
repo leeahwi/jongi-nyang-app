@@ -309,7 +309,7 @@ final class ReminderPopupController {
     static var onPetAlert: (@MainActor () -> Void)?
 
     private func frame(above anchor: NSRect, size: NSSize) -> NSRect {
-        let area = (NSScreen.screens.first { $0.frame.intersects(anchor) } ?? NSScreen.main)?.visibleFrame ?? anchor
+        let area = NSScreen.holding(anchor)?.visibleFrame ?? anchor
         let x = min(max(anchor.midX - size.width / 2, area.minX + 8), area.maxX - size.width - 8)
         let y = min(anchor.maxY + 4, area.maxY - size.height)
         return NSRect(x: x, y: y, width: size.width, height: size.height)

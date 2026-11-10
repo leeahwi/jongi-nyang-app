@@ -113,7 +113,7 @@ enum ShortcutList {
     /// Shows the slip till 확인, Return or Esc; the groups scroll when the slip would be taller than the screen.
     static func show(note: GlobalShortcut?, drawer: GlobalShortcut?) {
         let groups = groups(note: note, drawer: drawer)
-        let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
+        let screen = NSScreen.withPointer
         let room = (screen?.visibleFrame.height ?? 800) - SlipMetrics.margin.top - SlipMetrics.margin.bottom - 40
         SlipAlert.present(title: L("종이냥 단축키")) { done in
             ShortcutListSlip(groups: groups, scrollHeight: ShortcutListSlip.scrollHeight(groups, room: room), onClose: done)

@@ -100,7 +100,7 @@ final class TaskReminderController {
             image: model.mascotImage,
             tasks: due.map(ReminderPopupTask.init),
             duration: duration(),
-            screen: NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main,
+            screen: NSScreen.withPointer,
             scheduled: true,
             notebookFont: model.notebookFont,
             style: model.reminderStyle,

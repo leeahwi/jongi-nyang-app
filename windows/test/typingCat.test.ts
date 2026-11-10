@@ -3,9 +3,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import {
-  keydownCounts, newTypingCat, readTypingCorner, readTypingScope, tapThrottle, toggledTypingScope, typedWithin, typingCatFrame, typingCatSize,
-  typingChatterQuietMs, typingCorners, typingCounts, typingHoldMs, typingKey, typingLingerMs, typingShows, typingSource, typingStop, typingWake,
-  type TypingCat, type TypingCorner, type TypingScope, type TypingSource,
+  keydownCounts, newTypingCat, onTypingCat, readTypingCorner, readTypingPlace, readTypingScope, readTypingSpot, tapThrottle, toggledTypingScope,
+  typedWithin, typingCatBox, typingCatDrawn, typingCatFrame, typingCatFrameFor, typingCatSize, typingChatterQuietMs, typingCornerValues,
+  typingCorners, typingCounts, typingDropped, typingHoldMs, typingKey, typingLingerMs, typingPlaceFrame, typingShows, typingSource, typingStop,
+  typingWake, type CornerRect, type TypingCat, type TypingCorner, type TypingPlace, type TypingScope, type TypingScreen, type TypingSource,
 } from "../src/core/typingCat";
 
 // 치면 두드리는 고양이 (#230 · #289): the shared cases from docs/plans/typing-cat-cases.json (the Mac's
@@ -18,7 +19,7 @@ const file = JSON.parse(fs.readFileSync(path.resolve(root, "..", "docs", "plans"
   counts: { case: string; repeat: boolean; command: boolean; control: boolean; counts: boolean }[];
   chatter: { case: string; lastKey: number; now: number; quiet: boolean }[];
   sources: { case: string; scope: TypingScope; granted: boolean; locked: boolean; petShown: boolean; source: TypingSource }[];
-  shows: { case: string; source: TypingSource; lastKey?: number; now: number; shows: boolean }[];
+  shows: { case: string; source: TypingSource; lastKey?: number; now: number; dragging?: boolean; dropped?: number; shows: boolean }[];
   moving: { scope: { case: string; now?: string; before?: string; scope: TypingScope }[]; corner: { case: string; now?: string; before?: string; corner: TypingCorner }[] };
   toggle: { case: string; scope: TypingScope; last?: TypingScope; scopeAfter: TypingScope; lastAfter?: TypingScope }[];
   frames: { case: string; corner: TypingCorner; screen: number[]; topInset: number; frame: number[] }[];
@@ -118,7 +119,7 @@ for (const entry of file.sources) {
   test(`typing cat: ${entry.case}`, () => assert.equal(typingSource(entry.scope, entry.granted, entry.locked), entry.source));
 }
 for (const entry of file.shows) {
-  test(`typing cat: ${entry.case}`, () => assert.equal(typingShows(entry.source, entry.lastKey, entry.now), entry.shows));
+  test(`typing cat: ${entry.case}`, () => assert.equal(typingShows(entry.source, entry.lastKey, entry.now, entry.dragging ?? false, entry.dropped), entry.shows));
 }
 test("typing cat: the settings moved from the pet's", () => {
   for (const entry of file.moving.scope) assert.equal(readTypingScope(entry.now, entry.before), entry.scope, entry.case);
@@ -149,6 +150,88 @@ test("typing cat corner: every corner of a work area stays inside it, 112 DIP", 
     }
   }
   assert.deepEqual(typingCatFrame("bottomRight", { x: 0, y: 0, width: 1920, height: 1040 }), { x: 1788, y: 908, width: 112, height: 112 });
+});
+
+// ─── #331 옮긴 자리 (docs/plans/typing-cat-place-cases.json; the Mac's test-typing-cat.sh reads the same file) ───
+
+type Box = [number, number, number, number];
+interface CaseScreen { id: string; frame: Box; visible: Box }
+const places = JSON.parse(fs.readFileSync(path.resolve(root, "..", "docs", "plans", "typing-cat-place-cases.json"), "utf8")) as {
+  drawn: { bands: ([number, number] | null)[]; box: { across: [number, number]; down: [number, number] }; hits: { case: string; at: [number, number]; on: boolean }[] };
+  screens: CaseScreen[];
+  dropped: { case: string; frame: Box; kept: Box; place: TypingPlace }[];
+  restored: { case: string; place: TypingPlace; size: number; screens?: CaseScreen[]; frame: Box | null }[];
+  chosen: { area: Box; cases: { case: string; corner: TypingCorner; place?: TypingPlace; size?: number; frame?: Box; sameAs?: TypingCorner }[] };
+  saved: { case: string; saved: unknown; place: TypingPlace | null }[];
+};
+const rect = ([x, y, width, height]: Box): CornerRect => ({ x, y, width, height });
+const screensOf = (list: CaseScreen[]): TypingScreen[] => list.map((entry) => ({ id: entry.id, frame: rect(entry.frame), visible: rect(entry.visible) }));
+const near = (actual: CornerRect | undefined, expected: Box | null, name: string) => {
+  if (expected === null || actual === undefined) return assert.equal(actual, expected ?? undefined, name);
+  const want = rect(expected);
+  for (const part of ["x", "y", "width", "height"] as const) assert.ok(Math.abs(actual[part] - want[part]) < 1e-6, `${name} ${part}: expected ${want[part]}, got ${actual[part]}`);
+};
+const samePlace = (actual: TypingPlace | undefined, expected: TypingPlace | null, name: string) => {
+  if (expected === null || actual === undefined) return assert.equal(actual, expected ?? undefined, name);
+  assert.equal(actual.screen, expected.screen, `${name} screen`);
+  for (const part of ["x", "y", "centerX", "centerY"] as const) assert.ok(Math.abs(actual[part] - expected[part]) < 1e-6, `${name} ${part}: expected ${expected[part]}, got ${actual[part]}`);
+};
+const allScreens = screensOf(places.screens);
+
+test("typing cat place: the drawn area is the app's", () => {
+  assert.deepEqual(typingCatDrawn, places.drawn.bands);
+  assert.deepEqual(typingCatBox(), places.drawn.box);
+});
+for (const entry of places.drawn.hits) {
+  test(`typing cat place: ${entry.case}`, () => assert.equal(onTypingCat(entry.at[0], entry.at[1]), entry.on));
+}
+for (const entry of places.dropped) {
+  test(`typing cat place: ${entry.case}`, () => {
+    const dropped = typingDropped(rect(entry.frame), allScreens);
+    near(dropped?.frame, entry.kept, "kept");
+    samePlace(dropped?.place, entry.place, "place");
+    // Wholly inside a display's work area, and read back where it was let go.
+    assert.ok(dropped && allScreens.some(({ visible: v }) => dropped.frame.x >= v.x && dropped.frame.y >= v.y
+      && dropped.frame.x + dropped.frame.width <= v.x + v.width && dropped.frame.y + dropped.frame.height <= v.y + v.height), "inside a display");
+    near(typingPlaceFrame(dropped.place, dropped.frame.width, allScreens), entry.kept, "read back");
+  });
+}
+for (const entry of places.restored) {
+  test(`typing cat place: ${entry.case}`, () => {
+    near(typingPlaceFrame(entry.place, entry.size, entry.screens ? screensOf(entry.screens) : allScreens), entry.frame, "frame");
+  });
+}
+for (const entry of places.chosen.cases) {
+  test(`typing cat place: ${entry.case}`, () => {
+    const area = rect(places.chosen.area), size = entry.size ?? typingCatSize;
+    const frame = typingCatFrameFor(entry.corner, entry.place, area, 0, size, allScreens);
+    if (entry.sameAs) assert.deepEqual(frame, typingCatFrame(entry.sameAs, area, 0, size));
+    else near(frame, entry.frame ?? null, "frame");
+  });
+}
+for (const entry of places.saved) {
+  test(`typing cat place: ${entry.case}`, () => {
+    const place = readTypingPlace(entry.saved);
+    samePlace(place, entry.place, "place");
+    // Through the settings file and back.
+    if (place) samePlace(readTypingPlace(JSON.parse(JSON.stringify(place))), entry.place, "saved again");
+  });
+}
+test("typing cat place: 자리 as saved — 옮긴 자리 only with a place, the four corners apart", () => {
+  assert.deepEqual(typingCorners, ["topLeft", "topRight", "bottomLeft", "bottomRight"]);
+  assert.deepEqual(typingCornerValues, [...typingCorners, "moved"]);
+  const place = places.dropped[0].place;
+  assert.deepEqual(readTypingSpot("moved", place), { typingCorner: "moved", typingPlace: place });
+  assert.deepEqual(readTypingSpot("moved", undefined), { typingCorner: "bottomRight" });
+  assert.deepEqual(readTypingSpot("topLeft", place), { typingCorner: "topLeft", typingPlace: place });
+  assert.deepEqual(readTypingSpot("middle", "nowhere"), { typingCorner: "bottomRight" });
+});
+test("typing cat place: the window moves by its whole bounds (#316: never setPosition) and the page hit-tests the drawn cat", () => {
+  const main = fs.readFileSync(path.join(root, "src/main/typingCat.ts"), "utf8").split("\n").map((line) => line.replace(/\/\/.*$/, "")).join("\n");
+  assert.ok(!main.includes("setPosition"), "no setPosition");
+  assert.match(main, /setIgnoreMouseEvents\(true, \{ forward: true \}\)/, "click-through, the moves forwarded");
+  const page = fs.readFileSync(path.join(root, "src/renderer/typingCat.ts"), "utf8");
+  assert.match(page, /onTypingCat\(/, "the page asks the drawn area");
 });
 
 test("typing cat: a page sends one tap per 50 ms at most, the first of a burst at once", () => {

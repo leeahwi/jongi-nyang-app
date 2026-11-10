@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60">
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9cc097"/><stop offset=".35" stop-color="#6f966b"/><stop offset=".65" stop-color="#5c7a5a"/><stop offset="1" stop-color="#3f5a3e"/></linearGradient>
+    <linearGradient id="band" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eeeae0"/><stop offset=".5" stop-color="#b8b2a3"/><stop offset="1" stop-color="#8a8475"/></linearGradient>
+    <linearGradient id="eraser" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0b7a2"/><stop offset="1" stop-color="#c47a62"/></linearGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4e2c4"/><stop offset="1" stop-color="#d4b68a"/></linearGradient>
+  </defs>
+  <path d="M18 14h22v32H18a8 8 0 0 1-8-8V22a8 8 0 0 1 8-8z" fill="url(#eraser)"/>
+  <rect x="38" y="12" width="22" height="36" rx="3" fill="url(#band)"/>
+  <path d="M44 12v36M52 12v36" stroke="#7d7768" stroke-opacity=".45" stroke-width="1.5"/>
+  <rect x="58" y="14" width="128" height="32" fill="url(#body)"/>
+  <path d="M58 25h128M58 35h128" stroke="#fff" stroke-opacity=".18" stroke-width="1.5"/>
+  <path d="M186 14l40 16-40 16z" fill="url(#wood)"/>
+  <path d="M213 25l13 5-13 5z" fill="#2f2e2a"/>
+  <path d="M58 17h128" stroke="#fff" stroke-opacity=".4" stroke-width="3" stroke-linecap="round"/>
+</svg>

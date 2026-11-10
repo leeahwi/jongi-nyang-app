@@ -13,7 +13,7 @@ enum NoteDocking {
     private static let key = "note.docked"
 
     static func frame(for window: NSWindow, side: DockSide) -> NSRect? {
-        guard let area = (window.screen ?? NSScreen.main)?.visibleFrame else { return nil }
+        guard let area = (window.screen ?? NSScreen.holding(window.frame))?.visibleFrame else { return nil }
         let width = window.frame.width
         let height = min(area.height, window.contentMaxSize.height)
         return NSRect(x: side == .left ? area.minX : area.maxX - width, y: area.maxY - height, width: width, height: height)

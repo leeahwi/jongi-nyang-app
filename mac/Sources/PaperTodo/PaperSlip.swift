@@ -653,7 +653,7 @@ class SlipPanel: NSPanel {
             let by = CGVector(dx: point.x - start.x, dy: point.y - start.y)
             if !moved, hypot(by.dx, by.dy) < 3 { continue }
             moved = true
-            let area = NSScreen.screens.first { $0.frame.contains(point) }?.visibleFrame
+            let area = NSScreen.at(point, nearest: false)?.visibleFrame
             setFrameOrigin(Self.dragged(NSRect(origin: origin, size: frame.size), by: by, in: area))
         }
         if moved {
@@ -708,7 +708,7 @@ class SlipPanel: NSPanel {
             setFrameOrigin(origin)
             return
         }
-        if let area = (NSScreen.screens.first { $0.frame.contains(point) } ?? NSScreen.main)?.visibleFrame {
+        if let area = NSScreen.at(point)?.visibleFrame {
             origin = Self.kept(NSRect(origin: origin, size: frame.size), in: area)
         }
         setFrameOrigin(origin)
@@ -742,7 +742,7 @@ struct SlipPlaces {
     /// Opens `panel` at its kept place on the screen with the pointer, else at the usual spot (a fifth down, centred).
     func place(_ panel: SlipPanel) {
         let mouse = NSEvent.mouseLocation
-        guard let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main else { return }
+        guard let screen = NSScreen.at(mouse) else { return }
         let area = screen.visibleFrame
         let kept = saved[Self.id(screen)].flatMap { $0.count == 4 ? SlipMove.Place(dx: $0[0], dy: $0[1], areaWidth: $0[2], areaHeight: $0[3]) : nil }
         if let point = SlipMove.placed(kept, size: CGSize(width: width, height: SlipMove.head), in: Self.flipped(area)) {

@@ -5,17 +5,31 @@ import SwiftUI
 // 바탕화면 위젯 (#234): 책상 → 일정 → 바탕화면 위젯 — off until one is added — the gallery of the six kinds, and one
 // widget's settings slip (shown on the widget at once; 취소 puts it back). This Mac's settings only.
 
-/// A widget drawn small, as it looks at 100 %: the desk's rows and the gallery.
+/// A widget drawn small, as it looks at 100 %: the desk's rows and the gallery. #319: one `WidgetState` for as long as it
+/// is shown (a new one each time `body` ran made the whole widget work itself out again), told when its kind or style
+/// changes.
 struct WidgetThumbnail: View {
     let kind: CalendarWidget.Kind
     let style: CalendarWidget.Style
     var opacity = 100
     let size: CGSize
+    @StateObject private var state: WidgetState
+
+    init(kind: CalendarWidget.Kind, style: CalendarWidget.Style, opacity: Int = 100, size: CGSize) {
+        self.kind = kind
+        self.style = style
+        self.opacity = opacity
+        self.size = size
+        _state = StateObject(wrappedValue: WidgetState(settings: Self.settings(kind, style, opacity)))
+    }
+
+    private static func settings(_ kind: CalendarWidget.Kind, _ style: CalendarWidget.Style, _ opacity: Int) -> CalendarWidget.Settings {
+        CalendarWidget.Settings(id: "preview", kind: kind, style: style, opacity: opacity)
+    }
 
     var body: some View {
         let paper = CalendarWidget.windowSize(kind, style)
         let scale = min(size.width / paper.width, size.height / paper.height)
-        let state = WidgetState(settings: CalendarWidget.Settings(id: "preview", kind: kind, style: style, opacity: opacity))
         CalendarWidgetView(state: state, feed: CalendarWidgets.shared.feed, widgets: CalendarWidgets.shared)
             .allowsHitTesting(false)
             .frame(width: paper.width, height: paper.height)
@@ -26,6 +40,7 @@ struct WidgetThumbnail: View {
                 LinearGradient(colors: [Color(red: 0.81, green: 0.88, blue: 0.92), Color(red: 0.91, green: 0.89, blue: 0.82)], startPoint: .top, endPoint: .bottom),
                 in: RoundedRectangle(cornerRadius: 9, style: .continuous))
             .accessibilityHidden(true)
+            .onChange(of: Self.settings(kind, style, opacity)) { _, settings in state.settings = settings }
     }
 }
 
@@ -109,11 +124,16 @@ struct WidgetGalleryView: View {
     @ObservedObject var widgets: CalendarWidgets
     let done: () -> Void
     @State var picked = 3
+    /// #319: the seven pictures, drawn once when the slip opens.
+    @State private var pictures = WidgetGalleryPictures()
+    @Environment(\.self) private var environment
     static let choices: [(CalendarWidget.Kind, CalendarWidget.Style)] = [
         (.today, .simple), (.week, .simple), (.week, .detail), (.month, .simple), (.month, .detail), (.month, .wall), (.agenda, .simple),
     ]
+    static let thumbnail = CGSize(width: 130, height: 88)
 
     var body: some View {
+        let images = pictures.images(environment)
         PaperSlip(kind: .event, width: 470) {
             VStack(alignment: .leading, spacing: 0) {
                 SlipHeader(kind: .event, symbol: "calendar", title: L("위젯 더하기"), onClose: done)
@@ -125,7 +145,7 @@ struct WidgetGalleryView: View {
                         ForEach(Array(Self.choices.enumerated()), id: \.offset) { index, choice in
                             Button { picked = index } label: {
                                 VStack(spacing: 5) {
-                                    WidgetThumbnail(kind: choice.0, style: choice.1, size: CGSize(width: 130, height: 88))
+                                    WidgetGalleryPicture(image: images[index], kind: choice.0, style: choice.1, scale: environment.displayScale)
                                         .overlay {
                                             RoundedRectangle(cornerRadius: 9, style: .continuous)
                                                 .strokeBorder(index == picked ? PaperTheme.sage : .clear, lineWidth: 2)
@@ -164,6 +184,56 @@ struct WidgetGalleryView: View {
                 }
             }
         }
+    }
+}
+
+/// #319: a gallery tile's picture — the widget drawn once into an image, so a pick (its border, its name's weight) doesn't
+/// lay out and draw seven whole widgets again. The live widget only if it couldn't be drawn.
+private struct WidgetGalleryPicture: View {
+    let image: CGImage?
+    let kind: CalendarWidget.Kind
+    let style: CalendarWidget.Style
+    let scale: CGFloat
+
+    var body: some View {
+        if let image {
+            Image(decorative: image, scale: scale)
+                .frame(width: WidgetGalleryView.thumbnail.width, height: WidgetGalleryView.thumbnail.height)
+        } else {
+            WidgetThumbnail(kind: kind, style: style, size: WidgetGalleryView.thumbnail)
+        }
+    }
+}
+
+/// #319: the gallery's pictures as the slip draws them (the paper, light or dark, contrast, language, the display's
+/// scale): drawn when the slip opens, and again only when one of those changes. They show the day they were drawn on.
+@MainActor
+final class WidgetGalleryPictures {
+    private struct Key: Equatable {
+        var paper: Int
+        var scheme: ColorScheme
+        var contrast: ColorSchemeContrast
+        var scale: CGFloat
+        var locale: Locale
+    }
+    private var key: Key?
+    private var images: [CGImage?] = []
+
+    /// Read in the gallery's `body`: a paper picked while it is open (PaperLook's revision) draws them again.
+    func images(_ environment: EnvironmentValues) -> [CGImage?] {
+        let key = Key(paper: PaperLook.shared.revision, scheme: environment.colorScheme, contrast: environment.colorSchemeContrast,
+                      scale: environment.displayScale, locale: environment.locale)
+        if key != self.key {
+            images = WidgetGalleryView.choices.map { kind, style in
+                let renderer = ImageRenderer(content: WidgetThumbnail(kind: kind, style: style, size: WidgetGalleryView.thumbnail)
+                    .environment(\.self, environment))
+                renderer.scale = key.scale
+                renderer.isOpaque = false
+                return renderer.cgImage
+            }
+            self.key = key
+        }
+        return images
     }
 }
 

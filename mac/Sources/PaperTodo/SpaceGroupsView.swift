@@ -134,6 +134,9 @@ struct SpaceColumn: View {
     let byID: [UUID: TodoItem]
     let shared: TaskRowShared
     let rowGroups: [UUID: String]
+    /// The rows' scrolling area: the paper's ruling fills it down to the column's foot (#328).
+    @State private var viewport: CGFloat = 0
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         let space = model.todoSpaces.space(group.space)
@@ -173,32 +176,49 @@ struct SpaceColumn: View {
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
             .accessibilityLabel(name + ", " + SpaceGroupWords.left(group.open, language: .current))
+            // #328: the column is a piece of the paper. 모눈's squares run under the whole column, rows and all (the rows are
+            // 36 or 52 pt, not four squares, so they draw none of their own, and no line); the other papers rule each row
+            // as the sheet does, and carry on under `+ 회사에 넣기` (the next empty line) to the column's foot.
+            let grid = PaperLook.shared.paper(dark: colorScheme == .dark).ruling == .grid
+            let pitch = TaskRowStyle.inset.height
             ScrollView(.vertical) {
-                LazyVStack(spacing: 0) {
-                    ForEach(rows) { item in
-                        TaskRow(item: item, model: model, rowDrop: $rowDrop, ruled: item.id != rows.last?.id,
-                                nextTime: group.times[item.id], groupRows: reorder, shared: shared, style: .inset,
-                                onDragPoint: { point in drag.place(item.id, at: point, from: group.id, rowGroups: rowGroups, into: $rowDrop) },
-                                onDragEnd: { accepted in dropped(item.id, accepted: accepted) }, band: false, metaBelow: true)
-                            .padding(.horizontal, 4)
-                            .opacity(drag.source == item.id ? 0.55 : 1)
-                            .groupFrame(dragging, group: group.id, row: item.id)
-                            .id(item.id)
+                VStack(spacing: 0) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(rows) { item in
+                            TaskRow(item: item, model: model, rowDrop: $rowDrop, ruled: !grid,
+                                    nextTime: group.times[item.id], groupRows: reorder, shared: shared, style: .inset,
+                                    onDragPoint: { point in drag.place(item.id, at: point, from: group.id, rowGroups: rowGroups, into: $rowDrop) },
+                                    onDragEnd: { accepted in dropped(item.id, accepted: accepted) }, band: false, metaBelow: true,
+                                    dimmed: drag.source == item.id)
+                                .padding(.horizontal, 4)
+                                .groupFrame(dragging, group: group.id, row: item.id)
+                                .id(item.id)
+                        }
                     }
                     Button { model.writeInGroup(group.id) } label: {
                         Text(SpaceGroupWords.addTo(name, language: .current))
                             .font(.system(size: 11))
                             .foregroundStyle(PaperTheme.ink3)
                             .lineLimit(1)
-                            .frame(maxWidth: .infinity, minHeight: 30, alignment: .leading)
+                            .frame(maxWidth: .infinity, minHeight: pitch, alignment: .leading)
                             .padding(.leading, 12)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help(SpaceGroupWords.addTo(name, language: .current))
+                    .background(alignment: .top) {
+                        if !grid {
+                            PaperRules(pitch: pitch).padding(.horizontal, 4).frame(height: max(pitch, viewport), alignment: .top)
+                        }
+                    }
+                }
+                .frame(minHeight: viewport, alignment: .top)
+                .background(alignment: .top) {
+                    if grid { PaperRules().padding(.horizontal, 4) }
                 }
             }
             .scrollIndicators(.never)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { viewport = $0 }
         }
         .background {
             shape.fill(PaperTheme.card)
@@ -346,12 +366,13 @@ struct SpaceGroupRows: View {
                 .groupFrame(dragging, group: group.id)
                 ForEach(rows) { item in
                     let last = item.id == rows.last?.id && !doneFold
-                    TaskRow(item: item, model: model, rowDrop: $rowDrop, ruled: !(card && last),
+                    // #328: a card's last row keeps 모눈's squares and 원고지's cells; only its line goes (the card's edge).
+                    TaskRow(item: item, model: model, rowDrop: $rowDrop, ruled: true,
                             nextTime: group.times[item.id], stripMark: marks[item.id.uuidString], groupRows: reorder,
                             edges: RowEdges(item.id, first: firstID, last: lastID), shared: shared,
                             onDragPoint: { point in drag.place(item.id, at: point, from: group.id, rowGroups: rowGroups, into: $rowDrop) },
-                            onDragEnd: { accepted in dropped(item.id, accepted: accepted) }, band: !card)
-                        .opacity(drag.source == item.id ? 0.55 : 1)
+                            onDragEnd: { accepted in dropped(item.id, accepted: accepted) }, band: !card,
+                            footLine: !(card && last), dimmed: drag.source == item.id)
                         .groupLit(!card && lit, space: space)
                         .cardSlice(card, bottom: last, lit: lit ? space : nil, litGeneral: lit && space == nil)
                         .groupFrame(dragging, group: group.id, row: item.id)

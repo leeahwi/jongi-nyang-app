@@ -29,7 +29,7 @@ final class SearchController {
             panel.placeSlip(topCenter: NSPoint(x: note.midX, y: note.maxY - 54))
         } else {
             let mouse = NSEvent.mouseLocation
-            let screen = NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main
+            let screen = NSScreen.at(mouse)
             if let area = screen?.visibleFrame { panel.placeSlip(topCenter: NSPoint(x: area.midX, y: area.maxY - area.height / 6)) }
         }
         TestHooks.activate()

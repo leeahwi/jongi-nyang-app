@@ -818,7 +818,10 @@
 .lines.board .row .time, .lines.board .row .due, .lines.board .row .carry, .lines.board .row .sent-mark { display: none; }
 .lines.board .row:has(.subline:not([hidden])) { height: 50px; }
 .lines.board .sgroup-rows > .row { background-size: calc(100% - 24px) 1px; background-position: 12px 100%; }
-.lines.board .sgroup-rows > .row:last-child { background-image: none; }
+/* #332: every line of a column ends on a rule — the last row, ‘+ 넣기’ and 완료 too — and the rules go on to the
+   column's bottom (an empty part after the last line, as the Mac's #328), so a lined paper's column is ruled all the way. */
+.lines.board .sgroup-done, .lines.board .sgroup-add { height: 36px; background-image: linear-gradient(var(--rule), var(--rule)); background-repeat: no-repeat; background-size: calc(100% - 32px) 1px; background-position: 16px 100%; }
+.lines.board > .sgroup::after { content: ""; flex: 1 1 0; min-height: 0; margin: 0 16px; pointer-events: none; background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 35px, var(--rule) 35px, var(--rule) 36px); }
 .lines.board .row.selected { background-image: linear-gradient(var(--sage), var(--sage)); background-size: 2px calc(100% - 10px); background-position: 1px 5px; }
 .lines.board .row.drop-before::before, .lines.board .row.drop-after::before { left: 16px; right: 8px; }
 .sgroup-add { flex: none; height: 30px; display: flex; align-items: center; padding: 0 12px; font: 400 11px var(--ui); color: var(--ink-3); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

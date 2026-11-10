@@ -1,7 +1,7 @@
 import { allDayText, cellItems, dayTitle, fetchRange, foldedLabel, foldedRepeats, monthGrid, monthTitle, repeatWord, weekDays, weekTitle, type CalendarEvent, type DayTask } from "../core/calendar";
 import {
   agenda, backing, bolder, dayLines, dots, drawnOpacity, earHeightOf, earOpacity, earScale, edgeStrength, emptyText, floorOf, halo, inkOnly, lineSpoken, linesOf,
-  moreLabel, nextRedraw, pageDays, pageOffset, rgbOf, shiftedMonth, stepDay, tile, upcoming, weekendTint, weekRow, widgetAddedText, widgetSize, widgetToday,
+  moreLabel, nextRedraw, pageDays, pageOffset, rgbOf, shiftedMonth, stepDay, tile, upcoming, weekRow, widgetAddedText, widgetSize, widgetToday,
   type WidgetLine, type WidgetSettings,
 } from "../core/calendarWidget";
 import { eventMark, expand } from "../core/events";
@@ -17,10 +17,10 @@ import { waitsForAnswer } from "./widgetAsk";
 
 /**
  * 바탕화면 달력 위젯 (#234): one widget's page — 오늘 · 이번 주 (간단히 · 자세히) · 이번 달 (간단히 · 자세히) · 오늘 목록,
- * drawn from the app's state with the desk calendar's core (core/calendarWidget.ts, calendarCells.ts). Only the paper fades;
- * the classes on the widget say how the text stays readable (ink, rings, bolder numbers). Each day of the week and the month
- * is a paper tile that never fades below the paper's floor (ink keeps 4.5:1 on it over any wallpaper; #234 4-6), weekends
- * and holidays tinted with the paper's clay; the text off the tiles gets a backing at the floor below it. The lunar date and
+ * drawn from the app's state with the desk calendar's core (core/calendarWidget.ts, calendarCells.ts). The paper, its day
+ * tiles and the ears fade (#321); the classes on the widget say how the text stays readable (ink, rings, bolder numbers, and
+ * below the paper's floor an outline of solid paper round every letter, so the desktop shows through). Weekends and
+ * holidays are tinted with the paper's clay. The lunar date and
  * Korea's holidays show while their switches are on (책상 → 일정 → 달력). Hovering makes it solid
  * (마우스를 올리면 선명하게). The page tells the main process where it takes the mouse: the paper (unless 클릭 통과, or with
  * Ctrl held) and the ears; the clicks go through everywhere else. A day, a +N or the + opens the day sheet; an event's
@@ -75,8 +75,6 @@ const weekendOf = (day: string, holiday?: string) => { const weekday = fromKey(d
 
 /** The paper's floor (#234): from the paper and ink the page draws with now (a theme of #244 too). */
 let floor = 60;
-/** The tinted tiles' own floor (weekends and holidays). */
-let weekendFloor = 65;
 function hexOf(value: string): string | undefined {
   const text = value.trim();
   if (/^#[0-9a-f]{6}$/i.test(text)) return text;
@@ -87,12 +85,10 @@ function hexOf(value: string): string | undefined {
 function readFloor(): void {
   const style = getComputedStyle(document.documentElement);
   const paperHex = hexOf(style.getPropertyValue("--w-paper")), inkHex = hexOf(style.getPropertyValue("--w-ink"));
-  const clayHex = hexOf(style.getPropertyValue("--w-clay-2"));
   if (!paperHex || !inkHex) return;
   const paperRgb = rgbOf(paperHex), inkRgb = rgbOf(inkHex);
   const light = 0.2126 * paperRgb[0] + 0.7152 * paperRgb[1] + 0.0722 * paperRgb[2] > 0.4;
   floor = floorOf(paperRgb, inkRgb, !light);
-  weekendFloor = clayHex ? Math.max(floor, floorOf(weekendTint(rgbOf(clayHex), paperRgb), inkRgb, !light)) : floor;
 }
 
 function markOf(line: WidgetLine): HTMLElement {
@@ -374,8 +370,7 @@ function look(): void {
   const drawn = drawnOpacity(settings.opacity, reduceTransparency.matches, hovering, settings.solidOnHover);
   root.style.setProperty("--op", String(drawn / 100));
   root.style.setProperty("--edge", String(edgeStrength(drawn)));
-  root.style.setProperty("--tile", String(tile(drawn, floor) / 100));
-  root.style.setProperty("--tile-we", String(tile(drawn, weekendFloor) / 100));
+  root.style.setProperty("--tile", String(tile(drawn) / 100));
   root.style.setProperty("--floor", String(floor / 100));
   root.classList.toggle("fd", inkOnly(drawn));
   root.classList.toggle("pl", backing(drawn, floor));

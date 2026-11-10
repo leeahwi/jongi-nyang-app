@@ -37,7 +37,7 @@ import { megabytes } from "../core/fileLimits";
 import { checkedDeviceRules, cleanedDeviceRules, deviceKey, deviceRings, hiddenSpaces, readDeviceRules, storedDeviceRules, type StoredRules } from "../core/spaceDevice";
 
 import type { SlipPlace } from "../core/slipMove";
-import { readTypingCorner, readTypingScope, typingScopes } from "../core/typingCat";
+import { readTypingScope, readTypingSpot, typingScopes } from "../core/typingCat";
 import { readCatSize } from "../core/catSize";
 
 export interface WindowMemory {
@@ -1433,7 +1433,9 @@ export class Store extends EventEmitter {
         drawerSide: known.drawerSide === "left" ? "left" : "right",
         // #289: 타닥냥, moved from the pet's 글자 칠 때 두드리기 (`petTyping`) the first time.
         typingCat: readTypingScope(known.typingCat, (saved.prefs as Record<string, unknown> | undefined)?.petTyping),
-        typingCorner: readTypingCorner(known.typingCorner), typingCatLast: readTypingLast((saved.prefs as Record<string, unknown> | undefined)?.typingCatLast),
+        typingCatLast: readTypingLast((saved.prefs as Record<string, unknown> | undefined)?.typingCatLast),
+        // #331: 옮긴 자리 only with a place kept (else the corner unless changed).
+        ...readTypingSpot(known.typingCorner, (saved.prefs as Record<string, unknown> | undefined)?.typingPlace),
         // #304: 크기 of the pet and of 타닥냥 (anything odd: 보통).
         petSize: readCatSize(known.petSize), typingSize: readCatSize(known.typingSize),
         drawerBackdrop: readDrawerBackdrop(known.drawerBackdrop), drawerPinnedSort: readSort(known.drawerPinnedSort), drawerPinnedView: readView(known.drawerPinnedView),

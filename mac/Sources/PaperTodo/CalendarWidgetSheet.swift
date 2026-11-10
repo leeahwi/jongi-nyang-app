@@ -57,7 +57,7 @@ final class WidgetDaySheetController {
             panel.setFrameOrigin(NSPoint(x: -40_000, y: -40_000))
             return
         }
-        let area = (widget.screen ?? NSScreen.main)?.visibleFrame ?? widget.frame
+        let area = (widget.screen ?? NSScreen.holding(widget.frame))?.visibleFrame ?? widget.frame
         let width = WidgetDaySheetView.width + SlipMetrics.margin.leading + SlipMetrics.margin.trailing
         let gap: CGFloat = 8
         let right = area.maxX - widget.frame.maxX >= widget.frame.minX - area.minX

@@ -1724,6 +1724,59 @@ private enum PresentationTests {
             try expect(one.ink.symmetricDifference(typingOne.ink).count <= 1, "one line: the same rows with the keyboard (\(one.ink.sorted()) vs \(typingOne.ink.sorted()))")
         }
 
+        try await test("#328: a board column is ruled down to its foot — 모눈's squares, 원고지's cells, the lines") {
+            _ = NSApplication.shared
+            let fixture = try Fixture(items: [("보고서 쓰기", false), ("장보기", false)])
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            let work = model.addTodoSpace(name: "회사", color: .pink)!
+            for item in model.items { model.moveTodo(item.id, toSpace: work, toast: false) }
+            model.toast = nil
+            model.groupBySpace = true
+            model.spaceBoardShown = true
+            defer { model.paperTheme = .day }
+            guard let group = model.spaceGroups().first else { throw TestFailure(description: "no group") }
+            let byID = Dictionary(uniqueKeysWithValues: model.items.map { ($0.id, $0) })
+            /// The column (240 × 400, never on screen) and how many of the rows of points in its empty foot (below 260 pt:
+            /// the head, two rows and `+ 회사에 넣기` end near 150) carry a rule across the middle.
+            @MainActor func ruledRows(_ paper: PaperKind) throws -> Int {
+                model.paperTheme = paper
+                let column = SpaceColumn(model: model, drag: SpaceGroupDrag(), rowDrop: .constant(nil), group: group, byID: byID,
+                                         shared: TaskRowShared(model), rowGroups: [:])
+                    .frame(width: 240, height: 400)
+                let hosting = NSHostingView(rootView: column)
+                let window = NSWindow(contentRect: NSRect(x: -40_000, y: -40_000, width: 240, height: 400), styleMask: [.borderless], backing: .buffered, defer: false)
+                window.isReleasedWhenClosed = false
+                window.appearance = NSAppearance(named: .aqua)
+                defer { window.close() }
+                window.contentView = hosting
+                hosting.frame = NSRect(x: 0, y: 0, width: 240, height: 400)
+                hosting.layoutSubtreeIfNeeded()
+                RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+                hosting.layoutSubtreeIfNeeded()
+                guard let bitmap = hosting.bitmapImageRepForCachingDisplay(in: hosting.bounds) else { throw TestFailure(description: "no picture") }
+                hosting.cacheDisplay(in: hosting.bounds, to: bitmap)
+                let scale = CGFloat(bitmap.pixelsHigh) / 400
+                var rows = Set<Int>()
+                for y in Int(260 * scale)..<Int(390 * scale) {
+                    // The card beside the rules (left of where they start) against the middle of the column.
+                    guard let card = bitmap.colorAt(x: Int(10 * scale), y: y)?.usingColorSpace(.deviceRGB) else { continue }
+                    let xs = stride(from: Int(60 * scale), to: Int(180 * scale), by: 1)
+                    let marked = xs.filter { x in
+                        guard let p = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { return false }
+                        return abs(p.redComponent - card.redComponent) + abs(p.greenComponent - card.greenComponent) + abs(p.blueComponent - card.blueComponent) > 0.03
+                    }
+                    if marked.count > xs.underestimatedCount / 2 { rows.insert(Int(CGFloat(y) / scale)) }
+                }
+                return rows.count
+            }
+            // 130 pt of empty foot: 모눈's squares every 11 pt (about 11 rules), 원고지's bands and 낮 종이's lines every 36 pt.
+            let grid = try ruledRows(.grid), manuscript = try ruledRows(.manuscript), day = try ruledRows(.day)
+            try expect(grid >= 9, "모눈: squares down to the column's foot (\(grid) ruled rows)")
+            try expect(manuscript >= 4, "원고지: cells down to the column's foot (\(manuscript) ruled rows)")
+            try expect(day >= 3, "낮 종이: lines down to the column's foot (\(day) ruled rows)")
+        }
+
         try await test("#185: while 모든 스페이스 ▾ is open a plain 1–9 picks that space and 0 모든 스페이스; the rows keep ⌥⌘") {
             _ = NSApplication.shared
             let fixture = try Fixture(items: [("보고서 쓰기", false)])

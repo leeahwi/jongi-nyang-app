@@ -233,8 +233,9 @@ public enum CalendarWidget {
     /// sits on the same colour as on an 85 % paper whatever the wallpaper is.
     public static let backingOpacity = 85
 
-    /// The paper's floor (#234, frosted tiles): the faintest a day's tile or a line's backing may be, so ink on it keeps
-    /// 4.5:1 over the worst wallpaper (black behind a light paper, white behind a dark one) — in 5 % steps. Day paper 60,
+    /// The paper's floor (#234): the faintest the paper may be with ink on it alone keeping 4.5:1 over the worst wallpaper
+    /// (black behind a light paper, white behind a dark one) — in 5 % steps. Fainter than that, the text gets its outline of
+    /// paper (`backing`, #321). Day paper 60,
     /// kraft 65, night 75 (docs/plans/calendar-widget-cases.json `floors`, every paper of #244).
     public static func floor(paper: (Double, Double, Double), ink: (Double, Double, Double), dark: Bool) -> Int {
         let worst = dark ? (1.0, 1.0, 1.0) : (0.0, 0.0, 0.0), other = dark ? (0.0, 0.0, 0.0) : (1.0, 1.0, 1.0)
@@ -255,11 +256,13 @@ public enum CalendarWidget {
     /// Today's sage outline keeps a ring of solid paper inside it below 100 %, as every mark does (O11).
     public static func todayRing(_ drawn: Int) -> Bool { halo(drawn) }
 
-    /// A day's tile (the month and the week): the paper as drawn, never fainter than its floor.
-    public static func tile(_ drawn: Int, floor: Int) -> Int { max(drawn, floor) }
+    /// A day's tile (the month and the week): the paper as drawn (#321: it fades with the paper, so the desktop shows
+    /// through it as through the paper; the text on it keeps 4.5:1 by its outline, `backing`).
+    public static func tile(_ drawn: Int) -> Int { drawn }
 
-    /// Text off the tiles (the heading, the weekday letters, a line of 오늘 · 오늘 목록) gets a backing of the paper at its
-    /// floor once the paper is fainter than that (O2).
+    /// #321: every text (on a tile or off it) gets an outline of solid paper (1 pt round each letter) once the paper is
+    /// fainter than its floor, so ink keeps the paper's own contrast on any wallpaper while the desktop shows through.
+    /// It was a block of paper at the floor behind the text off the tiles, and the tiles never went below the floor (O2).
     public static func backing(_ drawn: Int, floor: Int) -> Bool { drawn < floor }
 
     /// sRGB (0–1, rounded to 0–255 as the app's colours are): `alpha` of `a` over `b`.
@@ -291,8 +294,9 @@ public enum CalendarWidget {
         return CalendarWidget.opacity(opacity)
     }
 
-    /// The ears never go below 85 % (O5): they are the handle to find, move and open the widget, also while clicks pass.
-    public static let earFloor = 85
+    /// The ears fade with the paper (#321) but never below half (O5), as the edge line (O8): they are the handle to find,
+    /// move and open the widget, also while clicks pass. (At 85 they stood dark over a faint paper.)
+    public static let earFloor = 50
     public static func earOpacity(_ drawn: Int) -> Int { max(drawn, earFloor) }
 
     /// The edge line's strength (0–1): never fainter than half, so the widget's border reads on any wallpaper.

@@ -123,6 +123,21 @@ enum TypingCatBench {
         model.petVisible = true
         await wait(0.3)
 
+        // #331: held by a drag in this app, it doesn't go; let go, it stays `linger` from then.
+        await wait(3.2)
+        typing.typed()
+        typing.dragBegan()
+        await wait(3.3)
+        check("held by a drag 3 s after the last key: still out (종이냥에서만 waits)", typing.isShown && typing.dragging)
+        typing.dragEnded()
+        await wait(2.5)
+        check("let go: it stays 3 s from then", typing.isShown)
+        await wait(0.8)
+        check("…then quietly goes, nothing waits", !typing.isShown && typing.isQuiet)
+        model.typingCorner = .topLeft
+        model.typingPlace = nil
+        await wait(0.1)
+
         // The setting.
         model.typingScope = .off
         await wait(0.2)
@@ -151,6 +166,48 @@ enum TypingCatBench {
         await wait(0.2)
         if let screen, let frame = typing.frame {
             check("자리 changed: bottom right now", frame.maxX - 40_000 == screen.frame.maxX - 20 && frame.minY == screen.frame.minY + 20)
+        }
+        // #331: dragged and let go as the window's view does it (off the screens here; read back on the real displays).
+        check("at rest the clear window lets clicks through", typing.passesClicks)
+        func onScreens(_ frame: NSRect?) -> Bool {
+            guard let frame else { return false }
+            return NSScreen.screens.contains { $0.visibleFrame.contains(frame.offsetBy(dx: -40_000, dy: 0)) }
+        }
+        if let before = typing.frame {
+            typing.drag(by: CGVector(dx: -300, dy: 200))
+            await wait(0.2)
+            let moved = typing.frame ?? .zero
+            check("dragged: it stays where it was let go, 옮긴 자리 chosen and kept",
+                  model.typingCorner == .moved && model.typingPlace != nil
+                  && abs(moved.minX - (before.minX - 300)) < 0.5 && abs(moved.minY - (before.minY + 200)) < 0.5 && onScreens(moved))
+            typing.drag(by: CGVector(dx: 6_000, dy: -6_000))
+            await wait(0.2)
+            check("dragged far past the screen's corner: kept wholly on a screen", onScreens(typing.frame))
+            typing.drag(by: CGVector(dx: -500, dy: 300))
+            await wait(0.2)
+            let centre = NSPoint(x: typing.frame?.midX ?? 0, y: typing.frame?.midY ?? 0)
+            model.typingSize = .large
+            await wait(0.2)
+            let large = typing.frame ?? .zero
+            check("크기 larger: the same centre, still on the screen",
+                  large.width == CatSize.large.typingSize && abs(large.midX - centre.x) < 0.5 && abs(large.midY - centre.y) < 0.5 && onScreens(large))
+            model.typingSize = .regular
+            await wait(0.2)
+            let place = model.typingPlace
+            let reopened = AppModel(storageURL: folder.appendingPathComponent("todos.json"), isolated: true, preferences: preferences)
+            check("opened again: 옮긴 자리 with the same place", reopened.typingCorner == .moved && reopened.typingPlace == place)
+            model.typingCorner = .topLeft
+            await wait(0.2)
+            if let screen, let frame = typing.frame {
+                check("a corner chosen: back in it, the place kept for 옮긴 자리",
+                      frame.minX - 40_000 == screen.frame.minX + 20 && model.typingPlace == place)
+            }
+            model.typingCorner = .moved
+            await wait(0.2)
+            check("옮긴 자리 chosen again: back where it was let go",
+                  abs((typing.frame?.midX ?? 0) - centre.x) < 0.5 && abs((typing.frame?.midY ?? 0) - centre.y) < 0.5)
+            model.typingCorner = .bottomRight
+            await wait(0.2)
         }
         typing.typed()
         await wait(3.3)

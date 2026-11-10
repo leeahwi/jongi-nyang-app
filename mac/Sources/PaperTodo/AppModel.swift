@@ -44,6 +44,8 @@ final class AppModel: ObservableObject {
     /// Monitoring), and the corner it sits in. Device settings.
     @Published var typingScope: TypingCat.Scope { didSet { preferences.set(typingScope.rawValue, forKey: "typing.scope") } }
     @Published var typingCorner: TypingCorner.Corner { didSet { preferences.set(typingCorner.rawValue, forKey: "typing.corner") } }
+    /// #331: 옮긴 자리 — where the cat was last dragged to (kept when a corner is chosen, so it can be chosen again).
+    @Published var typingPlace: TypingPlace? { didSet { preferences.set(typingPlace?.saved, forKey: "typing.place") } }
     /// The menu bar's 타닥냥: off, or back to what it was before (`typing.scope.last`).
     func toggleTypingCat() {
         let last = preferences.string(forKey: "typing.scope.last").map { TypingCat.Scope(saved: $0) }
@@ -671,7 +673,11 @@ final class AppModel: ObservableObject {
         typingSize = CatSize(saved: store.string(forKey: "typing.size"))
         // #289: moved from the pet's ‘글자 칠 때 두드리기’ and the full-screen cat's corner (those keys are left as they were).
         typingScope = TypingCat.Scope(saved: store.string(forKey: "typing.scope"), before: store.string(forKey: "pet.typing"))
-        typingCorner = TypingCorner.Corner(saved: store.string(forKey: "typing.corner"), before: store.string(forKey: "pet.companion.corner"))
+        // #331: 옮긴 자리 only with a place kept (else the corner unless changed).
+        let place = TypingPlace(saved: store.dictionary(forKey: "typing.place"))
+        let corner = TypingCorner.Corner(saved: store.string(forKey: "typing.corner"), before: store.string(forKey: "pet.companion.corner"))
+        typingCorner = corner == .moved && place == nil ? .fallback : corner
+        typingPlace = place
         chatterEnabled = flag("chatter.enabled", true)
         chatterFrequency = PetChatter.Frequency(rawValue: store.string(forKey: "chatter.frequency") ?? "") ?? .normal
         chatterQuestions = flag("chatter.questions", true)

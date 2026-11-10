@@ -207,7 +207,7 @@ for (const entry of file.opacity as Json[]) {
       const values = entry.opacity as number[];
       const floor = floorFor((entry.paper as string | undefined) ?? "day");
       if (entry.backing) assert.deepEqual(values.map((value) => backing(value, floor)), entry.backing);
-      if (entry.tile) assert.deepEqual(values.map((value) => tile(value, floor)), entry.tile);
+      if (entry.tile) assert.deepEqual(values.map(tile), entry.tile);
       if (entry.inkOnly) assert.deepEqual(values.map(inkOnly), entry.inkOnly);
       if (entry.ear) assert.deepEqual(values.map(earOpacity), entry.ear);
       if (entry.bolder) assert.deepEqual(values.map(bolder), entry.bolder);

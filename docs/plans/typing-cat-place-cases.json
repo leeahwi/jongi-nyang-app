@@ -1,0 +1,60 @@
+{
+  "about": "#331 타닥냥을 끌어 옮기기: the cases both apps run — Mac scripts/test-typing-cat.sh (PaperCore/TypingCat.swift: TypingCorner · TypingPlace), Windows test/typingCat.test.ts (src/core/typingCat.ts). Pressed on the drawn cat and dragged, the window follows; let go, it is kept wholly inside the usable area (Mac visibleFrame · Windows workArea) of the display it is mostly on (or the nearest), and that place is kept as 옮긴 자리 (`moved`): the display's id, the centre as a fraction of that area, and the centre itself (for when the display is gone). Rects are [x, y, width, height] in each app's own screen coordinates (Mac y up, Windows y down): nothing here depends on which way y goes. Numbers are compared to 1e-6.",
+  "drawn": {
+    "about": "The cat's drawn area: 16 bands from the top of its picture, each the part across it with paint in any of the three poses (null: none). `box` is the box around it. `at` is [across, down] as fractions of the window.",
+    "bands": [null, [0.296875, 0.796875], [0.265625, 0.828125], [0.25, 0.859375], [0.21875, 0.90625], [0.203125, 0.90625], [0.171875, 0.90625], [0.171875, 0.890625], [0.171875, 0.890625], [0.125, 0.875], [0.125, 0.828125], [0.125, 0.828125], [0.078125, 0.859375], [0.078125, 0.875], [0.09375, 0.875], null],
+    "box": { "across": [0.078125, 0.90625], "down": [0.0625, 0.9375] },
+    "hits": [
+      { "case": "D1 the middle of the cat: it takes the press", "at": [0.5, 0.5], "on": true },
+      { "case": "D2 the clear top left corner: the click goes to the app behind", "at": [0.03, 0.03], "on": false },
+      { "case": "D3 the clear top right corner", "at": [0.97, 0.03], "on": false },
+      { "case": "D4 the clear row under the cushion", "at": [0.5, 0.97], "on": false },
+      { "case": "D5 the cushion's left end", "at": [0.1, 0.85], "on": true },
+      { "case": "D6 beside the head", "at": [0.1, 0.2], "on": false },
+      { "case": "D7 outside the window", "at": [1.2, 0.5], "on": false }
+    ]
+  },
+  "screens": [
+    { "id": "1", "frame": [0, 0, 1440, 900], "visible": [0, 0, 1440, 860] },
+    { "id": "2", "frame": [1440, -180, 1920, 1080], "visible": [1440, -180, 1920, 1080] }
+  ],
+  "dropped": [
+    { "case": "P1 let go in the middle of the first display: it stays, kept as fractions of that display", "frame": [664, 374, 112, 112],
+      "kept": [664, 374, 112, 112], "place": { "screen": "1", "x": 0.5, "y": 0.5, "centerX": 720, "centerY": 430 } },
+    { "case": "P2 let go across two displays: on the one it is mostly on, wholly inside it", "frame": [1400, 100, 112, 112],
+      "kept": [1440, 100, 112, 112], "place": { "screen": "2", "x": 0.029166666666666667, "y": 0.3111111111111111, "centerX": 1496, "centerY": 156 } },
+    { "case": "P3 let go past the bottom edge (the Dock · the taskbar): kept inside", "frame": [100, -60, 112, 112],
+      "kept": [100, 0, 112, 112], "place": { "screen": "1", "x": 0.10833333333333334, "y": 0.06511627906976744, "centerX": 156, "centerY": 56 } },
+    { "case": "P4 let go off every display: on the nearest, inside", "frame": [-300, 300, 112, 112],
+      "kept": [0, 300, 112, 112], "place": { "screen": "1", "x": 0.03888888888888889, "y": 0.413953488372093, "centerX": 56, "centerY": 356 } }
+  ],
+  "restored": [
+    { "case": "R1 opened again: the same place on the same display", "place": { "screen": "1", "x": 0.5, "y": 0.5, "centerX": 720, "centerY": 430 }, "size": 112, "frame": [664, 374, 112, 112] },
+    { "case": "R2 크기 made larger: the same centre", "place": { "screen": "1", "x": 0.5, "y": 0.5, "centerX": 720, "centerY": 430 }, "size": 168, "frame": [636, 346, 168, 168] },
+    { "case": "R3 크기 made smaller: the same centre", "place": { "screen": "1", "x": 0.5, "y": 0.5, "centerX": 720, "centerY": 430 }, "size": 90, "frame": [675, 385, 90, 90] },
+    { "case": "R4 near an edge, made larger: still wholly inside", "place": { "screen": "1", "x": 0.98, "y": 0.5, "centerX": 1411.2, "centerY": 430 }, "size": 168, "frame": [1272, 346, 168, 168] },
+    { "case": "R5 the display's resolution changed: as far across as before", "place": { "screen": "1", "x": 0.5, "y": 0.5, "centerX": 720, "centerY": 430 }, "size": 112,
+      "screens": [{ "id": "1", "frame": [0, 0, 1280, 800], "visible": [0, 0, 1280, 760] }], "frame": [584, 324, 112, 112] },
+    { "case": "R6 its display unplugged: on the display nearest where it was, wholly inside", "place": { "screen": "2", "x": 0.5, "y": 0.5, "centerX": 2400, "centerY": 360 }, "size": 112,
+      "screens": [{ "id": "1", "frame": [0, 0, 1440, 900], "visible": [0, 0, 1440, 860] }], "frame": [1328, 304, 112, 112] },
+    { "case": "R7 its display unplugged, its centre on the one left: there", "place": { "screen": "9", "x": 0.1, "y": 0.1, "centerX": 300, "centerY": 200 }, "size": 112, "frame": [244, 144, 112, 112] },
+    { "case": "R8 no displays at all: nothing (left where it is)", "place": { "screen": "1", "x": 0.5, "y": 0.5, "centerX": 720, "centerY": 430 }, "size": 112, "screens": [], "frame": null }
+  ],
+  "chosen": {
+    "about": "자리 as chosen: 옮긴 자리 with a place kept sits there; a corner sits in that corner of `area` (each app's own corner rule, `frames` in typing-cat-cases.json) and the place stays kept, so 옮긴 자리 can be chosen again.",
+    "area": [0, 0, 1440, 900],
+    "cases": [
+      { "case": "C1 옮긴 자리 with a place: there", "corner": "moved", "place": { "screen": "1", "x": 0.5, "y": 0.5, "centerX": 720, "centerY": 430 }, "frame": [664, 374, 112, 112] },
+      { "case": "C2 a corner chosen after a drag: back in that corner", "corner": "topLeft", "place": { "screen": "1", "x": 0.5, "y": 0.5, "centerX": 720, "centerY": 430 }, "sameAs": "topLeft" },
+      { "case": "C3 another corner, made larger: flush in that corner", "corner": "bottomLeft", "place": { "screen": "1", "x": 0.5, "y": 0.5, "centerX": 720, "centerY": 430 }, "size": 168, "sameAs": "bottomLeft" },
+      { "case": "C4 옮긴 자리 with nothing kept: the corner unless changed", "corner": "moved", "sameAs": "bottomRight" }
+    ]
+  },
+  "saved": [
+    { "case": "W1 read back as saved", "saved": { "screen": "1", "x": 0.25, "y": 0.75, "centerX": 360, "centerY": 645 }, "place": { "screen": "1", "x": 0.25, "y": 0.75, "centerX": 360, "centerY": 645 } },
+    { "case": "W2 fractions past the edge are kept within 0…1", "saved": { "screen": "1", "x": 1.4, "y": -0.2, "centerX": 2000, "centerY": -100 }, "place": { "screen": "1", "x": 1, "y": 0, "centerX": 2000, "centerY": -100 } },
+    { "case": "W3 no display id: nothing", "saved": { "x": 0.5, "y": 0.5, "centerX": 720, "centerY": 430 }, "place": null },
+    { "case": "W4 a number missing: nothing", "saved": { "screen": "1", "x": 0.5, "centerX": 720, "centerY": 430 }, "place": null },
+    { "case": "W5 not a place at all: nothing", "saved": "bottomRight", "place": null }
+  ]
+}

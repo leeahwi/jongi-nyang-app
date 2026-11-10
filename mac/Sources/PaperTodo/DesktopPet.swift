@@ -365,7 +365,7 @@ final class DesktopPetController {
         // Dropped over another display: move there.
         let point = NSEvent.mouseLocation
         let current = savedScreen() ?? NSScreen.main
-        if let target = NSScreen.screens.first(where: { $0.frame.contains(point) }), target.frame != current?.frame,
+        if let target = NSScreen.at(point, nearest: false), target.frame != current?.frame,
            let id = target.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? Int {
             preferences.set(id, forKey: "pet.screen")
             preferences.set(Double((point.x - target.visibleFrame.minX) / target.visibleFrame.width), forKey: "pet.homeFraction")

@@ -900,7 +900,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         var frame = window.frame
         frame.size.width -= extra
         if NoteDocking.side(of: window, preferences: model.preferences) == .right { frame.origin.x += extra }
-        if !window.keepsOffscreen, let visible = (window.screen ?? NSScreen.main)?.visibleFrame {
+        if !window.keepsOffscreen, let visible = (window.screen ?? NSScreen.holding(window.frame))?.visibleFrame {
             frame.origin.x = min(max(frame.origin.x, visible.minX), visible.maxX - frame.width)
         }
         window.setFrame(frame, display: true)

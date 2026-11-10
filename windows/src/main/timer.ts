@@ -476,7 +476,7 @@ export class FocusTimerWidget {
     if (!this.window || this.window.isDestroyed()) return;
     const saved = this.store.memory.timer?.origin;
     const origin = validPoint(saved)
-      ? clampTimer(saved, screen.getAllDisplays().map((display) => display.workArea))
+      ? clampTimer(saved, screen.getAllDisplays().map((display) => display.workArea), this.size)
       : defaultTimerOrigin(screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea, this.size);
     this.setBounds(origin);
   }
@@ -539,8 +539,9 @@ export class FocusTimerWidget {
     ipcMain.on("timer:drag", (event) => {
       if (!fromBoard(event) || !this.window || !this.drag) return;
       const cursor = screen.getCursorScreenPoint();
-      this.window.setPosition(Math.round(this.drag.origin.x + cursor.x - this.drag.cursor.x),
-        Math.round(this.drag.origin.y + cursor.y - this.drag.cursor.y));
+      // #316: the whole bounds, not setPosition (it re-reads the size, which 125 % · 150 % can round up a pixel a move).
+      this.window.setBounds({ x: Math.round(this.drag.origin.x + cursor.x - this.drag.cursor.x),
+        y: Math.round(this.drag.origin.y + cursor.y - this.drag.cursor.y), ...this.size });
     });
     ipcMain.on("timer:drag-end", (event) => {
       if (!fromBoard(event) || !this.window || !this.drag) return;

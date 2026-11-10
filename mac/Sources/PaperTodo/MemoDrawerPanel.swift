@@ -118,7 +118,7 @@ final class MemoDrawerController {
         PerfProbe.begin("drawer")
         let panel = self.panel ?? makePanel()
         let mouse = NSEvent.mouseLocation
-        screen = NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main
+        screen = NSScreen.at(mouse)
         drawer.screenWidth = visible.width
         drawer.willOpen()
         let wasOpen = isOpen

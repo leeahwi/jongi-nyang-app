@@ -1,4 +1,5 @@
 import AppKit
+import PaperCore
 
 @MainActor
 final class FloatingMascotController {
@@ -160,24 +161,10 @@ final class FloatingMascotController {
         save(origin: origin)
     }
 
+    /// #327: on the display the icon is mostly on (it was the first display it touched — the main one, for an icon
+    /// dropped across the line between two), 12 pt inside.
     private func clampedOrigin(_ origin: NSPoint) -> NSPoint {
-        let visibleFrames = NSScreen.screens.map(\.visibleFrame)
-        guard !visibleFrames.isEmpty else { return origin }
-
-        let currentFrame = NSRect(origin: origin, size: Constants.size)
-        let targetFrame = visibleFrames.first { $0.intersects(currentFrame) }
-            ?? visibleFrames.first { $0.contains(origin) }
-            ?? NSScreen.main?.visibleFrame
-            ?? visibleFrames[0]
-
-        return clampedOrigin(origin, in: targetFrame)
-    }
-
-    private func clampedOrigin(_ origin: NSPoint, in targetFrame: NSRect) -> NSPoint {
-        return NSPoint(
-            x: min(max(origin.x, targetFrame.minX + Constants.edgePadding), targetFrame.maxX - Constants.size.width - Constants.edgePadding),
-            y: min(max(origin.y, targetFrame.minY + Constants.edgePadding), targetFrame.maxY - Constants.size.height - Constants.edgePadding)
-        )
+        ScreenFit.kept(NSRect(origin: origin, size: Constants.size), in: NSScreen.fitDisplays, slack: .all(-Constants.edgePadding)).origin
     }
 
 }

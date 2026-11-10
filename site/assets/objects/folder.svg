@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <defs>
+    <linearGradient id="back" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e2bd62"/><stop offset="1" stop-color="#b98a35"/></linearGradient>
+    <linearGradient id="front" x1="0" y1="0" x2="0.35" y2="1"><stop offset="0" stop-color="#f7e2a0"/><stop offset=".45" stop-color="#ebcb72"/><stop offset="1" stop-color="#cf9f45"/></linearGradient>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffdf7"/><stop offset="1" stop-color="#ece5d4"/></linearGradient>
+    <linearGradient id="paper2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6f1e4"/><stop offset="1" stop-color="#ddd5c1"/></linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".7"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <radialGradient id="shadow" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#000" stop-opacity=".45"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+  </defs>
+  <ellipse cx="122" cy="206" rx="92" ry="14" fill="url(#shadow)"/>
+  <path d="M30 70a12 12 0 0 1 12-12h46c5 0 8 2 11 6l9 11h88a12 12 0 0 1 12 12v102a12 12 0 0 1-12 12H42a12 12 0 0 1-12-12z" fill="url(#back)"/>
+  <g transform="rotate(-7 110 90)"><rect x="54" y="52" width="118" height="120" rx="6" fill="url(#paper2)"/></g>
+  <g transform="rotate(4 130 90)">
+    <rect x="70" y="46" width="120" height="124" rx="6" fill="url(#paper)"/>
+    <rect x="86" y="66" width="12" height="12" rx="3" fill="none" stroke="#5c7a5a" stroke-width="2.4"/>
+    <path d="m88.5 72 3 3 5-6" fill="none" stroke="#5c7a5a" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M106 72h58M86 92h78M86 108h64M86 124h72" stroke="#d6cdb8" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <path d="M24 104a12 12 0 0 1 12-13h168a12 12 0 0 1 12 13l-8 86a12 12 0 0 1-12 11H44a12 12 0 0 1-12-11z" fill="url(#front)"/>
+  <path d="M36 95h168a8 8 0 0 1 8 9l-1 7H33l-1-7a8 8 0 0 1 4-9z" fill="url(#gloss)" opacity=".8"/>
+  <path d="M40 186h160" stroke="#a87a30" stroke-opacity=".35" stroke-width="2" stroke-linecap="round"/>
+  <rect x="98" y="132" width="44" height="10" rx="5" fill="#fff" opacity=".35"/>
+</svg>

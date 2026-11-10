@@ -530,6 +530,12 @@ enum DesignSnapshots {
         model.typingScope = .off
         try desk(.pet, "desk-pet-typing-off", size: full)
         model.typingScope = .app
+        // #331: dragged somewhere — 자리 reads 옮긴 자리 (a made-up place on a made-up display).
+        model.typingPlace = TypingPlace(screen: "1", x: 0.62, y: 0.4, centerX: 893, centerY: 344)
+        model.typingCorner = .moved
+        try desk(.pet, "desk-pet-typing-moved", size: full)
+        model.typingCorner = .bottomRight
+        model.typingPlace = nil
         model.petVisible = petWasVisible
         // #195: 저장 위치's footnote (a move copies the list there and restarts) on the narrowest desk, and the toast the
         // restarted app shows once (the sample folder's name).

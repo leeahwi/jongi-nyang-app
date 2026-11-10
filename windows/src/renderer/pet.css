@@ -1,7 +1,8 @@
 html, body { background: transparent; }
+/* #313: pet.ts sets the height to the strip's (the floor is that far below the window's top, whatever its real size). */
 #stage { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
 
-/* The pet stands on the floor (the bottom of the window). */
+/* The pet stands on the floor (the bottom of the stage). */
 /* #304: --pet is the cat's size at the chosen 크기 and --k how much bigger than 보통 (unset at 보통: as before). */
 #pet { position: absolute; bottom: 2px; width: calc(var(--pet, 92px) + 160px); display: flex; flex-direction: column; align-items: center; }
 .body { position: relative; width: calc(var(--pet, 92px) + 40px); height: calc(var(--pet, 92px) + 8px); }

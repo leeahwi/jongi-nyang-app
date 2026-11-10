@@ -1,4 +1,4 @@
-import { bubblePointer, bubbleShift, clampFloorX, clipFrameMs, clipMs, floorMargin, isResting, petFrame, petScaleOf, petSize, petWindowWidth, restBreathMs, walkCycleFrames, type PetFrame, type PetImage, type PetPayload } from "../core/pet";
+import { bubblePointer, bubbleShift, clampFloorX, clipFrameMs, clipMs, floorMargin, isResting, petFrame, petScaleOf, petSize, petStripHeight, petWindowWidth, restBreathMs, walkCycleFrames, type PetFrame, type PetImage, type PetPayload } from "../core/pet";
 import { wrapBubble } from "../core/bubbleText";
 import { lang, paper, reduceMotion, t } from "./api";
 import { holdWhileAsked } from "./askGuard";
@@ -8,6 +8,7 @@ import { sampled } from "./sampled";
 holdWhileAsked();
 
 const api = paper();
+const stage = document.getElementById("stage")!;
 const pet = document.getElementById("pet")!;
 const shadow = pet.querySelector<HTMLElement>(".shadow")!;
 const cat = pet.querySelector<HTMLElement>(".cat")!;
@@ -19,6 +20,12 @@ const bubble = pet.querySelector<HTMLElement>(".bubble")!;
 /** #304: the cat's size at the chosen 크기 (92 at 보통), and its box with room for the bubble beside it. */
 let size = petSize;
 let petWidth = size + 160;
+/**
+ * #313: the floor is the strip's height below the window's top (the place main sets), not the window's bottom: a window
+ * the system made taller than asked (Windows rounds sizes at 125 % · 150 %) leaves the cat on the floor.
+ */
+const fitStage = () => { stage.style.height = `${petStripHeight(size)}px`; };
+fitStage();
 
 // ─── Art ──────────────────────────────────────────────────────────────────────
 
@@ -92,6 +99,7 @@ function resize(next: number): void {
   if (next === size) return;
   size = next;
   petWidth = size + 160;
+  fitStage();
   if (size === petSize) {
     pet.style.removeProperty("--pet");
     pet.style.removeProperty("--k");

@@ -1,7 +1,7 @@
 import { BrowserWindow, Menu, ipcMain, powerMonitor, screen, type MenuItemConstructorOptions } from "electron";
 import path from "node:path";
 import {
-  clampFloorX, clipMs, floorMargin, idleChoices, petSizeFor, petStripHeight, petWindowBounds, petWindowWidth, pickWeighted, walkStepX, sleepAfterSeconds, wakeWithinSeconds,
+  clampFloorX, clipMs, floorMargin, idleChoices, petSizeFor, petStripHeight, petWindowBounds, petWindowWidth, pickWeighted, placePetWindow, walkStepX, sleepAfterSeconds, wakeWithinSeconds,
   type PetAction, type PetPayload, type Rect,
 } from "../core/pet";
 import { dayKey, groupByDay, logicalDayStart, streakMilestone, type ArchiveEntry } from "../core/archive";
@@ -65,8 +65,8 @@ export class DesktopPet {
   private asleep = false;
   private reduceMotion = false;
   private interactive = false;
-  /** #67: where the window's left edge is now (screen), so a move that changes nothing isn't sent. */
-  private placedAt?: { x: number; y: number };
+  /** #67: where the window is now (screen), so a move that changes nothing isn't sent (#313: its whole bounds). */
+  private placedAt?: Rect;
   /** While walking: the window follows the cat. */
   private followTimer?: NodeJS.Timeout;
   /** While dragged: where the cursor started, where the cat was, and where it is now (floor coordinates). */
@@ -146,6 +146,9 @@ export class DesktopPet {
     const window = new BrowserWindow({
       ...petWindowBounds(floor, this.clamp(floor.width * this.homeFraction, floor.width), offscreen), show: false, frame: false, transparent: true, resizable: false, minimizable: false, maximizable: false,
       fullscreenable: false, focusable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false,
+      // #313 · #312: no WS_THICKFRAME (Electron drops it for a transparent window; said outright, as for the note's ears), so
+      // Windows keeps no resize frame or minimum size of its own on this window.
+      thickFrame: false,
       backgroundColor: "#00000000", title: t("종이냥"),
       // Off-screen runs (snapshots, tests): macOS pulls a window placed off every display back onto one unless it may be
       // larger than the screen (only macOS reads this).
@@ -230,13 +233,8 @@ export class DesktopPet {
    */
   private place(): void {
     if (!this.window || this.window.isDestroyed() || !this.shown) return;
-    const bounds = petWindowBounds(this.floor(), this.catX(), offscreen);
-    const at = { x: bounds.x, y: bounds.y };
-    if (this.placedAt?.x === at.x && this.placedAt.y === at.y) return;
-    // A walk only moves it; the size is set when it is placed anew (shown, another display).
-    if (this.placedAt) this.window.setPosition(at.x, at.y);
-    else this.window.setBounds(bounds);
-    this.placedAt = at;
+    // #313: every move sets the whole bounds (a walk's steps too), so a size Windows rounded up can't add up.
+    this.placedAt = placePetWindow(this.window, petWindowBounds(this.floor(), this.catX(), offscreen), this.placedAt);
   }
 
   /** While a walk plays the window follows the cat: looked at 30 times a second, moved once a step. */
@@ -614,7 +612,8 @@ export class DesktopPet {
 
   /**
    * #304 (snapshots): what doesn't fit — the cat or its bubble (with a question's buttons) past the window's edges, the
-   * cat's box not its size, the window not on the floor or not the strip's height. Empty when all is well.
+   * cat's box not its size, the window not on the floor or not the strip's height, the cat not standing on the floor
+   * (#313). Empty when all is well.
    */
   async layoutProblems(): Promise<string[]> {
     if (!this.catShown || !this.window) return ["the cat isn't out"];
@@ -634,11 +633,33 @@ export class DesktopPet {
       for (const button of document.querySelectorAll(".bubble .answer")) inside("answer", button);
       const cat = document.querySelector(".cat").getBoundingClientRect();
       if (Math.round(cat.width) !== ${this.px} || Math.round(cat.height) !== ${this.px}) out.push("cat " + cat.width + "×" + cat.height);
+      // #313: the cat's box (not the hopping cat) stands 2 px above the floor, the strip's height below the window's top.
+      const body = document.querySelector(".body").getBoundingClientRect();
+      if (Math.round(body.bottom) !== ${floor.height} - 2) out.push("cat not on the floor (" + body.bottom + " of ${floor.height})");
       const bubble = document.querySelector(".bubble");
       if (!bubble.hidden && bubble.getBoundingClientRect().bottom > cat.top + 12) out.push("bubble over the cat");
       return out;
     })()`) as string[];
     return [...problems, ...found];
+  }
+
+  /** Snapshots (#313): a wander of `by` DIP along the floor; resolves once it has ended (the window followed each step). */
+  walkForSnapshot(by: number): Promise<void> {
+    if (!this.catShown) return Promise.resolve();
+    const walk = { kind: "walk" as const, from: this.homeX, to: this.clamp(this.homeX + by) };
+    this.play(walk);
+    return new Promise((resolve) => setTimeout(resolve, clipMs(walk) + 300));
+  }
+
+  /** Snapshots (#313): laid out anew as on a display change (display-metrics-changed). */
+  displayChangedForSnapshot(): void { this.layout(); }
+
+  /** Snapshots (#313): the window against the floor and the work area (DIP, without the off-screen shift). */
+  floorLog(): string {
+    if (!this.window || this.window.isDestroyed()) return "no window";
+    const bounds = this.window.getBounds(), area = this.display().workArea;
+    const top = bounds.y - offscreen.y;
+    return `window y ${top} h ${bounds.height} (bottom ${top + bounds.height}), strip ${this.floor().height}, work area bottom ${area.y + area.height}`;
   }
 
   capture(): Promise<Electron.NativeImage> | undefined {

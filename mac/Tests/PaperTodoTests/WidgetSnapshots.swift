@@ -4,8 +4,8 @@ import SwiftUI
 
 // 바탕화면 달력 위젯 (#234): every kind at 100 % and 40 % over a made-up wallpaper (light by day, dark at night, and a
 // busy one), hovering, with its toast, the day sheet, the gallery, the settings slip and the desk's group — drawn in
-// one language and paper per run (scripts/render-widgets.sh ko|en|nl day|night). The wallpaper under a faded paper is
-// blurred here as the window server frosts it on screen. All sample data is made up.
+// one language and paper per run (scripts/render-widgets.sh ko|en|nl day|night). #321: also over a desktop with icons at
+// 20 · 50 · 85 · 100 %, which show through the paper as they are (no frost). All sample data is made up.
 
 @main
 private enum WidgetSnapshots {
@@ -109,6 +109,14 @@ private enum WidgetSnapshots {
             try scene(kind, style, opacity: 40, wall: .busy, to: output.appendingPathComponent("widget-\(name)-40-busy.png"))
         }
         try scene(.month, .simple, opacity: 40, wall: night ? .light : .dark, to: output.appendingPathComponent("widget-month-simple-40-other.png"))
+        // #321: a desktop with icons behind the month at 20 · 50 · 85 · 100 %, light and dark — what shows through the paper.
+        for opacity in [20, 50, 85, 100] {
+            try scene(.month, .simple, opacity: opacity, wall: .lightIcons, to: output.appendingPathComponent("widget-month-simple-\(opacity)-icons-light.png"))
+            try scene(.month, .simple, opacity: opacity, wall: .darkIcons, to: output.appendingPathComponent("widget-month-simple-\(opacity)-icons-dark.png"))
+        }
+        try scene(.month, .detail, opacity: 20, wall: night ? .darkIcons : .lightIcons, to: output.appendingPathComponent("widget-month-detail-20-icons.png"))
+        try scene(.week, .detail, opacity: 20, wall: night ? .darkIcons : .lightIcons, to: output.appendingPathComponent("widget-week-detail-20-icons.png"))
+        try scene(.today, .simple, opacity: 20, wall: night ? .darkIcons : .lightIcons, to: output.appendingPathComponent("widget-today-20-icons.png"))
         // #296: two daily repeats and a weekday one fold into each day's head; #295: 11 October (음 9.1) busy, so its head has
         // +N beside the lunar date and the repeat mark.
         let quiet = (series: widgets.feed.series, tasks: widgets.feed.tasks)
@@ -204,22 +212,17 @@ private enum WidgetSnapshots {
         state.hovering = hover
         state.toast = toast
         state.scale = scale
-        // The wallpaper under the paper in the paper's own (보통) points: the widget draws it `scale` times as big.
-        let paperTop = (inset.y + CalendarWidget.earHeight(kind, style) * scale) / scale
-        let paper = CalendarWidget.size(kind, style)
-        let backdrop = Wallpaper(kind: wall).frame(width: size.width / scale, height: size.height / scale)
-            .offset(x: -inset.x / scale, y: -paperTop)
-            .frame(width: paper.width, height: paper.height, alignment: .topLeading)
-            .clipped()
         let view = ZStack(alignment: .topLeading) {
             Wallpaper(kind: wall)
-            CalendarWidgetView(state: state, feed: CalendarWidgets.shared.feed, widgets: CalendarWidgets.shared, previewBackdrop: AnyView(backdrop))
-                .shadow(color: .black.opacity(night ? 0.45 : 0.18), radius: 7, y: 4)
+            CalendarWidgetView(state: state, feed: CalendarWidgets.shared.feed, widgets: CalendarWidgets.shared)
+                // The window's shadow: of the whole widget, and only under a solid paper (#321, CalendarWidgets.castsShadow).
+                .compositingGroup()
+                .shadow(color: opacity == 100 ? .black.opacity(night ? 0.45 : 0.18) : .clear, radius: 7, y: 4)
                 .offset(x: inset.x, y: inset.y)
         }
         .frame(width: size.width, height: size.height, alignment: .topLeading)
         .environment(\.colorScheme, night ? .dark : .light)
-        // SwiftUI's own renderer: it draws the blur (an NSView's cached display leaves it out).
+        // SwiftUI's own renderer: it draws the shadows as the window does.
         let renderer = ImageRenderer(content: view)
         renderer.scale = 2
         guard let image = renderer.cgImage else { throw CocoaError(.fileWriteUnknown) }
@@ -274,11 +277,13 @@ private enum WidgetSnapshots {
 
 /// Made-up wallpapers: a light sky, a night sky, and a busy one (bold colours and stripes) — the worst a widget meets.
 struct Wallpaper: View {
-    enum Kind { case light, dark, busy }
+    enum Kind { case light, dark, busy, lightIcons, darkIcons }
     let kind: Kind
 
     var body: some View {
         switch kind {
+        case .lightIcons, .darkIcons:
+            IconDesktop(dark: kind == .darkIcons)
         case .light:
             ZStack {
                 LinearGradient(colors: [Color(red: 0.81, green: 0.89, blue: 0.93), Color(red: 0.93, green: 0.95, blue: 0.92), Color(red: 0.91, green: 0.86, blue: 0.77)],
@@ -318,5 +323,44 @@ struct Wallpaper: View {
                 }
             }
         }
+    }
+}
+
+/// #321: a desktop with icons (folders and files, made-up names) on a light or dark wallpaper — what should show through
+/// a faint widget.
+struct IconDesktop: View {
+    let dark: Bool
+
+    var body: some View {
+        GeometryReader { geometry in
+            let step = CGSize(width: 86, height: 84)
+            let columns = Int(geometry.size.width / step.width) + 1, rows = Int(geometry.size.height / step.height) + 1
+            ZStack(alignment: .topLeading) {
+                Wallpaper(kind: dark ? .dark : .light)
+                ForEach(0..<(columns * rows), id: \.self) { index in
+                    let (row, column) = index.quotientAndRemainder(dividingBy: columns)
+                    icon(index).position(x: 44 + CGFloat(column) * step.width, y: 40 + CGFloat(row) * step.height)
+                }
+            }
+        }
+    }
+
+    private static let names = [("회사", "Work", "Werk", true), ("집", "Home", "Thuis", true), ("장보기.txt", "Groceries.txt", "Boodschappen.txt", false),
+                                ("공부", "Study", "Studie", true), ("사진", "Photos", "Foto's", true), ("영수증.pdf", "Receipt.pdf", "Bon.pdf", false),
+                                ("여행 계획.txt", "Trip plan.txt", "Reisplan.txt", false)]
+
+    private func icon(_ index: Int) -> some View {
+        let name = Self.names[index % Self.names.count]
+        return VStack(spacing: 3) {
+            Image(systemName: name.3 ? "folder.fill" : "doc.text.fill")
+                .font(.system(size: 34))
+                .foregroundStyle(name.3 ? Color(red: 0.36, green: 0.66, blue: 0.94) : Color(white: 0.97))
+                .shadow(color: .black.opacity(0.25), radius: 1.5, y: 1)
+            Text(WidgetSnapshots.t(name.0, name.1, name.2))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(dark ? Color.white : Color(white: 0.1))
+                .lineLimit(1)
+        }
+        .frame(width: 80)
     }
 }

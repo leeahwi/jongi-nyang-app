@@ -247,9 +247,11 @@ export function floorOf(paper: Rgb, ink: Rgb, dark: boolean): number {
 /** The weekend and holiday tiles' colour: the paper with its clay-2 mixed in (55 %). Its own floor (a little higher than
  *  the plain paper's on light papers: day 65, as the tint darkens it) keeps ink at 4.5:1 on it too. */
 export const weekendTint = (clay2: Rgb, paper: Rgb): Rgb => mix(clay2, 0.55, paper);
-/** A day's tile (the month and the week): the paper as drawn, never fainter than its floor. */
-export const tile = (drawn: number, floor: number): number => Math.max(drawn, floor);
-/** Text off the tiles gets a backing of the paper at its floor once the paper is fainter than that (O2). */
+/** A day's tile (the month and the week): the paper as drawn (#321: it fades with the paper, so the desktop shows through
+ *  it; the text on it keeps 4.5:1 by its outline, `backing`). */
+export const tile = (drawn: number): number => drawn;
+/** #321: every text (on a tile or off it) gets an outline of solid paper (1px round each letter) once the paper is fainter
+ *  than its floor (O2). It was a block of paper at the floor behind the text off the tiles, and the tiles stayed at the floor. */
 export const backing = (drawn: number, floor: number): boolean => drawn < floor;
 /** Below 100 % ink2 · ink3 · sage-text · clay-text are drawn in ink (O3). */
 export const inkOnly = (drawn: number): boolean => drawn < 100;
@@ -263,8 +265,9 @@ export function drawnOpacity(opacity: number, reduceTransparency: boolean, hover
   return readOpacity(opacity);
 }
 
-/** The ears never go below 85 % (O5): they are the handle, also while clicks pass through. */
-export const earFloor = 85;
+/** The ears fade with the paper (#321) but never below half (O5), as the edge line (O8): they are the handle, also while
+ *  clicks pass through. */
+export const earFloor = 50;
 export const earOpacity = (drawn: number): number => Math.max(drawn, earFloor);
 /** The edge line's strength (0–1): never fainter than half (O8). */
 export const edgeStrength = (drawn: number): number => Math.max(0.5, drawn / 100);

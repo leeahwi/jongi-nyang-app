@@ -9,6 +9,9 @@ import PaperCore
 /// - 종이냥에서만: it comes with a key typed in 종이냥 and quietly goes `TypingCat.linger` after the last one.
 /// - 모든 앱에서 (with Input Monitoring): it is always in its corner, over full-screen apps too.
 /// - Hiding the pet, or the pet walking, sleeping or cheering, changes nothing here; the pet never comes to the cushion.
+/// - #331: pressed on the cat and dragged, the window follows; let go, it stays there (옮긴 자리, `TypingPlace`), wholly on
+///   that display. Clicks anywhere clear still go to the app behind: the app's one mouse ear (`PointerWatch`) says when
+///   the pointer is over the drawn cat.
 ///
 /// At rest nothing runs: no timer, no animation, one still picture (or no window at all).
 @MainActor
@@ -28,6 +31,12 @@ final class TypingCatController {
     var offscreen = false
     /// The screen whose corner it sits in: the one in use (the bench hands in its own).
     var screen: () -> NSScreen? = { NSScreen.main ?? NSScreen.screens.first }
+    /// #331: the displays a kept place is looked up on (the bench hands in its own).
+    var screens: () -> [TypingCorner.Screen] = { NSScreen.typingScreens }
+    /// #331: held and being dragged — it isn't put back in its place, and 종이냥에서만 doesn't send it away meanwhile.
+    private(set) var dragging = false
+    /// When it was last let go: 종이냥에서만 keeps it `linger` from then, as after a key.
+    private var droppedAt: Double?
 
     init(model: AppModel, preferences: UserDefaults, access: InputMonitoringAccess) {
         self.model = model
@@ -98,7 +107,7 @@ final class TypingCatController {
 
     /// In its corner or not, as `TypingCorner.shows` says now.
     private func update() {
-        if TypingCorner.shows(source: keys.source, lastKey: cat.lastKey, now: now) {
+        if TypingCorner.shows(source: keys.source, lastKey: cat.lastKey, now: now, dragging: dragging, dropped: droppedAt) {
             show()
             if keys.source == .app { armGo() }
         } else {
@@ -111,22 +120,101 @@ final class TypingCatController {
     var frame: NSRect? { panel?.frame }
 
     private func show() {
-        let panel = panel ?? TypingCatPanel()
+        let panel = panel ?? makePanel()
         self.panel = panel
-        panel.place(on: screen(), corner: model.typingCorner, size: model.typingSize.typingSize, offscreen: offscreen)
+        place(panel)
         panel.show(cat.pose)
+        watchPointer()
+    }
+
+    private func makePanel() -> TypingCatPanel {
+        let panel = TypingCatPanel()
+        panel.onDragStart = { [weak self] in self?.dragBegan() }
+        panel.onDragEnd = { [weak self] in self?.dragEnded() }
+        return panel
     }
 
     private func hide() {
         goTask?.cancel()
         goTask = nil
         stopPaws()
+        dragging = false
+        PointerWatch.shared.stop("typingCat")
         panel?.hide(fade: !offscreen && !reduceMotion)
     }
 
     private func placeIfShown() {
         guard let panel, panel.isShown else { return }
-        panel.place(on: screen(), corner: model.typingCorner, size: model.typingSize.typingSize, offscreen: offscreen)
+        place(panel)
+    }
+
+    /// Where it sits now (on the screens, before `--offscreen`'s shift): 옮긴 자리 when chosen and kept, else the corner.
+    var target: NSRect? {
+        guard let screen = screen() ?? NSScreen.main ?? NSScreen.screens.first else { return nil }
+        return TypingCorner.frame(corner: model.typingCorner, place: model.typingPlace, screen: screen.frame,
+                                  topInset: max(NSStatusBar.system.thickness, screen.safeAreaInsets.top),
+                                  size: model.typingSize.typingSize, on: screens())
+    }
+
+    /// Put in its place — never while it is held (a key or a display change mid-drag leaves it in the hand).
+    private func place(_ panel: TypingCatPanel) {
+        guard !dragging, var frame = target else { return }
+        if offscreen { frame.origin.x += 40_000 }
+        panel.place(frame)
+        if PointerWatch.shared.watches("typingCat") { PointerWatch.shared.refresh() }
+    }
+
+    // MARK: Moving it (#331)
+
+    /// While it is out: the app's one mouse ear (#64) tells it when the pointer is over the drawn cat, and only then does
+    /// the window take the mouse. Far away, the ear looks only now and then (`PointerPace`).
+    private func watchPointer() {
+        guard !PointerWatch.shared.watches("typingCat") else { return }
+        PointerWatch.shared.watch("typingCat", distance: { [weak self] point in
+            guard let self, let panel = self.panel, panel.isShown else { return .infinity }
+            return PointerPace.distance(from: point, to: TypingCorner.catBox(in: panel.frame))
+        }, moved: { [weak self] point in
+            guard let self, !self.dragging, let panel = self.panel else { return }
+            panel.takesMouse = panel.isShown && TypingCorner.isOnCat(point, frame: panel.frame)
+        })
+    }
+
+    /// The bench: whether clicks pass through the window now (true) or the cat takes them.
+    var passesClicks: Bool { panel?.takesMouse != true }
+
+    /// Pressed on the cat and moved past the threshold: held until let go.
+    func dragBegan() {
+        guard isShown else { return }
+        dragging = true
+    }
+
+    /// Let go: kept wholly on the display it is mostly on, and that place kept as 옮긴 자리 (chosen in Settings now).
+    func dragEnded() {
+        guard dragging, let panel else { return }
+        dragging = false
+        droppedAt = now
+        var frame = panel.frame
+        if offscreen { frame.origin.x -= 40_000 }
+        if let dropped = TypingCorner.dropped(frame, on: screens()) {
+            model.typingPlace = dropped.place
+            // The same place either way: choosing 옮긴 자리 again puts it there too.
+            model.typingCorner = .moved
+            var kept = dropped.frame
+            if offscreen { kept.origin.x += 40_000 }
+            panel.place(kept)
+        }
+        PointerWatch.shared.refresh()
+        // 종이냥에서만: it stays `linger` from now, then goes.
+        update()
+    }
+
+    /// The bench: a drag as the window's view makes one — pressed, moved by `offset`, let go.
+    func drag(by offset: CGVector) {
+        guard let panel else { return }
+        dragBegan()
+        guard dragging else { return }
+        panel.place(panel.frame.offsetBy(dx: offset.dx, dy: offset.dy))
+        dragEnded()
     }
 
     // MARK: Keys
@@ -157,21 +245,26 @@ final class TypingCatController {
         }
     }
 
-    /// 종이냥에서만: one wait until `linger` after the last key; a newer key moves it on, then the cat goes.
+    /// 종이냥에서만: one wait until `linger` after the last key (or the last drop); a newer one moves it on, then the cat
+    /// goes. Held by a drag meanwhile, it waits: letting go starts the wait again.
     private func armGo() {
         guard goTask == nil else { return }
         goTask = Task { @MainActor [weak self] in
             while true {
-                guard let self, let last = self.cat.lastKey else { return }
+                guard let self, let last = self.lastTouch else { return }
                 try? await Task.sleep(for: .seconds(max(0, last + TypingCat.linger - ProcessInfo.processInfo.systemUptime)))
                 guard !Task.isCancelled else { return }
-                if !self.cat.typed(within: TypingCat.linger, of: self.now) { break }
+                if self.dragging { self.goTask = nil; return }
+                if !((self.lastTouch.map { self.now - $0 < TypingCat.linger }) ?? false) { break }
             }
             guard let self else { return }
             self.goTask = nil
             self.update()
         }
     }
+
+    /// The last key or drop, whichever was later.
+    private var lastTouch: Double? { [cat.lastKey, droppedAt].compactMap { $0 }.max() }
 
     /// 종이냥 한마디 (the pet's) waits after typing.
     var chatterWaits: Bool { cat.typed(within: TypingCat.chatterQuiet, of: now) }
@@ -189,6 +282,8 @@ final class TypingCatController {
         goTask?.cancel()
         goTask = nil
         stopPaws()
+        dragging = false
+        PointerWatch.shared.stop("typingCat")
         panel?.hide(fade: false)
     }
 
@@ -204,17 +299,32 @@ final class TypingCatController {
     }
 }
 
-/// The typing cat's window: a transparent, click-through panel that never takes the keyboard, in the chosen corner, on
-/// every Space including full-screen ones. Nothing in it reacts to the mouse; it is hidden from the menu bar's menu or
-/// Settings. Screen sharing shows it like any window.
+/// The typing cat's window: a transparent panel that never takes the keyboard, in the chosen corner (or where it was
+/// dragged), on every Space including full-screen ones. Clicks pass through it except over the drawn cat (`takesMouse`),
+/// where a press and a drag move it (#331); a click without moving does nothing. It is hidden from the menu bar's menu
+/// or Settings. Screen sharing shows it like any window.
 @MainActor
 final class TypingCatPanel {
     private let panel: NSPanel
-    private let imageView = NSImageView()
+    private let imageView = TypingCatView()
     private var pose: TypingCat.Pose?
     /// Moved on by each show and hide, so a fade that ends after the cat came back leaves it.
     private var turn = 0
     private var going = false
+    var onDragStart: () -> Void {
+        get { imageView.onDragStart }
+        set { imageView.onDragStart = newValue }
+    }
+    var onDragEnd: () -> Void {
+        get { imageView.onDragEnd }
+        set { imageView.onDragEnd = newValue }
+    }
+
+    /// Over the drawn cat: the window takes the mouse; anywhere else (and while hidden) clicks go to the app behind.
+    var takesMouse: Bool {
+        get { !panel.ignoresMouseEvents }
+        set { if panel.ignoresMouseEvents == newValue { panel.ignoresMouseEvents = !newValue } }
+    }
 
     init() {
         panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: TypingCorner.size, height: TypingCorner.size),
@@ -227,6 +337,8 @@ final class TypingCatPanel {
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.ignoresMouseEvents = true
+        // Over the cat, moves reach the app's one mouse ear (its local monitor), so it hears the pointer leave it.
+        panel.acceptsMouseMovedEvents = true
         panel.becomesKeyOnlyIfNeeded = true
         // Every Space, full-screen ones too.
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
@@ -238,12 +350,8 @@ final class TypingCatPanel {
     var isShown: Bool { panel.isVisible && !going }
     var frame: NSRect { panel.frame }
 
-    /// `size`: its side at the chosen 크기 (#304; 112 at 보통). The picture fills it, paws and all.
-    func place(on screen: NSScreen?, corner: TypingCorner.Corner, size: CGFloat = TypingCorner.size, offscreen: Bool) {
-        guard let screen = screen ?? NSScreen.main ?? NSScreen.screens.first else { return }
-        var frame = TypingCorner.frame(corner: corner, screen: screen.frame,
-                                       topInset: max(NSStatusBar.system.thickness, screen.safeAreaInsets.top), size: size)
-        if offscreen { frame.origin.x += 40_000 }
+    /// Its frame: a corner's, or 옮긴 자리 (the side is the chosen 크기, #304; 112 at 보통). The picture fills it.
+    func place(_ frame: NSRect) {
         if panel.frame != frame { panel.setFrame(frame, display: false) }
     }
 
@@ -264,6 +372,7 @@ final class TypingCatPanel {
     func hide(fade: Bool) {
         guard panel.isVisible, !going else { return }
         turn += 1
+        takesMouse = false
         guard fade else { panel.orderOut(nil); return }
         let mine = turn
         going = true
@@ -279,4 +388,50 @@ final class TypingCatPanel {
             self.panel.alphaValue = 1
         }
     }
+}
+
+/// #331: the cat's picture, which a press on the drawn cat and a drag move with the window (the window takes the mouse
+/// only there, `TypingCatPanel.takesMouse`). A click without moving does nothing; nothing here takes the keyboard.
+final class TypingCatView: NSImageView {
+    var onDragStart: () -> Void = {}
+    var onDragEnd: () -> Void = {}
+    /// Where the press was (the pointer on the screens) and where the window was then.
+    private var press: (pointer: NSPoint, origin: NSPoint)?
+    private var moving = false
+    /// Points the pointer moves before a press is a drag (a click that wobbles stays a click).
+    private let threshold: CGFloat = 3
+
+    override var mouseDownCanMoveWindow: Bool { false }
+    // The app isn't active (the panel never takes the keyboard): the first press drags already.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+    override func isAccessibilityElement() -> Bool { false }
+
+    override func mouseDown(with event: NSEvent) {
+        guard let window else { return }
+        press = (NSEvent.mouseLocation, window.frame.origin)
+        moving = false
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let window, let press else { return }
+        let pointer = NSEvent.mouseLocation
+        let dx = pointer.x - press.pointer.x, dy = pointer.y - press.pointer.y
+        if !moving {
+            guard hypot(dx, dy) >= threshold else { return }
+            moving = true
+            onDragStart()
+        }
+        window.setFrameOrigin(NSPoint(x: press.origin.x + dx, y: press.origin.y + dy))
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        let moved = moving
+        press = nil
+        moving = false
+        if moved { onDragEnd() }
+    }
+
+    // Inert: no menu of its own (the menu bar's 타닥냥 and Settings have its switch).
+    override func rightMouseDown(with event: NSEvent) {}
+    override func menu(for event: NSEvent) -> NSMenu? { nil }
 }

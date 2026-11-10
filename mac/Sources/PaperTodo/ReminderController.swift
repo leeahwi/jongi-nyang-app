@@ -138,7 +138,7 @@ final class ReminderController: ObservableObject {
             image: model.mascotImage,
             tasks: tasks,
             duration: TimeInterval(displaySeconds),
-            screen: NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main,
+            screen: NSScreen.withPointer,
             snoozeEnabled: enabled,
             notebookFont: model.notebookFont,
             style: model.reminderStyle,
@@ -1141,7 +1141,7 @@ struct PetSettingsPanel: View {
     /// hears, and the corner it sits in.
     @ViewBuilder
     private var typingGroup: some View {
-        SettingsGroup(title: L("타닥냥"), more: "pet", footer: L("글자를 치면 화면 구석의 고양이가 방석에 기대 앞발로 두드려요. 종이냥 펫과 따로 켜고 꺼요.")) {
+        SettingsGroup(title: L("타닥냥"), more: "pet", footer: L("글자를 치면 화면 구석의 고양이가 방석에 기대 앞발로 두드려요. 끌어서 옮길 수 있고, 종이냥 펫과 따로 켜고 꺼요.")) {
             HStack(spacing: 12) {
                 SettingsLabel(L("두드리기"), systemImage: "keyboard")
                 Spacer(minLength: 8)
@@ -1182,8 +1182,9 @@ struct PetSettingsPanel: View {
             HStack(spacing: 12) {
                 SettingsLabel(L("자리"), systemImage: "rectangle.inset.bottomright.filled")
                 Spacer(minLength: 8)
+                // #331: 옮긴 자리 once the cat was dragged somewhere (chosen by the drag; a corner puts it back there).
                 PaperMenuPicker(selection: $model.typingCorner,
-                                options: TypingCorner.Corner.allCases.map { ($0, Self.cornerTitle($0)) },
+                                options: (TypingCorner.Corner.corners + (model.typingPlace == nil ? [] : [.moved])).map { ($0, Self.cornerTitle($0)) },
                                 label: L("자리"))
             }
             .settingsRow()
@@ -1219,6 +1220,7 @@ struct PetSettingsPanel: View {
         case .topRight: L("오른쪽 위")
         case .bottomLeft: L("왼쪽 아래")
         case .bottomRight: L("오른쪽 아래")
+        case .moved: L("옮긴 자리")
         }
     }
 

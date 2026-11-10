@@ -86,6 +86,22 @@ export const petWindowLeft = (x: number): number => Math.round(x - petWindowWidt
 export const petWindowBounds = (floor: Rect, x: number, shift: { x: number; y: number } = { x: 0, y: 0 }): Rect =>
   ({ x: floor.x + petWindowLeft(x) + shift.x, y: floor.y + shift.y, width: petWindowWidth, height: floor.height });
 
+/** What placing the pet uses of its window (a BrowserWindow; a fake Windows window in the tests). */
+export interface PetPlacedWindow { setBounds(bounds: Rect): void }
+
+/**
+ * #313: puts the pet's window at `bounds` with its whole size, every time — never `setPosition`. Electron's
+ * setPosition is setBounds(the new place, the size read back from the system), and on Windows at 125 % · 150 % the size
+ * read back can be rounded up (whole physical pixels): each step of a walk (about 11 a second) could make the window a
+ * DIP taller (test/petFloor.test.ts models it). Its top stays put, so the cat drawn at its bottom sank below the taskbar
+ * until only its ears showed. Returns where it is now; nothing is sent when it is there already (`placed`).
+ */
+export function placePetWindow(window: PetPlacedWindow, bounds: Rect, placed?: Rect): Rect {
+  if (placed && placed.x === bounds.x && placed.y === bounds.y && placed.width === bounds.width && placed.height === bounds.height) return placed;
+  window.setBounds(bounds);
+  return { ...bounds };
+}
+
 /**
  * Where a walking cat's window is: the walk's place held for each of its eight pictures, so the window moves once a
  * step with the picture (about 11 times a second, 2 px a time) and the paws drawn on the ground stay put between.

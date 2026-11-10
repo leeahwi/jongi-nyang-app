@@ -8,6 +8,7 @@ import { checkedDeviceRules } from "./spaceDevice";
 import { readWidgets, widgetKinds, widgetLevels, widgetScales, widgetStyles } from "./calendarWidget";
 import { timerSizes } from "./timerWidget";
 import { catSizes } from "./catSize";
+import { typingCornerValues } from "./typingCat";
 import { noteLayers } from "./stayBehind";
 import { defaultPrefs, textSizes, type Action, type IntentRequest, type Prefs } from "./types";
 import { deskFramePages, ownPage } from "./webGuard";
@@ -302,7 +303,7 @@ const enumPrefs: Partial<Record<PrefKey, readonly unknown[]>> = {
   systemNotify: ["missed", "always", "off"], drawerSide: ["right", "left"], drawerTheme: drawerThemes, drawerBackdrop: drawerBackdrops,
   drawerPinnedSort: folderSorts, drawerPinnedView: folderViews, drawerFont: drawerFonts, drawerTextSize: drawerTextSizes, drawerLineHeight: lineSpacings,
   drawerParagraph: paragraphSpacings, drawerCodeFont: codeFonts, spaceGroupStyle: ["card", "bookmark"],
-  textStep: noteScales.map((_, index) => index), drawerTextPt: drawerPoints, typingCat: ["off", "app", "everywhere"], typingCorner: ["topLeft", "topRight", "bottomLeft", "bottomRight"],
+  textStep: noteScales.map((_, index) => index), drawerTextPt: drawerPoints, typingCat: ["off", "app", "everywhere"], typingCorner: typingCornerValues,
   // #304: 크기 of the pet and of 타닥냥.
   petSize: catSizes, typingSize: catSizes,
   // #244: 종이 and 밤에는 (a light paper under 밤에는 isn't one; loadSettings reads it as 밤 종이, a page may not send it).

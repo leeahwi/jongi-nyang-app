@@ -241,7 +241,7 @@ private enum CalendarWidgetTests {
                 if let values = entry["opacity"] as? [Int] {
                     let paperFloor = floor(entry["paper"] as? String ?? "day")
                     if let want = entry["backing"] as? [Bool] { try equal(values.map { CalendarWidget.backing($0, floor: paperFloor) }, want, "backing") }
-                    if let want = entry["tile"] as? [Int] { try equal(values.map { CalendarWidget.tile($0, floor: paperFloor) }, want, "tile") }
+                    if let want = entry["tile"] as? [Int] { try equal(values.map(CalendarWidget.tile), want, "tile") }
                     if let want = entry["inkOnly"] as? [Bool] { try equal(values.map(CalendarWidget.inkOnly), want, "inkOnly") }
                     if let want = entry["ear"] as? [Int] { try equal(values.map(CalendarWidget.earOpacity), want, "ear") }
                     if let want = entry["bolder"] as? [Bool] { try equal(values.map(CalendarWidget.bolder), want, "bolder") }

@@ -921,16 +921,18 @@ function typingGroup(): HTMLElement {
       : t("종이냥에서 글자를 치면 구석에 나와 두드리고, 멈추면 곧 들어가요. 무엇을 쳤는지는 보지 않아요."));
   const caption = said === undefined ? null : h("div", { class: `sub${state.typingCatNote ? " warn" : ""}` }, said);
   const scopeRow = h("div", { class: "row" }, glyph("keyboard"), h("div", { class: "grow" }, h("div", {}, t("두드리기")), caption), scope);
-  const corner = popup(typingCorners.map((value) => ({ value, title: cornerTitles()[value] })), prefs.typingCorner, (value) => set("typingCorner", value), t("자리"));
+  // #331: 옮긴 자리 once the cat was dragged somewhere (chosen by the drag; a corner puts it back there).
+  const places: TypingCorner[] = prefs.typingPlace ? [...typingCorners, "moved"] : [...typingCorners];
+  const corner = popup(places.map((value) => ({ value, title: cornerTitles()[value] })), prefs.typingCorner, (value) => set("typingCorner", value), t("자리"));
   corner.disabled = prefs.typingCat === "off";
   const cornerRow = h("div", { class: `row${prefs.typingCat === "off" ? " disabled" : ""}` }, glyph("corner"), h("span", { class: "grow" }, t("자리")), corner);
   // #304: its own 크기, apart from the pet's.
   const sizeRow = h("div", { class: `row${prefs.typingCat === "off" ? " disabled" : ""}` }, glyph("expand"), h("span", { class: "grow" }, t("크기")),
     segmented(catSizes.map((value) => ({ value, title: catSizeTitles[lang()][value] })), prefs.typingSize, (value) => set("typingSize", value), t("타닥냥 크기")));
-  return group(t("타닥냥"), [scopeRow, cornerRow, sizeRow], t("글자를 치면 화면 구석의 고양이가 방석에 기대 앞발로 두드려요. 종이냥 펫과 따로 켜고 꺼요."), false, "pet");
+  return group(t("타닥냥"), [scopeRow, cornerRow, sizeRow], t("글자를 치면 화면 구석의 고양이가 방석에 기대 앞발로 두드려요. 끌어서 옮길 수 있고, 종이냥 펫과 따로 켜고 꺼요."), false, "pet");
 }
 
-const cornerTitles = (): Record<TypingCorner, string> => ({ topLeft: t("왼쪽 위"), topRight: t("오른쪽 위"), bottomLeft: t("왼쪽 아래"), bottomRight: t("오른쪽 아래") });
+const cornerTitles = (): Record<TypingCorner, string> => ({ topLeft: t("왼쪽 위"), topRight: t("오른쪽 위"), bottomLeft: t("왼쪽 아래"), bottomRight: t("오른쪽 아래"), moved: t("옮긴 자리") });
 
 // ─── 시계: alarms, then the focus timer ───────────────────────────────────────
 

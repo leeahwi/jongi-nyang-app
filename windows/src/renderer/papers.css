@@ -225,7 +225,7 @@
 
 /* ─── 줄 모양 (4-1): 모눈 노트 (11 px squares, four to a row), 원고지 (two rules a row, 22 px columns), 하늘색 줄노트
    (blue lines and a 2 px red margin). The rows keep their 44 px; only the picture under them changes. ─── */
-:root[data-paper="grid"] .lines:not(.grouped), :root[data-paper="grid"] .lines-fill {
+:root[data-paper="grid"] .lines:not(.grouped):not(.spaced), :root[data-paper="grid"] .lines-fill {
   background-image:
     repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--row) - 1px), var(--rule) calc(var(--row) - 1px), var(--rule) var(--row)),
     repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--row) / 4 - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(var(--row) / 4 - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(var(--row) / 4)),
@@ -233,13 +233,14 @@
 }
 /* 원고지: a band of squares in every row — a rule 6 px under the row's top and one at its foot, columns between them
    (a tile per row: the colour is the paper's --rule, written out because a picture can't read a variable). */
-:root[data-paper="manuscript"] .lines:not(.grouped), :root[data-paper="manuscript"] .lines-fill {
+:root[data-paper="manuscript"] .lines:not(.grouped):not(.spaced), :root[data-paper="manuscript"] .lines-fill {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='44'%3E%3Cpath d='M0 6.5H22M0 43.5H22M21.5 6V44' stroke='%23eab4a6' stroke-width='1' fill='none'/%3E%3C/svg%3E");
   background-size: 22px var(--row); background-repeat: repeat;
 }
 /* The list in parts (다음 · 그 밖에, or by space): each row carries its own piece of the ruling (an unpicked row; a picked
    one keeps its sage bar and line). */
-:root[data-paper="grid"] .lines.grouped > .row:not(.selected), :root[data-paper="grid"] .lines.grouped > .all-done {
+:root[data-paper="grid"] .lines.grouped > .row:not(.selected), :root[data-paper="grid"] .lines.grouped > .all-done,
+:root[data-paper="grid"] .lines.spaced:not(.board) .sgroup-rows > .row:not(.selected), :root[data-paper="grid"] .lines.spaced > .all-done {
   background-image:
     linear-gradient(var(--rule), var(--rule)),
     repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--row) / 4 - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(var(--row) / 4 - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(var(--row) / 4)),
@@ -248,8 +249,49 @@
   background-position: 18px 100%, 18px 0, 18px 0;
   background-repeat: no-repeat;
 }
-:root[data-paper="manuscript"] .lines.grouped > .row:not(.selected), :root[data-paper="manuscript"] .lines.grouped > .all-done {
+:root[data-paper="manuscript"] .lines.grouped > .row:not(.selected), :root[data-paper="manuscript"] .lines.grouped > .all-done,
+:root[data-paper="manuscript"] .lines.spaced:not(.board) .sgroup-rows > .row:not(.selected), :root[data-paper="manuscript"] .lines.spaced > .all-done {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='44'%3E%3Cpath d='M0 6.5H22M0 43.5H22M21.5 6V44' stroke='%23eab4a6' stroke-width='1' fill='none'/%3E%3C/svg%3E");
   background-size: 22px var(--row); background-repeat: repeat-x; background-position: 18px 0;
 }
 :root[data-paper="lined"] .lines::before { width: 2px; background: var(--margin-rule); }
+/* By space (#332, as the Mac's #328). 메모지 · 책갈피 rows carry their piece of the ruling as above (the spaced list itself
+   draws none, so the cards and the gaps between them stay plain); a card's last row keeps its squares without the foot rule. */
+:root[data-paper="grid"] .lines.cards .sgroup-rows > .row:last-child:not(.selected) {
+  background-image:
+    repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--row) / 4 - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(var(--row) / 4 - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(var(--row) / 4)),
+    repeating-linear-gradient(to right, transparent 0, transparent calc(var(--row) / 4 - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(var(--row) / 4 - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(var(--row) / 4));
+  background-size: calc(100% - 38px) 100%, calc(100% - 38px) 100%;
+  background-position: 18px 0, 18px 0;
+}
+:root[data-paper="grid"] .lines.cards > .lines-fill, :root[data-paper="manuscript"] .lines.cards > .lines-fill { background-image: none; }
+/* 칸 보기: the grid lies under the whole column below its head, one piece (the rows scroll over it), with no rules of its own. */
+:root[data-paper="grid"] .lines.board > .sgroup {
+  background-image:
+    repeating-linear-gradient(to bottom, transparent 0, transparent calc(9px - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(9px - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(9px)),
+    repeating-linear-gradient(to right, transparent 0, transparent calc(9px - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(9px - 1px), color-mix(in srgb, var(--rule) 55%, transparent) calc(9px));
+  background-size: calc(100% - 32px) calc(100% - 38px), calc(100% - 32px) calc(100% - 38px);
+  background-position: 16px 38px, 16px 38px; background-repeat: no-repeat;
+}
+:root[data-paper="grid"] .lines.board .sgroup-rows > .row:not(.selected), :root[data-paper="grid"] .lines.board .sgroup-add,
+:root[data-paper="grid"] .lines.board .sgroup-done, :root[data-paper="grid"] .lines.board > .sgroup::after { background-image: none; }
+/* 원고지 in 칸 보기: a band of squares in every row, the ‘+ 넣기’ line and the rows' foot, on to the column's bottom. */
+:root[data-paper="manuscript"] .lines.board .sgroup-rows > .row:not(.selected) {
+  background-image:
+    linear-gradient(var(--rule), var(--rule)), linear-gradient(var(--rule), var(--rule)),
+    repeating-linear-gradient(to right, transparent 0, transparent 21px, var(--rule) 21px, var(--rule) 22px);
+  background-size: calc(100% - 24px) 1px, calc(100% - 24px) 1px, calc(100% - 24px) calc(100% - 6px);
+  background-position: 12px 6px, 12px 100%, 12px 6px; background-repeat: no-repeat;
+}
+/* ‘+ 넣기’ and 완료 sit in the column itself (the rows have 4 px of the column's padding more): the same band, 16 px in. */
+:root[data-paper="manuscript"] .lines.board .sgroup-add, :root[data-paper="manuscript"] .lines.board .sgroup-done {
+  background-image:
+    linear-gradient(var(--rule), var(--rule)), linear-gradient(var(--rule), var(--rule)),
+    repeating-linear-gradient(to right, transparent 0, transparent 21px, var(--rule) 21px, var(--rule) 22px);
+  background-size: calc(100% - 32px) 1px, calc(100% - 32px) 1px, calc(100% - 32px) calc(100% - 6px);
+  background-position: 16px 6px, 16px 100%, 16px 6px; background-repeat: no-repeat;
+}
+:root[data-paper="manuscript"] .lines.board > .sgroup::after {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='36'%3E%3Cpath d='M0 6.5H22M0 35.5H22M21.5 6V36' stroke='%23eab4a6' stroke-width='1' fill='none'/%3E%3C/svg%3E");
+  background-size: 22px 36px; background-repeat: repeat;
+}

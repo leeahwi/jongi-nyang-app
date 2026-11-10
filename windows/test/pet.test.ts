@@ -134,6 +134,6 @@ test("pet window: made and placed with its whole bounds on the floor, never at t
   // Made with them (not centred first, then moved), and placed with them.
   const source = (file: string) => fs.readFileSync(path.join(process.cwd(), file), "utf8");
   assert.match(source("src/main/pet.ts"), /new BrowserWindow\(\{\s*\.\.\.petWindowBounds\(/);
-  assert.match(source("src/main/pet.ts"), /setBounds\(bounds\)/);
+  assert.match(source("src/main/pet.ts"), /placePetWindow\(this\.window, petWindowBounds\(/);
   assert.match(source("src/main/typingCat.ts"), /new BrowserWindow\(\{\s*\.\.\.this\.frame\(\)/);
 });

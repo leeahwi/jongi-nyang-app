@@ -1,6 +1,6 @@
 import type { TimerSize } from "./timerWidget";
 import type { CatSize } from "./catSize";
-import type { TypingCorner, TypingScope } from "./typingCat";
+import type { TypingCorner, TypingPlace, TypingScope } from "./typingCat";
 import type { ChatterFrequency } from "./chatter";
 import type { ArchiveAfterDays } from "./archive";
 import type { TodoItem } from "./notebook";
@@ -71,6 +71,8 @@ export interface Prefs {
   /** #304: 타닥냥's 크기, apart from the pet's. */
   typingSize: CatSize;
   typingCatLast?: TypingScope;
+  /** #331: 옮긴 자리 — where 타닥냥 was last dragged to (written by the main process only; kept when a corner is chosen). */
+  typingPlace?: TypingPlace;
   pomodoroFocusMinutes: number;
   pomodoroRestMinutes: number;
   pomodoroLongRestMinutes: number;

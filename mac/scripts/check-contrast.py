@@ -348,6 +348,8 @@ def paper_rows(paper, p):
     # holiday) tile at its own floor (CalendarWidget.floor; none up to 100 % fails).
     for wall in ('#000000', '#ffffff'):
         rows.append(('ink', f'paper 85% / {wall}', 'text', 'widget text on its backing (#234)', ratio(p['ink'], blend(p['paper'], WIDGET_BACKING, wall))))
+    # #321: fainter than its floor, the tiles fade with the paper and every widget text gets an outline of solid paper.
+    rows.append(('ink', 'paper outline', 'text', 'widget text on its paper outline below the floor (#321)', ratio(p['ink'], p['paper'])))
     for tinted in (False, True):
         paper = blend(p['clay2'], 0.55, p['paper']) if tinted else p['paper']
         worst, other = ('#ffffff', '#000000') if dark else ('#000000', '#ffffff')
@@ -403,6 +405,7 @@ def widget_rows(table):
         out.append(('ink', f'paper 85% / {name}', 'text', f'widget text on its backing over a {name} wallpaper (#234)', day, night))
     for mark, where in (('sage', 'reminder dot, range bar, today circle'), ('clay', 'deadline dot and flag')):
         out.append((mark, 'paper ring', 'large', f'widget {where} on its paper ring (#234)', ratio(table[mark][0], table['paper'][0]), ratio(table[mark][1], table['paper'][1])))
+    out.append(('ink', 'paper outline', 'text', 'widget text on its paper outline below the floor (#321)', ratio(table['ink'][0], table['paper'][0]), ratio(table['ink'][1], table['paper'][1])))
     out.append(('onSage', 'sage', 'text', 'widget today number in its circle (#234)', ratio(table['onSage'][0], table['sage'][0]), ratio(table['onSage'][1], table['sage'][1])))
     # 4-6 (frosted paper tiles): a day's tile never fades below its paper's floor — ink on the paper at the floor over the
     # worst wallpaper; the weekend · holiday tile (clay2 55 % into the paper) has its own floor. Holiday names: clayText at
