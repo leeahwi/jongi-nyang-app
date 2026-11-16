@@ -1167,6 +1167,13 @@ struct PetSettingsPanel: View {
                             Button(L("시스템 설정 열기"), action: model.openInputMonitoringSettings)
                                 .buttonStyle(PaperActionButtonStyle())
                         }
+                        // #494: an update leaves the old build's entry switched on, and macOS doesn't ask again.
+                        Text(L("입력 모니터링에 종이냥이 이미 켜져 있다면 업데이트 전 앱의 항목이에요. 그 항목을 ‘−’로 지우고, ‘+’로 응용 프로그램 폴더의 종이냥을 다시 넣어 켜 주세요."))
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else if model.typingSecureInput {
+                        Text(L("지금 다른 프로그램이 키 입력을 막고 있어서(보안 입력) 다른 앱의 키를 듣지 못해요. 비밀번호 칸을 닫거나, 화면을 잠갔다 풀면 대개 풀려요."))
+                            .foregroundStyle(PaperTheme.ink)
+                            .fixedSize(horizontal: false, vertical: true)
                     } else {
                         Text(model.typingScope == .everywhere ? L("다른 앱에서 칠 때도 두드려요. 어떤 키인지는 보지 않고, 눌렸다는 것만 알아요.")
                              : L("종이냥에서 글자를 치면 구석에 나와 두드리고, 멈추면 곧 들어가요. 무엇을 쳤는지는 보지 않아요."))

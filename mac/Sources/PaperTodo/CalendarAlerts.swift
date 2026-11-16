@@ -54,7 +54,7 @@ final class CalendarAlertController {
         timer?.invalidate()
         let alert = CalendarDay.nextAlertTime(model.calendar.visibleEvents, now: .now, leadMinutes: model.calendar.alertMinutes, shownHere: shownHere)
         guard let next = ([alert].compactMap { $0 } + again.map(\.at)).min() else { return }
-        let timer = Timer(timeInterval: max(minimumDelay, next.timeIntervalSinceNow), repeats: false) { _ in
+        let timer = Timer(timeInterval: max(minimumDelay, next.timeIntervalSinceNow), repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in self?.tick() }
         }
         timer.tolerance = 2

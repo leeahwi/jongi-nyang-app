@@ -93,7 +93,7 @@ export const pageActions: Partial<Record<PageName, ReadonlySet<ActionType>>> = {
   drawer: actions(
     // #230 · #289: a key went down here (typingTap.ts), for the typing cat.
     "typingTap",
-    "copyText", "drawerPaste", "drawerView", "drawerWrite", "editCommand", "folderAdd", "folderColor", "folderDelete", "folderDuplicate",
+    "copyText", "drawerNew", "drawerPaste", "drawerView", "drawerWrite", "editCommand", "folderAdd", "folderColor", "folderDelete", "folderDuplicate",
     "folderOrder", "folderRename", "folderRestore", "folderSort", "memoCheck", "memoClose", "memoDelete", "memoDuplicate", "memoMove",
     "memoPaper", "memoPin", "memoPinMany", "memoRestore", "memoSetText", "memoUpdate", "openHelp", "openLink", "openSettings", "setPref", "window",
     // 2A (#115 · #120): 보기 · 이 폴더, 지운 메모's 되돌리기 and 지금 모두 비우기.
@@ -268,6 +268,7 @@ const actionFields: { [K in ActionType]: Record<string, Reader> } = {
   memoPaper: { id, paper: optional(oneOf(...memoPapers)) },
   memoPinMany: { ids, pinned: bool }, memoSetText: { id, text: longText }, memoDuplicate: { id },
   drawerPaste: { view: id },
+  drawerNew: { view: id },
   openLink: { url: str(4096) },
   editCommand: { command: oneOf("cut", "copy", "paste", "selectAll") },
   spaceAdd: { id, name, color: optional(nullable(str(40))), todo: optional(id) },

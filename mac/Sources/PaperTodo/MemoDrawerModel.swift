@@ -1183,12 +1183,17 @@ final class MemoDrawer: ObservableObject {
         selectedID = id
     }
 
-    /// ⌘N / 새 메모: the keyboard in the quick-write slip.
+    /// ⌘N / 새 메모: a blank memo on top of this folder (고정: 메모, pinned — as the quick-write slip puts it), open and
+    /// typing at once. Left blank, it goes away when it is closed.
     func newMemo() {
         endSearch()
         bigID = nil
         if expandedID != nil { collapse() }
-        focusQuick += 1
+        let target = folders.quickWriteTarget(tab)
+        let id = model.addBlankMemo(folder: target.folder, pinned: target.pinned)
+        memos = model.memos
+        folders = model.memoFolders
+        edit(id)
     }
 
     /// 여기에 새 메모 (a bookmark's menu): that folder, the keyboard in the quick-write slip.

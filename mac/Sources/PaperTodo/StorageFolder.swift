@@ -28,23 +28,76 @@ enum StorageFolder {
     /// (the list isn't moved: that folder's own list opens), 이 Mac 목록 열기 opens this Mac's for this run (the folder
     /// stays chosen, for the next launch). `folder` is the one to open (nil: this Mac's); `missing` when it stands in.
     /// `ask`: the slip (a check answers it instead) — given the folder's name and whether it is there now, the choice.
-    static func waitForChosen(_ preferences: UserDefaults, ask: @MainActor (String, @escaping @MainActor @Sendable () -> Bool) -> Int = askMissing)
+    /// A folder that is there but whose list iCloud Drive hasn't brought down yet (a new Mac, 저장 공간 최적화) is waited
+    /// for the same way (`askDownload`: 0 이 Mac 목록 열기 · 1 기다리기), the download asked for meanwhile: reading those
+    /// files here would hold the app before its first window until iCloud is done — or for good.
+    /// `ask` stays the last parameter, so a trailing closure (the tests') still answers the missing-folder question.
+    static func waitForChosen(_ preferences: UserDefaults,
+                              askDownload: @MainActor (String, @escaping @MainActor @Sendable () -> Bool) -> Int = askDownloading,
+                              ask: @MainActor (String, @escaping @MainActor @Sendable () -> Bool) -> Int = askMissing)
         -> (folder: URL?, missing: String?) {
-        while let path = missing(preferences) {
-            switch ask((path as NSString).lastPathComponent, { chosen(preferences) != nil }) {
-            case 0: return (nil, path)
-            case 1:
-                let panel = NSOpenPanel()
-                panel.canChooseDirectories = true
-                panel.canChooseFiles = false
-                panel.canCreateDirectories = true
-                panel.prompt = L("이 폴더 열기")
-                TestHooks.activate()
-                if panel.runModal() == .OK, let folder = panel.url { preferences.set(folder.path, forKey: preferenceKey) }
-            default: continue
+        while true {
+            if let path = missing(preferences) {
+                switch ask((path as NSString).lastPathComponent, { chosen(preferences) != nil }) {
+                case 0: return (nil, path)
+                case 1:
+                    let panel = NSOpenPanel()
+                    panel.canChooseDirectories = true
+                    panel.canChooseFiles = false
+                    panel.canCreateDirectories = true
+                    panel.prompt = L("이 폴더 열기")
+                    TestHooks.activate()
+                    if panel.runModal() == .OK, let folder = panel.url { preferences.set(folder.path, forKey: preferenceKey) }
+                default: break
+                }
+                continue
+            }
+            guard let folder = chosen(preferences) else { return (nil, nil) }
+            let waiting = notDownloaded(folder)
+            guard !waiting.isEmpty else { return (folder, nil) }
+            SafeFile.requestDownload(waiting)
+            // Picked another folder meanwhile (or it went): looked at again from the top.
+            if askDownload(folder.lastPathComponent, { notDownloaded(folder).isEmpty || chosen(preferences) != folder }) == 0 {
+                return (nil, folder.path)
             }
         }
-        return (chosen(preferences), nil)
+    }
+
+    /// The files of `folder` the app reads — the data files, focus.jsonl and the record's months — that iCloud Drive
+    /// hasn't downloaded yet (SafeFile.isDataless). Only `lstat`, so it is cheap enough to ask every second.
+    static func notDownloaded(_ folder: URL) -> [URL] {
+        var urls = (files + [Focus.fileName]).map { folder.appendingPathComponent($0) }
+        let archive = folder.appendingPathComponent("archive", isDirectory: true)
+        urls += ((try? FileManager.default.contentsOfDirectory(at: archive, includingPropertiesForKeys: nil)) ?? [])
+            .filter { $0.pathExtension == "jsonl" }
+        return urls.filter(SafeFile.isDataless)
+    }
+
+    /// iCloud Drive에서 목록을 받고 있어요: 0 이 Mac 목록 열기 · 1 기다리기 (also when the download is done).
+    static func askDownloading(_ name: String, back: @escaping @MainActor @Sendable () -> Bool) -> Int {
+        SlipAlert.run(symbol: "icloud.and.arrow.down", title: L("저장 폴더"), message: L("iCloud Drive에서 목록을 받고 있어요"),
+                      detail: L("‘\(name)’ 폴더의 파일이 아직 이 Mac에 다 내려오지 않았어요. 다 받으면 저절로 그 폴더로 열어요. 그전에는 아무 파일도 쓰지 않아요."),
+                      choices: [.init(title: L("이 Mac 목록 열기"), role: .quiet, leading: true),
+                                .init(title: L("기다리기"), role: .primary, isDefault: true, isCancel: true)],
+                      width: .medium, answersItself: back)
+    }
+
+    /// Before a move reads `folders` (the question about a list already there, the backup, the merge): their iCloud
+    /// files are brought down first, on a slip that answers itself (0 취소 · 1 기다리기). False: cancelled, nothing moved.
+    static func waitForDownloads(_ folders: [URL], ask: @MainActor (String, @escaping @MainActor @Sendable () -> Bool) -> Int = askDownloadingMove) -> Bool {
+        while let folder = folders.first(where: { !notDownloaded($0).isEmpty }) {
+            SafeFile.requestDownload(notDownloaded(folder))
+            if ask(folder.lastPathComponent, { notDownloaded(folder).isEmpty }) == 0 { return false }
+        }
+        return true
+    }
+
+    static func askDownloadingMove(_ name: String, back: @escaping @MainActor @Sendable () -> Bool) -> Int {
+        SlipAlert.run(symbol: "icloud.and.arrow.down", title: L("저장 폴더"), message: L("iCloud Drive에서 목록을 받고 있어요"),
+                      detail: L("‘\(name)’ 폴더의 파일을 다 받으면 저절로 이어서 옮겨요. 취소하면 지금 목록은 그대로예요."),
+                      choices: [.init(title: L("취소")),
+                                .init(title: L("기다리기"), role: .primary, isDefault: true, isCancel: true)],
+                      width: .medium, answersItself: back)
     }
 
     /// 저장 폴더를 찾지 못했어요: 0 이 Mac 목록 열기 · 1 폴더 다시 고르기 · 2 다시 확인 (also when the folder comes back).
@@ -62,6 +115,8 @@ enum StorageFolder {
     static func switchTo(_ target: URL?, defaultFolder: URL, current: URL, model: AppModel, preferences: UserDefaults) {
         let destination = target ?? defaultFolder
         guard destination.standardizedFileURL != current.standardizedFileURL else { return }
+        // A list in iCloud Drive not downloaded yet is read below on this thread: it comes down first.
+        guard waitForDownloads([destination, current]) else { return }
         var copyCurrent = true
         if FileManager.default.fileExists(atPath: destination.appendingPathComponent("todos.json").path) {
             let detail = target == nil
@@ -230,6 +285,8 @@ final class StorageWatcher {
     private let onLog: () -> Void
     private var timer: Timer?
     private var seen: [String: Date] = [:]
+    /// The not-downloaded files last asked for (asked once, not every check).
+    private var requested: [URL] = []
     private var seenLog: [Int] = []
     private var logSource: DispatchSourceFileSystemObject?
 
@@ -240,7 +297,7 @@ final class StorageWatcher {
         self.onLog = onLog
         seen = Self.dates(in: folder)
         seenLog = Self.stamp(log)
-        let timer = Timer(timeInterval: 2, repeats: true) { _ in
+        let timer = Timer(timeInterval: 2, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in self?.check() }
         }
         timer.tolerance = 0.5
@@ -262,7 +319,7 @@ final class StorageWatcher {
         let descriptor = open(log.path, O_EVTONLY)
         guard descriptor >= 0 else { return }
         let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor, eventMask: [.write, .extend, .delete, .rename], queue: .main)
-        source.setEventHandler {
+        source.setEventHandler { [weak self] in
             Task { @MainActor [weak self] in self?.logEvent() }
         }
         source.setCancelHandler { close(descriptor) }
@@ -284,6 +341,17 @@ final class StorageWatcher {
     private func check() {
         let now = Self.dates(in: folder)
         if now != seen {
+            // A file iCloud Drive hasn't brought down (another device's save, 저장 공간 최적화): asked for, and read on a
+            // later check once it is here — reading it now would hold the app until iCloud is done.
+            let waiting = StorageFolder.notDownloaded(folder)
+            if !waiting.isEmpty {
+                if waiting != requested { SafeFile.requestDownload(waiting) }
+                requested = waiting
+                armLog()
+                checkLog()
+                return
+            }
+            requested = []
             seen = now
             model.reloadFromDisk()
             NotificationCenter.default.post(name: Self.changed, object: model)

@@ -13,7 +13,7 @@ import { copyData, mergeArchive, readDataFiles } from "../src/main/storageFolder
 import { temporaryFolder } from "./temporaryFolder";
 
 /**
- * 집중 기록 (focus.jsonl): the shared cases of focus-cases.md (written by the
+ * 집중 기록 (focus.jsonl): the shared cases, the same as mac FocusTests.swift (written by the
  * Windows side; the macOS app passes the same rows), then the backup, storage and glance rows.
  */
 

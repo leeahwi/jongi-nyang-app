@@ -117,6 +117,14 @@ public enum TypingSource: String, Sendable {
     public static func showsNoPermission(scope: TypingCat.Scope, granted: Bool) -> Bool {
         scope == .everywhere && !granted
     }
+
+    /// #494: the line under the setting when ‘모든 앱에서’ is allowed and the key tap is set (`working`), but another
+    /// program has turned on macOS's Secure Event Input (a password field, loginwindow left so after unlocking, Terminal's
+    /// Secure Keyboard Entry). No tap hears other apps' keys meanwhile, so the cat looks deaf with every permission given.
+    /// Nothing else changes: the tap stays and hears again once it is off. Not while locked (the cat is away then).
+    public static func showsSecureInput(scope: TypingCat.Scope, working: Bool, locked: Bool, secureInput: Bool) -> Bool {
+        scope == .everywhere && working && !locked && secureInput
+    }
 }
 
 /// The typing cat's own small window (#289): a corner of the screen in use, over full-screen apps too, clicks passing

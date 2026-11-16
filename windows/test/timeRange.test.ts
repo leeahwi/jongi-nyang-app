@@ -6,7 +6,7 @@ import {
   blockTooltip, clockMinutes, dragged, drawnEnd, exportRange, focusMinutes, rangeDay, rangeOf, rangeOverdue, rangeText, rangeTimes, validRange, withRange,
 } from "../src/core/timeRange";
 
-/** 시간 정하기: the shared rules and cases of timeblock-cases.md §1–3 and §6. */
+/** 시간 정하기: the shared rules and cases (the same as mac TimeBlockTests.swift). */
 
 const task = (extra: Partial<TodoItem> = {}): TodoItem => ({ id: "A", title: "보고서", isCompleted: false, createdAt: "2026-10-01T00:00:00Z", ...extra });
 const local = (day: number, hour: number, minute = 0) => new Date(2026, 9, day, hour, minute);

@@ -11,8 +11,8 @@ source both apps are checked against). 낮 종이 and 밤 종이 are the day and
 
 Every text and UI pair must pass AA in day AND night (exit 1 otherwise) — since 1.37 the day palette
 was fixed where it failed: ink3 darker (the old one is `faint`, for marks that aren't text), and
-clayText / sageText for clay and sage words. The final table is kept in
-night-tokens.md ("Day tokens"), identical in the Windows app.
+clayText / sageText for clay and sage words. `--markdown` prints the final table, identical in the
+Windows app (windows/test/contrast.test.ts).
 Usage: scripts/check-contrast.py [--markdown]
 """
 import json

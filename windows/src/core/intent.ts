@@ -10,7 +10,7 @@ import { describe, isValidRule, nextOccurrence, type RepeatRule } from "./repeat
 /**
  * 입력 줄: what a line typed anywhere (the note's input line, 빠른 입력) means — a to-do, an event,
  * a timer, an alarm or a note — as candidates, best first. The same rules and test cases as the
- * macOS app (PaperCore Intent.swift); the shared cases are in intent-cases.md.
+ * macOS app (PaperCore Intent.swift); the shared cases are in test/intent.test.ts and IntentTests.swift.
  *
  * 1. A slash kind first (`/할일 /일정 /메모 /타이머 /알람`, en `/todo /event /note /timer /alarm`,
  *    nl `/taak /afspraak /notitie /timer /wekker`; the Korean ones in every language): only that

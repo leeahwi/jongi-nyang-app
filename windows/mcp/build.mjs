@@ -8,6 +8,7 @@ import { cp, mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/pro
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkReleasePaths } from "../../tools/check-release-paths.mjs";
+import { releaseEpoch, setZipFileTime } from "./zipTime.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
@@ -57,6 +58,8 @@ await cp(path.join(dist, "server/index.js.new"), path.join(pack, "server/index.j
 const cli = path.join(root, "node_modules/@anthropic-ai/mcpb/dist/cli/cli.js");
 execFileSync(process.execPath, [cli, "validate", path.join(pack, "manifest.json")], { stdio: "inherit" });
 execFileSync(process.execPath, [cli, "pack", pack, path.join(dist, "jongi-nyang.mcpb.new")], { stdio: ["ignore", "ignore", "inherit"] });
+// #493: mcpb stamps the entries with the time it runs; the commit's time makes one commit pack the same bytes on every build.
+setZipFileTime(path.join(dist, "jongi-nyang.mcpb.new"), releaseEpoch(root));
 await rm(pack, { recursive: true, force: true });
 // #225: the shipped files are searched for build-folder paths before they replace the old ones.
 if (await checkReleasePaths([path.join(dist, "server/index.js.new"), path.join(dist, "jongi-nyang.mcpb.new")]) !== 0) {

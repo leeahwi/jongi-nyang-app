@@ -12,7 +12,7 @@ import { fold, matchRange, prepareQuery } from "./match";
  * 메모 서랍 (1.28): memos from the screen's edge, one folder at a time. The memos stay in memos.json as
  * they are; which folder each one is in, and whether it is pinned (고정), lives beside it in
  * memo-folders.json, so an older version that saves memos.json never loses the folders. The same file,
- * rules and cases (D1–D16, the shared memo drawer cases) as the macOS app (PaperCore MemoFolders.swift):
+ * rules and cases (D1–D16, test/memoDrawer.test.ts · MemoDrawerTests.swift) as the macOS app (PaperCore MemoFolders.swift):
  *
  *   { "v": 1,
  *     "folders": [{ "id": "inbox", "name": "메모", "color": "lavender", "order": 0, "updatedAt": "…" }, …],

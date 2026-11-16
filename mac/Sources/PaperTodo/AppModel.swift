@@ -69,6 +69,8 @@ final class AppModel: ObservableObject {
     }
     /// Set by the typing cat: in all apps is chosen but macOS's Input Monitoring doesn't allow it (Settings says so).
     @Published var typingNoPermission = false
+    /// Set by the typing cat (#494): allowed and listening, but another program holds Secure Event Input (Settings says so).
+    @Published var typingSecureInput = false
     /// Set by the app: System Settings → Input Monitoring.
     var onInputMonitoringSettings: (() -> Void)?
     func openInputMonitoringSettings() { onInputMonitoringSettings?() }
@@ -426,6 +428,23 @@ final class AppModel: ObservableObject {
         memos.insert(memo, at: 0)
         memoEdits.insert(memo.id)
         saveMemosNow()
+        let target = folder ?? memoFolders.lastFolder(drawer.lastFolder)
+        if target != MemoFolders.inbox || pinned {
+            changeMemoFolders { folders, now in
+                folders.place(memo.id, in: target, now: now)
+                if pinned { folders.setPinned(memo.id, true, now: now) }
+            }
+        }
+        return memo.id
+    }
+
+    /// ⌘N in the drawer: a blank memo on top of `folder`, to be opened for typing. It is kept only while it is the open
+    /// one — closed still blank, it goes away (closeMemo), and its placement with the next folder change (pruned).
+    /// Unlike `newMemo` it isn't made the open memo here: the drawer opens it (expand), which first closes the one open now.
+    func addBlankMemo(folder: String? = nil, pinned: Bool = false) -> String {
+        let memo = Memo()
+        memos.insert(memo, at: 0)
+        memoEdits.insert(memo.id)
         let target = folder ?? memoFolders.lastFolder(drawer.lastFolder)
         if target != MemoFolders.inbox || pinned {
             changeMemoFolders { folders, now in

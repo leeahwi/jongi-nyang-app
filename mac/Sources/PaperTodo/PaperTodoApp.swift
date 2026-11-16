@@ -965,7 +965,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                 self.weeklyTimer?.invalidate()
                 self.weeklyTimer = nil
                 guard visible else { return }
-                let timer = Timer(timeInterval: 10 * 60, repeats: true) { _ in
+                let timer = Timer(timeInterval: 10 * 60, repeats: true) { [weak self] _ in
                     Task { @MainActor [weak self] in self?.checkWeeklyLookBack() }
                 }
                 timer.tolerance = 60

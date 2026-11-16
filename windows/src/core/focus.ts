@@ -9,7 +9,7 @@ import { awayText } from "./ribbon";
  * task or per plain timer, appended when it ends (finished, stopped early after at least a minute, or
  * 다 했어요). A Pomodoro writes one line per focus round; breaks are not written. The completion
  * archive is untouched. Same rules and test cases as the macOS app (PaperCore Focus.swift,
- * focus-cases.md).
+ * test/focus.test.ts · FocusTests.swift).
  *
  *   {"id":"…","taskId":"…","title":"보고서 마무리","start":"2026-10-08T05:00:00Z","end":"2026-10-08T05:25:00Z","minutes":25,"kind":"focus","done":true}
  */

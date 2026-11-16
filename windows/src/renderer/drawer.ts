@@ -533,7 +533,7 @@ function folderMenu(folder: MemoFolder, at: DOMRect | { x: number; y: number }, 
   const entries: MenuEntry[] = [
     { kind: "head", nodes: [square(folder.color), h("b", {}, folderName(folder, lang())), h("span", { class: "c" }, memos.length ? sheetCountWords(memos.length) : t("비어 있어요"))] },
     { kind: "sep" },
-    { kind: "item", label: t("여기에 새 메모"), icon: "plus", run: () => { setView(folder.id); quick.focus(); } },
+    { kind: "item", label: t("여기에 새 메모"), icon: "plus", run: () => { setView(folder.id); newMemo(); } },
     { kind: "sep" },
     { kind: "item", label: t("이름 바꾸기"), icon: "rename", run: () => folderForm(anchor, folder) },
     { kind: "sub", label: t("색"), icon: "colorWheel", entries: () => [{ kind: "node", node: swatches(shownColor(folder.color), (color) => { closeMenus(); act({ type: "folderColor", id: folder.id, color }); }) }] },
@@ -610,7 +610,7 @@ function gearMenu(at: DOMRect | { x: number; y: number }, keyboard = false): voi
   ];
   const backdropWords: Record<DrawerBackdrop, string> = { solid: t("불투명"), frost: t("반투명"), strong: t("투명"), none: t("바탕 없음") };
   const entries: MenuEntry[] = [
-    { kind: "item", label: t("새 메모"), icon: "plus", key: "Ctrl+N", run: () => { closeOpen(); render(); quick.focus(); } },
+    { kind: "item", label: t("새 메모"), icon: "plus", key: "Ctrl+N", run: newMemo },
     { kind: "item", label: t("복사한 글로 새 메모"), icon: "paste", run: pasteMemo },
     ...trashRow().filter((entry) => entry.kind === "item"),
     { kind: "sep" },
@@ -627,6 +627,28 @@ function gearMenu(at: DOMRect | { x: number; y: number }, keyboard = false): voi
   ];
   openMenu(menuHost, entries, t("메모 서랍 메뉴"), at, keyboard);
   gearButton.setAttribute("aria-expanded", "true");
+}
+
+/**
+ * Ctrl+N · 새 메모 (as the Mac's ⌘N): a blank memo on top of this folder, open and typing at once. It opens when the
+ * state with it comes (newMemoID); left blank, it goes away when it is closed.
+ */
+let newMemoID: string | undefined;
+function newMemo(): void {
+  closeOpen();
+  if (searching) leaveSearch(false);
+  big = false;
+  void (api.act({ type: "drawerNew", view: currentView() }) as unknown as Promise<string>).then((id) => {
+    newMemoID = id;
+    openNewMemo();
+  });
+}
+function openNewMemo(): void {
+  const id = newMemoID;
+  if (!id || !state?.memos.some((memo) => memo.id === id)) return;
+  newMemoID = undefined;
+  list.scrollTop = 0;
+  openMemo(id, true);
 }
 
 /** 복사한 글로 새 메모: the clipboard's words as a memo here; nothing copied → says so. */
@@ -1731,7 +1753,7 @@ window.addEventListener("keydown", (event) => {
   }
   if (ctrl && !event.shiftKey && !event.altKey) {
     const key = event.key.toLowerCase();
-    if (key === "n") { event.preventDefault(); closeOpen(); render(); quick.focus(); return; }
+    if (key === "n") { event.preventDefault(); newMemo(); return; }
     if (key === "f") { event.preventDefault(); enterSearch(); return; }
     if (key === "l") { event.preventDefault(); if (searching) leaveSearch(); folderList(true); return; }
     if (event.key === ",") { event.preventDefault(); act({ type: "openSettings", tab: "drawer" }); return; }
@@ -1980,7 +2002,8 @@ api.on("drawer:open", (payload) => {
     else if (currentView() === pinnedView && !placementOf(folders(), memo).pinned) { view = folder; act({ type: "drawerView", view: folder }); }
     const entry = state.memos.find((candidate) => candidate.id === memo)!;
     openMemo(memo, !checklistProgress(entry.text));
-  } else if (write || !wasShown) { fitQuick(); quick.focus(); }
+  } else if (write) newMemo();
+  else if (!wasShown) { fitQuick(); quick.focus(); }
 });
 
 api.on("drawer:shut", (payload) => {
@@ -2024,6 +2047,7 @@ api.on("state:memos", (next) => {
   for (const id of restoring) if (!state.memoTrash.entries.some((entry) => entry.memo.id === id)) restoring.delete(id);
   if (view === undefined) view = state.prefs.drawerLastFolder || inboxID;
   render();
+  openNewMemo();
 });
 void api.getState().then((initial) => {
   state = initial;

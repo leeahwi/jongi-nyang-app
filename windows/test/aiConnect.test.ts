@@ -13,7 +13,7 @@ import { Store } from "../src/main/store";
 import { temporaryFolder } from "./temporaryFolder";
 
 /**
- * AI 연결, the app's side (M13–M15 of the shared AI connection spec): the link it writes, the toast and the
+ * AI 연결, the app's side (M13–M15 of mac/docs/ai-connect-plan.md): the link it writes, the toast and the
  * away notice it makes from the log, undo with and without changes in between, Ctrl+Z, and the undo
  * history kept when Claude's write comes in. The real Store on temporary folders; the extension's writes
  * are made here the way it makes them (the file, then a line in the log).

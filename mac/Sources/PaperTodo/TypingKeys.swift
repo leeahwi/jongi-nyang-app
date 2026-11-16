@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import PaperCore
 
 /// 치면 두드리는 고양이 (#230): hears that a key went down — and nothing else. Each event is turned at once into "a key
@@ -98,6 +99,8 @@ final class TypingKeys {
 @MainActor
 protocol InputMonitoringAccess: AnyObject {
     var granted: Bool { get }
+    /// #494: another program has turned on Secure Event Input, so no key tap hears other apps' keys for now.
+    var secureInput: Bool { get }
     /// Shows macOS's question (once per build of the app; macOS itself doesn't ask again after an answer).
     func request()
 }
@@ -106,12 +109,14 @@ protocol InputMonitoringAccess: AnyObject {
 enum InputMonitoring {
     final class System: InputMonitoringAccess {
         var granted: Bool { CGPreflightListenEventAccess() }
+        var secureInput: Bool { IsSecureEventInputEnabled() }
         func request() { _ = CGRequestListenEventAccess() }
     }
 
     /// Not allowed, and never asks.
     final class NeverAsks: InputMonitoringAccess {
         var granted: Bool { false }
+        var secureInput: Bool { false }
         func request() {}
     }
 

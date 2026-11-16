@@ -171,6 +171,13 @@
       { "case": "A5 turned off after a refusal: the line goes", "scope": "off", "granted": false, "asked": true, "chosenNow": true, "ask": false, "note": false },
       { "case": "A6 after an update (this build never asked), still in all apps: no question at launch, only the line", "scope": "everywhere", "granted": false, "asked": false, "chosenNow": false, "ask": false, "note": true },
       { "case": "A7 the permission taken back: no question, the line", "scope": "everywhere", "granted": false, "asked": true, "chosenNow": false, "ask": false, "note": true }
+    ],
+    "secureInput": [
+      { "case": "S1 allowed and listening, another program has Secure Event Input on: the line says so", "scope": "everywhere", "working": true, "locked": false, "secureInput": true, "note": true },
+      { "case": "S2 allowed and listening, Secure Event Input off: nothing to say", "scope": "everywhere", "working": true, "locked": false, "secureInput": false, "note": false },
+      { "case": "S3 not allowed: the permission line instead, not this one", "scope": "everywhere", "working": false, "locked": false, "secureInput": true, "note": false },
+      { "case": "S4 locked (loginwindow holds it): the cat is away, no line", "scope": "everywhere", "working": true, "locked": true, "secureInput": true, "note": false },
+      { "case": "S5 in this app: other apps aren't heard anyway, no line", "scope": "app", "working": false, "locked": false, "secureInput": true, "note": false }
     ]
   }
 }

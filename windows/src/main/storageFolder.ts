@@ -51,6 +51,27 @@ export function usableFolder(folder: string): boolean {
   }
 }
 
+/**
+ * The files of `folder` the app reads at launch and on a move — the data files, focus.jsonl and the record's months —
+ * read once without waiting (Node's thread pool) and thrown away. A cloud file that isn't on this device yet (OneDrive's
+ * or iCloud for Windows' "online only", iCloud Drive on a Mac) is brought down by that read, off the main process: the
+ * store's own reads are synchronous and would hold every window until the cloud is done — or for good. Resolves once
+ * every read is done; a file that isn't there or is refused (#173) is skipped.
+ */
+export async function bringDown(folder: string): Promise<void> {
+  let months: string[] = [];
+  try {
+    months = (await fs.promises.readdir(path.join(folder, "archive"))).map((name) => `archive/${name}`).filter(isArchiveName);
+  } catch { /* no record yet */ }
+  await Promise.all([...sharedFiles, focusFileName, ...months].map(async (name) => {
+    const file = path.join(folder, name);
+    try {
+      if (isRefused(file)) return;
+      await fs.promises.readFile(file);
+    } catch { /* not there, or not readable: the store says so as before */ }
+  }));
+}
+
 export function hasList(folder: string): boolean {
   return fs.existsSync(path.join(folder, "todos.json"));
 }

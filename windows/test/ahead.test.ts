@@ -7,7 +7,7 @@ import type { TodoItem } from "../src/core/notebook";
 import { tables } from "../src/i18n";
 
 /**
- * 앞으로: the shared cases of ahead-cases.md (both apps pass every row exactly),
+ * 앞으로: the shared cases, the same rows as mac AheadTests.swift (both apps pass every row exactly),
  * in its notation — the inputs are read from the same text the file has.
  */
 

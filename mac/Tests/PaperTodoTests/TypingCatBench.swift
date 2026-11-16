@@ -13,6 +13,7 @@ import PaperCore
 @MainActor
 final class StandInAccess: InputMonitoringAccess {
     var granted = false
+    var secureInput = false
     var requests = 0
     func request() { requests += 1 }
 }
@@ -162,6 +163,14 @@ enum TypingCatBench {
         typing.refresh()
         check("allowed (in System Settings): the key tap takes over, the line goes, the cat is in its corner at rest",
               typing.heard == .everywhere && !model.typingNoPermission && typing.isShown && typing.cat.pose == .idle)
+        // #494: another program turns on Secure Event Input: the tap stays, Settings says why nothing is heard.
+        access.secureInput = true
+        typing.refresh()
+        check("Secure Event Input on: still in all apps, the secure input line, not the permission line",
+              typing.heard == .everywhere && model.typingSecureInput && !model.typingNoPermission)
+        access.secureInput = false
+        typing.refresh()
+        check("Secure Event Input off: the line goes", typing.heard == .everywhere && !model.typingSecureInput)
         model.typingCorner = .bottomRight
         await wait(0.2)
         if let screen, let frame = typing.frame {

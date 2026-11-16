@@ -263,7 +263,7 @@ final class FocusTimerController {
 
     private func startTicking() {
         guard tickTimer == nil else { return }
-        let timer = Timer(timeInterval: 1, repeats: true) { _ in
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in self?.tick() }
         }
         timer.tolerance = 0.2

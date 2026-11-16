@@ -9,7 +9,7 @@ import {
   viewForDigit, visibleFolders, type KeyPress, type MemoFolders,
 } from "../src/core/memoDrawer";
 
-// 메모 서랍: the shared cases D1–D16, verbatim from the shared memo drawer cases (the Mac's MemoDrawerTests.swift).
+// 메모 서랍: the shared cases D1–D16, the same rows as the Mac's MemoDrawerTests.swift.
 
 const now = new Date("2026-10-27T05:00:00Z");
 const memo = (id: string, text: string, updatedAt = "2026-10-27T04:00:00Z"): Memo => ({ id, text, createdAt: updatedAt, updatedAt });
@@ -313,7 +313,7 @@ test("the note's search finds a memo by its drawer folder's name", async () => {
   assert.match(groups[0].rows[0].meta, /^회사 · /);
 });
 
-// ─── M-rows: the memo tab gone (the shared memo drawer cases) ─────────────
+// ─── M-rows: the memo tab gone (the same in mac MemoDrawerTests.swift) ───
 
 test("M1–M3: the move notice — once, only with memos, the count in words, the shortcut named", async () => {
   const { moveNotice } = await import("../src/core/memoDrawer");

@@ -1,7 +1,7 @@
 import Foundation
 
 // 메모 서랍 (MemoFolders.swift): memo-folders.json, placements, checklist lines, quick write, the last
-// folder, search — the shared cases D1–D16 (the shared memo drawer cases, docs/memo-drawer-plan.md).
+// folder, search — the shared cases D1–D16 (the same rows as windows/test/memoDrawer.test.ts).
 private struct TestFailure: Error, CustomStringConvertible {
     let description: String
 }

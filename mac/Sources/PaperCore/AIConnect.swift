@@ -3,7 +3,7 @@ import Foundation
 /// 종이냥 for Claude (1.42): what the app and the extension share — `ai-link.json`, written by the app, and
 /// `ai-log.jsonl`, appended by the extension (and by the app's undo). Both live in the app's settings folder
 /// (`~/Library/Application Support/<bundle id>/`). Same formats, texts and cases as the Windows app and the
-/// extension (the shared AI connection spec; cases M13–M15 here).
+/// extension (mac/docs/ai-connect-plan.md, ‘사례 표’; cases M13–M15 here).
 ///
 /// Everything here is pure: the app reads and writes the files, this decides what they mean.
 public enum AIConnect {

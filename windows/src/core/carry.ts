@@ -7,7 +7,7 @@ import { pageOf } from "./shelf";
 /**
  * Carrying work forward (편의 기능 A): the 어제부터 / 3일째 tag on tasks that stayed on 오늘 past a day,
  * the date moves (내일 · 이번 주 금요일 · 다음 주 월요일 · 언젠가) and the one-day shifts. The same rules and
- * cases as the macOS app (convenience-cases.md §1–2).
+ * cases as the macOS app (test/convenience.test.ts · ConvenienceTests.swift).
  */
 
 const validKey = (value: unknown): value is string => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && fromKey(value) !== undefined;

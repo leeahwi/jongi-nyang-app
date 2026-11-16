@@ -100,6 +100,9 @@ final class TypingCatController {
         let working = granted && (locked || keys.source == .everywhere)
         let noPermission = TypingSource.showsNoPermission(scope: model.typingScope, granted: working)
         if model.typingNoPermission != noPermission { model.typingNoPermission = noPermission }
+        let secureInput = TypingSource.showsSecureInput(scope: model.typingScope, working: working, locked: locked,
+                                                        secureInput: working && access.secureInput)
+        if model.typingSecureInput != secureInput { model.typingSecureInput = secureInput }
         // Heard from elsewhere now (turned off, locked, the permission gone): the paws rest.
         if keys.source != before { stopPaws() }
         update()

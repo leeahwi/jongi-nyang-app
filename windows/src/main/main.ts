@@ -51,7 +51,7 @@ import { SlipConfirm, type ConfirmQuestion } from "./confirm";
 import type { ShortcutSheetGroup } from "../renderer/confirm";
 import { keyCaps, noteToggle, quickEntryShortcut, quickMemoShortcut } from "../core/shortcuts";
 import { PeriodicReminders, TaskReminders } from "./reminders";
-import { backupRefusal, hasList, importInto, moveData, readBackupText, readDataFiles, readDataFolder, removeLeftovers, takeMoved, usableFolder, writeDataFolder, writeFileAtomically, writeMoved } from "./storageFolder";
+import { backupRefusal, bringDown, hasList, importInto, moveData, readBackupText, readDataFiles, readDataFolder, removeLeftovers, takeMoved, usableFolder, writeDataFolder, writeFileAtomically, writeMoved } from "./storageFolder";
 import { AutoBackup } from "./autoBackup";
 import { Store } from "./store";
 import { AiConnection, type AiFiles } from "./aiConnect";
@@ -198,6 +198,42 @@ async function waitForDataFolder(place: ReturnType<typeof directories>): Promise
     place = directories();
   }
   return place;
+}
+
+/**
+ * The Mac's StorageFolder.waitForChosen (its download part): a chosen folder whose files the cloud hasn't brought to
+ * this PC yet (OneDrive · iCloud "online only", a new PC) is read once without waiting first (bringDown), so the store's
+ * synchronous reads never hold the app before its first window. Quick when the files are here; otherwise a question
+ * waits (기다리기 · 이 PC 목록 열기) and closes by itself once they are down. 이 PC 목록 열기 opens this PC's list for
+ * this run, as #380 does (the folder stays chosen; the storage problem says so).
+ */
+async function waitForDownload(place: ReturnType<typeof directories>): Promise<ReturnType<typeof directories>> {
+  if (!place.folder || place.unavailable) return place;
+  const folder = place.folder;
+  return await downloaded(undefined, folder, t("다 받으면 저절로 그 폴더로 열어요. 그전에는 아무 파일도 쓰지 않아요."), t("이 PC 목록 열기"))
+    ? place : { data: place.settings, settings: place.settings, folder, unavailable: folder };
+}
+
+/**
+ * bringDown(`folder`), with a question while it takes longer than a moment (기다리기 · `leave`) that closes by itself
+ * once it is done. True: everything is down; false: `leave` was picked.
+ */
+async function downloaded(parent: BrowserWindow | undefined, folder: string, after: string, leave: string): Promise<boolean> {
+  let done = false;
+  const down = bringDown(folder).then(() => { done = true; });
+  await Promise.race([down, new Promise((resolve) => setTimeout(resolve, 700))]);
+  while (!done) {
+    const back = new AbortController();
+    void down.then(() => back.abort());
+    const options = {
+      type: "info" as const, title: t("저장 폴더"), message: t("클라우드에서 목록을 받고 있어요"),
+      detail: t("‘{name}’ 폴더의 파일이 아직 이 PC에 다 내려오지 않았어요.", { name: path.basename(folder) }) + " " + after,
+      buttons: [t("기다리기"), leave], defaultId: 0, cancelId: 0, noLink: true, signal: back.signal,
+    };
+    const { response } = await (parent ? dialog.showMessageBox(parent, options) : dialog.showMessageBox(options));
+    if (!back.signal.aborted && response === 1) return false;
+  }
+  return true;
 }
 
 /**
@@ -1383,6 +1419,10 @@ async function switchStorage(folder: string | undefined): Promise<void> {
   const target = folder ?? settingsDirectory;
   if (sameFolder(target, store.dataDirectory, process.platform === "win32")) return;
   const parent = dialogParent();
+  // A list the cloud hasn't brought down is read below (the question, the backup, the merge): it comes down first.
+  for (const folder of [target, store.dataDirectory]) {
+    if (!await downloaded(parent, folder, t("다 받으면 저절로 이어서 옮겨요. 취소하면 지금 목록은 그대로예요."), t("취소"))) return;
+  }
   let copy = true;
   if (hasList(target)) {
     const response = await ask(parent, {
@@ -1533,6 +1573,7 @@ function handle(action: Action, sender: Electron.WebContents, frame?: WebFrameMa
     }
     case "memoPin": return store.changeFolders((data) => setPinned(data, action.id, action.pinned));
     case "memoCheck": return store.toggleMemoLine(action.id, action.line);
+    case "drawerNew": return store.addBlankMemo(targetOf(store.memoFolders, action.view)) as unknown as void;
     case "drawerWrite": { store.addMemoText(action.text.trim(), targetOf(store.memoFolders, action.view)); return; }
     case "drawerView": {
       // 고정 isn't a folder: the last folder stays what it was.
@@ -2469,7 +2510,7 @@ app.whenReady().then(async () => {
   settingsDirectory = first.settings;
   setLang(appLanguage(first.settings));
   // #380: a chosen folder that isn't there yet is waited for (the language first, for the question).
-  const place = await waitForDataFolder(first);
+  const place = await waitForDownload(await waitForDataFolder(first));
   // Every time in the app on the system's clock (preload hands it to each window: "clock:get").
   setHourCycle(systemHourCycle());
   // The week's first day from the system's too (preload: "week:get").

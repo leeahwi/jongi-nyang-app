@@ -44,7 +44,7 @@ private enum AheadTests {
         // Thursday 2026-10-08 14:50.
         let thursday = at(2026, 10, 8, 14, 50)
 
-        // Generated from ahead-cases.md (gen_ahead_cases.py): every row, as written there.
+        // The shared rows, the same in windows/test/ahead.test.ts: change both together.
         let sharedTasks = "\"회의록 정리\" due=2026-10-09; \"발표 자료 보내기\" due=2026-10-16; \"책 10쪽 읽기\" due=2026-10-11; \"자전거 바람 넣기\" shelf=later; \"오늘 할 일\"; \"끝낸 일\" due=2026-10-09 done; \"세금 신고\" due=2026-11-03; \"연말 정산\" due=2027-01-02; \"겨울옷 정리\" shelf=later; \"마감 지난 일\" due=2026-10-07; \"오늘에 꽂은 일\" due=2026-10-12 shelf=today"
         let sharedEvents = "\"주간 회의\" 2026-10-09 10:00–11:00; \"제주 여행\" 2026-10-10 all-day ×2; \"치과 정기 검진\" 2026-10-13 14:00–15:00; \"스탠드업\" 2026-10-05 09:30–09:45 weekly; \"오늘 일정\" 2026-10-08 16:00–17:00"
         let rows: [Row] = [

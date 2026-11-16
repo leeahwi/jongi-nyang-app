@@ -39,6 +39,33 @@ public enum SafeFile {
         return false
     }
 
+    /// An iCloud Drive file that is there but not downloaded (dataless: its bytes are only in iCloud). Opening or reading
+    /// one waits on that thread until iCloud brings it down — seconds, minutes, or never while iCloud is busy or offline —
+    /// so the main thread never reads one (StorageFolder.waitForDownloads).
+    public static func isDataless(_ url: URL) -> Bool {
+        var info = stat()
+        guard lstat(url.path, &info) == 0 else { return false }
+        return info.st_flags & UInt32(SF_DATALESS) != 0
+    }
+
+    /// Asks iCloud Drive for dataless files without waiting: `startDownloadingUbiquitousItem`, and a one-byte read of each
+    /// on a background queue (opening a dataless file is what makes the system fetch it for an app outside iCloud's own
+    /// containers). Only that background thread waits.
+    public static func requestDownload(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        for url in urls { try? FileManager.default.startDownloadingUbiquitousItem(at: url) }
+        let paths = urls.map(\.path)
+        DispatchQueue.global(qos: .userInitiated).async {
+            for path in paths {
+                let descriptor = open(path, O_RDONLY | O_NOFOLLOW)
+                guard descriptor >= 0 else { continue }
+                var byte: UInt8 = 0
+                _ = read(descriptor, &byte, 1)
+                close(descriptor)
+            }
+        }
+    }
+
     /// Throws a Refusal when `url` is a link, or a file bigger than `limit`. Nothing there (or a folder) passes.
     public static func check(_ url: URL, limit: Int = FileLimits.dataFileBytes) throws {
         guard let entry = entry(url) else { return }

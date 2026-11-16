@@ -271,13 +271,13 @@ final class BackupBook: ObservableObject {
     /// shouldn't take longer).
     func start() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in self?.checkDaily() }
-        let timer = Timer(timeInterval: 3600, repeats: true) { _ in
+        let timer = Timer(timeInterval: 3600, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in self?.checkDaily() }
         }
         timer.tolerance = 120
         RunLoop.main.add(timer, forMode: .common)
         self.timer = timer
-        wake = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
+        wake = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 15) { [weak self] in self?.checkDaily() }
             }

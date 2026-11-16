@@ -162,7 +162,7 @@ final class TodayWindowController: NSObject {
         if ticker == nil || everySecond != tickEverySecond {
             ticker?.invalidate()
             tickEverySecond = everySecond
-            let next = Timer(timeInterval: everySecond ? 1 : 30, repeats: true) { _ in
+            let next = Timer(timeInterval: everySecond ? 1 : 30, repeats: true) { [weak self] _ in
                 Task { @MainActor [weak self] in self?.update() }
             }
             next.tolerance = everySecond ? 0.1 : 5

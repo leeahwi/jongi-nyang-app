@@ -4,7 +4,7 @@ import type { Lang } from "./lang";
 /**
  * 다시 알림 choices (편의 기능 6): the reminder bubble's ⌄ menu — 5분 · 10분 · 30분 · 1시간 뒤, 오늘 저녁 7시 (only
  * before 18:00 of the logical day), 내일 아침 9시, and for a task's own alert 내일로 미루기 (the task moves to
- * tomorrow). Shared cases: convenience-cases.md §3.
+ * tomorrow). Shared cases: test/convenience.test.ts · ConvenienceTests.swift.
  */
 
 export type SnoozeId = "5" | "10" | "30" | "60" | "evening" | "morning" | "tomorrow";

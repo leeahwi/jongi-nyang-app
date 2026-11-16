@@ -1,6 +1,6 @@
 #!/bin/bash
 # 종이냥 for Claude (AIConnect.swift, Notebook.adopt): the log, texts, undo, the away notice, marks — the app's
-# side of the shared cases M13–M15 (the shared AI connection spec, docs/ai-connect-plan.md).
+# side of the shared cases M13–M15 (mac/docs/ai-connect-plan.md, ‘사례 표’).
 set -euo pipefail
 task_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$task_root"

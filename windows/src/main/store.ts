@@ -606,6 +606,20 @@ export class Store extends EventEmitter {
     return memo.id;
   }
 
+  /**
+   * Ctrl+N in the drawer: a blank memo at the top of `target`, opened there for typing. Blank, it isn't saved, and it
+   * goes away when it is closed (closeMemo); its placement goes with the next folder change.
+   */
+  addBlankMemo(target: { folder: string; pinned: boolean }): string {
+    this.catchUp(["memos.json"]);
+    const memo = newMemo();
+    this.memoEdits.add(memo.id);
+    this.memos.unshift(memo);
+    this.changeFolders((data) => placeNew(data, memo.id, target));
+    this.changed();
+    return memo.id;
+  }
+
   /** 빠른 메모 and /메모 go to the folder last shown in the drawer (never opened, or gone: 메모). */
   lastFolderTarget(): { folder: string; pinned: boolean } {
     return { folder: lastFolderOf(this.memoFolders, this.prefs.drawerLastFolder), pinned: false };

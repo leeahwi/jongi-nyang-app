@@ -9,7 +9,7 @@ import {
 import type { Lang } from "../src/core/lang";
 
 /**
- * 입력 줄: the shared cases of intent-cases.md (written by the macOS side; both
+ * 입력 줄: the shared cases, the same as mac IntentTests.swift (written by the macOS side; both
  * apps pass every row exactly), in its notation, then the Windows extras.
  */
 

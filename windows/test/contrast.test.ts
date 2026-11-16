@@ -22,7 +22,7 @@ const floorCase: Record<string, number> = (() => {
  * Every text colour on every surface it is drawn on, in 종이 (day) and 밤 종이 (night), against WCAG
  * AA: 4.5:1 for text, 3:1 for UI marks (a checkbox's edge, the focus ring, a badge's icon). Both must
  * pass every pair (stage 4 split ink-3 into ink-3 for text and --faint for marks, and gave sage and
- * clay text colours of their own). Prints both tables (the same as night-tokens.md).
+ * clay text colours of their own). Prints both tables (the same as mac/scripts/check-contrast.py --markdown).
  */
 
 const css = fs.readFileSync(path.join(process.cwd(), "src/renderer/base.css"), "utf8");

@@ -8,7 +8,7 @@ import {
 } from "../src/core/ai";
 import { readDeviceRules, storedDeviceRules } from "../src/core/spaceDevice";
 
-/** 종이냥 for Claude: the shared files and the app's side of them (the shared AI connection spec §2–3, §7; M13–M15). */
+/** 종이냥 for Claude: the shared files and the app's side of them (mac/docs/ai-connect-plan.md; M13–M15). */
 
 const local = (day: number, hour: number, minute = 0) => new Date(2026, 9, day, hour, minute);
 const iso = (date: Date) => date.toISOString().replace(/\.\d{3}Z$/, "Z");

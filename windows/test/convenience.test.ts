@@ -9,7 +9,7 @@ import { UndoableNotebook, parseNotebook, serializeNotebook, type TodoItem } fro
 import type { Lang } from "../src/core/lang";
 
 /**
- * 편의 기능 (1.23): the shared cases of convenience-cases.md (written by Windows; the Mac
+ * 편의 기능 (1.23): the shared cases, the same as mac ConvenienceTests.swift (written by Windows; the Mac
  * passes the same rows) — todaySince and its tag, date moves and shifts, snooze choices, the evening
  * sweep, search with 초성, Korean relative times.
  */

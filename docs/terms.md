@@ -75,6 +75,7 @@
 | 타닥냥이 앉는 구석 | **자리**: 왼쪽 위 · 오른쪽 위 · 왼쪽 아래 · **오른쪽 아래** · 옮긴 자리 | Corner: Top left · Top right · Bottom left · Bottom right · Where you put it | Hoek: Linksboven · Rechtsboven · Linksonder · Rechtsonder · Waar je hem zette | Mac의 ‘전체 화면에서 보이기’를 대신해요. ‘옮긴 자리’는 고양이를 끌어 놓으면 저절로 골라지고, 한 번 옮긴 뒤에만 목록에 나와요. ‘직접 옮긴 자리’ · ‘사용자 지정’ ✗(짧게, 한 일로 말해요). 저장 값은 `moved`, 자리는 shared/cases/typing-cat-place-cases.json에 있어요. |
 | 종이냥 펫 · 타닥냥의 크기 | **크기**: 작게 · **보통** · 크게 · 아주 크게 | Size: Small · Regular · Large · Extra large | Grootte: Klein · Normaal · Groot · Extra groot | 책상 → 종이냥의 ‘종이냥 펫’과 ‘타닥냥’ 칸에 따로 있어요. 타이머 크기와 같은 말 · 같은 배율(0.8 · 1 · 1.25 · 1.5)이에요. 화면 읽기 이름은 ‘펫 크기’ · ‘타닥냥 크기’(Desktop cat size · Tap-tap cat size, Grootte bureaubladkat · Grootte tiktakkat). 저장 값은 shared/cases/cat-size-cases.json에 있어요. |
 | 다른 앱의 키를 받는 macOS 권한 | **입력 모니터링** | Input Monitoring | Invoermonitoring | macOS 시스템 설정의 이름 그대로예요. 버튼은 ‘시스템 설정 열기’ · Open System Settings · Systeeminstellingen openen이에요. |
+| 다른 프로그램이 키 입력을 막아 둔 macOS 상태(Secure Event Input) | **보안 입력** | Secure Input | beveiligde invoer | 비밀번호 칸 · 잠금 화면 · 터미널의 보안 키보드 입력이 켭니다. 그동안 타닥냥 ‘모든 앱에서’가 다른 앱의 키를 듣지 못해 설정에 알립니다(Mac). |
 
 ## 쪽지의 버튼
 

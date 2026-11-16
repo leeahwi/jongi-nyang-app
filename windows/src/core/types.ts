@@ -769,6 +769,8 @@ export type Action =
   | { type: "memoDuplicate"; id: string }
   /** 복사한 글로 새 메모: the clipboard's text as a new memo where the drawer is (answers whether there was any). */
   | { type: "drawerPaste"; view: string }
+  /** Ctrl+N 새 메모: a blank memo on top where the drawer is, to be opened for typing (answers its id). */
+  | { type: "drawerNew"; view: string }
   /** A link chip: the URL in the default browser (http and https only). */
   | { type: "openLink"; url: string }
   /** The drawer's text menu: 오려 두기 · 복사하기 · 붙여넣기 · 모두 선택 in the page that asked. */

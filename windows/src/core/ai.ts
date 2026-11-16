@@ -13,7 +13,7 @@ import { spaceOf, type TodoSpaces } from "./todoSpaces";
  *   ai-log.jsonl   one line per thing Claude added or changed (and per undo made here). Toasts, the
  *                  away notice, undo and the stamps on rows all come from it.
  *
- * Same formats and rules as the macOS app (the shared AI connection spec §2–3, cases M1–M18).
+ * Same formats and rules as the macOS app (mac/docs/ai-connect-plan.md, cases M1–M18).
  */
 
 export const aiLinkFileName = "ai-link.json";

@@ -10,7 +10,7 @@ import { pageOf } from "./shelf";
  * the 나중에 shelf) beside the events of the coming days. This week's days from tomorrow, next
  * week's, then later deadlines by month, then 언젠가 (the undated shelf). A day is the logical
  * (4 a.m.) day; a week starts on Sunday in Korean and English, on Monday in Dutch. Same rules and
- * shared cases as the macOS app (Ahead.swift, ahead-cases.md).
+ * shared cases as the macOS app (Ahead.swift; the rows in test/ahead.test.ts and AheadTests.swift).
  */
 
 export type AheadSectionKind = "thisWeek" | "nextWeek" | "laterOn" | "someday";

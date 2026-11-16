@@ -149,13 +149,10 @@ final class MemoDrawerController {
         drawer.reveal(id)
     }
 
-    /// ⇧⌘N 새 메모: the drawer, the keyboard in its quick-write slip.
+    /// ⇧⌘N 새 메모: the drawer, with a blank memo open and typing (as ⌘N in it).
     func write() {
         if !isOpen { open() }
-        drawer.endSearch()
-        drawer.bigID = nil
-        if drawer.expandedID != nil { drawer.collapse() }
-        drawer.focusQuick += 1
+        drawer.newMemo()
     }
 
     func close() {

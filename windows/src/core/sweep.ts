@@ -6,7 +6,7 @@ import { pageOf } from "./shelf";
 /**
  * 저녁 정리 (편의 기능 4): once a day, at the chosen time, the cat offers to move what is left on 오늘 to
  * tomorrow or 언젠가; the first time the note opens on a new day after a missed evening, the morning
- * version offers the same for yesterday's leftovers. Shared cases: convenience-cases.md §4.
+ * version offers the same for yesterday's leftovers. Shared cases: test/convenience.test.ts · ConvenienceTests.swift.
  */
 
 /** The times the setting offers: 18:00 to 22:00 every half hour. */

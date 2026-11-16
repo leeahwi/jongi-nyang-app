@@ -400,7 +400,7 @@ final class DesktopPetController {
         chatterTimer?.invalidate()
         chatterTimer = nil
         guard wanted else { return }
-        let timer = Timer(timeInterval: 30, repeats: true) { _ in
+        let timer = Timer(timeInterval: 30, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in self?.checkChatter() }
         }
         timer.tolerance = 5

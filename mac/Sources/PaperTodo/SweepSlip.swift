@@ -32,7 +32,7 @@ final class SweepController {
     private func watch(_ on: Bool) {
         guard on else { timer?.invalidate(); timer = nil; return }
         guard timer == nil else { return }
-        let timer = Timer(timeInterval: 60, repeats: true) { _ in
+        let timer = Timer(timeInterval: 60, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in self?.check(opening: false) }
         }
         timer.tolerance = 10

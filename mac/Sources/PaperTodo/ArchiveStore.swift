@@ -49,7 +49,7 @@ final class ArchiveStore: ObservableObject {
     /// copies appear. Runs at launch, every 30 minutes, after waking and right after 4 a.m.
     func start() {
         tick()
-        let timer = Timer(timeInterval: 30 * 60, repeats: true) { _ in
+        let timer = Timer(timeInterval: 30 * 60, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in self?.tick() }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -82,7 +82,7 @@ final class ArchiveStore: ObservableObject {
     private func armBoundary() {
         boundaryTimer?.invalidate()
         let next = Calendar.current.date(byAdding: .day, value: 1, to: Archive.logicalDayStart(Date()))!
-        let timer = Timer(fire: next.addingTimeInterval(5), interval: 0, repeats: false) { _ in
+        let timer = Timer(fire: next.addingTimeInterval(5), interval: 0, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.tick()
                 self?.armBoundary()

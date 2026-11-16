@@ -158,7 +158,7 @@ final class TimetableScroller: NSObject {
         guard link == nil, timer == nil, let view else { return }
         last = 0
         if TestHooks.staysBehind, view.window?.screen == nil {
-            let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { _ in
+            let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
                 MainActor.assumeIsolated { [weak self] in self?.advance(now: CACurrentMediaTime()) }
             }
             RunLoop.main.add(timer, forMode: .common)

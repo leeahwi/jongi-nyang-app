@@ -10,7 +10,7 @@ import {
   removeCheckedLines, serializeMemoFolders, setFolderSort, setMemoPaper, sortOf, unpinAll, visibleFolders, type MemoFolders,
 } from "../src/core/memoDrawer";
 
-// 메모 서랍 1.29: the shared cases D17–D29, verbatim from the shared memo drawer cases (the Mac's MemoDrawerTests "D17…D29").
+// 메모 서랍 1.29: the shared cases D17–D29, the same rows as the Mac's MemoDrawerTests "D17…D29".
 // Times are read on the Seoul calendar, as the cases are written (test/time-zones.json, #399).
 
 const now = new Date("2026-10-27T05:00:00Z");

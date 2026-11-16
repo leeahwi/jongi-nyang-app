@@ -66,7 +66,7 @@ final class AlarmController {
         guard !sleeping else { return }
         let now = Date()
         let delay = book.next(now: now).map { max(0.3, $0.fire.timeIntervalSince(now) + 0.2) } ?? 60
-        let timer = Timer(timeInterval: min(60, delay), repeats: false) { _ in
+        let timer = Timer(timeInterval: min(60, delay), repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in self?.check() }
         }
         timer.tolerance = 0.3
@@ -139,7 +139,7 @@ final class AlarmController {
 
     private func later(_ ring: Ring, minutes: Int? = nil) {
         let id = ring.alarm.id, autoSnoozed = ring.autoSnoozed
-        let timer = Timer(timeInterval: TimeInterval((minutes ?? ring.alarm.snooze) * 60), repeats: false) { _ in
+        let timer = Timer(timeInterval: TimeInterval((minutes ?? ring.alarm.snooze) * 60), repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.snoozes.removeAll { !$0.isValid }

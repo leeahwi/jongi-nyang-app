@@ -8,7 +8,7 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 
 | Phase | Milestone | Mac | Windows |
 | --- | --- | --- | --- |
-| Polish | [Claude Code without Node · a safer shared folder](#claude-code-without-node--a-safer-shared-folder) | 1.50.0 | 1.35.0 |
+| Polish | [Claude Code without Node · a safer shared folder](#claude-code-without-node--a-safer-shared-folder) | 1.50.0 – 1.51.0 | 1.35.0 – 1.36.0 |
 | Widen | [Tap-tap cat · sizes to pick](#tap-tap-cat--sizes-to-pick) | 1.49.0 – 1.49.1 | 1.34.0 – 1.34.1 |
 | Widen | [Desktop calendar widgets · fifteen papers](#desktop-calendar-widgets--fifteen-papers) | 1.48.0 | 1.33.0 |
 | Widen | [Spaces per device · a new Today window](#spaces-per-device--a-new-today-window) | 1.47.0 | 1.32.0 |
@@ -45,7 +45,7 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 
 ## Claude Code without Node · a safer shared folder
 
-**Mac 1.50.0 · Windows 1.35.0** — Claude Code connects without Node.js, and with a shared folder neither app saves over what another device or Claude wrote, or over a file it briefly couldn't read. The case files both apps read moved to `shared/cases/` and are now twenty-five (new: the day boundary, conflict copies and joining item by item).
+**Mac 1.50.0 – 1.51.0 · Windows 1.35.0 – 1.36.0** — Claude Code connects without Node.js, and with a shared folder neither app saves over what another device or Claude wrote, or over a file it briefly couldn't read. The case files both apps read moved to `shared/cases/` and are now twenty-five (new: the day boundary, conflict copies and joining item by item).
 
 ![The AI connection pane on the Desk: the Claude Code row has a Copy Claude Code command button and says no Node.js is needed](docs/screenshots/mac/en/desk-ai.png)
 
@@ -53,6 +53,7 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 - **A safer shared folder** — a file that can't be read is never saved over, and Read again appears. When another device's file arrives, to-dos, events and alarms are joined item by item, and copies the cloud leaves after a conflict are moved to the backup folder with a notice. If the chosen shared folder is missing, the app asks first. On Windows, pending saves finish when you quit, and a briefly locked file is tried again.
 - **Error slips and matching names** — error slips end with Close and a button for the next step, and Storage & backup no longer shows the app's internal folder name or full paths. The same things have the same names in both apps and all three languages.
 - **Copy problem info** — Help on Windows copies monitors, scaling and window positions to paste into a problem report. No to-dos, notes or paths are included.
+- **A new-note shortcut · waiting for cloud files** (1.51.0 · 1.36.0) — in the notes drawer, ⌘N · Ctrl+N opens a blank note right away. When files in the storage folder aren't downloaded yet, the app waits on a slip instead of freezing and opens by itself once they're down.
 - **Lighter** — on the Mac, a click-through widget no longer wakes the app for modifier keys in other apps, and a list it has just saved isn't read again. On Windows, the resting cat and the timer use less graphics work.
 
 ## Tap-tap cat · sizes to pick

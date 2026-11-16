@@ -36,7 +36,7 @@ final class QuickMemoController {
     private func watchPasteboard(_ on: Bool) {
         guard on else { watch?.invalidate(); watch = nil; return }
         guard watch == nil else { return }
-        let timer = Timer(timeInterval: 3, repeats: true) { _ in
+        let timer = Timer(timeInterval: 3, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in self?.notice() }
         }
         timer.tolerance = 1

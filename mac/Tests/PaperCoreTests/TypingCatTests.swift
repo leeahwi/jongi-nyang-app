@@ -171,6 +171,13 @@ private enum TypingCatTests {
                 try equal(TypingSource.showsNoPermission(scope: scope, granted: granted), entry["note"] as! Bool, "note")
             }
         }
+        for entry in mac["secureInput"] as! [[String: Any]] {
+            try test(entry["case"] as! String) {
+                let scope = TypingCat.Scope(rawValue: entry["scope"] as! String)!
+                try equal(TypingSource.showsSecureInput(scope: scope, working: entry["working"] as! Bool, locked: entry["locked"] as! Bool,
+                                                        secureInput: entry["secureInput"] as! Bool), entry["note"] as! Bool, "note")
+            }
+        }
         for entry in file["frames"] as! [[String: Any]] {
             try test(entry["case"] as! String) {
                 let s = (entry["screen"] as! [Double]).map { CGFloat($0) }, f = (entry["frame"] as! [Double]).map { CGFloat($0) }

@@ -9,7 +9,7 @@ import { markdownLinks, markdownPlain, markdownRows, markdownTitle, type Markdow
  * 이번 주 · 지난주 · 10월 · 2025년 9월, weeks from Monday in every language), each card's short time (the header
  * already says the day), the kind a memo is (a checklist, a link, a phone number — found in its words, which
  * never change) and the words around them. The same rules and cases as the Mac (MemoCards.swift; D21–D29 in
- * the shared memo drawer cases).
+ * test/memoCards.test.ts · MemoDrawerTests.swift).
  */
 
 export type GroupKind = "pinned" | "today" | "yesterday" | "thisWeek" | "lastWeek" | "month" | "year" | "all";
