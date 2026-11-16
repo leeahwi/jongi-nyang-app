@@ -3,6 +3,15 @@
 set -euo pipefail
 task_root="$(cd "$(dirname "$0")/.." && pwd)"
 app="$task_root/dist/종이냥.app"
+# #405: a release passes the core checks, the translations and the contrast first (scripts/test-core.sh builds the debug
+# build they read). SKIP_CHECKS=1 skips them for a trial DMG only; it says so, and such a DMG is not for a release.
+if [[ "${SKIP_CHECKS:-}" == 1 ]]; then
+    echo "make-dmg: WARNING: SKIP_CHECKS=1, so the core checks, translations and contrast did not run. Don't release this DMG." >&2
+else
+    "$task_root/scripts/test-core.sh" --build
+    "$task_root/scripts/i18n/check.sh"
+    python3 "$task_root/scripts/check-contrast.py" | tail -1
+fi
 if [[ "${1:-}" != "--no-build" ]]; then "$task_root/scripts/build.sh"; fi
 version="$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$app/Contents/Info.plist")"
 out="$task_root/dist/JongiNyang-$version.dmg"

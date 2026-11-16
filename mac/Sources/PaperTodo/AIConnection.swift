@@ -16,16 +16,12 @@ final class AIConnection: ObservableObject {
     static let seenKey = "ai.seen"
     static let clearedKey = "ai.cleared"
     static let catKey = "ai.catSaid"
-    static let codeKey = "ai.codeServer"
 
     /// Claude may see and write the list (default off).
     @Published private(set) var enabled: Bool
     /// Today's and yesterday's work, newest first.
     @Published private(set) var recent: [AIConnect.Entry] = []
     @Published private(set) var undone: Set<String> = []
-    /// Claude Code: connecting now, and whether it knows this app's program (the path it was given is this one).
-    @Published private(set) var codeBusy = false
-    @Published private(set) var codeLinked = false
     /// Claude Desktop's installed extension is older than the one this app carries (AIConnect.extOutdated).
     @Published private(set) var desktopOutdated = false
     /// #174: there is something in ai-log.jsonl (기록 지우기 has something to clear).
@@ -48,8 +44,6 @@ final class AIConnection: ObservableObject {
     var speak: ((String) -> Bool)?
     /// How the bundled extension is opened (tests swap it, so nothing is installed into the real Claude).
     var opener = AIOpener.workspace
-    /// How Claude Code is told about the program (tests swap it, so nothing is written into the real Claude Code).
-    var codeLinker = AICodeLinker.system
     /// `--ai-check-log <file>` (scripts/ai-check.sh): each toast and undo, with the time, for the end-to-end check.
     var checkLog: URL?
 
@@ -74,7 +68,6 @@ final class AIConnection: ObservableObject {
         self.dataFolder = dataFolder
         self.live = live
         enabled = model.preferences.bool(forKey: Self.enabledKey)
-        codeLinked = model.preferences.string(forKey: Self.codeKey) == serverPath
     }
 
     private var preferences: UserDefaults { model.preferences }
@@ -386,8 +379,6 @@ final class AIConnection: ObservableObject {
             return
         }
         opener.open(bundle)
-        // The Code tab next to it (and the terminal's Claude Code) reads its own list, not the extensions.
-        connectCode(quiet: true)
     }
 
     /// Nothing opens .mcpb files: Claude Desktop isn't installed (닫기 · 내려받는 곳 열기).
@@ -399,71 +390,27 @@ final class AIConnection: ObservableObject {
                       cat: .curious, width: .medium)
     }
 
-    /// This app's copy of the program (Node runs it).
-    var serverPath: String {
-        (resources ?? Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/mcp")).appendingPathComponent("server/index.js").path
-    }
-
-    /// The line to paste into Terminal, with Node where it usually is (the row shows it, a failed connection
-    /// copies it).
+    /// The line ‘Claude Code 명령 복사’ copies: this app's own program with `--mcp-stdio` (#389, MCPStdio.swift).
     var codeCommand: String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        let node = AIConnect.toolPlaces("node", home: home).first { FileManager.default.isExecutableFile(atPath: $0) }
-        return AIConnect.codeCommand(node: node ?? "node", server: serverPath)
+        AIConnect.codeCommand(app: Bundle.main.executablePath ?? Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/PaperTodo").path)
     }
 
-    /// Claude Code learns the app's program (`claude mcp add-json -s user`), so every new Claude Code session —
-    /// the terminal's and Claude Desktop's Code tab — sees 종이냥 without pasting anything. `quiet` (from 연결 to
-    /// Claude Desktop): no slip when Claude Code or Node isn't there; the Code row still says how it went.
-    func connectCode(quiet: Bool = false) {
-        guard !codeBusy else { return }
-        if !enabled { setEnabled(true) }
-        let server = serverPath
-        guard FileManager.default.fileExists(atPath: server) else {
-            if !quiet { SlipAlert.inform(title: L("AI 연결"), message: L("앱 안에서 확장 파일을 찾지 못했어요."), detail: L("종이냥을 다시 설치해 주세요.")) }
-            return
-        }
+    /// ‘Claude Code 명령 복사’ (#389, the same as Windows): the line goes on the clipboard and the switch turns on;
+    /// pasting it into Terminal connects Claude Code. Nothing runs here and Claude Code's settings are never written
+    /// by the app. False when the app is where Claude Code couldn't find it later (the disk image, App Translocation).
+    func copyCodeCommand() -> Bool {
         guard !AIConnect.movablePlace(Bundle.main.bundlePath) else {
-            if !quiet {
-                SlipAlert.inform(title: L("Claude Code에 연결"), message: L("종이냥을 응용 프로그램 폴더로 옮긴 뒤 다시 눌러 주세요."),
+            // After the click that got here (a modal loop inside a SwiftUI action can't size its slip).
+            DispatchQueue.main.async {
+                SlipAlert.inform(symbol: "terminal", title: L("Claude Code 명령 복사"), message: L("종이냥을 응용 프로그램 폴더로 옮긴 뒤 다시 눌러 주세요."),
                                  detail: L("지금 있는 곳에서는 Claude Code가 다음에 종이냥을 찾지 못해요."))
             }
-            return
+            return false
         }
-        codeBusy = true
-        let linker = codeLinker
-        DispatchQueue.global(qos: .userInitiated).async {
-            let result = linker.link(server: server)
-            DispatchQueue.main.async { [weak self] in
-                MainActor.assumeIsolated { self?.finishCode(result.outcome, command: result.command, server: server, quiet: quiet) }
-            }
-        }
-    }
-
-    private func finishCode(_ outcome: AICodeLinker.Outcome, command: String, server: String, quiet: Bool) {
-        codeBusy = false
-        note("code \(outcome)")
-        if outcome == .linked {
-            preferences.set(server, forKey: Self.codeKey)
-            codeLinked = true
-            return
-        }
-        guard !quiet else { return }
+        if !enabled { setEnabled(true) }
         NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(command, forType: .string)
-        switch outcome {
-        case .linked:
-            break
-        case .noClaude:
-            SlipAlert.inform(symbol: "terminal", title: L("Claude Code를 찾지 못했어요"), message: L("이 Mac에서 claude 명령을 찾지 못했어요."),
-                             detail: L("연결 명령을 복사해 두었어요. Claude Code를 설치한 뒤 터미널에 붙여 넣어요."))
-        case .noNode:
-            SlipAlert.inform(symbol: "terminal", title: L("Node가 필요해요"), message: L("종이냥 for Claude는 Node로 실행돼요. 이 Mac에서 Node를 찾지 못했어요."),
-                             detail: L("nodejs.org에서 Node를 설치한 뒤 다시 눌러 주세요. 연결 명령도 복사해 두었어요."))
-        case .failed(let output):
-            SlipAlert.inform(title: L("Claude Code에 연결하지 못했어요"), message: L("연결 명령을 복사해 두었어요. 터미널에 붙여 넣어 주세요."),
-                             detail: String(output.trimmingCharacters(in: .whitespacesAndNewlines).suffix(300)))
-        }
+        NSPasteboard.general.setString(codeCommand, forType: .string)
+        return true
     }
 
     // MARK: The list
@@ -510,68 +457,5 @@ struct AIOpener {
     private static func note(_ line: String, _ log: URL) {
         let text = ((try? String(contentsOf: log, encoding: .utf8)) ?? "") + line + "\n"
         try? text.write(to: log, atomically: true, encoding: .utf8)
-    }
-}
-
-/// Tells Claude Code about the app's program: finds `claude` and `node`, takes out an earlier entry, adds this
-/// one. Runs off the main thread.
-struct AICodeLinker: Sendable {
-    enum Outcome: Equatable, Sendable { case linked, noClaude, noNode, failed(String) }
-
-    var find: @Sendable (_ tool: String) -> String?
-    var run: @Sendable (_ executable: String, _ arguments: [String]) -> (ok: Bool, output: String)
-
-    /// What happened, and the line to paste when it didn't.
-    func link(server: String) -> (outcome: Outcome, command: String) {
-        let node = find("node")
-        let command = AIConnect.codeCommand(node: node ?? "node", server: server)
-        guard let claude = find("claude") else { return (.noClaude, command) }
-        guard let node else { return (.noNode, command) }
-        _ = run(claude, AIConnect.codeRemoveArguments)
-        let added = run(claude, AIConnect.codeAddArguments(node: node, server: server))
-        return (added.ok ? .linked : .failed(added.output), command)
-    }
-
-    static let system = AICodeLinker(find: { locate($0) }, run: { execute($0, $1) })
-
-    /// The usual places first, then what a login shell finds (nvm, asdf, a PATH of one's own).
-    static func locate(_ tool: String) -> String? {
-        let files = FileManager.default
-        if let path = AIConnect.toolPlaces(tool, home: files.homeDirectoryForCurrentUser.path).first(where: files.isExecutableFile) {
-            return path
-        }
-        let shell = execute("/bin/zsh", ["-lc", "command -v \(tool)"])
-        let path = shell.output.split(separator: "\n").last.map { String($0).trimmingCharacters(in: .whitespaces) } ?? ""
-        return shell.ok && path.hasPrefix("/") && files.isExecutableFile(atPath: path) ? path : nil
-    }
-
-    /// Runs a program and waits (at most 20 seconds), with what it printed.
-    static func execute(_ executable: String, _ arguments: [String]) -> (ok: Bool, output: String) {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = arguments
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = pipe
-        process.standardInput = FileHandle.nullDevice
-        do { try process.run() } catch { return (false, error.localizedDescription) }
-        let stop = DispatchWorkItem { if process.isRunning { process.terminate() } }
-        DispatchQueue.global().asyncAfter(deadline: .now() + 20, execute: stop)
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        stop.cancel()
-        return (process.terminationStatus == 0, String(decoding: data, as: UTF8.self))
-    }
-
-    /// `--ai-code-log <file>` (tests): records what would run instead of running it, as if `claude` and `node`
-    /// were there; `--ai-no-code` acts as if `claude` weren't.
-    static func recording(to log: URL, noClaude: Bool) -> AICodeLinker {
-        AICodeLinker(find: { tool in
-            tool == "claude" && noClaude ? nil : "/stub/\(tool)"
-        }, run: { executable, arguments in
-            let text = ((try? String(contentsOf: log, encoding: .utf8)) ?? "") + ([executable] + arguments).joined(separator: " ") + "\n"
-            try? text.write(to: log, atomically: true, encoding: .utf8)
-            return (true, "")
-        })
     }
 }

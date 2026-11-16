@@ -12,14 +12,14 @@ import { call, connect, setup, task, todos, writeTodos, type Setup } from "./hel
 /**
  * 기기마다 보일 스페이스 for Claude (N3-9, docs/plans/mcp-plan.md; #196): the app puts this device's 이 기기에서 into
  * ai-link.json and the extension leaves out what the note leaves out — the shared cases S73–S76 of
- * docs/plans/spaces-cases.json → `aiDevice` (the Mac's test-space-device.sh and the Windows app's ai.test.ts read the
+ * shared/cases/spaces-cases.json → `aiDevice` (the Mac's test-space-device.sh and the Windows app's ai.test.ts read the
  * same block for what the app writes). M42: left out of today, the lists and the resources, with an end line. M43:
  * shown, marked hidden, when its space is picked or a word searched; the record shows all. M44: list_spaces says what
  * this device does, and adding or moving into a hidden space says it won't show here. M45: an app that doesn't say
  * (before ext 4) hides nothing. Fictional data only.
  */
 
-const fixture = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "spaces-cases.json"), "utf8"));
+const fixture = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "spaces-cases.json"), "utf8"));
 const cases = fixture.aiDevice;
 type Row = { title: string; hidden?: boolean; id: string };
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# 음력과 공휴일 (#234, KoreanCalendar.swift): the shared cases from docs/plans/calendar-korean-cases.json — lunar dates (ICU's
+# 음력과 공휴일 (#234, KoreanCalendar.swift): the shared cases from shared/cases/calendar-korean-cases.json — lunar dates (ICU's
 # Korean calendar), every day of 2020–2035 as one digest the Windows app must match, the cells' lunar labels, and every
 # Korean public holiday of 2024–2030 with the substitute days (the Windows app's test/koreanCalendar.test.ts reads it too).
 set -euo pipefail
@@ -46,4 +46,4 @@ swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/KoreanCalendar.swift \
     Tests/PaperCoreTests/KoreanCalendarTests.swift \
     -o .build/checks/KoreanCalendarTests
-.build/checks/KoreanCalendarTests ../docs/plans/calendar-korean-cases.json
+.build/checks/KoreanCalendarTests ../shared/cases/calendar-korean-cases.json

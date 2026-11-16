@@ -1,6 +1,6 @@
 import Foundation
 
-// 메모 마크다운 (#84, MemoMarkdown.swift): the shared cases from docs/plans/memo-markdown-cases.json (the Windows app's
+// 메모 마크다운 (#84, MemoMarkdown.swift): the shared cases from shared/cases/memo-markdown-cases.json (the Windows app's
 // test/memoMarkdown.test.ts reads the same file) — every case's spans, its words without marks, and its card title,
 // preview rows and kind when given; then the Mac's own checks.
 private struct TestFailure: Error, CustomStringConvertible {
@@ -18,7 +18,7 @@ private func equal<T: Equatable>(_ actual: T, _ expected: T, _ name: String) thr
 @main
 private enum MarkdownTests {
     static func main() throws {
-        let path = CommandLine.arguments.dropFirst().first ?? "../docs/plans/memo-markdown-cases.json"
+        let path = CommandLine.arguments.dropFirst().first ?? "../shared/cases/memo-markdown-cases.json"
         let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
         var count = 0
         func test(_ name: String, _ action: () throws -> Void) throws {

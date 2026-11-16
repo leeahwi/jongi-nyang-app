@@ -9,9 +9,9 @@ import {
 import { setLang } from "../src/i18n";
 import { paneTitle, sectionTitle } from "../src/renderer/deskPanes";
 
-// 책상 목록의 묶음 (#240, D4 B): the shared cases from docs/plans/desk-sidebar-cases.json (the Mac's test-localization.sh
+// 책상 목록의 묶음 (#240, D4 B): the shared cases from shared/cases/desk-sidebar-cases.json (the Mac's test-localization.sh
 // reads the same file).
-const sidebarCases = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "desk-sidebar-cases.json"), "utf8")) as {
+const sidebarCases = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "desk-sidebar-cases.json"), "utf8")) as {
   maxRows: number; sections: { section: string; panes: string[] }[]; shortcuts: string[]; titles: Record<string, [string, string, string]>;
 };
 

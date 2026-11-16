@@ -20,36 +20,40 @@ extension AppModel {
             memoFolders = try MemoFolders.decode(data, language: .current)
             knownFoldersData = data
         } catch {
-            moveFoldersAside(now: now, starting: true)
             memoFolders = .fresh(language: .current)
-            knownFoldersData = nil
+            knownFoldersData = moveFoldersAside(now: now, starting: true) ? nil : data
         }
     }
 
     /// The unreadable file moved aside, said the way every file says it (#34): what happened, what's safe, where the
     /// original is (its name only — the storage folder button shows where). At launch every memo starts in 메모;
     /// later (another device's file) the folders here stay and are written again on the next change.
-    private func moveFoldersAside(now: Date, starting: Bool) {
+    /// Not moved (a folder that can't be written): false, and the file is never written (#452).
+    func moveFoldersAside(now: Date, starting: Bool) -> Bool {
         let aside = memoFoldersURL.deletingLastPathComponent().appendingPathComponent(MemoFolders.asideName(now))
         let what = starting ? L("메모 폴더를 읽지 못해서 메모를 모두 ‘메모’ 폴더에 두고 시작했어요.")
                             : L("메모 폴더를 읽지 못했어요. 여기 있던 폴더는 그대로예요.")
-        if (try? FileManager.default.moveItem(at: memoFoldersURL, to: aside)) != nil {
-            storageError = what + " " + Self.keptAside(aside)
-        } else {
-            storageError = what + " " + L("저장 폴더가 열리는지 확인해 주세요.")
+        guard (try? FileManager.default.moveItem(at: memoFoldersURL, to: aside)) != nil else {
+            blockAside(memoFoldersFile)
+            return false
         }
+        memoFoldersFile.blocked = false
+        storageError = what + " " + Self.keptAside(aside)
+        return true
     }
 
     /// Another device (or an older app's backup) changed the file: merged in, the newer side winning (D13, D14).
     /// A write of this Mac's still under way is waited for first, so the file read is never this Mac's older one.
     func catchUpMemoFolders() {
         finishMemoFolderWrites()
-        guard let data = try? SafeFile.sharedData(memoFoldersURL), data != knownFoldersData else { return }
+        guard case .changed(let data) = memoFoldersFile.look() else { return }
         knownFoldersData = data
         guard let theirs = try? MemoFolders.decode(data, language: .current) else {
-            moveFoldersAside(now: Date(), starting: false)
+            // Not moved: known as it is, so the checks don't try again on their own (다시 읽기 does).
+            _ = moveFoldersAside(now: Date(), starting: false)
             return
         }
+        memoFoldersFile.blocked = false
         let merged = MemoFolders.merge(here: memoFolders, theirs: theirs)
         if merged != memoFolders { memoFolders = merged }
     }
@@ -67,6 +71,7 @@ extension AppModel {
             folders = folders.pruned(memoIDs: ids, now: now)
         }
         if folders != memoFolders { memoFolders = folders }
+        guard !memoFoldersFile.blocked else { return }
         // Written off the main thread (tens of ms at thousands of memos); the next change, a check for another
         // device's file, a backup and quitting all wait for it first.
         let url = memoFoldersURL
@@ -212,11 +217,13 @@ final class MemoFoldersWriter: @unchecked Sendable {
         }
     }
 
-    /// Waits for the writes under way; the last one's bytes when it is the newest asked for.
+    /// Waits for the writes under way; the last one's bytes when it is the newest asked for — once: what is known after it
+    /// may be another device's file, not taken back by the next call (#452).
     func finish() -> Data? {
         queue.sync {}
         return lock.withLock {
             guard let done, done.number == asked else { return nil }
+            self.done = nil
             return done.data
         }
     }

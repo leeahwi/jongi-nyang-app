@@ -163,6 +163,15 @@ test("pet floor (#313): the pet's window never moves with setPosition, and the p
   assert.match(main, /placePetWindow\(this\.window, petWindowBounds\(/);
   // No resize frame of Windows' own on the cats' windows (#312 found it on the note's ears).
   for (const file of ["src/main/pet.ts", "src/main/typingCat.ts"]) assert.match(source(file), /new BrowserWindow\(\{[^}]*thickFrame: false/, file);
+  // #312 (preventive): every small transparent window says it too — the ears, the drawer's handle (30 × 50), the folded
+  // note (110 × 130), the timer board and the desktop calendar widgets — so none can be held to Windows' minimum size.
+  const small: [string, string][] = [["src/main/noteEars.ts", ""], ["src/main/drawer.ts", "메모 서랍 열기"], ["src/main/floating.ts", ""],
+    ["src/main/timer.ts", "집중 타이머"], ["src/main/calendarWidget.ts", "달력 위젯"]];
+  for (const [file, title] of small) {
+    const windows = [...source(file).matchAll(/new BrowserWindow\(\{([^}]*)/g)].map((found) => found[1]).filter((options) => options.includes("transparent: true") && options.includes(title));
+    assert.equal(windows.length, 1, `${file}: one such window`);
+    assert.match(windows[0], /thickFrame: false/, `${file} ${title}`);
+  }
   const page = source("src/renderer/pet.ts");
   assert.match(page, /stage\.style\.height = `\$\{petStripHeight\(size\)\}px`/);
 });

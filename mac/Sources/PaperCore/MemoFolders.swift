@@ -596,7 +596,7 @@ public struct MemoFolders: Equatable, Sendable {
 
     /// What each visible bookmark shows (#116, D-2): the picked one its name; the others their first letter, or two
     /// where another un-picked one starts with the same letter (Shopping · Study → Sh · St), never more. Letters are
-    /// counted past spaces and compared without case. The shared cases B1… in docs/plans/drawer-bookmark-cases.json.
+    /// counted past spaces and compared without case. The shared cases B1… in shared/cases/drawer-bookmark-cases.json.
     public static func bookmarkLetters(_ names: [String], picked: Int?) -> [String] {
         func letters(_ name: String, _ count: Int) -> String { String(name.filter { !$0.isWhitespace }.prefix(count)) }
         let firsts = names.map { letters($0, 1).lowercased() }

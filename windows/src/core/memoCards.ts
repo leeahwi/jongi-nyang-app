@@ -300,7 +300,7 @@ export function folderDeletedWords(name: string, moved: number, inbox: string, l
  * 크게 보기 (#113, C2 A): the paper while a memo is shown big — 640 at most, or 45 % of the screen's width when that is
  * less, never narrower than the width the drawer was given, and never wider than the screen leaves beside the drawer's
  * own chrome (`chrome`: the bookmarks, 34 px here; 48 pt on the Mac with its shadow). Whole pixels. The shared cases W1…
- * in docs/plans/drawer-big-cases.json (the Mac's MemoCards.bigWidth).
+ * in shared/cases/drawer-big-cases.json (the Mac's MemoCards.bigWidth).
  */
 export function bigDrawerWidth(user: number, screen: number, chrome: number): number {
   const wide = Math.max(user, Math.min(640, Math.floor(screen * 0.45)));

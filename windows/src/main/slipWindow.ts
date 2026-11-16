@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain, screen, type BrowserWindowConstructorOptions } from "electron";
 import path from "node:path";
 import { offscreenEnabled } from "./env";
+import { dragBounds, dragStart, type DragStart } from "../core/dragBounds";
 import { draggedSlip, placedSlip, readSlipPlace, slipHead, slipPlace, type SlipPlace } from "../core/slipMove";
 import type { Store } from "./store";
 
@@ -21,6 +22,8 @@ export function slipWindowOptions(size: { width: number; height: number }, title
     // larger than the screen (only macOS reads this).
     enableLargerThanScreen: offscreenEnabled,
     ...extra,
+    // #67 (checked 2026-11): not throttled: each slip measures itself (ResizeObserver, slip:size) while its window is
+    // still hidden, then is shown at that size.
     webPreferences: { preload: path.join(__dirname, "preload.js"), sandbox: true, contextIsolation: true, backgroundThrottling: false, ...extra.webPreferences },
   };
 }
@@ -54,14 +57,14 @@ export function followSlip(window: BrowserWindow, onSize?: (size: { width: numbe
 
 /**
  * #246: 빠른 입력 · 빠른 메모 drag by their paper and title row (renderer/slip.ts dragByPaper, as the question slips of #228)
- * and keep where they were put, per display (core/slipMove.ts slipPlace · placedSlip, docs/plans/slip-move-cases.json
+ * and keep where they were put, per display (core/slipMove.ts slipPlace · placedSlip, shared/cases/slip-move-cases.json
  * `place`), in the settings file's window memory. A display whose work area changed size since opens the slip at its
  * usual spot again, and a double-click on the paper puts it back there (forgetting the place). The Mac's SlipPlaces.
  */
 export class KeptSlip {
   /** The window's stage around the paper (slip.css `.slip-stage`): 16 above, 24 at the sides, 30 below. */
   private static readonly stage = { top: 16, side: 24, bottom: 30 };
-  private drag?: { x: number; y: number; bounds: Electron.Rectangle; moved: boolean };
+  private drag?: DragStart & { moved: boolean };
 
   constructor(private readonly store: Store, private readonly which: "quick" | "quickMemo", private readonly slipWidth: number) {}
 
@@ -93,7 +96,7 @@ export class KeptSlip {
       if (!offscreenEnabled) { const to = usual(display); window.setPosition(to.x, to.y); }
       return;
     }
-    if (phase === "start") { this.drag = { x, y, bounds: window.getBounds(), moved: false }; return; }
+    if (phase === "start") { this.drag = { ...dragStart({ x, y }, window.getBounds()), moved: false }; return; }
     const drag = this.drag;
     if (!drag) return;
     if (phase === "end") {
@@ -104,12 +107,13 @@ export class KeptSlip {
       this.keep({ ...this.kept(), [String(display.id)]: slipPlace(slip, display.workArea) });
       return;
     }
-    if (!drag.moved && Math.hypot(x - drag.x, y - drag.y) < 3) return;
+    if (!drag.moved && Math.hypot(x - drag.cursor.x, y - drag.cursor.y) < 3) return;
     drag.moved = true;
     // (An off-screen run's slip lives away from every display: nothing to keep it on.)
     const display = offscreenEnabled ? undefined : screen.getAllDisplays().find(({ bounds: area }) => x >= area.x && x < area.x + area.width && y >= area.y && y < area.y + area.height);
-    const to = draggedSlip(KeptSlip.slipOf(drag.bounds), x - drag.x, y - drag.y, display?.workArea);
-    // #316: the whole bounds, not setPosition (it re-reads the size, which 125 % · 150 % can round up a pixel a move).
-    window.setBounds({ x: Math.round(to.x - KeptSlip.stage.side), y: Math.round(to.y - KeptSlip.stage.top), width: drag.bounds.width, height: drag.bounds.height });
+    window.setBounds(dragBounds(drag, { x, y }, (moved) => {
+      const to = draggedSlip(KeptSlip.slipOf(moved), 0, 0, display?.workArea);
+      return { x: to.x - KeptSlip.stage.side, y: to.y - KeptSlip.stage.top };
+    }));
   }
 }

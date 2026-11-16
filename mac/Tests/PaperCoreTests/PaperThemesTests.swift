@@ -1,6 +1,6 @@
 import Foundation
 
-// 종이 테마 열다섯 가지 (#244, PaperKind.swift · PaperLook.swift): the shared cases from docs/plans/paper-themes-cases.json
+// 종이 테마 열다섯 가지 (#244, PaperKind.swift · PaperLook.swift): the shared cases from shared/cases/paper-themes-cases.json
 // (the Windows app's test/paper.test.ts reads the same file) — the papers and their names, the paper drawn and the system
 // controls' lightness (R), the drawer (D), 1.47's settings moved (M), what is saved read back (S), the widget's paper (W1)
 // and the tiles' order and spoken names (K). The colours are checked by scripts/check-contrast.py against tokens.json.
@@ -19,9 +19,9 @@ private func equal<T: Equatable>(_ actual: T, _ expected: T, _ name: String) thr
 @main
 private enum PaperThemesTests {
     static func main() throws {
-        let path = CommandLine.arguments.dropFirst().first ?? "../docs/plans/paper-themes-cases.json"
+        let path = CommandLine.arguments.dropFirst().first ?? "../shared/cases/paper-themes-cases.json"
         let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
-        let tokensPath = URL(fileURLWithPath: path).deletingLastPathComponent().appendingPathComponent("paper-themes/tokens.json")
+        let tokensPath = URL(fileURLWithPath: path).deletingLastPathComponent().appendingPathComponent("../../docs/plans/paper-themes/tokens.json")
         let tokens = try JSONSerialization.jsonObject(with: Data(contentsOf: tokensPath)) as! [String: Any]
         var count = 0
         func test(_ name: String, _ action: () throws -> Void) throws {

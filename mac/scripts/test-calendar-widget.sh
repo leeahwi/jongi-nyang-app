@@ -1,5 +1,5 @@
 #!/bin/bash
-# 바탕화면 달력 위젯 (#234, CalendarWidget.swift): the shared cases from docs/plans/calendar-widget-cases.json — what each
+# 바탕화면 달력 위젯 (#234, CalendarWidget.swift): the shared cases from shared/cases/calendar-widget-cases.json — what each
 # kind shows, the day sheet, the opacity rules, places on displays, the quick entry's reading, the stored settings and
 # when a widget draws again (the Windows app's test/calendarWidget.test.ts reads the same file).
 set -euo pipefail
@@ -46,4 +46,4 @@ swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/KoreanCalendar.swift \
     Tests/PaperCoreTests/CalendarWidgetTests.swift \
     -o .build/checks/CalendarWidgetTests
-.build/checks/CalendarWidgetTests ../docs/plans/calendar-widget-cases.json
+.build/checks/CalendarWidgetTests ../shared/cases/calendar-widget-cases.json

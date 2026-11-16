@@ -493,7 +493,7 @@ enum DesignSnapshots {
         model.focusPicking = false
         model.selectedTaskID = nil
         model.calendar.showForSnapshot([])
-        try slip(SlipAlertView(symbol: "timer", title: L("집중"), message: L("집중을 그만둘까요?"), detail: L("여기까지 한 시간은 집중 기록에 남아요."),
+        try slip(SlipAlertView(symbol: "timer", title: L("집중"), message: L("집중을 그만둘까요?"), detail: L("지금까지 집중한 시간은 기록에 남아요."),
                                choices: [.init(title: L("계속하기"), isCancel: true), .init(title: L("그만두기"), role: .primary, isDefault: true)]),
                  to: output.appendingPathComponent("confirm-focus-stop.png"))
         // 1.36: the desk (책상) — every settings pane at the window's size and in full (to check
@@ -709,6 +709,16 @@ enum DesignSnapshots {
                                detail: BackupController.importDetail(fileName: "JongiNyang-2026-10-08.jongi", backup: sampleBackup),
                                choices: BackupController.importChoices, cat: .curious, width: .medium),
                  to: output.appendingPathComponent("confirm-import.png"))
+        // #390: error slips — what didn't happen, what to do, the next step beside 닫기 (as SlipAlert.inform draws them).
+        let close = SlipAlert.Choice(title: L("닫기"), role: .primary, isDefault: true, isCancel: true)
+        for (name, title, message, detail, next) in [
+            ("error-backup-now", L("자동 백업"), L("백업하지 못했어요. 지금 목록은 그대로예요."), L("백업 폴더를 열어 확인해 주세요."), L("백업 폴더 열기")),
+            ("error-storage-move", L("저장 폴더"), L("폴더로 옮기지 못했어요. 지금 목록은 그대로예요."), L("폴더에 쓸 수 있는지 확인하고 다시 시도해 주세요."), L("다시 시도")),
+        ] {
+            try slip(SlipAlertView(symbol: "exclamationmark.circle", title: title, message: message, detail: detail,
+                                   choices: [SlipAlert.Choice(title: next), close], cat: nil),
+                     to: output.appendingPathComponent("\(name).png"))
+        }
         // 달력: the month and the week with events and deadlines.
         func later(_ id: String, _ title: String, _ color: LocalEvent.Color, days: Int, hour: Int, length: Int = 1, location: String? = nil) -> LocalEvent {
             let day = Calendar.current.date(byAdding: .day, value: days, to: now)!
@@ -938,6 +948,8 @@ enum DesignSnapshots {
         try slip(QuickEntryView(model: model, text: t("알람 7시", "alarm 7am", "wekker 7:00")), to: output.appendingPathComponent("quick-entry-alarm.png"))
         let timerCommit = IntentCommit(text: "", candidates: model.intentCandidates(t("타이머 40", "timer 40", "timer 40")), index: 0, key: nil, made: .nothing, page: .todos)
         try slip(QuickEntryView(model: model, previewToast: model.makeToast(for: timerCommit, onChange: { _ in })), to: output.appendingPathComponent("quick-entry-toast.png"))
+        // #387: the longest button ("Herhalende taak toevoegen") keeps its words; the hints keep only their keycaps.
+        try slip(QuickEntryView(model: model, text: t("매일 물 마시기", "every day drink water", "elke dag water drinken")), to: output.appendingPathComponent("quick-entry-repeat.png"))
         model.page = .todos
         model.selectedTaskID = model.visibleItems.dropFirst().first?.id
         try render(PaperView(model: model), size: NSSize(width: 420, height: 560), to: output.appendingPathComponent("note-selected.png"))

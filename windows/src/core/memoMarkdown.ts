@@ -5,7 +5,7 @@ import type { Lang } from "./lang";
  * reads where they are — the spans the editor and the open memo draw (bold, a heading, a list …; `mark` = a mark drawn
  * faint at 40 % of the ink) and the words without the marks (the card's title and preview, search, a memo's kind).
  * Positions are UTF-16 offsets, `to` not included. The same rules and the same cases as the Mac (MemoMarkdown.swift;
- * docs/plans/memo-markdown-cases.json).
+ * shared/cases/memo-markdown-cases.json).
  *
  * Lines: `# ` · `## ` · `### ` headings, `- ` · `* ` · `+ ` lists (two spaces or a tab a step in, three at most),
  * `1. ` · `1) ` numbered, `> ` quotes, a line of ``` opening or closing a code block (unclosed: to the memo's end), a

@@ -17,6 +17,11 @@ private func equal<T: Equatable>(_ actual: T, _ expected: T, _ name: String) thr
 @main
 private enum MemoDrawerTests {
     static func main() throws {
+        // The cases are written on the Seoul clock: TimeZone.current (and the app's Calendar.paper) reads in that zone,
+        // whatever TZ runs the check (#399).
+        setenv("TZ", "Asia/Seoul", 1)
+        tzset()
+        NSTimeZone.resetSystemTimeZone()
         var count = 0
         func test(_ name: String, _ action: () throws -> Void) throws {
             try action()
@@ -635,7 +640,7 @@ private enum MemoDrawerTests {
         }
 
         // #116: the bookmarks' letters, the shared cases B1… (the Windows app reads the same file).
-        let lettersFile = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/drawer-bookmark-cases.json"))) as! [String: Any]
+        let lettersFile = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../shared/cases/drawer-bookmark-cases.json"))) as! [String: Any]
         for entry in lettersFile["cases"] as! [[String: Any]] {
             try test("\(entry["id"]!) \(entry["about"]!)") {
                 try equal(MemoFolders.bookmarkLetters(entry["names"] as! [String], picked: entry["picked"] as? Int), entry["expect"] as! [String], "letters")
@@ -643,7 +648,7 @@ private enum MemoDrawerTests {
         }
 
         // #113: 크게 보기's width and letter count, the shared cases W1… C1… N1… (the Windows app reads the same file).
-        let bigFile = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/drawer-big-cases.json"))) as! [String: Any]
+        let bigFile = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../shared/cases/drawer-big-cases.json"))) as! [String: Any]
         for entry in bigFile["width"] as! [[String: Any]] {
             try test("\(entry["id"]!) \(entry["about"]!)") {
                 try equal(MemoCards.bigWidth(user: entry["user"] as! Double, screen: entry["screen"] as! Double, chrome: entry["chrome"] as! Double),
@@ -663,7 +668,7 @@ private enum MemoDrawerTests {
 
         // #114: 메모 찾기's results by folder, scope and filters; the found line; the times; the footer — the shared cases
         // F1… P1… T1… R1… (the Windows app reads the same file).
-        let findFile = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/drawer-search-cases.json"))) as! [String: Any]
+        let findFile = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../shared/cases/drawer-search-cases.json"))) as! [String: Any]
         let findFolders = try MemoFolders.decode(JSONSerialization.data(withJSONObject: findFile["folders"]!))
         let findMemos = (findFile["memos"] as! [[String: String]]).map { Memo(id: $0["id"]!, text: $0["text"]!, createdAt: at($0["updatedAt"]!), updatedAt: at($0["updatedAt"]!)) }
         for entry in findFile["cases"] as! [[String: Any]] {
@@ -705,7 +710,7 @@ private enum MemoDrawerTests {
         }
 
         // #115: a folder's 보기 in memo-folders.json, the shared cases V1… (the Windows app reads the same file).
-        let viewFile = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/drawer-view-cases.json"))) as! [String: Any]
+        let viewFile = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../shared/cases/drawer-view-cases.json"))) as! [String: Any]
         let viewNow = at(viewFile["now"] as! String)
         func lines(_ value: Any?) -> String { (value as! [String]).joined(separator: "\n") + "\n" }
         for entry in viewFile["cases"] as! [[String: Any]] {
@@ -722,7 +727,7 @@ private enum MemoDrawerTests {
         }
 
         // #120: 지운 메모 in memo-trash.json, the shared cases T1… N1… A1… R1… (the Windows app reads the same file).
-        let trashFile = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/drawer-trash-cases.json"))) as! [String: Any]
+        let trashFile = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../shared/cases/drawer-trash-cases.json"))) as! [String: Any]
         let trashNow = at(trashFile["now"] as! String)
         for entry in trashFile["cases"] as! [[String: Any]] {
             try test("\(entry["id"]!) \(entry["about"]!)") {

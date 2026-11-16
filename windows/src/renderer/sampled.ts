@@ -5,7 +5,8 @@ import { reduceMotion } from "./api";
  * this moves them on about 8 times a second: `--t` is the ms since each one started, and the CSS turns it into a
  * negative animation-delay (pet.css, timer.css). At 60 frames a second they kept these always-on-top windows drawing
  * all the time, and their motion is under 2 px. A breath can also be one spell (`forMs`): it plays that long, then
- * rests at its first frame (the cat as drawn) and nothing is drawn until the next one.
+ * rests at its first frame (the cat as drawn) and nothing is drawn until the next one. While one plays the element is
+ * `.sampling`, the only time the CSS gives it `will-change` (#67: a layer kept for a cat at rest cost the GPU).
  */
 const stepMs = 125;
 const running = new Map<HTMLElement, { kind: string; key: unknown; start: number; until: number }>();
@@ -17,6 +18,7 @@ function tick(): void {
     if (now >= until) {
       // The spell is over: back to the first frame (no breath, no sway) and still.
       element.style.setProperty("--t", "0");
+      element.classList.remove("sampling");
       running.delete(element);
     } else element.style.setProperty("--t", String(Math.round(now - start)));
   }
@@ -43,6 +45,7 @@ export function sampled(element: HTMLElement, kind: string | undefined, spell?: 
   if (kind === undefined) {
     if (!current) return;
     running.delete(element);
+    element.classList.remove("sampling");
   } else {
     if (current && kind === current.kind && key === current.key) return;
     const last = spells.get(element);
@@ -52,6 +55,7 @@ export function sampled(element: HTMLElement, kind: string | undefined, spell?: 
     running.set(element, { kind, key, start, until: spell ? start + spell.forMs : Infinity });
     spells.set(element, { kind, key });
     element.style.setProperty("--t", "0");
+    element.classList.add("sampling");
   }
   arm();
 }

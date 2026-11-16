@@ -243,7 +243,9 @@ Turn on **Jongi-nyang for Claude** to see, add and edit to-dos, events and notes
 <details>
 <summary>The AI connection in detail</summary>
 
-- **Turning it on**: in Desk → **AI connection**, switch on ‘Let Claude see and write in Jongi-nyang’. **Connect to Claude Desktop** opens the extension (`.mcpb`) inside the app, and Claude Desktop asks whether to install it; it connects Claude Code too if you have it. If you only use Claude Code, click **Connect to Claude Code**. Claude Code needs Node.js.
+- **Turning it on**: in Desk → **AI connection**, switch on ‘Let Claude see and write in Jongi-nyang’. **Connect to Claude Desktop** opens the extension (`.mcpb`) inside the app, and Claude Desktop asks whether to install it; **Copy Claude Code command** copies a command in which the Jongi-nyang app itself runs the extension built into it, so you don’t need Node.js. Pasted into a terminal, it works in any folder and in Claude Desktop’s Code tab too:
+  `claude mcp add -s user jongi-nyang -- '/Applications/종이냥.app/Contents/MacOS/PaperTodo' --mcp-stdio`
+  An older connection that runs on Node still works. To switch to the new one, run `claude mcp remove -s user jongi-nyang`, then paste the new command.
 - **What it can do**: see and add to-dos, events and notes; edit to-dos and events that don’t repeat; see and filter to-dos by space, put new ones in a space and move them after a yes. It can attach today’s sheet, this week or one note to the conversation (`@` in Claude Code).
 - **What it doesn’t do**: delete anything, edit repeating events or alarms, or edit notes.
 - **Spaces hidden on this Mac** stay out of Claude’s today and lists too. Name the space and Claude shows them.
@@ -456,13 +458,13 @@ You need macOS 14 or later and Swift 6 (Xcode or the Command Line Tools). There 
 <details>
 <summary>Test, snapshot and measuring commands</summary>
 
-Some tests assume Korean time, so set the time zone to `Asia/Seoul` when you run them.
+The tests written on Korean time set Asia/Seoul themselves, so there is no time zone to set.
 
 ```sh
 swift build -Xswiftc -warnings-as-errors
-TZ=Asia/Seoul ./scripts/test.sh        # core regression tests
-TZ=Asia/Seoul ./scripts/test-intent.sh # input line · day ribbon · Next (same cases as Windows)
-TZ=Asia/Seoul ./scripts/test-focus.sh  # focus sessions
+./scripts/test.sh                      # core regression tests
+./scripts/test-intent.sh               # input line · day ribbon · Next (same cases as Windows)
+./scripts/test-focus.sh                # focus sessions
 ./scripts/test-presentation.sh         # screen state · keyboard · sharing · backups · desk …
 ./scripts/i18n/check.sh                # no English or Dutch translations missing
 ./scripts/render-design.sh             # draws every screen with sample data into docs/design/

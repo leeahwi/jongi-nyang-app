@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
 import { currentStreak, dayKey, dueForArchive, groupByDay, heatLevel, logicalDayStart, longestStreak, monthKey, parseArchiveLines, type ArchiveEntry } from "../src/core/archive";
 import { UndoableNotebook } from "../src/core/notebook";
@@ -18,6 +20,26 @@ test("the day turns over at 4 a.m.", () => {
   assert.equal(dayKey(local(2026, 9, 29, 1, 30)), "2026-09-28");
   assert.equal(dayKey(local(2026, 9, 29, 4, 0)), "2026-09-29");
   assert.deepEqual(logicalDayStart(local(2026, 9, 29, 3, 59)), local(2026, 9, 28, 4));
+});
+
+// #386: the shared cases of shared/cases/day-boundary-cases.json (the Mac's CoreTests reads the same file): the day turns
+// over at 04:00 on the wall clock, on the days daylight saving starts and ends too. Each case in its own time zone.
+test("B1–B12 the day turns over at 04:00 on the wall clock, daylight saving days too (day-boundary-cases.json)", () => {
+  const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "day-boundary-cases.json"), "utf8")) as {
+    cases: { id: string; timeZone: string; now: string; dayKey: string; dayStart: string }[];
+  };
+  const zone = process.env.TZ;
+  try {
+    for (const entry of file.cases) {
+      process.env.TZ = entry.timeZone;
+      const now = new Date(entry.now);
+      assert.equal(dayKey(now), entry.dayKey, `${entry.id} day`);
+      assert.equal(logicalDayStart(now).getTime(), new Date(entry.dayStart).getTime(), `${entry.id} start`);
+    }
+  } finally {
+    if (zone === undefined) delete process.env.TZ; else process.env.TZ = zone;
+  }
+  assert.ok(file.cases.length >= 12);
 });
 
 test("archive waits for the chosen number of days, and never when turned off", () => {

@@ -57,7 +57,9 @@ private struct StorageChoices: View {
 
     var body: some View {
         let shared = model.sharedFolder != nil
-        let here = FolderPlace.of(FolderPath.shownPath(model.storageFolderURL), home: NSHomeDirectory()).name
+        // #388: the default folder by what it is, never its name (com.noa.PaperTodo); a shared one by its own name.
+        let here = shared ? FolderPlace.of(FolderPath.shownPath(model.storageFolderURL), home: NSHomeDirectory()).name
+            : L("이 Mac의 기본 폴더")
         VStack(spacing: 10) {
             StorageChoiceCard(title: L("이 Mac에만"),
                               detail: shared ? L("이 Mac의 기본 폴더로 옮겨요") : L("지금 여기 있어요 · \(here)"),

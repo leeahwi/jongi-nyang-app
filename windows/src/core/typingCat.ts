@@ -2,7 +2,7 @@
  * 치면 두드리는 고양이 (#230 · #289, docs/plans/typing-cat.md): a cat of its own, apart from the desktop pet, on its
  * cushion in a corner of the screen. It puts a paw down for each key — the viewer's left paw first, then the other, back
  * to rest 120 ms after the last key. The same rules as the Mac's `PaperCore/TypingCat.swift`; both run the cases in
- * docs/plans/typing-cat-cases.json.
+ * shared/cases/typing-cat-cases.json.
  *
  * It is told only that a key went down and when (a monotonic clock, in milliseconds). It never sees which key, and it
  * keeps nothing of one: two poses, a time and a deadline.
@@ -168,7 +168,7 @@ export function typingCatFrame(corner: TypingCorner, area: CornerRect, topInset 
   return { x, y, width: side, height: side };
 }
 
-// ─── 옮긴 자리 (#331, docs/plans/typing-cat-place-cases.json) ──────────────────
+// ─── 옮긴 자리 (#331, shared/cases/typing-cat-place-cases.json) ──────────────────
 
 /**
  * The cat's drawn area — the cat and its cushion — as 16 bands from the top of its picture, each the part across it

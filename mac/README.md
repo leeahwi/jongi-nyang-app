@@ -16,7 +16,7 @@
 ## 5분 만에 시작하기
 
 1. **받기** — [Releases](https://github.com/leeahwi/jongi-nyang-app/releases)에서 `JongiNyang-<버전>.dmg`를 받습니다. macOS 14 이상, Apple Silicon Mac에서 돌아갑니다. DMG를 열고 `종이냥.app`을 옆의 **Applications** 폴더로 끌어 놓습니다.
-2. **처음 열기** — 아직 Apple의 정식 서명과 공증이 없어서, 처음 열 때 macOS가 막을 수 있습니다. 그러면 **시스템 설정 → 개인정보 보호 및 보안**에서 **그래도 열기**를 누릅니다.
+2. **처음 열기** — 아직 Apple의 정식 서명과 공증이 없어서, 처음 열 때 macOS가 막을 수 있습니다. 그러면 앱을 한 번 열어 본 뒤 **시스템 설정 → 개인정보 보호 및 보안**에서 **그래도 열기**를 누릅니다. macOS 14에서는 응용 프로그램 폴더에서 우클릭 → **열기**로도 열립니다.
 3. **사용 안내 다섯 장** — 처음 켜면 카드 다섯 장이 앱을 소개합니다. 마지막 카드의 ‘로그인할 때 같이 열기’는 처음부터 켜져 있고, 나중에 책상 → 꾸미기 → 시작에서 바꿉니다.
 4. **언어 고르기** — 책상 → 꾸미기 → **앱 언어**에서 자동(Mac의 언어 순서) · 한국어 · English · Nederlands를 고릅니다. 바꾸면 앱이 다시 시작됩니다.
 5. **첫 할 일 적기** — 노트 맨 아래 입력 줄에 `장보기`나 `내일 3시 회의`처럼 적고 `Return`을 누릅니다. 끝내면 왼쪽 네모를 눌러 체크합니다.
@@ -243,7 +243,9 @@ Windows와 같은 목록을 쓰는 방법은 [Mac과 PC에서 같은 목록을 �
 <details>
 <summary>AI 연결 자세히</summary>
 
-- **켜기**: 책상 → **AI 연결**에서 ‘Claude가 종이냥을 보고 쓸 수 있게 하기’를 켭니다. **Claude 데스크톱에 연결**을 누르면 앱 안에 든 확장(`.mcpb`)을 열어 Claude 데스크톱이 설치할지 묻습니다. Claude Code가 있으면 같이 연결합니다. Claude Code만 쓴다면 **Claude Code에 연결**을 누릅니다. Claude Code에는 Node.js가 필요합니다.
+- **켜기**: 책상 → **AI 연결**에서 ‘Claude가 종이냥을 보고 쓸 수 있게 하기’를 켭니다. **Claude 데스크톱에 연결**을 누르면 앱 안에 든 확장(`.mcpb`)을 열어 Claude 데스크톱이 설치할지 묻습니다. **Claude Code 명령 복사**는 종이냥 앱이 앱에 든 확장을 바로 돌리는 명령이라 Node.js가 없어도 됩니다. 터미널에 붙여 넣으면 어느 폴더에서나, Claude 데스크톱의 Code 탭에서도 씁니다.
+  `claude mcp add -s user jongi-nyang -- '/Applications/종이냥.app/Contents/MacOS/PaperTodo' --mcp-stdio`
+  예전에 연결한 Node 방식도 그대로 됩니다. 새 명령으로 바꾸려면 `claude mcp remove -s user jongi-nyang`을 실행하고 새 명령을 붙여 넣습니다.
 - **할 수 있는 것**: 할 일 · 일정 · 메모 보기와 넣기, 할 일과 반복하지 않는 일정 고치기, 할 일을 스페이스로 보고 거르기 · 넣기 · 확인 뒤 옮기기. 오늘 한 장 · 이번 주 · 메모 한 장을 대화에 자료로 붙입니다(Claude Code에서는 `@`).
 - **하지 않는 것**: 지우기, 반복 일정 · 알람 고치기, 메모 고치기.
 - **이 Mac에서 숨긴 스페이스**의 할 일은 Claude도 오늘과 목록에서 뺍니다. 그 스페이스를 말하면 보여 줍니다.
@@ -456,13 +458,13 @@ macOS 14 이상과 Swift 6(Xcode나 Command Line Tools)이 필요합니다. 외�
 <details>
 <summary>테스트 · 스냅숏 · 측정 명령</summary>
 
-일부 테스트는 한국 시간을 전제로 해서, 시간대를 `Asia/Seoul`로 맞추고 돌립니다.
+한국 시간으로 쓴 테스트는 스스로 Asia/Seoul로 돌아서, 시간대를 맞추지 않아도 됩니다.
 
 ```sh
 swift build -Xswiftc -warnings-as-errors
-TZ=Asia/Seoul ./scripts/test.sh        # 코어 회귀 테스트
-TZ=Asia/Seoul ./scripts/test-intent.sh # 입력 줄 · 하루 띠 · 다음 (Windows와 같은 사례)
-TZ=Asia/Seoul ./scripts/test-focus.sh  # 집중 기록 · 집중 세션
+./scripts/test.sh                      # 코어 회귀 테스트
+./scripts/test-intent.sh               # 입력 줄 · 하루 띠 · 다음 (Windows와 같은 사례)
+./scripts/test-focus.sh                # 집중 기록 · 집중 세션
 ./scripts/test-presentation.sh         # 화면 상태 · 키보드 · 함께 쓰기 · 백업 · 책상 …
 ./scripts/i18n/check.sh                # 영어 · 네덜란드어 번역이 빠진 문구가 없는지
 ./scripts/render-design.sh             # 모든 화면을 예시 데이터로 그려 docs/design/에 저장

@@ -294,7 +294,7 @@ public enum MemoCards {
     /// 크게 보기 (#113, C2 A): the paper while a memo is shown big — 640 at most, or 45 % of the screen's width when that
     /// is less, never narrower than the width the drawer was given, and never wider than the screen leaves beside the
     /// drawer's own chrome (`chrome`: the bookmarks and the shadow, 48 pt on the Mac, 34 px on Windows). Whole points.
-    /// The shared cases W1… in docs/plans/drawer-big-cases.json (Windows: bigDrawerWidth).
+    /// The shared cases W1… in shared/cases/drawer-big-cases.json (Windows: bigDrawerWidth).
     public static func bigWidth(user: Double, screen: Double, chrome: Double) -> Double {
         let wide = max(user, min(640, (screen * 0.45).rounded(.down)))
         return max(0, min(wide, (screen - chrome).rounded(.down)))

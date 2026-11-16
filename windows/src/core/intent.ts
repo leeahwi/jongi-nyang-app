@@ -743,7 +743,7 @@ export function addedText(candidate: Candidate, now = new Date(), lang: Lang = "
 /**
  * The button that puts the picked reading in (#240, D3 B): it says what happens — "일정 넣기", "할 일 넣기", "타이머 시작",
  * "집중 시작", "알람 맞추기", "메모 넣기", "반복 할 일 넣기"; "넣기" while nothing is read yet. Tab moves it with the chip.
- * The same words on the Mac (Intent.actionText) and in docs/plans/quick-entry-button-cases.json.
+ * The same words on the Mac (Intent.actionText) and in shared/cases/quick-entry-button-cases.json.
  */
 export function actionText(candidate: Candidate | undefined, lang: Lang = "ko"): string {
   const i = index(lang);

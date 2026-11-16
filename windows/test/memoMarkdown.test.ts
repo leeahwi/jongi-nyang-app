@@ -6,14 +6,14 @@ import { cardTitle, memoKind, previewRows } from "../src/core/memoCards";
 import { drawerSearch, emptyMemoFolders } from "../src/core/memoDrawer";
 import { markdownLines, markdownPlain, markdownSpans, markdownTitle, type MarkSpan } from "../src/core/memoMarkdown";
 
-// 메모 마크다운 (#84): the shared cases from docs/plans/memo-markdown-cases.json (the Mac's test-markdown.sh reads the
+// 메모 마크다운 (#84): the shared cases from shared/cases/memo-markdown-cases.json (the Mac's test-markdown.sh reads the
 // same file) — every case's spans, its words without marks, and its card title, preview rows and kind when given.
 
 interface Case {
   id: string; about: string; text: string; spans: MarkSpan[]; plain: string; title?: string; preview?: string[];
   kind?: { label?: string; link?: string; phone?: string; checklist?: string } | null;
 }
-const fixturePath = path.resolve(process.cwd(), "..", "docs", "plans", "memo-markdown-cases.json");
+const fixturePath = path.resolve(process.cwd(), "..", "shared", "cases", "memo-markdown-cases.json");
 const cases = (JSON.parse(fs.readFileSync(fixturePath, "utf8")) as { cases: Case[] }).cases;
 const memo = (text: string) => ({ id: "m", text, createdAt: "2026-10-30T00:00:00Z", updatedAt: "2026-10-30T00:00:00Z" });
 

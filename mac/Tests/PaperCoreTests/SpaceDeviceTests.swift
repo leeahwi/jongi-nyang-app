@@ -1,6 +1,6 @@
 import Foundation
 
-// 기기마다 보일 스페이스 (SpaceDevice.swift, #196): the shared cases S60–S72 read from docs/plans/spaces-cases.json →
+// 기기마다 보일 스페이스 (SpaceDevice.swift, #196): the shared cases S60–S72 read from shared/cases/spaces-cases.json →
 // `device` (Windows test/spaceDevice.test.ts reads the same), then the Mac's own.
 private struct TestFailure: Error, CustomStringConvertible {
     let description: String
@@ -19,7 +19,7 @@ private func at(_ text: String) -> Date { ISO8601DateFormatter().date(from: text
 @main
 private enum SpaceDeviceTests {
     static func main() throws {
-        let path = CommandLine.arguments.dropFirst().first ?? "../docs/plans/spaces-cases.json"
+        let path = CommandLine.arguments.dropFirst().first ?? "../shared/cases/spaces-cases.json"
         let all = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
         let cases = all["device"] as! [String: Any]
         var count = 0

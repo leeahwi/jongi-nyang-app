@@ -61,7 +61,7 @@ const subtitles: Record<Tab, string> = {
   appearance: t("언어와 낮 · 밤, 종이, 노트의 글꼴과 글자 크기를 정해요."),
   notifications: t("주기 알림과 알림 모양을 정해요."),
   repeat: t("반복하는 날마다 목록에 한 줄씩 놓여요."),
-  pet: t("종이냥을 보이거나 숨기고, 돌아다닐지, 말을 걸지 정해요."),
+  pet: t("종이냥 펫과 타닥냥을 보이거나 숨기고, 움직임과 말을 정해요."),
   clock: t("알람을 맞추고, 뽀모도로 시간과 소리를 정하고 바로 시작해요."),
   events: t("일정을 적어 두면 오늘 할 일 위에 보이고, 시작 전에 알려 줘요."),
   storage: t("공유 폴더에 두면 다른 기기에서도 같은 목록을 써요."),
@@ -340,7 +340,7 @@ function appearance(): Node[] {
     stepName);
 
   const startRow = h("div", { class: "row" }, glyph("power"), h("span", { class: "grow" }, t("컴퓨터를 켤 때 같이 열기")),
-    toggle(prefs.openAtLogin, t("Windows 시작 시 실행"), (value) => set("openAtLogin", value)));
+    toggle(prefs.openAtLogin, t("컴퓨터를 켤 때 같이 열기"), (value) => set("openAtLogin", value)));
   // 작업 표시줄에 남은 개수: the taskbar button's small number (Windows).
   const badgeRow = h("div", { class: "row" }, glyph("bellDot"), h("span", { class: "grow" }, t("작업 표시줄에 남은 개수")),
     toggle(prefs.taskbarBadge, t("작업 표시줄에 남은 개수"), (value) => set("taskbarBadge", value)));
@@ -407,7 +407,8 @@ function completedGroup(): HTMLElement {
   const openArchive = h("button", { class: "action small", title: t("탐색기에서 완료 기록 폴더 열기") }, icon("arrow", 13), t("폴더 열기"));
   openArchive.addEventListener("click", () => api.act({ type: "openArchiveFolder" }));
   const archiveFolderRow = h("div", { class: "row storage" }, glyph("folder"),
-    h("div", { class: "grow" }, h("div", {}, t("기록 폴더")), folderPlaceLine(state.storage.archivePath)), openArchive);
+    // #388: the place only when it is a folder the user chose; the app's own folder stays behind 폴더 열기.
+    h("div", { class: "grow" }, h("div", {}, t("기록 폴더")), state.storage.custom ? folderPlaceLine(state.storage.archivePath) : null), openArchive);
   historyButton.addEventListener("click", () => api.act({ type: "openHistory" }));
   const archiveFoot = prefs.archiveAfterDays === 0
     ? t("완료한 일이 목록에 계속 남아요. ⋯ → 완료한 일 정리로 직접 지울 수 있어요.")
@@ -431,7 +432,8 @@ let storageMore = false;
 function storagePane(): Node[] {
   const { storage, backups } = state;
   const shared = storage.custom;
-  const here = folderPlace(storage.path, storage.home, /^[a-z]:[\\/]|^\\\\/i.test(storage.path)).name;
+  // #388: the default folder by what it is, never its name (PaperTodo); a shared one by its own name.
+  const here = storage.custom ? folderPlace(storage.path, storage.home, /^[a-z]:[\\/]|^\\\\/i.test(storage.path)).name : t("이 PC의 기본 폴더");
   const choice = (title: string, detail: string, selected: boolean, act: () => void) => {
     const card = h("button", { class: "storage-choice", role: "radio", "aria-checked": String(selected) },
       h("span", { class: "sc-radio", "aria-hidden": "true" }), h("span", { class: "sc-text" }, h("span", { class: "sc-title" }, title), h("span", { class: "sc-detail" }, detail)));
@@ -480,7 +482,7 @@ function storageDetails(): Node[] {
   openFolder.addEventListener("click", () => api.act({ type: "openDataFolder" }));
   const whereRow = h("div", { class: "row storage" }, glyph("folder"),
     h("div", { class: "grow" }, h("div", { class: "where" }, h("span", {}, t("저장 폴더")), h("span", { class: "kind" }, storage.custom ? t("공유 폴더") : t("이 PC (기본)"))),
-      folderPlaceLine(storage.path)), openFolder);
+      storage.custom ? folderPlaceLine(storage.path) : null), openFolder);
   const actionsRow = h("div", { class: "row storage-actions" }, h("span", { class: "grow" }), reset, choose);
 
   // 백업 · 옮기기: everything in the storage folder to one .jongi file, and back.
@@ -526,7 +528,7 @@ function autoBackupGroup(): HTMLElement {
   open.addEventListener("click", () => api.act({ type: "openBackupFolder" }));
   const folderRow = h("div", { class: "row storage" }, glyph("archive"),
     h("div", { class: "grow" }, h("div", { class: "where" }, h("span", {}, t("백업 폴더")), h("span", { class: "kind" }, backups.custom ? t("고른 폴더") : t("이 PC (기본)"))),
-      folderPlaceLine(backups.folder)), open);
+      backups.custom ? folderPlaceLine(backups.folder) : null), open);
   const reset = h("button", { class: "action small", title: t("이 PC의 기본 위치로 돌아가요") }, t("기본으로"));
   reset.disabled = !backups.custom && !backups.missing;
   reset.addEventListener("click", () => api.act({ type: "resetBackupFolder" }));

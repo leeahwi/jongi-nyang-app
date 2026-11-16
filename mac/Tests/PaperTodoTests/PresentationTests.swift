@@ -330,6 +330,269 @@ private enum PresentationTests {
             try expect(!(try NotebookFile(url: fixture.storageURL).load()).items[0].isCompleted, "Undo still works after catching up")
         }
 
+        try await test("#411 this Mac's own save of todos.json is never read back; another device's is read once") {
+            let fixture = try Fixture(items: [("A", false)])
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            model.sharedFolder = fixture.folder
+            let reads = model.todosFile.file.reads
+            for index in 0..<5 { model.add("할 일 \(index)") }
+            model.reloadFromDisk()
+            try expect(model.todosFile.file.reads == reads, "Five changes and a check read nothing back: \(model.todosFile.file.reads - reads)")
+            // Before, the list read back differed from the one here (its dates lose their fractions of a second), so it
+            // was taken as another device's: the undo history started over and ⌘Z went back one step only.
+            model.undo()
+            model.undo()
+            try expectEqual(model.items.map(\.title), ["A", "할 일 0", "할 일 1", "할 일 2"], "⌘Z goes back step by step")
+            var elsewhere = try NotebookFile(url: fixture.storageURL).load()
+            _ = elsewhere.add("from Windows")
+            try NotebookFile(url: fixture.storageURL).save(elsewhere)
+            model.reloadFromDisk()
+            model.reloadFromDisk()
+            try expect(model.todosFile.file.reads == reads + 1 && model.items.last?.title == "from Windows", "Another device's list is read once and taken")
+        }
+
+        try await test("#385 a cloud's conflict copies go to the backup folder and are told; what changed here joins another device's file") {
+            let fixture = try Fixture(items: [("장보기", false)])
+            defer { fixture.cleanup() }
+            func url(_ name: String) -> URL { fixture.folder.appendingPathComponent(name) }
+            let model = fixture.model()
+            model.sharedFolder = fixture.folder
+            // Copies iCloud Drive and Dropbox left beside the files, and a file of the person's that isn't one.
+            for name in ["todos 2.json", "memos (Minji's MacBook conflicted copy 2026-11-11).json", "notes 2.json"] {
+                try Data("{}".utf8).write(to: url(name))
+            }
+            model.reloadFromDisk()
+            let moved = model.movedConflictCopies
+            try expect(moved.count == 2 && moved.allSatisfy { FileManager.default.fileExists(atPath: $0.path) && $0.path.contains("/sync-conflicts/") },
+                       "Both copies moved to the backup folder: \(moved.map(\.lastPathComponent))")
+            try expect(!FileManager.default.fileExists(atPath: url("todos 2.json").path) && FileManager.default.fileExists(atPath: url("notes 2.json").path),
+                       "Out of the storage folder; another file stays")
+            try expect(model.storageError?.contains("‘todos 2.json’") == true, "Told, by name: \(model.storageError ?? "nothing")")
+
+            // The to-do got its 어제부터 day here at launch; another device renames it meanwhile: both are kept and written.
+            try expect(model.items[0].todaySince != nil, "Stamped here")
+            var elsewhere = try NotebookFile(url: fixture.storageURL).load()
+            _ = elsewhere.edit(id: elsewhere.items[0].id, title: "장보기, 우유")
+            try NotebookFile(url: fixture.storageURL).save(elsewhere)
+            model.reloadFromDisk()
+            let saved = try NotebookFile(url: fixture.storageURL).load().items[0]
+            try expect(saved.title == "장보기, 우유" && saved.todaySince != nil && model.items[0].title == "장보기, 우유",
+                       "The rename from there and the day from here, on disk: \(saved.title) · \(saved.todaySince ?? "none")")
+
+            // events.json couldn't be read at launch; an event added here meanwhile joins the other device's file once it reads.
+            _ = model.calendar.perform(.create(CalendarDraft(title: "회의", date: "2026-11-12", startMinutes: 600, endMinutes: 660)))
+            try FileManager.default.setAttributes([.posixPermissions: 0o000], ofItemAtPath: url("events.json").path)
+            let later = fixture.model()
+            later.sharedFolder = fixture.folder
+            _ = later.calendar.perform(.create(CalendarDraft(title: "점심", date: "2026-11-12", startMinutes: 720, endMinutes: 780)))
+            try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: url("events.json").path)
+            var file = try JSONSerialization.jsonObject(with: Data(contentsOf: url("events.json"))) as! [String: Any]
+            var events = file["events"] as! [[String: Any]]
+            events[0]["title"] = "회의 (3층)"
+            file["events"] = events
+            try JSONSerialization.data(withJSONObject: file).write(to: url("events.json"))
+            later.reloadFromDisk()
+            try expectEqual(later.calendar.events.map(\.title).sorted(), ["점심", "회의 (3층)"],
+                            "Both events here")
+            let written = String(decoding: try Data(contentsOf: url("events.json")), as: UTF8.self)
+            try expect(written.contains("점심") && written.contains("회의 (3층)") && later.calendar.problem == nil, "…and on disk")
+        }
+
+        try await test("#376 #377 a repeat, today's copies and 어제부터 land on top of what another device or Claude just saved") {
+            let fixture = try Fixture(items: [("스트레칭", false)])
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            model.sharedFolder = fixture.folder
+            let repeatsURL = fixture.folder.appendingPathComponent("repeats.json")
+            let morning = Calendar.current.date(bySettingHour: 8, minute: 0, second: 0, of: Date())!
+            let mine = model.saveSeries(title: "물 마시기", rule: RepeatRule(kind: .daily), remindAt: nil, now: morning)!
+            func diskSeries() throws -> [String] {
+                let object = try JSONSerialization.jsonObject(with: Data(contentsOf: repeatsURL)) as! [String: Any]
+                return (object["series"] as! [[String: Any]]).map { $0["title"] as! String }
+            }
+            func addElsewhere(_ id: String, _ title: String) throws {
+                var object = try JSONSerialization.jsonObject(with: Data(contentsOf: repeatsURL)) as! [String: Any]
+                object["series"] = (object["series"] as! [[String: Any]])
+                    + [["id": id, "title": title, "rule": ["kind": "daily"], "createdAt": "2026-11-01T00:00:00Z"]]
+                try JSONSerialization.data(withJSONObject: object).write(to: repeatsURL)
+            }
+            // The other device adds 분리수거 a moment before this Mac edits its own rule.
+            try addElsewhere("from-windows", "분리수거")
+            model.saveSeries(seriesID: mine, title: "물 두 잔", rule: RepeatRule(kind: .daily), remindAt: nil, now: morning)
+            try expectEqual(try diskSeries().sorted(), ["물 두 잔", "분리수거"], "The other device's repeat must survive an edit here")
+            // …and another just before the half-hourly check places tomorrow's copies.
+            try addElsewhere("from-mac-b", "화분 물 주기")
+            let tomorrow = Calendar.current.date(byAdding: .day, value: 1, to: morning)!
+            model.placeRecurring(now: tomorrow)
+            try expectEqual(try diskSeries().sorted(), ["물 두 잔", "분리수거", "화분 물 주기"], "Placing copies must not drop a rule added elsewhere")
+            let placed = try NotebookFile(url: fixture.storageURL).load().items.filter { $0.seriesID != nil }.map(\.title).sorted()
+            try expectEqual(placed, ["물 두 잔", "분리수거", "화분 물 주기"], "Every rule gets one copy, once")
+            // Removing one here leaves the others.
+            model.deleteSeries("from-windows")
+            try expectEqual(try diskSeries().sorted(), ["물 두 잔", "화분 물 주기"], "A rule removed here goes")
+
+            // #377: a to-do taken from the other device has no 어제부터 stamp yet; while this Mac sleeps that device adds
+            // another, and the stamp on waking lands on top of it.
+            func addToDisk(_ title: String) throws {
+                var elsewhere = try NotebookFile(url: fixture.storageURL).load()
+                _ = elsewhere.add(title)
+                try NotebookFile(url: fixture.storageURL).save(elsewhere)
+            }
+            try addToDisk("from Windows")
+            model.reloadFromDisk()
+            try addToDisk("overnight")
+            model.stampToday()
+            let stamped = try NotebookFile(url: fixture.storageURL).load()
+            try expect(stamped.items.contains { $0.title == "overnight" }, "Waking must not drop the other device's to-do")
+            try expect(stamped.items.first { $0.title == "from Windows" }?.todaySince != nil, "The stamp is saved too")
+
+            // Claude writes with AI 연결 on (this Mac's own folder): the stamp lands on top of it as well.
+            model.sharedFolder = nil
+            model.aiWatching = true
+            try addToDisk("Claude 1")
+            model.reloadFromDisk()
+            try addToDisk("Claude 2")
+            model.stampToday()
+            try expect(try NotebookFile(url: fixture.storageURL).load().items.contains { $0.title == "Claude 2" }, "Claude's change must survive")
+        }
+
+        try await test("#382 a file that can't be read just now is never saved over; once it reads, saving opens again") {
+            let fixture = try Fixture(items: [("장보기", false)])
+            defer { fixture.cleanup() }
+            let names = ["todos.json", "memos.json", "repeats.json", "events.json", "alarms.json"]
+            func url(_ name: String) -> URL { fixture.folder.appendingPathComponent(name) }
+            func lock(_ mode: Int) throws { for name in names { try FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: url(name).path) } }
+            // Every file as another device left it.
+            let first = fixture.model()
+            _ = first.addMemo(text: "회의 메모")
+            first.saveMemosNow()
+            first.saveSeries(title: "물 마시기", rule: RepeatRule(kind: .daily), remindAt: nil)
+            first.calendar.perform(.create(CalendarDraft(title: "회의", date: "2026-10-08", startMinutes: 600, endMinutes: 660, repeatRule: .weekly)))
+            _ = first.alarms.add(now: Date())
+            let before = try Dictionary(uniqueKeysWithValues: names.map { ($0, try Data(contentsOf: url($0))) })
+            // No permission to read (a cloud file still on its way reads the same): the app opens, every change stays here.
+            try lock(0o000)
+            let model = fixture.model()
+            model.sharedFolder = fixture.folder
+            try expect(model.hasUnreadFiles && model.storageError != nil, "It says so")
+            model.mutate { _ = $0.add("새 일") }
+            _ = model.addMemo(text: "새 메모")
+            model.saveMemosNow()
+            model.saveSeries(title: "스트레칭", rule: RepeatRule(kind: .daily), remindAt: nil)
+            model.calendar.perform(.create(CalendarDraft(title: "점심", date: "2026-10-09", startMinutes: 720, endMinutes: 780)))
+            _ = model.alarms.add(now: Date())
+            try lock(0o644)
+            for name in names { try expect(try Data(contentsOf: url(name)) == before[name], "\(name) is never saved over") }
+            // Readable again: the next check reads every file, keeps what was added here (the list, memos, repeats) and saves.
+            model.reloadFromDisk()
+            try expect(!model.hasUnreadFiles, "Saving opens again")
+            // (and today's copies of the repeats, placed here meanwhile)
+            let list = Set(try NotebookFile(url: url("todos.json")).load().items.map(\.title))
+            try expect(list.isSuperset(of: ["장보기", "새 일"]), "The list, with this Mac's to-do: \(list.sorted())")
+            model.saveMemosNow()
+            try expectEqual(Set(try MemoFile.decode(Data(contentsOf: url("memos.json"))).map(\.title)), ["회의 메모", "새 메모"], "Memos merged")
+            try expectEqual(Set(model.series.map(\.title)), ["물 마시기", "스트레칭"], "Repeats merged")
+            model.saveSeries(title: "산책", rule: RepeatRule(kind: .daily), remindAt: nil)
+            let repeats = String(decoding: try Data(contentsOf: url("repeats.json")), as: UTF8.self)
+            try expect(["물 마시기", "스트레칭", "산책"].allSatisfy(repeats.contains), "repeats.json is written again")
+            model.calendar.perform(.create(CalendarDraft(title: "저녁", date: "2026-10-09", startMinutes: 1080, endMinutes: 1140)))
+            try expect(String(decoding: try Data(contentsOf: url("events.json")), as: UTF8.self).contains("저녁"), "events.json is written again")
+            // iCloud Drive hasn't downloaded the list yet (only its placeholder): not a first launch, nothing written.
+            let cloud = try Fixture(items: [])
+            defer { cloud.cleanup() }
+            try FileManager.default.removeItem(at: cloud.storageURL)
+            try Data().write(to: cloud.folder.appendingPathComponent(".todos.json.icloud"))
+            let waiting = cloud.model()
+            waiting.mutate { _ = $0.add("새 일") }
+            try expect(waiting.hasUnreadFiles && !FileManager.default.fileExists(atPath: cloud.storageURL.path), "No new list over the one on its way")
+        }
+
+        try await test("#452 a spaces · memo folders · 지운 메모 file that couldn't be moved aside is never saved over until 다시 읽기 moves it") {
+            let broken = Data("{ not json".utf8)
+            @MainActor func change(_ model: AppModel, _ name: String) {
+                switch name {
+                case TodoSpaces.fileName: _ = model.addTodoSpace(name: "공부 \(UUID().uuidString.prefix(4))")
+                case MemoFolders.fileName: _ = model.addMemoFolder(name: "회사 \(UUID().uuidString.prefix(4))", color: .mint)
+                default: model.keepInTrash(Memo(text: "장보기"))
+                }
+                model.finishMemoFolderWrites()
+            }
+            func aside(_ fixture: Fixture) -> [String] {
+                ((try? FileManager.default.contentsOfDirectory(atPath: fixture.folder.path)) ?? []).filter { $0.contains(".unreadable-") }
+            }
+            // The folder can't be written (no right to, or a cloud lock) while `body` runs: the move aside fails.
+            @MainActor func locked<T>(_ fixture: Fixture, _ body: () throws -> T) throws -> T {
+                try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: fixture.folder.path)
+                defer { try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: fixture.folder.path) }
+                return try body()
+            }
+            @MainActor func reread(_ model: AppModel, _ fixture: Fixture, _ name: String, _ file: URL) throws {
+                // 다시 읽기 while the folder still can't be written: still not written.
+                try locked(fixture) { model.rereadFiles() }
+                try expect(model.hasUnreadFiles, "\(name): still blocked")
+                change(model, name)
+                try expect(try Data(contentsOf: file) == broken, "\(name) is never saved over")
+                // Writable again: 다시 읽기 moves it aside as it was, and saving opens again.
+                model.rereadFiles()
+                try expect(!model.hasUnreadFiles, "\(name): saving opens again")
+                try expectEqual(aside(fixture).map { try Data(contentsOf: fixture.folder.appendingPathComponent($0)) }, [broken], "\(name) kept aside")
+                change(model, name)
+                try expect(((try? Data(contentsOf: file)) ?? broken) != broken, "\(name) is written again")
+            }
+            for name in [TodoSpaces.fileName, MemoFolders.fileName, MemoTrash.fileName] {
+                // At launch.
+                let fixture = try Fixture(items: [("장보기", false)])
+                defer { fixture.cleanup() }
+                let file = fixture.folder.appendingPathComponent(name)
+                try broken.write(to: file)
+                let model = try locked(fixture) { fixture.model() }
+                try expect(model.hasUnreadFiles && model.storageError?.contains(name) == true, "\(name): it says so (\(model.storageError ?? "-"))")
+                change(model, name)
+                try expect(try Data(contentsOf: file) == broken, "\(name) is never saved over")
+                try reread(model, fixture, name, file)
+            }
+            // Another device's file that doesn't read: moved aside on the first catch-up (memo folders · 지운 메모, #485) or
+            // the third (spaces).
+            for name in [TodoSpaces.fileName, MemoFolders.fileName, MemoTrash.fileName] {
+                let fixture = try Fixture(items: [("장보기", false)])
+                defer { fixture.cleanup() }
+                let file = fixture.folder.appendingPathComponent(name)
+                let model = fixture.model()
+                model.sharedFolder = fixture.folder
+                change(model, name)
+                try broken.write(to: file)
+                try locked(fixture) { for _ in 0..<3 { model.reloadFromDisk() } }
+                try expect(model.hasUnreadFiles, "\(name): blocked")
+                change(model, name)
+                try expect(try Data(contentsOf: file) == broken, "\(name) from another device is never saved over")
+                try reread(model, fixture, name, file)
+            }
+        }
+
+        try await test("#485 another device's 지운 메모 file that doesn't read is moved aside, and the 지운 메모 here stay") {
+            let broken = Data("{ half synced".utf8)
+            let fixture = try Fixture(items: [("장보기", false)])
+            defer { fixture.cleanup() }
+            let file = fixture.folder.appendingPathComponent(MemoTrash.fileName)
+            let model = fixture.model()
+            model.sharedFolder = fixture.folder
+            let memo = Memo(text: "장보기")
+            model.keepInTrash(memo)
+            try broken.write(to: file)
+            model.reloadFromDisk()
+            let aside = ((try? FileManager.default.contentsOfDirectory(atPath: fixture.folder.path)) ?? [])
+                .filter { $0.hasPrefix("memo-trash.unreadable-") }
+            try expectEqual(aside.map { try Data(contentsOf: fixture.folder.appendingPathComponent($0)) }, [broken], "kept aside as it was")
+            try expect(!model.hasUnreadFiles, "nothing blocked")
+            try expect(model.storageError?.hasPrefix(L("지운 메모 파일을 읽지 못했어요. 여기 있던 지운 메모는 그대로예요.")) == true,
+                       "it says the 지운 메모 here stay (\(model.storageError ?? "-"))")
+            try expectEqual(model.memoTrash.entries.map(\.memo.id), [memo.id], "the 지운 메모 here stay")
+            model.keepInTrash(Memo(text: "회사"))
+            let written = try MemoTrash.decode(try Data(contentsOf: file))
+            try expectEqual(written.entries.count, 2, "this Mac's 지운 메모 written in its place")
+        }
+
         try await test("moving folders merges the record by task, whichever list is kept") {
             let source = FileManager.default.temporaryDirectory.appendingPathComponent("PaperTodo-archive-\(UUID().uuidString)")
             let target = source.appendingPathExtension("target")
@@ -347,6 +610,26 @@ private enum PresentationTests {
             try expectEqual(ids, ["both", "mine"], "Each task once")
         }
 
+        try await test("#378 a to-do filed after a torn last line reads; only the torn line is left out") {
+            let fixture = try Fixture(items: [("장보기", true), ("빨래", false)])
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            let archive = ArchiveStore(model: model)
+            let done = model.items.filter(\.isCompleted)
+            let month = archive.directory.appendingPathComponent("\(Archive.monthKey(ArchiveEntry(done[0]))).jsonl")
+            // A power cut tore the month's last line (the Windows app's archiveStore.test.ts has the same case).
+            let whole = Archive.encodeLine(ArchiveEntry(id: "whole", title: "설거지", createdAt: Date(), completedAt: Date()))
+            let torn = String(Archive.encodeLine(ArchiveEntry(id: "torn", title: "분리수거", createdAt: Date(), completedAt: Date())).dropLast(6))
+            try FileManager.default.createDirectory(at: archive.directory, withIntermediateDirectories: true)
+            try (whole + "\n" + torn).write(to: month, atomically: true, encoding: .utf8)
+            try expectEqual(archive.file(done).count, 1, "The finished to-do is filed")
+            try expect(!model.items.contains { $0.title == "장보기" }, "…and leaves the list")
+            let text = try String(contentsOf: month, encoding: .utf8)
+            try expectEqual(Archive.parseLines(text).map(\.id), ["whole", done[0].id.uuidString], "The filed line reads; the torn one is left out")
+            try expect(text.hasSuffix("\n") && !text.contains("\n\n"), "One line each, no empty line")
+            try expect(archive.allEntries().contains { $0.id == done[0].id.uuidString }, "완료 기록 shows it")
+        }
+
         try await test("text size persists, grows step by step and still fits a ruled line") {
             let fixture = try Fixture(items: [("write", false)])
             defer { fixture.cleanup() }
@@ -361,6 +644,35 @@ private enum PresentationTests {
             try expect(NotebookTextSize.extraLarge.larger == nil && NotebookTextSize.small.smaller == nil, "Steps must stop at both ends")
         }
 
+        try await test("#379 완료한 일 정리's 되돌리기 leaves the other lines as they were; a month that can't be written says so") {
+            let fixture = try Fixture(items: [("빨래", true)])
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            let archive = ArchiveStore(model: model)
+            let month = archive.directory.appendingPathComponent("2026-11.jsonl")
+            // A newer version's field, keys in Windows' order, and a line this version can't read (the Windows app's
+            // archiveUnfile.test.ts has the same case).
+            let newer = #"{"title":"장보기","id":"newer","createdAt":"2026-11-01T00:00:00Z","completedAt":"2026-11-02T09:00:00Z","mood":"좋음"}"#
+            let filed = #"{"id":"filed","title":"빨래","createdAt":"2026-11-01T00:00:00Z","completedAt":"2026-11-02T10:00:00Z"}"#
+            let odd = #"{"id":"odd","title":"#
+            try FileManager.default.createDirectory(at: archive.directory, withIntermediateDirectories: true)
+            try "\(newer)\n\(filed)\n\(odd)\n".write(to: month, atomically: true, encoding: .utf8)
+            archive.unfile(["filed"])
+            try expectEqual(try String(contentsOf: month, encoding: .utf8), "\(newer)\n\(odd)\n", "Only that line goes")
+            try expect(model.storageError == nil, "Nothing to say")
+            // The folder can't be written: the month stays, and the note says so.
+            try "\(newer)\n\(filed)\n".write(to: month, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: archive.directory.path)
+            archive.unfile(["filed"])
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: archive.directory.path)
+            try expectEqual(try String(contentsOf: month, encoding: .utf8), "\(newer)\n\(filed)\n", "The month stays as it was")
+            try expect(model.storageError?.contains("되돌리지 못한") == true, "The note says so")
+            // The last line of a month going takes the month file with it.
+            try filed.appending("\n").write(to: month, atomically: true, encoding: .utf8)
+            archive.unfile(["filed"])
+            try expect(!FileManager.default.fileExists(atPath: month.path), "An empty month goes")
+        }
+
         try await test("bundled handwriting fonts load with narrow standalone jamo") {
             HandwritingFont.register()
             for face in [HandwritingFont.Face.pen, .brush] {
@@ -370,6 +682,29 @@ private enum PresentationTests {
                 let syllable = ("가" as NSString).size(withAttributes: [.font: font]).width
                 try expect(jamo <= syllable, "A lone jamo must not be wider than a full syllable (\(jamo) > \(syllable))")
             }
+        }
+
+        try await test("#381 what another device files shows in 완료 기록 without a restart") {
+            let fixture = try Fixture(items: [("장보기", true)])
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            model.sharedFolder = fixture.folder
+            let archive = ArchiveStore(model: model)
+            archive.run(now: Date().addingTimeInterval(3 * 86_400))
+            try expectEqual(archive.history().entries.map(\.title), ["장보기"], "This Mac's own filing shows")
+            // The other device finishes 빨래 and files it: a line in the record, and not on the list.
+            let entry = ArchiveEntry(id: UUID().uuidString, title: "빨래", createdAt: Date(), completedAt: Date())
+            let month = archive.directory.appendingPathComponent("\(Archive.monthKey(entry)).jsonl")
+            let handle = try FileHandle(forWritingTo: month)
+            try handle.seekToEnd()
+            try handle.write(contentsOf: Data((Archive.encodeLine(entry) + "\n").utf8))
+            try handle.close()
+            let before = archive.revision
+            NotificationCenter.default.post(name: StorageWatcher.changed, object: model)
+            for _ in 0..<50 where archive.revision == before { try await Task.sleep(for: .milliseconds(20)) }
+            try expect(archive.revision != before, "The pane is told")
+            try expectEqual(Set(archive.history().entries.map(\.title)), ["장보기", "빨래"], "완료 기록 shows the other device's work")
+            try expect(archive.allEntries().contains { $0.id == entry.id }, "…and so do 연속 기록 and 찾기")
         }
 
         try await test("코드 글꼴 D2Coding (#143) loads from the bundle, a Hangul syllable two Latin columns wide") {
@@ -580,7 +915,7 @@ private enum PresentationTests {
         }
 
         try await test("the desk: one window, its panes in sidebar order, ⌘1…⌘9 and the old entry points") {
-            // #240 (D4 B, docs/plans/desk-sidebar-cases.json): four groups of six rows or fewer.
+            // #240 (D4 B, shared/cases/desk-sidebar-cases.json): four groups of six rows or fewer.
             try expectEqual(DeskPane.allCases.map(\.rawValue),
                             ["calendar", "history", "appearance", "notifications", "clock", "repeating", "events", "pet", "drawer", "spaces", "storage", "ai", "help"], "Sidebar order")
             try expectEqual(DeskPane.Section.view.panes, [.calendar, .history], "보기")
@@ -1051,8 +1386,39 @@ private enum PresentationTests {
             try expect(same(panel.frame.size, grown), "shown again: window \(panel.frame.size), slip \(grown)")
         }
 
-        // #228 · #229 (docs/plans/slip-move-cases.json): every window here is far off the screens (x −40 000) and clear
+        // #228 · #229 (shared/cases/slip-move-cases.json): every window here is far off the screens (x −40 000) and clear
         // (alpha 0), and the app is never brought to the front; the beep is counted, not played.
+        try await test("#380 a chosen folder that isn't there waits on a slip, writes nothing, and opens by itself once it's there") {
+            let suite = TestDefaults("PresentationTests-380")
+            let folder = FileManager.default.temporaryDirectory.appendingPathComponent("PaperTodo-dropbox-\(UUID().uuidString)", isDirectory: true)
+            defer { suite.remove(); try? FileManager.default.removeItem(at: folder) }
+            suite.defaults.set(folder.path, forKey: StorageFolder.preferenceKey)
+            try expect(StorageFolder.chosen(suite.defaults) == nil, "Not there: not chosen")
+            try expectEqual(StorageFolder.missing(suite.defaults), folder.path, "…but missing")
+            // Dropbox starts while the question waits: the folder appears and the question answers itself (as the slip's
+            // `answersItself` does, every second). The slip is a modal session; a check stands in for it.
+            var asked = 0
+            @MainActor func waits(_ name: String, _ back: @escaping @MainActor @Sendable () -> Bool) -> Int {
+                asked += 1
+                if asked == 1 { try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
+                for _ in 0..<50 where !back() { RunLoop.main.run(until: Date().addingTimeInterval(0.02)) }
+                return 2
+            }
+            let place = StorageFolder.waitForChosen(suite.defaults, ask: waits)
+            try expectEqual(asked, 1, "Asked once")
+            try expect(place.folder?.standardizedFileURL.path == folder.standardizedFileURL.path && place.missing == nil, "The folder opens by itself")
+            try expect((try FileManager.default.contentsOfDirectory(atPath: folder.path)).isEmpty, "Nothing was written while it waited")
+            try expectEqual(suite.defaults.string(forKey: StorageFolder.preferenceKey), folder.path, "The folder stays chosen")
+            // Gone again: 이 Mac 목록 열기 opens this Mac's own list for this run, the folder still chosen.
+            try FileManager.default.removeItem(at: folder)
+            let local = StorageFolder.waitForChosen(suite.defaults) { _, _ in 0 }
+            try expect(local.folder == nil && local.missing == folder.path, "This Mac's list, saying which folder is missing")
+            try expect(!FileManager.default.fileExists(atPath: folder.path), "The missing folder isn't made")
+            // Nothing chosen: nothing to wait for.
+            suite.defaults.removeObject(forKey: StorageFolder.preferenceKey)
+            try expect(StorageFolder.missing(suite.defaults) == nil && StorageFolder.waitForChosen(suite.defaults, ask: { _, _ in 0 }) == (nil, nil), "This Mac's own folder")
+        }
+
         try await test("#228 a question slip moves by its paper and its title row; its chip, field and button still take clicks") {
             _ = NSApplication.shared
             SlipMotion.enabled = false
@@ -1167,7 +1533,7 @@ private enum PresentationTests {
 
         try await test("#229 a click elsewhere while a question is up brings it forward, shakes it once and beeps once") {
             _ = NSApplication.shared
-            let cases = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/slip-move-cases.json"))) as! [String: Any]
+            let cases = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../shared/cases/slip-move-cases.json"))) as! [String: Any]
             let nudge = cases["nudge"] as! [String: Any]
             try expectEqual(Motion.shake, (nudge["shake"] as! [NSNumber]).map { CGFloat($0.doubleValue) }, "the shake")
             try expectEqual(Motion.blink, (nudge["blink"] as! [NSNumber]).map(\.doubleValue), "the tape's blink")
@@ -1255,7 +1621,7 @@ private enum PresentationTests {
             let fixture = try Fixture(items: [])
             defer { fixture.cleanup() }
             let model = fixture.model()
-            let cases = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/slip-move-cases.json"))) as! [String: Any]
+            let cases = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../shared/cases/slip-move-cases.json"))) as! [String: Any]
             for entry in cases["open"] as! [[String: Any]] {
                 let keys = entry["keys"] as! [String]
                 var panels: [ObjectIdentifier: SlipPanel] = [:]
@@ -1281,7 +1647,7 @@ private enum PresentationTests {
         }
 
         try await test("#253 the questions that replace the whole list say so where they are made (widget-ask-cases.json)") {
-            let cases = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/widget-ask-cases.json"))) as! [String: Any]
+            let cases = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../shared/cases/widget-ask-cases.json"))) as! [String: Any]
             let folder = URL(fileURLWithPath: "Sources/PaperTodo")
             let files = try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil).filter { $0.pathExtension == "swift" }
             let lines = try files.flatMap { try String(contentsOf: $0, encoding: .utf8).components(separatedBy: "\n") }
@@ -1303,7 +1669,7 @@ private enum PresentationTests {
 
         try await test("#253 while a question is up the desktop widgets and their day sheet work; one that replaces the list holds 넣기") {
             _ = NSApplication.shared
-            let cases = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/widget-ask-cases.json"))) as! [String: Any]
+            let cases = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../shared/cases/widget-ask-cases.json"))) as! [String: Any]
             var beeps = 0
             let playing = SlipModal.beep
             SlipModal.beep = { beeps += 1 }

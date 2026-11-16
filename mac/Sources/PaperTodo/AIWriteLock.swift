@@ -1,7 +1,7 @@
 import Foundation
 
 /// `ai-write.lock` (1.42, shared with the extension and the Windows app): while AI 연결 is on, a write of
-/// todos.json, events.json or memos.json — catching up with the disk, changing, saving — holds this file in the
+/// todos.json, events.json, memos.json or repeats.json — catching up with the disk, changing, saving — holds this file in the
 /// settings folder, so the extension and the app never write over each other in the same moment. Taken by
 /// creating the file exclusively ("pid time random"); a lock older than 3 s is stale and removed; waiting stops
 /// after 300 ms and the write goes on (the catch-up just before it still applies). Let go only while it's still ours.

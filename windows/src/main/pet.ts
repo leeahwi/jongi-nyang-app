@@ -53,6 +53,8 @@ const defaultHomeFraction = 0.78;
  */
 export class DesktopPet {
   private window?: BrowserWindow;
+  /** #409 문제 보고용 정보: the window as it is (none until the pet is first shown). */
+  get reportWindow(): BrowserWindow | undefined { return this.window; }
   private shown = false;
   private action: PetAction = { kind: "sit" };
   /** When the current clip started (Date.now()), to know where a walking cat is. */
@@ -153,6 +155,8 @@ export class DesktopPet {
       // Off-screen runs (snapshots, tests): macOS pulls a window placed off every display back onto one unless it may be
       // larger than the screen (only macOS reads this).
       enableLargerThanScreen: offscreenEnabled,
+      // #67 (checked 2026-11): not throttled: the cat walks and breathes on timers in its page, and Windows may count a
+      // transparent always-on-top window as covered.
       webPreferences: { preload: path.join(__dirname, "preload.js"), sandbox: true, contextIsolation: true, backgroundThrottling: false },
     });
     // Every desktop, but not over full-screen apps (videos, presentations).

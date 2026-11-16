@@ -2,7 +2,7 @@ import Foundation
 
 /// 글꼴 설정 (#141, docs/plans/settings-plan.md F1 · F2): the size steps of the note and the drawer, how a 1.45 setting
 /// reads into them, and the drawer's line and paragraph spacing — the same numbers as the Windows app (textSteps.ts;
-/// the shared cases in docs/plans/settings-cases.json). Device settings only, never in the shared folder or a backup.
+/// the shared cases in shared/cases/settings-cases.json). Device settings only, never in the shared folder or a backup.
 public enum TextSteps {
     // MARK: The note (노트 글꼴)
 

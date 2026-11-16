@@ -22,6 +22,8 @@ final class ArchiveStore: ObservableObject {
     private var grouped: (revision: Int, entries: [ArchiveEntry], days: [String: [ArchiveEntry]])?
     private let model: AppModel
     private var cache: [ArchiveEntry]?
+    /// The month files `cache` was read from (`monthStamp`, #381).
+    private var cacheStamp: [String]?
     private var timer: Timer?
     private var boundaryTimer: Timer?
     private var subscriptions = Set<AnyCancellable>()
@@ -32,11 +34,15 @@ final class ArchiveStore: ObservableObject {
         model.$archiveAfterDays.dropFirst().sink { [weak self] _ in
             DispatchQueue.main.async { self?.run() }
         }.store(in: &subscriptions)
-        model.objectWillChange.sink { [weak self] _ in
+        // #64: what `signature` reads — the list and its spaces, and the focus record — not every change of the model.
+        model.listChanged.merge(with: model.focusLog.$revision.dropFirst().map { _ in () }).sink { [weak self] _ in
             DispatchQueue.main.async { self?.modelChanged() }
         }.store(in: &subscriptions)
         model.fileCompleted = { [weak self] items in self?.file(items) ?? [] }
         model.unfileCompleted = { [weak self] ids in self?.unfile(ids) }
+        NotificationCenter.default.publisher(for: StorageWatcher.changed).sink { [weak self] _ in
+            DispatchQueue.main.async { self?.diskChanged() }
+        }.store(in: &subscriptions)
     }
 
     /// Day housekeeping: yesterday's finished work goes to the record, then today's recurring
@@ -52,11 +58,16 @@ final class ArchiveStore: ObservableObject {
         NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didWakeNotification)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
-                self?.tick()
                 self?.armBoundary()
+                // #377: after the shared folder's two-second check has had its turn (a night's changes from another
+                // device are read first; every write below catches up with the disk again anyway).
+                DispatchQueue.main.asyncAfter(deadline: .now() + Self.wakeDelay) { self?.tick() }
             }
             .store(in: &subscriptions)
     }
+
+    /// Longer than StorageWatcher's two-second check.
+    static let wakeDelay: TimeInterval = 3
 
     private func tick() {
         run()
@@ -65,7 +76,7 @@ final class ArchiveStore: ObservableObject {
         // 할 일 스페이스 (1.45): yesterday's 한 스페이스만 보기 lets go (S11).
         model.dropStaleSpaceLens()
         // A new day re-sorts the pages (deadlines come due) even when nothing was archived or placed.
-        model.objectWillChange.send()
+        model.dayTurned()
     }
 
     private func armBoundary() {
@@ -98,19 +109,27 @@ final class ArchiveStore: ObservableObject {
         return filed
     }
 
-    /// 완료한 일 정리's 되돌리기: these entries leave the record again (the tasks go back on the list).
+    /// 완료한 일 정리's 되돌리기: these entries leave the record again (the tasks go back on the list). #379: only their
+    /// lines go — the others stay byte for byte, a field this version doesn't know and a line it can't read too — and a
+    /// month that can't be written says so.
     func unfile(_ ids: Set<String>) {
         guard !ids.isEmpty else { return }
         let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        var failed = false
         for url in files where url.pathExtension == "jsonl" {
             // #173: a linked or oversized month is left as it is.
-            guard let text = try? SafeFile.text(url) else { continue }
-            let entries = Archive.parseLines(text)
-            guard entries.contains(where: { ids.contains($0.id) }) else { continue }
-            let kept = entries.filter { !ids.contains($0.id) }
-            if kept.isEmpty { try? FileManager.default.removeItem(at: url) } else {
-                try? Data((kept.map(Archive.encodeLine).joined(separator: "\n") + "\n").utf8).write(to: url, options: .atomic)
+            guard let text = try? SafeFile.text(url), let kept = Archive.removingLines(ids, from: text) else { continue }
+            do {
+                if kept.allSatisfy(\.isWhitespace) { try FileManager.default.removeItem(at: url) } else {
+                    try Data(kept.utf8).write(to: url, options: .atomic)
+                }
+            } catch {
+                failed = true
             }
+        }
+        if failed {
+            model.storageError = L("완료 기록에서 되돌리지 못한 일이 있어요. 끝낸 일은 목록으로 돌아왔고, 완료 기록에도 그대로 남아 있어요.") + " "
+                + L("저장 폴더가 열리는지 확인해 주세요.")
         }
         cache = nil
         revision += 1
@@ -188,10 +207,18 @@ final class ArchiveStore: ObservableObject {
                 let data = Data((list.map(Archive.encodeLine).joined(separator: "\n") + "\n").utf8)
                 // #173: never appended through a link, nor onto a month past 32MB (the tasks stay on the list).
                 try SafeFile.check(url)
-                if let handle = try? FileHandle(forWritingTo: url) {
+                if let handle = try? FileHandle(forUpdating: url) {
                     defer { try? handle.close() }
-                    try handle.seekToEnd()
-                    try handle.write(contentsOf: data)
+                    let end = try handle.seekToEnd()
+                    // #378: after a torn last line (a power cut mid-append) the new lines start on their own, as in
+                    // focus.jsonl — joined to it, both would be unreadable and the tasks gone from the list and the record.
+                    var lead = Data()
+                    if end > 0 {
+                        try handle.seek(toOffset: end - 1)
+                        if try handle.read(upToCount: 1) != Data([0x0A]) { lead = Data([0x0A]) }
+                        try handle.seekToEnd()
+                    }
+                    try handle.write(contentsOf: lead + data)
                 } else {
                     try data.write(to: url, options: .atomic)
                 }
@@ -201,16 +228,43 @@ final class ArchiveStore: ObservableObject {
             model.storageError = L("완료 기록을 저장하지 못했어요. 끝낸 일은 목록에 그대로 둘게요.") + " " + L("저장 폴더가 열리는지 확인해 주세요.")
         }
         if !saved.isEmpty { revision += 1 }
+        // The cache already has this Mac's own lines (#381: not a reason to read the months again).
+        if cache != nil, !byMonth.isEmpty { cacheStamp = monthStamp() }
         return saved
     }
 
     private func load() -> [ArchiveEntry] {
-        if let cache { return cache }
+        // #381: another device files into a shared folder too — a month changed on disk is read again.
+        let stamp = monthStamp()
+        if let cache, stamp == cacheStamp { return cache }
         let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
         let entries = files.filter { $0.pathExtension == "jsonl" }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
             .flatMap { Archive.parseLines((try? SafeFile.text($0)) ?? "") } // #173: a link or a month past 32MB reads as none
         cache = entries
+        cacheStamp = stamp
         return entries
+    }
+
+    /// The month files as they are on disk: name, size and modification time (#381).
+    private func monthStamp() -> [String] {
+        let keys: Set<URLResourceKey> = [.contentModificationDateKey, .fileSizeKey]
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: Array(keys))) ?? []
+        return files.filter { $0.pathExtension == "jsonl" }.map { url in
+            let values = try? url.resourceValues(forKeys: keys)
+            return "\(url.lastPathComponent) \(values?.fileSize ?? -1) \(values?.contentModificationDate?.timeIntervalSince1970 ?? 0)"
+        }.sorted()
+    }
+
+    /// The shared folder changed (StorageWatcher): when a month did, 완료 기록 · 연속 기록 · 찾기 read the record again.
+    func diskChanged() {
+        guard cache != nil, monthStamp() != cacheStamp else { return }
+        cache = nil
+        if paused {
+            shown = nil
+            missed = true
+        } else {
+            revision += 1
+        }
     }
 }

@@ -99,10 +99,10 @@ private enum LocalizationTests {
                                  "Nog geen wekkers. Zet er een om op te staan of je medicijnen te nemen."), "no alarms")
         }
 
-        // 책상 목록의 묶음 (#240, D4 B): the shared cases in docs/plans/desk-sidebar-cases.json (the Windows desk's
+        // 책상 목록의 묶음 (#240, D4 B): the shared cases in shared/cases/desk-sidebar-cases.json (the Windows desk's
         // test/desk.test.ts reads the same file). The pane names there are the Windows ones (반복 is "repeat").
         try test("the desk's sidebar groups and ⌘1–⌘9 (shared cases)") {
-            let path = "../docs/plans/desk-sidebar-cases.json"
+            let path = "../shared/cases/desk-sidebar-cases.json"
             let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
             let name = { (pane: DeskPane) in pane == .repeating ? "repeat" : pane.rawValue }
             let sections = (file["sections"] as! [[String: Any]]).map { ($0["section"] as! String, $0["panes"] as! [String]) }

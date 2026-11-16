@@ -4,7 +4,7 @@ import Foundation
 /// them all, each with a small colour band, and the header can show one space for the rest of the day. Which space a
 /// to-do is in lives beside todos.json in todo-spaces.json (an older version that saves todos.json drops keys it
 /// doesn't know, so the place can't live on the to-do). Same file, rules and cases (S1–S22,
-/// docs/plans/spaces-phase1.md, docs/plans/spaces-cases.json) as the Windows app (todoSpaces.ts):
+/// docs/plans/spaces-phase1.md, shared/cases/spaces-cases.json) as the Windows app (todoSpaces.ts):
 ///
 ///     { "general": { "name": "기타", "updatedAt": "…" },
 ///       "items": { "<todo id>": { "at": "…", "space": "s-7f3a9c" | null } },

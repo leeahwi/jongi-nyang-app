@@ -2038,6 +2038,8 @@ void api.getState().then((initial) => {
 // The page going away (quitting, the window closed): the typed text that waits is saved first.
 window.addEventListener("beforeunload", () => editor?.flushNow());
 window.addEventListener("pagehide", () => editor?.flushNow());
+// #383: Windows is shutting down or logging off (no beforeunload comes then).
+api.on("drawer:flush", () => editor?.flushNow());
 // The window let go or hidden: sent at once.
 window.addEventListener("blur", () => editor?.flush());
 document.addEventListener("visibilitychange", () => { if (document.hidden) editor?.flush(); });

@@ -1,6 +1,6 @@
 import Foundation
 
-// 달력을 실제로 쓰는 흐름 (docs/plans/calendar-flows.md): the shared cases from docs/plans/calendar-flows-cases.json (the
+// 달력을 실제로 쓰는 흐름 (docs/plans/calendar-flows.md): the shared cases from shared/cases/calendar-flows-cases.json (the
 // Windows app's test/calendarFlows.test.ts reads the same file) — the all-day order that keeps a trip's band in place,
 // which days draw an event as a band and how bands join along a week row, which cut titles take a second line, the
 // week's first day from the system, and the day sheet's holiday line and faded lines.
@@ -15,7 +15,7 @@ private func equal<T: Equatable>(_ actual: T, _ expected: T, _ name: String) thr
 @main
 private enum CalendarFlowsTests {
     static func main() throws {
-        let path = CommandLine.arguments.dropFirst().first ?? "../docs/plans/calendar-flows-cases.json"
+        let path = CommandLine.arguments.dropFirst().first ?? "../shared/cases/calendar-flows-cases.json"
         let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
         var count = 0
         func test(_ name: String, _ action: () throws -> Void) throws {

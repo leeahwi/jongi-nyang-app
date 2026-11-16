@@ -59,6 +59,15 @@ export class KeyFilter {
 /** The hook is set only while 모든 앱에서 is chosen and the screen isn't locked; off, another choice or locked: off at once. */
 export const hookWanted = (scope: "off" | "app" | "everywhere", locked: boolean): boolean => scope === "everywhere" && !locked;
 
+/** #410 (GlobalKeys.watch): how often the hook is looked at while 모든 앱에서 listens. */
+export const hookCheckMs = 5_000;
+/** Seconds of system idle time that still count as someone at the computer. */
+export const hookActiveIdleS = 2;
+/** No key event for this long while someone is at the computer: the hook may have been taken off. */
+export const hookSilenceMs = 30_000;
+/** At most one setting again in this long. */
+export const hookRearmGapMs = 60_000;
+
 /** What GlobalKeys needs of Windows (main/keyHook.ts; a stand-in in the tests). */
 export interface KeyHookNative {
   /**
@@ -79,6 +88,11 @@ export class GlobalKeys {
   private readonly filter = new KeyFilter();
   private readonly ok = tapThrottle();
   private set = false;
+  /** #410: when the hook last heard anything (any key event, up or down), and when it was last set. */
+  private lastHeard = 0;
+  private lastSet = 0;
+  /** #410: how many times `watch` set the hook again (tests, and the report). */
+  rearmed = 0;
 
   constructor(private readonly native: KeyHookNative | undefined, private readonly onKey: () => void,
     private readonly now: () => number = () => performance.now()) {}
@@ -97,17 +111,43 @@ export class GlobalKeys {
       this.filter.forget();
       return false;
     }
+    return this.install();
+  }
+
+  private install(): boolean {
     try {
-      this.set = this.native.install((message, vk) => this.event(message, vk));
+      this.set = this.native!.install((message, vk) => this.event(message, vk));
     } catch {
       this.set = false;
     }
+    this.lastSet = this.lastHeard = this.now();
     return this.set;
+  }
+
+  /**
+   * #410: Windows takes a low-level hook off without a word when it doesn't answer in time (the main thread held up by a
+   * write lock or a slow cloud file), and the cat stops hearing other apps. Asked every `hookCheckMs` while listening,
+   * with the system's idle time (powerMonitor, seconds since the last key or mouse input anywhere): someone is at the
+   * computer (`hookActiveIdleS` or less) yet the hook has heard nothing for `hookSilenceMs` — then the hook is set
+   * again, at most once every `hookRearmGapMs` (a mouse moved while nobody types looks the same, and setting it again
+   * costs nothing). The answer is whether it was set again; `listening` says whether that worked.
+   */
+  watch(idleSeconds: number): boolean {
+    if (!this.native || !this.set || idleSeconds > hookActiveIdleS) return false;
+    const now = this.now();
+    if (now - this.lastHeard < hookSilenceMs || now - this.lastSet < hookRearmGapMs) return false;
+    this.native.uninstall();
+    this.filter.forget();
+    this.rearmed += 1;
+    this.install();
+    return true;
   }
 
   /** Called by the hook: as little as possible, and nothing of the key goes further than the filter. */
   private event(message: number, vk: number): void {
-    if (this.filter.counts(message, vk, () => this.native!.modifiers()) && this.ok(this.now())) this.onKey();
+    const now = this.now();
+    this.lastHeard = now;
+    if (this.filter.counts(message, vk, () => this.native!.modifiers()) && this.ok(now)) this.onKey();
   }
 
   /** Tests: the filter remembers no key. */

@@ -302,21 +302,16 @@ private enum AIConnectTests {
             try equal(history, same, "same file")
         }
 
-        try test("Claude Code: user scope, full paths, one line to paste") {
-            let node = "/usr/local/bin/node"
-            let server = "/Applications/종이냥.app/Contents/Resources/mcp/server/index.js"
-            try equal(AIConnect.codeAddArguments(node: node, server: server),
-                      ["mcp", "add-json", "-s", "user", "jongi-nyang",
-                       "{\"args\":[\"/Applications/종이냥.app/Contents/Resources/mcp/server/index.js\"],\"command\":\"/usr/local/bin/node\",\"type\":\"stdio\"}"],
-                      "arguments")
-            try equal(AIConnect.codeRemoveArguments, ["mcp", "remove", "-s", "user", "jongi-nyang"], "remove")
-            let line = AIConnect.codeCommand(node: node, server: "/home/a b/it's/index.js")
-            try expect(line.hasPrefix("claude mcp add-json -s user jongi-nyang '{"), "command: \(line)")
-            try expect(line.contains("/home/a b/it'\\''s/index.js"), "quote inside: \(line)")
+        try test("Claude Code (#389): the app itself with --mcp-stdio, user scope, no Node, one line to paste") {
+            let app = "/Applications/종이냥.app/Contents/MacOS/PaperTodo"
+            try equal(AIConnect.codeCommand(app: app),
+                      "claude mcp add -s user jongi-nyang -- '/Applications/종이냥.app/Contents/MacOS/PaperTodo' --mcp-stdio", "command")
+            try expect(!AIConnect.codeCommand(app: app).contains("node"), "no Node in it")
+            let odd = AIConnect.codeCommand(app: "/Volumes/a b/it's/종이냥.app/Contents/MacOS/PaperTodo")
+            try expect(odd.hasSuffix(" -- '/Volumes/a b/it'\\''s/종이냥.app/Contents/MacOS/PaperTodo' --mcp-stdio"), "quote inside: \(odd)")
+            try equal(AIConnect.codeCommand(app: "/opt/PaperTodo"), "claude mcp add -s user jongi-nyang -- /opt/PaperTodo --mcp-stdio", "plain path")
             try equal(AIConnect.shellQuoted("/usr/local/bin/node"), "/usr/local/bin/node", "plain")
             try equal(AIConnect.shellQuoted(""), "''", "empty")
-            try expect(AIConnect.toolPlaces("claude", home: "/home/a").first == "/home/a/.local/bin/claude", "claude places")
-            try expect(AIConnect.toolPlaces("node", home: "/home/a").contains("/opt/homebrew/bin/node"), "node places")
             try expect(AIConnect.movablePlace("/Volumes/종이냥/종이냥.app"), "disk image")
             try expect(AIConnect.movablePlace("/private/var/folders/x/AppTranslocation/Y/d/종이냥.app"), "translocated")
             try expect(!AIConnect.movablePlace("/Applications/종이냥.app"), "Applications")
@@ -343,9 +338,9 @@ private enum AIConnectTests {
         }
 
         // MARK: S57–S59 (spaces 2c, N3-6 · N3-7): Claude moving to-dos between spaces, and the app's undo — the `ai`
-        // block of docs/plans/spaces-cases.json, read by the extension and the Windows app too.
+        // block of shared/cases/spaces-cases.json, read by the extension and the Windows app too.
 
-        let casesPath = CommandLine.arguments.dropFirst().first ?? "../docs/plans/spaces-cases.json"
+        let casesPath = CommandLine.arguments.dropFirst().first ?? "../shared/cases/spaces-cases.json"
         let shared = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: casesPath))) as! [String: Any]
         let ai = shared["ai"] as! [String: Any]
         let live: Set<String> = Set((shared["file"] as! [String: Any])["spaces"].flatMap { $0 as? [[String: Any]] }!.compactMap { $0["id"] as? String })

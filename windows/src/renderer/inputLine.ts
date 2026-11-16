@@ -313,7 +313,8 @@ export class InputLine {
   }
 }
 
-/** The keycap row of the quick entry's footer: "tab 다른 뜻 · esc 닫기". */
+/** The keycap row of the quick entry's footer: "tab 다른 뜻 · esc 닫기". The words sit in their own span so a tight
+ *  footer can keep only the keycaps (#387). */
 export function lineKeys(): HTMLElement[] {
-  return [h("span", {}, keyCap("Tab"), t("다른 뜻")), h("span", {}, keyCap("Esc"), t("닫기"))];
+  return [["Tab", t("다른 뜻")], ["Esc", t("닫기")]].map(([key, word]) => h("span", { title: word }, keyCap(key), h("span", { class: "word" }, word)));
 }

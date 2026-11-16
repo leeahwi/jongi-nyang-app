@@ -6,7 +6,7 @@ import Foundation
 /// (core/koreanCalendar.ts), and the two agree on every day of 2020–2035. Holidays follow 관공서의 공휴일에 관한 규정
 /// (substitute days for 설날 · 추석 since 2014, 어린이날 since 2014, 삼일절 · 광복절 · 개천절 · 한글날 since 2021,
 /// 부처님오신날 · 성탄절 since 2023); one-off days (elections, temporary holidays) can't be worked out, so the ones known
-/// are listed here and new ones come with app updates. Shared cases: docs/plans/calendar-korean-cases.json.
+/// are listed here and new ones come with app updates. Shared cases: shared/cases/calendar-korean-cases.json.
 public enum KoreanCalendar {
     // MARK: Lunar dates
 
@@ -78,7 +78,7 @@ public enum KoreanCalendar {
         }
 
         /// #260: `text` as a month cell draws it — English and Dutch with soft hyphens (U+00AD) where the name may break
-        /// onto a second line ("Han-/geuldag"), the same places as on Windows (docs/plans/calendar-flows-cases.json); Korean
+        /// onto a second line ("Han-/geuldag"), the same places as on Windows (shared/cases/calendar-flows-cases.json); Korean
         /// as it is.
         public func shown(_ language: AppLanguage = .ko) -> String {
             guard language != .ko else { return text(language) }

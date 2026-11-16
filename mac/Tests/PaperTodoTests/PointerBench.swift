@@ -132,6 +132,7 @@ enum PointerBench {
         await move(to: far)
         check("a move far from both: the app stops listening and looks again within 0.25 s",
               !watch.isListening && watch.isLookingAway && pet.passesClicks && widgets.passesClicks(id))
+        check("far from the widget: the modifier keys aren't watched (#64)", !watch.isHearingKeys)
         feed.manual = NSPoint(x: cat.midX, y: cat.midY)
         await wait(0.3)
         check("the pointer on the cat meanwhile: the look finds it — the cat takes the mouse, every move heard again",
@@ -140,10 +141,12 @@ enum PointerBench {
         check("just off the cat: clicks pass again, still hearing every move", pet.passesClicks && watch.isListening)
         await move(to: NSPoint(x: ears.midX, y: ears.midY))
         check("on the widget's ears: the widget takes the mouse", !widgets.passesClicks(id) && watch.isListening)
+        check("near the widget: ⌥ going down is heard at once (#64)", watch.isHearingKeys)
         await move(to: far)
         await wait(0.6)
         check("off the widget and far: clicks pass, and once the pointer rests the app listens again (no timer)",
               widgets.passesClicks(id) && watch.isListening && !watch.isLookingAway)
+        check("…but not to the modifier keys, far from the widget (#64)", !watch.isHearingKeys)
         let (heard, looks, before) = (watch.heard, watch.looks, wakes)
         await wait(1)
         check("the mouse resting: nothing heard, nothing looked at", watch.heard == heard && watch.looks == looks)

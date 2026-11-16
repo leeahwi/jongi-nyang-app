@@ -1,0 +1,19 @@
+# Weekly update PRs for the workflows' actions and the Windows app's npm packages (windows/package-lock.json).
+# The extension (windows/mcp) shares that lock file. Updates land in the public repo; bring them to dev first.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /windows
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      npm-minor-and-patch:
+        update-types: [minor, patch]

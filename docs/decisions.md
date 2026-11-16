@@ -104,7 +104,7 @@ Claude 데스크톱과 Claude Code가 쓰는 MCP 확장(AI 앱이 다른 프로�
 - 두 앱이 같은 바이트를 씁니다: 키 정렬, 들여쓰기 2칸, 초 단위 UTC.
 - 한 스페이스만 보기는 기기마다의 설정이고, 파일에 넣지 않습니다.
 
-사례 표도 이번에 처음으로 파일 하나에 뒀습니다. `docs/plans/spaces-cases.json`의 S1–S22를 Mac `scripts/test-spaces.sh`와 Windows `npm test`가 같이 읽습니다. ADR 4의 대가로 적은 ‘두 테스트 파일에 옮겨 적기’를 이 기능부터 덜었습니다.
+사례 표도 이번에 처음으로 파일 하나에 뒀습니다. `shared/cases/spaces-cases.json`의 S1–S22를 Mac `scripts/test-spaces.sh`와 Windows `npm test`가 같이 읽습니다. ADR 4의 대가로 적은 ‘두 테스트 파일에 옮겨 적기’를 이 기능부터 덜었습니다.
 
 얻은 것: 옛 버전이 할 일을 저장해도 스페이스는 남습니다. 옛 버전이 만든 할 일은 ‘스페이스 없음’으로 보입니다. 스페이스를 하나도 만들지 않으면 파일도 화면도 1.44/1.29와 같습니다.
 

@@ -54,6 +54,24 @@ public struct Series: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+/// repeats.json: `{ "series": [ … ] }`, as the Windows app writes it. A rule this version can't place is left out.
+public enum RepeatsFile {
+    private struct Contents: Codable { var series: [Series] }
+
+    public static func decode(_ data: Data) throws -> [Series] {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(Contents.self, from: data).series.filter { Repeat.isValid($0.rule) }
+    }
+
+    public static func encode(_ series: [Series]) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try encoder.encode(Contents(series: series))
+    }
+}
+
 public struct RepeatPlan: Equatable, Sendable {
     /// New copies to put on the list.
     public var create: [TodoItem] = []
@@ -70,6 +88,25 @@ public struct RepeatRoll: Equatable, Sendable {
 
 public enum Repeat {
     public static let weekdayShort = ["일", "월", "화", "수", "목", "금", "토"]
+
+    /// #376: repeats.json as another device (or Claude) saved it since `base` was read, with this Mac's changes on top, by
+    /// id: what was added, edited or removed here wins; a rule left alone here stays as they have it, one added there stays.
+    public static func merge(base: [Series], here: [Series], theirs: [Series]) -> [Series] {
+        if theirs == base { return here }
+        if here == base { return theirs }
+        let before = Dictionary(base.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let mine = Dictionary(here.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let changedHere = { (id: String) in mine[id] != before[id] }
+        // Theirs, less what was removed here; an entry changed here is this Mac's.
+        var merged = theirs.compactMap { entry -> Series? in
+            guard let own = mine[entry.id] else { return before[entry.id] == nil ? entry : nil }
+            return changedHere(entry.id) ? own : entry
+        }
+        // Added here, or edited here after the other side removed it.
+        let present = Set(merged.map(\.id))
+        merged += here.filter { !present.contains($0.id) && changedHere($0.id) }
+        return merged
+    }
 
     /// Whether the rule applies on the logical (4 a.m.) day starting at `dayStart`.
     public static func occurs(_ rule: RepeatRule, on dayStart: Date, calendar: Calendar = .paper) -> Bool {

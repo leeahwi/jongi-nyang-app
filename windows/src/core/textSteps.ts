@@ -4,7 +4,7 @@ import type { DrawerFont } from "./types";
 /**
  * 글꼴 설정 (#141, docs/plans/settings-plan.md F1 · F2): the size steps of the note and the drawer, how a 1.30 setting
  * reads into them, and the drawer's line and paragraph spacing — the same numbers as the Mac app (TextSteps.swift; the
- * shared cases in docs/plans/settings-cases.json). This device's settings only, never in the shared folder or a backup.
+ * shared cases in shared/cases/settings-cases.json). This device's settings only, never in the shared folder or a backup.
  */
 
 export type LegacyTextSize = "small" | "regular" | "large" | "extraLarge";

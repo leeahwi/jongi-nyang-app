@@ -1,7 +1,7 @@
 import Foundation
 
 // 할 일 스페이스 (TodoSpaces.swift): todo-spaces.json, the `#` token, the lens, merging, pruning and the backup — the
-// shared cases S1–S22 read from docs/plans/spaces-cases.json (the Windows app reads the same file), then the Mac's own.
+// shared cases S1–S22 read from shared/cases/spaces-cases.json (the Windows app reads the same file), then the Mac's own.
 private struct TestFailure: Error, CustomStringConvertible {
     let description: String
 }
@@ -23,7 +23,7 @@ private func at(_ text: String) -> Date {
 @main
 private enum SpacesTests {
     static func main() throws {
-        let path = CommandLine.arguments.dropFirst().first ?? "../docs/plans/spaces-cases.json"
+        let path = CommandLine.arguments.dropFirst().first ?? "../shared/cases/spaces-cases.json"
         let cases = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
         var count = 0
         func test(_ name: String, _ action: () throws -> Void) throws {

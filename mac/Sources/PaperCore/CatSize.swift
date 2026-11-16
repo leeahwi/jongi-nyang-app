@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 
-/// 종이냥 펫과 타닥냥의 크기 (#304, docs/plans/cat-size-cases.json — the Windows app's catSize.ts reads the same file):
+/// 종이냥 펫과 타닥냥의 크기 (#304, shared/cases/cat-size-cases.json — the Windows app's catSize.ts reads the same file):
 /// 작게 · 보통 · 크게 · 아주 크게, chosen apart for each in 책상 → 종이냥 (`pet.size`, `typing.size`). The steps, scales and
 /// names are the timer's (`TimerSize`). 보통 is a scale of 1: the cats as they were before #304, to the pixel.
 public enum CatSize: String, CaseIterable, Sendable {

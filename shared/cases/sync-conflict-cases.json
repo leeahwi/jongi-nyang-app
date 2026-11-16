@@ -1,0 +1,121 @@
+{
+  "about": "#385: cloud conflict copies in the storage folder, and joining todos.json · events.json · alarms.json by item when another device wrote them. Read by mac/Tests/PaperCoreTests/SyncConflictTests.swift; windows/test/syncConflict.test.ts reads the same file. Made-up data only.",
+  "copies": [
+    { "name": "todos 2.json", "copyOf": "todos.json", "why": "iCloud Drive" },
+    { "name": "events 3.json", "copyOf": "events.json", "why": "iCloud Drive" },
+    { "name": "memo-folders 2.json", "copyOf": "memo-folders.json", "why": "iCloud Drive, a name with a hyphen" },
+    { "name": "todos (1).json", "copyOf": "todos.json", "why": "Google Drive" },
+    { "name": "alarms (12).json", "copyOf": "alarms.json", "why": "Google Drive" },
+    { "name": "todos (Minji's MacBook Pro's conflicted copy 2026-11-11).json", "copyOf": "todos.json", "why": "Dropbox" },
+    { "name": "memos (minji-pc conflicted copy 2026-11-11 (1)).json", "copyOf": "memos.json", "why": "Dropbox, numbered" },
+    { "name": "repeats (Minji의 MacBook의 충돌 사본 2026-11-11).json", "copyOf": "repeats.json", "why": "Dropbox in Korean" },
+    { "name": "todos-MINJI-PC.json", "copyOf": "todos.json", "why": "OneDrive" },
+    { "name": "todo-spaces-DESKTOP-1A2B3C.json", "copyOf": "todo-spaces.json", "why": "OneDrive" },
+    { "name": "TODOS 2.JSON", "copyOf": "todos.json", "why": "a case-insensitive folder" },
+    { "name": "todos.json", "copyOf": null, "why": "the file itself" },
+    { "name": "memo-folders.json", "copyOf": null, "why": "another data file, not a copy of memos" },
+    { "name": "todo-spaces.json", "copyOf": null, "why": "another data file" },
+    { "name": "todos.unreadable-1793000000.json", "copyOf": null, "why": "this app's own copy of an unreadable file" },
+    { "name": "memo-folders.json.unreadable-20261111-090000", "copyOf": null, "why": "this app's own copy, not .json" },
+    { "name": "todos 2.json.icloud", "copyOf": null, "why": "an iCloud placeholder (not downloaded)" },
+    { "name": "todos 2026.json", "copyOf": null, "why": "a number too long for a copy" },
+    { "name": "todos (copy).json", "copyOf": null, "why": "not a number, not a conflicted copy" },
+    { "name": "todos-.json", "copyOf": null, "why": "no device name" },
+    { "name": "todos-내 PC.json", "copyOf": null, "why": "OneDrive names are letters, digits, - and _" },
+    { "name": "notes 2.json", "copyOf": null, "why": "not a data file" },
+    { "name": "todos 2.txt", "copyOf": null, "why": "not .json" }
+  ],
+  "merge": [
+    {
+      "name": "M1 nothing changed here: theirs as it is",
+      "base": [{ "id": "a", "title": "장보기" }],
+      "here": [{ "id": "a", "title": "장보기" }],
+      "theirs": [{ "id": "a", "title": "장보기, 우유" }, { "id": "b", "title": "빨래" }],
+      "expected": [{ "id": "a", "title": "장보기, 우유" }, { "id": "b", "title": "빨래" }]
+    },
+    {
+      "name": "M2 nothing changed there: this device's as it is",
+      "base": [{ "id": "a", "title": "장보기" }],
+      "here": [{ "id": "a", "title": "장보기", "isCompleted": true }, { "id": "c", "title": "공부" }],
+      "theirs": [{ "id": "a", "title": "장보기" }],
+      "expected": [{ "id": "a", "title": "장보기", "isCompleted": true }, { "id": "c", "title": "공부" }]
+    },
+    {
+      "name": "M3 one item, different fields changed on each side: both changes",
+      "base": [{ "id": "a", "title": "장보기", "isCompleted": false }],
+      "here": [{ "id": "a", "title": "장보기", "isCompleted": true, "completedAt": "2026-11-11T09:00:00Z" }],
+      "theirs": [{ "id": "a", "title": "장보기, 우유", "isCompleted": false }],
+      "expected": [{ "id": "a", "title": "장보기, 우유", "isCompleted": true, "completedAt": "2026-11-11T09:00:00Z" }]
+    },
+    {
+      "name": "M4 the same field changed on both sides: this device's",
+      "base": [{ "id": "a", "title": "장보기" }],
+      "here": [{ "id": "a", "title": "장보기 (마트)" }],
+      "theirs": [{ "id": "a", "title": "장보기 (시장)" }],
+      "expected": [{ "id": "a", "title": "장보기 (마트)" }]
+    },
+    {
+      "name": "M5 deleted there, untouched here: gone",
+      "base": [{ "id": "a", "title": "장보기" }, { "id": "b", "title": "빨래" }],
+      "here": [{ "id": "a", "title": "장보기" }, { "id": "b", "title": "빨래" }],
+      "theirs": [{ "id": "b", "title": "빨래" }],
+      "expected": [{ "id": "b", "title": "빨래" }]
+    },
+    {
+      "name": "M6 deleted there, changed here: kept as changed here",
+      "base": [{ "id": "a", "title": "장보기" }, { "id": "b", "title": "빨래" }],
+      "here": [{ "id": "a", "title": "장보기, 우유" }, { "id": "b", "title": "빨래" }],
+      "theirs": [{ "id": "b", "title": "빨래" }],
+      "expected": [{ "id": "a", "title": "장보기, 우유" }, { "id": "b", "title": "빨래" }]
+    },
+    {
+      "name": "M7 deleted here, untouched there: gone",
+      "base": [{ "id": "a", "title": "장보기" }, { "id": "b", "title": "빨래" }],
+      "here": [{ "id": "b", "title": "빨래" }],
+      "theirs": [{ "id": "a", "title": "장보기" }, { "id": "b", "title": "빨래" }],
+      "expected": [{ "id": "b", "title": "빨래" }]
+    },
+    {
+      "name": "M8 deleted here, changed there: kept as changed there",
+      "base": [{ "id": "a", "title": "장보기" }],
+      "here": [],
+      "theirs": [{ "id": "a", "title": "장보기, 달걀" }],
+      "expected": [{ "id": "a", "title": "장보기, 달걀" }]
+    },
+    {
+      "name": "M9 new on both sides: both, theirs first, this device's after the item it followed",
+      "base": [{ "id": "a", "title": "장보기" }],
+      "here": [{ "id": "a", "title": "장보기" }, { "id": "m", "title": "Mac에서 더함" }],
+      "theirs": [{ "id": "a", "title": "장보기" }, { "id": "w", "title": "Windows에서 더함" }],
+      "expected": [{ "id": "a", "title": "장보기" }, { "id": "m", "title": "Mac에서 더함" }, { "id": "w", "title": "Windows에서 더함" }]
+    },
+    {
+      "name": "M10 an item new here at the top stays at the top",
+      "base": [{ "id": "a", "title": "장보기" }],
+      "here": [{ "id": "m", "title": "회사 보고서" }, { "id": "a", "title": "장보기" }],
+      "theirs": [{ "id": "a", "title": "장보기" }, { "id": "b", "title": "빨래" }],
+      "expected": [{ "id": "m", "title": "회사 보고서" }, { "id": "a", "title": "장보기" }, { "id": "b", "title": "빨래" }]
+    },
+    {
+      "name": "M11 a field removed (null or missing) on one side counts as a change",
+      "base": [{ "id": "a", "title": "장보기", "dueDate": "2026-11-12" }],
+      "here": [{ "id": "a", "title": "장보기" }],
+      "theirs": [{ "id": "a", "title": "장보기, 우유", "dueDate": "2026-11-12" }],
+      "expected": [{ "id": "a", "title": "장보기, 우유" }]
+    },
+    {
+      "name": "M12 no base (the file was never read here): this device's fields win where they differ",
+      "base": [],
+      "here": [{ "id": "a", "title": "장보기", "isCompleted": true }],
+      "theirs": [{ "id": "a", "title": "장보기", "isCompleted": false }, { "id": "b", "title": "빨래" }],
+      "expected": [{ "id": "a", "title": "장보기", "isCompleted": true }, { "id": "b", "title": "빨래" }]
+    },
+    {
+      "name": "M13 nested values compare whole, keys in any order (an event's repeat, an alarm's days)",
+      "base": [{ "id": "e", "title": "회의", "repeat": { "kind": "weekly", "every": 1 }, "skip": [] }],
+      "here": [{ "id": "e", "title": "회의", "repeat": { "every": 1, "kind": "weekly" }, "skip": ["2026-11-18"] }],
+      "theirs": [{ "id": "e", "title": "회의 (3층)", "repeat": { "kind": "weekly", "every": 1 }, "skip": [] }],
+      "expected": [{ "id": "e", "title": "회의 (3층)", "repeat": { "kind": "weekly", "every": 1 }, "skip": ["2026-11-18"] }]
+    }
+  ]
+}

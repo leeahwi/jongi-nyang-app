@@ -4,7 +4,7 @@ import type { Lang } from "./lang";
 /**
  * 종이 테마 열다섯 가지 (#244, docs/plans/paper-themes.md): the one list of papers the notepad, the desk's calendar,
  * the widget, the slips and the drawer all share — the same keys, order, names and rules as the Mac's
- * PaperCore/PaperKind.swift · PaperLook.swift (docs/plans/paper-themes-cases.json, test/paperThemes.test.ts).
+ * PaperCore/PaperKind.swift · PaperLook.swift (shared/cases/paper-themes-cases.json, test/paperThemes.test.ts).
  * The colours are in renderer/base.css · papers.css · drawer.css, the same as docs/plans/paper-themes/tokens.json.
  */
 

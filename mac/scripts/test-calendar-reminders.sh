@@ -1,5 +1,5 @@
 #!/bin/bash
-# 달력의 알림 할 일 (#227, CalendarMonth.swift): the shared cases from docs/plans/calendar-reminders-cases.json — a month
+# 달력의 알림 할 일 (#227, CalendarMonth.swift): the shared cases from shared/cases/calendar-reminders-cases.json — a month
 # cell's lines and +N, a week row's to-dos, the day panel's, the tooltips and hidden spaces (the Windows app's
 # test/calendarReminders.test.ts reads the same file).
 set -euo pipefail
@@ -44,4 +44,4 @@ swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/CalendarMonth.swift \
     Tests/PaperCoreTests/CalendarRemindersTests.swift \
     -o .build/checks/CalendarRemindersTests
-.build/checks/CalendarRemindersTests ../docs/plans/calendar-reminders-cases.json
+.build/checks/CalendarRemindersTests ../shared/cases/calendar-reminders-cases.json

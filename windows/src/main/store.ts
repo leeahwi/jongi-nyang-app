@@ -21,7 +21,7 @@ import {
 } from "../core/todoSpaces";
 import { pageOf } from "../core/shelf";
 import { todaySinceUpdates } from "../core/carry";
-import { sharedFiles, type SharedFile } from "../core/storage";
+import { deepLookEvery, sharedFiles, type SharedFile } from "../core/storage";
 import { defaultPrefs, type AiView, type AppState, type BackupsView, type FocusView, type Prefs, type TimerView } from "../core/types";
 import type { CalendarView } from "../core/calendar";
 import { readPaper } from "../core/desk";
@@ -39,6 +39,7 @@ import { checkedDeviceRules, cleanedDeviceRules, deviceKey, deviceRings, hiddenS
 import type { SlipPlace } from "../core/slipMove";
 import { readTypingScope, readTypingSpot, typingScopes } from "../core/typingCat";
 import { readCatSize } from "../core/catSize";
+import { conflictCopies, copyOf, joinFiles } from "../core/syncConflict";
 
 export interface WindowMemory {
   bounds?: { x: number; y: number; width: number; height: number };
@@ -97,6 +98,9 @@ export interface TimerMemory {
 export function saveProblem(what: string): string {
   return [what, t("앱을 끄기 전까지 적은 글은 화면에 그대로 있어요."), t("다음에 바뀔 때 다시 저장해 볼게요."), t("저장 폴더가 열리는지 확인해 주세요.")].join(" ");
 }
+
+/** The files keepUnreadable copies aside when they don't parse (the spaces, folders and trash are moved aside instead). */
+type KeptAside = "todos.json" | "memos.json" | "repeats.json" | "events.json" | "alarms.json";
 
 /** #196 D10: when each space was made visible here, as read (anything odd left out). */
 function readShown(value: unknown): Record<string, string> {
@@ -176,6 +180,8 @@ export class Store extends EventEmitter {
   backupsView: () => BackupsView = () => ({ auto: true, folder: "", custom: false, missing: false, failed: false, shared: false, entries: [], total: 0 });
   /** The text this app last read or wrote for each shared file; undefined while the file is absent. */
   private readonly known = new Map<SharedFile, string | undefined>();
+  /** #478: a file's last known text while another device has it deleted (or mid-replace): the base when it comes back. */
+  private readonly vanished = new Map<SharedFile, string>();
   private readonly stamps = new Map<SharedFile, string | undefined>();
   /** Memos changed (or added) here since the last write, and memos deleted here: kept when another device's file comes in. */
   private readonly memoEdits = new Set<string>();
@@ -184,12 +190,22 @@ export class Store extends EventEmitter {
   private typedOpenMemo?: string;
   private watcher?: fs.FSWatcher;
   private poll?: NodeJS.Timeout;
+  /** #67: the folder's watch has reported a change of a shared file (so the whole files are read less often). */
+  private watchHeard = false;
   /** The one look `watch` takes once the watcher has surely started. */
   private settle?: NodeJS.Timeout;
   private readonly syncTimers = new Map<SharedFile, NodeJS.Timeout>();
   private readonly failedReads = new Map<SharedFile, number>();
+  /** #384: shared files whose last write failed (a file held for a moment by OneDrive, Defender or the indexer). */
+  private readonly unsaved = new Set<SharedFile>();
   /** #173: shared files left alone (a link, or past the size limit): not read, never written over; the message shown. */
   private readonly refused = new Map<SharedFile, string>();
+  /**
+   * #382: shared files not written over, as the list's canSave: `read`, there but not readable (no permission, a cloud
+   * file not downloaded yet, held by another program); `kept`, unreadable and couldn't be copied aside. A good read
+   * (`read`), the copy or a file that reads and parses (`kept`), or the file gone, opens it again; 다시 읽기 tries.
+   */
+  private readonly blocked = new Map<SharedFile, { why: "read" | "kept"; message: string }>();
   /**
    * AI 연결 on: ai-write.lock in the settings folder, held from catching up to writing so the extension
    * (mcp/) and this app never write todos.json, events.json or memos.json from the same stale copy.
@@ -215,7 +231,7 @@ export class Store extends EventEmitter {
     const memos = this.readDisk("memos.json");
     this.noteKnown("memos.json", memos);
     if (memos !== undefined) {
-      try { this.memos = parseMemos(memos).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); } catch { this.keepUnreadable(this.memosPath, "memos"); }
+      try { this.memos = parseMemos(memos).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); } catch { this.keepUnreadable(this.memosPath, "memos.json"); }
     }
     this.loadSettings();
     this.loadMemoFolders();
@@ -408,16 +424,19 @@ export class Store extends EventEmitter {
     try {
       fs.renameSync(this.todoSpacesPath, aside);
       this.noteKnown(todoSpacesFileName, undefined);
+      this.unblock(todoSpacesFileName);
       this.storageError = `${message} ${keptAside(aside)}`;
     } catch {
-      this.storageError = `${message} ${t("저장 폴더가 열리는지 확인해 주세요.")}`;
+      this.block(todoSpacesFileName, "kept"); // #416: not moved aside, so never written over
     }
   }
 
   private saveTodoSpaces(): void {
     if (!this.mayWrite(todoSpacesFileName)) return;
     // S17, S22, S36: entries of to-dos gone more than 30 days, old tombstones, and rules gone that long, go.
-    this.todoSpaces = pruneTodoSpaces(this.todoSpaces, new Set(this.history.items.map((item) => item.id)), new Date(),
+    // #382: with todos.json unread, no to-do counts as gone.
+    const todos = this.blocked.has("todos.json") ? Object.keys(this.todoSpaces.items) : this.history.items.map((item) => item.id);
+    this.todoSpaces = pruneTodoSpaces(this.todoSpaces, new Set(todos), new Date(),
       this.repeatsUnread ? undefined : new Set(this.series.map((entry) => entry.id)));
     const contents = serializeTodoSpaces(this.todoSpaces);
     if (contents === this.known.get(todoSpacesFileName)) return;
@@ -539,17 +558,21 @@ export class Store extends EventEmitter {
     if (pruneTrash(this.memoTrash, new Set(this.memos.map((memo) => memo.id))) !== this.memoTrash) this.saveMemoTrash();
   }
 
-  /** An unreadable memo-trash.json is moved aside as memo-trash.unreadable-<UTC stamp>.json, said once; the trash starts empty. */
-  private keepTrashAside(): void {
+  /**
+   * An unreadable memo-trash.json is moved aside as memo-trash.unreadable-<UTC stamp>.json, said once. At launch
+   * (`starting`) the trash starts empty; later (another device's file) this device's 지운 메모 stay and are written in its place.
+   */
+  private keepTrashAside(starting = true): void {
     const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/T/, "-").replace(/\..*$/, "").replace(/Z$/, "");
     const aside = path.join(this.dataDirectory, `memo-trash.unreadable-${stamp}.json`);
-    const what = t("지운 메모 파일을 읽지 못해서 지운 메모 없이 시작했어요. 메모는 모두 그대로예요.");
+    const what = starting ? t("지운 메모 파일을 읽지 못해서 지운 메모 없이 시작했어요. 메모는 모두 그대로예요.") : t("지운 메모 파일을 읽지 못했어요. 여기 있던 지운 메모는 그대로예요.");
     try {
       fs.renameSync(this.memoTrashPath, aside);
       this.noteKnown(memoTrashFileName, undefined);
+      this.unblock(memoTrashFileName);
       this.storageError = `${what} ${keptAside(aside)}`;
     } catch {
-      this.storageError = `${what} ${t("저장 폴더가 열리는지 확인해 주세요.")}`;
+      this.block(memoTrashFileName, "kept"); // #416: not moved aside, so never written over
     }
   }
 
@@ -629,9 +652,10 @@ export class Store extends EventEmitter {
     try {
       fs.renameSync(this.memoFoldersPath, aside);
       this.noteKnown(memoFoldersFileName, undefined);
+      this.unblock(memoFoldersFileName);
       this.storageError = `${what} ${keptAside(aside)}`;
     } catch {
-      this.storageError = `${what} ${t("저장 폴더가 열리는지 확인해 주세요.")}`;
+      this.block(memoFoldersFileName, "kept"); // #416: not moved aside, so never written over
     }
   }
 
@@ -642,6 +666,8 @@ export class Store extends EventEmitter {
     const recent = new Date(Date.now() - 3_600_000).toISOString().replace(/\.\d{3}Z$/, "Z");
     const keep = new Set([...this.memos.map((memo) => memo.id), ...Object.entries(this.memoFolders.placement).filter(([, entry]) => entry.at > recent).map(([id]) => id)]);
     if (this.lastDeletedMemo) keep.add(this.lastDeletedMemo.id);
+    // #382: with memos.json unread, no memo counts as gone.
+    if (this.blocked.has("memos.json")) for (const id of Object.keys(this.memoFolders.placement)) keep.add(id);
     this.memoFolders = pruneMemoFolders(this.memoFolders, keep);
     const contents = serializeMemoFolders(this.memoFolders);
     if (contents === this.known.get(memoFoldersFileName)) return;
@@ -776,7 +802,8 @@ export class Store extends EventEmitter {
       this.reload("memos.json");
       if (this.differs("memos.json")) return; // not readable yet; tried again soon
     }
-    if (this.refused.has("memos.json")) return; // #173: a link or an oversized file stays as it is
+    // #173: a link or an oversized file stays as it is; #382: so does one that didn't read.
+    if (this.refused.has("memos.json") || this.blocked.has("memos.json")) return;
     const contents = serializeMemos(this.memos.filter((memo) => !isBlank(memo)));
     if (contents === this.known.get("memos.json")) return this.forgetMemoEdits();
     try {
@@ -897,12 +924,13 @@ export class Store extends EventEmitter {
   private loadRepeats(): void {
     const text = this.readDisk("repeats.json");
     this.noteKnown("repeats.json", text);
-    if (text === undefined) return; // No recurring tasks yet.
+    // No recurring tasks yet — or #382 there but not readable: then the rules' spaces aren't cleaned up either (S36).
+    if (text === undefined) { this.repeatsUnread = this.blocked.has("repeats.json"); return; }
     try {
       this.series = parseSeries(text);
     } catch {
       this.repeatsUnread = true;
-      this.keepUnreadable(this.repeatsPath, "repeats");
+      this.keepUnreadable(this.repeatsPath, "repeats.json");
     }
   }
 
@@ -915,7 +943,7 @@ export class Store extends EventEmitter {
     try {
       this.events = parseEvents(text);
     } catch {
-      this.keepUnreadable(this.eventsPath, "events");
+      this.keepUnreadable(this.eventsPath, "events.json");
     }
   }
 
@@ -976,7 +1004,7 @@ export class Store extends EventEmitter {
     try {
       this.alarms = parseAlarms(text);
     } catch {
-      this.keepUnreadable(this.alarmsPath, "alarms");
+      this.keepUnreadable(this.alarmsPath, "alarms.json");
     }
   }
 
@@ -1039,10 +1067,12 @@ export class Store extends EventEmitter {
     this.alarms = [];
     this.history = new UndoableNotebook();
     this.canSave = true;
+    this.blocked.clear(); // #382: each file is read again below, and left unwritten again if it still doesn't read
+    this.vanished.clear();
     const memos = this.readDisk("memos.json");
     this.noteKnown("memos.json", memos);
     if (memos !== undefined) {
-      try { this.memos = parseMemos(memos).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); } catch { this.keepUnreadable(this.memosPath, "memos"); }
+      try { this.memos = parseMemos(memos).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)); } catch { this.keepUnreadable(this.memosPath, "memos.json"); }
     }
     this.loadMemoFolders();
     this.loadMemoTrash();
@@ -1056,24 +1086,23 @@ export class Store extends EventEmitter {
     this.changed();
   }
 
-  /** An unreadable file is copied aside before anything is saved over it. */
-  /** `starting`: read at launch, so that part starts empty; later (another device's file), what's here stays. */
-  private keepUnreadable(file: string, what: "list" | "memos" | "repeats" | "events" | "alarms", starting = true): void {
+  /**
+   * An unreadable file is copied aside before anything is saved over it. `starting`: read at launch, so that part starts
+   * empty; later (another device's file), what's here stays. #382: one that can't be copied is not written over (`block`).
+   */
+  private keepUnreadable(file: string, what: KeptAside, starting = true): void {
     const backup = file.replace(/\.json$/, `.unreadable-${Math.floor(Date.now() / 1000)}.json`);
-    const unread = {
-      list: t("목록 파일을 읽지 못했어요."), memos: t("메모 파일을 읽지 못했어요."),
-      repeats: t("반복 할 일 파일을 읽지 못했어요."), events: t("일정 파일을 읽지 못했어요."), alarms: t("알람 파일을 읽지 못했어요."),
-    }[what];
     const emptied = {
-      list: t("목록 파일을 읽지 못해서 빈 목록으로 시작했어요."), memos: t("메모 파일을 읽지 못해서 메모 없이 시작했어요."),
-      repeats: t("반복 할 일 파일을 읽지 못해서 반복 없이 시작했어요."), events: t("일정 파일을 읽지 못해서 일정 없이 시작했어요."),
-      alarms: t("알람 파일을 읽지 못해서 알람 없이 시작했어요."),
+      "todos.json": t("목록 파일을 읽지 못해서 빈 목록으로 시작했어요."), "memos.json": t("메모 파일을 읽지 못해서 메모 없이 시작했어요."),
+      "repeats.json": t("반복 할 일 파일을 읽지 못해서 반복 없이 시작했어요."), "events.json": t("일정 파일을 읽지 못해서 일정 없이 시작했어요."),
+      "alarms.json": t("알람 파일을 읽지 못해서 알람 없이 시작했어요."),
     }[what];
     try {
       fs.copyFileSync(file, backup, fs.constants.COPYFILE_EXCL);
-      this.storageError = `${starting ? emptied : unread} ${keptAside(backup)}`;
+      this.unblock(what);
+      this.storageError = `${starting ? emptied : this.unreadText(what)} ${keptAside(backup)}`;
     } catch {
-      this.storageError = `${unread} ${t("저장 폴더가 열리는지 확인해 주세요.")}`;
+      this.block(what, "kept");
     }
   }
 
@@ -1143,9 +1172,12 @@ export class Store extends EventEmitter {
     this.changed();
   }
 
+  /** Everything still waiting written now (quitting, Windows ending the session, before a folder is read or moved). */
   flush(): void {
     clearTimeout(this.memoTimer);
     this.saveMemos();
+    // #384: the to-dos, repeats, events, alarms, spaces, folders and trash whose last write failed.
+    if (this.unsaved.size) this.locked(() => { for (const file of [...this.unsaved]) this.saveAgain(file); });
     if (this.settingsTimer) {
       clearTimeout(this.settingsTimer);
       this.writeSettings();
@@ -1193,12 +1225,67 @@ export class Store extends EventEmitter {
     try {
       const text = readTextSafely(this.pathOf(file));
       this.accept(file);
+      if (this.blocked.get(file)?.why === "read") this.unblock(file);
       return text;
     } catch (error) {
-      if (error instanceof RefusedFile) this.refuse(file, error);
-      else this.accept(file); // gone (or unreadable another way): no longer a refused one
+      if (error instanceof RefusedFile) {
+        this.refuse(file, error);
+        return undefined;
+      }
+      this.accept(file); // no longer a refused one
+      // #382: only a file that isn't there may be made new; one there but unreadable is never written over.
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === "ENOENT" || code === "ENOTDIR") this.unblock(file); else this.block(file, "read");
       return undefined;
     }
+  }
+
+  /** #382: what the note says of a file that didn't read (the four of the Mac's wording, and the others by name). */
+  private unreadText(file: SharedFile): string {
+    return {
+      "todos.json": t("목록 파일을 읽지 못했어요."), "memos.json": t("메모 파일을 읽지 못했어요."), "repeats.json": t("반복 할 일 파일을 읽지 못했어요."),
+      "events.json": t("일정 파일을 읽지 못했어요."), "alarms.json": t("알람 파일을 읽지 못했어요."),
+    }[file as string] ?? t("{file} 파일을 읽지 못했어요.", { file });
+  }
+
+  private block(file: SharedFile, why: "read" | "kept"): void {
+    if (this.blocked.get(file)?.why === "kept") why = "kept"; // read again or not, it still isn't kept aside
+    const message = `${this.unreadText(file)} ${t("원래 파일은 덮어쓰지 않고 그대로 둬요.")} ${t("저장 폴더가 열리는지 확인해 주세요.")}`;
+    this.blocked.set(file, { why, message });
+    this.reportError(message);
+  }
+
+  private unblock(file: SharedFile): void {
+    const entry = this.blocked.get(file);
+    if (!entry) return;
+    this.blocked.delete(file);
+    if (this.storageError === entry.message) {
+      this.storageError = [...this.blocked.values()][0]?.message ?? [...this.refused.values()][0];
+      this.changed();
+    }
+  }
+
+  /** #382: how many shared files are left unwritten because they didn't read (저장 폴더 확인 offers 다시 읽기). */
+  get unreadFiles(): number { return this.blocked.size; }
+
+  /** #382 다시 읽기: each file left unwritten is read again; one that reads now, or is copied aside now, opens for saving. */
+  reread(): void {
+    this.locked(() => {
+      for (const [file, { why }] of [...this.blocked]) {
+        const text = this.readDisk(file);
+        if (why === "kept" && text !== undefined && text === this.known.get(file)) this.keepAgain(file);
+        else this.catchUp([file], true);
+      }
+    });
+    this.changed();
+  }
+
+  /** #416: a file that didn't parse kept aside again — moved (스페이스 · 메모 폴더 · 지운 메모) or copied (the others). */
+  private keepAgain(file: SharedFile): void {
+    if (file === todoSpacesFileName) this.keepSpacesAside();
+    else if (file === memoFoldersFileName) this.keepFoldersAside(false);
+    else if (file === memoTrashFileName) this.keepTrashAside(false);
+    else this.keepUnreadable(this.pathOf(file), file, false);
   }
 
   /**
@@ -1223,17 +1310,41 @@ export class Store extends EventEmitter {
     }
   }
 
-  /** Writes to a random temporary file (made new) and renames it, so a crash (or a sync client) never sees half a file. */
+  /**
+   * Writes to a random temporary file (made new) and renames it, so a crash (or a sync client) never sees half a file.
+   * #384: a shared file whose write failed is noted, and `flush` writes it again.
+   */
   private writeAtomically(file: string, contents: string): void {
-    writeFileAtomically(file, contents);
+    const shared = sharedFiles.find((name) => this.pathOf(name) === file);
+    try { writeFileAtomically(file, contents); } catch (error) {
+      if (shared) this.unsaved.add(shared);
+      throw error;
+    }
+    if (shared) this.unsaved.delete(shared);
   }
 
-  /** A write is allowed only once this app has caught up with the file on disk (and never over a refused one, #173). */
+  /** #384: a file whose last write failed, saved again from what is here (each save catches up with the disk first). */
+  private saveAgain(file: SharedFile): void {
+    this.unsaved.delete(file); // the save notes it again if it fails again
+    if (file === "todos.json") this.saveNotebook(serializeNotebook(this.history.notebook));
+    else if (file === "repeats.json") this.saveRepeats();
+    else if (file === "events.json") this.saveEvents();
+    else if (file === "alarms.json") this.saveAlarms();
+    else if (file === todoSpacesFileName) this.saveTodoSpaces();
+    else if (file === memoFoldersFileName) this.saveMemoFolders();
+    else if (file === memoTrashFileName) this.saveMemoTrash();
+    // memos.json: flush saves the memos anyway.
+  }
+
+  /**
+   * A write is allowed only once this app has caught up with the file on disk (and never over a refused one, #173, or
+   * one that didn't read, #382).
+   */
   private mayWrite(file: SharedFile): boolean {
-    if (!this.differs(file)) return !this.refused.has(file);
+    if (!this.differs(file)) return !this.refused.has(file) && !this.blocked.has(file);
     // Newer data came in: memory now matches the disk, and the stale contents must not be written.
     const replaced = this.reload(file);
-    return !replaced && !this.differs(file) && !this.refused.has(file);
+    return !replaced && !this.differs(file) && !this.refused.has(file) && !this.blocked.has(file);
   }
 
   /** Reads back any shared file that changed on disk since this app last read or wrote it. */
@@ -1245,6 +1356,7 @@ export class Store extends EventEmitter {
 
   /** The text this app last read or wrote for a file, and the file's size and time then (see `differs`). */
   private noteKnown(file: SharedFile, text: string | undefined): void {
+    if (text !== undefined) this.vanished.delete(file);
     this.known.set(file, text);
     this.stamps.set(file, text === undefined ? undefined : this.stampOf(file));
   }
@@ -1284,26 +1396,36 @@ export class Store extends EventEmitter {
     const text = this.readDisk(file);
     if (text === this.known.get(file)) return false;
     if (text === undefined) {
-      // Deleted elsewhere (or mid-replace): keep what is here; the next change writes it back.
-      this.noteKnown(file, undefined);
+      // Deleted elsewhere (or mid-replace): keep what is here; the next change writes it back. #382: there but not
+      // readable, it stays as last known (and isn't written over meanwhile).
+      const known = this.known.get(file);
+      if (known !== undefined) this.vanished.set(file, known);
+      if (!this.blocked.has(file)) this.noteKnown(file, undefined);
       return false;
     }
+    let joined: string | undefined;
     try {
       if (file === "todos.json") {
         const theirs = parseNotebook(text);
         const known = this.known.get(file);
+        joined = this.joinHere(file, text);
+        if (joined !== undefined) this.history = new UndoableNotebook(parseNotebook(joined));
         // AI 연결 on: Claude's change comes in without wiping the undo history (when nothing here is unsaved).
-        if (this.aiLock && known !== undefined && this.canSave && serializeNotebook(this.history.notebook) === known) this.history.absorb(parseNotebook(known), theirs);
+        else if (this.aiLock && known !== undefined && this.canSave && serializeNotebook(this.history.notebook) === known) this.history.absorb(parseNotebook(known), theirs);
         else this.history = new UndoableNotebook(theirs);
         this.canSave = true;
       } else if (file === "repeats.json") {
         this.series = parseSeries(text);
         this.repeatsUnread = false;
       } else if (file === "events.json") {
-        this.events = parseEvents(text);
+        const theirs = parseEvents(text);
+        joined = this.joinHere(file, text);
+        this.events = joined === undefined ? theirs : parseEvents(joined);
         this.eventsVersion += 1;
       } else if (file === "alarms.json") {
-        this.alarms = parseAlarms(text);
+        const theirs = parseAlarms(text);
+        joined = this.joinHere(file, text);
+        this.alarms = joined === undefined ? theirs : parseAlarms(joined);
       } else if (file === todoSpacesFileName) {
         // Another device's spaces (W3): the file's copy is the one already there; this device's wins only where newer.
         this.todoSpaces = mergeTodoSpaces(parseTodoSpaces(text), this.todoSpaces);
@@ -1331,6 +1453,7 @@ export class Store extends EventEmitter {
       if (file === todoSpacesFileName) {
         // Kept aside; this device's spaces are written in its place.
         this.keepSpacesAside();
+        if (this.blocked.has(todoSpacesFileName)) this.noteKnown(todoSpacesFileName, text); // #416: 다시 읽기 tries the move again
         this.saveTodoSpaces();
         this.changed();
         return false;
@@ -1338,29 +1461,98 @@ export class Store extends EventEmitter {
       if (file === memoFoldersFileName) {
         // Kept aside; this device's folders are written in its place.
         this.keepFoldersAside(false);
+        if (this.blocked.has(memoFoldersFileName)) this.noteKnown(memoFoldersFileName, text); // #416: 다시 읽기 tries the move again
         this.saveMemoFolders();
         this.changed();
         return false;
       }
       if (file === memoTrashFileName) {
         // Kept aside; this device's 지운 메모 are written in its place.
-        this.keepTrashAside();
+        this.keepTrashAside(false);
+        if (this.blocked.has(memoTrashFileName)) this.noteKnown(memoTrashFileName, text); // #416: 다시 읽기 tries the move again
         this.saveMemoTrash();
         this.changed();
         return false;
       }
-      this.keepUnreadable(this.pathOf(file), file === "todos.json" ? "list" : file === "memos.json" ? "memos" : file === "events.json" ? "events" : file === "alarms.json" ? "alarms" : "repeats", false);
+      this.keepUnreadable(this.pathOf(file), file, false);
       this.noteKnown(file, text);
       this.changed();
       return false;
     }
     this.failedReads.delete(file);
     this.noteKnown(file, text);
+    this.unblock(file); // #382: read and taken, so it may be written again
+    if (joined !== undefined) this.locked(() => this.saveAgain(file)); // #478: theirs with this PC's changes, written back
     this.emit("reloaded", file);
     if (file === "events.json") this.emit("events");
     if (file === "alarms.json") this.emit("alarms");
     this.changed();
     return true;
+  }
+
+  /**
+   * #478 (#385): another device's to-dos, events or alarms joined item by item, field by field (core/syncConflict.ts) with
+   * what changed here since this PC last read or wrote the file — a save that failed, a file that didn't read meanwhile.
+   * Undefined: theirs as it is (nothing changed here, as before). The base is read back as this app writes it, so a
+   * Mac's formatting or fields this app doesn't keep never count as changes here.
+   */
+  private joinHere(file: "todos.json" | "events.json" | "alarms.json", text: string): string | undefined {
+    const [key, here, again] = file === "todos.json" ? ["items", serializeNotebook(this.history.notebook), (from: string) => serializeNotebook(parseNotebook(from))] as const
+      : file === "events.json" ? ["events", serializeEvents(this.events), (from: string) => serializeEvents(parseEvents(from))] as const
+        : ["alarms", serializeAlarms(this.alarms), (from: string) => serializeAlarms(parseAlarms(from))] as const;
+    const known = this.known.get(file) ?? this.vanished.get(file);
+    if (here === known) return undefined;
+    let base: string | undefined;
+    try { base = known === undefined ? undefined : again(known); } catch { /* never read here: no base */ }
+    const result = joinFiles(base, here, text, key);
+    // A join this app can't read back is never taken for an unreadable file of theirs: theirs as it is then.
+    try { return result && "joined" in result ? again(result.joined) : undefined; } catch { return undefined; }
+  }
+
+  /** #478: the backup folder (main sets it from autoBackup.ts); a cloud's conflict copies go to its `sync-conflicts`. */
+  backupFolder: () => string = () => path.join(path.dirname(this.settingsPath), "backups");
+  /** Conflict copies moved since 저장 폴더 확인 last showed them (its 열어 보기 shows them in File Explorer). */
+  movedCopies: string[] = [];
+  private copiesTimer?: NodeJS.Timeout;
+
+  /**
+   * #478 (#385): copies a cloud made of a data file when two devices changed it at once (`todos 2.json`, `… conflicted
+   * copy …`, `todos-PC.json`, `todos (1).json`), moved out of the storage folder — no device reads them — into the backup
+   * folder's `sync-conflicts` (on this device only), and told. Not joined: which items to keep is the person's call.
+   */
+  moveConflictCopies(now = new Date()): void {
+    let names: string[];
+    try { names = fs.readdirSync(this.dataDirectory, { withFileTypes: true }).filter((entry) => entry.isFile()).map((entry) => entry.name); } catch { return; }
+    const copies = conflictCopies(names);
+    if (copies.length === 0) return;
+    const folder = path.join(this.backupFolder(), "sync-conflicts");
+    const two = (value: number) => String(value).padStart(2, "0");
+    const stamp = `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())} ${two(now.getHours())}${two(now.getMinutes())}${two(now.getSeconds())}`;
+    const moved: string[] = [];
+    for (const { name } of copies) {
+      const from = path.join(this.dataDirectory, name), target = path.join(folder, `${stamp} ${name}`);
+      try {
+        fs.mkdirSync(folder, { recursive: true });
+        if (fs.existsSync(target)) continue;
+        try { fs.renameSync(from, target); } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
+          fs.copyFileSync(from, target, fs.constants.COPYFILE_EXCL); // a backup folder on another drive
+          fs.unlinkSync(from);
+        }
+        moved.push(name);
+        this.movedCopies.push(target);
+      } catch { /* left where it is (held by the cloud, say): tried again on the next look */ }
+    }
+    if (moved.length === 0) return;
+    this.reportError(`${t("다른 기기와 동시에 고친 파일이 있어요.")} ${t("클라우드가 남긴 사본을 백업 폴더로 옮겨 뒀어요:")} ${moved.map((name) => `‘${name}’`).join(", ")}`);
+  }
+
+  /** 저장 폴더 확인 showed the moved copies: told once, they're the person's now. */
+  copiesShown(): void {
+    this.movedCopies = [];
+    if (!this.storageError?.startsWith(t("다른 기기와 동시에 고친 파일이 있어요."))) return;
+    this.storageError = [...this.blocked.values()][0]?.message ?? [...this.refused.values()][0];
+    this.changed();
   }
 
   private syncSoon(file: SharedFile, delay = 500): void {
@@ -1386,18 +1578,31 @@ export class Store extends EventEmitter {
       this.watcher = fs.watch(this.dataDirectory, (_event, filename) => {
         const name = filename?.toString();
         if (!name) for (const file of sharedFiles) this.syncSoon(file);
-        else if ((sharedFiles as readonly string[]).includes(name)) this.syncSoon(name as SharedFile);
+        else if ((sharedFiles as readonly string[]).includes(name)) { this.watchHeard = true; this.syncSoon(name as SharedFile); }
+        else if (copyOf(name)) {
+          // #478: a cloud's conflict copy, moved once the cloud is likely done writing it.
+          clearTimeout(this.copiesTimer);
+          this.copiesTimer = setTimeout(() => this.moveConflictCopies(), 2_000);
+          this.copiesTimer.unref?.();
+        }
       });
-      this.watcher.on("error", () => { this.watcher?.close(); this.watcher = undefined; });
+      this.watcher.on("error", () => { this.watcher?.close(); this.watcher = undefined; this.watchHeard = false; });
     } catch {
       // No change notifications here (some network drives): the poll below still notices.
     }
     let looks = 0;
-    this.poll = setInterval(() => this.catchUp(sharedFiles, ++looks % 5 === 0), 30_000);
+    // #67: the whole files every 2.5 minutes, or every 10 once the watch is known to report changes (core/storage.ts).
+    this.poll = setInterval(() => {
+      const deep = ++looks >= deepLookEvery(this.watchHeard && this.watcher !== undefined);
+      if (deep) looks = 0;
+      this.catchUp(sharedFiles, deep);
+      this.moveConflictCopies();
+    }, 30_000);
     this.poll.unref?.();
     this.settle = setTimeout(() => {
       this.settle = undefined;
       this.catchUp(sharedFiles);
+      this.moveConflictCopies(); // #478: copies left while the app was closed
       this.emit("watching");
     }, Store.watchSettleMs);
     this.settle.unref?.();
@@ -1409,12 +1614,14 @@ export class Store extends EventEmitter {
   unwatch(): void {
     this.watcher?.close();
     this.watcher = undefined;
+    this.watchHeard = false;
     clearInterval(this.poll);
     this.poll = undefined;
     clearTimeout(this.settle);
     this.settle = undefined;
     for (const timer of this.syncTimers.values()) clearTimeout(timer);
     this.syncTimers.clear();
+    clearTimeout(this.copiesTimer);
   }
 
   private loadSettings(): void {

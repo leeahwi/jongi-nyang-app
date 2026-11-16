@@ -174,6 +174,11 @@ export class MemoDrawer {
 
   private look() { return this.hooks.look(); }
 
+  /** #383: Windows is ending the session — the page hands over the memo being typed (memo:flush, which saves it). */
+  flushTyping(): void {
+    if (this.window && !this.window.isDestroyed() && this.loaded) this.window.webContents.send("drawer:flush");
+  }
+
   /** 자동 follows the note's paper: the page hears the look again when the paper changes. */
   sendLook(): void {
     const look = this.look();
@@ -421,6 +426,9 @@ export class MemoDrawer {
     const handle = new BrowserWindow({
       ...handleSize, show: false, frame: false, transparent: true, resizable: false, movable: false, minimizable: false, maximizable: false, fullscreenable: false,
       focusable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false, backgroundColor: "#00000000", title: t("메모 서랍 열기"),
+      // #312 (preventive): no WS_THICKFRAME, said outright as for the pet, the ears and 타닥냥, so Windows keeps no resize
+      // frame or minimum size of its own on this small window.
+      thickFrame: false,
       enableLargerThanScreen: offscreenEnabled, // off-screen runs stay off-screen on a Mac (#92)
       webPreferences: { preload: path.join(__dirname, "preload.js"), sandbox: true, contextIsolation: true, backgroundThrottling: true },
     });

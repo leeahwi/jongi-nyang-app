@@ -17,6 +17,46 @@ enum StorageFolder {
         return URL(fileURLWithPath: path, isDirectory: true)
     }
 
+    /// #380: a folder is chosen but isn't there just now (Dropbox · OneDrive not running yet, a disk unplugged): its path.
+    static func missing(_ preferences: UserDefaults) -> String? {
+        guard let path = preferences.string(forKey: preferenceKey), chosen(preferences) == nil else { return nil }
+        return path
+    }
+
+    /// At launch (#380): while the chosen folder is missing, nothing is read or written. A slip says so and the folder is
+    /// looked for every second — once it is there it opens by itself. 다시 확인 looks again, 폴더 다시 고르기 picks another
+    /// (the list isn't moved: that folder's own list opens), 이 Mac 목록 열기 opens this Mac's for this run (the folder
+    /// stays chosen, for the next launch). `folder` is the one to open (nil: this Mac's); `missing` when it stands in.
+    /// `ask`: the slip (a check answers it instead) — given the folder's name and whether it is there now, the choice.
+    static func waitForChosen(_ preferences: UserDefaults, ask: @MainActor (String, @escaping @MainActor @Sendable () -> Bool) -> Int = askMissing)
+        -> (folder: URL?, missing: String?) {
+        while let path = missing(preferences) {
+            switch ask((path as NSString).lastPathComponent, { chosen(preferences) != nil }) {
+            case 0: return (nil, path)
+            case 1:
+                let panel = NSOpenPanel()
+                panel.canChooseDirectories = true
+                panel.canChooseFiles = false
+                panel.canCreateDirectories = true
+                panel.prompt = L("이 폴더 열기")
+                TestHooks.activate()
+                if panel.runModal() == .OK, let folder = panel.url { preferences.set(folder.path, forKey: preferenceKey) }
+            default: continue
+            }
+        }
+        return (chosen(preferences), nil)
+    }
+
+    /// 저장 폴더를 찾지 못했어요: 0 이 Mac 목록 열기 · 1 폴더 다시 고르기 · 2 다시 확인 (also when the folder comes back).
+    static func askMissing(_ name: String, back: @escaping @MainActor @Sendable () -> Bool) -> Int {
+        SlipAlert.run(symbol: "externaldrive.badge.questionmark", title: L("저장 폴더"), message: L("저장 폴더를 찾지 못했어요"),
+                      detail: L("‘\(name)’ 폴더가 아직 보이지 않아요. iCloud Drive · Dropbox · OneDrive가 켜지거나 디스크가 연결되면 저절로 그 폴더로 열어요. 그전에는 아무 파일도 쓰지 않아요."),
+                      choices: [.init(title: L("이 Mac 목록 열기"), role: .quiet, leading: true),
+                                .init(title: L("폴더 다시 고르기")),
+                                .init(title: L("다시 확인"), role: .primary, isDefault: true, isCancel: true)],
+                      width: .medium, answersItself: back)
+    }
+
     /// Moves the app to `target` (nil = back to this Mac's folder) and restarts it there. If the
     /// target already holds a list, asks which one to keep.
     static func switchTo(_ target: URL?, defaultFolder: URL, current: URL, model: AppModel, preferences: UserDefaults) {
@@ -52,11 +92,15 @@ enum StorageFolder {
             guard answer == 1 else { return }
         }
         model.saveMemosNow()
-        do {
-            try move(from: current, to: destination, copyCurrent: copyCurrent, backups: model.backups?.activeFolder ?? BackupController.backupsFolder)
-        } catch {
-            SlipAlert.inform(title: L("저장 폴더"), message: L("폴더로 옮기지 못했어요. 지금 목록은 그대로예요."))
-            return
+        // #390: 다시 시도 moves again with the same answer (it doesn't ask again).
+        while true {
+            do {
+                try move(from: current, to: destination, copyCurrent: copyCurrent, backups: model.backups?.activeFolder ?? BackupController.backupsFolder)
+                break
+            } catch {
+                guard SlipAlert.inform(title: L("저장 폴더"), message: L("폴더로 옮기지 못했어요. 지금 목록은 그대로예요."),
+                                       detail: L("폴더에 쓸 수 있는지 확인하고 다시 시도해 주세요."), next: L("다시 시도")) else { return }
+            }
         }
         if let target { preferences.set(target.path, forKey: preferenceKey) } else { preferences.removeObject(forKey: preferenceKey) }
         // #195: the restarted app says once where the list went — the folder's name (as Finder shows it), never its path.
@@ -234,11 +278,15 @@ final class StorageWatcher {
         checkLog()
     }
 
+    /// Posted after a check found the shared files changed (#381: ArchiveStore reads a changed month again).
+    static let changed = Notification.Name("StorageWatcher.changed")
+
     private func check() {
         let now = Self.dates(in: folder)
         if now != seen {
             seen = now
             model.reloadFromDisk()
+            NotificationCenter.default.post(name: Self.changed, object: model)
         }
         armLog()
         checkLog()
@@ -257,6 +305,14 @@ final class StorageWatcher {
         for name in StorageFolder.files + [Focus.fileName] {
             let values = try? folder.appendingPathComponent(name).resourceValues(forKeys: [.contentModificationDateKey])
             if let date = values?.contentModificationDate { result[name] = date }
+        }
+        // #381: and the record's months, which another device appends to.
+        let archive = folder.appendingPathComponent("archive", isDirectory: true)
+        for month in (try? FileManager.default.contentsOfDirectory(at: archive, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        where month.pathExtension == "jsonl" {
+            if let date = (try? month.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate {
+                result["archive/" + month.lastPathComponent] = date
+            }
         }
         return result
     }

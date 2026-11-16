@@ -5,11 +5,11 @@ import { test } from "node:test";
 import { holidayLabel, holidayName, holidaysOf, lunarLabel, lunarOf, lunarSpoken, shiftDay, type HolidayName, type Lunar } from "../src/core/koreanCalendar";
 import type { Lang } from "../src/core/lang";
 
-// 음력과 공휴일 (#234): the shared cases from docs/plans/calendar-korean-cases.json (the Mac's scripts/test-korean-calendar.sh
+// 음력과 공휴일 (#234): the shared cases from shared/cases/calendar-korean-cases.json (the Mac's scripts/test-korean-calendar.sh
 // reads the same file) — lunar dates on 설날 · 추석 · 윤달 · year ends, every day of 2020–2035 as one digest (the two apps'
 // calendars must agree on each), the cell's lunar label, and every holiday of 2024–2030.
 type Json = Record<string, unknown>;
-const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "calendar-korean-cases.json"), "utf8")) as Json;
+const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "calendar-korean-cases.json"), "utf8")) as Json;
 const langs: Lang[] = ["ko", "en", "nl"];
 const text = (lunar: Lunar) => `${lunar.month}${lunar.leap ? "L" : ""}.${lunar.day}`;
 

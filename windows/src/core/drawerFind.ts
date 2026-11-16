@@ -7,7 +7,7 @@ import { checklistLine, drawerFooter, drawerSearch, placementOf, pinnedView, typ
 /**
  * 메모 찾기's results (#114, docs/plans/drawer-ux-plan.md B1): where to look (모든 폴더 · this folder or 고정 only), what
  * kind of memo to keep to (안 한 체크 · 링크 · 고정), the results in groups by folder, the found line brought near the start,
- * the results' dates and the footer. The same rules and shared cases (docs/plans/drawer-search-cases.json) as the Mac
+ * the results' dates and the footer. The same rules and shared cases (shared/cases/drawer-search-cases.json) as the Mac
  * (PaperCore MemoFolderSearch.swift `find` · `snippet`, MemoCards.foundTime, MemoFolders.searchFooter).
  */
 

@@ -14,12 +14,12 @@ import { firstDayFromIntl, firstDayFromRegistry, setWeekStart, weekStartFrom, we
 import type { TodoItem } from "../src/core/notebook";
 import type { RepeatKind, Series } from "../src/core/repeat";
 
-// 달력을 실제로 쓰는 흐름 (docs/plans/calendar-flows.md): the shared cases from docs/plans/calendar-flows-cases.json (the
+// 달력을 실제로 쓰는 흐름 (docs/plans/calendar-flows.md): the shared cases from shared/cases/calendar-flows-cases.json (the
 // Mac's scripts/test-calendar-flows.sh reads the same file) — the all-day order that keeps a trip's band in place, which
 // days draw an event as a band and how bands join along a week row, which cut titles take a second line, the week's
 // first day from the system, and the day sheet's holiday line and faded lines.
 type Json = Record<string, any>;
-const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "calendar-flows-cases.json"), "utf8")) as Json;
+const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "calendar-flows-cases.json"), "utf8")) as Json;
 const langs: Lang[] = ["ko", "en", "nl"];
 
 /** "2026-11-06T15:00:00" on this PC's wall clock. */

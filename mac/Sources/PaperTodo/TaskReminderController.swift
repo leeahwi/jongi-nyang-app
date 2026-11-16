@@ -40,7 +40,8 @@ final class TaskReminderController {
             self?.model.completeTasks(ids)
             self?.armTimer()
         }
-        model.objectWillChange.sink { [weak self] _ in
+        // #64: the list's changes and the reminder being edited (left out while it is), not every change of the model.
+        model.listChanged.merge(with: model.$editingTaskReminderID.dropFirst().map { _ in () }).sink { [weak self] _ in
             DispatchQueue.main.async { self?.modelChanged() }
         }.store(in: &subscriptions)
         let center = NSWorkspace.shared.notificationCenter

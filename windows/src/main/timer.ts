@@ -4,6 +4,7 @@ import {
   adjustTimer, isFinished, isPaused, isRestPhase, nextPhase, parseTimer, pauseTimer, remainingMs, resumeTimer, startCountdown, startPomodoro, timerCaption,
   type FocusTimer, type TimerCommand,
 } from "../core/focusTimer";
+import { dragBounds, dragStart, type DragStart } from "../core/dragBounds";
 import type { Point } from "../core/placement";
 import { clampTimer, defaultTimerOrigin, resizedTimerOrigin, timerScale, timerSizes, timerSizeTitles, timerWindowSizeFor, type TimerPayload } from "../core/timerWidget";
 import { pomodoroSettings, type FocusCommand, type FocusStage, type FocusView, type TimerView } from "../core/types";
@@ -85,7 +86,7 @@ export class FocusTimerWidget {
   private interactive = false;
   private messageTimer?: NodeJS.Timeout;
   private finishTimer?: NodeJS.Timeout;
-  private drag?: { cursor: Point; origin: Point };
+  private drag?: DragStart;
 
   constructor(private readonly store: Store, private readonly rendererDirectory: string, private readonly hooks: TimerHooks) {
     const { pet, timer } = store.memory;
@@ -456,9 +457,14 @@ export class FocusTimerWidget {
       ...this.size, show: false, frame: false, transparent: true, resizable: false, minimizable: false, maximizable: false,
       fullscreenable: false, focusable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false,
       backgroundColor: "#00000000", title: t("집중 타이머"),
+      // #312 (preventive): no WS_THICKFRAME, said outright as for the pet, the ears and 타닥냥, so Windows keeps no resize
+      // frame or minimum size of its own on this small window.
+      thickFrame: false,
       // Off-screen runs (snapshots, tests): macOS pulls a window placed off every display back onto one unless it may be
       // larger than the screen (only macOS reads this).
       enableLargerThanScreen: offscreenEnabled,
+      // #67 (checked 2026-11): not throttled: the board counts down and its cat breathes on timers in its page, and
+      // Windows may count a transparent always-on-top window as covered.
       webPreferences: { preload: path.join(__dirname, "preload.js"), sandbox: true, contextIsolation: true, backgroundThrottling: false },
     });
     // Every desktop, but not over full-screen apps (videos, presentations).
@@ -533,15 +539,12 @@ export class FocusTimerWidget {
     });
     ipcMain.on("timer:drag-start", (event) => {
       if (!fromBoard(event) || !this.window) return;
-      const bounds = this.window.getBounds();
-      this.drag = { cursor: screen.getCursorScreenPoint(), origin: { x: bounds.x, y: bounds.y } };
+      const { x, y } = this.window.getBounds();
+      this.drag = dragStart(screen.getCursorScreenPoint(), { x, y, ...this.size });
     });
     ipcMain.on("timer:drag", (event) => {
       if (!fromBoard(event) || !this.window || !this.drag) return;
-      const cursor = screen.getCursorScreenPoint();
-      // #316: the whole bounds, not setPosition (it re-reads the size, which 125 % · 150 % can round up a pixel a move).
-      this.window.setBounds({ x: Math.round(this.drag.origin.x + cursor.x - this.drag.cursor.x),
-        y: Math.round(this.drag.origin.y + cursor.y - this.drag.cursor.y), ...this.size });
+      this.window.setBounds(dragBounds(this.drag, screen.getCursorScreenPoint()));
     });
     ipcMain.on("timer:drag-end", (event) => {
       if (!fromBoard(event) || !this.window || !this.drag) return;

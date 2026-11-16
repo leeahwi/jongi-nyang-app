@@ -45,7 +45,11 @@ export function setup(options: { link?: Partial<AiLink> | null; shared?: boolean
 export const stderrOf = new WeakMap<Client, () => string>();
 
 /** `args`: what follows `command` (the server's file for Node; the app's folder and --mcp-stdio for Electron, #175). */
+/** #389: PAPERTODO_MCP_HOST names a program that runs the server itself with --mcp-stdio (the Mac app), handed the test build. */
+export const host = process.env.PAPERTODO_MCP_HOST;
+
 export async function connect(env: Record<string, string>, command = process.execPath, name = "paper-todo-test", args = [server]): Promise<Client> {
+  if (host && command === process.execPath) [command, args, env] = [host, ["--mcp-stdio"], { ...env, PAPERTODO_MCP_SERVER: server }];
   const client = new Client({ name, version: "1.0.0" });
   const base = Object.fromEntries(Object.entries(process.env).filter(([key, value]) => value !== undefined && !key.startsWith("PAPERTODO_") && key !== "ELECTRON_RUN_AS_NODE")) as Record<string, string>;
   const transport = new StdioClientTransport({ command, args, env: { ...base, ...env }, stderr: "pipe" });

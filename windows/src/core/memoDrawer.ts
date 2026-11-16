@@ -203,7 +203,7 @@ export function visibleFolders(data: MemoFolders): MemoFolder[] {
 /**
  * What each visible bookmark shows (#116, D-2): the picked one its name; the others their first letter, or two where
  * another un-picked one starts with the same letter (Shopping · Study → Sh · St), never more. Letters are counted past
- * spaces and compared without case. The shared cases B1… in docs/plans/drawer-bookmark-cases.json (the Mac's
+ * spaces and compared without case. The shared cases B1… in shared/cases/drawer-bookmark-cases.json (the Mac's
  * MemoFolders.bookmarkLetters).
  */
 export function bookmarkLetters(names: readonly string[], picked: number | null): string[] {
@@ -357,7 +357,7 @@ export function setFolderSort(data: MemoFolders, id: string, sort: FolderSort, n
 /**
  * 보기 (#115): "cards" (카드) is written as no key; like 정렬 a change of the folder (its `updatedAt`), so the newer copy
  * of the folder wins a merge. A value a newer version wrote is replaced only when one is picked here. The shared cases
- * V1… in docs/plans/drawer-view-cases.json (the Mac's MemoFolders.setView).
+ * V1… in shared/cases/drawer-view-cases.json (the Mac's MemoFolders.setView).
  */
 export function setFolderView(data: MemoFolders, id: string, view: FolderView, now = new Date()): MemoFolders {
   const folder = data.folders.find((entry) => entry.id === id && !entry.deleted);

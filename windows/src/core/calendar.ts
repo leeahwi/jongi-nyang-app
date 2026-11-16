@@ -529,7 +529,7 @@ export function dayTasks(day: string, tasks: readonly TaskLike[], lang: Lang = "
  * the copy shows on has no repeat (it isn't drawn twice), and once today's copy is done (placed today, none open) the repeats
  * start tomorrow. A line opens the open copy (`taskId`), or the rule when there is none. Each day's repeats go by their
  * time, then title (no time last). Same rule and shared cases as the Mac (CalendarMonth.repeats,
- * docs/plans/calendar-flows-cases.json `repeats`).
+ * shared/cases/calendar-flows-cases.json `repeats`).
  */
 export function repeatsOn(days: Iterable<string>, series: readonly Series[], tasks: readonly TaskLike[], now: Date, lang: Lang = "ko"): Map<string, DayTask[]> {
   const found = new Map<string, { minutes: number; task: DayTask }[]>();

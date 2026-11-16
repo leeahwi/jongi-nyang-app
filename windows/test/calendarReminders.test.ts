@@ -7,13 +7,13 @@ import type { Lang } from "../src/core/lang";
 import { hiddenSpaces, isHiddenSpace, readDeviceRules } from "../src/core/spaceDevice";
 import { parseTodoSpaces } from "../src/core/todoSpaces";
 
-// 달력의 알림 할 일 (#227): the shared cases from docs/plans/calendar-reminders-cases.json (the Mac's
+// 달력의 알림 할 일 (#227): the shared cases from shared/cases/calendar-reminders-cases.json (the Mac's
 // test-calendar-reminders.sh reads the same file) — a month cell's lines (events, deadlines, then reminders by time, the
 // title only) and its "+N", a week row's tasks, the day panel's (unchanged), the tooltips, and what a space this PC hides
 // leaves out.
 type Todo = { id: string; title: string; due?: string; reminder?: string; time?: [string, string]; space?: string; done?: boolean };
 type Case = { case: string; day: string; events?: string[]; todos: string[]; limit?: number; hidden?: string; at?: string; lines: string[]; more?: number };
-const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "calendar-reminders-cases.json"), "utf8")) as {
+const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "calendar-reminders-cases.json"), "utf8")) as {
   spaces: Record<string, unknown>;
   rules: Record<string, unknown>;
   events: Record<string, { title: string; allDay?: boolean; start: string; end: string }>;

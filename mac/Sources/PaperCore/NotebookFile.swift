@@ -2,6 +2,8 @@ import Foundation
 
 public enum NotebookFileError: Error, Equatable, LocalizedError, Sendable {
     case missing(URL)
+    /// #382: there, but not readable just now (no permission, a cloud file still on its way): never saved over.
+    case unreadable(URL)
     case corrupt(URL)
     case writeFailed(URL)
 
@@ -9,6 +11,8 @@ public enum NotebookFileError: Error, Equatable, LocalizedError, Sendable {
         switch self {
         case .missing:
             "Notebook file does not exist."
+        case .unreadable:
+            "Notebook file could not be opened."
         case .corrupt:
             "Notebook file could not be read."
         case .writeFailed:
@@ -29,8 +33,13 @@ public struct NotebookFile: Sendable {
             throw NotebookFileError.missing(url)
         }
 
+        let data: Data
         do {
-            let data = try Data(contentsOf: url)
+            data = try Data(contentsOf: url)
+        } catch {
+            throw NotebookFileError.unreadable(url)
+        }
+        do {
             return try Self.decoder.decode(Notebook.self, from: data)
         } catch {
             throw NotebookFileError.corrupt(url)
@@ -49,6 +58,10 @@ public struct NotebookFile: Sendable {
             throw NotebookFileError.writeFailed(url)
         }
     }
+
+    /// todos.json's bytes read as a list (#411: SyncedJSONFile), and written.
+    public static func decode(_ data: Data) throws -> Notebook { try decoder.decode(Notebook.self, from: data) }
+    public static func encode(_ notebook: Notebook) throws -> Data { try encoder.encode(notebook) }
 
     private static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()

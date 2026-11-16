@@ -7,6 +7,8 @@ import SwiftUI
 @main
 enum PaperTodoApp {
     @MainActor static func main() {
+        // #389: started by Claude Code as `PaperTodo --mcp-stdio`: only 종이냥 for Claude, nothing of the app.
+        if MCPStdio.wanted(CommandLine.arguments) { MCPStdio.run() }
         // Before any text is looked up: the language of this run (Settings → 꾸미기 → 언어).
         L10n.activate()
         let app = NSApplication.shared
@@ -99,8 +101,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let directory = support.appendingPathComponent(qaBuild ? "com.noa.PaperTodo" : Bundle.main.bundleIdentifier ?? "com.noa.PaperTodo", isDirectory: true)
         let qaStorage = support.appendingPathComponent("com.noa.PaperTodo.QA/test-todos.json")
-        // A shared folder chosen in Settings (iCloud Drive, Dropbox …) holds the list instead.
-        let shared = isolated ? nil : StorageFolder.chosen(.standard)
+        // A shared folder chosen in Settings (iCloud Drive, Dropbox …) holds the list instead. #380: one that isn't there
+        // yet is waited for (nothing is written meanwhile), unless another folder or this Mac's list is picked.
+        let place = isolated ? (folder: nil, missing: nil) : StorageFolder.waitForChosen(.standard)
+        let shared = place.folder
         let storage = specifiedPath.map { URL(fileURLWithPath: $0) }
             ?? (qaBuild ? qaStorage : isolated ? FileManager.default.temporaryDirectory.appendingPathComponent("PaperTodo-preview-\(UUID().uuidString).json") : (shared ?? directory).appendingPathComponent("todos.json"))
         let preferences = qaBuild ? UserDefaults(suiteName: "PaperTodo.QA")! : isolated ? UserDefaults(suiteName: "PaperTodo.Preview")! : .standard
@@ -115,9 +119,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         model = AppModel(storageURL: storage, isolated: isolated, demo: demo, preferences: preferences)
         PerfProbe.mark("model")
         model.sharedFolder = shared
+        if let missing = place.missing {
+            let name = (missing as NSString).lastPathComponent
+            model.storageError = L("‘\(name)’ 폴더를 열 수 없어서 이 Mac의 기본 위치에 저장하고 있어요. 폴더가 다시 보이면 종이냥을 다시 시작해 주세요.")
+        }
         model.backups = BackupBook(storageFolder: storage.deletingLastPathComponent(), defaultFolder: backupsFolder,
                                    preferences: preferences)
         if !isolated { model.backups?.start() }
+        // #385: a cloud's conflict copies left in the folder while the app was closed.
+        model.moveConflictCopies()
         // 낮 · 밤 and the paper (#244) before the first window, so nothing opens in the wrong colours.
         model.applyPaper()
         if !isolated {
@@ -146,9 +156,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         ai.checkLog = argument(after: "--ai-check-log").map { URL(fileURLWithPath: $0) }
         if let log = argument(after: "--ai-open-log") {
             ai.opener = .recording(to: URL(fileURLWithPath: log), noHandler: arguments.contains("--ai-no-handler"))
-        }
-        if let log = argument(after: "--ai-code-log") {
-            ai.codeLinker = .recording(to: URL(fileURLWithPath: log), noClaude: arguments.contains("--ai-no-code"))
         }
         ai.onEnabledChange = { [weak self] _ in self?.updateStorageWatcher() }
         model.calendar.onEdited = { [weak self] id in self?.ai.clearMarks([id]) }
@@ -723,7 +730,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             let count = self.model.hereRemainingCount
             NSApp.dockTile.badgeLabel = self.model.dockBadge && count > 0 ? "\(count)" : nil
         }
-        model.objectWillChange.sink { _ in DispatchQueue.main.async { badge() } }.store(in: &subscriptions)
+        // #64: the list's changes and the setting, not every change of the model.
+        model.listChanged.merge(with: model.$dockBadge.dropFirst().map { _ in () })
+            .sink { _ in DispatchQueue.main.async { badge() } }.store(in: &subscriptions)
         badge()
         // A moment after the note is up (1.39): asking macOS whether the login item is on takes a while.
         if !isolated || arguments.contains("--live-test") {

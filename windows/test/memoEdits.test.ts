@@ -4,12 +4,12 @@ import path from "node:path";
 import { test } from "node:test";
 import { enter, heading, indent, link, moveLines, paste, rule, setLink, tick, tickAtCaret, toggleDone, toggleLines, wrap, type Edit, type LineKind } from "../src/core/memoEdits";
 
-// 메모 서식 (#84): the shared `edits` and `done` cases of docs/plans/memo-markdown-cases.json (the Mac's
+// 메모 서식 (#84): the shared `edits` and `done` cases of shared/cases/memo-markdown-cases.json (the Mac's
 // scripts/test-markdown.sh reads the same file). In the texts ‸ is the caret and « » a selection.
 
 interface EditCase { id: string; about: string; op: string; text: string; expect: string | null; level?: number | "cycle"; mark?: string; kind?: LineKind; pasted?: string; line?: number; move?: boolean; url?: string }
 interface DoneCase { id: string; about: string; text: string; line: number; move: boolean; expect: string }
-const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "memo-markdown-cases.json"), "utf8")) as { edits: EditCase[]; done: DoneCase[] };
+const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "memo-markdown-cases.json"), "utf8")) as { edits: EditCase[]; done: DoneCase[] };
 
 /** The text without its markers, and where they were. */
 function parse(marked: string): Edit {

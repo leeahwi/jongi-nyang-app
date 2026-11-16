@@ -1,6 +1,6 @@
 import Foundation
 
-// 달력의 알림 할 일 (#227, CalendarMonth): the shared cases from docs/plans/calendar-reminders-cases.json (the Windows app's
+// 달력의 알림 할 일 (#227, CalendarMonth): the shared cases from shared/cases/calendar-reminders-cases.json (the Windows app's
 // test/calendarReminders.test.ts reads the same file) — a month cell's lines (events, deadlines, then reminders by time, the
 // title only) and its "+N", a week row's to-dos, the day panel's (unchanged), the tooltips, and what a space this Mac hides
 // leaves out.
@@ -15,7 +15,7 @@ private func equal<T: Equatable>(_ actual: T, _ expected: T, _ name: String) thr
 @main
 private enum CalendarRemindersTests {
     static func main() throws {
-        let path = CommandLine.arguments.dropFirst().first ?? "../docs/plans/calendar-reminders-cases.json"
+        let path = CommandLine.arguments.dropFirst().first ?? "../shared/cases/calendar-reminders-cases.json"
         let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
         var count = 0
         func test(_ name: String, _ action: () throws -> Void) throws {

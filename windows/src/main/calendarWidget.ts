@@ -4,6 +4,7 @@ import {
   frameFor, hasStyles, newPlace, stylesOf, newWidgetId, placeOf, readOpacity, scaleFits, scaleName, shownScale, snap, widget as makeWidget, widgetLimit,
   widgetName, widgetScales, windowSize, type Box, type WidgetKind, type WidgetScreen, type WidgetSettings, type WidgetStyle,
 } from "../core/calendarWidget";
+import { dragBounds, dragStart, type DragStart } from "../core/dragBounds";
 import { askLevels } from "../core/slipMove";
 import type { WidgetChanges } from "../core/types";
 import { lang, t } from "../i18n";
@@ -36,7 +37,7 @@ interface Shown {
   window: BrowserWindow;
   interactive: boolean;
   loaded: boolean;
-  drag?: { cursor: Electron.Point; origin: Electron.Point };
+  drag?: DragStart;
   /** Removed: the window shows only the toast until it goes. */
   removing?: NodeJS.Timeout;
   /** The last frame it was put at (without the room around it, off-screen offset taken out). */
@@ -82,15 +83,15 @@ export class CalendarWidgets {
     ipcMain.on("widget:drag-start", (event) => {
       const entry = owner(event);
       if (!entry || entry.settings.locked) return;
-      const bounds = entry.window.getBounds();
-      entry.drag = { cursor: screen.getCursorScreenPoint(), origin: { x: bounds.x, y: bounds.y } };
+      // #408: the size it should have (its kind, style and scale), as #316 keeps the others.
+      const { x, y } = entry.window.getBounds();
+      const { width, height } = this.windowBounds({ x: 0, y: 0, ...windowSize(entry.settings.kind, entry.settings.style, this.scaleOf(entry.settings)) });
+      entry.drag = dragStart(screen.getCursorScreenPoint(), { x, y, width, height });
     });
     ipcMain.on("widget:drag", (event) => {
       const entry = owner(event);
       if (!entry?.drag) return;
-      const cursor = screen.getCursorScreenPoint();
-      const bounds = entry.window.getBounds();
-      entry.window.setBounds({ ...bounds, x: Math.round(entry.drag.origin.x + cursor.x - entry.drag.cursor.x), y: Math.round(entry.drag.origin.y + cursor.y - entry.drag.cursor.y) });
+      entry.window.setBounds(dragBounds(entry.drag, screen.getCursorScreenPoint()));
     });
     ipcMain.on("widget:drag-end", (event) => {
       const entry = owner(event);
@@ -206,6 +207,9 @@ export class CalendarWidgets {
       ...size, show: false, frame: false, transparent: true, hasShadow: false, resizable: false, movable: false, minimizable: false,
       maximizable: false, fullscreenable: false, focusable: false, skipTaskbar: true, backgroundColor: "#00000000",
       title: t("달력 위젯"),
+      // #312 (preventive): no WS_THICKFRAME, said outright as for the pet, the ears and 타닥냥, so Windows keeps no resize
+      // frame or minimum size of its own on this small window.
+      thickFrame: false,
       // Off-screen runs (#92): a window placed off every display may stay there (only macOS reads this).
       enableLargerThanScreen: offscreenEnabled || this.snapshots,
       paintWhenInitiallyHidden: this.snapshots,

@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 
-/// 질문 쪽지 옮기기 (#228, docs/plans/slip-move-cases.json; Windows core/slipMove.ts): where a slip goes as it is dragged.
+/// 질문 쪽지 옮기기 (#228, shared/cases/slip-move-cases.json; Windows core/slipMove.ts): where a slip goes as it is dragged.
 /// In the coordinates people see a screen in — the top left is 0 and y grows downwards (the Mac turns its own over).
 public enum SlipMove {
     /// The slip's head (its badge and title) stays on the screen: the top this much of the paper.
@@ -46,7 +46,7 @@ public enum SlipMove {
         return dragged(slip, by: .zero, in: area)
     }
 
-    // MARK: #253 — the widgets while a question waits (docs/plans/widget-ask-cases.json)
+    // MARK: #253 — the widgets while a question waits (shared/cases/widget-ask-cases.json)
 
     /// What is up: no question, a question, or one that replaces the whole list (its answer swaps the list for a backup or
     /// a shared folder's, or the app starts again after the list was swapped: SlipAlert.run(replacesList:)).

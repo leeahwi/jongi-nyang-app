@@ -11,7 +11,7 @@ const listen = new Set([
   "state", "state:memos", "state:prefs", "note:focus-new", "note:commit-editing", "note:row-command", "note:event-sheet", "calendar:event-sheet",
   "popup:show", "popup:retain", "popup:reset", "floating:summary", "history:changed", "pet:state", "timer:state", "timer:chime", "quick:open",
   "quickMemo:open", "quickMemo:blur", "timerSheet:open", "ring:show", "ring:hush", "note:toast", "confirm:show", "glance:open",
-  "desk:pane", "paper", "focus:chime", "note:notice", "note:row-menu", "drawer:open", "drawer:shut", "drawer:look", "drawer:backdrop", "handle:state",
+  "desk:pane", "paper", "focus:chime", "note:notice", "note:row-menu", "drawer:open", "drawer:shut", "drawer:look", "drawer:flush", "drawer:backdrop", "handle:state",
   "ears:twitch", "ears:preview", "slip:asking", "confirm:nudge",
   // #234: the desktop calendar widgets and their day sheet.
   "widget:settings", "widget:made", "widget:removed", "widgetSheet:open",

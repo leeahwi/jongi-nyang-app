@@ -13,10 +13,10 @@ import { mayAct, readAction } from "../src/core/ipcCheck";
 import { emptyTodoSpaces, findSpace, inLens, lensNone, parseTodoSpaces } from "../src/core/todoSpaces";
 import type { Lang } from "../src/core/lang";
 
-// 기기마다 보일 스페이스 (#196): the shared cases S60–S72 from docs/plans/spaces-cases.json → `device` (the Mac's
-// test-space-device.sh reads the same), then Windows' own. Run with TZ=Asia/Seoul (the file's time zone).
+// 기기마다 보일 스페이스 (#196): the shared cases S60–S72 from shared/cases/spaces-cases.json → `device` (the Mac's
+// test-space-device.sh reads the same), then Windows' own. test/setup-tz.mjs runs this file in the fixture's zone (#399).
 
-const fixture = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "spaces-cases.json"), "utf8"));
+const fixture = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "spaces-cases.json"), "utf8"));
 const cases = fixture.device;
 const rule = (name: string | null | undefined): DeviceRule | undefined => (name ? readDeviceRules({ x: cases.rules[name] }).x : undefined);
 const spaces = parseTodoSpaces(JSON.stringify({ version: 1, items: {}, spaces: cases.spaces }));

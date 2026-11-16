@@ -9,10 +9,10 @@ import {
 import { bodyFontSize, type DrawerFont } from "../src/core/types";
 import { drawerLook, drawerPaper, drawerThemeValue, readDrawerTheme } from "../src/core/memoDrawer";
 
-// 글꼴 · 종이 설정 (#141 · #142): the shared cases from docs/plans/settings-cases.json (the Mac's test-settings.sh reads
+// 글꼴 · 종이 설정 (#141 · #142): the shared cases from shared/cases/settings-cases.json (the Mac's test-settings.sh reads
 // the same file) — the note's seven steps and the drawer's nine read from 1.30's names and written back as the nearest of
 // them, the drawer's line, paragraph and preview sizes, where a paragraph ends.
-const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "settings-cases.json"), "utf8")) as {
+const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "settings-cases.json"), "utf8")) as {
   noteScales: number[];
   noteSteps: { case: string; saved?: number; legacy?: string; step: number }[];
   noteLegacyNames: string[];

@@ -278,8 +278,8 @@ Zet **Jongi-nyang for Claude** aan om taken, afspraken en notities te bekijken, 
 <summary>De AI-koppeling in detail</summary>
 
 - **Aanzetten**: zet in Bureau → **AI-koppeling** ‘Claude Jongi-nyang laten lezen en schrijven’ aan. **Verbinden met Claude Desktop** opent de `jongi-nyang.mcpb` in de app, en Claude Desktop vraagt of je hem wilt installeren. **Claude Code-opdracht kopiëren** kopieert een opdracht waarin het programma van Jongi-nyang zelf de extensie in de app draait, dus Node.js is niet nodig:
-  `claude mcp add jongi-nyang -- "…\종이냥.exe" --mcp-stdio`
-  De oudere opdracht met `ELECTRON_RUN_AS_NODE=1` werkt nog. Wil je de nieuwe, voer dan `claude mcp remove jongi-nyang` uit in de map waar je hem plakte en plak de nieuwe opdracht.
+  `claude mcp add -s user jongi-nyang -- "…\종이냥.exe" --mcp-stdio`
+  Hij koppelt in je gebruikersbereik (`-s user`), dus hij werkt in elke map en ook in het Code-tabblad van Claude Desktop. De knop zet ook de schakelaar van de AI-koppeling aan (zoals op de Mac). Eerder gekopieerde opdrachten (een die één map koppelt, of een met `ELECTRON_RUN_AS_NODE=1`) werken nog. Wil je de nieuwe, voer dan `claude mcp remove -s user jongi-nyang` uit in een terminal en plak opnieuw. Een oudere verwijder je met `claude mcp remove jongi-nyang` in de map waar je hem plakte.
 - **Wat het kan**: vandaag tonen; taken, afspraken, notities, focussessies en afgevinkte taken laten zien; taken (tot 20 tegelijk), afspraken (zonder herhaling) en notities toevoegen; taken en eenmalige afspraken bewerken; taken per ruimte bekijken en filteren, nieuwe in een ruimte zetten en ze na een ja verplaatsen; vandaag, een week of één notitie aan het gesprek toevoegen. Een bevestigingsnummer is 10 minuten geldig.
 - **Op deze pc verborgen ruimtes**: taken in een ruimte die je op deze pc verbergt (Bureau → Ruimtes), laat Claude ook weg uit vandaag en lijsten, met één regel die zegt hoeveel. Noem de ruimte of zoek en Claude toont ze, gemarkeerd als verborgen. Afgevinkte taken staan er allemaal, zoals in Geschiedenis.
 - **Wat het niet doet**: iets verwijderen, herhalende afspraken of wekkers bewerken, notities bewerken, of ruimtes maken of verwijderen.
@@ -463,7 +463,7 @@ In de [privacyverklaring](https://leeahwi.github.io/jongi-nyang-app/en/privacy.h
 
 Het verwijderprogramma haalt de app weg, maar laat je lijst staan. Wil je alles weg, doe het dan in deze volgorde.
 
-1. Gebruikte je de AI-koppeling, ontkoppel Claude dan eerst. Verwijder ‘Jongi-nyang for Claude’ in Claude Desktop onder Instellingen → Extensies, en als je de koppelopdracht in Claude Code plakte, voer dan in die map `claude mcp remove jongi-nyang` uit.
+1. Gebruikte je de AI-koppeling, ontkoppel Claude dan eerst. Verwijder ‘Jongi-nyang for Claude’ in Claude Desktop onder Instellingen → Extensies, en als je Claude Code koppelde, voer dan `claude mcp remove -s user jongi-nyang` uit (met een oudere opdracht: `claude mcp remove jongi-nyang` in de map waar je hem plakte).
 2. Zet ‘Jongi-nyang openen bij het starten van Windows’ uit in Bureau → Weergave → Opstarten. Heb je de app al verwijderd, zet het dan uit in Taakbeheer → Opstart-apps.
 3. Sluit Jongi-nyang af via het systeemvak en verwijder het in Instellingen → Apps → Geïnstalleerde apps. Gebruikte je de ZIP, verwijder dan de uitgepakte map.
 4. Verwijder `%APPDATA%\PaperTodo\`. Alle bestanden hierboven staan daar (je lijst, instellingen, het AI-logboek, `backups\`).
@@ -499,18 +499,19 @@ De app is met Electron op macOS gedraaid om de schermen en het belangrijkste ged
 
 ### Ontwikkeling
 
-Je hebt Node.js 22 of nieuwer nodig (Electron 44 · electron-builder 26). Voer dit uit in deze map (`windows/`). Het Windows-installatiebestand kun je ook op macOS bouwen.
+Je hebt Node.js 22.12 of nieuwer nodig (Electron 44 · electron-builder 26). Voer dit uit in deze map (`windows/`). Het Windows-installatiebestand kun je ook op macOS bouwen.
 
 ```sh
 npm install
 npm start            # bouwen en starten
 npm run dist         # typecheck + tests + dist/JongiNyang-<versie>-x64.exe (installatie) · .zip (zonder installatie)
+tools/dist.sh        # releasebuild: npm ci en heel npm run dist op Node 22, welke Node er ook staat
 ```
 
 <details>
 <summary>Tests, snapshots en metingen</summary>
 
-Sommige tests gaan uit van Koreaanse tijd; zet de tijdzone op `Asia/Seoul` als je ze draait.
+`npm test` draait de tests die op Koreaanse tijd zijn geschreven in Asia/Seoul (`test/time-zones.json`); de rest slaagt in elke tijdzone.
 
 ```sh
 npm test             # tests van de kernlogica, met afspraken · back-up (exporteren → importeren) · gedeelde map · vertalingen

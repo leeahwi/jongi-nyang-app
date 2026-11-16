@@ -1,5 +1,5 @@
 // #272 · #273: makes sure the one native file the Windows app ships is in node_modules before electron-builder packs it —
-// Koffi's prebuilt Windows binary (@koromix/koffi-win32-x64, MIT), which main/stayBehind.ts uses to call SetWindowPos.
+// Koffi's prebuilt Windows binary (@koromix/koffi-win32-x64, MIT), which main/native/user32.ts loads for SetWindowPos and the hooks.
 // npm installs it only on Windows (it is an optional dependency for win32 x64), so a build on a Mac fetches the exact
 // tarball package-lock.json names and checks it against the lockfile's integrity before unpacking koffi.node.
 // `node tools/native.mjs` (part of `npm run dist`).

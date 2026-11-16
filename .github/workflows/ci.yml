@@ -13,28 +13,34 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  # Some shared cases are written for the developer's time zone (e.g. timeblock, search).
-  TZ: Asia/Seoul
-
+# No time zone is set here: windows/test/setup-tz.mjs gives the test files written on the developer's clock their zone
+# (windows/test/time-zones.json) and runs the rest in UTC; the extension's tests set theirs (mcp/test/helpers.ts).
 jobs:
   windows-app:
-    name: Windows app · typecheck + tests
-    # The tests are pure Node (node:test on the esbuild output); they were verified on macOS.
-    runs-on: macos-latest
+    name: Windows app · typecheck + tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # macOS is where the app has been checked so far; windows-latest is the platform it ships for.
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     defaults:
       run:
         working-directory: windows
-    env:
-      # Tests and the type check don't need the Electron binary, only its type definitions.
-      ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # windows/package.json: "engines": { "node": ">=22.12" }, the version the release build uses.
+          node-version: 22
           cache: npm
           cache-dependency-path: windows/package-lock.json
       - run: npm ci
       - run: npx tsc --noEmit -p .
       - run: npm test
+      # Electron 44 has no install script: its binary comes down the first time something asks for it. One extension
+      # test starts the app's own Electron with --mcp-stdio (the Claude Code command), so it is fetched in its own step.
+      - name: Electron binary for the extension's tests
+        run: node node_modules/electron/install.js
+      - name: 종이냥 for Claude (the extension's own tests)
+        run: npm run mcp:test

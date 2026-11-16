@@ -284,11 +284,24 @@ export class AiConnection {
 
   /**
    * The Claude Code line: 종이냥.exe itself runs the server built into it (#175, main/mcpMode.ts), so no Node is needed
-   * and Electron's RunAsNode stays off. The older line with ELECTRON_RUN_AS_NODE=1 still works (mcpMode.ts).
+   * and Electron's RunAsNode stays off. The older line with ELECTRON_RUN_AS_NODE=1 still works (mcpMode.ts). #441: in
+   * the user's scope (`-s user`), as on the Mac (#389 · #437): every folder and Claude Desktop's Code tab see it, not
+   * only the folder it was pasted in.
    */
   get command(): string {
     const app = this.files.app ? ` "${this.files.app}"` : "";
-    return `claude mcp add jongi-nyang -- "${this.files.exe}"${app} ${mcpStdioFlag}`;
+    return `claude mcp add -s user jongi-nyang -- "${this.files.exe}"${app} ${mcpStdioFlag}`;
+  }
+
+  /**
+   * ‘Claude Code 명령 복사’ (#441, as the Mac's copyCodeCommand): the switch turns on — the line does nothing with it
+   * off — and the line goes to `write` (the clipboard); 복사했어요 shows for a moment. Nothing runs, and Claude Code's
+   * settings are never written by the app.
+   */
+  copyCommand(write: (text: string) => void): void {
+    if (!this.enabled) this.setEnabled(true);
+    write(this.command);
+    this.markCopied();
   }
 
   /** 복사했어요 on the button for a moment. */

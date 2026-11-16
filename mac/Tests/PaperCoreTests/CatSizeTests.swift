@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 
-// 종이냥 펫과 타닥냥의 크기 (#304, CatSize.swift): the shared cases from docs/plans/cat-size-cases.json (the Windows app's
+// 종이냥 펫과 타닥냥의 크기 (#304, CatSize.swift): the shared cases from shared/cases/cat-size-cases.json (the Windows app's
 // test/catSize.test.ts reads the same file).
 private struct TestFailure: Error, CustomStringConvertible {
     let description: String
@@ -20,7 +20,7 @@ private func number(_ value: Any?) -> CGFloat { CGFloat((value as! NSNumber).dou
 @main
 private enum CatSizeTests {
     static func main() throws {
-        let path = CommandLine.arguments.dropFirst().first ?? "../docs/plans/cat-size-cases.json"
+        let path = CommandLine.arguments.dropFirst().first ?? "../shared/cases/cat-size-cases.json"
         let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
         var count = 0
         func test(_ name: String, _ action: () throws -> Void) throws {

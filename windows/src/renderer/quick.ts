@@ -36,6 +36,7 @@ function close(): void {
 const flow: FlowHost = { toast, page: () => "today" };
 /** The button: 넣기 until a reading, then what it makes (made below the line, which reads itself once as it is made). */
 let put: HTMLButtonElement | undefined;
+let foot: HTMLElement | undefined;
 const line = new InputLine({
   variant: "slip",
   placeholder: () => ({ long: t("무엇이든 적어요: 할 일, 일정, ‘타이머 40’"), short: t("무엇이든 적어요") }),
@@ -61,12 +62,22 @@ function sayPut(): void {
   const words = put.querySelector("span");
   const text = actionText(line.pickedReading, lang());
   if (words && words.textContent !== text) words.textContent = text;
+  fitFoot();
+}
+
+/** #387: the button keeps all its words ("Herhalende taak toevoegen"); when they leave no room, the hints keep only
+ *  their keycaps — as on the Mac. */
+function fitFoot(): void {
+  const keys = foot?.querySelector<HTMLElement>(".keys");
+  if (!foot || !keys) return;
+  foot.classList.remove("tight");
+  foot.classList.toggle("tight", keys.scrollWidth > keys.clientWidth);
 }
 const head = slipHead({ icon: "check", tint: "sage", title: t("빠른 입력"), context: `· ${t("어디서든 Ctrl+Alt+N")}`, onClose: close });
 put = slipButton(t("넣기"), "primary", () => void line.submit(), "↩");
+foot = h("div", { class: "slip-foot" }, h("span", { class: "keys" }, ...lineKeys()), h("span", { class: "spacer" }), put);
+card.append(tape("todo"), head.element, h("div", { class: "slip-body" }, line.element), foot);
 sayPut();
-card.append(tape("todo"), head.element, h("div", { class: "slip-body" }, line.element),
-  h("div", { class: "slip-foot" }, h("span", { class: "keys" }, ...lineKeys()), h("span", { class: "spacer" }), put));
 line.field.setAttribute("aria-label", t("빠른 입력"));
 fitWindow(stage);
 

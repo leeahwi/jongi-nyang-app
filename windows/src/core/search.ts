@@ -17,7 +17,7 @@ import { matchRange, prepareQuery } from "./match";
  * 검색 (편의 기능 8): one query over the tasks (오늘 · 앞으로), the memos, the record of finished tasks
  * and the events. Korean matches whole syllables or their first consonants (`ㅂㄱㅅ` → 보고서, `보고ㅅ`
  * too); English and Dutch ignore case and accents (`cafe` → Café). Shared cases:
- * convenience-cases.md §5. 스페이스 2c (C1–C5, S49–S54 in docs/plans/spaces-cases.json): a `#name` looks in
+ * convenience-cases.md §5. 스페이스 2c (C1–C5, S49–S54 in shared/cases/spaces-cases.json): a `#name` looks in
  * that space only — its to-dos and its record lines; memos and events, which have no space, are left out.
  */
 

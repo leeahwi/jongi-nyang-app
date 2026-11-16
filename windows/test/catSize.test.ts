@@ -11,10 +11,10 @@ import { timerScale, timerSizes, timerSizeTitles } from "../src/core/timerWidget
 import { defaultPrefs } from "../src/core/types";
 import { pagePrefs } from "../src/core/ipcCheck";
 
-// 종이냥 펫과 타닥냥의 크기 (#304): the shared cases from docs/plans/cat-size-cases.json (the Mac's
+// 종이냥 펫과 타닥냥의 크기 (#304): the shared cases from shared/cases/cat-size-cases.json (the Mac's
 // scripts/test-cat-size.sh reads the same file).
 const root = process.cwd();
-const file = JSON.parse(fs.readFileSync(path.resolve(root, "..", "docs", "plans", "cat-size-cases.json"), "utf8")) as {
+const file = JSON.parse(fs.readFileSync(path.resolve(root, "..", "shared", "cases", "cat-size-cases.json"), "utf8")) as {
   steps: { id: CatSize; scale: number; names: string[] }[];
   default: CatSize;
   prefs: { windows: { pet: string; typing: string } };

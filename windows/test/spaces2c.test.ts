@@ -10,10 +10,10 @@ import { search, searchHint } from "../src/core/search";
 import { aiMarks, aiPlacesFile, parseAiLog, placeNow, undoTodoEntry } from "../src/core/ai";
 import { emptyTodoSpaces, entrySpace, historySpaces, inHistory, moveTodo, parseTodoSpaces, searchSpace, spaceOf, type TodoSpaces } from "../src/core/todoSpaces";
 
-// 할 일 스페이스 2c (docs/plans/spaces-phase2.md C1–C5 · H1–H5, mcp-plan.md N3): the shared cases S49–S56 of docs/plans/spaces-cases.json
+// 할 일 스페이스 2c (docs/plans/spaces-phase2.md C1–C5 · H1–H5, mcp-plan.md N3): the shared cases S49–S56 of shared/cases/spaces-cases.json
 // and S57–S59 (Claude moving to-dos between spaces, undone here) — the Mac (test-spaces.sh, test-ai.sh) and the extension read the same file.
 
-const fixture = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "spaces-cases.json"), "utf8"));
+const fixture = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "spaces-cases.json"), "utf8"));
 const now = new Date(fixture.now);
 
 /** The shared file with the `search` section's places. */

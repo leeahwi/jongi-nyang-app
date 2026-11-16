@@ -1,19 +1,17 @@
-import { app, screen, type BrowserWindow } from "electron";
-import { createRequire } from "node:module";
+import { screen, type BrowserWindow } from "electron";
 import { performance } from "node:perf_hooks";
 import {
   CaptionDoubleClick, HC_ACTION, HTCAPTION, SM_CXDOUBLECLK, SM_CYDOUBLECLK, WH_MOUSE, WM_NCLBUTTONDBLCLK,
   captionMessage, fallbackLimits, isButtonPress, limitsFrom, pointFromLParam, type DoubleClickLimits,
 } from "../core/captionClicks";
 import { hwndOf } from "../core/stayBehind";
-import { offscreenEnabled } from "./env";
-import { koffiPath } from "./stayBehind";
+import { windowsNative } from "./native/user32";
 
 /**
  * 노트 위쪽을 두 번 눌러 접기 on Windows (#323; why the old hookWindowMessage alone never heard it: core/captionClicks.ts).
  *
  * A WH_MOUSE hook on the main thread only (SetWindowsHookExW with this thread's id and no module: nothing is injected
- * into other apps, and only this app's mouse messages pass through it), reached through Koffi like main/keyHook.ts.
+ * into other apps, and only this app's mouse messages pass through it), reached through Koffi (main/native/user32.ts) like main/keyHook.ts.
  * Windows calls it as the main thread takes a mouse message out of its queue, before the message goes to any window,
  * so it hears the presses that Chromium's child window takes. It doesn't wrap the message's handling (a drag's move
  * loop runs after it returns, not inside it), changes nothing and always passes the message on with CallNextHookEx.
@@ -22,17 +20,6 @@ import { koffiPath } from "./stayBehind";
  *
  * Not on macOS, in an off-screen run or a test, or where Koffi won't load: then only the old hook is left.
  */
-
-interface Koffi {
-  load(name: string): { func(prototype: string): (...args: unknown[]) => unknown };
-  proto?(prototype: string): unknown;
-  callback?(prototype: string): unknown;
-  struct(name: string, members: Record<string, string>): unknown;
-  pointer(type: unknown): unknown;
-  register(callback: (...args: never[]) => unknown, type: unknown): unknown;
-  unregister(callback: unknown): void;
-  decode(pointer: unknown, type: unknown): unknown;
-}
 
 const GA_ROOT = 2;
 
@@ -53,12 +40,10 @@ let loaded = false;
 function loadNative(): CaptionHookNative | undefined {
   if (loaded) return native;
   loaded = true;
-  if (process.platform !== "win32" || offscreenEnabled) return undefined;
   try {
-    const koffi = createRequire(__filename)(koffiPath(app.isPackaged, process.resourcesPath, app.getAppPath())) as Koffi;
-    const user32 = koffi.load("user32.dll");
-    const kernel32 = koffi.load("kernel32.dll");
-    const proto = (koffi.proto ?? koffi.callback)!.bind(koffi);
+    const loadedNative = windowsNative();
+    if (!loadedNative) return undefined;
+    const { koffi, user32, kernel32, proto } = loadedNative;
     const hookProc = proto("intptr __stdcall CaptionMouseProc(int nCode, uintptr wParam, void *lParam)");
     // MOUSEHOOKSTRUCT: POINT pt (two 32-bit LONGs), HWND hwnd, UINT wHitTestCode, ULONG_PTR dwExtraInfo.
     const mouseHookStruct = koffi.struct("CAPTION_MOUSEHOOKSTRUCT", { x: "int32", y: "int32", hwnd: "intptr", wHitTestCode: "uint32", dwExtraInfo: "uintptr" });

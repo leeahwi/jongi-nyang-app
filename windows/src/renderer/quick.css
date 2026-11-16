@@ -12,3 +12,5 @@
 .slip-inp .chips { gap: 6px; }
 .toast-room { display: flex; justify-content: center; width: 420px; max-width: 100%; }
 .toast-room:empty { display: none; }
+/* #387: a long button ("Herhalende taak toevoegen") keeps its words; the hints keep only their keycaps. */
+.slip-foot.tight .keys .word { display: none; }

@@ -4,7 +4,7 @@ import Foundation
 /// 치면 두드리는 고양이 (#230 · #289, docs/plans/typing-cat.md): a cat of its own, apart from the desktop pet, in a
 /// corner of the screen on its cushion. It puts a paw down for each key — the viewer's left paw first, then the other,
 /// back to rest 0.12 s after the last key. The same rules as the Windows app's `src/core/typingCat.ts`; both run the
-/// cases in docs/plans/typing-cat-cases.json.
+/// cases in shared/cases/typing-cat-cases.json.
 ///
 /// What it is given is only that a key went down and when (a monotonic clock, in seconds). It never sees which key,
 /// and it keeps nothing of one: two poses, a time and a deadline.

@@ -8,7 +8,21 @@ final class AppModel: ObservableObject {
     @Published private(set) var history = UndoableNotebook() { didSet { revision &+= 1 } }
     /// Bumped on every change to the list: the derived lists below are worked out once per change and day
     /// (1.39 — every row asked for them again on every redraw).
-    private var revision = 0
+    private var revision = 0 { didSet { listDidChange() } }
+    /// #64: told when what the lists hold changes — the to-dos, the repeats, the spaces, what this Mac hides — and not on
+    /// the screen's own state (a selection, a toast, a drag, a setting), unlike `objectWillChange`. What the controllers
+    /// and the Dock badge scan the list on. Sent after the change is in.
+    let listChanged = PassthroughSubject<Void, Never>()
+    private func listDidChange() {
+        PerfProbe.count("listChanged")
+        listChanged.send()
+    }
+    /// The housekeeping's half-hour and 4 a.m. check (ArchiveStore): deadlines come due and today's sheet changes even
+    /// when the list didn't.
+    func dayTurned() {
+        objectWillChange.send()
+        listDidChange()
+    }
     private var derived: (revision: Int, day: String, today: [TodoItem], ahead: Int, done: Int)?
     @Published var storageError: String?
     @Published var focusRequest = 0
@@ -23,7 +37,7 @@ final class AppModel: ObservableObject {
         didSet { textSize.save(in: preferences) }
     }
     /// Recurring tasks, kept in repeats.json next to todos.json (same format as the Windows app).
-    @Published private(set) var series: [Series] = []
+    @Published private(set) var series: [Series] = [] { didSet { listDidChange() } }
     /// repeats.json couldn't be read at launch: the rules' spaces aren't pruned against an empty list (S36).
     var repeatsUnreadable = false
     var onRepeatSettings: (() -> Void)?
@@ -242,8 +256,8 @@ final class AppModel: ObservableObject {
     private var openMemoTyped = false
     @Published private(set) var lastDeletedMemo: Memo?
     private var memoSaveTask: Task<Void, Never>?
-    /// memos.json as this Mac last read or wrote it; anything else there came from another device.
-    private var knownMemosData: Data?
+    /// memos.json as this Mac last read or wrote it (#411); anything else there came from another device.
+    private(set) lazy var memosFile = SyncedJSONFile(url: memosURL, decode: MemoFile.decode, encode: MemoFile.encode)
     /// Memos written or deleted here since the last save: kept as they are here when another
     /// device's memos come in.
     private var memoEdits: Set<String> = []
@@ -251,18 +265,27 @@ final class AppModel: ObservableObject {
     private var memosURL: URL { file.url.deletingLastPathComponent().appendingPathComponent("memos.json") }
     /// 메모 서랍 (1.43): folders and pins, in memo-folders.json next to memos.json (MemoDrawerModel.swift).
     @Published var memoFolders = MemoFolders.fresh(language: .current)
-    /// memo-folders.json as this Mac last read or wrote it.
-    var knownFoldersData: Data?
+    /// memo-folders.json as this Mac last read or wrote it (#411).
+    private(set) lazy var memoFoldersFile = SyncedFile(url: memoFoldersURL)
+    var knownFoldersData: Data? {
+        get { memoFoldersFile.known }
+        set { if let newValue { memoFoldersFile.accept(newValue) } else { memoFoldersFile.forget() } }
+    }
     /// 지운 메모 (#120): deleted memos kept 30 days, in memo-trash.json next to memos.json (MemoDrawerTrash.swift).
     @Published var memoTrash = MemoTrash()
-    /// memo-trash.json as this Mac last read or wrote it.
-    var knownTrashData: Data?
+    /// memo-trash.json as this Mac last read or wrote it (#411).
+    private(set) lazy var memoTrashFile = SyncedFile(url: memoTrashURL)
+    var knownTrashData: Data? {
+        get { memoTrashFile.known }
+        set { if let newValue { memoTrashFile.accept(newValue) } else { memoTrashFile.forget() } }
+    }
     /// 할 일 스페이스 (1.45): which space each to-do is in, in todo-spaces.json next to todos.json (TodoSpacesModel.swift).
     @Published var todoSpaces = TodoSpaces() {
         didSet {
             guard todoSpaces != oldValue else { return }
             spaceIndex = Self.spaceIndex(todoSpaces)
             spacesRevision &+= 1
+            listDidChange()
             // The last space gone (or the first made) while grouping is on: the note's widest changes too.
             if todoSpaces.isEmpty != oldValue.isEmpty { onNoteWidthCap?() }
             // #196: a to-do moved in or out of a hidden space comes or goes on the note; a space made, deleted or put
@@ -303,8 +326,12 @@ final class AppModel: ObservableObject {
         revision &+= 1
         spacesRevision &+= 1
     }
-    /// todo-spaces.json as this Mac last read or wrote it.
-    var knownSpacesData: Data?
+    /// todo-spaces.json as this Mac last read or wrote it (#411).
+    private(set) lazy var todoSpacesFile = SyncedFile(url: todoSpacesURL)
+    var knownSpacesData: Data? {
+        get { todoSpacesFile.known }
+        set { if let newValue { todoSpacesFile.accept(newValue) } else { todoSpacesFile.forget() } }
+    }
     /// Catch-ups in a row that found the file unreadable (moved aside on the third, W21).
     var spacesBadReads = 0
     /// Each to-do's live space (rows look theirs up on every draw).
@@ -539,10 +566,11 @@ final class AppModel: ObservableObject {
 
     private func saveMemosHeld() {
         catchUpMemos()
+        guard !memosBlocked else { return }
         let started = PerfProbe.now
         defer { PerfProbe.io("memos", since: started) }
         do {
-            knownMemosData = try MemoFile.save(memos.filter { !$0.isBlank || $0.id == openMemoID }, to: memosURL)
+            try memosFile.save(memos.filter { !$0.isBlank || $0.id == openMemoID })
             memoEdits = []
             memoDeletions = []
         } catch {
@@ -624,6 +652,8 @@ final class AppModel: ObservableObject {
     }
     weak var window: NSWindow?
     let file: NotebookFile
+    /// todos.json as this Mac last read or wrote it (#411): a check finds it unchanged without reading or decoding it.
+    let todosFile: SyncedJSONFile<Notebook>
     let preferences: UserDefaults
     /// 일정: the app's own events, in events.json next to todos.json.
     let calendar: EventBook
@@ -657,6 +687,7 @@ final class AppModel: ObservableObject {
 
     init(storageURL: URL, isolated: Bool = false, demo: Bool = false, preferences suppliedPreferences: UserDefaults? = nil) {
         file = NotebookFile(url: storageURL)
+        todosFile = SyncedJSONFile(url: storageURL, decode: NotebookFile.decode, encode: NotebookFile.encode)
         isolatedRun = isolated
         preferences = suppliedPreferences ?? (isolated ? UserDefaults(suiteName: "PaperTodo.Preview")! : .standard)
         preferences.removeObject(forKey: "mascot")
@@ -712,13 +743,18 @@ final class AppModel: ObservableObject {
         hideCompleted = isolated ? false : preferences.bool(forKey: "hideCompleted")
         noteLayer = isolated ? .normal : NoteLayer.saved(preferences.string(forKey: "noteLayer"), legacyOnTop: preferences.bool(forKey: "alwaysOnTop"))
         loadRepeats()
-        let memosFile = file.url.deletingLastPathComponent().appendingPathComponent("memos.json")
-        do {
-            // #173: through SafeFile (a link or a file past 32MB is never read; it is kept aside as unreadable).
-            memos = try (SafeFile.entry(memosFile) == nil ? [] : MemoFile.decode(SafeFile.sharedData(memosFile))).sorted { $0.updatedAt > $1.updatedAt }
-            knownMemosData = try? SafeFile.sharedData(memosFile)
-        } catch {
-            keepUnreadable(memosFile, what: .memos)
+        // #173: through SafeFile (a link or a file past 32MB is never read; it is kept aside as unreadable). #382: a file
+        // there but not readable just now is never saved over (an iCloud placeholder starts its download).
+        if !SafeFile.isAbsent(memosURL) {
+            switch memosFile.catchUp() {
+            case .theirs(let read, let data):
+                memos = read.sorted { $0.updatedAt > $1.updatedAt }
+                memosFile.accept(data, as: read)
+            case .broken:
+                keepUnreadable(memosURL, what: .memos)
+            case .absent, .unreadable, .same:
+                blockUnread(.memos)
+            }
         }
         loadMemoFolders()
         loadMemoTrash()
@@ -734,11 +770,16 @@ final class AppModel: ObservableObject {
             canSave = false
             storageError = L("목록 파일이 링크이거나 32MB보다 커서 읽지 않았어요. 그 파일은 덮어쓰지 않고 그대로 둬요.")
         } else {
-            do {
-                history = UndoableNotebook(notebook: try file.load())
-            } catch NotebookFileError.missing {
-                // The first launch starts with a blank sheet.
-            } catch {
+            switch todosFile.catchUp() {
+            case .theirs(let notebook, let data):
+                history = UndoableNotebook(notebook: notebook)
+                todosFile.accept(data, as: notebook)
+            case .absent, .same:
+                // The first launch starts with a blank sheet — unless iCloud Drive hasn't downloaded the file yet (#382).
+                if !SafeFile.isAbsent(storageURL) { blockList() }
+            case .unreadable:
+                blockList()
+            case .broken:
                 let backup = storageURL.deletingPathExtension()
                     .appendingPathExtension("unreadable-\(Int(Date().timeIntervalSince1970)).json")
                 do {
@@ -746,6 +787,7 @@ final class AppModel: ObservableObject {
                     storageError = L("목록 파일을 읽지 못해서 빈 목록으로 시작했어요.") + " " + Self.keptAside(backup)
                 } catch {
                     canSave = false
+                    listUnread = true
                     storageError = L("목록 파일을 읽지 못했어요. 원래 파일을 지키려고 그 위에 저장하지 않아요. 여기 적은 건 ‘텍스트로 내보내기’로 따로 남겨 두세요.")
                 }
             }
@@ -1073,55 +1115,131 @@ final class AppModel: ObservableObject {
 
     /// Puts today's copies on the list; runs at launch, every 30 minutes, after waking and at 4 a.m.
     func placeRecurring(now: Date = Date()) {
-        let plan = Repeat.planToday(series, items: items, now: now)
-        guard !plan.placed.isEmpty else { return }
-        mutate { $0.placeRecurring(create: plan.create, roll: plan.roll) }
-        placeMadeCopies(plan.create)
-        let key = Archive.dayKey(now)
-        for index in series.indices where plan.placed.contains(series[index].id) { series[index].lastPlaced = key }
-        saveRepeats()
+        AIWriteLock.with {
+            // #376: another device may have added a rule or placed today's copies already.
+            catchUpWithDisk()
+            catchUpRepeats()
+            let plan = Repeat.planToday(series, items: items, now: now)
+            guard !plan.placed.isEmpty else { return }
+            mutate { $0.placeRecurring(create: plan.create, roll: plan.roll) }
+            placeMadeCopies(plan.create)
+            let key = Archive.dayKey(now)
+            for index in series.indices where plan.placed.contains(series[index].id) { series[index].lastPlaced = key }
+            saveRepeats()
+        }
     }
 
     private var repeatsURL: URL { file.url.deletingLastPathComponent().appendingPathComponent("repeats.json") }
 
-    private struct RepeatsFile: Codable { var series: [Series] }
+    /// repeats.json as this Mac last read or wrote it (#376, #411): its known value is the base another device's changes
+    /// are told apart by.
+    private(set) lazy var repeatsFile = SyncedJSONFile(url: repeatsURL, decode: RepeatsFile.decode, encode: RepeatsFile.encode)
 
     private func loadRepeats() {
-        guard FileManager.default.fileExists(atPath: repeatsURL.path) else { return }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        do {
-            series = try decoder.decode(RepeatsFile.self, from: SafeFile.sharedData(repeatsURL)).series.filter { Repeat.isValid($0.rule) }
-        } catch {
+        guard !SafeFile.isAbsent(repeatsURL) else { return }
+        switch repeatsFile.catchUp() {
+        case .theirs(let read, let data):
+            series = read
+            repeatsFile.accept(data, as: read)
+        case .broken:
             repeatsUnreadable = true
-            keepUnreadable(repeatsURL, what: .repeats)
+            if !keepUnreadable(repeatsURL, what: .repeats) { repeatsBlocked = true }
+        case .absent, .unreadable, .same:
+            repeatsUnreadable = true
+            blockUnread(.repeats)
         }
     }
 
     /// An unreadable file is copied aside before anything is saved over it.
     private enum Unreadable { case memos, repeats }
 
-    private func keepUnreadable(_ url: URL, what: Unreadable) {
+    /// #382 (as the Windows app's store.ts `blocked`): a file that is there but can't be read just now (no permission, a
+    /// cloud file still on its way), or can't be read and couldn't be copied aside, is never written: an empty one saved
+    /// over it would reach every device. The next read that works opens saving again (the shared folder's check, a
+    /// change, 다시 읽기 on the storage slip).
+    private var listUnread = false
+    private var memosBlocked: Bool {
+        get { memosFile.file.blocked }
+        set { memosFile.file.blocked = newValue }
+    }
+    private var repeatsBlocked: Bool {
+        get { repeatsFile.file.blocked }
+        set { repeatsFile.file.blocked = newValue }
+    }
+    var hasUnreadFiles: Bool {
+        listUnread || memosBlocked || repeatsBlocked || calendar.problem != nil || alarms.problem != nil
+            || [todoSpacesFile, memoFoldersFile, memoTrashFile].contains(where: \.blocked)
+    }
+
+    /// #452 (the Windows app's #416): 스페이스 · 메모 폴더 · 지운 메모 files that don't read are moved aside, not copied; one
+    /// that couldn't be moved (a folder that can't be written) is never written until it is (다시 읽기, `retryAside`).
+    func blockAside(_ file: SyncedFile) {
+        file.blocked = true
+        storageError = L("\(file.url.lastPathComponent) 파일을 읽지 못했어요.") + " " + L("원래 파일은 덮어쓰지 않고 그대로 둬요.") + " "
+            + L("저장 폴더가 열리는지 확인해 주세요.")
+    }
+
+    /// 다시 읽기 for a file `blockAside` blocked: nil while it still can't be moved; true when it is moved now, false when it
+    /// reads now or is gone. Saving opens again either way.
+    private func retryAside(_ file: SyncedFile, reads: (Data) -> Bool, move: () -> Bool) -> Bool? {
+        guard file.blocked else { return nil }
+        if let data = try? SafeFile.sharedData(file.url) {
+            guard !reads(data) else {
+                file.blocked = false
+                return false
+            }
+            guard move() else { return nil }
+            file.forget()
+            return true
+        }
+        guard SafeFile.isAbsent(file.url) else { return nil }
+        file.blocked = false
+        return false
+    }
+
+    private func blockUnread(_ what: Unreadable) {
+        if what == .memos { memosBlocked = true } else { repeatsBlocked = true }
+        storageError = (what == .memos ? L("메모 파일을 읽지 못했어요.") : L("반복 할 일 파일을 읽지 못했어요.")) + " "
+            + L("원래 파일은 덮어쓰지 않고 그대로 둬요.") + " " + L("저장 폴더가 열리는지 확인해 주세요.")
+    }
+
+    /// Copied aside: true, and saving goes on without it (the copy keeps it). Not copied: false — the caller blocks it.
+    @discardableResult
+    private func keepUnreadable(_ url: URL, what: Unreadable) -> Bool {
         let backup = url.deletingPathExtension().appendingPathExtension("unreadable-\(Int(Date().timeIntervalSince1970)).json")
         if (try? FileManager.default.copyItem(at: url, to: backup)) != nil {
             storageError = (what == .memos
                 ? L("메모 파일을 읽지 못해서 메모 없이 시작했어요.")
                 : L("반복 할 일 파일을 읽지 못해서 반복 없이 시작했어요.")) + " " + Self.keptAside(backup)
-        } else {
-            storageError = (what == .memos ? L("메모 파일을 읽지 못했어요.") : L("반복 할 일 파일을 읽지 못했어요.")) + " " + L("저장 폴더가 열리는지 확인해 주세요.")
+            return true
         }
+        blockUnread(what)
+        return false
     }
 
+    /// #376: what another device (or Claude) saved since this Mac last read the file, with this Mac's changes on top
+    /// (`Repeat.merge`). A file that can't be read just now is left for the next check.
+    private func catchUpRepeats() {
+        guard case .theirs(let theirs, let data) = repeatsFile.catchUp() else { return }
+        // #382: read at last — what was added here meanwhile joins it, and saving opens again.
+        repeatsBlocked = false
+        repeatsUnreadable = false
+        let merged = Repeat.merge(base: repeatsFile.knownValue ?? [], here: series, theirs: theirs)
+        repeatsFile.accept(data, as: theirs)
+        if merged != series { series = merged }
+    }
+
+    /// Read again and merged just before writing, inside the write lock, like the list's `mutateHeld` (#376).
     private func saveRepeats() {
         guard !savingStopped else { return }
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        do {
-            try FileManager.default.createDirectory(at: repeatsURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try encoder.encode(RepeatsFile(series: series)).write(to: repeatsURL, options: .atomic)
-        } catch {
-            storageError = Self.saveProblem(L("반복 할 일을 저장하지 못했어요."))
+        AIWriteLock.with {
+            catchUpRepeats()
+            guard !repeatsBlocked else { return }
+            do {
+                try repeatsFile.save(series)
+            } catch {
+                storageError = Self.saveProblem(L("반복 할 일을 저장하지 못했어요."))
+            }
         }
     }
     // MARK: Shared folder
@@ -1151,33 +1269,124 @@ final class AppModel: ObservableObject {
     /// while a title is being edited here (the next check catches up); memos written here and the
     /// open memo keep this Mac's text.
     func reloadFromDisk() {
-        if !hasUnsavedChanges, editingTaskReminderID == nil, !SafeFile.isRefused(file.url), let notebook = try? file.load(), notebook != history.notebook {
-            takeFromDisk(notebook)
-        }
+        moveConflictCopies()
+        retryUnreadList()
+        if !hasUnsavedChanges, editingTaskReminderID == nil { catchUpTodos() }
         catchUpMemos()
         catchUpMemoFolders()
         catchUpMemoTrash()
         catchUpTodoSpaces()
         calendar.reloadIfChanged()
         alarms.reloadIfChanged()
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        if let data = try? SafeFile.sharedData(repeatsURL), let loaded = try? decoder.decode(RepeatsFile.self, from: data).series.filter({ Repeat.isValid($0.rule) }),
-           loaded != series {
-            series = loaded
+        catchUpRepeats()
+    }
+
+    /// #385: copies a cloud made of a data file when two devices changed it at once (`todos 2.json`, `… conflicted copy …`,
+    /// `todos-PC.json`, `todos (1).json`), moved out of the storage folder — no device reads them as data — into the backup
+    /// folder's `sync-conflicts`, and told (저장 폴더 확인 › 열어 보기). Not merged: which items to keep is the person's call.
+    private(set) var movedConflictCopies: [URL] = []
+
+    func moveConflictCopies(now: Date = Date()) {
+        guard !savingStopped, let names = try? FileManager.default.contentsOfDirectory(atPath: storageFolderURL.path) else { return }
+        let copies = SyncConflict.copies(in: names)
+        guard !copies.isEmpty else { return }
+        let folder = (backups?.activeFolder ?? storageFolderURL.appendingPathComponent("backups", isDirectory: true))
+            .appendingPathComponent("sync-conflicts", isDirectory: true)
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd HHmmss"
+        var moved: [(name: String, to: URL)] = []
+        for copy in copies {
+            let target = folder.appendingPathComponent("\(formatter.string(from: now)) \(copy.name)")
+            do {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                try FileManager.default.moveItem(at: storageFolderURL.appendingPathComponent(copy.name), to: target)
+                moved.append((copy.name, target))
+            } catch {
+                continue // Left where it is: tried again on the next check.
+            }
         }
+        guard !moved.isEmpty else { return }
+        movedConflictCopies += moved.map(\.to)
+        storageError = L("다른 기기와 동시에 고친 파일이 있어요.") + " " + L("클라우드가 남긴 사본을 백업 폴더로 옮겨 뒀어요:") + " "
+            + moved.map { "‘\($0.name)’" }.joined(separator: ", ")
     }
 
     /// In a shared folder another device may have saved since the last check (it runs every two
     /// seconds): take its list first, so the change about to be made lands on top of it instead
     /// of writing over it. Everything here is saved right away, so a file that differs is newer.
     private func catchUpWithDisk() {
-        guard sharedFolder != nil || aiWatching, !hasUnsavedChanges, !SafeFile.isRefused(file.url), let notebook = try? file.load(), notebook != history.notebook else { return }
-        takeFromDisk(notebook)
+        retryUnreadList()
+        guard sharedFolder != nil || aiWatching, !hasUnsavedChanges else { return }
+        catchUpTodos()
+    }
+
+    /// #411: the list on disk, read only when it isn't the one this Mac last read or wrote (this Mac's own save is never
+    /// read back), and taken when it differs from the list here.
+    private func catchUpTodos() {
+        guard !SafeFile.isRefused(file.url), case .theirs(let notebook, let data) = todosFile.catchUp() else { return }
+        // #385: what changed here since the file was last read or written joins theirs, to-do by to-do.
+        let base = todosFile.file.known
+        todosFile.accept(data, as: notebook)
+        if let here = try? NotebookFile.encode(history.notebook),
+           case .joined(let bytes)? = SyncConflict.join(base: base, here: here, theirs: data, key: "items"),
+           let joined = try? NotebookFile.decode(bytes) {
+            takeFromDisk(joined)
+            AIWriteLock.with {
+                hasUnsavedChanges = true
+                retrySave()
+            }
+            return
+        }
+        if notebook != history.notebook { takeFromDisk(notebook) }
     }
 
     /// Another writer's list. With AI 연결 on (1.42) its changes go into the undo history too, so ⌘Z still takes
     /// back this Mac's own steps; otherwise (another device in a shared folder) the history starts over, as before.
+    /// #382: the list file couldn't be read at launch (see `blockList`): read at last, it becomes the list with the to-dos
+    /// added here meanwhile, and saving opens again.
+    private func retryUnreadList() {
+        guard listUnread, !SafeFile.isRefused(file.url), let notebook = try? file.load() else { return }
+        let onDisk = Set(notebook.items.map(\.id))
+        let merged = Notebook(items: notebook.items + items.filter { !onDisk.contains($0.id) })
+        listUnread = false
+        canSave = true
+        storageError = nil
+        takeFromDisk(merged)
+        if merged != notebook {
+            hasUnsavedChanges = true
+            retrySave()
+        }
+    }
+
+    /// The list file is there but couldn't be read (#382): never saved over until it reads.
+    private func blockList() {
+        canSave = false
+        listUnread = true
+        storageError = L("목록 파일을 읽지 못했어요.") + " " + L("원래 파일은 덮어쓰지 않고 그대로 둬요.") + " " + L("저장 폴더가 열리는지 확인해 주세요.")
+    }
+
+    /// 다시 읽기 on the storage slip (#382): every file that couldn't be read is tried again.
+    func rereadFiles() {
+        retryUnreadList()
+        if memosBlocked { memosFile.forget() }
+        catchUpMemos()
+        catchUpRepeats()
+        calendar.reloadIfChanged()
+        alarms.reloadIfChanged()
+        // #452: moved aside at last (its notice says where), and what was changed here meanwhile written.
+        let now = Date()
+        let spaces = retryAside(todoSpacesFile, reads: { (try? TodoSpaces.decode($0)) != nil }, move: { moveSpacesAside(now: now) })
+        if spaces != nil { changeTodoSpaces { _, _ in } }
+        let folders = retryAside(memoFoldersFile, reads: { (try? MemoFolders.decode($0, language: .current)) != nil },
+                                 move: { moveFoldersAside(now: now, starting: false) })
+        if folders != nil { changeMemoFolders { _, _ in } }
+        let trash = retryAside(memoTrashFile, reads: { (try? MemoTrash.decode($0)) != nil },
+                               move: { moveTrashAside(now: now, starting: false) })
+        if trash != nil { changeMemoTrash { _, _ in } }
+        if !hasUnreadFiles, ![spaces, folders, trash].contains(true) { storageError = nil }
+    }
+
     private func takeFromDisk(_ notebook: Notebook) {
         if aiWatching { history.adopt(notebook) } else { history.replaceNotebook(notebook) }
         objectWillChange.send()
@@ -1230,14 +1439,24 @@ final class AppModel: ObservableObject {
     /// open memo once something was typed in it) and leaving deleted ones out, so a save never
     /// drops a memo or an edit made elsewhere.
     private func catchUpMemos() {
-        guard let data = try? SafeFile.sharedData(memosURL), data != knownMemosData else { return }
-        let base = knownMemosData.flatMap { try? MemoFile.decode($0) } ?? []
-        knownMemosData = data
-        guard let theirs = try? MemoFile.decode(data) else {
-            // Half-arrived or broken: kept aside before this Mac's memos are written over it.
+        let base: [Memo], theirs: [Memo]
+        switch memosFile.catchUp() {
+        case .theirs(let read, let data):
+            // The bytes known before these, as they were on disk.
+            base = memosFile.file.known.flatMap { try? MemoFile.decode($0) } ?? []
+            theirs = read
+            memosFile.accept(data, as: read)
+        case .broken(let data):
+            // Half-arrived or broken: kept aside before this Mac's memos are written over it (#382: not copied, not written).
+            // Known as it is: kept aside once, not again on every check.
+            memosFile.accept(data, as: nil)
             keepUnreadable(memosURL, what: .memos)
             return
+        case .same, .absent, .unreadable:
+            return
         }
+        // #382: read at last — merged with what was written here meanwhile, and saving opens again.
+        memosBlocked = false
         var changedHere = memoEdits
         if let openMemoID, openMemoTyped { changedHere.insert(openMemoID) }
         let merged = MemoFile.merge(base: base, here: memos, theirs: theirs, changedHere: changedHere, deletedHere: memoDeletions)
@@ -1499,7 +1718,11 @@ final class AppModel: ObservableObject {
         do {
             try plainText.write(to: url, atomically: true, encoding: .utf8)
         } catch {
-            showStorageError(L("파일을 내보내지 못했어요.") + "\n\(error.localizedDescription)")
+            // #388: not the system's English text with the full path. #390: as on Windows, 다시 시도 picks a place again.
+            if SlipAlert.inform(title: L("텍스트로 내보내기"), message: L("내보내지 못했어요."), detail: L("다른 곳을 골라 다시 시도해 주세요."),
+                                next: L("다시 시도")) {
+                exportTasks()
+            }
         }
     }
 
@@ -1509,9 +1732,21 @@ final class AppModel: ObservableObject {
     }
 
     func showStorageError(_ message: String) {
+        // #382: 다시 읽기 only while a file couldn't be read (the same choice as the Windows app's).
+        let reread = hasUnreadFiles
+        // #385: 열어 보기 while a cloud's conflict copies were moved aside (shown once: told, they're the person's).
+        let copies = movedConflictCopies
         let answer = SlipAlert.run(symbol: "externaldrive.badge.exclamationmark", title: L("저장 폴더 확인"), message: message,
-                                   choices: [.init(title: L("저장 폴더 열기")), .init(title: L("닫기"), role: .primary, isDefault: true, isCancel: true)],
+                                   choices: [.init(title: L("저장 폴더 열기"))] + (reread ? [.init(title: L("다시 읽기"))] : [])
+                                       + (copies.isEmpty ? [] : [.init(title: L("열어 보기"))])
+                                       + [.init(title: L("닫기"), role: .primary, isDefault: true, isCancel: true)],
                                    cat: nil, width: .medium)
+        if !copies.isEmpty {
+            movedConflictCopies = []
+            if storageError?.hasPrefix(L("다른 기기와 동시에 고친 파일이 있어요.")) == true { storageError = nil }
+            if answer == (reread ? 2 : 1) { return NSWorkspace.shared.activateFileViewerSelecting(copies) }
+        }
+        if reread, answer == 1 { return rereadFiles() }
         if answer == 0 {
             NSWorkspace.shared.open(file.url.deletingLastPathComponent())
         }
@@ -1522,7 +1757,7 @@ final class AppModel: ObservableObject {
         let started = PerfProbe.now
         defer { PerfProbe.io("todos", since: started) }
         do {
-            try file.save(history.notebook)
+            try todosFile.save(history.notebook)
             ai?.noteSave(history.notebook)
             hasUnsavedChanges = false
             storageError = nil
@@ -1560,13 +1795,17 @@ final class AppModel: ObservableObject {
         return text
     }
 
-    /// 어제부터: stamps without an undo step (bookkeeping), saved when anything changed.
+    /// 어제부터: stamps without an undo step (bookkeeping), saved when anything changed. #377: like `mutateHeld`, inside
+    /// the write lock and on top of what another device or Claude saved since the last check.
     func stampToday(now: Date = Date()) {
-        let before = history.notebook
-        history.stampToday(now: now)
-        guard history.notebook != before else { return }
-        hasUnsavedChanges = true
-        retrySave()
+        AIWriteLock.with {
+            catchUpWithDisk()
+            let before = history.notebook
+            history.stampToday(now: now)
+            guard history.notebook != before else { return }
+            hasUnsavedChanges = true
+            retrySave()
+        }
     }
 
     func mutate<T>(_ action: (inout UndoableNotebook) -> T) {

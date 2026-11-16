@@ -12,13 +12,13 @@ import { Store } from "../src/main/store";
 import { temporaryFolder } from "./temporaryFolder";
 
 // #173 (security review L-04 · L-05 · I-08): links, sizes and temporary files — the shared cases L1… Z1… T1… of
-// docs/plans/file-safety-cases.json (the Mac's Tests/PaperTodoTests/BackupTests.swift reads the same file). Fictional
+// shared/cases/file-safety-cases.json (the Mac's Tests/PaperTodoTests/BackupTests.swift reads the same file). Fictional
 // temporary folders only.
 
 interface LinkCase { id: string; about: string; file: string; where: "read" | "import"; expect: "skipped" | "untouched" | "read" }
 interface SizeCase { id: string; about: string; kind: "dataFile" | "backup"; file?: string; bytes: "limit" | "limit+1"; expect: "allowed" | "refused" }
 interface TemporaryCase { id: string; about: string; file: string; planted?: string; expect: "unique" | "beside" | "untouched" | "none-left" }
-const cases = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "file-safety-cases.json"), "utf8")) as {
+const cases = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "file-safety-cases.json"), "utf8")) as {
   limits: { backupBytes: number; dataFileBytes: number }; links: LinkCase[]; size: SizeCase[]; temporary: TemporaryCase[];
   messages: { tooLarge: Record<"ko" | "en" | "nl", string> };
 };
@@ -144,12 +144,12 @@ test("the shared folder: a linked or oversized todos.json / memo-trash.json is n
     assert.ok(fs.lstatSync(path.join(folder, "todos.json")).isSymbolicLink(), "still the link");
     assert.match(fs.readFileSync(secret, "utf8"), /남의 파일/, "what it points at is untouched");
     assert.equal(fs.statSync(path.join(folder, "memo-trash.json")).size, fileLimits.dataFileBytes + 1, "the big file is untouched");
-    // Once it is a normal file again, it is read and the message goes.
+    // Once it is a normal file again, it is read and the message goes; #478: the to-do written here meanwhile joins it.
     fs.unlinkSync(path.join(folder, "todos.json"));
     fs.writeFileSync(path.join(folder, "todos.json"), todos("다시 보통 파일"));
     fs.rmSync(path.join(folder, "memo-trash.json"));
     store.catchUp(undefined, true);
-    assert.deepEqual(store.items.map((item) => item.title), ["다시 보통 파일"]);
+    assert.deepEqual(store.items.map((item) => item.title), ["여기서 적은 것", "다시 보통 파일"]);
     assert.equal(store.storageError, undefined);
   } finally {
     store.unwatch();

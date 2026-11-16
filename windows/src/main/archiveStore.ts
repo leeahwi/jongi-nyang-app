@@ -5,7 +5,7 @@ import { spaceOf } from "../core/todoSpaces";
 import type { Store } from "./store";
 import type { TodoItem } from "../core/notebook";
 import { t } from "../i18n";
-import { appendSafely, readTextIfSafe, writeFileAtomically } from "./safeFiles";
+import { appendSafely, readTextIfSafe, tornLineLead, writeFileAtomically } from "./safeFiles";
 
 /**
  * The record of finished tasks: `archive/2026-09.jsonl`, one line per task. Lines are only
@@ -40,22 +40,27 @@ export class ArchiveStore {
   }
 
   /**
-   * 되돌리기 right after 완료한 일 정리: those lines leave the record again (each month file written
-   * anew without them). The only time a line is taken out.
+   * 되돌리기 right after 완료한 일 정리: those lines leave the record again. The only time a line is taken out. #379: the
+   * other lines stay byte for byte — a field this version doesn't know, a line it can't read — and a month that can't be
+   * written says so (the tasks still come back to the list).
    */
   unfile(ids: ReadonlySet<string>): void {
-    try {
-      for (const name of fs.readdirSync(this.directory).filter((file) => file.endsWith(".jsonl"))) {
-        const file = path.join(this.directory, name);
-        // #173: a link or an oversized month is left as it is (readTextIfSafe), and the new text never goes through one.
-        const text = readTextIfSafe(file);
-        if (text === undefined) continue;
-        const kept = parseArchiveLines(text).filter((entry) => !ids.has(entry.id));
-        if (kept.length === parseArchiveLines(text).length) continue;
-        writeFileAtomically(file, kept.map((entry) => JSON.stringify(entry)).join("\n") + (kept.length ? "\n" : ""));
-      }
-    } catch {
-      // The record stays as it is; the tasks still come back to the list.
+    let names: string[] = [];
+    try { names = fs.readdirSync(this.directory).filter((file) => file.endsWith(".jsonl")); } catch { /* no record yet */ }
+    let failed = false;
+    for (const name of names) {
+      const file = path.join(this.directory, name);
+      // #173: a link or an oversized month is left as it is (readTextIfSafe), and the new text never goes through one.
+      const text = readTextIfSafe(file);
+      if (text === undefined) continue;
+      const lines = text.split("\n");
+      const kept = lines.filter((line) => !ids.has(lineID(line) ?? ""));
+      if (kept.length === lines.length) continue;
+      try { writeFileAtomically(file, kept.join("\n")); } catch { failed = true; }
+    }
+    if (failed) {
+      this.store.storageError = `${t("완료 기록에서 되돌리지 못한 일이 있어요. 끝낸 일은 목록으로 돌아왔고, 완료 기록에도 그대로 남아 있어요.")} ${t("저장 폴더가 열리는지 확인해 주세요.")}`;
+      this.store.changed();
     }
     this.entries = undefined;
   }
@@ -90,7 +95,9 @@ export class ArchiveStore {
     try {
       fs.mkdirSync(this.directory, { recursive: true });
       for (const [month, list] of byMonth) {
-        appendSafely(path.join(this.directory, `${month}.jsonl`), list.map((entry) => JSON.stringify(entry)).join("\n") + "\n");
+        const file = path.join(this.directory, `${month}.jsonl`);
+        // #378: after a torn last line the new lines start on their own (joined to it, both would be unreadable).
+        appendSafely(file, tornLineLead(file) + list.map((entry) => JSON.stringify(entry)).join("\n") + "\n");
         for (const entry of list) { saved.add(entry.id); this.entries?.push(entry); }
       }
     } catch {
@@ -113,5 +120,15 @@ export class ArchiveStore {
     }
     this.entries = entries;
     return entries;
+  }
+}
+
+/** A record line's id, read only for that (undefined for a line that isn't one, such as a torn last line). */
+function lineID(line: string): string | undefined {
+  try {
+    const value = JSON.parse(line) as { id?: unknown } | null;
+    return typeof value?.id === "string" ? value.id : undefined;
+  } catch {
+    return undefined;
   }
 }

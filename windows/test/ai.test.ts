@@ -163,9 +163,9 @@ test("#174: the app keeps 30 days of the log whatever its size", () => {
   assert.equal(trimAiLog(`${recent}\n`, local(27, 10), 0), undefined);
 });
 
-// S73 (#121 N3-9): what ai-link.json carries for Claude — the `aiDevice` block of docs/plans/spaces-cases.json, read by
+// S73 (#121 N3-9): what ai-link.json carries for Claude — the `aiDevice` block of shared/cases/spaces-cases.json, read by
 // the Mac's test-space-device.sh and the extension too.
-const aiDevice = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "spaces-cases.json"), "utf8")).aiDevice;
+const aiDevice = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "spaces-cases.json"), "utf8")).aiDevice;
 
 test("S73: ai-link.json carries this PC's 이 기기에서 as stored (bad entries left out), no key when nothing is set", () => {
   const rules = storedDeviceRules(readDeviceRules(aiDevice.rules));

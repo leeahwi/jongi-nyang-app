@@ -337,7 +337,7 @@
 
 **M8. 읽지 못한 파일의 이름**은 `todo-spaces.json.unreadable-20261028-090000`(UTC `yyyyMMdd-HHmmss`)입니다. 옆으로 옮기고 한 번 알립니다.
 
-**M9. 공유 사례 데이터 `docs/plans/spaces-cases.json`.** S1–S22를 데이터로 적었습니다. `lines`(입력 → 뜻 · 제목 · 스페이스 · 후보), `lens`(보기 상태 → 보이는 것, `null`은 모두), `merges` · `renames`(합치기, 양쪽 방향), `S16`(모르는 키가 든 기준 파일. 읽고 쓰면 바이트가 같아야 합니다), `prune`(S17 · S22, 정확히 30일은 남습니다), `unreadable` · `readable`(S21). 시각은 UTC, `timeZone`은 `Asia/Seoul`, 지금은 10월 28일 10:00(KST)입니다. Mac은 `mac/scripts/test-spaces.sh`가 이 파일을 읽습니다. Windows도 같은 파일을 읽으면 두 앱이 어긋날 수 없습니다. 후보의 표기는 스페이스 id, `new:<이름>`, `none`입니다.
+**M9. 공유 사례 데이터 `shared/cases/spaces-cases.json`.** S1–S22를 데이터로 적었습니다. `lines`(입력 → 뜻 · 제목 · 스페이스 · 후보), `lens`(보기 상태 → 보이는 것, `null`은 모두), `merges` · `renames`(합치기, 양쪽 방향), `S16`(모르는 키가 든 기준 파일. 읽고 쓰면 바이트가 같아야 합니다), `prune`(S17 · S22, 정확히 30일은 남습니다), `unreadable` · `readable`(S21). 시각은 UTC, `timeZone`은 `Asia/Seoul`, 지금은 10월 28일 10:00(KST)입니다. Mac은 `mac/scripts/test-spaces.sh`가 이 파일을 읽습니다. Windows도 같은 파일을 읽으면 두 앱이 어긋날 수 없습니다. 후보의 표기는 스페이스 id, `new:<이름>`, `none`입니다.
 
 **M10. 조사.** W12와 같되, 끝 글자가 숫자 · 영문일 때 읽는 소리를 이렇게 봅니다. `1 7 8 l r` → ㄹ받침(`로` · `을`), `0 3 6 m n` → 다른 받침(`으로` · `을`), 그 밖 → 받침 없음(`로` · `를`). 0은 ‘영’, r은 ‘알’입니다. *(Windows도 W13에서 맞췄습니다.)*
 
@@ -364,7 +364,7 @@
 
 **W13. M2 · M10 · M11에 맞췄습니다.** 스페이스가 0개면 `#`를 읽지 않습니다(Windows는 처음부터 그랬고, `spaces-cases.json`의 S19 줄로 검사합니다). 조사는 M10의 숫자 · 영문 읽기(`1 7 8 l r` → ㄹ, `0 3 6 m n` → 다른 받침)로 고쳤습니다. 띠 색은 M11의 표를 그대로 씁니다(Windows의 종이 · paper-2 · 카드에서도 모두 3:1 이상, 낮 가장 낮은 값 3.09). M13의 nl `Herstel`은 따르지 않고 Windows 앱 전체가 쓰는 `Ongedaan maken` 그대로입니다.
 
-**W14. 공유 사례 파일을 Windows도 읽습니다.** `windows/test/todoSpaces.test.ts`가 `docs/plans/spaces-cases.json`의 `lines` · `lens` · `merges` · `renames` · `S16` · `prune` · `unreadable` · `readable`을 모두 돌립니다(S1–S22 각 사례의 검사와 따로).
+**W14. 공유 사례 파일을 Windows도 읽습니다.** `windows/test/todoSpaces.test.ts`가 `shared/cases/spaces-cases.json`의 `lines` · `lens` · `merges` · `renames` · `S16` · `prune` · `unreadable` · `readable`을 모두 돌립니다(S1–S22 각 사례의 검사와 따로).
 
 **W15. 거르기의 입력 기본값은 노트의 입력 줄에만 있습니다.** 빠른 입력(`Ctrl+Alt+N`)과 오늘 창의 입력 줄은 `#`는 읽지만 보기 상태는 따르지 않습니다(그 창들은 거른 목록을 보여 주지 않기 때문입니다). Mac이 빠른 입력에도 보기 상태를 쓰면 알려 주세요.
 

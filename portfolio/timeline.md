@@ -1,6 +1,6 @@
 # 타임라인
 
-날짜는 적지 않고 순서만 적었다. 버전마다 자세한 내용은 [CHANGELOG](../CHANGELOG.md)에 있다.
+날짜는 적지 않고 순서만 적었습니다. 버전마다 자세한 내용은 [CHANGELOG](../CHANGELOG.md)에 있습니다.
 
 ```mermaid
 flowchart TB

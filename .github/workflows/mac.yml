@@ -16,6 +16,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # The Mac checks have no per-file zone like windows/test/setup-tz.mjs yet; their shared cases use the developer's clock.
   TZ: Asia/Seoul
 
 jobs:
@@ -31,17 +32,15 @@ jobs:
         run: |
           sudo xcode-select -s /Applications/Xcode_26.4.1.app
           swift --version
-      - name: Build
-        run: swift build
-      - name: Core regression checks
-        run: ./scripts/test.sh
-      - name: Shared-case and core suites
-        run: |
-          for suite in intent timeblock daystrip ahead focus convenience alarms duration reminders task-reminders time-labels; do
-            echo "::group::test-$suite"
-            "./scripts/test-$suite.sh"
-            echo "::endgroup::"
-          done
+      - name: Build (debug, warnings as errors)
+        run: swift build -Xswiftc -warnings-as-errors
+      - name: Build (release configuration, as scripts/build.sh does)
+        # The same flags as the release build, in its own folder; the app bundle, the extension and signing are left out.
+        env:
+          PAPERTODO_APP_BUNDLE: "1"
+        run: swift build -c release -Xswiftc -warnings-as-errors -Xswiftc -DPAPERTODO_RELEASE --scratch-path .build/app
+      - name: Core checks (scripts/test-core.sh, the same list as the self-review)
+        run: ./scripts/test-core.sh
       - name: WCAG contrast (day and night tokens)
         run: python3 scripts/check-contrast.py
       - name: Translations complete (en, nl)

@@ -1,9 +1,9 @@
 import CoreGraphics
 import Foundation
 
-// 질문 쪽지 옮기기 (#228, SlipMove): the drag cases from docs/plans/slip-move-cases.json (the Windows app's
+// 질문 쪽지 옮기기 (#228, SlipMove): the drag cases from shared/cases/slip-move-cases.json (the Windows app's
 // test/slipMove.test.ts reads the same file). The clicks, open and nudge cases are the app's (test-presentation.sh).
-// #253: and what works on the desktop calendar widgets while a question waits, from docs/plans/widget-ask-cases.json.
+// #253: and what works on the desktop calendar widgets while a question waits, from shared/cases/widget-ask-cases.json.
 private struct TestFailure: Error, CustomStringConvertible {
     let description: String
 }
@@ -15,7 +15,7 @@ private func equal<T: Equatable>(_ actual: T, _ expected: T, _ name: String) thr
 @main
 private enum SlipMoveTests {
     static func main() throws {
-        let path = CommandLine.arguments.dropFirst().first ?? "../docs/plans/slip-move-cases.json"
+        let path = CommandLine.arguments.dropFirst().first ?? "../shared/cases/slip-move-cases.json"
         let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
         var count = 0
         func test(_ name: String, _ action: () throws -> Void) throws {
@@ -61,7 +61,7 @@ private enum SlipMoveTests {
             }
         }
         // #253: what works on the widgets and their day sheet while a question waits (widget-ask-cases.json `presses`).
-        let askedPath = CommandLine.arguments.dropFirst(2).first ?? "../docs/plans/widget-ask-cases.json"
+        let askedPath = CommandLine.arguments.dropFirst(2).first ?? "../shared/cases/widget-ask-cases.json"
         let asked = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: askedPath))) as! [String: Any]
         for entry in asked["presses"] as! [[String: Any]] {
             try test(entry["case"] as! String) {

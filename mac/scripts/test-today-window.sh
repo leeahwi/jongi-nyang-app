@@ -1,6 +1,6 @@
 #!/bin/bash
 # 오늘 창 (#200, TodayGlance.swift): the cards that become chips, the to-do rows that fit, 외 N개, the header's progress
-# and date — the shared cases from docs/plans/today-window-cases.json (the Windows app's test/todayWindow.test.ts reads
+# and date — the shared cases from shared/cases/today-window-cases.json (the Windows app's test/todayWindow.test.ts reads
 # the same file).
 set -euo pipefail
 task_root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -26,4 +26,4 @@ swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/TodayGlance.swift \
     Tests/PaperCoreTests/TodayWindowTests.swift \
     -o .build/checks/TodayWindowTests
-.build/checks/TodayWindowTests ../docs/plans/today-window-cases.json
+.build/checks/TodayWindowTests ../shared/cases/today-window-cases.json

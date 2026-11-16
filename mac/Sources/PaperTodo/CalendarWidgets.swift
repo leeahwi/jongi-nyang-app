@@ -121,7 +121,6 @@ final class CalendarWidgets: ObservableObject {
     private var subscriptions = Set<AnyCancellable>()
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
     private var timer: Timer?
-    private var mouseMonitors: [Any] = []
     private var started = false
     let sheet = WidgetDaySheetController()
 
@@ -475,26 +474,21 @@ final class CalendarWidgets: ObservableObject {
     /// Watched only while a widget lets clicks through: over its ears, or with ⌥ held over it, it takes the mouse and
     /// is drawn solid; off it, clicks pass again. The moves come through the app's one mouse ear (PointerWatch, #64:
     /// it looks away for a moment while the pointer is far from every widget); ⌥ going down or up is heard at once
-    /// (no key watching, no permission).
+    /// (no key watching, no permission) — through PointerWatch too, and only while the pointer is near a widget (#64:
+    /// before, the modifier keys were heard everywhere, all the time a widget let clicks through).
     private func updateMouseMonitors() {
         let needed = list.contains { $0.clickThrough } && !allHidden
-        if needed, mouseMonitors.isEmpty {
-            let watch = PointerWatch.shared
+        let watch = PointerWatch.shared
+        if needed, !watch.watches("widgets") {
             watch.watch("widgets", distance: { [weak self] point in
                 self?.distance(to: point) ?? .infinity
             }, moved: { [weak self] point in
                 self?.pointerMoved(at: point, option: PointerWatch.shared.modifiers().contains(.option))
+            }, keys: { [weak self] flags in
+                self?.pointerMoved(at: PointerWatch.shared.pointer(), option: flags.contains(.option))
             })
-            let flags: (NSEvent) -> Void = { [weak self] event in
-                let option = event.modifierFlags.contains(.option)
-                MainActor.assumeIsolated { self?.pointerMoved(at: PointerWatch.shared.pointer(), option: option) }
-            }
-            if watch.systemWide, let global = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: flags) { mouseMonitors.append(global) }
-            if let local = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged, handler: { flags($0); return $0 }) { mouseMonitors.append(local) }
-        } else if !needed, !mouseMonitors.isEmpty {
-            PointerWatch.shared.stop("widgets")
-            mouseMonitors.forEach(NSEvent.removeMonitor)
-            mouseMonitors.removeAll()
+        } else if !needed, watch.watches("widgets") {
+            watch.stop("widgets")
         }
     }
 

@@ -1,35 +1,35 @@
 # 이력서용 문장
 
-한 줄에 하나씩, 무엇을 했고 어떻게 했고 결과가 어땠는지. 숫자는 [숫자 모음](metrics.md)과 같다.
+한 줄에 하나씩, 무엇을 했고 어떻게 했고 결과가 어땠는지. 숫자는 [숫자 모음](metrics.md)과 같습니다.
 
 ## 한국어
 
-- 같은 할 일 앱을 macOS(SwiftUI)와 Windows(Electron)로 따로 만들고, 기능마다 사례 표를 먼저 써서 두 앱의 시험이 같은 기대 문자열을 통과하게 함 (입력 줄 사례 136줄, 메모 서랍 사례 D1–D30, Windows 시험 582개). 할 일 스페이스부터는 사례 표를 JSON 파일 하나(S1–S22)로 두고 두 앱의 시험이 같이 읽게 함
+- 같은 할 일 앱을 macOS(SwiftUI)와 Windows(Electron)로 따로 만들고, 기능마다 사례 표를 먼저 써서 두 앱의 테스트가 같은 기대 문자열을 통과하게 함 (입력 줄 사례 136줄, 메모 서랍 사례 D1–D30, Windows 테스트 1,616개). 할 일 스페이스부터는 사례 표를 JSON 파일 하나(S1–S22)로 두고 두 앱의 테스트가 같이 읽게 함
 - 같은 데이터로 프로세스 하나만 재는 측정 스크립트를 만들어 쉴 때 CPU 원인(하루 띠 깜빡임이 노트 전체를 매 프레임 다시 그림)을 찾고, Mac 61% → 0.7%, 입력 지연 0.46초 → 0.01초, 시작 2.7초 → 1.0초로 줄임
 - Electron 앱에서 숨긴 창의 애니메이션, 모든 창에 보내던 상태, 공유 폴더 파일 통째 읽기를 걷어내 쉴 때 CPU 5.7% → 1.5%, 10분 뒤 메모리 692MB → 457MB로 줄임(macOS 위 Electron에서 잼)
 - 앱을 쓰다가 집중 카드의 ×를 누르면 앱 전체가 클릭을 받지 않는 버그를 발견. 원인을 추적해(프로세스 샘플링, 창 목록) 0×0 모달 창을 찾고, 쪽지를 띄우는 공통 코드를 고쳐 1.40.1로 배포
 - 하루 일정표에서 끄는 블록이 떨리는 문제를 쓰다가 발견. 끌기를 움직이는 블록 기준으로 재서 생긴 되먹임(Mac)과 15분 칸 단위 그리기(Windows)를 찾아 일정표 기준 측정으로 바꾸고, 틱마다 위치를 기록하는 도구로 포인터와의 차이를 51.5pt → 0.20pt(Mac), 6px → 0px(Windows)로 확인
-- 실제 화면을 3개 언어와 낮/밤으로 약 2,100장 자동으로 그리고, Windows 창을 크기, 배율, 글꼴별로 훑어 잘림과 겹침을 시험 실패로 만듦. 노트 111쌍과 메모 서랍 234쌍의 WCAG AA 대비 검사를 넣음
+- 실제 화면을 3개 언어와 낮/밤으로 약 2,100장 자동으로 그리고, Windows 창을 크기, 배율, 글꼴별로 훑어 잘림과 겹침을 테스트 실패로 만듦. 노트 111쌍과 메모 서랍 234쌍의 WCAG AA 대비 검사를 넣음
 - 서버 없이 JSON 파일과 사용자의 클라우드 폴더로 Mac과 Windows가 한 목록을 쓰게 하고, 동시 편집은 저장 직전 다시 읽기와 메모 3-way 합치기로 처리
-- 다섯 판에 걸쳐 만든 Google 캘린더/Tasks 연동(OAuth loopback + PKCE)을 설정 부담과 "서버 없음" 원칙 때문에 빼고, 앱 안의 일정과 `.jongi` 백업 파일로 대체
+- 다섯 버전에 걸쳐 만든 Google 캘린더/Tasks 연동(OAuth loopback + PKCE)을 설정 부담과 "서버 없음" 원칙 때문에 빼고, 앱 안의 일정과 `.jongi` 백업 파일로 대체
 - Claude 데스크톱 · Claude Code용 MCP 확장(도구 11개)을 만들어 대화로 할 일 · 일정 · 메모를 보고 넣게 함. 기본 꺼짐, 고치기 전 미리 보기와 확인, 앱에서 한 번에 되돌리기, 앱과 확장이 같은 파일을 동시에 쓰지 않게 잠금. 앱 20개 · Claude 20개를 동시에 넣어 하나도 잃지 않음을 확인
 - 메모 탭을 화면 끝 메모 서랍으로 옮기면서 폴더 정보를 새 파일에 두고 모르는 항목은 그대로 남기게 해, 옛 버전과 같은 공유 폴더를 써도 메모를 잃지 않게 함. 써 보며 날짜 묶음, 종류 표시, 우클릭 메뉴로 다듬고 Windows 서랍 다시 열기를 17ms → 3ms로 줄임
 
 - 할 일 2,000개에서 빈 입력 줄의 첫 글자와 Esc가 몇 초씩 멈추던 문제를 많은 데이터로 재다가 찾음. 목록 높이 어림값이 그릴 때마다 바뀌어 다시 그리기를 500–900번 되풀이하던 것을 끊어 첫 글자 5.7–8.8초 → 25–58ms, Esc 10–14초 → 22–41ms로 줄임
 - 메모 서랍을 메모 2,000 · 5,000장과 1MB 메모로 재는 도구와 보고서를 먼저 쓰고, 한 글자마다 모델이 네 번 바뀌던 것을 손을 멈출 때 한 번으로 바꿔 Mac 한 글자 694ms → 9ms(2,000장), 한글 조합 중 한 타 286ms → 4ms로 줄임
-- 할 일 스페이스를 넣으면서 옛 버전이 모르는 칸을 지우는 것을 시험으로 확인하고, 할 일 파일은 그대로 둔 채 새 파일에 자리를 두어 옛 버전과 같은 공유 폴더를 써도 스페이스를 잃지 않게 함
+- 할 일 스페이스를 넣으면서 옛 버전이 모르는 칸을 지우는 것을 테스트로 확인하고, 할 일 파일은 그대로 둔 채 새 파일에 자리를 두어 옛 버전과 같은 공유 폴더를 써도 스페이스를 잃지 않게 함
 - 실제 Windows PC 없이, 클릭을 흘리는 알림 쪽지가 체크를 못 받던 버그를 진짜 창을 화면 밖에 띄우는 Electron 도구로 11가지 경우에서 재현하고 고침(실제 PC 확인은 남김)
 - UI/UX 점검 두 번과 문구 점검으로 이슈 38개를 모으고, 글쓰기 가이드와 용어표를 만들어 두 앱 · 세 언어의 메뉴, 버튼, 오류, 확인 쪽지의 말을 맞춤
 
-짧은 판 (이력서 프로젝트 칸):
+짧은 버전 (이력서 프로젝트 칸):
 
-> 종이냥: macOS(SwiftUI)와 Windows(Electron)용 할 일 앱, 1인 개발(AI 페어 프로그래밍). Mac 1.45.0, Windows 1.30.0 배포.
+> 종이냥: macOS(SwiftUI)와 Windows(Electron)용 할 일 앱, 1인 개발(AI 페어 프로그래밍). Mac 1.50.0, Windows 1.35.0 배포.
 > 두 앱이 같은 사례 표(입력 줄 136줄)를 통과하게 해 동작을 맞추고, 측정 스크립트로 쉴 때 CPU를 61% → 0.7%(Mac), 5.7% → 1.5%(Windows, macOS 위 Electron에서 잼)로 줄임.
 > github.com/leeahwi/jongi-nyang-app
 
 ## English
 
-- Built the same to-do app twice, for macOS (SwiftUI) and Windows (Electron), and kept them consistent by writing a case table per feature that both test suites must pass with identical strings (136 input-line cases, notes-drawer cases D1–D30, 582 Windows tests); from to-do spaces on, the case table is one JSON file (S1–S22) that both suites read
+- Built the same to-do app twice, for macOS (SwiftUI) and Windows (Electron), and kept them consistent by writing a case table per feature that both test suites must pass with identical strings (136 input-line cases, notes-drawer cases D1–D30, 1,616 Windows tests); from to-do spaces on, the case table is one JSON file (S1–S22) that both suites read
 - Wrote a measurement script that drives one process with fixed sample data, traced idle CPU to a blinking line that redrew the whole note every frame, and cut Mac idle CPU from 61% to 0.7%, keystroke latency from 0.46 s to 0.01 s and launch time from 2.7 s to 1.0 s
 - Stopped hidden-window animations, per-window state broadcasts and whole-file reads in the Electron app, taking idle CPU from 5.7% to 1.5% and memory after ten minutes from 692 MB to 457 MB (measured in Electron on macOS)
 - Found, while using the app, that pressing the focus card's × froze all clicks; tracing it (process sampling, window list) turned up a 0×0 modal window, fixed in the shared slip code and shipped in 1.40.1
@@ -48,6 +48,6 @@
 
 Short version (résumé project entry):
 
-> Jongi-nyang: to-do app for macOS (SwiftUI) and Windows (Electron), solo, with AI pair programming. Shipped Mac 1.45.0 and Windows 1.30.0.
+> Jongi-nyang: to-do app for macOS (SwiftUI) and Windows (Electron), solo, with AI pair programming. Shipped Mac 1.50.0 and Windows 1.35.0.
 > Kept both apps consistent with shared case tables (136 input-line cases); cut idle CPU from 61% to 0.7% on Mac and from 5.7% to 1.5% on Windows (measured in Electron on macOS) using my own measurement scripts.
 > github.com/leeahwi/jongi-nyang-app

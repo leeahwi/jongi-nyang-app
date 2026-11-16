@@ -57,7 +57,7 @@ final class DesktopPetController {
             DispatchQueue.main.async { self?.setVisible(visible) }
         }.store(in: &subscriptions)
         // A task checked off anywhere gets a little cheer.
-        model.objectWillChange.sink { [weak self] _ in
+        model.listChanged.sink { [weak self] _ in
             DispatchQueue.main.async { self?.checkForCompletion() }
         }.store(in: &subscriptions)
         NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)

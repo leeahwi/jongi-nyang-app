@@ -448,7 +448,7 @@ struct HelpTopic: Identifiable {
         HelpTopic(id: "start", title: L("시작하기"), symbol: "sparkles", pose: .happy, headline: L("하루에 한 장, 가볍게"), entries: [
             HelpEntry(title: L("종이냥은 어떤 앱인가요?"), body: L("할 일과 일정을 종이 한 장에 적는 노트예요. 적고, 체크하고, 끝내면 종이냥이 축하해 줘요.\n· 인터넷이나 로그인 없이 이 Mac에 저장돼요.\n· 원하면 iCloud Drive 같은 공유 폴더로 여러 기기에서 같은 목록을 써요.")),
             HelpEntry(title: L("창을 닫아도 계속 실행돼요"), body: L("노트를 닫아도 앱은 메뉴 막대의 종이냥 얼굴로 남아 알림을 계속 보내요. 얼굴을 누르면 오늘 창이, ⌘0을 누르면 노트가 다시 열려요. 완전히 끄려면 ⌘Q."), keys: ["⌘0", "⌘Q"]),
-            HelpEntry(title: L("로그인할 때 켜기"), body: L("‘로그인할 때 같이 열기’를 켜면 Mac에 로그인할 때 종이냥이 바로 열려요.\n· 이 스위치는 처음 안내의 마지막 카드와 책상 → 꾸미기 → 시작에 있어요.\n· 꺼 둔 채로 세 번 직접 켜면 종이냥이 한 번 물어봐요.")),
+            HelpEntry(title: L("로그인할 때 같이 열기"), body: L("‘로그인할 때 같이 열기’를 켜면 Mac에 로그인할 때 종이냥이 바로 열려요.\n· 이 스위치는 처음 안내의 마지막 카드와 책상 → 꾸미기 → 시작에 있어요.\n· 꺼 둔 채로 세 번 직접 켜면 종이냥이 한 번 물어봐요.")),
             HelpEntry(title: L("처음 안내 다시 보기"), body: L("⋯ 메뉴 → 사용 안내, 또는 메뉴 막대의 도움말 → 사용 안내에서 처음에 본 카드 안내를 다시 볼 수 있어요.")),
         ]),
         HelpTopic(id: "tasks", title: L("할 일"), symbol: "checklist", pose: .blink, headline: L("적고, 체크하고, 끝"), entries: [
@@ -633,7 +633,7 @@ struct HelpTopic: Identifiable {
         ]),
         HelpTopic(id: "ai", title: L("AI 연결"), symbol: "bubble.left", pose: .curious, headline: L("Claude와 이야기하며 정리해요"), entries: [
             HelpEntry(title: L("무엇을 할 수 있나요"), body: L("Claude 데스크톱이나 Claude Code와 이야기하면서 할 일 · 일정 · 메모를 보고 새로 넣어요.\n· 할 일과 반복하지 않는 일정은 고칠 수도 있어요.\n· 할 일을 스페이스로 보고 거르고, 넣을 때 스페이스를 정하고, 물어본 뒤 다른 스페이스로 옮겨요.\n· 이 기기에서 숨긴 스페이스의 할 일은 오늘과 목록에서 빼요. 그 스페이스를 말하면 보여 줘요.\n· 예: ‘내일 3시–4시 보고서 쓰기 넣어줘’, ‘이번 주 뭐 했는지 정리해줘’\n· 지우기, 반복 일정 · 알람 고치기, 메모 고치기, 스페이스 만들기 · 지우기는 하지 않아요.")),
-            HelpEntry(title: L("켜고 연결하기"), body: L("책상 → AI 연결에서 켜고, Claude 데스크톱이나 Claude Code에 연결해요. 끄면 Claude는 아무것도 읽거나 쓰지 못해요.\n1. ‘Claude가 종이냥을 보고 쓸 수 있게 하기’를 켜요. 처음에는 꺼져 있어요.\n2. ‘Claude 데스크톱에 연결’을 눌러요. Claude 데스크톱이 ‘종이냥 for Claude’를 설치할지 물어봐요.\n3. Claude Code만 쓴다면 ‘Claude Code에 연결’을 눌러요.\n· ‘Claude 데스크톱에 연결’은 Claude Code가 있으면 같이 연결해요.\n· Claude Code는 터미널과 Claude 데스크톱의 Code 탭에서 써요. Node.js(nodejs.org)가 필요해요.")),
+            HelpEntry(title: L("켜고 연결하기"), body: L("책상 → AI 연결에서 켜고, Claude 데스크톱이나 Claude Code에 연결해요. 끄면 Claude는 아무것도 읽거나 쓰지 못해요.\n1. ‘Claude가 종이냥을 보고 쓸 수 있게 하기’를 켜요. 처음에는 꺼져 있어요.\n2. ‘Claude 데스크톱에 연결’을 눌러요. Claude 데스크톱이 ‘종이냥 for Claude’를 설치할지 물어봐요.\n3. Claude Code는 ‘Claude Code 명령 복사’로 복사한 명령을 터미널에 붙여 넣어요.\n· Claude Code에 Node.js는 필요 없어요. 종이냥이 실행해요.\n· 붙여 넣은 명령은 어느 폴더에서나, Claude 데스크톱의 Code 탭에서도 돼요.\n· 예전에 연결한 것도 그대로 돼요. 새 명령으로 바꾸려면 터미널에서 claude mcp remove -s user jongi-nyang을 실행하고 다시 붙여 넣어요.")),
             HelpEntry(title: L("고치기 전에 물어봐요"), body: L("Claude는 고치기 전에 바뀌기 전과 후를 대화에 먼저 보여 주고, ‘응’이라는 답을 받은 뒤에 고쳐요. 그사이 종이냥에서 그 항목을 바꿨으면 고치지 않고 다시 보여 줘요.")),
             HelpEntry(title: L("알림과 되돌리기"), body: L("Claude가 넣거나 고치면 노트 아래에 ‘Claude가 할 일 2개를 넣었어요 · 되돌리기’가 떠요.\n1. 안내의 ‘되돌리기’를 눌러요. 그 뒤로 여기서 아무것도 바꾸지 않았다면 ⌘Z로도 돼요.\n2. 나중에 되돌리려면 책상 → AI 연결 → 최근 AI 작업에서 오늘과 어제 한 일을 하나씩 되돌려요.\n· 그사이 바뀐 항목은 그대로 둬요.\n· Claude가 넣거나 고친 할 일과 일정에는 그날 동안 작은 ‘Claude’ 도장이 찍혀요."), keys: ["⌘Z"]),
             HelpEntry(title: L("종이냥이 꺼져 있을 때"), body: L("종이냥을 꺼 둬도 Claude는 넣고 고칠 수 있어요.\n1. 다음에 종이냥을 켜면 ‘자리를 비운 사이 Claude가 3개를 넣거나 고쳤어요’가 떠요.\n2. ‘보기’를 누르면 무엇을 했는지 보여요.")),

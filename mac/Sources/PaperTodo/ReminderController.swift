@@ -63,8 +63,8 @@ final class ReminderController: ObservableObject {
         schedule = ReminderSchedule(enabled: initialEnabled, intervalMinutes: initialInterval, now: .now)
         armTimer()
 
-        model.objectWillChange.sink { [weak self] _ in
-            // Published model mutations are delivered before their new values are installed.
+        // #64: the list's changes only (not a selection or a toast); after the rest of the change is in.
+        model.listChanged.sink { [weak self] _ in
             DispatchQueue.main.async { self?.modelChanged() }
         }.store(in: &subscriptions)
 
@@ -907,8 +907,11 @@ struct CompletedSettingsGroup: View {
                     // #52: the same ‘↗ 폴더 열기’ in the same place as 저장 폴더's.
                     OpenFolderButton(help: L("Finder에서 완료 기록 폴더 열기")) { model.openFolder(model.archiveFolderURL) }
                 }
-                FolderPath(url: model.archiveFolderURL)
-                    .padding(.leading, FolderPath.indent)
+                // #388: the place only when it is a folder the user chose; the app's own folder stays behind 폴더 열기.
+                if model.sharedFolder != nil {
+                    FolderPath(url: model.archiveFolderURL)
+                        .padding(.leading, FolderPath.indent)
+                }
             }
             .padding(.vertical, 9)
             .settingsRow()
@@ -949,8 +952,10 @@ struct StorageSettingsGroup: View {
                     // #52: at the end of the folder's row, as for 기록 폴더 (same name, same place).
                     OpenFolderButton(help: L("Finder에서 저장 폴더 열기")) { model.openFolder(model.storageFolderURL) }
                 }
-                FolderPath(url: model.storageFolderURL)
-                    .padding(.leading, FolderPath.indent)
+                if model.sharedFolder != nil {
+                    FolderPath(url: model.storageFolderURL)
+                        .padding(.leading, FolderPath.indent)
+                }
             }
             .padding(.vertical, 9)
             .settingsRow()
@@ -1112,8 +1117,8 @@ struct PetSettingsPanel: View {
                     Spacer(minLength: 8)
                     PaperSegmented(selection: $model.chatterFrequency,
                                    options: PetChatter.Frequency.allCases.map { ($0, $0.title(.current), nil) },
-                                   label: L("말 거는 횟수"))
-                        .frame(width: 186)
+                                   label: L("말 거는 횟수"), fit: true)
+                        .frame(width: 224)
                 }
                 .settingsRow()
                 .help("가끔 약 1시간 반, 보통 약 45분, 자주 약 20분마다")

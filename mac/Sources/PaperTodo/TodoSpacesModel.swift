@@ -26,33 +26,38 @@ extension AppModel {
             todoSpaces = try TodoSpaces.decode(data)
             knownSpacesData = data
         } catch {
-            moveSpacesAside(now: now)
             todoSpaces = TodoSpaces()
-            knownSpacesData = nil
+            knownSpacesData = moveSpacesAside(now: now) ? nil : data
         }
     }
 
-    private func moveSpacesAside(now: Date) {
+    /// Moved aside: true. Not moved (a folder that can't be written): false, and the file is never written (#452).
+    func moveSpacesAside(now: Date) -> Bool {
         let aside = storageFolderURL.appendingPathComponent(TodoSpaces.asideName(now))
-        if (try? FileManager.default.moveItem(at: todoSpacesURL, to: aside)) != nil {
-            storageError = L("스페이스 파일을 읽지 못해서 스페이스 없이 시작했어요. 할 일은 모두 그대로예요.") + " " + Self.keptAside(aside)
+        guard (try? FileManager.default.moveItem(at: todoSpacesURL, to: aside)) != nil else {
+            blockAside(todoSpacesFile)
+            return false
         }
+        todoSpacesFile.blocked = false
+        storageError = L("스페이스 파일을 읽지 못해서 스페이스 없이 시작했어요. 할 일은 모두 그대로예요.") + " " + Self.keptAside(aside)
+        return true
     }
 
     /// Another device changed the file: merged in — the file's copy is the one already there, this Mac's comes in (W3).
     /// One that doesn't read may be half synced: it's read again on the next checks, and moved aside on the third (W21).
     func catchUpTodoSpaces() {
-        guard let data = try? SafeFile.sharedData(todoSpacesURL), data != knownSpacesData else { return }
+        guard case .changed(let data) = todoSpacesFile.look() else { return }
         guard let theirs = try? TodoSpaces.decode(data) else {
             spacesBadReads += 1
             if spacesBadReads >= 3 {
                 spacesBadReads = 0
-                knownSpacesData = nil
-                moveSpacesAside(now: Date())
+                // Not moved: known as it is, so the checks don't count it again (다시 읽기 tries the move again).
+                knownSpacesData = moveSpacesAside(now: Date()) ? nil : data
             }
             return
         }
         spacesBadReads = 0
+        todoSpacesFile.blocked = false
         knownSpacesData = data
         let merged = TodoSpaces.merge(existing: theirs, incoming: todoSpaces)
         if merged != todoSpaces { todoSpaces = merged }
@@ -77,12 +82,11 @@ extension AppModel {
         }
         // The lens goes with its space (S12).
         if let lens = spaceLens, lens.spaceId != SpaceLens.none, spaces.space(lens.spaceId) == nil { spaceLens = nil }
-        guard spaces.encoded().utf8.elementsEqual(knownSpacesData ?? Data()) == false else { return }
+        guard spaces.encoded().utf8.elementsEqual(knownSpacesData ?? Data()) == false, !todoSpacesFile.blocked else { return }
         let started = PerfProbe.now
         defer { PerfProbe.io("todo-spaces", since: started) }
         do {
-            try spaces.save(to: todoSpacesURL)
-            knownSpacesData = try? SafeFile.sharedData(todoSpacesURL)
+            try todoSpacesFile.write(Data(spaces.encoded().utf8))
         } catch {
             storageError = Self.saveProblem(L("스페이스를 저장하지 못했어요."))
         }

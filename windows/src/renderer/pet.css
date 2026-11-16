@@ -13,8 +13,11 @@ html, body { background: transparent; }
 .art { display: block; width: 100%; height: 100%; object-fit: contain; transform-origin: 50% 93%; pointer-events: none; }
 /* #67: held paused and moved on about 8 times a second (renderer/sampled.ts sets --t, the ms since it started), for
    one breath each time the cat settles; then it sits still (--t back to 0, the first frame: the cat as drawn). */
-.art.awake { animation: breathe-awake 2.6s ease-in-out infinite paused, sway 5.3s ease-in-out infinite paused; animation-delay: calc(var(--t, 0) * -1ms); will-change: scale, rotate; }
-.art.asleep { animation: breathe-asleep 3.4s ease-in-out infinite paused; animation-delay: calc(var(--t, 0) * -1ms); will-change: scale; }
+.art.awake { animation: breathe-awake 2.6s ease-in-out infinite paused, sway 5.3s ease-in-out infinite paused; animation-delay: calc(var(--t, 0) * -1ms); }
+.art.asleep { animation: breathe-asleep 3.4s ease-in-out infinite paused; animation-delay: calc(var(--t, 0) * -1ms); }
+/* #67: a layer of its own only while a breath plays (sampled.ts marks it `.sampling`); at rest the cat is drawn with the page. */
+.art.awake.sampling { will-change: scale, rotate; }
+.art.asleep.sampling { will-change: scale; }
 /* Breathing: a little taller and narrower on the in-breath; a slow sway on another period. */
 @keyframes breathe-awake { 0%, 100% { scale: 1 1; } 45% { scale: 0.9944 1.016; } }
 @keyframes breathe-asleep { 0%, 100% { scale: 1 1; } 45% { scale: 0.9902 1.028; } }

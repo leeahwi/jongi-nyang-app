@@ -8,13 +8,13 @@ import { parseMemoFolders, pinnedView } from "../src/core/memoDrawer";
 import { matchRange } from "../src/core/search";
 
 // #114: 메모 찾기's results by folder, scope and filters; the found line; the times; the footer — the shared cases F1… P1…
-// T1… R1… of docs/plans/drawer-search-cases.json (the Mac's MemoDrawerTests.swift reads the same file).
+// T1… R1… of shared/cases/drawer-search-cases.json (the Mac's MemoDrawerTests.swift reads the same file).
 
 interface FindCase { id: string; about: string; query: string; scope: null | "pinned" | { folder: string }; filters: SearchFilter[]; expect: { folder: string; ids: string[] }[] }
 interface SnippetCase { id: string; about: string; line: string; query: string; expect: string; mark: string }
 interface TimeCase { id: string; about: string; at: string; ko: string; en: string; nl: string }
 interface FooterCase { id: string; count: number; folders: number; ko: string; en: string; nl: string }
-const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "drawer-search-cases.json"), "utf8")) as {
+const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "drawer-search-cases.json"), "utf8")) as {
   folders: unknown; memos: { id: string; text: string; updatedAt: string }[]; cases: FindCase[]; snippets: SnippetCase[]; now: string; times: TimeCase[]; footer: FooterCase[];
 };
 const folders = parseMemoFolders(JSON.stringify(file.folders));

@@ -195,6 +195,8 @@ export class ReminderPopup {
       // Off-screen runs (snapshots, tests): macOS pulls a window placed off every display back onto one unless it may be
       // larger than the screen (only macOS reads this).
       enableLargerThanScreen: offscreenEnabled,
+      // #67 (checked 2026-11): not throttled: the bubble measures itself (ResizeObserver, a frame) while the window is
+      // still hidden, then is shown at that size.
       webPreferences: { preload: path.join(__dirname, "preload.js"), sandbox: true, contextIsolation: true, backgroundThrottling: false },
     });
     window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });

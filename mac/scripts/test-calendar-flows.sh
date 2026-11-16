@@ -1,5 +1,5 @@
 #!/bin/bash
-# 달력을 실제로 쓰는 흐름 (docs/plans/calendar-flows.md): the shared cases from docs/plans/calendar-flows-cases.json — the
+# 달력을 실제로 쓰는 흐름 (docs/plans/calendar-flows.md): the shared cases from shared/cases/calendar-flows-cases.json — the
 # all-day order and the bands of multi-day events along a week row, the cut titles that take a second line, the week's
 # first day from the system, and the day sheet's holiday line and faded lines (the Windows app's
 # test/calendarFlows.test.ts reads the same file).
@@ -47,4 +47,4 @@ swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/KoreanCalendar.swift \
     Tests/PaperCoreTests/CalendarFlowsTests.swift \
     -o .build/checks/CalendarFlowsTests
-.build/checks/CalendarFlowsTests ../docs/plans/calendar-flows-cases.json
+.build/checks/CalendarFlowsTests ../shared/cases/calendar-flows-cases.json

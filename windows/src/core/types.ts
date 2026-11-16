@@ -692,6 +692,8 @@ export type Action =
   | { type: "deskPane"; pane: DeskPane }
   /** 사용 안내 (the first-launch cards) on the note, from the desk's sidebar. */
   | { type: "openGuide" }
+  /** #409: 문제 보고용 정보 복사 (책상 → 도움). */
+  | { type: "copyReportInfo" }
   | { type: "openArchiveFolder" }
   | { type: "previewReminder" }
   | { type: "snoozePeriodic"; minutes: number }

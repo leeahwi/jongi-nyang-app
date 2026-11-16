@@ -27,6 +27,11 @@ if (tests) {
   // (out/mcp.js: mcp/src as in the .mcpb, here inside the checked app.asar so Claude Code needs no RunAsNode).
   await build({ ...common, ...node, entryPoints: [path.join(root, "src/main/entry.ts")], outfile: path.join(out, "main.js") });
   await build({ ...common, ...node, entryPoints: [path.join(root, "src/main/main.ts")], outfile: path.join(out, "app.js") });
+  // #408: a release has none of the snapshot tools (src/main/snapshots, loaded only under __TEST_HOOKS__).
+  if (production && (await readFile(path.join(out, "app.js"), "utf8")).includes("PAPERTODO_SNAPSHOT_ONLY")) {
+    console.error("build: the snapshot tools (src/main/snapshots) ended up in the release's out/app.js");
+    process.exit(1);
+  }
   const { version } = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
   await build({ ...common, ...node, entryPoints: [path.join(root, "mcp/src/index.ts")], outfile: path.join(out, "mcp.js"), legalComments: "none", define: { ...common.define, __VERSION__: JSON.stringify(version) } });
   await build({ ...common, ...node, entryPoints: [path.join(root, "src/preload.ts")], outfile: path.join(out, "preload.js") });

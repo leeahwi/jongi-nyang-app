@@ -1,7 +1,7 @@
 import type { PageName } from "./ipcCheck";
 
 /**
- * 질문 쪽지 옮기기 · 막힌 클릭 (#228 · #229, docs/plans/slip-move-cases.json; the Mac's SlipMove · SlipModal). Kept out of
+ * 질문 쪽지 옮기기 · 막힌 클릭 (#228 · #229, shared/cases/slip-move-cases.json; the Mac's SlipMove · SlipModal). Kept out of
  * Electron so the rules are tested on their own (test/slipMove.test.ts).
  */
 export interface Rect { x: number; y: number; width: number; height: number }
@@ -69,7 +69,7 @@ export function pressWhileUp(page: PageName, up: "question" | "settings"): "nudg
 }
 
 /**
- * #253 (docs/plans/widget-ask-cases.json): what is up — no question, a question, or one that replaces the whole list (its
+ * #253 (shared/cases/widget-ask-cases.json): what is up — no question, a question, or one that replaces the whole list (its
  * answer swaps the list for a backup or a shared folder's, `ConfirmQuestion.replacesList`).
  */
 export type AskedUp = "none" | "question" | "replacesList";

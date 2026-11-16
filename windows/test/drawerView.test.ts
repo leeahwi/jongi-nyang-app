@@ -4,14 +4,14 @@ import path from "node:path";
 import { test } from "node:test";
 import { duplicateFolder, mergeMemoFolders, parseMemoFolders, serializeMemoFolders, setFolderView, viewOf, type FolderView } from "../src/core/memoDrawer";
 
-// #115: a folder's 보기 in memo-folders.json — the shared cases V1… of docs/plans/drawer-view-cases.json (the Mac's
+// #115: a folder's 보기 in memo-folders.json — the shared cases V1… of shared/cases/drawer-view-cases.json (the Mac's
 // MemoDrawerTests.swift reads the same file).
 
 interface ViewCase {
   id: string; about: string; input: string[]; expect: string[]; views: Record<string, FolderView>;
   op: null | { setView?: [string, FolderView]; merge?: string[]; duplicate?: [string, string] };
 }
-const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "drawer-view-cases.json"), "utf8")) as { now: string; cases: ViewCase[] };
+const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "drawer-view-cases.json"), "utf8")) as { now: string; cases: ViewCase[] };
 const now = new Date(file.now);
 const text = (lines: string[]) => `${lines.join("\n")}\n`;
 

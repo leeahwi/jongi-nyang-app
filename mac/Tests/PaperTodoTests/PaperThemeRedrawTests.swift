@@ -103,9 +103,11 @@ private enum PaperThemeRedrawTests {
             let seen = pixel(view, point.0, point.1)
             try expect(distance(seen, new) < distance(seen, old), "\(name): \(seen.map { Int($0) }) is nearer \(old) than \(new)")
         }
-        // Where each window shows its paper: the note's sheet under the rows, a day in the month's card, the drawer's paper
-        // beside the bookmarks, the kept colour.
-        let notePoint: (CGFloat, CGFloat) = (406, 380), calendarPoint: (CGFloat, CGFloat) = (250, 200), drawerPoint: (CGFloat, CGFloat) = (280, 340)
+        // Where each window shows its paper: the note's sheet under the rows, the month's card, the drawer's paper beside
+        // the bookmarks, the kept colour. The month's point is the empty lower part of the grid's last cell (the sixth
+        // week's Saturday), which is always in the next month: never today, so never the selected day's green tint
+        // (#446: (250, 200) was the second week's Wednesday and failed on the days that cell was today).
+        let notePoint: (CGFloat, CGFloat) = (406, 380), calendarPoint: (CGFloat, CGFloat) = (440, 520), drawerPoint: (CGFloat, CGFloat) = (280, 340)
 
         try test("8-3 a light paper to another light paper redraws every open window (낮 종이 → 모눈 노트 → 노란 메모지 → 하늘색 줄노트: papers without grain, so a pixel shows its colour)") {
             for (from, to) in [(PaperKind.day, PaperKind.grid), (.grid, .memo), (.memo, .lined)] {

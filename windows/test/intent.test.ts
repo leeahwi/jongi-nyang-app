@@ -315,9 +315,9 @@ test("intent ranges: the Mac's rows M1–M4 (timeblock-cases.md, the 4 a.m. day)
   assert.equal(read("22:00-23:30 정리").reminderAt?.getHours(), 22);
 });
 
-// 빠른 입력의 버튼 (#240, D3 B): the shared cases from docs/plans/quick-entry-button-cases.json (the Mac's test-intent.sh
+// 빠른 입력의 버튼 (#240, D3 B): the shared cases from shared/cases/quick-entry-button-cases.json (the Mac's test-intent.sh
 // reads the same file).
-const buttonCases = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "quick-entry-button-cases.json"), "utf8")) as {
+const buttonCases = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "quick-entry-button-cases.json"), "utf8")) as {
   now: [number, number, number, number, number];
   kinds: { kind: string; words: [string, string, string] }[];
   lines: { case: string; lang: Lang; text: string; buttons: string[] }[];

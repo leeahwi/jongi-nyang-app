@@ -2,7 +2,7 @@ import Foundation
 
 /// 보이는 종이 (#244, docs/plans/paper-themes.md 3장 · 7장): which paper is drawn, how bright the system's controls are, how
 /// the drawer follows the note, and how 1.47's settings read into 1.48's. The rules are the Windows app's `core/paper.ts`;
-/// both read docs/plans/paper-themes-cases.json (scripts/test-paper-themes.sh).
+/// both read shared/cases/paper-themes-cases.json (scripts/test-paper-themes.sh).
 public struct PaperLook: Equatable, Sendable {
     /// 낮 · 밤 (`paper.color`): 자동 follows macOS.
     public enum DayNight: String, CaseIterable, Sendable { case auto, day, night }

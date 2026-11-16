@@ -1,6 +1,6 @@
 #!/bin/bash
 # 메모 마크다운 (#84, MemoMarkdown.swift): spans, the words without marks, and the card title, preview and kind read
-# from them — the shared cases M1… from docs/plans/memo-markdown-cases.json (the Windows app reads the same file).
+# from them — the shared cases M1… from shared/cases/memo-markdown-cases.json (the Windows app reads the same file).
 set -euo pipefail
 task_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$task_root"
@@ -37,4 +37,4 @@ swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/PetAsk.swift \
     Tests/PaperCoreTests/MarkdownTests.swift \
     -o .build/checks/MarkdownTests
-.build/checks/MarkdownTests ../docs/plans/memo-markdown-cases.json
+.build/checks/MarkdownTests ../shared/cases/memo-markdown-cases.json

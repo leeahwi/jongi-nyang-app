@@ -99,7 +99,8 @@ export function lex(source: string): { literals: Literal[]; bare: number[] } {
 
 function sourceFiles(): string[] {
   const list = (directory: string, extension: string) => fs.readdirSync(path.join(root, directory)).filter((name) => name.endsWith(extension)).map((name) => path.join(directory, name));
-  return [...list("src/main", ".ts"), ...list("src/renderer", ".ts"), "src/preload.ts"];
+  // #408: the snapshot tools live in src/main/snapshots.
+  return [...list("src/main", ".ts"), ...list("src/main/snapshots", ".ts"), ...list("src/renderer", ".ts"), "src/preload.ts"];
 }
 
 const lineOf = (source: string, index: number) => source.slice(0, index).split("\n").length;

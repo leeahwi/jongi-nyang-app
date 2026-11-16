@@ -3,5 +3,5 @@ out/
 out-test/
 out-test-mcp/
 dist/
-snapshots/
+/snapshots/
 .DS_Store

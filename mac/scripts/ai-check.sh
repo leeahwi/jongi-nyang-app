@@ -1,11 +1,11 @@
 #!/bin/bash
 # 종이냥 for Claude, end to end (1.42): builds a separate debug test copy (bundle id com.noa.PaperTodo.LiveTest,
 # never dist/) with the extension's program inside (../windows/mcp/dist), turns AI 연결 on in its own
-# settings folder, runs it, and talks to the bundled server with the MCP SDK the way Claude does (ai-check.mjs,
-# PAPERTODO_AI_HOME = the test copy's settings folder). Checks: added tasks show in the running app within ~2 s with
+# settings folder, runs it, and talks to the bundled server with the MCP SDK the way Claude Code does — through the
+# copy's own program, `PaperTodo --mcp-stdio` (#389, no Node; ai-check.mjs, PAPERTODO_AI_HOME = its settings folder). Checks: added tasks show in the running app within ~2 s with
 # the toast; ⌘Z undoes them (logged); preview → apply changes a time; the away notice after adding while it's
-# closed (M15); turned off, the tools only say "turn it on"; 연결 opens the .mcpb and tells Claude Code (both
-# recorded, never really done: nothing is installed into Claude); no Claude Desktop → the slip. The installed app,
+# closed (M15); turned off, the tools only say "turn it on"; 연결 opens the .mcpb (recorded, never really
+# done: nothing is installed into Claude); no Claude Desktop → the slip. The installed app,
 # its data and the real Claude are never touched; the copy is stopped by its pid and everything it wrote is removed.
 #
 #   scripts/ai-check.sh [out-folder] [--no-build]
@@ -34,7 +34,6 @@ check="$out/ai-check.log"
 perflog="$out/perf.log"
 commands="$out/perf-drive.txt"
 opened="$out/ai-open.log"
-coded="$out/ai-code.log"
 storage="$HOME/Library/Application Support/$bundle_id"
 server="$app/Contents/Resources/mcp/server/index.js"
 
@@ -103,7 +102,7 @@ defaults write "$bundle_id" ai.enabled -bool true
 
 launch() {
     : > "$commands"; : > "$perflog"
-    open -g -n --env PAPERTODO_OFFSCREEN=1 "$app" --args --ai-check-log "$check" --ai-open-log "$opened" --ai-code-log "$coded" \
+    open -g -n --env PAPERTODO_OFFSCREEN=1 "$app" --args --ai-check-log "$check" --ai-open-log "$opened" \
         --offscreen --perf-log "$perflog" --perf-drive "$commands" "$@"
     for _ in $(seq 1 100); do pid=$(pgrep -f "$app/Contents/MacOS/PaperTodo" | head -1 || true); [ -n "$pid" ] && break; sleep 0.05; done
     for _ in $(seq 1 100); do [ -f "$storage/ai-link.json" ] && break; sleep 0.1; done
@@ -118,7 +117,7 @@ offscreen_check() {
     if grep -q '^onscreen' "$perflog"; then grep '^onscreen' "$perflog"; fail "the test copy put a window on a screen"; fi
     if grep -q '^drive ' "$perflog"; then grep '^drive ' "$perflog"; fail "the test copy couldn't do a command"; fi
 }
-call() { node "$repo/scripts/ai-check.mjs" "$sdk" "$server" "$storage" "$@"; }
+call() { node "$repo/scripts/ai-check.mjs" "$sdk" "$app/Contents/MacOS/PaperTodo" "$storage" "$@"; }
 field() { python3 -I -c "import json,sys; d=json.loads(sys.argv[1]); print(eval(sys.argv[2], {}, {'d': d}))" "$1" "$2"; }
 # wait_line <word> <after ms>: the first check-log line with that word written after the time; prints it.
 wait_line() {
@@ -206,11 +205,6 @@ offscreen_check
 drive ai-connect; sleep 0.8
 echo "연결 (stubbed opener): $(tr '\n' ' ' < "$opened")"
 grep -q "open .*jongi-nyang.mcpb" "$opened" || fail "the .mcpb wasn't opened"
-sleep 0.5
-echo "Claude Code too (stubbed claude): $(cut -c1-90 "$coded" | tr '\n' ' ')"
-grep -q "^/stub/claude mcp remove -s user jongi-nyang$" "$coded" || fail "no earlier entry taken out"
-# The JSON's keys are sorted (AIConnect.codeServerJSON): "args" with the program comes before "command".
-grep -q "^/stub/claude mcp add-json -s user jongi-nyang {.*index.js.*\"command\":\"/stub/node\"" "$coded" || fail "Claude Code wasn't told"
 
 # 5. Away (M15): closed, Claude adds one; at launch one notice.
 stop

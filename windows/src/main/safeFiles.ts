@@ -13,7 +13,7 @@ import { fileLimits } from "../core/fileLimits";
  * - a file is looked at with `lstat` first: a link is neither read nor written over, and one past its size limit is
  *   not read (core/fileLimits.ts). Both throw `RefusedFile`, which callers turn into "skipped" or a message.
  *
- * The same rules as the Mac's (PaperCore SafeFile.swift); the shared cases are docs/plans/file-safety-cases.json.
+ * The same rules as the Mac's (PaperCore SafeFile.swift); the shared cases are shared/cases/file-safety-cases.json.
  */
 
 /** Why a file was left alone: a symbolic link, or past its size limit. */
@@ -88,6 +88,26 @@ export function readTextIfSafe(file: string, limit: number = fileLimits.dataFile
 }
 
 /**
+ * "\n" when `file` ends in a torn line (its last byte isn't a newline, as after a power cut), else "" (#378): lines
+ * appended after it start on a line of their own instead of joining the torn one, which would make both unreadable.
+ */
+export function tornLineLead(file: string): string {
+  let handle: number | undefined;
+  try {
+    const size = fs.lstatSync(file).size;
+    if (size === 0) return "";
+    handle = fs.openSync(file, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+    const last = Buffer.alloc(1);
+    fs.readSync(handle, last, 0, 1, size - 1);
+    return last[0] === 0x0a ? "" : "\n";
+  } catch {
+    return ""; // a new file (or a link, which appendSafely refuses)
+  } finally {
+    if (handle !== undefined) fs.closeSync(handle);
+  }
+}
+
+/**
  * Adds `text` to the end of `file` (made when missing): never through a link (RefusedFile; O_NOFOLLOW on the open where
  * the system has it), and not onto a file past `limit` — one that big isn't read back either.
  */
@@ -126,9 +146,28 @@ export function writeFileAtomically(file: string, contents: string | Buffer): vo
     throw error;
   }
   try {
-    fs.renameSync(temporary, file);
+    renameOver(temporary, file);
   } catch (error) {
     try { fs.unlinkSync(temporary); } catch { /* gone already */ }
     throw error;
+  }
+}
+
+/**
+ * #384: on Windows a file another program has open for a moment (OneDrive, Defender, the search indexer) can't be
+ * renamed over: EPERM · EBUSY · EACCES. The rename is tried again after each of these waits (0.5 s in all at most);
+ * any other error, or another system, fails at once. `platform` and `waits` are switched by the tests.
+ */
+export const renameRetry = { platform: process.platform as string, waits: [50, 100, 150, 200] };
+const busy = new Set(["EPERM", "EBUSY", "EACCES"]);
+
+export function renameOver(from: string, to: string): void {
+  for (let attempt = 0; ; attempt += 1) {
+    try { return fs.renameSync(from, to); } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code ?? "";
+      if (renameRetry.platform !== "win32" || attempt >= renameRetry.waits.length || !busy.has(code)) throw error;
+      // The save runs on the main process's thread and the file must be there when it returns: a short blocking wait.
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, renameRetry.waits[attempt]);
+    }
   }
 }

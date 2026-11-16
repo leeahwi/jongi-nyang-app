@@ -167,5 +167,13 @@ sleep 0.3
 for _ in 1 2 3 4 5 6 7 8; do drive key 49; sleep 1.5; done
 wait "$sampler"; kill -USR2 "$pid"; sleep 0.5
 echo "  then 8 checks in 13 s: $(cat "$out/changes.txt") · $(grep '^counts' "$log" | tail -1)"
+# #64: moving the selection changes the screen, not the list: model counts every change of the model, listChanged the
+# ones the reminders, the record, the cat, the menu bar and the Dock badge scan the list on.
+kill -USR2 "$pid"; sleep 0.2
+"$probe" sample "$pid" 13 > "$out/moves.txt" & sampler=$!
+sleep 0.3
+for _ in 1 2 3 4 5 6 7 8; do drive key 125; sleep 0.75; drive key 126; sleep 0.75; done
+wait "$sampler"; kill -USR2 "$pid"; sleep 0.5
+echo "  then 16 selection moves in 13 s: $(cat "$out/moves.txt") · $(grep '^counts' "$log" | tail -1)"
 offscreen_check
 if grep -q '^drive ' "$log"; then echo "commands the test copy couldn't do:"; grep '^drive ' "$log" | sort | uniq -c; fi

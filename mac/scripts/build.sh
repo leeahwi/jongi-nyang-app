@@ -54,6 +54,11 @@ cp "$mcp_dist/server/index.js" "$bundle/Contents/Resources/mcp/server/index.js"
 cp "$mcp_dist/jongi-nyang.mcpb" "$bundle/Contents/Resources/mcp/jongi-nyang.mcpb"
 # #145: the third-party notices (the fonts, and the MIT · ISC · BSD packages inside 종이냥 for Claude) go along, as
 # the Windows installer's resources/NOTICE.txt does (#128).
+# #406: it is the public repository's NOTICE, word for word, so no dev issue number goes inside the app.
+if grep -nE '#[0-9]+' "$task_root/../NOTICE"; then
+    echo "build.sh: NOTICE names a dev issue number (above); ship the public NOTICE text" >&2
+    exit 1
+fi
 cp "$task_root/../NOTICE" "$bundle/Contents/Resources/NOTICE"
 swift scripts/make-icon.swift "$bundle/Contents/Resources" "$task_root/Sources/PaperTodo/Assets/PaperCat.png"
 # #175 (security review S-01): ad-hoc signed with the hardened runtime (no Developer ID yet: the user's call). Checked on

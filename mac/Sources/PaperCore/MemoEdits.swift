@@ -3,7 +3,7 @@ import Foundation
 /// 메모 서식 (#84, docs/plans/memo-markdown.md ‘사이드노트에서 가져온 것’): what a formatting key, the Aa bar, a paste or a
 /// ticked box does to a memo's words — pure text in, text out, with the selection (UTF-16 offsets, `from` ≤ `to`). The
 /// editor only applies the result (one change, so one undo). The same rules and the same cases as the Windows app
-/// (memoEdits.ts; the `edits` and `done` of docs/plans/memo-markdown-cases.json). nil: nothing to do here (the editor
+/// (memoEdits.ts; the `edits` and `done` of shared/cases/memo-markdown-cases.json). nil: nothing to do here (the editor
 /// does its own thing — a plain new line, a plain paste).
 public enum MemoEdits {
     public struct Edit: Equatable, Sendable {

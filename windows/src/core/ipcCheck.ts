@@ -109,7 +109,7 @@ export const pageActions: Partial<Record<PageName, ReadonlySet<ActionType>>> = {
   floating: actions("slipBlocked"),
   pet: actions("slipBlocked"),
   timer: actions("slipBlocked"),
-  help: actions("slipBlocked"),
+  help: actions("slipBlocked", "copyReportInfo"),
   // #230: the quick note and 직접 정하기 also send only that a key went down.
   // #246: their paper drags them.
   quickMemo: actions("typingTap", "slipBlocked", "slipDrag"),
@@ -237,7 +237,7 @@ const actionFields: { [K in ActionType]: Record<string, Reader> } = {
   openHistory: { day: optional(day) }, openSearch: {},
   openHelp: { topic: optional(str(200)) },
   deskPane: { pane: oneOf(...deskPanes) },
-  openGuide: {}, openArchiveFolder: {}, previewReminder: {},
+  openGuide: {}, copyReportInfo: {}, openArchiveFolder: {}, previewReminder: {},
   snoozePeriodic: { minutes: int(1, 24 * 60) },
   copyList: {}, exportList: {},
   showMenu: { menu: oneOf("more"), x: point, y: point },

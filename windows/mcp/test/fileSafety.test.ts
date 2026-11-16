@@ -7,12 +7,12 @@ import { call, connect, setup, task, temporary, todos, writeTodos } from "./help
 
 /**
  * M42 (#173, security review L-04 · L-05): the extension's reads and writes follow the shared cases of
- * docs/plans/file-safety-cases.json — a data file that is a link is neither read nor written through (FILE_IS_LINK), one
+ * shared/cases/file-safety-cases.json — a data file that is a link is neither read nor written through (FILE_IS_LINK), one
  * past 32MB is not read (FILE_TOO_LARGE), what is only shown (the record's months) skips a link, and its temporary
  * files have random names and are never left behind. Fictional temporary folders only.
  */
 
-const cases = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "file-safety-cases.json"), "utf8")) as { limits: { dataFileBytes: number } };
+const cases = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "file-safety-cases.json"), "utf8")) as { limits: { dataFileBytes: number } };
 
 test("M42: the extension's limit is the shared one", () => {
   assert.equal(fileLimits.dataFileBytes, cases.limits.dataFileBytes);

@@ -15,13 +15,13 @@ import type { PaperSetting } from "../src/core/desk";
 import { tables } from "../src/i18n";
 
 /**
- * 종이 테마 열다섯 가지 (#244): the shared cases (docs/plans/paper-themes-cases.json — the Mac's
+ * 종이 테마 열다섯 가지 (#244): the shared cases (shared/cases/paper-themes-cases.json — the Mac's
  * scripts/test-paper-themes.sh reads the same file) and the colours (docs/plans/paper-themes/tokens.json, the one source:
  * base.css · papers.css · drawer.css and core/paper.ts must hold its values).
  */
 
 const root = path.join(process.cwd(), "..");
-const cases = JSON.parse(fs.readFileSync(path.join(root, "docs/plans/paper-themes-cases.json"), "utf8"));
+const cases = JSON.parse(fs.readFileSync(path.join(root, "shared/cases/paper-themes-cases.json"), "utf8"));
 interface TokenPaper {
   key: PaperKind; names: { ko: string; short: string; en: string; nl: string }; scheme: "light" | "dark"; ruling: string; grain: number;
   note: Record<string, string>; eventMarks: Record<string, string>; drawer: { existing?: boolean; palette?: Record<string, string | number>; folders?: string };

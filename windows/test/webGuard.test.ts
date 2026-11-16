@@ -60,7 +60,7 @@ test("every page's CSP: no plugins, no <base>, no form posts, no remote scripts"
 });
 
 test("the main process opens links only through safeExternal", () => {
-  for (const file of fs.readdirSync(path.join(root, "src/main")).filter((name) => name.endsWith(".ts"))) {
+  for (const file of fs.readdirSync(path.join(root, "src/main"), { recursive: true, encoding: "utf8" }).filter((name) => name.endsWith(".ts"))) {
     const source = fs.readFileSync(path.join(root, "src/main", file), "utf8");
     if (file === "security.ts") { assert.match(source, /shell\.openExternal\(safe\)/); continue; }
     assert.doesNotMatch(source, /shell\.openExternal\(/, file);

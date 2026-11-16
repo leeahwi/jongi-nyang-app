@@ -12,7 +12,7 @@ import { parseEvents, serializeEvents } from "../../src/core/events";
 import { parseMemos } from "../../src/core/memo";
 import { parseNotebook, serializeNotebook } from "../../src/core/notebook";
 import { Store } from "../../src/main/store";
-import { assertNoPath, call, connect, event, logOf, setup, stderrOf, task, temporary, todos, writeTodos } from "./helpers";
+import { assertNoPath, call, connect, event, host, logOf, setup, stderrOf, task, temporary, todos, writeTodos } from "./helpers";
 
 /**
  * 종이냥 for Claude: the real bundled server (mcp/dist/server/index.js) over stdio with the SDK's client (helpers.ts),
@@ -345,7 +345,7 @@ test("the app's Store and the extension write todos.json at the same time, 100 r
   store.unwatch();
 });
 
-test("the Claude Code command (#175): the app's own Electron with --mcp-stdio runs the server built into the app, no RunAsNode", async () => {
+test("the Claude Code command (#175): the app's own Electron with --mcp-stdio runs the server built into the app, no RunAsNode", { skip: host ? "the Mac app runs every test here (#389)" : false }, async () => {
   const electron = createRequire(import.meta.url)("electron") as unknown as string;
   const app = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")), "..");
   assert.ok(fs.existsSync(path.join(app, "out", "mcp.js")), "out/mcp.js: npm run mcp:test builds the app first");

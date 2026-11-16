@@ -15,12 +15,17 @@ final class AlarmBook: ObservableObject {
     private let preferences: UserDefaults
     private let url: URL
     /// alarms.json as this Mac last read or wrote it; anything else there came from another device.
-    private var known: Data?
+    private let file: SyncedFile
+    private var known: Data? {
+        get { file.known }
+        set { if let newValue { file.accept(newValue) } else { file.forget() } }
+    }
     private var stopped = false
 
     init(preferences: UserDefaults, folder: URL) {
         self.preferences = preferences
         url = folder.appendingPathComponent("alarms.json")
+        file = SyncedFile(url: url)
         handled = Set(preferences.stringArray(forKey: "alarm.handled") ?? [])
         load()
     }
@@ -112,7 +117,16 @@ final class AlarmBook: ObservableObject {
     // MARK: The file
 
     private func load() {
-        guard let data = try? SafeFile.sharedData(url) else {
+        let data: Data
+        do {
+            data = try SafeFile.sharedData(url)
+        } catch {
+            guard SafeFile.isAbsent(url) else {
+                // #382: there but not readable just now (no permission, iCloud Drive still downloading it): never saved
+                // over — the next check that reads it (reloadIfChanged) opens saving again.
+                problem = L("알람 파일을 읽지 못했어요.") + " " + L("원래 파일은 덮어쓰지 않고 그대로 둬요.") + " " + L("저장 폴더가 열리는지 확인해 주세요.")
+                return
+            }
             alarms = []
             known = nil
             return
@@ -129,7 +143,17 @@ final class AlarmBook: ObservableObject {
 
     /// Another device wrote alarms.json (a shared folder is checked every two seconds).
     func reloadIfChanged() {
-        guard let data = try? SafeFile.sharedData(url), data != known else { return }
+        guard case .changed(let theirs) = file.look() else { return }
+        // #385: alarms changed here since the file was last read or written join theirs, alarm by alarm (as events.json).
+        if let here = try? Alarm.File(alarms: alarms).encoded(),
+           case .joined(let bytes)? = SyncConflict.join(base: known, here: here, theirs: theirs, key: "alarms"),
+           let joined = try? Alarm.File.decode(bytes) {
+            known = theirs
+            alarms = joined.alarms
+            problem = nil
+            AIWriteLock.with { save() }
+            return
+        }
         load()
     }
 
@@ -140,10 +164,7 @@ final class AlarmBook: ObservableObject {
         let started = PerfProbe.now
         defer { PerfProbe.io("alarms", since: started) }
         do {
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let data = try Alarm.File(alarms: alarms).encoded()
-            try data.write(to: url, options: .atomic)
-            known = data
+            try file.write(try Alarm.File(alarms: alarms).encoded())
         } catch {
             // Not tried again until the file reads again (save() waits for problem == nil).
             problem = AppModel.saveProblem(L("알람을 저장하지 못했어요."), retries: false)

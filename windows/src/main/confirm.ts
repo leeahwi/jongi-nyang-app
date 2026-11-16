@@ -1,5 +1,6 @@
 import { BrowserWindow, ipcMain, screen, shell } from "electron";
 import path from "node:path";
+import { dragBounds, dragStart, type DragStart } from "../core/dragBounds";
 import { askLevels, draggedSlip, widgetPressWhileUp, type AskedUp } from "../core/slipMove";
 import type { ConfirmQuestion } from "../renderer/confirm";
 import { offscreen, offscreenEnabled } from "./env";
@@ -23,7 +24,7 @@ export class SlipConfirm {
   private window?: BrowserWindow;
   private loaded = false;
   private pending?: { question: ConfirmQuestion; resolve: (index: number) => void };
-  private drag?: { x: number; y: number; bounds: Electron.Rectangle };
+  private drag?: DragStart;
   /** How many presses a question held up (the snapshot run's check). */
   nudges = 0;
   /** #253: the waiting question floats over a widget kept on top or the day sheet (askLevels). */
@@ -119,19 +120,18 @@ export class SlipConfirm {
   dragSlip(sender: Electron.WebContents, phase: "start" | "move" | "end", x: number, y: number): void {
     const window = this.window;
     if (!window || window.isDestroyed() || sender !== window.webContents) return;
-    if (phase === "start") { this.drag = { x, y, bounds: window.getBounds() }; return; }
+    if (phase === "start") { this.drag = dragStart({ x, y }, window.getBounds()); return; }
     const drag = this.drag;
     // (The last move put it where it is.)
     if (phase === "end") { this.drag = undefined; return; }
     if (!drag) return;
-    const { bounds } = drag;
-    // The slip is the window less its stage (slip.css `.slip-stage`: 16 above, 24 at the sides, 30 below).
-    const slip = { x: bounds.x + 24, y: bounds.y + 16, width: bounds.width - 48, height: bounds.height - 46 };
     // (An off-screen run's slip lives away from every display: nothing to keep it on.)
     const display = offscreenEnabled ? undefined : screen.getAllDisplays().find(({ bounds: area }) => x >= area.x && x < area.x + area.width && y >= area.y && y < area.y + area.height);
-    const to = draggedSlip(slip, x - drag.x, y - drag.y, display?.workArea);
-    // #316: the whole bounds, not setPosition (it re-reads the size, which 125 % · 150 % can round up a pixel a move).
-    window.setBounds({ x: Math.round(to.x - 24), y: Math.round(to.y - 16), width: bounds.width, height: bounds.height });
+    window.setBounds(dragBounds(drag, { x, y }, (moved) => {
+      // The slip is the window less its stage (slip.css `.slip-stage`: 16 above, 24 at the sides, 30 below).
+      const to = draggedSlip({ x: moved.x + 24, y: moved.y + 16, width: moved.width - 48, height: moved.height - 46 }, 0, 0, display?.workArea);
+      return { x: to.x - 24, y: to.y - 16 };
+    }));
   }
 
   /** Shown and given the keys — but never brought to the front in an off-screen run (the person's app stays in front). */

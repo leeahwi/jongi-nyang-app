@@ -1,0 +1,68 @@
+name: 문제 알리기 · Report a problem
+description: 앱이 생각과 다르게 동작하면 알려 주세요. Tell us when the app does something you didn't expect.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        이슈는 누구나 볼 수 있습니다. 메모 · 할 일의 실제 내용, 이름, 전화번호, 메일 주소, 폴더 경로는 적지 말고, 캡처의 글자도 가려 주세요. 예시는 ‘장보기’, ‘팀 회의’처럼 지어낸 것으로 충분합니다.
+        보안 문제는 이 양식 대신 [보안 정책](https://github.com/leeahwi/jongi-nyang-app/security/policy)대로 비공개로 알려 주세요.
+
+        Anyone can read issues. Please leave out the real text of your notes and to-dos, names, phone numbers, email addresses and folder paths, and hide them in screenshots. Made-up examples such as ‘groceries’ are enough.
+        For a security problem, don't use this form: follow the [security policy](https://github.com/leeahwi/jongi-nyang-app/security/policy) to report it privately.
+  - type: dropdown
+    id: app
+    attributes:
+      label: 앱 · App
+      options:
+        - Mac
+        - Windows
+        - Mac과 Windows 둘 다 · Both
+        - Claude 확장 · Claude extension
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 앱 버전 · App version
+      description: 받은 파일 이름에도 있습니다(JongiNyang-1.49.1.dmg). The downloaded file name shows it too.
+      placeholder: "1.49.1"
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS 버전 · System version
+      placeholder: "macOS 15.4 / Windows 11 24H2"
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: 무슨 일이 있었나요 · What happened
+      description: 보이는 그대로 적어 주세요. 오류 문구가 있으면 그대로 옮겨 주세요. Describe what you saw; copy any error message as it is.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 다시 일어나게 하는 방법 · Steps to make it happen
+      description: 지어낸 예시로 한 단계씩 적어 주세요. One step per line, with made-up examples.
+      placeholder: |
+        1. 입력 줄에 ‘내일 3시 회의’를 적고 Return을 누릅니다.
+        2. …
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대한 동작 · What you expected
+    validations:
+      required: false
+  - type: textarea
+    id: more
+    attributes:
+      label: 그 밖에 · Anything else
+      description: 캡처는 개인 정보를 가린 뒤 붙여 주세요. Hide personal details before attaching a screenshot.
+    validations:
+      required: false

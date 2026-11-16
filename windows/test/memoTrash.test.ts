@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { emptyAll, emptyQuestion, emptyTrash, mergeTrash, parseMemoTrash, pruneTrash, restoredWords, serializeMemoTrash, trashAgo, trashMemo, trashMenuLabel, untrash } from "../src/core/memoTrash";
 
-// #120: 지운 메모 in memo-trash.json — the shared cases T1… N1… A1… R1… of docs/plans/drawer-trash-cases.json (the Mac's
+// #120: 지운 메모 in memo-trash.json — the shared cases T1… N1… A1… R1… of shared/cases/drawer-trash-cases.json (the Mac's
 // MemoDrawerTests.swift reads the same file).
 
 type Lang3 = { ko: string; en: string; nl: string };
@@ -14,7 +14,7 @@ interface TrashOp {
   empty?: boolean; prune?: string[]; merge?: string[];
 }
 interface TrashCase { id: string; about: string; input: string[] | null; ops: TrashOp[]; expect: string[] }
-const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "drawer-trash-cases.json"), "utf8")) as {
+const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "drawer-trash-cases.json"), "utf8")) as {
   now: string; cases: TrashCase[]; words: { id: string; count: number; menu: Lang3; question: Lang3 }[];
   ago: ({ id: string; at: string } & Lang3)[]; restored: ({ id: string; folder: string } & Lang3)[];
 };

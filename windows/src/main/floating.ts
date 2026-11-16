@@ -1,5 +1,6 @@
 import { BrowserWindow, Menu, ipcMain, screen, type MenuItemConstructorOptions } from "electron";
 import path from "node:path";
+import { dragBounds, dragStart, type DragStart } from "../core/dragBounds";
 import { iconOrigin, type Point } from "../core/placement";
 import { t } from "../i18n";
 import { offscreen, offscreenEnabled } from "./env";
@@ -11,25 +12,22 @@ const padding = 12;
 /** The folded note: a small post-it the cat peeks over, showing what is left. Click to unfold, drag to move. */
 export class FloatingNote {
   private window?: BrowserWindow;
-  private dragStart?: { cursor: Point; origin: Point };
+  private drag?: DragStart;
 
   constructor(private readonly store: Store, private readonly rendererDirectory: string, private readonly onRestore: () => void, private readonly onQuit: () => void) {
     const fromIcon = (event: Electron.IpcMainEvent) => event.sender === this.window?.webContents;
     ipcMain.on("floating:drag-start", (event) => {
       if (!fromIcon(event) || !this.window) return;
       const [x, y] = this.window.getPosition();
-      this.dragStart = { cursor: screen.getCursorScreenPoint(), origin: { x, y } };
+      this.drag = dragStart(screen.getCursorScreenPoint(), { x, y, ...size });
     });
     ipcMain.on("floating:drag", (event) => {
-      if (!fromIcon(event) || !this.window || !this.dragStart) return;
-      const cursor = screen.getCursorScreenPoint();
-      // #316: the whole bounds, not setPosition (it re-reads the size, which 125 % · 150 % can round up a pixel a move).
-      this.window.setBounds({ x: Math.round(this.dragStart.origin.x + cursor.x - this.dragStart.cursor.x),
-        y: Math.round(this.dragStart.origin.y + cursor.y - this.dragStart.cursor.y), ...size });
+      if (!fromIcon(event) || !this.window || !this.drag) return;
+      this.window.setBounds(dragBounds(this.drag, screen.getCursorScreenPoint()));
     });
     ipcMain.on("floating:drag-end", (event) => {
       if (!fromIcon(event) || !this.window) return;
-      this.dragStart = undefined;
+      this.drag = undefined;
       const [x, y] = this.window.getPosition();
       // (Off-screen runs, #250: worked out on the displays, then put back off them like `show`.)
       const center = { x: x - offscreen.x + size.width / 2, y: y - offscreen.y + size.height / 2 };
@@ -97,6 +95,9 @@ export class FloatingNote {
     const window = new BrowserWindow({
       ...size, show: false, frame: false, transparent: true, resizable: false, maximizable: false,
       minimizable: false, fullscreenable: false, skipTaskbar: true, alwaysOnTop: true, hasShadow: false,
+      // #312 (preventive): no WS_THICKFRAME, said outright as for the pet, the ears and 타닥냥, so Windows keeps no resize
+      // frame or minimum size of its own on this small window.
+      thickFrame: false,
       backgroundColor: "#00000000",
       // Off-screen runs (snapshots, tests): macOS pulls a window placed off every display back onto one unless it may be
       // larger than the screen (only macOS reads this).

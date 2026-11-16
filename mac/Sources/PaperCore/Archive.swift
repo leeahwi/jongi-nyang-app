@@ -78,9 +78,10 @@ public enum Archive {
     /// A "day" ends at 4 a.m., so something finished just after midnight still counts as tonight's work.
     public static let dayBoundaryHour = 4
 
+    /// 04:00 on the wall clock, as on Windows — on the days daylight saving starts and ends too (#386: midnight plus four
+    /// hours was 05:00 and 03:00 then; shared/cases/day-boundary-cases.json).
     public static func logicalDayStart(_ date: Date, calendar: Calendar = .paper) -> Date {
-        let midnight = calendar.startOfDay(for: date)
-        let start = calendar.date(byAdding: .hour, value: dayBoundaryHour, to: midnight)!
+        let start = calendar.date(bySettingHour: dayBoundaryHour, minute: 0, second: 0, of: date)!
         return date < start ? calendar.date(byAdding: .day, value: -1, to: start)! : start
     }
 
@@ -129,6 +130,19 @@ public enum Archive {
         text.split(whereSeparator: \.isNewline).compactMap { line in
             try? lineDecoder.decode(ArchiveEntry.self, from: Data(line.utf8))
         }
+    }
+
+    /// #379: a record line's id, read only for that — nil for a line that isn't one (a torn last line, an empty one).
+    public static func lineID(_ line: Substring) -> String? {
+        (try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any])?["id"] as? String
+    }
+
+    /// The record text without the lines of `ids`; every other line stays byte for byte (a field this version doesn't
+    /// know, a line it can't read). Nil when no line goes.
+    public static func removingLines(_ ids: Set<String>, from text: String) -> String? {
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        let kept = lines.filter { line in lineID(line).map { !ids.contains($0) } ?? true }
+        return kept.count == lines.count ? nil : kept.joined(separator: "\n")
     }
 
     // MARK: Statistics for the history calendar

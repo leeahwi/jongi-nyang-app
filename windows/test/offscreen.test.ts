@@ -26,7 +26,7 @@ test("offscreen: a window far off every display stays where it is; near or on on
 test("offscreen: every window the app makes may stand off every display (enableLargerThanScreen in an off-screen run)", () => {
   const folder = path.join(process.cwd(), "src/main");
   const missing: string[] = [];
-  for (const name of fs.readdirSync(folder).filter((file) => file.endsWith(".ts"))) {
+  for (const name of fs.readdirSync(folder, { recursive: true, encoding: "utf8" }).filter((file) => file.endsWith(".ts"))) { // #408: snapshots/ too
     const text = fs.readFileSync(path.join(folder, name), "utf8");
     let at = text.indexOf("new BrowserWindow(");
     while (at >= 0) {
@@ -133,7 +133,7 @@ test("offscreen: no window is placed, sized or shown by a call the guard doesn't
   // showInactive, focus and the owner. These would let the system pick a place, so the app never calls them.
   const folder = path.join(process.cwd(), "src/main");
   const found: string[] = [];
-  for (const name of fs.readdirSync(folder).filter((file) => file.endsWith(".ts"))) {
+  for (const name of fs.readdirSync(folder, { recursive: true, encoding: "utf8" }).filter((file) => file.endsWith(".ts"))) { // #408: snapshots/ too
     const lines = fs.readFileSync(path.join(folder, name), "utf8").split("\n");
     lines.forEach((line, index) => {
       if (/\.(setContentBounds|maximize|setFullScreen|setSimpleFullScreen|setKiosk|showDefinitionForSelection|previewFile)\(/.test(line)) found.push(`${name}:${index + 1}`);

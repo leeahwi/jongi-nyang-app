@@ -26,6 +26,8 @@ const mac = process.platform === "darwin";
 
 export class NoteEars {
   private window: BrowserWindow | undefined;
+  /** #409 문제 보고용 정보: the window as it is (none while the ears are off). */
+  get reportWindow(): BrowserWindow | undefined { return this.window; }
   private interactive = false;
   private readonly sizes = new EarsSizeCheck();
   private pending = false;

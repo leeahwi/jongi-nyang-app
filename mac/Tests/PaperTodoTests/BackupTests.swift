@@ -195,9 +195,9 @@ private enum BackupTests {
             try expect(BackupBook.peekCounts(older) == Backup.Counts(todos: 3), "…counted from the files when it has no counts")
         }
 
-        // #173 (security review L-04 · L-05): the shared cases of docs/plans/file-safety-cases.json (the Windows app's
+        // #173 (security review L-04 · L-05): the shared cases of shared/cases/file-safety-cases.json (the Windows app's
         // test/fileSafety.test.ts reads the same file).
-        let casesURL = URL(fileURLWithPath: "../docs/plans/file-safety-cases.json")
+        let casesURL = URL(fileURLWithPath: "../shared/cases/file-safety-cases.json")
         let cases = try JSONSerialization.jsonObject(with: Data(contentsOf: casesURL)) as! [String: Any]
         let limits = cases["limits"] as! [String: Int]
         let manager = FileManager.default
@@ -330,10 +330,10 @@ private enum BackupTests {
             try expectEqual(try titles(String(contentsOf: destination.appendingPathComponent("todos.json"), encoding: .utf8)), ["이 Mac"], "the rest moves")
         }
 
-        // 저장과 백업의 백업 한 줄 (#240, D2 C): the shared cases from docs/plans/storage-summary-cases.json (the Windows
+        // 저장과 백업의 백업 한 줄 (#240, D2 C): the shared cases from shared/cases/storage-summary-cases.json (the Windows
         // app's test/backup.test.ts reads the same file).
         try test("backup status: when the last copy was, or what is wrong, in ko · en · nl (shared cases)") {
-            let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../docs/plans/storage-summary-cases.json"))) as! [String: Any]
+            let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: "../shared/cases/storage-summary-cases.json"))) as! [String: Any]
             let date = { (parts: [NSNumber]) in
                 Calendar.paper.date(from: DateComponents(year: parts[0].intValue, month: parts[1].intValue, day: parts[2].intValue,
                                                          hour: parts[3].intValue, minute: parts[4].intValue))!

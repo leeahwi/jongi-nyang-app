@@ -17,10 +17,14 @@ final class PointerWatch {
         var moved: (NSPoint) -> Void
         /// Also told while the left button is held (a drag in another app).
         var duringDrag: Bool
+        /// The modifier keys going down or up (⌥ over a widget), heard only while the pointer is within `PointerPace.near`
+        /// of this watcher (#64: a system-wide key watch only there, not all the time).
+        var keys: ((NSEvent.ModifierFlags) -> Void)?
     }
 
     private var watchers: [String: Watcher] = [:]
     private var monitors: [Any] = []
+    private var keyMonitors: [Any] = []
     private var lookTimer: Timer?
     private var lastPoint: NSPoint?
 
@@ -44,16 +48,20 @@ final class PointerWatch {
 
     var isListening: Bool { !monitors.isEmpty }
     var isLookingAway: Bool { lookTimer != nil }
+    /// A watch on the modifier keys is on (the pointer is near a watcher that wants them).
+    var isHearingKeys: Bool { !keyMonitors.isEmpty }
     func watches(_ id: String) -> Bool { watchers[id] != nil }
 
-    func watch(_ id: String, duringDrag: Bool = false, distance: @escaping (NSPoint) -> Double, moved: @escaping (NSPoint) -> Void) {
+    func watch(_ id: String, duringDrag: Bool = false, distance: @escaping (NSPoint) -> Double, moved: @escaping (NSPoint) -> Void,
+               keys: ((NSEvent.ModifierFlags) -> Void)? = nil) {
         let first = watchers[id] == nil
-        watchers[id] = Watcher(distance: distance, moved: moved, duringDrag: duringDrag)
+        watchers[id] = Watcher(distance: distance, moved: moved, duringDrag: duringDrag, keys: keys)
         if first { refresh() }
     }
 
     func stop(_ id: String) {
         guard watchers.removeValue(forKey: id) != nil else { return }
+        if !watchers.values.contains(where: { $0.keys != nil }) { hearKeys(false) }
         if watchers.isEmpty {
             stopListening()
             lookTimer?.invalidate()
@@ -142,11 +150,34 @@ final class PointerWatch {
 
     /// Every watcher hears the pointer (during a drag only those that want it); the distance to the nearest of them.
     private func tell(_ point: NSPoint, dragging: Bool) -> Double {
-        var nearest = Double.infinity
+        var nearest = Double.infinity, nearestKeys = Double.infinity
         for watcher in watchers.values {
             if !dragging || watcher.duringDrag { watcher.moved(point) }
-            nearest = min(nearest, watcher.distance(point))
+            let distance = watcher.distance(point)
+            nearest = min(nearest, distance)
+            if watcher.keys != nil { nearestKeys = min(nearestKeys, distance) }
         }
+        hearKeys(nearestKeys <= PointerPace.near)
         return nearest
+    }
+
+    /// The modifier keys are watched only while the pointer is near a watcher that wants them: far from it, a key going
+    /// down can't change anything there.
+    private func hearKeys(_ on: Bool) {
+        if on, keyMonitors.isEmpty {
+            let heard: (NSEvent) -> Void = { [weak self] event in
+                let flags = event.modifierFlags
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    PerfProbe.count("keyFlags")
+                    for watcher in self.watchers.values { watcher.keys?(flags) }
+                }
+            }
+            if systemWide, let global = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: heard) { keyMonitors.append(global) }
+            if let local = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged, handler: { heard($0); return $0 }) { keyMonitors.append(local) }
+        } else if !on, !keyMonitors.isEmpty {
+            keyMonitors.forEach(NSEvent.removeMonitor)
+            keyMonitors.removeAll()
+        }
     }
 }

@@ -158,7 +158,7 @@ extension MemoFolders {
     /// are kept to `filters`, then searched as `search` does; with no query the filters alone pick them (each with its
     /// title, nothing marked), and with neither there is nothing. The hits come in groups, one per folder, the folders in
     /// the order their first hit comes (the newest first), each group's hits in the memos' order. The shared cases
-    /// in docs/plans/drawer-search-cases.json (Windows: drawerFind).
+    /// in shared/cases/drawer-search-cases.json (Windows: drawerFind).
     public func find(_ query: String, memos: [Memo], scope: Tab?, filters: SearchFilters, language: AppLanguage = .ko,
                      index: SearchIndex? = nil, isOpen: ((Memo) -> Bool)? = nil, hasLink: ((Memo) -> Bool)? = nil) -> [HitGroup] {
         let typed = !Search.Query(query).isEmpty

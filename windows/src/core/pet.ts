@@ -50,7 +50,7 @@ export const walkStride = (192 * petSize) / 1024;
 /** The floor strip above the taskbar (보통; #304: `petStripHeight` at the chosen 크기). */
 export const stripHeight = 250;
 
-// ─── #304: 크기 (docs/plans/cat-size-cases.json) ─────────────────────────────
+// ─── #304: 크기 (shared/cases/cat-size-cases.json) ─────────────────────────────
 
 /** The cat's size (DIP) at a step: 74 · 92 · 115 · 138. */
 export const petSizeFor = (size: CatSize): number => scaledSize(petSize, size);

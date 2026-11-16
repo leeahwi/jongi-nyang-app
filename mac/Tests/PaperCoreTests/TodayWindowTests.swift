@@ -1,6 +1,6 @@
 import Foundation
 
-// 오늘 창 (#200, TodayGlance): the shared cases from docs/plans/today-window-cases.json (the Windows app's
+// 오늘 창 (#200, TodayGlance): the shared cases from shared/cases/today-window-cases.json (the Windows app's
 // test/todayWindow.test.ts reads the same file) — which cards stay full size and which become chips, how many to-do rows
 // fit, 그 밖에's rows and 외 N개, the header's progress words and date, and the chips' words.
 private struct TestFailure: Error, CustomStringConvertible {
@@ -14,7 +14,7 @@ private func equal<T: Equatable>(_ actual: T, _ expected: T, _ name: String) thr
 @main
 private enum TodayWindowTests {
     static func main() throws {
-        let path = CommandLine.arguments.dropFirst().first ?? "../docs/plans/today-window-cases.json"
+        let path = CommandLine.arguments.dropFirst().first ?? "../shared/cases/today-window-cases.json"
         let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
         var count = 0
         func test(_ name: String, _ action: () throws -> Void) throws {

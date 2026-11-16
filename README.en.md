@@ -8,7 +8,7 @@
 
 Mac · Windows · free · no account
 
-[**Download for Mac**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.49.1) · [**Download for Windows**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.34.1) · [Project site](https://leeahwi.github.io/jongi-nyang-app/en/) · [40-second intro video](site/assets/promo-en.mp4) · [Changelog](CHANGELOG.en.md)
+[**Download for Mac**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.50.0) · [**Download for Windows**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.35.0) · [Project site](https://leeahwi.github.io/jongi-nyang-app/en/) · [40-second intro video](site/assets/promo-en.mp4) · [Changelog](CHANGELOG.en.md)
 
 [![Latest Mac release](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=mac-*&label=Mac&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![Latest Windows release](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=windows-*&label=Windows&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![CI](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml/badge.svg)](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml)
 
@@ -16,7 +16,7 @@ Mac · Windows · free · no account
 
 </div>
 
-<img src="site/assets/og-en.png" width="1200" alt="Three Jongi-nyang notes: the Mac app by day, the Mac app at night, and the Windows app">
+<img src="site/assets/og-en.jpg" width="1200" alt="Three Jongi-nyang notes: the Mac app by day, the Mac app at night, and the Windows app">
 
 Your to-dos, events, notes and focus timer on one small notepad. A paper cat at the bottom of the screen brings your reminders.
 
@@ -30,7 +30,7 @@ Your to-dos, events, notes and focus timer on one small notepad. A paper cat at 
 
 1. **Download** — from the [releases page](https://github.com/leeahwi/jongi-nyang-app/releases): the DMG for Mac (macOS 14 or later, Apple Silicon), or the `.exe` installer or ZIP for Windows (Windows 10/11, x64). On a Mac, open the DMG and drag the app into Applications.
 2. **Open it the first time** — neither app is signed yet, so your system may block the first launch.
-   - Mac: go to **System Settings → Privacy & Security** and click **Open Anyway**.
+   - Mac: open the app once, then go to **System Settings → Privacy & Security** and click **Open Anyway**. On macOS 14 you can also right-click the app in Applications and choose **Open**.
    - Windows: in the SmartScreen window, click **More info → Run anyway**.
 3. **Take the short tour** — a few cards introduce the app. The switch on the last card, ‘Open Jongi-nyang at login’ (on Windows, ‘Open Jongi-nyang when Windows starts’), is on from the start. You can change it later under Desk → Appearance → Startup.
 
@@ -225,7 +225,7 @@ Removing only the app keeps your lists. To remove everything:
 
 | | macOS | Windows |
 | --- | --- | --- |
-| 1. Disconnect AI (if used) | Remove ‘Jongi-nyang for Claude’ in Claude desktop's Settings → Extensions; for Claude Code, `claude mcp remove -s user jongi-nyang` | Claude desktop the same; for Claude Code, run `claude mcp remove jongi-nyang` in the folder where you pasted the connect command |
+| 1. Disconnect AI (if used) | Remove ‘Jongi-nyang for Claude’ in Claude desktop's Settings → Extensions; for Claude Code, `claude mcp remove -s user jongi-nyang` | Claude desktop the same; for Claude Code, `claude mcp remove -s user jongi-nyang` (an older command: `claude mcp remove jongi-nyang` in the folder where you pasted it) |
 | 2. Stop opening at startup | ‘Open Jongi-nyang at login’ in Desk → Appearance → Startup (if the app is already gone: System Settings → General → Login Items) | ‘Open Jongi-nyang when Windows starts’ in the same place (if the app is already gone: Task Manager → Startup apps) |
 | 3. Remove the app | Quit, then move Jongi-nyang from Applications to the Trash | Quit, then uninstall in Settings → Apps → Installed apps (ZIP: delete the unzipped folder). The uninstaller leaves your data |
 | 4. Data, AI log, automatic backups | `~/Library/Application Support/com.noa.PaperTodo/` | `%APPDATA%\PaperTodo\` (settings `settings.json` and `storage.json` too) |
@@ -273,9 +273,9 @@ Core checks run with `swiftc`, without XCTest. Checks for alarms, repeats, backu
 
 ```sh
 swift build -Xswiftc -warnings-as-errors
-TZ=Asia/Seoul ./scripts/test.sh
-TZ=Asia/Seoul ./scripts/test-intent.sh
-TZ=Asia/Seoul ./scripts/test-focus.sh
+./scripts/test.sh
+./scripts/test-intent.sh
+./scripts/test-focus.sh
 ./scripts/i18n/check.sh
 ```
 
@@ -301,10 +301,9 @@ npm ci
 npm start
 ```
 
-`npm run dist` runs the type check and tests, then writes a Windows x64 installer and ZIP to `dist/`. Some tests assume Korean time, so set the time zone first.
+`npm run dist` runs the type check and tests, then writes a Windows x64 installer and ZIP to `dist/`. The tests written on Korean time run in that zone on their own, so there is no time zone to set.
 
 ```powershell
-$env:TZ = "Asia/Seoul"
 npm run typecheck
 npm test
 npm run dist

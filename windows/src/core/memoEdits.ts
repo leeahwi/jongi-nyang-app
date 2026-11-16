@@ -5,7 +5,7 @@ import { isFenceLine, lineSpans, readLine, type LineRead, type MarkSpan } from "
  * 메모 서식 (#84, docs/plans/memo-markdown.md ‘사이드노트에서 가져온 것’): what a formatting key, the Aa bar, a paste or a
  * ticked box does to a memo's words — pure text in, text out, with the selection (UTF-16 offsets, `from` ≤ `to`). The
  * editors only apply the result (one change, so one undo). The same rules and the same cases as the Mac
- * (MemoEdits.swift; the `edits` of docs/plans/memo-markdown-cases.json). undefined: nothing to do here (the editor does
+ * (MemoEdits.swift; the `edits` of shared/cases/memo-markdown-cases.json). undefined: nothing to do here (the editor does
  * its own thing — a plain new line, a plain paste).
  */
 export interface Edit { text: string; from: number; to: number }

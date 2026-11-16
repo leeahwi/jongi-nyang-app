@@ -280,8 +280,8 @@ Mac과 같은 목록을 쓰는 방법은 [PC와 Mac에서 같은 목록 쓰기](
 <summary>AI 연결 자세히</summary>
 
 - **켜기**: 책상 → **AI 연결**에서 ‘Claude가 종이냥을 보고 쓸 수 있게 하기’를 켭니다. **Claude 데스크톱에 연결**을 누르면 앱에 든 `jongi-nyang.mcpb`를 열어 Claude 데스크톱이 설치할지 묻습니다. **Claude Code 명령 복사**는 종이냥 실행 파일이 앱에 든 확장을 바로 돌리는 명령이라 Node.js가 없어도 됩니다.
-  `claude mcp add jongi-nyang -- "…\종이냥.exe" --mcp-stdio`
-  예전에 복사한 `ELECTRON_RUN_AS_NODE=1` 명령도 그대로 됩니다. 새 명령으로 바꾸려면 그 명령을 붙여 넣었던 폴더에서 `claude mcp remove jongi-nyang`을 실행하고 새 명령을 붙여 넣습니다.
+  `claude mcp add -s user jongi-nyang -- "…\종이냥.exe" --mcp-stdio`
+  사용자 범위(`-s user`)로 연결해서 어느 폴더에서나, Claude 데스크톱의 Code 탭에서도 됩니다. 이 버튼을 누르면 AI 연결 스위치도 켜집니다(Mac과 같습니다). 예전에 복사한 명령(폴더 하나에만 연결하는 명령, `ELECTRON_RUN_AS_NODE=1` 명령)도 그대로 됩니다. 새 명령으로 바꾸려면 터미널에서 `claude mcp remove -s user jongi-nyang`을 실행하고 다시 붙여 넣습니다. 예전 명령을 지우려면 그 명령을 붙여 넣었던 폴더에서 `claude mcp remove jongi-nyang`을 실행합니다.
 - **할 수 있는 것**: 오늘 보기, 할 일 · 일정 · 메모 · 집중 · 끝낸 일 보기, 할 일(한 번에 20개까지) · 일정(반복 없음) · 메모 넣기, 할 일과 한 번만 있는 일정 고치기, 할 일을 스페이스로 보고 거르기 · 스페이스에 넣기 · 확인 뒤 옮기기, 오늘 한 장 · 한 주 · 메모 한 장을 대화에 자료로 붙이기. 확인 번호는 10분 동안 쓸 수 있습니다.
 - **이 PC에서 숨긴 스페이스**: 책상 → 스페이스에서 이 PC에 숨긴 스페이스의 할 일은 Claude도 오늘과 목록에서 빼고, 몇 개를 뺐는지 한 줄로 말합니다. 그 스페이스를 말하거나 찾으면 ‘숨김’을 붙여 보여 줍니다. 끝낸 일은 완료 기록처럼 모두 보입니다.
 - **하지 않는 것**: 지우기, 반복 일정 · 알람 고치기, 메모 고치기, 스페이스 만들기 · 지우기.
@@ -465,7 +465,7 @@ Mac과 같은 목록을 쓰는 방법은 [PC와 Mac에서 같은 목록 쓰기](
 
 제거 프로그램은 앱만 지우고 목록은 남깁니다. 모두 지우려면 이 순서로 지웁니다.
 
-1. AI 연결을 썼다면 Claude에서 먼저 뗍니다. Claude 데스크톱의 설정 → 확장 프로그램에서 ‘종이냥 for Claude’를 지우고, Claude Code에 연결 명령을 붙여 넣었다면 그 폴더에서 `claude mcp remove jongi-nyang`을 실행합니다.
+1. AI 연결을 썼다면 Claude에서 먼저 뗍니다. Claude 데스크톱의 설정 → 확장 프로그램에서 ‘종이냥 for Claude’를 지우고, Claude Code에 연결했다면 `claude mcp remove -s user jongi-nyang`을 실행합니다(예전 명령으로 연결했다면 그 폴더에서 `claude mcp remove jongi-nyang`).
 2. 책상 → 꾸미기 → 시작의 ‘컴퓨터를 켤 때 같이 열기’를 끕니다. 앱을 먼저 지웠다면 작업 관리자 → 시작 앱에서 끕니다.
 3. 알림 영역에서 종이냥을 종료하고 설정 → 앱 → 설치된 앱에서 제거합니다. ZIP으로 받았다면 푼 폴더를 지웁니다.
 4. `%APPDATA%\PaperTodo\`를 지웁니다. 위의 파일이 모두 여기 있습니다(목록, 설정, AI 연결 기록, `backups\`).
@@ -501,18 +501,19 @@ Mac과 같은 목록을 쓰는 방법은 [PC와 Mac에서 같은 목록 쓰기](
 
 ### 개발
 
-Node.js 22 이상이 필요합니다(Electron 44 · electron-builder 26). 이 폴더(`windows/`)에서 실행합니다. macOS에서도 Windows 설치 파일을 만들 수 있습니다.
+Node.js 22.12 이상이 필요합니다(Electron 44 · electron-builder 26). 이 폴더(`windows/`)에서 실행합니다. macOS에서도 Windows 설치 파일을 만들 수 있습니다.
 
 ```sh
 npm install
 npm start            # 빌드 후 실행
 npm run dist         # 타입 검사 + 테스트 + dist/JongiNyang-<버전>-x64.exe(설치) · .zip(설치 없이)
+tools/dist.sh        # 릴리스 빌드: 설치된 Node가 22가 아니어도 Node 22로 npm ci와 npm run dist 전체
 ```
 
 <details>
 <summary>테스트 · 스냅숏 · 측정 명령</summary>
 
-일부 테스트는 한국 시간을 전제로 해서, 시간대를 `Asia/Seoul`로 맞추고 돌립니다.
+한국 시간으로 쓴 테스트는 `npm test`가 Asia/Seoul로 돌리고(`test/time-zones.json`), 나머지는 기기의 시간대와 상관없이 통과합니다.
 
 ```sh
 npm test             # 핵심 로직 테스트: 일정 · 백업(내보내기 → 가져오기) · 공유 폴더 · 번역 포함

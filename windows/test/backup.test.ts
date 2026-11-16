@@ -364,10 +364,10 @@ test("the daily copy: once a day from 4 a.m., only when something changed (TZ=As
   assert.equal(isDue(new Date(2026, 9, 30, 5, 0), new Date(2026, 9, 30, 2, 0), true), true);
 });
 
-// 저장과 백업의 백업 한 줄 (#240, D2 C): the shared cases from docs/plans/storage-summary-cases.json (the Mac's
+// 저장과 백업의 백업 한 줄 (#240, D2 C): the shared cases from shared/cases/storage-summary-cases.json (the Mac's
 // test-backups.sh reads the same file).
 test("backup summary: when the last copy was, or what is wrong, in ko · en · nl (shared cases)", () => {
-  const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "storage-summary-cases.json"), "utf8")) as {
+  const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "storage-summary-cases.json"), "utf8")) as {
     now: number[];
     cases: { case: string; auto: boolean; failed: boolean; missing: boolean; newest: number[] | null; tone: string; ko: string[]; en: string[]; nl: string[] }[];
   };

@@ -6,7 +6,7 @@ import { isoDate } from "./notebook";
 /**
  * 지운 메모 (#120, docs/plans/drawer-ux-plan.md B3): a deleted memo is kept 30 days in memo-trash.json next to memos.json
  * — out of memos.json, so an older app (or another device's) never shows it again — with the folder, pin and paper it
- * had, to go back there. The same file, rules and shared cases (docs/plans/drawer-trash-cases.json) as the Mac
+ * had, to go back there. The same file, rules and shared cases (shared/cases/drawer-trash-cases.json) as the Mac
  * (PaperCore MemoTrash.swift):
  *
  *   { "v": 1,

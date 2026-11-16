@@ -37,10 +37,13 @@ export function takeMoved(settingsDirectory: string): StorageMoved | undefined {
   return parseMoved(text);
 }
 
-/** A folder that can be written to now (a cloud or USB folder may be missing at launch). */
+/**
+ * A folder that is there and can be written to now (a cloud or USB folder may be missing at launch). #380: one that
+ * isn't there is not made — an empty folder in its place (Dropbox or OneDrive not running yet) would open as an empty list.
+ */
 export function usableFolder(folder: string): boolean {
   try {
-    fs.mkdirSync(folder, { recursive: true });
+    if (!fs.statSync(folder).isDirectory()) return false;
     fs.accessSync(folder, fs.constants.W_OK);
     return true;
   } catch {

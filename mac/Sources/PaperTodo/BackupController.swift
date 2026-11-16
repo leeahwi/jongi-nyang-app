@@ -24,7 +24,11 @@ enum BackupController {
             try exportText(folder: model.storageFolderURL).write(to: url, atomically: true, encoding: .utf8)
             NSWorkspace.shared.activateFileViewerSelecting([url])
         } catch {
-            fail(L("백업 파일을 만들지 못했어요."), error.localizedDescription)
+            // #388: not the system's English text (it names the full path). #390: 다시 시도 opens the save panel again.
+            if SlipAlert.inform(title: L("내보내기"), message: L("내보내지 못했어요."), detail: L("다른 곳을 골라 다시 시도해 주세요."),
+                                next: L("다시 시도")) {
+                export(model: model)
+            }
         }
     }
 
@@ -72,7 +76,7 @@ enum BackupController {
         }
 
         let done = SlipAlert.run(symbol: "checkmark", title: L("가져오기"), message: L("가져왔어요."), replacesList: true,
-                                 detail: "\(Backup.summary(result).text(.current))\n" + L("종이냥이 다시 시작돼요. 가져오기 전 것도 ‘backups’ 폴더에 남겨 뒀어요."),
+                                 detail: "\(Backup.summary(result).text(.current))\n" + L("종이냥이 다시 시작돼요. 가져오기 전 것도 백업 폴더에 남겨 뒀어요."),
                                  choices: [.init(title: L("백업 폴더 열기")), .init(title: L("다시 시작"), role: .primary, isDefault: true, isCancel: true)],
                                  cat: .happy)
         if done == 0 { NSWorkspace.shared.open(safety) }
@@ -267,7 +271,7 @@ enum BackupController {
     }
 
     private static func fail(_ title: String, _ detail: String?) {
-        SlipAlert.inform(title: L("백업 · 옮기기"), message: title, detail: detail)
+        SlipAlert.inform(title: L("가져오기"), message: title, detail: detail)
     }
 
     /// A fresh start on the new files; the quit path (which saves) is skipped on purpose.

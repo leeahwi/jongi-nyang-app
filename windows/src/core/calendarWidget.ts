@@ -11,7 +11,7 @@ import { rangeText, rangeTimes } from "./timeRange";
  * and the text stays readable, where a widget sits on which display, what a line typed into its day sheet makes, and
  * when it draws again. The cells come from the desk calendar's core (calendar.ts: cellItems · dayTasks · eventsOn), with
  * the to-dos of the spaces this PC hides already left out. Days run midnight to midnight, like the calendar. Same rules
- * and shared cases as the Mac (PaperCore/CalendarWidget.swift, docs/plans/calendar-widget-cases.json).
+ * and shared cases as the Mac (PaperCore/CalendarWidget.swift, shared/cases/calendar-widget-cases.json).
  */
 
 // ─── Kinds and settings ───────────────────────────────────────────────────────

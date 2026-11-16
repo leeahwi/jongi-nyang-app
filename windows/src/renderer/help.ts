@@ -31,7 +31,7 @@ const makeTopics = (noteKey: string): Topic[] => [
   { id: "start", title: t("시작하기"), icon: "sparkles", headline: t("하루에 한 장, 가볍게"), entries: [
     { title: t("종이냥은 어떤 앱인가요?"), body: t("할 일과 일정을 종이 한 장에 적는 노트예요. 적고, 체크하고, 끝내면 종이냥이 축하해 줘요.\n· 인터넷이나 로그인 없이 이 PC에 저장돼요.\n· 원하면 OneDrive 같은 공유 폴더로 여러 기기에서 같은 목록을 써요.") },
     { title: t("창을 닫아도 계속 실행돼요"), body: t("노트의 ×를 눌러도 앱은 알림 영역의 종이냥 아이콘으로 남아 알림을 계속 보내요.\n· 알림 영역(트레이)은 작업 표시줄 오른쪽에 있어요.\n· 아이콘을 누르면 오늘 창이 뜨고, 두 번 누르면 노트가 바로 열려요.\n· 완전히 끄려면 아이콘 우클릭 → 종이냥 종료.") },
-    { title: t("Windows를 켤 때 함께 실행"), body: t("‘컴퓨터를 켤 때 같이 열기’를 켜면 PC를 켤 때 종이냥이 바로 열려요.\n· 이 스위치는 처음 안내의 마지막 카드와 책상 → 꾸미기 → 시작에 있어요.\n· 꺼 둔 채로 세 번 직접 켜면 종이냥이 한 번 물어봐요.") },
+    { title: t("컴퓨터를 켤 때 같이 열기"), body: t("‘컴퓨터를 켤 때 같이 열기’를 켜면 PC를 켤 때 종이냥이 바로 열려요.\n· 이 스위치는 처음 안내의 마지막 카드와 책상 → 꾸미기 → 시작에 있어요.\n· 꺼 둔 채로 세 번 직접 켜면 종이냥이 한 번 물어봐요.") },
     { title: t("처음 안내 다시 보기"), body: t("⋯ 메뉴 → 사용 안내에서 처음에 본 카드 안내를 다시 볼 수 있어요.") },
   ] },
   { id: "tasks", title: t("할 일"), icon: "check", headline: t("적고, 체크하고, 끝"), entries: [
@@ -228,7 +228,7 @@ const makeTopics = (noteKey: string): Topic[] => [
   ] },
   { id: "ai", title: t("AI 연결"), icon: "chat", headline: t("Claude와 이야기하며 정리해요"), entries: [
     { title: t("무엇을 할 수 있나요"), body: t("Claude 데스크톱이나 Claude Code와 이야기하면서 할 일 · 일정 · 메모를 보고 새로 넣어요.\n· 할 일과 반복하지 않는 일정은 고칠 수도 있어요.\n· 할 일을 스페이스로 보고 거르고, 넣을 때 스페이스를 정하고, 물어본 뒤 다른 스페이스로 옮겨요.\n· 이 기기에서 숨긴 스페이스의 할 일은 오늘과 목록에서 빼요. 그 스페이스를 말하면 보여 줘요.\n· 예: ‘내일 3시–4시 보고서 쓰기 넣어줘’, ‘이번 주 뭐 했는지 정리해줘’\n· 지우기, 반복 일정 · 알람 고치기, 메모 고치기, 스페이스 만들기 · 지우기는 하지 않아요.") },
-    { title: t("켜고 연결하기"), body: t("책상 → AI 연결에서 켜고, Claude 데스크톱이나 Claude Code에 연결해요. 끄면 Claude는 아무것도 읽거나 쓰지 못해요.\n1. ‘Claude가 종이냥을 보고 쓸 수 있게 하기’를 켜요. 처음에는 꺼져 있어요.\n2. ‘Claude 데스크톱에 연결’을 눌러요. Claude 데스크톱이 ‘종이냥 for Claude’를 설치할지 물어봐요.\n3. Claude Code는 ‘Claude Code 명령 복사’로 복사한 명령을 터미널에 붙여 넣어요.\n· Claude Code에 Node.js는 필요 없어요. 종이냥이 실행해요.\n· 예전에 복사한 명령도 그대로 돼요. 새 명령으로 바꾸려면 붙여 넣었던 폴더에서 claude mcp remove jongi-nyang을 실행하고 다시 붙여 넣어요."), keys: [t("Claude 데스크톱에 연결"), t("Claude Code 명령 복사")] },
+    { title: t("켜고 연결하기"), body: t("책상 → AI 연결에서 켜고, Claude 데스크톱이나 Claude Code에 연결해요. 끄면 Claude는 아무것도 읽거나 쓰지 못해요.\n1. ‘Claude가 종이냥을 보고 쓸 수 있게 하기’를 켜요. 처음에는 꺼져 있어요.\n2. ‘Claude 데스크톱에 연결’을 눌러요. Claude 데스크톱이 ‘종이냥 for Claude’를 설치할지 물어봐요.\n3. Claude Code는 ‘Claude Code 명령 복사’로 복사한 명령을 터미널에 붙여 넣어요.\n· Claude Code에 Node.js는 필요 없어요. 종이냥이 실행해요.\n· 붙여 넣은 명령은 어느 폴더에서나, Claude 데스크톱의 Code 탭에서도 돼요.\n· 예전에 연결한 것도 그대로 돼요. 새 명령으로 바꾸려면 터미널에서 claude mcp remove -s user jongi-nyang을 실행하고 다시 붙여 넣어요."), keys: [t("Claude 데스크톱에 연결"), t("Claude Code 명령 복사")] },
     { title: t("고치기 전에 물어봐요"), body: t("Claude는 고치기 전에 바뀌기 전과 후를 대화에 먼저 보여 주고, ‘응’이라는 답을 받은 뒤에 고쳐요. 그사이 종이냥에서 그 항목을 바꿨으면 고치지 않고 다시 보여 줘요.") },
     { title: t("알림과 되돌리기"), body: t("Claude가 넣거나 고치면 노트 아래에 ‘Claude가 할 일 2개를 넣었어요 · 되돌리기’가 떠요.\n1. 안내의 ‘되돌리기’를 눌러요. 그 뒤로 여기서 아무것도 바꾸지 않았다면 Ctrl+Z로도 돼요.\n2. 나중에 되돌리려면 책상 → AI 연결 → 최근 AI 작업에서 오늘과 어제 한 일을 하나씩 되돌려요.\n· 그사이 바뀐 항목은 그대로 둬요.\n· Claude가 넣거나 고친 할 일과 일정에는 그날 동안 작은 ‘Claude’ 도장이 찍혀요."), keys: ["Ctrl+Z"] },
     { title: t("종이냥이 꺼져 있을 때"), body: t("종이냥을 꺼 둬도 Claude는 넣고 고칠 수 있어요.\n1. 다음에 종이냥을 켜면 ‘자리를 비운 사이 Claude가 3개를 넣거나 고쳤어요’가 떠요.\n2. ‘보기’를 누르면 무엇을 했는지 보여요.") },
@@ -330,8 +330,29 @@ function topicPage(topic: Topic): Node[] {
       chips),
     ...cards,
     neighbours(topic),
+    reportButton(),
     h("p", { class: "copyright" }, COPYRIGHT),
   ];
+}
+
+/**
+ * #409 문제 보고용 정보 복사: the displays and the cats' windows for a problem that shows only on a PC (main/reportInfo.ts;
+ * no to-do, memo or path), at the end of every topic; 복사했어요 for a moment, as the AI pane's copy button.
+ */
+function reportButton(): HTMLElement {
+  const label = t("문제 보고용 정보 복사");
+  const name = h("span", {}, label);
+  const tile = h("span", { class: "report-icon", "aria-hidden": "true" }, icon("copy", 12, 2));
+  const button = h("button", { class: "report", title: label }, tile, name);
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  button.addEventListener("click", () => {
+    void paper().act({ type: "copyReportInfo" });
+    name.textContent = t("복사했어요");
+    tile.replaceChildren(icon("check", 12, 2));
+    clearTimeout(timer);
+    timer = setTimeout(() => { name.textContent = label; tile.replaceChildren(icon("copy", 12, 2)); }, 2500);
+  });
+  return h("div", { class: "report-row" }, button);
 }
 
 function searchResults(words: string[]): Node[] {

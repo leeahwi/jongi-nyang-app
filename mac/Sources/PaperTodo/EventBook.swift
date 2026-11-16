@@ -30,12 +30,17 @@ final class EventBook: ObservableObject {
 
     private let preferences: UserDefaults
     private let url: URL
-    /// events.json as this Mac last read or wrote it; anything else there came from another device.
-    private var known: Data?
+    /// events.json as this Mac last read or wrote it (#411); anything else there came from another device.
+    private let file: SyncedFile
+    private var known: Data? {
+        get { file.known }
+        set { if let newValue { file.accept(newValue) } else { file.forget() } }
+    }
 
     init(preferences: UserDefaults, folder: URL) {
         self.preferences = preferences
         url = folder.appendingPathComponent("events.json")
+        file = SyncedFile(url: url)
         showsStrip = preferences.object(forKey: "calendar.strip") == nil ? true : preferences.bool(forKey: "calendar.strip")
         openDay = preferences.string(forKey: "calendar.openDay")
         // Until 1.39: today's event list under the ribbon, open or folded (the whole day replaces it).
@@ -134,7 +139,16 @@ final class EventBook: ObservableObject {
     // MARK: The file
 
     private func load() {
-        guard let data = try? SafeFile.sharedData(url) else {
+        let data: Data
+        do {
+            data = try SafeFile.sharedData(url)
+        } catch {
+            guard SafeFile.isAbsent(url) else {
+                // #382: there but not readable just now (no permission, iCloud Drive still downloading it): never saved
+                // over — the next check that reads it (reloadIfChanged) opens saving again.
+                problem = L("일정 파일을 읽지 못했어요.") + " " + L("원래 파일은 덮어쓰지 않고 그대로 둬요.") + " " + L("저장 폴더가 열리는지 확인해 주세요.")
+                return
+            }
             events = []
             known = nil
             return
@@ -151,7 +165,18 @@ final class EventBook: ObservableObject {
 
     /// Another device wrote events.json (a shared folder is checked every two seconds).
     func reloadIfChanged() {
-        guard let data = try? SafeFile.sharedData(url), data != known else { return }
+        guard case .changed(let theirs) = file.look() else { return }
+        // #385: events changed here since the file was last read or written (a save that failed, a file that couldn't be
+        // read at launch) join theirs, event by event, and are written back.
+        if let here = try? Self.encoder.encode(LocalEvent.File(events: events)),
+           case .joined(let bytes)? = SyncConflict.join(base: known, here: here, theirs: theirs, key: "events"),
+           let joined = try? Self.decoder.decode(LocalEvent.File.self, from: bytes) {
+            known = theirs
+            events = joined.events
+            problem = nil
+            AIWriteLock.with { save() }
+            return
+        }
         load()
     }
 
@@ -163,10 +188,7 @@ final class EventBook: ObservableObject {
         let started = PerfProbe.now
         defer { PerfProbe.io("events", since: started) }
         do {
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let data = try Self.encoder.encode(LocalEvent.File(events: events))
-            try data.write(to: url, options: .atomic)
-            known = data
+            try file.write(try Self.encoder.encode(LocalEvent.File(events: events)))
         } catch {
             // Not tried again until the file reads again (save() waits for problem == nil).
             problem = AppModel.saveProblem(L("일정을 저장하지 못했어요."), retries: false)

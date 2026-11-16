@@ -1,6 +1,6 @@
 import Foundation
 
-// 음력과 공휴일 (#234, KoreanCalendar): the shared cases from docs/plans/calendar-korean-cases.json (the Windows app's
+// 음력과 공휴일 (#234, KoreanCalendar): the shared cases from shared/cases/calendar-korean-cases.json (the Windows app's
 // test/koreanCalendar.test.ts reads the same file) — lunar dates on 설날 · 추석 · 윤달 · year ends, every day of 2020–2035
 // as one digest (the two apps' calendars must agree on each), the cell's lunar label, and every holiday of 2024–2030.
 private struct TestFailure: Error, CustomStringConvertible {
@@ -14,7 +14,7 @@ private func equal<T: Equatable>(_ actual: T, _ expected: T, _ name: String) thr
 @main
 private enum KoreanCalendarTests {
     static func main() throws {
-        let path = CommandLine.arguments.dropFirst().first ?? "../docs/plans/calendar-korean-cases.json"
+        let path = CommandLine.arguments.dropFirst().first ?? "../shared/cases/calendar-korean-cases.json"
         let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
         var count = 0
         func test(_ name: String, _ action: () throws -> Void) throws {

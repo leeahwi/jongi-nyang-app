@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { GlobalKeys, KeyFilter, hookWanted, WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP, type HeldModifiers, type KeyHookNative } from "../src/core/keyHook";
+import { GlobalKeys, KeyFilter, hookActiveIdleS, hookCheckMs, hookRearmGapMs, hookSilenceMs, hookWanted,WM_KEYDOWN, WM_KEYUP, WM_SYSKEYDOWN, WM_SYSKEYUP, type HeldModifiers, type KeyHookNative } from "../src/core/keyHook";
 
 // 모든 앱에서 on Windows (#288): the low-level hook's logic with a stand-in for Windows — what counts, the throttle,
 // that nothing of a key goes past the filter, and that the hook is set and taken off as asked.
@@ -188,7 +188,9 @@ test("key hook: --mcp-stdio and off-screen runs never load it", () => {
   const entry = fs.readFileSync(path.join(root, "src/main/entry.ts"), "utf8");
   assert.ok(!entry.includes("keyHook"), "entry.ts doesn't import it");
   const native = fs.readFileSync(path.join(root, "src/main/keyHook.ts"), "utf8");
-  assert.match(native, /process\.platform !== "win32" \|\| offscreenEnabled\) return undefined/);
+  assert.match(native, /const native = windowsNative\(\);\n    if \(!native\) return undefined;/);
+  const loader = fs.readFileSync(path.join(root, "src/main/native/user32.ts"), "utf8");
+  assert.match(loader, /process\.platform !== "win32" \|\| offscreenEnabled\) return undefined/);
 });
 
 test("key hook: wanted only for 모든 앱에서 with the screen unlocked; the typing cat follows that, and unhooks on quit", () => {
@@ -205,4 +207,67 @@ test("key hook: wanted only for 모든 앱에서 with the screen unlocked; the t
   assert.match(window, /tap\(\): void \{\n    if \(this\.source === "app"\) this\.key\(\);/, "the pages' taps are left while the hook hears every key");
   const main = fs.readFileSync(path.join(root, "src/main/main.ts"), "utf8");
   assert.match(main, /app\.on\("will-quit", \(\) => \{ typingCat\?\.dispose\(\);/);
+});
+
+// #410: Windows takes a hook off without a word when the main thread doesn't answer in time; the cat then hears nothing.
+// The watch sets it again when someone is at the computer but the hook has been silent too long (a fake clock here).
+test("key hook watch (#410): someone active but nothing heard for 30 s: the hook is set again, at most once a minute", () => {
+  const { native, keys, heard, clock } = setUp();
+  keys.listen(true);
+  native.press(A);
+  // Windows drops the hook: keys go on in other apps, the hook hears none.
+  native.proc = undefined;
+  for (clock.now = hookCheckMs; clock.now < hookRearmGapMs; clock.now += hookCheckMs) assert.equal(keys.watch(0), false, `${clock.now} ms: not yet`);
+  clock.now = hookRearmGapMs;
+  assert.equal(keys.watch(1), true, "set again");
+  assert.deepEqual([native.uninstalls, native.installs, keys.rearmed, keys.listening], [1, 2, 1, true]);
+  native.press(B);
+  assert.equal(heard.length, 2, "heard again");
+  // Silent again right after: not before another minute.
+  native.proc = undefined;
+  clock.now += hookSilenceMs;
+  assert.equal(keys.watch(0), false, "a minute between two");
+  clock.now += hookRearmGapMs - hookSilenceMs;
+  assert.equal(keys.watch(0), true);
+  assert.equal(keys.rearmed, 2);
+});
+
+test("key hook watch (#410): left alone while the hook hears keys, while nobody is at the computer, or when not listening", () => {
+  const { native, keys, clock } = setUp();
+  assert.equal(keys.watch(0), false, "not listening");
+  keys.listen(true);
+  // Keys keep coming: never set again, however long.
+  for (clock.now = 0; clock.now < 10 * 60_000; clock.now += hookCheckMs) {
+    native.press(A);
+    assert.equal(keys.watch(0), false);
+  }
+  // Nobody at the computer (idle longer than hookActiveIdleS): silence is expected.
+  clock.now += 10 * 60_000;
+  assert.equal(keys.watch(hookActiveIdleS + 1), false);
+  assert.equal(keys.watch(600), false);
+  assert.equal(native.installs, 1);
+  keys.listen(false);
+  clock.now += 10 * 60_000;
+  assert.equal(keys.watch(0), false, "taken off: nothing to watch");
+  assert.equal(native.installs, 1);
+});
+
+test("key hook watch (#410): a key-up alone counts as heard; a hook Windows won't set again leaves listening off", () => {
+  const { native, keys, clock } = setUp();
+  keys.listen(true);
+  clock.now = hookRearmGapMs + 1;
+  native.proc?.(WM_KEYUP, SHIFT);
+  assert.equal(keys.watch(0), false, "heard just now");
+  clock.now += hookRearmGapMs;
+  native.proc = undefined;
+  native.refuse = true;
+  assert.equal(keys.watch(0), true);
+  assert.equal(keys.listening, false, "the typing cat brings Settings in line (refresh)");
+  assert.equal(keys.watch(0), false, "nothing set: nothing to watch");
+  // The typing cat looks every few seconds while the hook is set, with the system's idle time, and stops on quit.
+  const window = fs.readFileSync(path.join(root, "src/main/typingCat.ts"), "utf8");
+  assert.match(window, /this\.watchHook\(hooked\);/);
+  assert.match(window, /if \(this\.keys\?\.watch\(powerMonitor\.getSystemIdleTime\(\)\) && !this\.keys\.listening\) this\.refresh\(\);/);
+  assert.match(window, /\}, hookCheckMs\);/);
+  assert.match(window, /dispose\(\): void \{\n    this\.keys\?\.listen\(false\);\n    this\.watchHook\(false\);/);
 });

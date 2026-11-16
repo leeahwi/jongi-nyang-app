@@ -4,7 +4,7 @@ import Foundation
 /// and the text stays readable, where a widget sits on which display, what a line typed into its quick entry makes, and
 /// when it draws again. The cells themselves come from `CalendarMonth.Page` (the desk calendar's), with the to-dos of
 /// the spaces this device hides already left out (`AppModel.hereItems`). Days run midnight to midnight, like the
-/// calendar. Same rules and shared cases as the Windows app (core/calendarWidget.ts, docs/plans/calendar-widget-cases.json).
+/// calendar. Same rules and shared cases as the Windows app (core/calendarWidget.ts, shared/cases/calendar-widget-cases.json).
 public enum CalendarWidget {
     // MARK: Kinds and settings
 
@@ -236,7 +236,7 @@ public enum CalendarWidget {
     /// The paper's floor (#234): the faintest the paper may be with ink on it alone keeping 4.5:1 over the worst wallpaper
     /// (black behind a light paper, white behind a dark one) — in 5 % steps. Fainter than that, the text gets its outline of
     /// paper (`backing`, #321). Day paper 60,
-    /// kraft 65, night 75 (docs/plans/calendar-widget-cases.json `floors`, every paper of #244).
+    /// kraft 65, night 75 (shared/cases/calendar-widget-cases.json `floors`, every paper of #244).
     public static func floor(paper: (Double, Double, Double), ink: (Double, Double, Double), dark: Bool) -> Int {
         let worst = dark ? (1.0, 1.0, 1.0) : (0.0, 0.0, 0.0), other = dark ? (0.0, 0.0, 0.0) : (1.0, 1.0, 1.0)
         for step in stride(from: 20, through: 100, by: 5) {

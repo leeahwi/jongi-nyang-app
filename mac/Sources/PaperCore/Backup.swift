@@ -208,7 +208,7 @@ public enum Backup {
 
     /// 저장과 백업's one line about the backups (#240, D2 C): what the user wants to know first — when the last copy was,
     /// or what is wrong — then how they are made. The same words as the Windows app (backup.ts: backupStatus) and
-    /// docs/plans/storage-summary-cases.json.
+    /// shared/cases/storage-summary-cases.json.
     public struct Status: Equatable, Sendable {
         public enum Tone: String, Sendable { case ok, off, warn }
         public var title: String

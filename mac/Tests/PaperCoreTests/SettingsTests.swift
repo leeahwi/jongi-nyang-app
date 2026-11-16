@@ -1,6 +1,6 @@
 import Foundation
 
-// 글꼴 · 종이 설정 (#141 · #142, TextSteps.swift): the shared cases from docs/plans/settings-cases.json (the Windows app's
+// 글꼴 · 종이 설정 (#141 · #142, TextSteps.swift): the shared cases from shared/cases/settings-cases.json (the Windows app's
 // test/textSteps.test.ts reads the same file) — the note's seven steps and the drawer's nine read from 1.45's names and
 // written back as the nearest of them, the drawer's line, paragraph and preview sizes, where a paragraph ends, and the
 // drawer's paper read from 1.45's ‘자동’ with 밤에는 밤 종이로 (#142).
@@ -19,7 +19,7 @@ private func equal<T: Equatable>(_ actual: T, _ expected: T, _ name: String) thr
 @main
 private enum SettingsTests {
     static func main() throws {
-        let path = CommandLine.arguments.dropFirst().first ?? "../docs/plans/settings-cases.json"
+        let path = CommandLine.arguments.dropFirst().first ?? "../shared/cases/settings-cases.json"
         let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
         var count = 0
         func test(_ name: String, _ action: () throws -> Void) throws {

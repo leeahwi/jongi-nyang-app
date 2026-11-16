@@ -8,7 +8,7 @@
 
 Mac · Windows · 무료 · 계정 없이
 
-[**Mac 내려받기**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.49.1) · [**Windows 내려받기**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.34.1) · [소개 페이지](https://leeahwi.github.io/jongi-nyang-app/) · [40초 소개 영상](site/assets/promo-ko.mp4) · [변경 기록](CHANGELOG.md)
+[**Mac 내려받기**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.50.0) · [**Windows 내려받기**](https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.35.0) · [소개 페이지](https://leeahwi.github.io/jongi-nyang-app/) · [40초 소개 영상](site/assets/promo-ko.mp4) · [변경 기록](CHANGELOG.md)
 
 [![Mac 최신 버전](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=mac-*&label=Mac&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![Windows 최신 버전](https://img.shields.io/github/v/release/leeahwi/jongi-nyang-app?filter=windows-*&label=Windows&color=5c7a5a)](https://github.com/leeahwi/jongi-nyang-app/releases) [![CI](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml/badge.svg)](https://github.com/leeahwi/jongi-nyang-app/actions/workflows/ci.yml)
 
@@ -16,7 +16,7 @@ Mac · Windows · 무료 · 계정 없이
 
 </div>
 
-<img src="site/assets/og-ko.png" width="1200" alt="종이냥 노트 세 장: Mac 낮 화면, Mac 밤 화면, Windows 화면">
+<img src="site/assets/og-ko.jpg" width="1200" alt="종이냥 노트 세 장: Mac 낮 화면, Mac 밤 화면, Windows 화면">
 
 할 일, 일정, 메모, 집중 타이머를 작은 노트 한 장에 모읍니다. 알림은 화면 아래의 종이 고양이가 들고 옵니다.
 
@@ -30,7 +30,7 @@ Mac · Windows · 무료 · 계정 없이
 
 1. **받기** — [릴리스 목록](https://github.com/leeahwi/jongi-nyang-app/releases)에서 Mac은 DMG(macOS 14 이상, Apple Silicon), Windows는 `.exe` 설치 파일이나 ZIP(Windows 10/11, x64)을 받습니다. Mac은 DMG를 열어 앱을 응용 프로그램 폴더로 옮깁니다.
 2. **처음 열기** — 두 앱 모두 아직 서명이 없어서, 처음 열 때 운영체제가 막을 수 있습니다.
-   - Mac: **시스템 설정 → 개인정보 보호 및 보안**에서 **그래도 열기**를 누릅니다.
+   - Mac: 앱을 한 번 열어 본 뒤 **시스템 설정 → 개인정보 보호 및 보안**에서 **그래도 열기**를 누릅니다. macOS 14에서는 응용 프로그램 폴더에서 우클릭 → **열기**로도 열립니다.
    - Windows: SmartScreen 창에서 **추가 정보 → 실행**을 누릅니다.
 3. **처음 안내 보기** — 카드 몇 장이 앱을 소개합니다. 마지막 카드의 ‘로그인할 때 같이 열기’(Windows는 ‘컴퓨터를 켤 때 같이 열기’)는 처음부터 켜져 있고, 나중에 책상 → 꾸미기 → 시작에서 바꿀 수 있습니다.
 
@@ -225,7 +225,7 @@ Mac 1.48 · Windows 1.33부터 바탕화면에 종이 달력 위젯을 둡니다
 
 | | macOS | Windows |
 | --- | --- | --- |
-| 1. AI 연결 떼기(썼다면) | Claude 데스크톱 설정 → 확장 프로그램에서 ‘종이냥 for Claude’ 제거, Claude Code는 `claude mcp remove -s user jongi-nyang` | Claude 데스크톱은 macOS와 같다. Claude Code는 연결 명령을 붙여 넣은 폴더에서 `claude mcp remove jongi-nyang` |
+| 1. AI 연결 떼기(썼다면) | Claude 데스크톱 설정 → 확장 프로그램에서 ‘종이냥 for Claude’ 제거, Claude Code는 `claude mcp remove -s user jongi-nyang` | Claude 데스크톱은 macOS와 같다. Claude Code는 `claude mcp remove -s user jongi-nyang`(예전 명령은 붙여 넣은 폴더에서 `claude mcp remove jongi-nyang`) |
 | 2. 켤 때 열기 끄기 | 책상 → 꾸미기 → 시작의 ‘로그인할 때 같이 열기’(앱을 먼저 지웠다면 시스템 설정 → 일반 → 로그인 항목) | 같은 자리의 ‘컴퓨터를 켤 때 같이 열기’(앱을 먼저 지웠다면 작업 관리자 → 시작 앱) |
 | 3. 앱 지우기 | 종료한 뒤 응용 프로그램 폴더의 종이냥을 휴지통으로 | 종료한 뒤 설정 → 앱 → 설치된 앱에서 제거(ZIP은 푼 폴더를 지운다). 제거 프로그램은 데이터를 지우지 않는다 |
 | 4. 데이터 · AI 기록 · 자동 백업 | `~/Library/Application Support/com.noa.PaperTodo/` | `%APPDATA%\PaperTodo\` (설정 `settings.json`, `storage.json`도 여기) |
@@ -273,9 +273,9 @@ cd jongi-nyang-app/mac
 
 ```sh
 swift build -Xswiftc -warnings-as-errors
-TZ=Asia/Seoul ./scripts/test.sh
-TZ=Asia/Seoul ./scripts/test-intent.sh
-TZ=Asia/Seoul ./scripts/test-focus.sh
+./scripts/test.sh
+./scripts/test-intent.sh
+./scripts/test-focus.sh
 ./scripts/i18n/check.sh
 ```
 
@@ -301,10 +301,9 @@ npm ci
 npm start
 ```
 
-`npm run dist`는 타입 검사와 테스트를 거친 뒤 Windows x64 설치 파일과 ZIP을 `dist/`에 만듭니다. 일부 테스트가 한국 시간을 기준으로 해서 시간대를 맞춰야 합니다.
+`npm run dist`는 타입 검사와 테스트를 거친 뒤 Windows x64 설치 파일과 ZIP을 `dist/`에 만듭니다. 한국 시간으로 쓴 테스트는 `npm test`가 그 시간대로 돌려서, 시간대를 따로 맞추지 않아도 됩니다.
 
 ```powershell
-$env:TZ = "Asia/Seoul"
 npm run typecheck
 npm test
 npm run dist

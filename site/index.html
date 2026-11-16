@@ -11,12 +11,21 @@
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="alternate" hreflang="ko" href="https://leeahwi.github.io/jongi-nyang-app/">
 <link rel="alternate" hreflang="en" href="https://leeahwi.github.io/jongi-nyang-app/en/">
+<link rel="alternate" hreflang="x-default" href="https://leeahwi.github.io/jongi-nyang-app/">
+<link rel="canonical" href="https://leeahwi.github.io/jongi-nyang-app/">
 <meta property="og:type" content="website">
 <meta property="og:title" content="종이냥 — 종이 한 장처럼 꺼내 쓰는 할 일 앱">
 <meta property="og:description" content="오늘 할 일을 적고 체크하는 노트. macOS와 Windows용.">
-<meta property="og:image" content="https://leeahwi.github.io/jongi-nyang-app/assets/og-ko.png">
+<meta property="og:image" content="https://leeahwi.github.io/jongi-nyang-app/assets/og-ko.jpg">
 <meta property="og:url" content="https://leeahwi.github.io/jongi-nyang-app/">
+<meta property="og:site_name" content="종이냥">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="종이냥 노트 세 장: Mac 낮 화면, Mac 밤 화면, Windows 화면">
 <meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "종이냥", "alternateName": "Jongi-nyang", "description": "오늘 할 일을 적고 체크하는 노트. 화면 아래에 종이 고양이가 앉아 있어요. macOS와 Windows용 무료 할 일 앱.", "applicationCategory": "ProductivityApplication", "operatingSystem": "macOS 14 이상 (Apple Silicon), Windows 10/11 (x64)", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "KRW"}, "url": "https://leeahwi.github.io/jongi-nyang-app/", "downloadUrl": "https://github.com/leeahwi/jongi-nyang-app/releases", "screenshot": "https://leeahwi.github.io/jongi-nyang-app/assets/note-ko.webp", "license": "https://www.apache.org/licenses/LICENSE-2.0", "inLanguage": "ko"}</script>
 <script>(function(d){d.className=d.className.replace("no-js","js");try{var t=localStorage.getItem("theme");if(t==="light"||t==="dark")d.setAttribute("data-theme",t)}catch(e){}})(document.documentElement)</script>
 <link rel="preload" href="assets/fonts/HanJangPen-site.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="assets/fonts/fonts.css">
@@ -78,8 +87,8 @@
         <h1 id="hero-title">오늘 할 일,<br><span class="hand">종이 한 장</span>에.</h1>
         <p class="hero-sub">할 일을 적고 체크하는 종이 노트예요.<br>알림은 종이 고양이가 들고 와요.</p>
         <div class="hero-cta">
-          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.49.1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>Mac용 내려받기 <small>1.49.1</small></a>
-          <a class="btn glass" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.34.1">Windows용 내려받기 <small>1.34.1</small></a>
+          <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.50.0"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg>Mac용 내려받기 <small>1.50.0</small></a>
+          <a class="btn glass" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.35.0">Windows용 내려받기 <small>1.35.0</small></a>
         </div>
         <div class="line-wrap">
           <div class="line" role="img" aria-label="입력 줄 예: ‘내일 3시 회의’&#8288;라고 적으면 ‘일정 · 내일 15:00’&#8288;으로 알아들어요" data-line='[["내일 3시 회의","일정 · 내일 15:00"],["금요일까지 보고서","할 일 · 마감 금요일"],["타이머 40","40분 타이머"],["알람 7시 평일","알람 · 평일 오전 7:00","clay"]]'>
@@ -389,11 +398,11 @@
       <div class="head reveal">
         <p class="eyebrow">만든 방식</p>
         <h2 id="built-title">두 번 만들고,<br>같게 지켰어요</h2>
-        <p>Mac은 Swift(SwiftUI + AppKit), Windows는 Electron + TypeScript로 따로 만들었어요. 코드는 나누지 않고, 두 앱이 같은 시험 사례 표를 통과하게 해서 동작을 맞춰요.</p>
+        <p>Mac은 Swift(SwiftUI + AppKit), Windows는 Electron + TypeScript로 따로 만들었어요. 코드는 나누지 않고, 두 앱이 같은 테스트 사례 표를 통과하게 해서 동작을 맞춰요.</p>
       </div>
       <div class="stats reveal">
         <div class="stat"><b>136줄</b><span>입력 줄 사례를 두 앱이 글자 하나 다르지 않게&nbsp;통과해요</span></div>
-        <div class="stat"><b>582 + 420</b><span>Windows 시험 582개와 Mac 검사 약 420개(Windows 1.30 · Mac&nbsp;1.45&nbsp;기준)</span></div>
+        <div class="stat"><b>1,616 + 1,610</b><span>Windows 테스트 1,616개와 Mac 검사 약 1,610개(2026년 11월 12일&nbsp;기준)</span></div>
         <div class="stat"><b>61% → 0.7%</b><span>노트를 열어 둔 채 쉴 때 Mac의 CPU&nbsp;사용량</span></div>
         <div class="stat"><b>WCAG AA</b><span>앱의 낮과 밤 글자 색 대비(일부러 옅게 둔 안내는 빼고). 기준에 못 미치면 검사가 실패해요</span></div>
       </div>
@@ -424,8 +433,9 @@
           <details><summary>계정이 필요해요? 내 기록은 어디에 있어요?</summary><p>계정도 서버도 없어요. 처음에는 이 컴퓨터 안의 종이냥 폴더에, 원하면 내가 고른 폴더에 파일로 저장돼요. 폴더는 책상 → 저장과 백업에서 바꿔요. 자세한 건 <a href="privacy.html">개인정보 안내</a>에 있어요.</p></details>
           <details><summary>Mac과 Windows에서 같이 쓸 수 있어요?</summary><p>네. 두 컴퓨터에서 같은 공유 폴더(iCloud Drive, OneDrive, Dropbox 등)&#8288;를 저장 위치로 고르면 돼요. 기기마다 보일 스페이스도 따로 정할 수 있어요.</p></details>
           <details><summary>Google 캘린더와 연결돼요?</summary><p>아니요. 다섯 버전에 걸쳐 만들었고 잘 동작했지만 뺐어요. 업무 일정이 개인 공간에 섞이는 게 싫었고, 같이 써 본 사람들도 같은 이야기를 했어요. 자세한 이유는 <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/decisions.md">결정 기록</a>에 적었어요.</p></details>
-          <details><summary>처음 열 때 왜 막혀요?</summary><p>코드 서명을 하지 않은 빌드라서 그래요. Mac은 응용 프로그램 폴더에서 우클릭 → 열기를 누르고, 그래도 막히면 시스템 설정 → 개인정보 보호 및 보안에서 그래도 열기를 눌러요. Windows는 SmartScreen 창에서 추가 정보 → 실행을 눌러요.</p></details>
+          <details><summary>처음 열 때 왜 막혀요?</summary><p>코드 서명을 하지 않은 빌드라서 그래요. Mac은 종이냥을 한 번 열어 본 뒤 시스템 설정 → 개인정보 보호 및 보안에서 그래도 열기를 눌러요. macOS 14에서는 응용 프로그램 폴더에서 우클릭 → 열기로도 열려요. Windows는 SmartScreen 창에서 추가 정보 → 실행을 눌러요.</p></details>
           <details><summary>어떤 언어와 환경에서 돼요?</summary><p>한국어, 영어, 네덜란드어를 지원해요. Mac은 macOS 14 이상의 Apple Silicon, Windows는 10/11 x64에서 돌아가요. 다만 Windows 버전은 macOS 위 Electron에서만 확인했고, 실제 Windows PC에서는 아직 시험하지 못했어요.</p></details>
+          <details><summary>문제를 찾으면 어디에 알려요?</summary><p>GitHub에서 <a href="https://github.com/leeahwi/jongi-nyang-app/issues/new/choose">문제 알리기</a>를 눌러 남겨 주세요. 앱 버전과 OS, 어떻게 하면 생기는지를 적어 주면 빨리 찾을 수 있어요. 누구나 볼 수 있는 곳이라 메모 내용 같은 개인 정보는 적지 말아 주세요. 보안 문제는 공개 이슈 대신 <a href="https://github.com/leeahwi/jongi-nyang-app/security/policy">보안 문제 알리기</a> 안내대로 비공개로 알려 주세요.</p></details>
         </div>
       </div>
     </section>
@@ -439,30 +449,30 @@
       <div class="downloads">
         <div class="dl reveal">
           <h3>Mac</h3>
-          <p class="meta">1.49.1 · macOS 14 이상 · Apple Silicon&nbsp;·&nbsp;DMG</p>
+          <p class="meta">1.50.0 · macOS 14 이상 · Apple Silicon&nbsp;·&nbsp;DMG</p>
           <ol>
             <li>DMG를 열고 <strong>종이냥</strong>을 응용 프로그램 폴더로 끌어 놓아요.</li>
-            <li>응용 프로그램 폴더에서 종이냥을 <strong>우클릭 → 열기</strong>. 막히면 시스템 설정 → 개인정보 보호 및 보안 → <strong>그래도 열기</strong>.</li>
+            <li>종이냥을 한 번 열어 보고, 막히면 시스템 설정 → 개인정보 보호 및 보안 → <strong>그래도 열기</strong>. macOS 14에서는 우클릭 → 열기도 돼요.</li>
           </ol>
-          <a class="btn light" href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.49.1/JongiNyang-1.49.1.dmg">Mac용 내려받기</a>
-          <p class="files"><a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.49.1/jongi-nyang.mcpb">Claude 데스크톱 확장 파일</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.49.1/SHA256SUMS-1.49.1.txt">파일 확인값</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.49.1">릴리스 노트</a></p>
+          <a class="btn light" href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.50.0/JongiNyang-1.50.0.dmg">Mac용 내려받기</a>
+          <p class="files"><a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.50.0/jongi-nyang.mcpb">Claude 데스크톱 확장 파일</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/mac-v1.50.0/SHA256SUMS-1.50.0.txt">파일 확인값</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.50.0">릴리스 노트</a></p>
         </div>
         <div class="dl reveal">
           <h3>Windows</h3>
-          <p class="meta">1.34.1 · Windows 10/11 x64 · 설치 파일 또는 무설치 zip</p>
+          <p class="meta">1.35.0 · Windows 10/11 x64 · 설치 파일 또는 무설치 zip</p>
           <ol>
-            <li><code>JongiNyang-1.34.1-x64.exe</code>를 실행해요.</li>
+            <li><code>JongiNyang-1.35.0-x64.exe</code>를 실행해요.</li>
             <li>SmartScreen이 뜨면 <strong>추가 정보 → 실행</strong>.</li>
           </ol>
-          <a class="btn light" href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.34.1/JongiNyang-1.34.1-x64.exe">Windows용 내려받기</a>
-          <p class="files"><a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.34.1/JongiNyang-1.34.1-x64.zip">무설치 zip</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.34.1/jongi-nyang.mcpb">Claude 데스크톱 확장 파일</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.34.1/SHA256SUMS.txt">파일 확인값</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.34.1">릴리스 노트</a></p>
+          <a class="btn light" href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.35.0/JongiNyang-1.35.0-x64.exe">Windows용 내려받기</a>
+          <p class="files"><a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.35.0/JongiNyang-1.35.0-x64.zip">무설치 zip</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.35.0/jongi-nyang.mcpb">Claude 데스크톱 확장 파일</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/download/windows-v1.35.0/SHA256SUMS.txt">파일 확인값</a> · <a href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.35.0">릴리스 노트</a></p>
         </div>
         <div class="dl check reveal" id="check">
           <h3>받은 파일 확인</h3>
           <p>릴리스마다 파일의 SHA-256 값을 파일 확인값(SHA256SUMS)&#8288;과 릴리스 노트에 적어 둬요. 받은 파일의 값이 같으면 올린 그대로예요. 값이 다르면 열지 말고 지워 주세요.</p>
           <ul>
-            <li>Mac 터미널: <code>shasum -a 256 ~/Downloads/JongiNyang-1.49.1.dmg</code></li>
-            <li>Windows PowerShell: <code>Get-FileHash "$HOME\Downloads\JongiNyang-1.34.1-x64.exe" -Algorithm SHA256</code></li>
+            <li>Mac 터미널: <code>shasum -a 256 ~/Downloads/JongiNyang-1.50.0.dmg</code></li>
+            <li>Windows PowerShell: <code>Get-FileHash "$HOME\Downloads\JongiNyang-1.35.0-x64.exe" -Algorithm SHA256</code></li>
           </ul>
         </div>
       </div>
@@ -475,8 +485,8 @@
   <div class="curtain-in">
     <h2>종이 한 장처럼<br><span class="hand">꺼내 쓰는</span> 할 일 앱</h2>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.49.1">Mac용 내려받기</a>
-      <a class="btn glass" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.34.1">Windows용 내려받기</a>
+      <a class="btn primary" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/mac-v1.50.0">Mac용 내려받기</a>
+      <a class="btn glass" href="https://github.com/leeahwi/jongi-nyang-app/releases/tag/windows-v1.35.0">Windows용 내려받기</a>
     </div>
     <div class="foot">
       <div class="about">
@@ -484,7 +494,7 @@
         <p>종이 한 장처럼 꺼내 쓰는 할 일 앱과 종이 고양이. macOS와 Windows.</p>
       </div>
       <div class="apps">
-        <h4>앱</h4>
+        <h3>앱</h3>
         <ul class="two">
           <li><a href="#tour">둘러보기</a></li>
           <li><a href="#features">기능</a></li>
@@ -501,7 +511,7 @@
         </ul>
       </div>
       <div>
-        <h4>문서</h4>
+        <h3>문서</h3>
         <ul>
           <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/design-process.md">디자인 과정</a></li>
           <li><a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/docs/engineering.md">엔지니어링</a></li>
@@ -510,17 +520,18 @@
         </ul>
       </div>
       <div>
-        <h4>다른 곳</h4>
+        <h3>다른 곳</h3>
         <ul>
           <li><a href="https://github.com/leeahwi/jongi-nyang-app">GitHub 저장소</a></li>
           <li><a href="https://github.com/leeahwi/jongi-nyang-app/releases">릴리스</a></li>
+          <li><a href="https://github.com/leeahwi/jongi-nyang-app/issues/new/choose">문제 알리기</a></li>
           <li><a href="en/" hreflang="en" lang="en">English</a></li>
         </ul>
       </div>
     </div>
     <div class="legal">
       <span>© 2026 leeAhwi · 소스 코드는 <a href="https://github.com/leeahwi/jongi-nyang-app/blob/main/LICENSE">Apache License 2.0</a> · <a href="privacy.html">개인정보</a></span>
-      <span>Mac 1.49.1 · Windows 1.34.1</span>
+      <span>Mac 1.50.0 · Windows 1.35.0</span>
     </div>
   </div>
   <div class="ground" aria-hidden="true">

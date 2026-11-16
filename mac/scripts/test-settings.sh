@@ -1,6 +1,6 @@
 #!/bin/bash
 # 글꼴 · 종이 설정 (#141 · #142, TextSteps.swift): the note's seven size steps and the drawer's nine, 1.45's settings read
-# into them, line and paragraph spacing, where a paragraph ends — the shared cases from docs/plans/settings-cases.json
+# into them, line and paragraph spacing, where a paragraph ends — the shared cases from shared/cases/settings-cases.json
 # (the Windows app's test/textSteps.test.ts reads the same file).
 set -euo pipefail
 task_root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -41,4 +41,4 @@ swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/PaperLook.swift \
     Tests/PaperCoreTests/SettingsTests.swift \
     -o .build/checks/SettingsTests
-.build/checks/SettingsTests ../docs/plans/settings-cases.json
+.build/checks/SettingsTests ../shared/cases/settings-cases.json

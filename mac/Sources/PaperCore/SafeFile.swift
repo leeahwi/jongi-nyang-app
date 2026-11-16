@@ -3,7 +3,7 @@ import Foundation
 /// How big a file the app reads (#173, security review L-05): a file is read whole and then parsed, so memory grows to a
 /// few times its size. Past these it is refused untouched, with a message, and what is on the list stays as it is. The
 /// same numbers as the Windows app and 종이냥 for Claude (windows/src/core/fileLimits.ts); both tests read them from
-/// docs/plans/file-safety-cases.json.
+/// shared/cases/file-safety-cases.json.
 public enum FileLimits {
     /// A .jongi (가져오기, 되돌리기, the backup list's counts).
     public static let backupBytes = 64 * 1024 * 1024
@@ -14,7 +14,7 @@ public enum FileLimits {
 /// Reading the storage folder's and the backup folder's files safely (#173, security review L-04): someone who can write
 /// to a shared folder could put a link where a data file goes, or a huge file. A file is looked at with `lstat` first: a
 /// link is neither read nor written over, and one past its limit is not read. The same rules as the Windows app's
-/// `safeFiles.ts`; the shared cases are docs/plans/file-safety-cases.json.
+/// `safeFiles.ts`; the shared cases are shared/cases/file-safety-cases.json.
 public enum SafeFile {
     public enum Refusal: Error, Equatable {
         case link
@@ -27,6 +27,16 @@ public enum SafeFile {
         guard lstat(url.path, &info) == 0 else { return nil }
         let kind = info.st_mode & S_IFMT
         return (kind == S_IFLNK, kind == S_IFREG, Int(info.st_size))
+    }
+
+    /// #382: nothing at `url` and no iCloud Drive placeholder for it (`.todos.json.icloud`: the file is in iCloud and not
+    /// downloaded yet). A placeholder starts the download and counts as there — a file not readable yet, never a new one.
+    public static func isAbsent(_ url: URL) -> Bool {
+        guard entry(url) == nil else { return false }
+        let placeholder = url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).icloud")
+        guard entry(placeholder) != nil else { return true }
+        try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+        return false
     }
 
     /// Throws a Refusal when `url` is a link, or a file bigger than `limit`. Nothing there (or a folder) passes.

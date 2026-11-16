@@ -6,7 +6,7 @@
 
 ## 규모
 
-줄 수와 파일 수는 2026-11-06에 이 저장소에서 다시 셌습니다(`git ls-files`로 고른 파일을 이어 붙여 `wc -l`). 테스트 수는 2026-10-29(Mac 1.45 · Windows 1.30)에 센 값입니다.
+줄 수와 파일 수는 2026-11-06에 이 저장소에서 다시 셌습니다(`git ls-files`로 고른 파일을 이어 붙여 `wc -l`). 테스트 수는 2026-11-12(Mac 1.50.0 · Windows 1.35.0을 만들 main)에 모든 테스트를 돌려 다시 셌습니다.
 
 | | macOS | Windows |
 | --- | --- | --- |
@@ -14,14 +14,14 @@
 | 앱과 화면 | Swift 99개 파일, 약 37,400줄 | main 약 13,700줄, renderer 약 13,600줄, CSS 약 3,600줄 |
 | Claude 확장 | (Windows의 것을 그대로 넣습니다) | `mcp/` 약 2,400줄 |
 | 테스트 코드 | 약 13,000줄 | 65개 파일, 약 9,400줄 (확장 테스트 약 1,500줄 따로) |
-| 자동 테스트 (2026-10-29) | 테스트 스크립트 20개, 검사 약 420개 (지금 스크립트는 28개) | `node:test` 582개, 확장 16개 |
+| 자동 테스트 (2026-11-12) | 테스트 스크립트 43개, 검사 약 1,610개 | `node:test` 1,616개, 확장 53개 |
 | 외부 런타임 의존성 | 없음 (Apple 프레임워크만) | Electron 하나 |
 
-Mac 검사 수는 `mac/scripts/test*.sh` 각각이 마지막에 출력하는 수를 더한 값입니다(57 + 6 + 16 + 7 + 12 + 20 + 4 + 7 + 13 + 9 + 언어마다 9 + 41 + 47 + 13 + 45 + 14 + 21 + 58, 대비와 메모 스트레스 검사는 통과 여부만). Windows는 `npm test`와 `npm run mcp:test`의 결과입니다. 그 뒤로 늘어난 테스트는 아직 세지 않았습니다.
+Mac 검사 수는 `mac/scripts/test*.sh` 43개(`test-core.sh`가 돌리는 코어 35개와 그 밖의 8개)를 돌려, 각 스크립트가 출력한 통과 수를 더한 값입니다(코어 1,428 + 그 밖의 180 = 1,608). 줄마다 `ok`만 찍는 스크립트는 그 줄 수로, 대비처럼 통과 여부만 보는 스크립트는 0으로 셌습니다. 메모 스트레스(시간 상한만 봄)와 `test-mcp-stdio.sh`(확장 테스트 53개를 Node 대신 앱으로 돌림)는 돌리지 않고 0으로 셌습니다. Windows는 Node 22에서 돌린 `npm test`와 `npm run mcp:test`의 결과입니다.
 
-## 1. 공유 시험 사례
+## 1. 공유 테스트 사례
 
-두 앱은 코드를 나누지 않습니다. 대신 기능마다 사례 표를 먼저 쓰고, 두 앱이 표의 모든 줄을 같은 기대 문자열로 통과하게 했습니다. 개발하는 동안 표는 `intent-cases.md`, `ribbon-cases.md` 같은 문서였습니다. 공개 저장소에는 그 문서가 없고, 표를 옮겨 적은 두 테스트 파일이 기준입니다. 할 일 스페이스(1.45/1.30)부터는 표를 JSON 파일 하나(`docs/plans/spaces-cases.json`)로 두고, 두 앱의 테스트가 그 파일을 같이 읽습니다.
+두 앱은 코드를 나누지 않습니다. 대신 기능마다 사례 표를 먼저 쓰고, 두 앱이 표의 모든 줄을 같은 기대 문자열로 통과하게 했습니다. 개발하는 동안 표는 `intent-cases.md`, `ribbon-cases.md` 같은 문서였습니다. 공개 저장소에는 그 문서가 없고, 표를 옮겨 적은 두 테스트 파일이 기준입니다. 할 일 스페이스(1.45/1.30)부터는 표를 JSON 파일 하나(`shared/cases/spaces-cases.json`)로 두고, 두 앱의 테스트가 그 파일을 같이 읽습니다.
 
 입력 줄 사례 1번은 두 앱에서 이렇게 생겼습니다.
 
@@ -65,7 +65,7 @@ Mac 검사 수는 `mac/scripts/test*.sh` 각각이 마지막에 출력하는 수
 
 스페이스 사례 파일은 Mac이 먼저 쓰고, Windows가 같은 파일을 읽어 돌렸습니다. Mac 쪽 사례까지 45개이고, Windows도 S1–S22를 한 사례씩 통과합니다. 파일이 하나라서 한쪽만 고치는 일이 없습니다.
 
-약점도 있습니다. 사례 일부(시간 범위, 검색)는 내 시간대 Asia/Seoul을 전제로 썼습니다. 그래서 CI(자동 검사)는 두 워크플로 모두 `TZ=Asia/Seoul`로 돌립니다. 달력 사례는 처음부터 시간대와 상관없이 써서 로스앤젤레스와 채텀 시간대에서도 통과합니다.
+사례 일부(시간 범위, 검색, 스페이스)는 내 시간대 Asia/Seoul을 전제로 썼습니다. 그래서 테스트가 그 사례의 시간대를 직접 정합니다. Windows는 `npm test`가 `test/setup-tz.mjs`를 먼저 불러, `test/time-zones.json`에 적은 파일만 Asia/Seoul로 돌리고 나머지는 부른 쪽의 `TZ`(없으면 UTC)로 돌립니다. Mac은 사례마다 `Calendar`의 시간대를 정하고, 앱의 `TimeZone.current`를 거치는 `TimeBlockTests` · `MemoDrawerTests`는 시작할 때 `TZ`를 Asia/Seoul로 바꿉니다. 그래서 UTC · 로스앤젤레스 · 서울 어디서 돌려도 통과하고, CI(자동 검사)에 `TZ=Asia/Seoul`이 필요 없습니다. 달력 사례는 처음부터 시간대와 상관없이 써서 채텀 시간대에서도 통과합니다.
 
 ## 2. 스냅숏과 크기 훑기
 
@@ -77,7 +77,7 @@ macOS에서는 `mac/scripts/render-design.sh`가 실제 SwiftUI 뷰에 예시 �
 
 테스트가 쓰는 설정은 끝나면 남지 않습니다. macOS 테스트와 렌더러는 `UserDefaults(suiteName:)`를 직접 만들지 않고 `TestDefaults("<묶음>")`(`Tests/PaperTodoTests/TestDefaults.swift`)를 씁니다. 이 설정은 `~/Library/Preferences`가 아니라 임시 폴더의 파일이라 `remove()`로 지우면 다시 생기지 않습니다. 테스트용 사본을 띄우는 스크립트는 `scripts/lib/test-defaults.sh`로 번들 ID를 먼저 확인하고, 끝날 때 그 설정과 파일을 지웁니다. 사용자 앱의 `com.noa.PaperTodo`는 대소문자를 바꿔도 거절합니다. `scripts/test-defaults-cleanup.sh`가 이 규칙을 확인합니다. Windows 테스트는 임시 폴더를 `temporaryFolder()`(`windows/test/temporaryFolder.ts`)로 만들고, 테스트 파일이 끝나면 지웁니다. 예전에 쌓인 것은 `scripts/clean-test-defaults.sh`로 한 번 휴지통에 옮깁니다(기본은 목록만 보여 줍니다).
 
-Windows에서는 `npm run snapshot`이 모든 창을 화면 밖에서 그리고 크기 훑기(size sweep)를 돌립니다.
+Windows에서는 `npm run snapshot`이 모든 창을 화면 밖에서 그리고 크기 훑기(size sweep)를 돌립니다. 스냅숏 도구는 `windows/src/main/snapshots/`에 있고, `main.ts`는 `__TEST_HOOKS__`일 때만 부릅니다. 그래서 배포 빌드(`--production`)의 `out/app.js`에는 들어가지 않고, 들어가면 빌드가 실패합니다.
 
 - 창마다 가장 작은 크기부터 2560 × 1440까지, 배율 125%와 150%, 다른 글꼴(Noto, 붓, 깔끔), 밤 종이로 그립니다.
 - 크기마다 페이지 안의 검사(`src/main/layoutCheck.ts`)가 옆으로 스크롤되는 상자, 말줄임 없이 잘린 글, 아래가 잘린 글, 창 밖으로 나간 요소, 이웃과 겹친 요소, 상자 밖에서 잘린 손글씨 잉크, 보이지 않는 입력 칸 안내 글을 찾습니다. 하나라도 있으면 실패하고, 없으면 `SWEEP OK`를 출력합니다.
@@ -293,24 +293,37 @@ Mac은 재다가 둘을 더 고쳤습니다. 파일의 시각을 읽을 때마�
 # macOS (Swift 6, macOS 14 이상)
 cd mac
 swift build
-./scripts/test.sh                 # 코어 회귀 (57)
-./scripts/test-intent.sh          # … 그 밖의 test-*.sh
+./scripts/test-core.sh            # 창 없이 도는 코어 스크립트 35개를 한 번에(test.sh · 공유 사례 · 인터넷 연결 검사 포함)
+./scripts/test-core.sh --list     # 돌리는 것과 빼는 것, 뺀 이유
+./scripts/test-mcp-stdio.sh       # Claude 확장 테스트 전체를 Node 대신 앱(--mcp-stdio)으로 (windows/에서 npm ci 먼저)
+./scripts/test-no-network.sh      # 인터넷에 연결하는 코드가 없는지
 python3 scripts/check-contrast.py
 ./scripts/i18n/check.sh
 ./scripts/build.sh                # dist/종이냥.app (로컬 서명)
 
-# Windows (Node 22 이상)
+# Windows (Node 22.12 이상, windows/.node-version)
 cd windows
 npm ci
 npx tsc --noEmit -p .
-npm test                          # 582
-npm run mcp:test                  # Claude 확장 16
+npm test                          # 1,616
+npm run mcp:test                  # Claude 확장 53
 npm run dist                      # Windows 설치 파일 (macOS에서도 만들 수 있어요)
+tools/dist.sh                     # 릴리스 빌드: Node 22로 npm ci와 npm run dist 전체
 ```
+
+README와 개인정보 쪽은 두 앱에 인터넷에 연결하는 코드가 없다고 약속합니다. 이 약속은 테스트가 지킵니다. Mac은 `scripts/test-no-network.sh`가 `Sources/`에서 `URLSession` · `NWConnection` · `URLRequest` 같은 API를, Windows는 `test/noNetwork.test.ts`가 `src/` · `mcp/src/`에서 `fetch` · `http` · `net.request` · `WebSocket` 같은 API를 찾습니다. 허용하는 길은 누른 링크를 시스템 브라우저에 넘기는 것(`NSWorkspace.open`, `src/main/security.ts`의 `shell.openExternal`)뿐입니다.
+
+Windows 릴리스 빌드는 `windows/tools/dist.sh`로 만듭니다. 설치된 Node가 22가 아니면 `npx -p node@22`로 Node 22를 받아, `npm ci`와 `npm run dist` 전체(타입 검사 · `npm test` · `mcp:test` · 출시 빌드 · Koffi 준비 · electron-builder · 경로 검사 · 확인값)를 그 Node로 돌립니다. Electron zip은 `~/Library/Caches/jongi-nyang/electron`에 두고, Electron 기본 캐시에 같은 버전이 있으면 복제해 씁니다. `windows/.npmrc`의 `engine-strict=true` 때문에 Node 20에서는 `npm ci`가 바로 멈춥니다. `tools/dist.sh --check`는 빌드 없이 쓸 Node와 명령만 보여 줍니다.
 
 두 앱의 출시 빌드(`build.sh` · `make-dmg.sh`, `npm run dist`, `npm run mcp:build`)는 끝에 `tools/check-release-paths.mjs`로 내보낼 파일 전체를 검사합니다. 앱 묶음 · asar · `.mcpb` · DMG · 설치 파일 · zip을 풀어, 바이트 안에서 빌드한 기기의 경로(`/Users/`, 집 폴더, `/private/tmp`, `/var/folders`, `../../../`)를 ASCII와 UTF-16LE로 찾습니다. 하나라도 있으면 멈추고, 그 DMG · 설치 파일을 남기지 않습니다.
 
-GitHub Actions 워크플로는 두 개입니다. `.github/workflows/ci.yml`(README 배지)은 Windows 앱의 타입 검사와 테스트를 macOS 러너에서 돌립니다. `.github/workflows/mac.yml`은 Xcode 26 러너에서 Mac 앱을 빌드하고 코어 테스트, 대비 검사, 번역 검사를 돌립니다. Xcode 26 이미지가 없을 때 이 워크플로만 실패하도록 둘을 나눴습니다.
+GitHub Actions 워크플로는 세 개입니다.
+
+- `ci.yml`(README 배지): Windows 앱의 타입 검사, `npm test`, `npm run mcp:test`를 Node 22로 macOS와 `windows-latest` 러너에서 돌립니다. Electron 바이너리는 `mcp:test` 바로 앞에서만 받습니다. 시간대는 `windows/test/setup-tz.mjs`가 파일마다 정합니다.
+- `mac.yml`: Xcode 26 러너에서 Mac 앱을 디버그와 릴리스 설정(`-warnings-as-errors`, `build.sh`와 같은 플래그)으로 빌드하고, `scripts/test-core.sh`, 대비 검사, 번역 검사를 돌립니다. Xcode 26 이미지가 없을 때 이 워크플로만 실패하도록 `ci.yml`과 나눴습니다.
+- `pages.yml`: main의 `site/`가 바뀌면 GitHub Pages에 사이트를 올립니다.
+
+`test-core.sh`에 없는 나머지 Mac 스크립트는 CI에서 돌지 않습니다. `mcp:test`의 Claude Code 명령 사례 하나는 Electron 바이너리가 있어야 통과해서, CI는 그 앞에서 바이너리를 받습니다.
 
 ## 8. 일하는 방법
 

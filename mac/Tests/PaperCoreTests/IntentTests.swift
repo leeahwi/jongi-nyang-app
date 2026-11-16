@@ -285,10 +285,10 @@ private enum IntentTests {
             CalendarEvent(key: "local/\(id)", calendarId: "local", title: id, allDay: allDay, start: from, end: to, color: "#5b8bd0")
         }
 
-        // 빠른 입력의 버튼 (#240, D3 B): the shared cases from docs/plans/quick-entry-button-cases.json (the Windows app's
+        // 빠른 입력의 버튼 (#240, D3 B): the shared cases from shared/cases/quick-entry-button-cases.json (the Windows app's
         // test/intent.test.ts reads the same file).
         try test("quick entry: the button says what the picked chip makes (shared cases)") {
-            let path = CommandLine.arguments.dropFirst().first ?? "../docs/plans/quick-entry-button-cases.json"
+            let path = CommandLine.arguments.dropFirst().first ?? "../shared/cases/quick-entry-button-cases.json"
             let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
             let sample: [String: Intent.Candidate?] = [
                 "none": nil, "todo": .todo(QuickParse(title: "우유")),

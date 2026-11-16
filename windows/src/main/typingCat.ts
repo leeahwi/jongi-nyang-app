@@ -1,12 +1,13 @@
 import { BrowserWindow, ipcMain, powerMonitor, screen } from "electron";
 import path from "node:path";
 import { t } from "../i18n";
+import { dragBounds, dragStart, type DragStart } from "../core/dragBounds";
 import { scaledSize } from "../core/catSize";
 import {
   lastTouch, toggledTypingScope, typingCatFrameFor, typingCatSize, typingDropped, typingLingerMs, typingShows, typingSource, typedWithin,
   type TypingCat, type TypingPose, type TypingScreen, type TypingSource,
 } from "../core/typingCat";
-import { GlobalKeys, hookWanted, type KeyHookNative } from "../core/keyHook";
+import { GlobalKeys, hookCheckMs, hookWanted, type KeyHookNative } from "../core/keyHook";
 import { offscreen, offscreenEnabled } from "./env";
 import type { Store } from "./store";
 
@@ -34,6 +35,8 @@ const fadeMs = 250;
  */
 export class TypingCatWindow {
   private window?: BrowserWindow;
+  /** #409 문제 보고용 정보: the window as it is (none until the cat is first shown). */
+  get reportWindow(): BrowserWindow | undefined { return this.window; }
   private ready = false;
   private locked = false;
   /** When the last key went down (performance.now()); the pet's 한마디 waits by it too. */
@@ -45,8 +48,10 @@ export class TypingCatWindow {
   private source: TypingSource = "none";
   /** 모든 앱에서: the hook, loaded the first time it is wanted. */
   private keys?: GlobalKeys;
+  /** #410: the look at the hook every few seconds while it is set. */
+  private hookWatch?: NodeJS.Timeout;
   /** #331: a drag going on — where the cursor and the window were when it started. */
-  private drag?: { cursor: Electron.Point; bounds: Electron.Rectangle };
+  private drag?: DragStart;
   /** When it was last let go: 종이냥에서만 keeps it `typingLingerMs` from then, as after a key. */
   private droppedAt?: number;
   /** Whether the window takes the mouse now (over the drawn cat). */
@@ -87,6 +92,7 @@ export class TypingCatWindow {
     if (wantsHook) this.keys ??= new GlobalKeys(this.loadHook(), () => this.key());
     // Off, another choice, locked or quitting: the hook comes off at once.
     const hooked = this.keys?.listen(wantsHook) ?? false;
+    this.watchHook(hooked);
     this.source = typingSource(scope, hooked, this.locked);
     const note = wantsHook && !hooked ? t("다른 앱의 키를 받지 못해서 종이냥 안에서만 두드려요.") : undefined;
     if (note !== this.store.typingCatNote) {
@@ -144,6 +150,8 @@ export class TypingCatWindow {
       thickFrame: false,
       backgroundColor: "#00000000", title: t("타닥냥"),
       enableLargerThanScreen: offscreenEnabled,
+      // #67 (checked 2026-11): not throttled: the cat's paws move on timers in its page, and Windows may count a
+      // transparent always-on-top window as covered.
       webPreferences: { preload: path.join(__dirname, "preload.js"), sandbox: true, contextIsolation: true, backgroundThrottling: false },
     });
     // Over full-screen apps too (the pet stays off those), and clicks pass through to the window behind.
@@ -245,14 +253,11 @@ export class TypingCatWindow {
     ipcMain.on("typingCat:interactive", (event, interactive: unknown) => { if (fromCat(event) && !this.drag) this.setInteractive(interactive === true); });
     ipcMain.on("typingCat:drag-start", (event) => {
       if (!fromCat(event) || !this.window || !this.isShown) return;
-      this.drag = { cursor: screen.getCursorScreenPoint(), bounds: this.window.getBounds() };
+      this.drag = dragStart(screen.getCursorScreenPoint(), this.window.getBounds());
     });
     ipcMain.on("typingCat:drag", (event) => {
       if (!fromCat(event) || !this.window || !this.drag) return;
-      const cursor = screen.getCursorScreenPoint(), { bounds } = this.drag;
-      // #316: the whole bounds, never setPosition (it re-reads the size, which 125 % · 150 % can round up a pixel a move).
-      this.window.setBounds({ x: Math.round(bounds.x + cursor.x - this.drag.cursor.x), y: Math.round(bounds.y + cursor.y - this.drag.cursor.y),
-        width: bounds.width, height: bounds.height });
+      this.window.setBounds(dragBounds(this.drag, screen.getCursorScreenPoint()));
     });
     ipcMain.on("typingCat:drag-end", (event) => { if (fromCat(event)) this.dragEnded(); });
   }
@@ -281,7 +286,7 @@ export class TypingCatWindow {
     const window = this.window;
     if (!window || window.isDestroyed() || !this.isShown) return;
     const bounds = window.getBounds();
-    this.drag = { cursor: { x: 0, y: 0 }, bounds };
+    this.drag = dragStart({ x: 0, y: 0 }, bounds);
     window.setBounds({ ...bounds, x: bounds.x + dx, y: bounds.y + dy });
     this.dragEnded();
   }
@@ -300,9 +305,22 @@ export class TypingCatWindow {
     if (window && !window.isDestroyed()) window.destroy();
   }
 
+  /**
+   * #410: while the hook is set, it is looked at every `hookCheckMs` (core/keyHook.ts GlobalKeys.watch) and set again if
+   * Windows seems to have taken it off; if setting it again fails, everything is brought in line (this app only, and
+   * Settings says so).
+   */
+  private watchHook(on: boolean): void {
+    if (!on) { clearInterval(this.hookWatch); this.hookWatch = undefined; return; }
+    this.hookWatch ??= setInterval(() => {
+      if (this.keys?.watch(powerMonitor.getSystemIdleTime()) && !this.keys.listening) this.refresh();
+    }, hookCheckMs);
+  }
+
   /** Quitting: the hook comes off first. */
   dispose(): void {
     this.keys?.listen(false);
+    this.watchHook(false);
     this.clearGo();
     this.destroy();
   }

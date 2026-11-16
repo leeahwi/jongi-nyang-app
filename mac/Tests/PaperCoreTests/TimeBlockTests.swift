@@ -17,6 +17,11 @@ private func equal<T: Equatable>(_ actual: T, _ expected: T, _ name: String) thr
 @main
 private enum TimeBlockTests {
     static func main() throws {
+        // The cases are written on the Seoul clock: TimeZone.current (and the app's Calendar.paper) reads in that zone,
+        // whatever TZ runs the check (#399).
+        setenv("TZ", "Asia/Seoul", 1)
+        tzset()
+        NSTimeZone.resetSystemTimeZone()
         var count = 0
         func test(_ name: String, _ action: () throws -> Void) throws {
             try action()

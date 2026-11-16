@@ -9,11 +9,11 @@ import {
   typingWake, type CornerRect, type TypingCat, type TypingCorner, type TypingPlace, type TypingScope, type TypingScreen, type TypingSource,
 } from "../src/core/typingCat";
 
-// 치면 두드리는 고양이 (#230 · #289): the shared cases from docs/plans/typing-cat-cases.json (the Mac's
+// 치면 두드리는 고양이 (#230 · #289): the shared cases from shared/cases/typing-cat-cases.json (the Mac's
 // test-typing-cat.sh reads the same file), Windows' own key filter and throttle, and that nothing of a key is kept or sent.
 const root = process.cwd();
 type Step = { at: number; key?: boolean; reduceMotion?: boolean; stop?: string; pose?: string; next?: string; timer?: boolean };
-const file = JSON.parse(fs.readFileSync(path.resolve(root, "..", "docs", "plans", "typing-cat-cases.json"), "utf8")) as {
+const file = JSON.parse(fs.readFileSync(path.resolve(root, "..", "shared", "cases", "typing-cat-cases.json"), "utf8")) as {
   holdMs: number; lingerMs: number; chatterQuietMs: number;
   paws: { case: string; burst?: { from: number; every: number; count: number }; steps: Step[] }[];
   counts: { case: string; repeat: boolean; command: boolean; control: boolean; counts: boolean }[];
@@ -152,11 +152,11 @@ test("typing cat corner: every corner of a work area stays inside it, 112 DIP", 
   assert.deepEqual(typingCatFrame("bottomRight", { x: 0, y: 0, width: 1920, height: 1040 }), { x: 1788, y: 908, width: 112, height: 112 });
 });
 
-// ─── #331 옮긴 자리 (docs/plans/typing-cat-place-cases.json; the Mac's test-typing-cat.sh reads the same file) ───
+// ─── #331 옮긴 자리 (shared/cases/typing-cat-place-cases.json; the Mac's test-typing-cat.sh reads the same file) ───
 
 type Box = [number, number, number, number];
 interface CaseScreen { id: string; frame: Box; visible: Box }
-const places = JSON.parse(fs.readFileSync(path.resolve(root, "..", "docs", "plans", "typing-cat-place-cases.json"), "utf8")) as {
+const places = JSON.parse(fs.readFileSync(path.resolve(root, "..", "shared", "cases", "typing-cat-place-cases.json"), "utf8")) as {
   drawn: { bands: ([number, number] | null)[]; box: { across: [number, number]; down: [number, number] }; hits: { case: string; at: [number, number]; on: boolean }[] };
   screens: CaseScreen[];
   dropped: { case: string; frame: Box; kept: Box; place: TypingPlace }[];

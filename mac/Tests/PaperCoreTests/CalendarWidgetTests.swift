@@ -1,6 +1,6 @@
 import Foundation
 
-// 바탕화면 달력 위젯 (#234, CalendarWidget): the shared cases from docs/plans/calendar-widget-cases.json (the Windows app's
+// 바탕화면 달력 위젯 (#234, CalendarWidget): the shared cases from shared/cases/calendar-widget-cases.json (the Windows app's
 // test/calendarWidget.test.ts reads the same file) — what each kind shows, the day sheet, the opacity rules, places on
 // displays, the quick entry's reading, the stored settings and when a widget draws again.
 private struct TestFailure: Error, CustomStringConvertible {
@@ -14,7 +14,7 @@ private func equal<T: Equatable>(_ actual: T, _ expected: T, _ name: String) thr
 @main
 private enum CalendarWidgetTests {
     static func main() throws {
-        let path = CommandLine.arguments.dropFirst().first ?? "../docs/plans/calendar-widget-cases.json"
+        let path = CommandLine.arguments.dropFirst().first ?? "../shared/cases/calendar-widget-cases.json"
         let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]
         var count = 0
         func test(_ name: String, _ action: () throws -> Void) throws {
@@ -205,8 +205,8 @@ private enum CalendarWidgetTests {
             }
         }
 
-        // Opacity: the papers of #244 (docs/plans/paper-themes/tokens.json, beside this file).
-        let tokensURL = URL(fileURLWithPath: path).deletingLastPathComponent().appendingPathComponent("paper-themes/tokens.json")
+        // Opacity: the papers of #244 (docs/plans/paper-themes/tokens.json).
+        let tokensURL = URL(fileURLWithPath: path).deletingLastPathComponent().appendingPathComponent("../../docs/plans/paper-themes/tokens.json")
         let papers = ((try JSONSerialization.jsonObject(with: Data(contentsOf: tokensURL)) as! [String: Any])["papers"] as! [[String: Any]])
         func rgb(_ hex: String) -> (Double, Double, Double) {
             let v = Int(hex.dropFirst(), radix: 16)!

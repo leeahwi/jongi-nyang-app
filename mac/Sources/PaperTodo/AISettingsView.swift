@@ -31,7 +31,7 @@ struct AISettingsPanel: View {
                     }
                     note(ai.enabled && ai.desktopOutdated
                          ? L("Claude 데스크톱의 확장이 이 앱보다 옛 판이에요. 다시 연결하면 새로 설치해요.")
-                         : L("누르면 Claude가 ‘종이냥 for Claude’를 설치할지 물어봐요. Claude Code가 있으면 같이 연결해요."))
+                         : L("누르면 Claude가 ‘종이냥 for Claude’를 설치할지 물어봐요."))
                 }
                 .padding(.vertical, 9)
                 .settingsRow()
@@ -40,23 +40,18 @@ struct AISettingsPanel: View {
                     HStack(spacing: 10) {
                         SettingsLabel("Claude Code", systemImage: "terminal")
                         Spacer(minLength: 8)
-                        Button(ai.codeBusy ? L("연결하는 중…") : ai.codeLinked ? L("다시 연결") : L("Claude Code에 연결")) { ai.connectCode() }
-                            .buttonStyle(PaperActionButtonStyle())
-                            .disabled(ai.codeBusy)
+                        // #389: the same button as Windows. The command itself isn't for reading (#36): copied, not shown.
+                        Button {
+                            guard ai.copyCodeCommand() else { return }
+                            copied = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { copied = false }
+                        } label: {
+                            Label(copied ? L("복사했어요") : L("Claude Code 명령 복사"), systemImage: copied ? "checkmark" : "keyboard")
+                        }
+                        .buttonStyle(PaperActionButtonStyle())
+                        .help(ai.codeCommand)
                     }
-                    note(ai.codeLinked ? L("연결했어요. 새로 여는 Claude Code 세션부터 종이냥이 보여요.")
-                                       : L("터미널과 Claude 데스크톱의 Code 탭에서 써요. Node.js가 필요해요."))
-                    // #36: the command itself isn't for reading — copied, not shown.
-                    Button(copied ? L("복사했어요") : L("명령 복사")) {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(ai.codeCommand, forType: .string)
-                        copied = true
-                    }
-                    .buttonStyle(.link)
-                    .font(.system(size: 11))
-                    .help(ai.codeCommand)
-                    .padding(.leading, FolderPath.indent)
-                    .padding(.top, 2)
+                    note(L("복사한 명령을 터미널에 붙여 넣어요. Node.js는 없어도 돼요."))
                 }
                 .padding(.vertical, 9)
                 .settingsRow()

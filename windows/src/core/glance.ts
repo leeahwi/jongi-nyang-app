@@ -189,7 +189,7 @@ export function glanceTasks(today: readonly TodoItem[], now: Date, cap = glanceR
   return { next, rest: others.slice(0, rest), hidden };
 }
 
-// ─── Layout (#200, docs/plans/today-window-cases.json — the Mac's TodayGlance reads the same file) ──────────────
+// ─── Layout (#200, shared/cases/today-window-cases.json — the Mac's TodayGlance reads the same file) ──────────────
 
 const cardKinds: readonly GlanceCardKind[] = ["event", "timer", "alarm"];
 

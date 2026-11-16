@@ -116,7 +116,7 @@
 | 공유 폴더 | 앱 · 도움말 · 사이트 · README 모두 이 말(용어표) | ‘동기화 폴더’ ✗ |
 | 아크릴 | 개발 문서만 | ‘반투명’ |
 | 절대 경로, `%APPDATA%`, `~/Library/…` | 도움말 ‘알아 두기’만 | 폴더 이름 + ‘폴더 열기’ |
-| Node | AI 연결의 Claude Code 줄 | 처음엔 ‘Node.js’, 받는 곳(nodejs.org)과 함께 |
+| Node | AI 연결의 Claude Code 줄(‘Node.js는 없어도 돼요’) | 늘 ‘Node.js’ |
 | 명령어 | ‘복사’ 버튼 뒤 | 화면에 통째로 펼치지 않아요 |
 | 단축키 | Mac ⌘⌥⌃⇧ · Windows Ctrl+Alt+N | 문장 속보다 키캡 |
 
@@ -133,7 +133,7 @@
 
 - **같은 뜻, 그 말답게.** 한국어 어순을 옮기지 않아요. 짧은 쪽을 골라요.
 - 낱말은 `windows/src/i18n/en.ts` 머리의 용어표와 [용어표](terms.md)를 따라요. en ‘to-do’(task ✕), nl ‘taak’. 화면 이름은 앱과 사이트가 같게(‘notepad’, ‘Day ribbon’).
-- en: sentence case, ‘Couldn’t …’로 시작하는 오류, Mac ⌘ / Windows Ctrl.
+- en: sentence case, ‘Couldn’t …’로 시작하는 오류, Mac ⌘ / Windows Ctrl. 철자는 미국식(color, gray)이에요.
 - nl: ‘je’로 말하고, 오류는 ‘Het lukte niet om …’처럼 온전한 문장으로. nl은 ko보다 30% 남짓 길어요. 렌더해서 잘림을 봐요.
 - 번역은 아직 원어민이 본 적이 없어요. 큰 문구를 바꾸면 원어민 확인 목록에 올려요.
 

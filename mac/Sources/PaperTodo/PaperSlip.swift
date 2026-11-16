@@ -723,7 +723,7 @@ class SlipPanel: NSPanel {
     }
 }
 
-/// #246: where 빠른 입력 and 빠른 메모 were dragged, kept per display (SlipMove.Place, docs/plans/slip-move-cases.json `place`)
+/// #246: where 빠른 입력 and 빠른 메모 were dragged, kept per display (SlipMove.Place, shared/cases/slip-move-cases.json `place`)
 /// in the app's preferences: the next time the slip opens on that display it opens there. A display whose usable area
 /// changed size since (another resolution, the Dock moved) opens it at the usual spot again, and so does a double-click
 /// on its paper or title row (which also forgets the place). Windows: main/quick.ts · quickMemo.ts.

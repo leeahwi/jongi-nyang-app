@@ -13,10 +13,10 @@ import { call, connect, logOf, setup, task, todos, writeTodos } from "./helpers"
 /**
  * 할 일 스페이스 for Claude (N3, docs/plans/mcp-plan.md ‘2c에서 정한 것’): M24 (reading and filtering, 일반 renamed), M25
  * (a space that isn't there), M26 (a move: preview → apply → the log → the apps' undo, with the shared cases S57 of
- * docs/plans/spaces-cases.json), M27 (moved in the app meanwhile) and N3-8 (an older app). Fictional data only.
+ * shared/cases/spaces-cases.json), M27 (moved in the app meanwhile) and N3-8 (an older app). Fictional data only.
  */
 
-const fixture = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "spaces-cases.json"), "utf8"));
+const fixture = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "spaces-cases.json"), "utf8"));
 const spacesFile = (folder: string) => path.join(folder, "todo-spaces.json");
 const readSpaces = (folder: string): TodoSpaces => parseTodoSpaces(fs.readFileSync(spacesFile(folder), "utf8"));
 /** The shared file (회사 s-a · 집 s-b · 공부 s-c) with `places` and, optionally, 일반 renamed. */

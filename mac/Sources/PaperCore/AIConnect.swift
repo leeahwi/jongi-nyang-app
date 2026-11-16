@@ -85,26 +85,11 @@ public enum AIConnect {
     /// The server's name in Claude Code (the same as the extension's).
     public static let codeName = "jongi-nyang"
 
-    /// What `claude mcp add-json` gets: Node, by its full path (an app opened from the Dock has a short PATH, and
-    /// so may Claude Code), running the app's copy of the program.
-    public static func codeServerJSON(node: String, server: String) -> String {
-        let object: [String: Any] = ["type": "stdio", "command": node, "args": [server]]
-        let data = (try? JSONSerialization.data(withJSONObject: object, options: [.sortedKeys, .withoutEscapingSlashes])) ?? Data()
-        return String(decoding: data, as: UTF8.self)
-    }
-
-    /// `claude mcp add-json -s user …`: the user scope, so every Claude Code session sees it — the terminal's
-    /// and Claude Desktop's Code tab, in any folder (without `-s` it would be the one folder it ran in).
-    public static func codeAddArguments(node: String, server: String) -> [String] {
-        ["mcp", "add-json", "-s", "user", codeName, codeServerJSON(node: node, server: server)]
-    }
-
-    /// An entry left by an earlier connection goes first (add-json refuses a name that is taken).
-    public static let codeRemoveArguments = ["mcp", "remove", "-s", "user", codeName]
-
-    /// The same as one line to paste into Terminal, when the app can't run it.
-    public static func codeCommand(claude: String = "claude", node: String, server: String) -> String {
-        ([claude] + codeAddArguments(node: node, server: server)).map(shellQuoted).joined(separator: " ")
+    /// The line ‘Claude Code 명령 복사’ copies (#389): Claude Code starts the app itself with `--mcp-stdio`
+    /// (MCPStdio.swift), so no Node.js is needed — the same as Windows (#175). `-s user`: every Claude Code session sees
+    /// it, the terminal's and Claude Desktop's Code tab, in any folder (without it, only the folder it was pasted in).
+    public static func codeCommand(app executable: String) -> String {
+        ["claude", "mcp", "add", "-s", "user", codeName, "--", executable, "--mcp-stdio"].map(shellQuoted).joined(separator: " ")
     }
 
     /// 'text' for zsh, unless it needs nothing.
@@ -112,19 +97,6 @@ public enum AIConnect {
         let plain = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_./=:")
         if !text.isEmpty, text.unicodeScalars.allSatisfy(plain.contains) { return text }
         return "'" + text.replacingOccurrences(of: "'", with: "'\\''") + "'"
-    }
-
-    /// Where `claude` and `node` usually are, looked at before asking a login shell.
-    public static func toolPlaces(_ tool: String, home: String) -> [String] {
-        switch tool {
-        case "claude":
-            return ["\(home)/.local/bin/claude", "\(home)/.claude/local/claude", "/opt/homebrew/bin/claude",
-                    "/usr/local/bin/claude", "\(home)/.npm-global/bin/claude", "\(home)/.bun/bin/claude"]
-        case "node":
-            return ["/opt/homebrew/bin/node", "/usr/local/bin/node", "\(home)/.volta/bin/node", "/usr/bin/node"]
-        default:
-            return []
-        }
     }
 
     /// A program inside the app can be linked only while the app stays where it is: not opened from the disk

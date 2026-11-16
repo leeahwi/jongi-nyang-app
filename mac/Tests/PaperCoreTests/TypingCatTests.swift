@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 
-// 치면 두드리는 고양이 (#230 · #289, TypingCat.swift): the shared cases from docs/plans/typing-cat-cases.json (the Windows app's
+// 치면 두드리는 고양이 (#230 · #289, TypingCat.swift): the shared cases from shared/cases/typing-cat-cases.json (the Windows app's
 // test/typingCat.test.ts reads the same file), and a privacy check — the rules and the key watcher keep nothing of a key.
 private struct TestFailure: Error, CustomStringConvertible {
     let description: String
@@ -44,7 +44,7 @@ private struct Clock {
 private enum TypingCatTests {
     static func main() throws {
         let arguments = CommandLine.arguments.dropFirst()
-        let path = arguments.first ?? "../docs/plans/typing-cat-cases.json"
+        let path = arguments.first ?? "../shared/cases/typing-cat-cases.json"
         let watcher = arguments.dropFirst().first ?? "Sources/PaperTodo/TypingKeys.swift"
         // #331: the place cases sit beside the others.
         let placesPath = URL(fileURLWithPath: path).deletingLastPathComponent().appendingPathComponent("typing-cat-place-cases.json").path
@@ -230,7 +230,7 @@ private enum TypingCatTests {
         print("\(count) typing-cat checks passed")
     }
 
-    /// #331 (docs/plans/typing-cat-place-cases.json): the drawn area, letting go, the kept place read back after a relaunch,
+    /// #331 (shared/cases/typing-cat-place-cases.json): the drawn area, letting go, the kept place read back after a relaunch,
     /// a size change, a display change or one unplugged, and 자리 as chosen.
     static func placeCases(_ path: String, _ test: (String, () throws -> Void) throws -> Void) throws {
         let file = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: path))) as! [String: Any]

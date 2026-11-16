@@ -59,8 +59,33 @@ test("ai-link.json: written at launch, off by default; on, with the data folder 
   ai.setEnabled(false);
   assert.equal(parseAiLink(fs.readFileSync(path.join(folder, "ai-link.json"), "utf8"))!.enabled, false, "turned off: written false, not deleted");
   // #175: the app's own program in its MCP mode; no ELECTRON_RUN_AS_NODE, no script path.
-  assert.equal(ai.command, 'claude mcp add jongi-nyang -- "C:\\Program Files\\종이냥\\종이냥.exe" --mcp-stdio');
+  // #441: in the user's scope, as on the Mac.
+  assert.equal(ai.command, 'claude mcp add -s user jongi-nyang -- "C:\\Program Files\\종이냥\\종이냥.exe" --mcp-stdio');
   ai.stop();
+});
+
+test("#441 Claude Code 명령 복사: turns the switch on (as the Mac), copies the user-scope line, says 복사했어요", () => {
+  const { folder, ai } = setup();
+  ai.start();
+  const copied: string[] = [];
+  assert.equal(ai.enabled, false);
+  ai.copyCommand((text) => copied.push(text));
+  assert.equal(ai.enabled, true, "the switch is on");
+  assert.equal(parseAiLink(fs.readFileSync(path.join(folder, "ai-link.json"), "utf8"))!.enabled, true);
+  assert.deepEqual(copied, [ai.command]);
+  assert.match(copied[0], /^claude mcp add -s user jongi-nyang -- /);
+  assert.equal(ai.view().copied, true);
+  // Already on: stays on, copied again.
+  ai.copyCommand((text) => copied.push(text));
+  assert.equal(ai.enabled, true);
+  assert.equal(copied.length, 2);
+  ai.stop();
+  // The help's remove line is the user scope's (its text is the Mac's, mac/scripts/test-ai.sh).
+  const help = fs.readFileSync(path.join(process.cwd(), "src/renderer/help.ts"), "utf8");
+  assert.match(help, /claude mcp remove -s user jongi-nyang/);
+  assert.doesNotMatch(help, /claude mcp remove jongi-nyang/);
+  const main = fs.readFileSync(path.join(process.cwd(), "src/main/main.ts"), "utf8");
+  assert.match(main, /case "aiCopyCommand": return ai\.copyCommand\(\(text\) => clipboard\.writeText\(text\)\);/);
 });
 
 test("N3-9: 이 기기에서 goes into ai-link.json as it changes, and leaves it when every space shows again", () => {

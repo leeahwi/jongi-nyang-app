@@ -7,7 +7,7 @@ import SwiftUI
 /// window with a sidebar. 보기: 달력 · 완료 기록; 설정: 꾸미기 · 알림 · 알람 · 타이머 · 반복 · 일정 · 종이냥;
 /// 메모와 데이터: 메모 서랍 · 스페이스 · 저장과 백업 · AI 연결; 도움: 도움말 (and 사용 안내, which opens the guide over
 /// the note). #240 (D4 B): every group six rows or fewer, 알람 · 타이머 (was 시계, under 보기) and 일정 next to 알림.
-/// The order is the shared one in docs/plans/desk-sidebar-cases.json (the Windows desk reads the same file).
+/// The order is the shared one in shared/cases/desk-sidebar-cases.json (the Windows desk reads the same file).
 enum DeskPane: String, CaseIterable, Identifiable {
     case calendar, history, appearance, notifications, clock, repeating, events, pet, drawer, spaces, storage, ai, help
 
@@ -88,7 +88,7 @@ enum DeskPane: String, CaseIterable, Identifiable {
         case .appearance: L("언어와 낮 · 밤, 종이, 노트의 글꼴과 글자 크기를 정해요.")
         case .notifications: L("주기 알림과 알림 모양을 정해요.")
         case .repeating: L("반복하는 날마다 목록에 한 줄씩 놓여요.")
-        case .pet: L("종이냥을 보이거나 숨기고, 돌아다닐지, 말을 걸지 정해요.")
+        case .pet: L("종이냥 펫과 타닥냥을 보이거나 숨기고, 움직임과 말을 정해요.")
         case .events: L("일정을 적어 두면 오늘 할 일 위에 보이고, 시작 전에 알려 줘요.")
         case .storage: L("공유 폴더에 두면 다른 기기에서도 같은 목록을 써요.")
         case .drawer: L("화면 끝에서 메모를 꺼내 보고, 바로 적고, 그 자리에서 고쳐요.")

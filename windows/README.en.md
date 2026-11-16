@@ -278,8 +278,8 @@ Turn on **Jongi-nyang for Claude** to see, add and edit to-dos, events and notes
 <summary>The AI connection in detail</summary>
 
 - **Turning it on**: in Desk → **AI connection**, switch on ‘Let Claude see and write in Jongi-nyang’. **Connect to Claude Desktop** opens the `jongi-nyang.mcpb` inside the app, and Claude Desktop asks whether to install it. **Copy Claude Code command** copies a command in which Jongi-nyang’s own executable runs the extension built into the app, so you don’t need Node.js:
-  `claude mcp add jongi-nyang -- "…\종이냥.exe" --mcp-stdio`
-  The older command with `ELECTRON_RUN_AS_NODE=1` still works. To switch to the new one, run `claude mcp remove jongi-nyang` in the folder where you pasted it, then paste the new command.
+  `claude mcp add -s user jongi-nyang -- "…\종이냥.exe" --mcp-stdio`
+  It connects in your user scope (`-s user`), so it works in every folder and in Claude Desktop's Code tab too. The button also turns the AI connection switch on (as on the Mac). Commands you copied before (one that connects a single folder, or one with `ELECTRON_RUN_AS_NODE=1`) still work. To switch to the new one, run `claude mcp remove -s user jongi-nyang` in a terminal, then paste again. To remove an older one, run `claude mcp remove jongi-nyang` in the folder where you pasted it.
 - **What it can do**: show today; list to-dos, events, notes, focus sessions and finished to-dos; add to-dos (up to 20 at once), events (no repeats) and notes; edit to-dos and one-time events; see and filter to-dos by space, put new ones in a space and move them after a yes; attach today’s sheet, a week or one note to the conversation. A confirmation number is good for 10 minutes.
 - **Spaces hidden on this PC**: to-dos in a space you hid on this PC (Desk → Spaces) stay out of Claude’s today and lists too, with one line saying how many. Name the space or search and Claude shows them, marked hidden. Finished to-dos all show, as in History.
 - **What it doesn’t do**: delete anything, edit repeating events or alarms, edit notes, or make or delete spaces.
@@ -463,7 +463,7 @@ The [privacy notice](https://leeahwi.github.io/jongi-nyang-app/en/privacy.html) 
 
 The uninstaller removes the app but leaves your list. To remove everything, go in this order.
 
-1. If you used the AI connection, disconnect Claude first. Remove ‘Jongi-nyang for Claude’ in Claude Desktop under Settings → Extensions, and if you pasted the connect command into Claude Code, run `claude mcp remove jongi-nyang` in that folder.
+1. If you used the AI connection, disconnect Claude first. Remove ‘Jongi-nyang for Claude’ in Claude Desktop under Settings → Extensions, and if you connected Claude Code, run `claude mcp remove -s user jongi-nyang` (with an older command, `claude mcp remove jongi-nyang` in the folder where you pasted it).
 2. Turn off ‘Open Jongi-nyang when Windows starts’ in Desk → Appearance → Startup. If you already removed the app, turn it off in Task Manager → Startup apps.
 3. Quit Jongi-nyang from the notification area and uninstall it in Settings → Apps → Installed apps. If you used the ZIP, delete the folder you unpacked.
 4. Delete `%APPDATA%\PaperTodo\`. All the files above are there (your list, settings, the AI log, `backups\`).
@@ -499,18 +499,19 @@ The app was run with Electron on macOS to check the screens and the main behavio
 
 ### Development
 
-You need Node.js 22 or later (Electron 44 · electron-builder 26). Run these in this folder (`windows/`). You can build the Windows installer on macOS too.
+You need Node.js 22.12 or later (Electron 44 · electron-builder 26). Run these in this folder (`windows/`). You can build the Windows installer on macOS too.
 
 ```sh
 npm install
 npm start            # build and run
 npm run dist         # typecheck + tests + dist/JongiNyang-<version>-x64.exe (installer) · .zip (no install)
+tools/dist.sh        # release build: npm ci and all of npm run dist on Node 22, whatever Node is installed
 ```
 
 <details>
 <summary>Tests, snapshots and measurements</summary>
 
-Some tests assume Korean time, so set the time zone to `Asia/Seoul` when you run them.
+`npm test` runs the tests written on Korean time in Asia/Seoul (`test/time-zones.json`); the rest pass in any time zone.
 
 ```sh
 npm test             # core logic tests, including events · backup (export → import) · shared folder · translations

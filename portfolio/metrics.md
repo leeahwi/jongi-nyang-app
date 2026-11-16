@@ -1,34 +1,34 @@
 # 숫자 모음
 
-포트폴리오, 이력서, 면접에 쓰는 숫자와 그 출처다. 성능 숫자는 내 Mac 한 대에서 같은 도구와 같은 시험 데이터(할 일 150개, 일정 60개, 완료 기록 2,000줄, 메모 80개)로 쟀다. Windows 숫자도 macOS 위 Electron에서 잰 값이고, 실제 Windows PC에서 잰 숫자는 없다.
+포트폴리오, 이력서, 면접에 쓰는 숫자와 그 출처입니다. 성능 숫자는 제 Mac 한 대에서 같은 도구와 같은 테스트 데이터(할 일 150개, 일정 60개, 완료 기록 2,000줄, 메모 80개)로 쟀습니다. Windows 숫자도 macOS 위 Electron에서 잰 값이고, 실제 Windows PC에서 잰 숫자는 없습니다.
 
 ## 제품
 
 | 항목 | 값 | 출처 |
 | --- | --- | --- |
-| 출시 버전 | Mac 1.0 → 1.45.0, Windows 1.0 → 1.30.0 | [CHANGELOG.md](../CHANGELOG.md) |
+| 출시 버전 | Mac 1.0 → 1.50.0, Windows 1.0 → 1.35.0 | [CHANGELOG.md](../CHANGELOG.md) |
 | 지원 언어 | 한국어, 영어, 네덜란드어 | Mac 1.32.0, Windows 1.17.0 |
 | 번역 문구 | Mac 문자열표 약 1,100개(1.32 당시 679개), Windows 키 약 1,240개(1.17 당시 약 700개) | `mac/Resources/*.lproj`, `windows/src/i18n/` |
 | 플랫폼 | macOS 14 이상 (Apple Silicon 빌드), Windows 10/11 x64 | `mac/Package.swift`, `windows/package.json` |
 | 외부 런타임 의존성 | Mac 0개, Windows는 Electron 1개 | `mac/Package.swift`, `windows/package.json` |
 | Claude 확장 도구 | 11개 (보기 6, 넣기 3, 고치기 전 미리 보기 1, 확인 뒤 고치기 1) | `windows/mcp/manifest.json` |
 
-## 코드와 시험
+## 코드와 테스트
 
 | 항목 | 값 | 출처 |
 | --- | --- | --- |
-| Swift 코어 / 앱 / 시험 | 41개 파일 약 10,800줄 / 81개 파일 약 29,200줄 / 약 8,600줄 | `mac/Sources`, `mac/Tests` (`wc -l`) |
+| Swift 코어 / 앱 / 테스트 | 41개 파일 약 10,800줄 / 81개 파일 약 29,200줄 / 약 8,600줄 | `mac/Sources`, `mac/Tests` (`wc -l`) |
 | TypeScript 코어 / main / renderer | 48개 파일 약 10,400줄 / 약 10,500줄 / 약 10,300줄, CSS 2,800줄 | `windows/src` |
-| Claude 확장 (TypeScript) | 약 1,000줄, 시험 약 400줄 | `windows/mcp` |
-| Windows 시험 | 582개 (39개 파일, 약 6,700줄), Claude 확장 16개 | `cd windows && npm test`, `npm run mcp:test` |
-| Mac 시험 | 스크립트 20개, 검사 약 420개 | `mac/scripts/test*.sh` 출력 합계 |
+| Claude 확장 (TypeScript) | 약 1,000줄, 테스트 약 400줄 | `windows/mcp` |
+| Windows 테스트 (2026-11-12) | 1,616개 (99개 파일, 약 13,800줄), Claude 확장 53개 (약 1,700줄) | `cd windows && npm test`, `npm run mcp:test` |
+| Mac 테스트 (2026-11-12) | 스크립트 43개, 검사 약 1,610개 | `mac/scripts/test*.sh` 출력 합계 |
 | 공유 입력 줄 사례 | 136줄 (1–66, 101–118, 201–228, 301–324) | `windows/test/intent.test.ts`, `mac/Tests/PaperCoreTests/IntentTests.swift` |
 | 공유 하루 띠 사례 | R1–R14(1.45/1.30에서 R8에 목록 줄의 ‘지금’ 표시), K1–K8, G1–G4, N1–N5, T1–T4 | `DayStripTests.swift`, `dayStrip.test.ts` |
 | 공유 일정표 끌기 · 늘리기 사례 | R1–R8, W3 | `DayStripTests.swift`, `dayStrip.test.ts` |
 | 공유 앞으로 탭 사례 | 45줄, 옮김 12줄, 빈 화면 3줄 | `AheadTests.swift`, `ahead.test.ts` |
 | 공유 집중 사례 | F1–F17, FB1–FB4 | `FocusTests.swift`, `focus.test.ts` |
 | 공유 메모 서랍 사례 | D1–D30 (폴더 파일, 합치기, 체크 줄, 검색, 정렬, 메모의 종이, 모르는 항목, 날짜 묶음, 종류 표시, 세 줄 미리보기) | `MemoDrawerTests.swift`, `memoDrawer.test.ts`, `memoCards.test.ts` |
-| 공유 스페이스 사례 | S1–S22, 두 앱이 JSON 파일 하나를 같이 읽음(Mac 쪽 사례까지 45개) | `docs/plans/spaces-cases.json`, `SpacesTests.swift`, `todoSpaces.test.ts` |
+| 공유 스페이스 사례 | S1–S22, 두 앱이 JSON 파일 하나를 같이 읽음(Mac 쪽 사례까지 45개) | `shared/cases/spaces-cases.json`, `SpacesTests.swift`, `todoSpaces.test.ts` |
 | 공유 AI 연결 사례 | 18줄 (읽기, 넣기, 미리 보기와 확인, 되돌리기, 기록) | `AIConnectTests.swift`, `ai.test.ts`, `mcp/test/server.test.ts` |
 | Mac 화면 스냅숏 | 약 2,100장 (3개 언어, 낮/밤) | `mac/scripts/render-design.sh` |
 | 대비 검사 | 노트 낮/밤 111쌍, 메모 서랍 네 종이 234쌍, 모두 WCAG AA. 두 앱이 같은 색인지 공유 토큰 43개 | `mac/scripts/test-contrast.sh`, `windows/test/contrast.test.ts`, `drawerContrast.test.ts` |
@@ -45,7 +45,7 @@
 | 켜서 노트가 보일 때까지 | 2.7초 | 1.0초 | 같음 |
 | 10분 쓴 뒤 메모리 | 213MB | 136MB | 같음 |
 
-원인과 고친 방법은 [문제 해결 기록 1번](troubleshooting.md)에 있다.
+원인과 고친 방법은 [문제 해결 기록 1번](troubleshooting.md)에 있습니다.
 
 ## 성능: Windows
 
@@ -75,7 +75,7 @@
 | 끄는 동안 다른 블록 다시 그리기 | Mac은 한 칸마다 일정표 전체 | 0번 | 수정 기록 |
 | 자동 스크롤 중 따라가기 | 없음 (Windows) | Mac 236.7pt, Windows 271px 동안 따라감 | 수정 기록 |
 
-원인과 고친 방법은 [문제 해결 기록 4번](troubleshooting.md#4-하루-일정표-블록이-떨림-mac-140--1410-windows-125--1260)에 있다.
+원인과 고친 방법은 [문제 해결 기록 4번](troubleshooting.md#4-하루-일정표-블록이-떨림-mac-140--1410-windows-125--1260)에 있습니다.
 
 ## 메모 서랍과 Claude 연결 (Mac 1.42–1.44, Windows 1.27–1.29)
 
@@ -90,7 +90,7 @@
 | Mac AI 연결을 켜도 쉴 때 CPU | 노트를 띄워 둔 채 0.59–0.93% → 0.47–0.63% (끔 → 켬, 같은 수준) | `mac/CHANGELOG.md` 1.42.0 |
 | 동시에 넣기 | 앱 20개 · Claude 20개를 동시에 넣어 잃은 것 0 | 1.42.0 |
 
-숫자는 모두 내 Mac 한 대에서 시험용 사본과 예시 데이터로 잰 값이다. Windows의 반투명 바탕은 macOS 위 Electron에서만 확인했다.
+숫자는 모두 제 Mac 한 대에서 테스트용 사본과 예시 데이터로 잰 값입니다. Windows의 반투명 바탕은 macOS 위 Electron에서만 확인했습니다.
 
 ## 메모가 많고 길 때 (Mac 1.45, Windows 1.30)
 
@@ -107,7 +107,7 @@
 | Windows 펼친 메모에 한 글자, 2,000장 / 5,000장 | 94ms / 245ms | 11ms / 40ms | `windows/CHANGELOG.md` 1.30.0 |
 | Windows 찾는 게 없는 검색, 2,000장 | 125ms | 11ms | 같음 |
 
-다른 빌드로 바쁜 Mac에서 이전 서랍과 번갈아 쟀다. 숫자 하나는 30%쯤 흔들린다.
+다른 빌드로 바쁜 Mac에서 이전 서랍과 번갈아 쟀습니다. 숫자 하나는 30%쯤 흔들립니다.
 
 ## 입력 줄이 몇 초 멈춤 (Mac 1.45)
 
@@ -119,7 +119,7 @@
 | 오늘 탭 그리기 | 590 · 700ms | 88 · 96ms | 같음 |
 | 높이를 다시 재고 다시 그린 횟수 | 500–900번 | 되풀이 없음 | 같음 |
 
-원인과 고친 방법은 [문제 해결 기록 8번](troubleshooting.md#8-할-일이-많으면-입력-줄이-몇-초-멈춤-mac-1440--1450-2)에 있다.
+원인과 고친 방법은 [문제 해결 기록 8번](troubleshooting.md#8-할-일이-많으면-입력-줄이-몇-초-멈춤-mac-1440--1450-2)에 있습니다.
 
 ## 할 일 스페이스 (Mac 1.45, Windows 1.30)
 

@@ -138,7 +138,8 @@ final class TodayWindowController: NSObject {
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
         }
         update()
-        model.objectWillChange.sink { [weak self] _ in
+        // #64: the words read the list (reminders, what's left) and 메뉴 막대 글자, not every change of the model.
+        model.listChanged.merge(with: model.$menuBarText.dropFirst().map { _ in () }).sink { [weak self] _ in
             DispatchQueue.main.async { self?.update() }
         }.store(in: &subscriptions)
         timer.$timer.sink { [weak self] _ in

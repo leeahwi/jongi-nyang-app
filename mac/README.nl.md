@@ -243,7 +243,9 @@ Zet **Jongi-nyang for Claude** aan om taken, afspraken en notities te bekijken, 
 <details>
 <summary>De AI-koppeling in detail</summary>
 
-- **Aanzetten**: zet in Bureau → **AI-koppeling** ‘Claude Jongi-nyang laten lezen en schrijven’ aan. **Verbinden met Claude Desktop** opent de extensie (`.mcpb`) in de app, en Claude Desktop vraagt of hij hem moet installeren; heb je Claude Code, dan wordt die ook verbonden. Gebruik je alleen Claude Code, klik dan op **Verbinden met Claude Code**. Claude Code heeft Node.js nodig.
+- **Aanzetten**: zet in Bureau → **AI-koppeling** ‘Claude Jongi-nyang laten lezen en schrijven’ aan. **Verbinden met Claude Desktop** opent de extensie (`.mcpb`) in de app, en Claude Desktop vraagt of hij hem moet installeren; **Claude Code-opdracht kopiëren** kopieert een opdracht waarin de Jongi-nyang-app zelf de extensie in de app draait, dus Node.js is niet nodig. Geplakt in een terminal werkt hij in elke map en ook in het Code-tabblad van Claude Desktop:
+  `claude mcp add -s user jongi-nyang -- '/Applications/종이냥.app/Contents/MacOS/PaperTodo' --mcp-stdio`
+  Een oudere koppeling die op Node draait, werkt nog. Wil je de nieuwe, voer dan `claude mcp remove -s user jongi-nyang` uit en plak de nieuwe opdracht.
 - **Wat hij kan**: taken, afspraken en notities bekijken en toevoegen; taken en niet-herhalende afspraken bewerken; taken per ruimte bekijken en filteren, nieuwe in een ruimte zetten en na een ja verplaatsen. Hij kan het blad van vandaag, deze week of één notitie aan het gesprek hangen (`@` in Claude Code).
 - **Wat hij niet doet**: iets verwijderen, herhalende afspraken of wekkers bewerken, of notities bewerken.
 - **Ruimtes die op deze Mac verborgen zijn**, blijven ook buiten Claudes vandaag en lijsten. Noem je de ruimte, dan laat Claude ze zien.
@@ -456,13 +458,13 @@ Je hebt macOS 14 of nieuwer en Swift 6 nodig (Xcode of de Command Line Tools). E
 <details>
 <summary>Commando’s voor tests, snapshots en metingen</summary>
 
-Sommige tests gaan uit van Koreaanse tijd, dus zet de tijdzone op `Asia/Seoul` als je ze draait.
+De tests die op Koreaanse tijd zijn geschreven, zetten zelf Asia/Seoul; je hoeft geen tijdzone in te stellen.
 
 ```sh
 swift build -Xswiftc -warnings-as-errors
-TZ=Asia/Seoul ./scripts/test.sh        # regressietests van de kern
-TZ=Asia/Seoul ./scripts/test-intent.sh # invoerregel · daglint · Volgende (dezelfde gevallen als Windows)
-TZ=Asia/Seoul ./scripts/test-focus.sh  # focussessies
+./scripts/test.sh                      # regressietests van de kern
+./scripts/test-intent.sh               # invoerregel · daglint · Volgende (dezelfde gevallen als Windows)
+./scripts/test-focus.sh                # focussessies
 ./scripts/test-presentation.sh         # schermtoestand · toetsenbord · delen · back-ups · bureau …
 ./scripts/i18n/check.sh                # geen Engelse of Nederlandse vertalingen die ontbreken
 ./scripts/render-design.sh             # tekent elk scherm met voorbeelddata in docs/design/

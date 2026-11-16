@@ -121,7 +121,7 @@ public enum TodayGlance {
         max(1, Int((date.timeIntervalSince(now) / 60).rounded(.up)))
     }
 
-    // MARK: Layout (#200, docs/plans/today-window-cases.json — the Windows app's core/glance.ts reads the same file)
+    // MARK: Layout (#200, shared/cases/today-window-cases.json — the Windows app's core/glance.ts reads the same file)
 
     /// The three cards, always in this order.
     public enum CardKind: String, CaseIterable, Sendable { case event, timer, alarm }

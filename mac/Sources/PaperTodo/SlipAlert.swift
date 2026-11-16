@@ -18,26 +18,47 @@ enum SlipAlert {
     }
 
     /// Shows the question and waits; returns the index of the choice picked. `replacesList` (#253,
-    /// docs/plans/widget-ask-cases.json `questions`): its answer replaces the whole list (a backup, a shared folder's list),
+    /// shared/cases/widget-ask-cases.json `questions`): its answer replaces the whole list (a backup, a shared folder's list),
     /// or the app starts again after the list was replaced — while it waits, the day sheet's 넣기 and 되돌리기 wait too.
     /// Written on the line with the question's message.
+    /// `answersItself` (#380): looked at every second while the slip waits; once true the slip goes as if its default
+    /// choice was picked (the storage folder that came back while 저장 폴더를 찾지 못했어요 was up).
     @discardableResult
     static func run(symbol: String, title: String, message: String, replacesList: Bool = false, detail: String? = nil, choices: [Choice],
-                    cat: PetArt.Pose? = .curious, width: SlipWidth = .small) -> Int {
+                    cat: PetArt.Pose? = .curious, width: SlipWidth = .small, answersItself: (@MainActor @Sendable () -> Bool)? = nil) -> Int {
         let over = SlipModal.front
         let panel = ModalSlipPanel(title: title)
-        var picked = choices.firstIndex { $0.isCancel } ?? max(0, choices.count - 1)
-        var answered = false
+        let answer = Answer(choices.firstIndex { $0.isCancel } ?? max(0, choices.count - 1))
         panel.show(SlipAlertView(symbol: symbol, title: title, message: message, detail: detail, choices: choices, cat: cat, width: width) { index in
-            picked = index
-            answered = true
+            answer.picked = index
+            answer.answered = true
             SlipModal.wake()
         })
         place(panel)
         bringForward(panel)
-        SlipModal.run(panel, asked: replacesList ? .replacesList : .question, over: over) { answered }
+        let fallback = choices.firstIndex { $0.isDefault }
+        let check = answersItself.map { done in
+            Timer(timeInterval: 1, repeats: true) { _ in
+                MainActor.assumeIsolated {
+                    guard !answer.answered, done() else { return }
+                    answer.picked = fallback ?? answer.picked
+                    answer.answered = true
+                    SlipModal.wake()
+                }
+            }
+        }
+        if let check { RunLoop.main.add(check, forMode: .common) }
+        SlipModal.run(panel, asked: replacesList ? .replacesList : .question, over: over) { answer.answered }
+        check?.invalidate()
         panel.orderOut(nil)
-        return picked
+        return answer.picked
+    }
+
+    /// What `run`'s slip was answered (a timer may answer it too, #380).
+    @MainActor private final class Answer {
+        var picked: Int
+        var answered = false
+        init(_ picked: Int) { self.picked = picked }
     }
 
     /// A name asked on a slip (새 스페이스…, 1.45): the trimmed text, or nil for 취소 / Esc / nothing typed.
@@ -146,10 +167,18 @@ enum SlipAlert {
         }
     }
 
-    /// Something went wrong: the reason and 확인.
+    /// Something went wrong (#390, docs/writing.md 오류): what didn't happen and what is safe (`message`), what to do
+    /// (`detail`), and 닫기. The same slips as Windows (main.ts `ask` with icon "warning").
     static func inform(symbol: String = "exclamationmark.circle", title: String, message: String, detail: String? = nil) {
         run(symbol: symbol, title: title, message: message, detail: detail,
-            choices: [Choice(title: L("확인"), role: .primary, isDefault: true, isCancel: true)], cat: nil)
+            choices: [Choice(title: L("닫기"), role: .primary, isDefault: true, isCancel: true)], cat: nil)
+    }
+
+    /// `inform` with the next step as a button beside 닫기 (#390: 백업 폴더 열기, 다시 시도, 다른 폴더…). True when it was picked.
+    static func inform(symbol: String = "exclamationmark.circle", title: String, message: String, detail: String? = nil,
+                       next: String) -> Bool {
+        run(symbol: symbol, title: title, message: message, detail: detail,
+            choices: [Choice(title: next), Choice(title: L("닫기"), role: .primary, isDefault: true, isCancel: true)], cat: nil) == 0
     }
 }
 
@@ -171,7 +200,7 @@ final class ModalSlipPanel: SlipPanel {
 /// them, so the loop is here: inside the modal session (menus behave as they do for a question), each event in turn goes
 /// to the question and the windows that work while it is up, and a press anywhere else nudges it.
 ///
-/// #253 (docs/plans/widget-ask-cases.json): the desktop calendar widgets and their day sheet work while it is up (they
+/// #253 (shared/cases/widget-ask-cases.json): the desktop calendar widgets and their day sheet work while it is up (they
 /// work when modal): looking always, putting in and taking back unless the question replaces the whole list (`waits`); a
 /// line that opens the note or the desk brings it forward under the question (`cameForward`).
 @MainActor

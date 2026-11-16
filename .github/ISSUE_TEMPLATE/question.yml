@@ -1,0 +1,37 @@
+name: 질문 · Question
+description: 쓰는 법이 궁금하거나 바라는 것이 있으면 남겨 주세요. Ask how something works, or suggest an idea.
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        이슈는 누구나 볼 수 있습니다. 메모 · 할 일의 실제 내용, 이름, 전화번호, 메일 주소, 폴더 경로는 적지 말아 주세요.
+        많이 묻는 것은 [사이트의 질문](https://leeahwi.github.io/jongi-nyang-app/#faq)과 [개인정보 안내](https://leeahwi.github.io/jongi-nyang-app/privacy.html)에 먼저 적어 두었습니다.
+
+        Anyone can read issues. Please leave out the real text of your notes and to-dos, names, phone numbers, email addresses and folder paths.
+        Common questions are answered in the [FAQ](https://leeahwi.github.io/jongi-nyang-app/en/#faq) and the [privacy page](https://leeahwi.github.io/jongi-nyang-app/en/privacy.html).
+  - type: dropdown
+    id: app
+    attributes:
+      label: 앱 · App
+      options:
+        - Mac
+        - Windows
+        - Mac과 Windows 둘 다 · Both
+        - Claude 확장 · Claude extension
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: 앱 버전 · App version
+      description: 받은 파일 이름에도 있습니다(JongiNyang-1.49.1.dmg). The downloaded file name shows it too.
+      placeholder: "1.49.1"
+    validations:
+      required: false
+  - type: textarea
+    id: question
+    attributes:
+      label: 질문이나 바라는 것 · Your question or idea
+    validations:
+      required: true

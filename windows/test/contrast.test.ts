@@ -7,7 +7,7 @@ import { isDarkPaper, paperKinds, type PaperKind } from "../src/core/paper";
 import { floorOf, rgbOf, weekendTint } from "../src/core/calendarWidget";
 
 /** The widget's floor per paper (calendar-widget-cases.json, O9: every paper of #244). */
-const widgetCases = JSON.parse(fs.readFileSync(path.join(process.cwd(), "../docs/plans/calendar-widget-cases.json"), "utf8")) as Record<string, unknown>;
+const widgetCases = JSON.parse(fs.readFileSync(path.join(process.cwd(), "../shared/cases/calendar-widget-cases.json"), "utf8")) as Record<string, unknown>;
 const floorCase: Record<string, number> = (() => {
   const found: Record<string, number>[] = [];
   const walk = (value: unknown): void => {

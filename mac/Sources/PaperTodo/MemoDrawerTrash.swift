@@ -23,9 +23,8 @@ extension AppModel {
             memoTrash = try MemoTrash.decode(data)
             knownTrashData = data
         } catch {
-            moveTrashAside(now: now)
             memoTrash = MemoTrash()
-            knownTrashData = nil
+            knownTrashData = moveTrashAside(now: now, starting: true) ? nil : data
             return
         }
         let pruned = memoTrash.pruned(now: now, alive: aliveMemoIDs)
@@ -35,22 +34,32 @@ extension AppModel {
     /// The memos the trash may let go of (an empty list is never read as "every memo is gone").
     private var aliveMemoIDs: Set<String> { Set(memos.map(\.id)) }
 
-    private func moveTrashAside(now: Date) {
+    /// Moved aside: true. Not moved (a folder that can't be written): false, and the file is never written (#452). At launch
+    /// the trash starts empty; later (another device's file, #485) the 지운 메모 here stay and are written on the next change.
+    func moveTrashAside(now: Date, starting: Bool) -> Bool {
         let aside = memoTrashURL.deletingLastPathComponent().appendingPathComponent(
             MemoFolders.asideName(now).replacingOccurrences(of: "memo-folders", with: "memo-trash"))
-        let what = L("지운 메모 파일을 읽지 못해서 지운 메모 없이 시작했어요. 메모는 모두 그대로예요.")
-        if (try? FileManager.default.moveItem(at: memoTrashURL, to: aside)) != nil {
-            storageError = what + " " + Self.keptAside(aside)
-        } else {
-            storageError = what + " " + L("저장 폴더가 열리는지 확인해 주세요.")
+        guard (try? FileManager.default.moveItem(at: memoTrashURL, to: aside)) != nil else {
+            blockAside(memoTrashFile)
+            return false
         }
+        memoTrashFile.blocked = false
+        let what = starting ? L("지운 메모 파일을 읽지 못해서 지운 메모 없이 시작했어요. 메모는 모두 그대로예요.")
+                            : L("지운 메모 파일을 읽지 못했어요. 여기 있던 지운 메모는 그대로예요.")
+        storageError = what + " " + Self.keptAside(aside)
+        return true
     }
 
     /// Another device (or an older app's backup) changed the file: joined in (T5).
     func catchUpMemoTrash() {
-        guard let data = try? SafeFile.sharedData(memoTrashURL), data != knownTrashData else { return }
+        guard case .changed(let data) = memoTrashFile.look() else { return }
         knownTrashData = data
-        guard let theirs = try? MemoTrash.decode(data) else { return }
+        guard let theirs = try? MemoTrash.decode(data) else {
+            // #485: moved aside like memo folders; not moved, known as it is, so the checks don't try again (다시 읽기 does).
+            _ = moveTrashAside(now: Date(), starting: false)
+            return
+        }
+        memoTrashFile.blocked = false
         let merged = MemoTrash.merge(here: memoTrash, theirs: theirs)
         if merged != memoTrash { memoTrash = merged }
     }
@@ -65,12 +74,9 @@ extension AppModel {
         trash = trash.pruned(now: now, alive: aliveMemoIDs)
         if trash != memoTrash { memoTrash = trash }
         let text = trash.encoded()
-        guard Data(text.utf8) != knownTrashData else { return }
+        guard Data(text.utf8) != knownTrashData, !memoTrashFile.blocked else { return }
         do {
-            try FileManager.default.createDirectory(at: memoTrashURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            let data = Data(text.utf8)
-            try data.write(to: memoTrashURL, options: .atomic)
-            knownTrashData = data
+            try memoTrashFile.write(Data(text.utf8))
             if storageError?.hasPrefix(L("지운 메모를 저장하지 못했어요.")) == true { storageError = nil }
         } catch {
             storageError = Self.saveProblem(L("지운 메모를 저장하지 못했어요."))

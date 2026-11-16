@@ -399,9 +399,9 @@ test("store: todo-spaces.json beside todos.json; todos.json keeps its shape; ano
   assert.equal(spaceIndexOf(store.state().todoSpaces.spaces, store.state().spaceOf).get(todoID)?.name, "집");
 });
 
-// ─── The shared fixture (docs/plans/spaces-cases.json, read by the Mac's test-spaces.sh too) ──
+// ─── The shared fixture (shared/cases/spaces-cases.json, read by the Mac's test-spaces.sh too) ──
 
-const fixturePath = path.resolve(process.cwd(), "..", "docs", "plans", "spaces-cases.json");
+const fixturePath = path.resolve(process.cwd(), "..", "shared", "cases", "spaces-cases.json");
 const fixture = fs.existsSync(fixturePath) ? JSON.parse(fs.readFileSync(fixturePath, "utf8")) : undefined;
 const fileOf = (value: unknown) => parseTodoSpaces(JSON.stringify(value));
 const choiceText = (entry: SpaceChoice) => (entry.kind === "space" ? entry.id : entry.kind === "new" ? `new:${entry.name}` : "none");

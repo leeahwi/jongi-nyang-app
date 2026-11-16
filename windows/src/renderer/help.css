@@ -67,6 +67,15 @@
 .neighbours { flex: none; display: flex; gap: 10px; padding-top: 8px; }
 .neighbours .spacer { flex: 1; }
 .copyright { flex: none; margin: 14px 0 0; text-align: center; font-size: 10.5px; color: var(--ink-3); }
+/* #409 문제 보고용 정보 복사: a quiet button above the copyright line. */
+.report-row { flex: none; display: flex; justify-content: center; margin-top: 18px; }
+.report {
+  height: 30px; padding: 0 12px; border-radius: 8px; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  font: 500 12px var(--ui); color: var(--ink-2); background: transparent; border: 1px solid var(--rule); transition: background 0.12s;
+}
+.report:hover { background: var(--card); color: var(--ink); }
+.report:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
+.report-icon { display: inline-flex; color: var(--ink-3); }
 .neighbour {
   flex: 1; min-width: 0; min-height: 46px; padding: 0 14px; border-radius: 10px; display: flex; align-items: center; gap: 8px; color: var(--ink);
   border: 1px solid var(--rule); background: var(--card); transition: background 0.12s;

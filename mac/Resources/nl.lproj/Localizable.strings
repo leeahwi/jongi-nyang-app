@@ -14,9 +14,14 @@
 "반복 할 일 파일을 읽지 못해서 반복 없이 시작했어요." = "Het lukte niet om het bestand met herhalende taken te lezen, dus je begint zonder.";
 "메모 파일을 읽지 못했어요." = "Het lukte niet om je notitiebestand te lezen.";
 "반복 할 일 파일을 읽지 못했어요." = "Het lukte niet om het bestand met herhalende taken te lezen.";
+"목록 파일을 읽지 못했어요." = "Het lukte niet om je lijstbestand te lezen.";
+"%@ 파일을 읽지 못했어요." = "Het lukte niet om %@ te lezen.";
+"다시 읽기" = "Opnieuw lezen";
+"다른 기기와 동시에 고친 파일이 있어요." = "Een ander apparaat heeft tegelijk een bestand gewijzigd.";
+"클라우드가 남긴 사본을 백업 폴더로 옮겨 뒀어요:" = "De kopie die je cloud maakte staat nu in de back-upmap:";
+"열어 보기" = "Toon in Finder";
 "반복 할 일을 저장하지 못했어요." = "Het lukte niet om je herhalende taken te bewaren.";
 "할 일 내보내기" = "Taken exporteren";
-"파일을 내보내지 못했어요." = "Het lukte niet om het bestand te exporteren.";
 "종이냥 단축키" = "Sneltoetsen van Jongi-nyang";
 "저장 폴더 확인" = "Opslagmap nakijken";
 "확인" = "OK";
@@ -29,9 +34,14 @@
 "마감" = "Deadline";
 /* ArchiveStore.swift */
 "완료 기록을 저장하지 못했어요. 끝낸 일은 목록에 그대로 둘게요." = "Het lukte niet om de geschiedenis te bewaren. Afgevinkte taken blijven voorlopig op de lijst.";
+"완료 기록에서 되돌리지 못한 일이 있어요. 끝낸 일은 목록으로 돌아왔고, 완료 기록에도 그대로 남아 있어요." = "Sommige taken konden niet uit de geschiedenis worden gehaald. Ze staan weer op de lijst en ook nog in de geschiedenis.";
 /* BackupController.swift */
 "다른 컴퓨터의 종이냥에서 가져올 수 있는 백업 파일을 만들어요" = "Maakt een back-upbestand dat Jongi-nyang op een andere computer kan importeren";
-"백업 파일을 만들지 못했어요." = "Het lukte niet om het back-upbestand te maken.";
+"내보내지 못했어요." = "Het lukte niet om te exporteren.";
+"다시 시도" = "Opnieuw proberen";
+"다른 곳을 골라 다시 시도해 주세요." = "Kies een andere plek en probeer het opnieuw.";
+"백업 폴더를 열어 확인해 주세요." = "Open de back-upmap om hem te controleren.";
+"폴더에 쓸 수 있는지 확인하고 다시 시도해 주세요." = "Controleer of je in de map kunt schrijven en probeer het opnieuw.";
 "가져오기" = "Importeren";
 "종이냥에서 내보낸 백업 파일(.jongi)을 골라요" = "Kies een back-upbestand (.jongi) dat uit Jongi-nyang is geëxporteerd";
 "가져오지 못했어요. 지금 목록은 그대로예요." = "Het lukte niet om te importeren. Je lijst is niet veranderd.";
@@ -43,7 +53,7 @@
 "지금 것을 이 백업으로 바꿀까요?" = "Alles hier vervangen door deze back-up?";
 "지금 있는 할 일 · 메모 · 일정 · 기록이 이 백업으로 바뀌어요. 바꾸기 전 상태는 자동으로 백업해 둘게요." = "Je taken, notities, afspraken en geschiedenis hier worden vervangen door deze back-up. Wat er nu is, wordt eerst bewaard als back-up.";
 "가져왔어요." = "Geïmporteerd.";
-"종이냥이 다시 시작돼요. 가져오기 전 것도 ‘backups’ 폴더에 남겨 뒀어요." = "Jongi-nyang start opnieuw. Wat er eerst stond, staat ook in de map ‘backups’.";
+"종이냥이 다시 시작돼요. 가져오기 전 것도 백업 폴더에 남겨 뒀어요." = "Jongi-nyang start opnieuw. Wat er eerst stond, staat ook in de back-upmap.";
 "백업 폴더 열기" = "Back-upmap openen";
 "%@에서 내보냄" = "Geëxporteerd uit %@";
 "%@ 내보냄" = "Geëxporteerd op %@";
@@ -166,7 +176,6 @@
 "종이냥은 어떤 앱인가요?" = "Wat is Jongi-nyang?";
 "할 일과 일정을 종이 한 장에 적는 노트예요. 적고, 체크하고, 끝내면 종이냥이 축하해 줘요.\n· 인터넷이나 로그인 없이 이 Mac에 저장돼요.\n· 원하면 iCloud Drive 같은 공유 폴더로 여러 기기에서 같은 목록을 써요." = "Jongi-nyang (종이냥, ‘papieren kat’) is een papieren notitieblok voor je taken en afspraken. Opschrijven, afvinken, en als je klaar bent juicht de kat.\n· Alles wordt op deze Mac bewaard, zonder internet of account.\n· Wil je, dan gebruiken meerdere apparaten dezelfde lijst via een gedeelde map zoals iCloud Drive.";
 "창을 닫아도 계속 실행돼요" = "Hij blijft draaien als je het venster sluit";
-"로그인할 때 켜기" = "Openen bij inloggen";
 "처음 안내 다시 보기" = "De rondleiding opnieuw bekijken";
 "⋯ 메뉴 → 사용 안내, 또는 메뉴 막대의 도움말 → 사용 안내에서 처음에 본 카드 안내를 다시 볼 수 있어요." = "De kaartjes van de eerste keer komen terug via het ⋯-menu → Rondleiding, of Help → Rondleiding in de menubalk.";
 "적고, 체크하고, 끝" = "Opschrijven, afvinken, klaar";
@@ -409,7 +418,7 @@
 "꾸미기" = "Weergave";
 "알림" = "Herinnering";
 "반복하는 날마다 목록에 한 줄씩 놓여요." = "Op elke dag dat hij herhaalt, komt er een regel op de lijst.";
-"종이냥을 보이거나 숨기고, 돌아다닐지, 말을 걸지 정해요." = "Toon of verberg Jongi-nyang, en kies of hij rondloopt en praat.";
+"종이냥 펫과 타닥냥을 보이거나 숨기고, 움직임과 말을 정해요." = "Toon of verberg de bureaubladkat en de tiktakkat, en kies hoe ze bewegen en praten.";
 "알람을 맞추고, 뽀모도로 시간과 소리를 정해 바로 시작해요." = "Zet wekkers, kies de Pomodoro-tijden en het geluid en begin meteen.";
 "일정을 적어 두면 오늘 할 일 위에 보이고, 시작 전에 알려 줘요." = "Afspraken staan boven je taken van vandaag, met een herinnering voordat ze beginnen.";
 "가" = "A";
@@ -539,6 +548,13 @@
 "다음: %@부터 나타나요" = "Volgende: staat er vanaf %@";
 /* ShelfPageView.swift */
 /* StorageFolder.swift */
+"저장 폴더를 찾지 못했어요" = "De opslagmap is niet gevonden";
+"‘%@’ 폴더가 아직 보이지 않아요. iCloud Drive · Dropbox · OneDrive가 켜지거나 디스크가 연결되면 저절로 그 폴더로 열어요. 그전에는 아무 파일도 쓰지 않아요." = "De map ‘%@’ is er nog niet. Zodra iCloud Drive, Dropbox of OneDrive draait of de schijf is aangesloten, gaat hij vanzelf open. Tot dan wordt er niets bewaard.";
+"이 Mac 목록 열기" = "Lijst van deze Mac openen";
+"폴더 다시 고르기" = "Andere map kiezen";
+"다시 확인" = "Opnieuw kijken";
+"이 폴더 열기" = "Deze map openen";
+"‘%@’ 폴더를 열 수 없어서 이 Mac의 기본 위치에 저장하고 있어요. 폴더가 다시 보이면 종이냥을 다시 시작해 주세요." = "De map ‘%@’ ging niet open, dus Jongi-nyang bewaart nu op de standaardplek van deze Mac. Start Jongi-nyang opnieuw zodra de map terug is.";
 "이 Mac에 전에 쓰던 목록이 있어요." = "Op deze Mac staat de lijst die je eerder gebruikte.";
 "공유 폴더로 옮기기 전의 목록으로 돌아가려면 ‘전에 쓰던 목록 쓰기’를 고르면 돼요. 덮어써도 바꾸기 전 상태를 백업해 둬요." = "Wil je terug naar de lijst van voor de gedeelde map, kies dan ‘Eerdere lijst gebruiken’. Overschrijf je die, dan wordt die eerst als back-up bewaard.";
 "이 폴더에 이미 종이냥 목록이 있어요." = "Deze map heeft al een lijst van Jongi-nyang.";
@@ -660,7 +676,7 @@
 "남은 할 일" = "Nog te doen";
 "넣고 나면 아래에 ‘일정으로 넣었어요 · 할 일로 바꾸기’ 같은 안내가 4초 떠요.\n· ‘바꾸기’를 누르면 방금 것은 흔적 없이 지우고 다른 뜻으로 다시 넣어요.\n· 같은 말을 두 번 바꾸면 다음부터 그쪽으로 먼저 알아들어요.\n· 바로 ⌘Z를 누르면 넣은 것을 되돌려요." = "Zodra het erin staat, verschijnt onderaan 4 seconden een melding als ‘Toegevoegd als afspraak · Maak er een taak van’.\n· ‘Maak er een … van’ haalt wat net is gemaakt spoorloos weg en zet het er op de andere manier in.\n· Verander je dezelfde woorden twee keer, dan leest hij ze de volgende keer meteen zo.\n· Met ⌘Z meteen daarna draai je het terug.";
 "넣은 뒤 바꾸기" = "Achteraf omzetten";
-"다른 뜻" = "andere keuze";
+"다른 뜻" = "Andere keuze";
 "다른 앱을 쓰다가 ⌃⌥N을 누르면 같은 입력 줄이 쪽지로 떠요. ⌘Return은 일정으로 넣어요. 책상 → 꾸미기 → 빠른 입력에서 끌 수 있어요." = "Druk in elke app op ⌃⌥N en dezelfde invoerregel verschijnt op een briefje. ⌘Return zet het erin als afspraak. Uitzetten kan via Bureau → Weergave → Snel toevoegen.";
 "다시 울림" = "Sluimeren";
 "다음 · 그 밖에" = "Volgende · De rest";
@@ -806,6 +822,7 @@
 "모두 비우기" = "Legen";
 "지운 메모를 비웠어요" = "Verwijderde notities geleegd";
 "지운 메모 파일을 읽지 못해서 지운 메모 없이 시작했어요. 메모는 모두 그대로예요." = "Het lukte niet om je verwijderde notities te lezen, dus die beginnen leeg. Al je notities zijn zoals ze waren.";
+"지운 메모 파일을 읽지 못했어요. 여기 있던 지운 메모는 그대로예요." = "Het lukte niet om je bestand met verwijderde notities te lezen. De verwijderde notities hier blijven zoals ze zijn.";
 "지운 메모를 저장하지 못했어요." = "Het lukte niet om je verwijderde notities te bewaren.";
 "지운 메모는 30일 동안 둬요.\n· 폴더 이름(▾) 메뉴 맨 아래나 ⚙의 ‘지운 메모 세 장’을 누르면 보여요(없으면 그 줄도 없어요).\n· 되돌리기를 누르면 원래 폴더로 가요. 그 폴더가 없어졌으면 ‘메모’ 폴더로 가요. 고정과 종이도 그대로예요.\n· 지금 모두 비우기…는 한 번 더 물어요. 비우면 되돌릴 수 없어요.\n· 30일이 지난 메모는 저절로 지워져요.\n· 지운 메모도 백업과 공유 폴더에 함께 가요. AI 연결에는 보이지 않아요." = "Verwijderde notities worden 30 dagen bewaard.\n· Je vindt ze onder ‘3 verwijderde notities’ onderaan het menu van de mapnaam (▾) of in ⚙ (die regel staat er niet als er geen zijn).\n· Terugzetten zet een notitie terug in haar map, of in ‘Notities’ als die map weg is, vastgezet en op haar papier zoals eerst.\n· Nu legen… vraagt het eerst. Geleegde notities krijg je niet terug.\n· Notities die meer dan 30 dagen geleden zijn verwijderd, verdwijnen vanzelf.\n· Verwijderde notities gaan mee in back-ups en gedeelde mappen. De AI-koppeling ziet ze niet.";
 "검색" = "Zoeken";
@@ -948,23 +965,12 @@
 "AI 연결 설정을 저장하지 못했어요. 스위치를 껐다 켜면 다시 저장해 볼게요." = "Het lukte niet om de AI-koppeling te bewaren. Zet de schakelaar uit en weer aan om het opnieuw te proberen.";
 "Claude 데스크톱" = "Claude Desktop";
 "Claude 데스크톱에 연결" = "Verbinden met Claude Desktop";
-"누르면 Claude가 ‘종이냥 for Claude’를 설치할지 물어봐요. Claude Code가 있으면 같이 연결해요." = "Claude vraagt of ‘Jongi-nyang for Claude’ geïnstalleerd mag worden. Is Claude Code er, dan wordt die ook verbonden.";
-"연결하는 중…" = "Verbinden…";
-"다시 연결" = "Opnieuw verbinden";
-"Claude Code에 연결" = "Verbinden met Claude Code";
-"연결했어요. 새로 여는 Claude Code 세션부터 종이냥이 보여요." = "Verbonden. Jongi-nyang verschijnt in nieuwe Claude Code-sessies.";
-"터미널과 Claude 데스크톱의 Code 탭에서 써요. Node.js가 필요해요." = "Werkt in Terminal en in het Code-tabblad van Claude Desktop. Vereist Node.js.";
 "종이냥을 응용 프로그램 폴더로 옮긴 뒤 다시 눌러 주세요." = "Zet Jongi-nyang in de map Apps en druk dan opnieuw.";
 "지금 있는 곳에서는 Claude Code가 다음에 종이냥을 찾지 못해요." = "Vanaf de huidige plek vindt Claude Code Jongi-nyang de volgende keer niet.";
-"Claude Code를 찾지 못했어요" = "Claude Code niet gevonden";
-"이 Mac에서 claude 명령을 찾지 못했어요." = "De opdracht claude staat niet op deze Mac.";
-"연결 명령을 복사해 두었어요. Claude Code를 설치한 뒤 터미널에 붙여 넣어요." = "De verbindingsopdracht is gekopieerd. Installeer Claude Code en plak hem dan in Terminal.";
-"Node가 필요해요" = "Node is nodig";
-"종이냥 for Claude는 Node로 실행돼요. 이 Mac에서 Node를 찾지 못했어요." = "Jongi-nyang for Claude draait op Node, en Node staat niet op deze Mac.";
-"nodejs.org에서 Node를 설치한 뒤 다시 눌러 주세요. 연결 명령도 복사해 두었어요." = "Installeer Node via nodejs.org en druk dan opnieuw. De verbindingsopdracht is ook gekopieerd.";
-"Claude Code에 연결하지 못했어요" = "Het lukte niet om met Claude Code te verbinden";
-"연결 명령을 복사해 두었어요. 터미널에 붙여 넣어 주세요." = "De verbindingsopdracht is gekopieerd. Plak hem in Terminal.";
-"책상 → AI 연결에서 켜고, Claude 데스크톱이나 Claude Code에 연결해요. 끄면 Claude는 아무것도 읽거나 쓰지 못해요.\n1. ‘Claude가 종이냥을 보고 쓸 수 있게 하기’를 켜요. 처음에는 꺼져 있어요.\n2. ‘Claude 데스크톱에 연결’을 눌러요. Claude 데스크톱이 ‘종이냥 for Claude’를 설치할지 물어봐요.\n3. Claude Code만 쓴다면 ‘Claude Code에 연결’을 눌러요.\n· ‘Claude 데스크톱에 연결’은 Claude Code가 있으면 같이 연결해요.\n· Claude Code는 터미널과 Claude 데스크톱의 Code 탭에서 써요. Node.js(nodejs.org)가 필요해요." = "Zet het aan in Bureau → AI-koppeling en verbind Claude Desktop of Claude Code. Staat het uit, dan kan Claude niets lezen of schrijven.\n1. Zet ‘Claude Jongi-nyang laten lezen en schrijven’ aan. Het staat eerst uit.\n2. Klik op ‘Verbinden met Claude Desktop’. Claude Desktop vraagt of ‘Jongi-nyang for Claude’ geïnstalleerd mag worden.\n3. Gebruik je alleen Claude Code, klik dan op ‘Verbinden met Claude Code’.\n· ‘Verbinden met Claude Desktop’ verbindt ook Claude Code als die er is.\n· Claude Code werkt in Terminal en in het Code-tabblad van Claude Desktop. Het vereist Node.js (nodejs.org).";
+"누르면 Claude가 ‘종이냥 for Claude’를 설치할지 물어봐요." = "Claude vraagt of ‘Jongi-nyang for Claude’ geïnstalleerd mag worden.";
+"Claude Code 명령 복사" = "Claude Code-opdracht kopiëren";
+"복사한 명령을 터미널에 붙여 넣어요. Node.js는 없어도 돼요." = "Plak de gekopieerde opdracht in een terminal. Node.js is niet nodig.";
+"책상 → AI 연결에서 켜고, Claude 데스크톱이나 Claude Code에 연결해요. 끄면 Claude는 아무것도 읽거나 쓰지 못해요.\n1. ‘Claude가 종이냥을 보고 쓸 수 있게 하기’를 켜요. 처음에는 꺼져 있어요.\n2. ‘Claude 데스크톱에 연결’을 눌러요. Claude 데스크톱이 ‘종이냥 for Claude’를 설치할지 물어봐요.\n3. Claude Code는 ‘Claude Code 명령 복사’로 복사한 명령을 터미널에 붙여 넣어요.\n· Claude Code에 Node.js는 필요 없어요. 종이냥이 실행해요.\n· 붙여 넣은 명령은 어느 폴더에서나, Claude 데스크톱의 Code 탭에서도 돼요.\n· 예전에 연결한 것도 그대로 돼요. 새 명령으로 바꾸려면 터미널에서 claude mcp remove -s user jongi-nyang을 실행하고 다시 붙여 넣어요." = "Zet het aan in Bureau → AI-koppeling en verbind Claude Desktop of Claude Code. Staat het uit, dan kan Claude niets lezen of schrijven.\n1. Zet ‘Claude Jongi-nyang laten lezen en schrijven’ aan. Het staat eerst uit.\n2. Klik op ‘Verbinden met Claude Desktop’. Claude Desktop vraagt of ‘Jongi-nyang for Claude’ geïnstalleerd mag worden.\n3. Voor Claude Code plak je de opdracht van ‘Claude Code-opdracht kopiëren’ in een terminal.\n· Claude Code heeft geen Node.js nodig. Jongi-nyang voert het uit.\n· De geplakte opdracht werkt in elke map, en ook in het Code-tabblad van Claude Desktop.\n· Wat je eerder verbond, werkt nog. Wil je de nieuwe opdracht, voer dan claude mcp remove -s user jongi-nyang uit in een terminal en plak opnieuw.";
 "Claude 데스크톱이 필요해요" = "Claude Desktop is nodig";
 "Claude 데스크톱이나 Claude Code와 이야기하면서 할 일 · 일정 · 메모를 보고 새로 넣어요.\n· 할 일과 반복하지 않는 일정은 고칠 수도 있어요.\n· 할 일을 스페이스로 보고 거르고, 넣을 때 스페이스를 정하고, 물어본 뒤 다른 스페이스로 옮겨요.\n· 이 기기에서 숨긴 스페이스의 할 일은 오늘과 목록에서 빼요. 그 스페이스를 말하면 보여 줘요.\n· 예: ‘내일 3시–4시 보고서 쓰기 넣어줘’, ‘이번 주 뭐 했는지 정리해줘’\n· 지우기, 반복 일정 · 알람 고치기, 메모 고치기, 스페이스 만들기 · 지우기는 하지 않아요." = "Terwijl je met Claude Desktop of Claude Code praat, kan Claude je taken, afspraken en notities bekijken en nieuwe toevoegen.\n· Taken en eenmalige afspraken kan Claude ook wijzigen.\n· Claude kan taken per ruimte bekijken en filteren, nieuwe in een ruimte zetten en ze na je ja naar een andere ruimte verplaatsen.\n· Taken in ruimtes die op dit apparaat verborgen zijn, laat Claude weg, tenzij je de ruimte noemt.\n· Bijvoorbeeld: ‘zet morgen 15–16 uur rapport schrijven erin’, ‘vat samen wat ik deze week deed’.\n· Claude verwijdert niets en wijzigt geen herhalende afspraken, wekkers of notities, en maakt of verwijdert geen ruimtes.";
 "Claude가 넣거나 고치면 노트 아래에 ‘Claude가 할 일 2개를 넣었어요 · 되돌리기’가 떠요.\n1. 안내의 ‘되돌리기’를 눌러요. 그 뒤로 여기서 아무것도 바꾸지 않았다면 ⌘Z로도 돼요.\n2. 나중에 되돌리려면 책상 → AI 연결 → 최근 AI 작업에서 오늘과 어제 한 일을 하나씩 되돌려요.\n· 그사이 바뀐 항목은 그대로 둬요.\n· Claude가 넣거나 고친 할 일과 일정에는 그날 동안 작은 ‘Claude’ 도장이 찍혀요." = "Als Claude iets toevoegt of wijzigt, verschijnt onderaan het notitieblok ‘Claude heeft 2 taken toegevoegd · Herstel’.\n1. Klik op ‘Herstel’ in de melding. Heb je hier sindsdien niets veranderd, dan werkt ⌘Z ook.\n2. Later herstellen kan in Bureau → AI-koppeling → Recent AI-werk: daar herstel je het werk van vandaag en gisteren één voor één.\n· Wat intussen is gewijzigd, blijft zoals het is.\n· Taken en afspraken die Claude toevoegde of wijzigde, krijgen die dag een klein ‘Claude’-stempel.";
@@ -992,7 +998,6 @@
 "최근 AI 작업" = "Recent AI-werk";
 "켜면 Claude가 할 일 · 일정 · 메모를 보고 새로 넣어요. 고칠 땐 먼저 물어보고, 지우지는 못해요. 읽은 내용은 대화와 함께 Claude로 가요." = "Als dit aan staat, kan Claude je taken, afspraken en notities zien en nieuwe toevoegen. Claude vraagt het eerst voordat er iets verandert en kan niets wissen. Wat Claude leest, gaat mee in het gesprek naar Claude.";
 "켜고 연결하기" = "Aanzetten en verbinden";
-"명령 복사" = "Opdracht kopiëren";
 
 /* 1.43 메모 서랍 */
 "%@ 키는 종이냥이 이미 써요(빠른 메모 · 노트 · 빠른 입력). 다른 키를 눌러 주세요." = "Jongi-nyang gebruikt %@ al (Snelle notitie · het notitieblok · Snel toevoegen). Druk op een andere toets.";
@@ -1480,6 +1485,7 @@
 "이 Mac에만" = "Alleen op deze Mac";
 "공유 폴더에" = "In een gedeelde map";
 "이 Mac의 기본 폴더로 옮겨요" = "Zet de lijst in de eigen map van deze Mac";
+"이 Mac의 기본 폴더" = "de eigen map van deze Mac";
 "지금 여기 있어요 · %@" = "Staat nu hier · %@";
 "iCloud Drive 같은 폴더를 골라요" = "Kies een map zoals iCloud Drive";
 "백업" = "Back-ups";

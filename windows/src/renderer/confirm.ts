@@ -15,7 +15,7 @@ export interface ConfirmQuestion {
   buttons: { label: string; kind: "primary" | "ghost" | "danger"; clay?: boolean }[];
   cancelId: number;
   /**
-   * #253 (docs/plans/widget-ask-cases.json `questions`): its answer replaces the whole list (a backup, a shared folder's
+   * #253 (shared/cases/widget-ask-cases.json `questions`): its answer replaces the whole list (a backup, a shared folder's
    * list): while it waits, the day sheet's 넣기 and 되돌리기 wait too. Written on the line with the question's message.
    */
   replacesList?: boolean;

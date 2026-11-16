@@ -75,8 +75,11 @@ struct AutoBackupGroup: View {
                     .lineLimit(1)
                 OpenFolderButton(help: L("Finder에서 백업 폴더 열기")) { book.openFolder() }
             }
-            FolderPath(url: book.chosenFolder ?? book.defaultFolder)
-                .padding(.leading, FolderPath.indent)
+            // #388: the default folder sits inside the app's own folder: 이 Mac (기본) and 폴더 열기 say enough.
+            if let chosen = book.chosenFolder {
+                FolderPath(url: chosen)
+                    .padding(.leading, FolderPath.indent)
+            }
         }
         .padding(.vertical, 9)
         .settingsRow()
@@ -99,7 +102,10 @@ struct AutoBackupGroup: View {
         do {
             try book.copy(.manual)
         } catch {
-            SlipAlert.inform(title: L("자동 백업"), message: L("백업하지 못했어요. 지금 목록은 그대로예요."))
+            if SlipAlert.inform(title: L("자동 백업"), message: L("백업하지 못했어요. 지금 목록은 그대로예요."),
+                                detail: L("백업 폴더를 열어 확인해 주세요."), next: L("백업 폴더 열기")) {
+                book.openFolder()
+            }
         }
     }
 
@@ -114,7 +120,10 @@ struct AutoBackupGroup: View {
         TestHooks.activate()
         guard panel.runModal() == .OK, let folder = panel.url else { return }
         if !book.choose(folder) {
-            SlipAlert.inform(title: L("백업 폴더"), message: L("저장 폴더 안에는 백업을 둘 수 없어요."), detail: L("다른 폴더를 골라 주세요."))
+            if SlipAlert.inform(title: L("백업 폴더"), message: L("저장 폴더 안에는 백업을 둘 수 없어요."), detail: L("다른 폴더를 골라 주세요."),
+                                next: L("다른 폴더…")) {
+                chooseFolder()
+            }
         }
     }
 }

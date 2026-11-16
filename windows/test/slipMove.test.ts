@@ -8,10 +8,10 @@ import {
   widgetPressWhileUp, type AskedUp, type WidgetOutcome, type WidgetPress,
 } from "../src/core/slipMove";
 
-// 질문 쪽지 옮기기 · 막힌 클릭 (#228 · #229): the shared cases from docs/plans/slip-move-cases.json (the Mac's
+// 질문 쪽지 옮기기 · 막힌 클릭 (#228 · #229): the shared cases from shared/cases/slip-move-cases.json (the Mac's
 // test-slip-move.sh and test-presentation.sh read the same file).
 type Box = [number, number, number, number];
-const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "slip-move-cases.json"), "utf8")) as {
+const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "slip-move-cases.json"), "utf8")) as {
   head: number; keep: number;
   drag: { case: string; slip: Box; area: Box | null; by: [number, number]; to: [number, number] }[];
   clicks: { case: string; up: "question" | "settings"; click: string; then: "nudge" | "works" }[];
@@ -111,8 +111,8 @@ test("slip place: kept per display, opened there again unless the display change
 });
 
 // #253: what works on the desktop calendar widgets and their day sheet while a question waits — the shared cases from
-// docs/plans/widget-ask-cases.json (the Mac's test-slip-move.sh and test-presentation.sh read the same file).
-const asked = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "widget-ask-cases.json"), "utf8")) as {
+// shared/cases/widget-ask-cases.json (the Mac's test-slip-move.sh and test-presentation.sh read the same file).
+const asked = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "widget-ask-cases.json"), "utf8")) as {
   questions: { case: string; question: string; message: string | { mac: string; windows: string }; replacesList: boolean; apps?: string[] }[];
   presses: { case: string; up: AskedUp; press: WidgetPress; over?: boolean; then: WidgetOutcome }[];
   levels: { case: string; top: string[] };

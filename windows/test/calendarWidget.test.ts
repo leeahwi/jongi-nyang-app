@@ -17,11 +17,11 @@ import type { TodoItem } from "../src/core/notebook";
 import { addedHidden, hiddenSpaces, isHiddenSpace, readDeviceRules } from "../src/core/spaceDevice";
 import { parseTodoSpaces, readSpaceLine } from "../src/core/todoSpaces";
 
-// 바탕화면 달력 위젯 (#234): the shared cases from docs/plans/calendar-widget-cases.json (the Mac's
+// 바탕화면 달력 위젯 (#234): the shared cases from shared/cases/calendar-widget-cases.json (the Mac's
 // scripts/test-calendar-widget.sh reads the same file) — what each kind shows, the day sheet, the opacity rules, places on
 // displays, the quick entry's reading, the stored settings and when a widget draws again.
 type Json = Record<string, unknown>;
-const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "docs", "plans", "calendar-widget-cases.json"), "utf8")) as Json;
+const file = JSON.parse(fs.readFileSync(path.resolve(process.cwd(), "..", "shared", "cases", "calendar-widget-cases.json"), "utf8")) as Json;
 const langs: Lang[] = ["ko", "en", "nl"];
 
 /** "2026-11-06T15:00:00" on this PC's wall clock. */

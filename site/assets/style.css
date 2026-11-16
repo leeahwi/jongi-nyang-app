@@ -609,7 +609,7 @@ section { position: relative; z-index: 1; padding: 140px 0 0; }
 .foot .brand { color: var(--ink); font-size: 19px; }
 .foot .brand img { width: 30px; height: 30px; }
 .foot .about p { color: var(--ink-2); margin: 10px 0 0; max-width: 20em; line-height: 1.55; }
-.foot h4 { margin: 4px 0 10px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.curtain .foot h3 { margin: 4px 0 10px; font-size: 13px; line-height: inherit; letter-spacing: 0; font-weight: 600; color: var(--ink-2); }
 .foot ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px 20px; }
 .foot .two { grid-template-columns: repeat(2, max-content); }
 .foot a { color: var(--ink); text-decoration: none; white-space: nowrap; transition: opacity .2s ease-in-out; }
@@ -687,8 +687,11 @@ html:has(.subnav) { scroll-padding-top: calc(var(--bar-h) + 72px); }
 .doc ul, .doc ol { margin: 0 0 14px; padding-left: 22px; }
 .doc li + li { margin-top: 8px; }
 .doc strong { color: var(--ink); }
-.doc code { font: .86em var(--mono); background: var(--paper-2); border-radius: 6px; padding: 1px 6px; overflow-wrap: anywhere; word-break: normal; }
-@media (min-width: 601px) { .doc code { white-space: nowrap; } }
+/* Paths and commands stay in one piece (#396). On a phone only the long Mac paths wrap, at the <wbr> after a slash. */
+.doc code { font: .86em var(--mono); background: var(--paper-2); border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+.doc code:has(wbr) { white-space: normal; overflow-wrap: normal; word-break: keep-all; }
+@media (min-width: 601px) { .doc code:has(wbr) { white-space: nowrap; } }
+.doc .code-word { white-space: nowrap; } /* a path or command and the Korean particle after it, e.g. `backups`에 */
 .dark .doc > h2, .dark .doc h3, .dark .doc strong { color: var(--on-dark); }
 .dark .doc p, .dark .doc li, .dark .doc dd { color: var(--on-dark-2); }
 .dark .doc code { background: rgba(243, 238, 226, .1); color: var(--on-dark); }

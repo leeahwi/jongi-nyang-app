@@ -227,7 +227,7 @@ public enum Intent {
 
     /// The button that puts the picked reading in (#240, D3 B): it says what happens — "일정 넣기", "할 일 넣기",
     /// "타이머 시작", "집중 시작", "알람 맞추기", "메모 넣기", "반복 할 일 넣기"; "넣기" while nothing is read yet. Tab moves it
-    /// with the chip. The same words on Windows (intent.ts: actionText) and in docs/plans/quick-entry-button-cases.json.
+    /// with the chip. The same words on Windows (intent.ts: actionText) and in shared/cases/quick-entry-button-cases.json.
     public static func actionText(_ candidate: Candidate?, language: AppLanguage = .ko) -> String {
         let words: [String]
         switch candidate {

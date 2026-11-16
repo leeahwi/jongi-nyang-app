@@ -11,6 +11,16 @@ export const sharedFiles = ["todos.json", "memos.json", "repeats.json", "events.
 export type SharedFile = typeof sharedFiles[number];
 export const storageFileName = "storage.json";
 
+/**
+ * #67: the shared folder is looked at every 30 seconds by size, time and inode (no read); every this-many looks the
+ * files are read whole, for folders that keep times oddly. Every fifth look (2.5 minutes) while there is no working
+ * change watch; every twentieth (10 minutes) once the folder's watch has reported a change of a shared file, so the
+ * system is known to say when one changes.
+ */
+export function deepLookEvery(watchHeard: boolean): number {
+  return watchHeard ? 20 : 5;
+}
+
 export function parseStorageFile(text: string): string | undefined {
   try {
     const value = JSON.parse(text) as { folder?: unknown };

@@ -143,14 +143,24 @@ struct QuickEntryView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 4)
                 SlipFooter {
-                    HStack(spacing: 10) {
-                        KeyHint(key: "Tab", label: L("다른 뜻"))
-                        KeyHint(key: "Esc", label: L("닫기"))
+                    // #387: the button keeps all its words ("Herhalende taak toevoegen"); when they leave no room,
+                    // the hints keep only their keycaps. The priority lets the hints measure before the spacer.
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 10) {
+                            KeyHint(key: "Tab", label: L("다른 뜻"))
+                            KeyHint(key: "Esc", label: L("닫기"))
+                        }
+                        HStack(spacing: 6) {
+                            KeyCap("Tab").help(L("다른 뜻"))
+                            KeyCap("Esc").help(L("닫기"))
+                        }
                     }
+                    .layoutPriority(1)
                 } trailing: {
                     // #240 (D3 B): the button says what Return makes, and follows the picked chip (Tab).
                     Button(Intent.actionText(candidates.isEmpty ? nil : candidates[index], language: .current)) { submit(literal: false, asEvent: false) }
                         .buttonStyle(SlipButtonStyle(role: .primary, key: "↩"))
+                        .fixedSize()
                         .disabled(candidates.isEmpty)
                 }
                 // The toast takes the footer's place (it was drawn over the hints and the button).

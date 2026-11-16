@@ -50,13 +50,18 @@ public enum MemoFile {
     /// Returns what was written, so the app can tell its own file from another device's.
     @discardableResult
     public static func save(_ memos: [Memo], to url: URL) throws -> Data {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        let data = try encode(memos)
+        try data.write(to: url, options: .atomic)
+        return data
+    }
+
+    /// memos.json's bytes (#411: SyncedJSONFile writes them).
+    public static func encode(_ memos: [Memo]) throws -> Data {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let data = try encoder.encode(Contents(memos: memos))
-        try data.write(to: url, options: .atomic)
-        return data
+        return try encoder.encode(Contents(memos: memos))
     }
 
     /// Another device saved memos while this one had changes of its own (`base`: the file as

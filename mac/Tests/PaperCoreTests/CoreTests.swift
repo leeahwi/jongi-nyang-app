@@ -217,6 +217,20 @@ private enum CoreTests {
             try expect(Archive.due([legacy], now: Date(), after: .week).count == 1, "Undated finished work moves at the first check")
         }
 
+        try test("B1–B12 the day turns over at 04:00 on the wall clock, daylight saving days too (day-boundary-cases.json, #386)") {
+            let data = try Data(contentsOf: URL(fileURLWithPath: "../shared/cases/day-boundary-cases.json"))
+            let cases = (try JSONSerialization.jsonObject(with: data) as! [String: Any])["cases"] as! [[String: String]]
+            let iso = ISO8601DateFormatter()
+            for entry in cases {
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(identifier: entry["timeZone"]!)!
+                let now = iso.date(from: entry["now"]!)!
+                try expectEqual(Archive.dayKey(now, calendar: calendar), entry["dayKey"]!, "\(entry["id"]!) day")
+                try expectEqual(Archive.logicalDayStart(now, calendar: calendar), iso.date(from: entry["dayStart"]!)!, "\(entry["id"]!) start")
+            }
+            try expect(cases.count >= 12, "All the shared cases")
+        }
+
         try test("archiving leaves undo history so undo can't bring tasks back") {
             var history = UndoableNotebook()
             let item = history.add("끝난 일")!

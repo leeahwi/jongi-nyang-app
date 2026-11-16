@@ -1,7 +1,7 @@
 #!/bin/bash
 # 종이 테마 열다섯 가지 (#244, PaperKind.swift · PaperLook.swift): the papers and their names, the paper drawn and the system
 # controls' lightness, the drawer with 노트와 같은 종이, 1.47's settings moved, what is saved read back, the widget's paper
-# and the tiles' order — the shared cases from docs/plans/paper-themes-cases.json (the Windows app's test/paper.test.ts reads
+# and the tiles' order — the shared cases from shared/cases/paper-themes-cases.json (the Windows app's test/paper.test.ts reads
 # the same file). The colours: scripts/test-contrast.sh.
 set -euo pipefail
 task_root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -21,7 +21,7 @@ swiftc -warnings-as-errors -parse-as-library \
     Sources/PaperCore/PaperLook.swift \
     Tests/PaperCoreTests/PaperThemesTests.swift \
     -o .build/checks/PaperThemesTests
-.build/checks/PaperThemesTests ../docs/plans/paper-themes-cases.json
+.build/checks/PaperThemesTests ../shared/cases/paper-themes-cases.json
 
 # 8-3 · W3: picking a paper redraws every open window once (between two light papers too) and nothing while idle. The
 # windows are drawn to bitmaps and never shown.

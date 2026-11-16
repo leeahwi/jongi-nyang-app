@@ -263,7 +263,7 @@ public enum CalendarMonth {
     /// every repeat is faded. A day the copy shows on has no repeat (it isn't drawn twice), and once today's copy is done
     /// (placed today, none open) the repeats start tomorrow. A line opens the open copy (`taskId`), or the rule when there
     /// is none. Each day's repeats go by their time, then title (no time last). Same rule and shared cases as Windows
-    /// (calendar.ts `repeatsOn`, docs/plans/calendar-flows-cases.json `repeats`).
+    /// (calendar.ts `repeatsOn`, shared/cases/calendar-flows-cases.json `repeats`).
     public static func repeats(on days: Set<String>, series: [Series], tasks: [TodoItem], now: Date, ranges: Bool = true,
                                calendar: Calendar = .paper, language: AppLanguage = .ko) -> [String: [DayTask]] {
         guard !series.isEmpty else { return [:] }

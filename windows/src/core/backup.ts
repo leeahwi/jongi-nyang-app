@@ -321,7 +321,7 @@ export function savedWhen(date: Date, now: Date, lang: Lang = "ko", midSentence 
 
 /**
  * 저장과 백업's one line about the backups (#240, D2 C): what the user wants to know first — when the last copy was, or
- * what is wrong — then how they are made. The same words as the Mac's (Backup.status) and docs/plans/storage-summary-cases.json.
+ * what is wrong — then how they are made. The same words as the Mac's (Backup.status) and shared/cases/storage-summary-cases.json.
  */
 export interface BackupStatus { title: string; detail: string; tone: "ok" | "off" | "warn" }
 export function backupStatus(state: { auto: boolean; failed: boolean; missing: boolean; newest?: Date }, now: Date, lang: Lang = "ko"): BackupStatus {

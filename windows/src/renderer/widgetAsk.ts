@@ -2,7 +2,7 @@ import { widgetPressWhileUp, type AskedUp, type WidgetPress } from "../core/slip
 import { paper } from "./api";
 
 /**
- * #253 (docs/plans/widget-ask-cases.json): the desktop calendar widgets and their day sheet aren't held up by a question
+ * #253 (shared/cases/widget-ask-cases.json): the desktop calendar widgets and their day sheet aren't held up by a question
  * (they don't bring in askGuard.ts): they listen for what is up (main/confirm.ts sends "slip:asking" with whether the
  * question replaces the whole list) and wait only where core/slipMove.ts `widgetPressWhileUp` says so. A press that waits
  * brings the question forward and shakes it once (`slipBlocked`); main checks the same rule again for what is put in.
