@@ -18,7 +18,7 @@ CORE=(
     test.sh
     test-ahead.sh test-ai.sh test-alarms.sh test-calendar-flows.sh test-calendar-reminders.sh test-calendar-widget.sh
     test-cat-size.sh test-contrast.sh test-convenience.sh test-daystrip.sh test-defaults-cleanup.sh test-duration.sh
-    test-focus.sh test-intent.sh test-korean-calendar.sh test-markdown.sh test-memo-drawer.sh test-no-network.sh
+    test-focus.sh test-input-history.sh test-intent.sh test-korean-calendar.sh test-markdown.sh test-memo-drawer.sh test-no-network.sh
     test-paper-themes.sh test-pointer-pace.sh test-reminders.sh test-screen-fit.sh test-settings.sh test-shortcuts.sh
     test-slip-move.sh test-space-device.sh test-spaces.sh test-sync-conflicts.sh test-synced-files.sh test-task-reminders.sh
     test-time-labels.sh test-timeblock.sh test-today-window.sh test-typing-cat.sh

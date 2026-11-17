@@ -40,11 +40,11 @@ struct PaperView: View {
 
     var body: some View {
         // 집중: the focus card instead of the sheet while a focus on a to-do runs.
-        FocusSwitch(state: model.timerState) { focusing in
-            if focusing {
+        FocusSwitch(state: model.timerState) { card, focusing in
+            if card {
                 FocusCardView(model: model, state: model.timerState)
             } else {
-                note
+                note(focusing: focusing)
             }
         }
     }
@@ -70,10 +70,16 @@ struct PaperView: View {
             .allowsHitTesting(false)
     }
 
-    private var note: some View {
+    private func note(focusing: Bool) -> some View {
         VStack(spacing: 0) {
             // Above what follows (the tab row's band and the space menu's pill).
             header.zIndex(1)
+            // #529: a focus runs on while its list shows.
+            if focusing {
+                FocusStrip(model: model, state: model.timerState)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 6)
+            }
             if model.page == .ahead {
                 AheadPageView(model: model, previewDrag: previewAheadDrag, previewLine: previewLine)
             } else {

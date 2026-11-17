@@ -706,7 +706,12 @@ test("일반 in the store: renamed through the shared folder, the later name win
   const saved = parseTodoSpaces(fs.readFileSync(path.join(directory, "todo-spaces.json"), "utf8"));
   assert.equal(saved.general?.name, "기타");
   // Another device renames it later: merged on the next change here.
-  fs.writeFileSync(path.join(directory, "todo-spaces.json"), serializeTodoSpaces(renameGeneral(saved, "개인", at("2026-10-28T10:05:00Z"))), "utf8");
+  const file = path.join(directory, "todo-spaces.json");
+  fs.writeFileSync(file, serializeTodoSpaces(renameGeneral(saved, "개인", at("2026-10-28T10:05:00Z"))), "utf8");
+  // Written later than this app's save, as another device would: same size here, and on Windows the time can land on
+  // the same clock tick as the save, so the store would take the file as unchanged (Store.differs).
+  const later = new Date(fs.statSync(file).mtimeMs + 2000);
+  fs.utimesSync(file, later, later);
   store.changeSpaces((data) => addSpace(data, "집", "s-b", "mint"));
   assert.equal(generalName(store.todoSpaces), "개인");
   assert.equal(generalName(store.state().todoSpaces, "en"), "개인");

@@ -63,6 +63,14 @@ export class FocusCard {
   private readonly checkedHere = new Set<string>();
   private shownStage?: string;
   private leaving = false;
+  /** #529: the note's list shows (with `strip` over it) while the focus runs on. */
+  private listMode = false;
+  /** #529: over the list — the to-do, the time left, ⏸ and the way back to the card. note.ts puts it in the note. */
+  readonly strip: HTMLElement;
+  private readonly stripTitle = h("span", { class: "fs-title" });
+  private readonly stripTime = h("span", { class: "fs-time" });
+  private readonly stripPause = h("button", { class: "quiet fs-btn" });
+  private stripTicker?: number;
 
   constructor(private readonly host: FocusCardHost) {
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -75,11 +83,20 @@ export class FocusCard {
     this.play.addEventListener("click", () => this.togglePause());
     const close = h("button", { class: "quiet fc-close", title: t("집중 그만두기 (Esc)"), "aria-label": t("집중 그만두기") }, icon("close", 15));
     close.addEventListener("click", () => this.send({ kind: "askStop" }));
+    // #529: the note's list while the focus runs on.
+    const toList = h("button", { class: "quiet fc-close fc-to-list", title: t("할 일 목록 보기"), "aria-label": t("할 일 목록 보기") }, icon("list", 15));
+    toList.addEventListener("click", () => this.showList());
+    const toCard = h("button", { class: "quiet fs-btn", title: t("집중 화면 보기"), "aria-label": t("집중 화면 보기") }, icon("expand", 13));
+    toCard.addEventListener("click", (event) => { event.stopPropagation(); this.showCard(); });
+    this.stripPause.addEventListener("click", (event) => { event.stopPropagation(); this.togglePause(); });
+    this.strip = h("div", { class: "focus-strip", role: "region", "aria-label": t("집중"), hidden: "" },
+      h("i", { class: "fs-dot", "aria-hidden": "true" }), this.stripTitle, h("span", { class: "spacer" }), this.stripTime, this.stripPause, toCard);
+    this.strip.addEventListener("click", () => this.showCard());
     this.restToggle.addEventListener("click", () => { this.expanded = !this.expanded; this.render(); });
     this.body = h("div", { class: "fc-body" }, this.ring, this.spaceLine, this.task, this.nextLine, this.buttons);
     this.element = h("div", { class: "focus-card", role: "region", "aria-label": t("집중") },
       // The round dots at the right of the top line, before × (as the mock and the Mac).
-      h("div", { class: "fc-top" }, this.kicker, h("span", { class: "spacer" }), this.dots, close),
+      h("div", { class: "fc-top" }, this.kicker, h("span", { class: "spacer" }), this.dots, toList, close),
       this.body,
       // The rest of today: the line, and the list opening below it.
       h("div", { class: "fc-foot" }, this.cat, this.restToggle, h("span", { class: "fc-foot-end" })),
@@ -90,17 +107,44 @@ export class FocusCard {
   }
 
   get visible(): boolean { return !this.element.hidden; }
+  /** #529: a focus runs and the note shows its list (the strip over it). */
+  get listing(): boolean { return this.listMode && this.view !== undefined; }
 
-  /** A new state: the card shows while a session is on. */
+  /** #529: the note's list, the focus running on. */
+  showList(): void {
+    if (!this.view) return;
+    this.listMode = true;
+    if (this.state) this.update(this.state);
+  }
+
+  /** #529: back to the card (the strip, the timer's tag, its menu). */
+  showCard(): void {
+    if (!this.listMode) return;
+    this.listMode = false;
+    if (this.state) this.update(this.state);
+  }
+
+  /** A new state: the card shows while a session is on (or its strip over the list, #529). */
   update(state: TodosState): void {
     this.state = state;
     const view = state.focus;
     const was = this.view;
     this.view = view;
     if (!view) {
+      this.listMode = false;
+      this.hideStrip();
       if (!this.element.hidden) this.hide();
       return;
     }
+    // A new session starts on its card; time up (or a break's end) brings the card back for its buttons.
+    if (was?.startedAt !== view.startedAt || view.stage === "timeUp" || view.stage === "breakOver") this.listMode = false;
+    if (this.listMode) {
+      if (!this.element.hidden) this.hide();
+      document.documentElement.dataset.focus = "list";
+      this.renderStrip();
+      return;
+    }
+    this.hideStrip();
     if (this.element.hidden || was?.startedAt !== view.startedAt) {
       this.host.closeOthers();
       this.expanded = false;
@@ -123,19 +167,48 @@ export class FocusCard {
     this.shownStage = undefined;
   }
 
+  private hideStrip(): void {
+    this.strip.hidden = true;
+    clearTimeout(this.stripTicker);
+    this.stripTicker = undefined;
+  }
+
+  /** #529: the strip's to-do, time left and ⏸, once a second while the time runs. */
+  private renderStrip(): void {
+    clearTimeout(this.stripTicker);
+    this.stripTicker = undefined;
+    const view = this.view, timer = this.state?.timer;
+    if (!view || !this.listMode) return;
+    this.strip.hidden = false;
+    if (this.stripTitle.textContent !== view.title) this.stripTitle.textContent = view.title;
+    this.stripTitle.title = view.title;
+    const paused = !timer || timer.endsAt === undefined;
+    const left = this.remaining();
+    this.stripTime.textContent = paused ? t("멈춤") : timerClock(left);
+    this.strip.classList.toggle("paused", paused);
+    const label = paused ? t("계속 (Space)") : t("일시정지 (Space)");
+    if (this.stripPause.dataset.paused !== String(paused)) {
+      this.stripPause.dataset.paused = String(paused);
+      this.stripPause.replaceChildren(icon(paused ? "play" : "pause", 12, 2));
+    }
+    this.stripPause.title = label;
+    this.stripPause.setAttribute("aria-label", label);
+    if (!paused && left > 0) this.stripTicker = window.setTimeout(() => this.renderStrip(), (left % 1000 || 1000) + 5);
+  }
+
   private send(command: FocusCommand): void {
     void api.act({ type: "focus", command });
   }
 
   /** Esc on the note while the card is up: the question first. */
   escape(): void {
-    if (this.visible) this.send({ kind: "askStop" });
+    if (this.visible || this.listing) this.send({ kind: "askStop" });
   }
 
   /** ⏸ / ▶ (and Space): the time stops or goes on, while it runs (a focus or a break). */
   togglePause(): void {
     const stage = this.view?.stage;
-    if (!this.visible || !this.state?.timer || (stage !== "running" && stage !== "break")) return;
+    if ((!this.visible && !this.listing) || !this.state?.timer || (stage !== "running" && stage !== "break")) return;
     void api.act({ type: "timerCommand", command: { kind: "togglePause" } });
   }
 

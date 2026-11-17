@@ -22,7 +22,7 @@ const send = new Set([
   "popup:interactive", "popup:complete", "popup:complete-all", "popup:snooze", "popup:snooze-until", "popup:tomorrow", "popup:event-again", "popup:sweep", "popup:open", "popup:open-event", "popup:closed",
   "floating:drag-start", "floating:drag", "floating:drag-end", "floating:click", "floating:menu",
   "pet:ready", "pet:interactive", "pet:click", "pet:answer", "pet:open-note", "pet:menu", "pet:drag-start", "pet:drag", "pet:drag-end",
-  "timer:ready", "timer:interactive", "timer:toggle", "timer:pause", "timer:stop", "timer:dismiss", "timer:menu",
+  "timer:ready", "timer:interactive", "timer:toggle", "timer:pause", "timer:stop", "timer:dismiss", "timer:again", "timer:menu",
   "timer:drag-start", "timer:drag", "timer:drag-end", "quick:close",
   "quickMemo:draft", "quickMemo:close", "quickMemo:save", "timerSheet:start", "timerSheet:close", "ring:ready", "ring:stop", "ring:snooze",
   "slip:size", "confirm:answer", "confirm:ready", "glance:close", "glance:size",

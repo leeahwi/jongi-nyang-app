@@ -49,13 +49,14 @@ final class NoteWindow: NSWindow {
     var onTimetableKey: ((NSEvent) -> Bool)?
 
     /// Turns a key press into a list command, unless someone is typing. In an empty input
-    /// line, ↑ leaves the line and selects the last row.
+    /// line, ⌥↑ leaves the line and selects the last row (#528: ↑ there brings back the lines put in before).
     private func listKey(for event: NSEvent) -> AppModel.ListKey? {
         let flags = event.modifierFlags.intersection([.command, .option, .control, .shift])
         let typing = firstResponder is NSText
         if typing {
-            guard flags.isEmpty, let editor = firstResponder as? NSText, editor.string.isEmpty else { return nil }
-            return event.keyCode == 126 ? .upFromInput : event.keyCode == 125 ? .downFromInput : nil
+            guard let editor = firstResponder as? NSText, editor.string.isEmpty else { return nil }
+            if flags == [.option], event.keyCode == 126 { return .upFromInput }
+            return flags.isEmpty && event.keyCode == 125 ? .downFromInput : nil
         }
         switch (event.keyCode, flags) {
         case (126, []): return .up

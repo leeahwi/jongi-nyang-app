@@ -185,6 +185,15 @@ final class AppModel: ObservableObject {
     @Published var timerSize: TimerSize { didSet { preferences.set(timerSize.rawValue, forKey: "timer.size") } }
     /// Typed timer lengths (직접 정하기), newest first, for every timer menu.
     @Published private(set) var timerRecent: [Int] { didSet { preferences.set(timerRecent, forKey: "timer.recent") } }
+    /// #528: the lines put in on the input line, for ↑ · ↓ (this Mac only; not in the shared folder).
+    private var inputHistory = InputHistory()
+    /// A line went in (#528): the newest for ↑.
+    func rememberLine(_ line: String) {
+        inputHistory.add(line)
+        preferences.set(inputHistory.entries, forKey: "input.history")
+    }
+    /// ↑ (`up`) or ↓ on the input line holding `text`: the line's new text, or nil when the key is the field's own (#528).
+    func stepInputHistory(up: Bool, text: String) -> String? { inputHistory.step(up: up, text: text) }
     func rememberTimer(_ minutes: Int) {
         let recent = TimerLength.remember(minutes, in: timerRecent)
         if recent != timerRecent { timerRecent = recent }
@@ -739,6 +748,7 @@ final class AppModel: ObservableObject {
         paperNight = PaperLook.readNight(store.object(forKey: "paper.night"))
         quickMemoEnabled = flag("quickMemo.enabled", true)
         timerRecent = TimerLength.cleaned((store.array(forKey: "timer.recent") as? [Int]) ?? [])
+        inputHistory = InputHistory(entries: (store.array(forKey: "input.history") as? [String]) ?? [])
         pomodoroAutoContinue = flag("pet.autoContinue", true)
         timerSize = TimerSize(rawValue: store.string(forKey: "timer.size") ?? "") ?? .regular
         timerSound = flag("pet.sound", true)
@@ -1573,8 +1583,19 @@ final class AppModel: ObservableObject {
     /// whether the key was used. `fromEmptyInput`: ↑ pressed in an empty input line.
     @discardableResult
     func handleListKey(_ key: ListKey) -> Bool {
-        // 집중: the card takes Esc (it asks first); the list's keys rest meanwhile.
-        if timerState.isFocusing {
+        // 집중: the card takes Esc (it asks first); the list's keys rest meanwhile. #529: with the list shown, the keys work
+        // on it — but Space pauses, and Esc (nothing picked) asks to stop.
+        if timerState.isFocusing, timerState.showsList, !showsGuide {
+            switch key {
+            case .toggle:
+                petCommand(.focusStep(.togglePause))
+                return true
+            case .clear where selectedTaskID == nil && !focusPicking:
+                petCommand(.focusStep(.askToStop))
+                return true
+            default: break
+            }
+        } else if timerState.isFocusing {
             guard !showsGuide else { return false }
             switch key {
             case .clear: petCommand(.focusStep(.askToStop))

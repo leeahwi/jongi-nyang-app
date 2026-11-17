@@ -1,0 +1,26 @@
+{
+  "about": "#528: ↑ · ↓ in the input line bring back lines put in before (Mac PaperCore/InputHistory.swift · Windows core/inputHistory.ts). `steps`: a key pressed with the line's text then; `result` is the line's new text, or null when the key is the field's own (the caret moves). `added`: the history after a line is put in. Words are made up.",
+  "limit": 50,
+  "steps": [
+    { "case": "↑ on an empty line brings back the newest line, ↑ again the one before", "entries": ["장보기", "우유 사기", "보고서 25분 집중"],
+      "keys": [ { "key": "up", "text": "", "result": "보고서 25분 집중" }, { "key": "up", "text": "보고서 25분 집중", "result": "우유 사기" } ] },
+    { "case": "↓ goes back toward the newest, and past it to an empty line", "entries": ["장보기", "우유 사기"],
+      "keys": [ { "key": "up", "text": "", "result": "우유 사기" }, { "key": "up", "text": "우유 사기", "result": "장보기" },
+                { "key": "down", "text": "장보기", "result": "우유 사기" }, { "key": "down", "text": "우유 사기", "result": "" },
+                { "key": "down", "text": "", "result": null } ] },
+    { "case": "at the oldest line ↑ stays there (the key is still taken)", "entries": ["장보기"],
+      "keys": [ { "key": "up", "text": "", "result": "장보기" }, { "key": "up", "text": "장보기", "result": "장보기" } ] },
+    { "case": "a line with words typed keeps its ↑ (the caret moves)", "entries": ["장보기"],
+      "keys": [ { "key": "up", "text": "우유", "result": null } ] },
+    { "case": "a line brought back and then changed stops the walk: ↑ is the field's again", "entries": ["장보기", "우유 사기"],
+      "keys": [ { "key": "up", "text": "", "result": "우유 사기" }, { "key": "up", "text": "우유 사기 2개", "result": null },
+                { "key": "up", "text": "", "result": "우유 사기" } ] },
+    { "case": "no lines yet: ↑ is the field's own", "entries": [],
+      "keys": [ { "key": "up", "text": "", "result": null }, { "key": "down", "text": "", "result": null } ] }
+  ],
+  "add": [
+    { "case": "a line goes in as the newest, trimmed", "entries": ["장보기"], "line": "  우유 사기 ", "added": ["장보기", "우유 사기"] },
+    { "case": "the same line again moves to the newest, kept once", "entries": ["장보기", "우유 사기"], "line": "장보기", "added": ["우유 사기", "장보기"] },
+    { "case": "an empty line isn't kept", "entries": ["장보기"], "line": "   ", "added": ["장보기"] }
+  ]
+}

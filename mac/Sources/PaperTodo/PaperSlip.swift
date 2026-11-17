@@ -834,7 +834,8 @@ struct PlainSlipField: NSViewRepresentable {
     }
 
     private func update(_ field: NSTextField) {
-        if field.stringValue != text { field.stringValue = text }
+        // #526: not over a syllable being composed (see IntentField.update).
+        if field.stringValue != text, !field.isComposing { field.stringValue = text }
         let font = NSFont.systemFont(ofSize: size)
         if field.font != font { field.font = font }
         field.textColor = NSColor(PaperTheme.ink)

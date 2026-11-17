@@ -9,13 +9,15 @@ import type { Lang } from "./lang";
 
 /** Everything the timer window draws; sent from the main process on every change. */
 export interface TimerPayload {
-  /** Absent once a countdown has finished: only its message is left, for a moment. */
+  /** Absent once a countdown has finished: its message is left (with `done`). */
   timer?: FocusTimer;
   message?: string;
   /** TimerSize: the whole page drawn larger or smaller. */
   scale?: number;
   /** 집중 with the note away: the task's title on the board (a click brings the note back). */
   focus?: string;
+  /** #527: a countdown of this many minutes ran out — the tag offers 다시 시작 and 닫기 until it is put away. */
+  done?: number;
 }
 
 /** The transparent window at 보통: the cat holding the board at the bottom centre, the bubble above. */

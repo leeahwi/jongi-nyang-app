@@ -1269,6 +1269,46 @@ private enum PresentationTests {
             try expectEqual(model.focusLog.url.deletingLastPathComponent().standardizedFileURL, fixture.folder.standardizedFileURL, "in the storage folder")
         }
 
+        try await test("#529: a focus with its list shown — the list's keys work, Space pauses, Esc asks once nothing is picked") {
+            let fixture = try Fixture(items: [("읽기", false), ("장보기", false)])
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            var commands: [PetCommand] = []
+            model.onPetCommand = { commands.append($0) }
+            model.finishGuide()
+            model.timerState.session = .focus(taskId: "T", title: "읽기", minutes: 25, now: Date())
+            model.timerState.showsList = true
+            try expect(model.handleListKey(.down), "↓ picks a row")
+            try expect(model.selectedTaskID != nil, "a row is picked")
+            try expect(model.handleListKey(.toggle), "Space used")
+            try expectEqual(commands, [.focusStep(.togglePause)], "Space pauses the focus (the row stays open)")
+            try expect(!model.items.contains { $0.isCompleted }, "nothing was ticked")
+            try expect(model.handleListKey(.clear), "Esc used")
+            try expect(model.selectedTaskID == nil, "Esc lets go of the row first")
+            try expectEqual(commands.count, 1, "and doesn't ask yet")
+            try expect(model.handleListKey(.clear), "Esc used again")
+            try expectEqual(commands.last, .focusStep(.askToStop), "then it asks to stop")
+            model.timerState.showsList = false
+            try expect(!model.handleListKey(.down), "the card again: ↓ rests")
+        }
+
+        try await test("#529: the card comes back from the list when the time is up") {
+            let fixture = try Fixture(items: [("읽기", false)])
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            let timer = FocusTimerController(model: model, preferences: fixture.preferences)
+            @MainActor func wait(_ seconds: Double) { RunLoop.main.run(until: Date().addingTimeInterval(seconds)) }
+            model.timerState.session = .focus(taskId: "T", title: "읽기", minutes: 1, now: Date().addingTimeInterval(-90))
+            model.timerState.timer = model.timerState.session?.timer
+            model.timerState.showsList = true
+            NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
+            wait(0.2)
+            try expect(!model.timerState.showsList, "time up: the card's buttons are next")
+            try expectEqual(model.timerState.timeUps, 1, "announced once")
+            timer.command(.stop)
+            try expect(!model.timerState.showsList && !model.timerState.isFocusing, "ended")
+        }
+
         try await test("focus: the menu bar shows ● and the time while focusing, the time for a plain timer, nothing paused") {
             let fixture = try Fixture(items: [("읽기", false)])
             defer { fixture.cleanup() }
@@ -1282,6 +1322,31 @@ private enum PresentationTests {
             timer.pause(at: now)
             try expectEqual(MenuBarState.current(model: model, timer: timer, focusing: true, now: now).text, "", "paused")
             try expect(MenuBarState.current(model: model, timer: timer, now: now).accessibility.contains(words[1]), "VoiceOver still hears a paused time")
+        }
+
+        try await test("#527: a plain timer that ran out stays up (다시 시작 · 닫기) until it is put away") {
+            let fixture = try Fixture(items: [])
+            defer { fixture.cleanup() }
+            let model = fixture.model()
+            let timer = FocusTimerController(model: model, preferences: fixture.preferences)
+            @MainActor func wait(_ seconds: Double) { RunLoop.main.run(until: Date().addingTimeInterval(seconds)) }
+            let ran = FocusTimer.countdown(minutes: 1, now: Date().addingTimeInterval(-90))
+            model.timerState.session = FocusSession(timer: ran, segmentStart: Date().addingTimeInterval(-90))
+            model.timerState.timer = ran
+            // The wake check ticks at once (the tick would come within a second anyway).
+            NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
+            wait(0.2)
+            try expectEqual(model.timerState.doneMinutes, 1, "the finished length is kept for 다시 시작")
+            try expect(model.timerState.timer == nil, "the timer itself is over")
+            try expectEqual(model.timerState.message, L("\(1)분 끝났어요!"), "the message is up")
+            try expect(timer.isVisible, "the tag is up")
+            // Nothing is timed to take it away (it was 10 seconds).
+            wait(0.5)
+            try expect(timer.isVisible && model.timerState.message != nil, "still up: nothing takes it away by itself")
+            timer.command(.countdown(minutes: 1))
+            try expect(model.timerState.doneMinutes == nil && model.timerState.timer != nil, "다시 시작: the same length runs again")
+            timer.command(.stop)
+            try expect(!timer.isVisible && model.timerState.doneMinutes == nil, "닫기 puts it away")
         }
 
         try await test("handwriting: a title's last letter keeps its ink inside the frame (Ahead, coffee, koffie)") {
@@ -1411,7 +1476,7 @@ private enum PresentationTests {
             try expectEqual(suite.defaults.string(forKey: StorageFolder.preferenceKey), folder.path, "The folder stays chosen")
             // Gone again: 이 Mac 목록 열기 opens this Mac's own list for this run, the folder still chosen.
             try FileManager.default.removeItem(at: folder)
-            let local = StorageFolder.waitForChosen(suite.defaults) { _, _ in 0 }
+            let local = StorageFolder.waitForChosen(suite.defaults, ask: { _, _ in 0 })
             try expect(local.folder == nil && local.missing == folder.path, "This Mac's list, saying which folder is missing")
             try expect(!FileManager.default.fileExists(atPath: folder.path), "The missing folder isn't made")
             // Nothing chosen: nothing to wait for.
@@ -1980,6 +2045,21 @@ private enum PresentationTests {
             settle()
             try expectEqual(field.stringValue, "", "Esc empties the line")
             try expectEqual(field.frame.height, line, "Esc: one line again")
+            // #526: a syllable being composed (한글 입력기) calls no controlTextDidChange, so the line's text lags behind the
+            // field; a redraw then must not write it back over the syllable (‘가끔’ came in as ‘가ㄲㅡㅁ’).
+            editor.insertText("가", replacementRange: editor.selectedRange())
+            editor.setMarkedText("ㄲ", selectedRange: NSRange(location: 1, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+            model.objectWillChange.send()
+            settle()
+            try expect(editor.hasMarkedText(), "#526: the syllable being composed survives a redraw")
+            try expectEqual(field.stringValue, "가ㄲ", "#526: the line keeps what is being composed")
+            editor.insertText("끄", replacementRange: editor.markedRange())
+            settle()
+            try expectEqual(field.stringValue, "가끄", "#526: the composed syllable goes in")
+            try expect((field.delegate as! IntentField.Coordinator).control(field, textView: editor, doCommandBy: #selector(NSResponder.cancelOperation(_:))),
+                       "Esc is taken")
+            settle()
+            try expectEqual(field.stringValue, "", "Esc empties the line again")
             // Return puts it in (a memo, or a to-do of its first line); ⌘Z brings the lines back.
             paste("장보기 목록\n우유\n달걀\n빵\n사과\n휴지")
             let memos = model.memos.count, items = model.items.count
@@ -1989,6 +2069,17 @@ private enum PresentationTests {
             try expect(model.memos.count + model.items.count == memos + items + 1, "Return made one thing")
             try expectEqual(field.stringValue, "", "Return empties the line")
             try expectEqual(field.frame.height, line, "Return: one line again")
+            // #528: ↑ on the empty line brings back what went in (the caret at its end); ↓ goes back to the empty line.
+            let coordinator = field.delegate as! IntentField.Coordinator
+            try expect(coordinator.control(field, textView: editor, doCommandBy: #selector(NSResponder.moveUp(_:))), "#528: ↑ on the empty line is taken")
+            settle()
+            try expectEqual(field.stringValue, "장보기 목록\n우유\n달걀\n빵\n사과\n휴지", "#528: ↑ brings back the line put in")
+            if let now = field.currentEditor() {
+                try expectEqual(now.selectedRange.location, (field.stringValue as NSString).length, "#528: the caret at the end")
+            }
+            try expect(coordinator.control(field, textView: field.currentEditor() as! NSTextView, doCommandBy: #selector(NSResponder.moveDown(_:))), "#528: ↓ is taken")
+            settle()
+            try expectEqual(field.stringValue, "", "#528: ↓ goes back to the empty line")
             let commandZ = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0, windowNumber: window.windowNumber,
                                             context: nil, characters: "z", charactersIgnoringModifiers: "z", isARepeat: false, keyCode: 6)!
             try expect(field.performKeyEquivalent(with: commandZ), "⌘Z is taken while the toast is up")

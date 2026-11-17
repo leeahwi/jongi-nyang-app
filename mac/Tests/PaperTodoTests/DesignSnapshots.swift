@@ -1058,7 +1058,7 @@ enum DesignSnapshots {
                 state.timer = FocusTimer.pomodoro(PomodoroSettings(), now: start).next(at: start.addingTimeInterval(25 * 60))
                 state.message = L("집중 끝! \(5)분 쉬어요")
             }),
-            ("done", { $0.message = L("\(25)분 끝났어요!") }),
+            ("done", { $0.message = L("\(25)분 끝났어요!"); $0.doneMinutes = 25 }),
         ]
         for (name, configure) in timerStates {
             let state = FocusTimerState()

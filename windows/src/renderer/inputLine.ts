@@ -1,5 +1,6 @@
 import { actionText, chipText, intentProblem, readIntent, slashHint, slashOf, type Candidate, type IntentKind, type IntentPrefer } from "../core/intent";
 import { findSpace, generalName, readSpaceLine, spaceColor, spaceLineProblem, takesSpace, type SpaceChoice, type SpaceToken, type TodoSpaces } from "../core/todoSpaces";
+import { InputHistory } from "../core/inputHistory";
 import { h, icon, lang, t } from "./api";
 import { restCaret } from "./caretRest";
 import { keyCap } from "./slip";
@@ -33,8 +34,10 @@ export interface InputLineOptions {
   spaces?: () => { data: TodoSpaces; lens?: string } | undefined;
   /** Put `candidate` in (the line clears when it returns true); `space` for a to-do. */
   commit: (candidate: Candidate, candidates: Candidate[], text: string, space?: SpaceChoice) => Promise<boolean> | boolean;
-  /** ↑ in the empty line (the note steps into its list). */
+  /** Alt+↑ in the empty line (the note steps into its list; #528: ↑ alone brings back the lines put in before). */
   onArrowUp?: (event: KeyboardEvent) => void;
+  /** #528: ↑ · ↓ bring back the lines put in before (the note's and the 오늘 창's line). */
+  history?: boolean;
   onEscape?: (event: KeyboardEvent) => void;
   /** The text or the readings changed (the quick entry's window fits itself). */
   onChange?: () => void;
@@ -279,7 +282,21 @@ export class InputLine {
       void this.submit(event.ctrlKey || event.metaKey);
       return;
     }
-    if (event.key === "ArrowUp" && !text && this.options.onArrowUp) this.options.onArrowUp(event);
+    const plain = !event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
+    if (plain && this.options.history && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+      // An empty line isn't walking: read the lines again (another window may have put one in).
+      if (text === "") history = undefined;
+      const line = sharedHistory().step(event.key === "ArrowUp", text);
+      if (line !== null) {
+        event.preventDefault();
+        this.set(line);
+        this.field.setSelectionRange(line.length, line.length);
+        return;
+      }
+    }
+    if (event.key === "ArrowUp" && event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey && !text && this.options.onArrowUp) {
+      this.options.onArrowUp(event);
+    }
     if (event.key === "Escape") this.options.onEscape?.(event);
   }
 
@@ -305,7 +322,10 @@ export class InputLine {
     try {
       const space = takesSpace(candidate) ? this.spaceChoices[this.spacePicked] : undefined;
       const done = await this.options.commit(candidate, candidates, text, space);
-      if (done) this.clear();
+      if (done) {
+        if (this.options.history) rememberLine(text);
+        this.clear();
+      }
       return done;
     } finally {
       this.busy = false;
@@ -317,4 +337,23 @@ export class InputLine {
  *  footer can keep only the keycaps (#387). */
 export function lineKeys(): HTMLElement[] {
   return [["Tab", t("다른 뜻")], ["Esc", t("닫기")]].map(([key, word]) => h("span", { title: word }, keyCap(key), h("span", { class: "word" }, word)));
+}
+
+// #528: the lines put in, for ↑ · ↓ — this device only (the pages' own storage, not the shared folder).
+const historyKey = "input.history";
+let history: InputHistory | undefined;
+function sharedHistory(): InputHistory {
+  if (!history) {
+    let saved: unknown = [];
+    try { saved = JSON.parse(localStorage.getItem(historyKey) ?? "[]"); } catch { saved = []; }
+    history = new InputHistory(Array.isArray(saved) ? saved : []);
+  }
+  return history;
+}
+function rememberLine(text: string): void {
+  // Another window (the 오늘 창) may have put a line in since: read again before adding.
+  history = undefined;
+  const lines = sharedHistory();
+  lines.add(text);
+  try { localStorage.setItem(historyKey, JSON.stringify(lines.entries)); } catch { /* full or blocked: kept for this run */ }
 }

@@ -26,6 +26,12 @@ const phasePill = board.querySelector<HTMLElement>(".phase")!;
 const roundDots = board.querySelector<HTMLElement>(".rounds")!;
 const pauseButton = board.querySelector<HTMLButtonElement>(".pause")!;
 const stopButton = board.querySelector<HTMLButtonElement>(".stop")!;
+// #527: under the cheering cat of a finished countdown.
+const doneButtons = document.querySelector<HTMLElement>(".done-buttons")!;
+const againButton = doneButtons.querySelector<HTMLButtonElement>(".again")!;
+const closeButton = doneButtons.querySelector<HTMLButtonElement>(".close")!;
+againButton.textContent = t("다시 시작");
+closeButton.textContent = t("닫기");
 
 
 let state: TimerPayload | undefined;
@@ -45,6 +51,8 @@ function receive(next: TimerPayload): void {
   if (document.documentElement.style.zoom !== zoom) document.documentElement.style.zoom = zoom;
   document.body.classList.toggle("done", !next.timer);
   if (next.message !== previous?.message) renderBubble(next.message);
+  doneButtons.hidden = next.timer !== undefined || next.done === undefined;
+  cat.title = next.timer === undefined && next.done !== undefined ? t("누르면 닫혀요") : "";
   renderBoard();
 }
 
@@ -150,7 +158,7 @@ function setInteractive(value: boolean): void {
 
 /** Only the cat, its board and the bubble catch the mouse; everywhere else clicks fall through. */
 function overWidget(x: number, y: number): boolean {
-  return [board, cat, bubbleSlot.firstElementChild as HTMLElement | null].some((element) => {
+  return [board, cat, bubbleSlot.firstElementChild as HTMLElement | null, doneButtons].some((element) => {
     if (!element || element.hidden) return false;
     const rect = element.getBoundingClientRect();
     return x >= rect.left - 4 && x <= rect.right + 4 && y >= rect.top - 4 && y <= rect.bottom + 4;
@@ -195,6 +203,15 @@ for (const [button, channel] of [[pauseButton, "timer:pause"], [stopButton, "tim
   button.addEventListener("click", (event) => { event.stopPropagation(); api.send(channel); });
 }
 bubbleSlot.addEventListener("click", () => api.send("timer:dismiss"));
+// #527: a finished countdown's cat closes it too (a drag still moves it).
+cat.addEventListener("click", () => {
+  if (suppressClick) { suppressClick = false; return; }
+  if (!state?.timer && state?.done !== undefined) api.send("timer:dismiss");
+});
+for (const [button, channel] of [[againButton, "timer:again"], [closeButton, "timer:dismiss"]] as const) {
+  button.addEventListener("pointerdown", (event) => event.stopPropagation());
+  button.addEventListener("click", (event) => { event.stopPropagation(); api.send(channel); });
+}
 document.addEventListener("contextmenu", (event) => {
   event.preventDefault();
   if (overWidget(event.clientX, event.clientY)) api.send("timer:menu");

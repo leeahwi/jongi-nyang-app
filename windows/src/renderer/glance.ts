@@ -52,6 +52,7 @@ const line = new InputLine({
   spaces: () => (state ? { data: state.todoSpaces } : undefined),
   commit: async (candidate, candidates, text, space) => Boolean((await commitReading(flow, candidate, candidates, text, "glance", space)).made),
   onEscape: (event) => { event.preventDefault(); if (line.value) line.clear(); else close(); },
+  history: true,
 });
 const links = h("div", { class: "g-links" });
 card.append(top, cards, tasks, h("div", { class: "g-line" }, toastHost, line.element), links);

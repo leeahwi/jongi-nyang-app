@@ -566,7 +566,18 @@
 .aday.placeholder .aday-key.tomorrow, .aday.placeholder .aday-key.tomorrow b { color: var(--sage-text); }
 
 /* ─── 집중: the note as one card (the design's "할 일 하나와 남은 시간만") ─────────────────────── */
-:root[data-focus] #app > :not(.focus-card) { display: none !important; }
+:root[data-focus="on"] #app > :not(.focus-card) { display: none !important; }
+/* #529: a focus with its list shown — the strip over the list (the to-do, the time left, ⏸, back to the card). */
+.focus-strip { flex: none; display: flex; align-items: center; gap: 8px; margin: 0 12px 6px; height: 34px; padding: 0 6px 0 12px;
+  border-radius: 10px; border: 1px solid var(--sage); background: var(--sage-2); font-family: var(--ui); cursor: pointer; }
+.focus-strip[hidden] { display: none; }
+.focus-strip .spacer { flex: 1; }
+.fs-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--clay); }
+.focus-strip.paused .fs-dot { background: var(--ink-3); }
+.fs-title { min-width: 0; font: 600 12.5px/1.3 var(--ui); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fs-time { flex: none; font: 600 12.5px/1 var(--ui); font-variant-numeric: tabular-nums; color: var(--sage-text); }
+.focus-strip.paused .fs-time { color: var(--ink-3); }
+.fs-btn { flex: none; width: 24px; height: 24px; color: var(--ink-2); }
 .focus-card { flex: 1; min-height: 0; display: flex; flex-direction: column; position: relative; font-family: var(--ui); }
 /* The toast, while the card is up, floats over its foot. */
 .focus-card .toast-host { bottom: 56px; }

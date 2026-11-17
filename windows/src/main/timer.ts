@@ -81,8 +81,8 @@ export class FocusTimerWidget {
   private session?: FocusSession;
   private round?: Round;
   private message?: string;
-  /** A countdown just ended: the window stays a moment showing only its message. */
-  private finished = false;
+  /** #527: a countdown of this many minutes ended: the window stays with its message, 다시 시작 and 닫기 until put away. */
+  private doneMinutes?: number;
   private interactive = false;
   private messageTimer?: NodeJS.Timeout;
   private finishTimer?: NodeJS.Timeout;
@@ -226,7 +226,7 @@ export class FocusTimerWidget {
     this.round = undefined;
     clearTimeout(this.messageTimer);
     this.message = undefined;
-    this.finished = false;
+    this.doneMinutes = undefined;
     this.setTimer(undefined);
     this.hooks.focusEnded();
   }
@@ -289,7 +289,7 @@ export class FocusTimerWidget {
         this.writeRound(now, false);
         clearTimeout(this.messageTimer);
         this.message = undefined;
-        this.finished = false;
+        this.doneMinutes = undefined;
         this.setTimer(undefined);
         break;
     }
@@ -331,7 +331,7 @@ export class FocusTimerWidget {
 
   private setTimer(timer: FocusTimer | undefined): void {
     this.timer = timer;
-    if (timer) this.finished = false;
+    if (timer) this.doneMinutes = undefined;
     this.persist();
     this.armFinish();
     this.update();
@@ -383,29 +383,32 @@ export class FocusTimerWidget {
       else if (next.phase === "longRest") this.say(t("{rounds}번 해냈어요! {minutes}분 푹 쉬어요", { rounds: settings.roundsBeforeLongRest, minutes: settings.longRestMinutes }), 6);
       else this.say(t("다시 집중해 볼까요?") + start, 6);
     } else {
-      // The board goes; its message stays where it was for a moment, then the window closes.
-      this.finished = true;
+      // #527: the board goes; the cheering cat, its message, 다시 시작 and 닫기 stay until put away.
+      const minutes = Math.floor(timer.durationMs / 60_000);
+      this.doneMinutes = minutes;
       this.setTimer(undefined);
-      this.say(t("{minutes}분 끝났어요!", { minutes: Math.floor(timer.durationMs / 60_000) }), 10);
+      this.say(t("{minutes}분 끝났어요!", { minutes }), null);
     }
     this.hooks.cheer();
   }
 
   // ─── Speech ─────────────────────────────────────────────────────────────────
 
-  private say(text: string, seconds: number): void {
+  /** `seconds` null: the message stays until it is put away (#527). */
+  private say(text: string, seconds: number | null): void {
     clearTimeout(this.messageTimer);
+    this.messageTimer = undefined;
     this.message = text;
     this.send();
-    this.messageTimer = setTimeout(() => this.dismiss(), seconds * 1000);
+    if (seconds !== null) this.messageTimer = setTimeout(() => this.dismiss(), seconds * 1000);
   }
 
   private dismiss(): void {
     clearTimeout(this.messageTimer);
     this.messageTimer = undefined;
     this.message = undefined;
-    if (this.finished) {
-      this.finished = false;
+    if (this.doneMinutes !== undefined) {
+      this.doneMinutes = undefined;
       this.update();
     } else this.send();
   }
@@ -426,7 +429,7 @@ export class FocusTimerWidget {
    * keeps no page around. During 집중 the note's focus card stands in for it — unless the note is away.
    */
   private update(): void {
-    if ((!this.timer && !this.finished) || (this.session && this.hooks.noteVisible())) {
+    if ((!this.timer && this.doneMinutes === undefined) || (this.session && this.hooks.noteVisible())) {
       this.close();
       this.hooks.changed();
       return;
@@ -518,6 +521,7 @@ export class FocusTimerWidget {
     const payload: TimerPayload = {
       timer: this.timer, message: this.message, scale: timerScale[this.store.prefs.timerSize ?? "regular"] ?? 1,
       ...(this.session ? { focus: this.focusTitle } : {}),
+      ...(this.doneMinutes !== undefined ? { done: this.doneMinutes } : {}),
     };
     this.window.webContents.send("timer:state", payload);
   }
@@ -534,6 +538,10 @@ export class FocusTimerWidget {
     ipcMain.on("timer:pause", (event) => { if (fromBoard(event)) this.command({ kind: "togglePause" }); });
     ipcMain.on("timer:stop", (event) => { if (fromBoard(event)) this.command({ kind: "stop" }); });
     ipcMain.on("timer:dismiss", (event) => { if (fromBoard(event)) this.dismiss(); });
+    // #527: 다시 시작 on a finished countdown's tag: the same length again.
+    ipcMain.on("timer:again", (event) => {
+      if (fromBoard(event) && this.doneMinutes !== undefined) this.command({ kind: "countdown", minutes: this.doneMinutes });
+    });
     ipcMain.on("timer:menu", (event) => {
       if (fromBoard(event)) Menu.buildFromTemplate(this.timerMenu()).popup({ window: this.window });
     });

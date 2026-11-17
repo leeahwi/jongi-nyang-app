@@ -294,6 +294,11 @@ struct ToastView: View {
 /// The line's text field: handwriting, and the keys the line needs that a SwiftUI TextField
 /// gives away — Tab / ⇧Tab (another reading), Return / ⇧Return (literal) / ⌘Return (as an
 /// event), Esc, and ⌘Z right after a commit.
+extension NSTextField {
+    /// #526: its field editor holds a syllable the input method is still composing (marked text).
+    var isComposing: Bool { (currentEditor() as? NSTextView)?.hasMarkedText() == true }
+}
+
 struct IntentField: NSViewRepresentable {
     @Binding var text: String
     var placeholder: String
@@ -415,7 +420,9 @@ struct IntentField: NSViewRepresentable {
     private static var lineHeights: [NSFont: CGFloat] = [:]
 
     private func update(_ field: KeyField, context: Context) {
-        if field.stringValue != text { field.stringValue = text }
+        // #526: never over a syllable being composed (한글 입력기): it calls no controlTextDidChange, so `text` lags behind
+        // the field then, and writing it back broke the syllable apart (‘가끔’ → ‘가ㄲㅡㅁ’).
+        if field.stringValue != text, !field.isComposing { field.stringValue = text }
         if field.font != font { field.font = font }
         field.textColor = NSColor(PaperTheme.ink)
         // The hint stays on one line, cut short with … when it doesn't fit (Windows: nowrap, ellipsis).
@@ -453,6 +460,18 @@ struct IntentField: NSViewRepresentable {
             parent.onFocus(false)
         }
 
+        /// ↑ · ↓ to `onArrow`; when it put other words in the line (#528, the lines put in before), they show at once with
+        /// the caret at their end.
+        private func arrow(_ step: Int, _ control: NSControl, _ textView: NSTextView) -> Bool {
+            let before = parent.text
+            guard parent.onArrow(step) else { return false }
+            let text = parent.text
+            guard text != before, let field = control as? NSTextField else { return true }
+            field.stringValue = text
+            (field.currentEditor() ?? textView).selectedRange = NSRange(location: (text as NSString).length, length: 0)
+            return true
+        }
+
         func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
             switch selector {
             case #selector(NSResponder.insertTab(_:)): return parent.onTab(1)
@@ -462,8 +481,8 @@ struct IntentField: NSViewRepresentable {
                 parent.onSubmit(flags.contains(.shift), flags.contains(.command))
                 return true
             case #selector(NSResponder.cancelOperation(_:)): return parent.onEscape()
-            case #selector(NSResponder.moveUp(_:)): return parent.onArrow(-1)
-            case #selector(NSResponder.moveDown(_:)): return parent.onArrow(1)
+            case #selector(NSResponder.moveUp(_:)): return arrow(-1, control, textView)
+            case #selector(NSResponder.moveDown(_:)): return arrow(1, control, textView)
             case #selector(NSResponder.moveWordLeft(_:)): return parent.onWordArrow(-1)
             case #selector(NSResponder.moveWordRight(_:)): return parent.onWordArrow(1)
             default: return false
@@ -778,6 +797,12 @@ struct IntentLineView: View {
                             onSubmit: { shift, command in submit(literal: shift, asEvent: command) },
                             onEscape: escape,
                             onUndo: undo,
+                            onArrow: { step in
+                                // #528: ↑ · ↓ bring back the lines put in before (the caret goes to the end).
+                                guard let line = model.stepInputHistory(up: step < 0, text: text) else { return false }
+                                text = line
+                                return true
+                            },
                             accessibilityLabel: L("입력 줄"))
                     .growing(oneLine: compact ? 22 : 26)
                     .accessibilityHint(L("할 일, 일정, 타이머, 알람이나 메모를 적어요. Tab으로 다른 뜻을 골라요."))
@@ -881,6 +906,7 @@ struct IntentLineView: View {
         }
         guard !list.isEmpty else { return } // a slash line that can't be read (the hint says why), or only `#회사` (S5)
         guard let commit = model.commitIntent(text: trimmed, candidates: list, index: index, page: page, space: space) else { return }
+        model.rememberLine(trimmed)
         // 2b (I): `+ 회사에 넣기` was for this one line.
         if usesLens { model.lineSpace = nil }
         text = ""

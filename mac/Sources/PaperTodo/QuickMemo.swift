@@ -266,7 +266,8 @@ struct MemoTextView: NSViewRepresentable {
     func updateNSView(_ scroll: NSScrollView, context: Context) {
         context.coordinator.parent = self
         guard let view = scroll.documentView as? KeyTextView else { return }
-        if view.string != text {
+        // #526: not over a syllable being composed (see IntentField.update).
+        if view.string != text, !view.hasMarkedText() {
             view.string = text
             if let storage = view.textStorage { storage.setAttributes(view.typingAttributes, range: NSRange(location: 0, length: storage.length)) }
         }

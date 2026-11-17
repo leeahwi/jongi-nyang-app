@@ -27,6 +27,9 @@ enum ShortcutList {
             Group(title: L("입력"), rows: [
                 Row(title: L("입력 줄로 가기"), caps: ["⌘", "N"]),
                 Row(title: L("넣기 · 고치기 끝"), caps: ["↩"]),
+                // #528: in the input line.
+                Row(title: L("전에 넣은 줄"), caps: ["↑"], also: ["↓"]),
+                Row(title: L("입력 줄에서 목록으로"), caps: ["⌥", "↑"]),
                 Row(title: L("고치기 취소"), caps: ["Esc"]),
                 Row(title: String(localized: "실행 취소", table: "Keys"), caps: ["⌘", "Z"]),
                 Row(title: L("다시 실행"), caps: ["⇧", "⌘", "Z"]),

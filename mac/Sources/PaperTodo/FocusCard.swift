@@ -168,6 +168,14 @@ struct FocusCardView: View {
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(Focus.topLine(round: round.number, of: round.of, language: language))
             }
+            // #529: the note's list while the focus runs on (the strip on top brings the card back).
+            Button { state.showsList = true } label: {
+                Image(systemName: "list.bullet").font(.system(size: 11, weight: .semibold))
+            }
+            .buttonStyle(QuietButtonStyle(size: 26))
+            .background(ToolbarControlFrame())
+            .help(L("할 일 목록 보기"))
+            .accessibilityLabel(L("할 일 목록 보기"))
             Button { model.petCommand(.focusStep(.askToStop)) } label: {
                 Image(systemName: "xmark").font(.system(size: 11, weight: .semibold))
             }
@@ -434,12 +442,67 @@ struct FocusPickBanner: View {
     }
 }
 
-/// Shows the focus card in place of the note while a focus runs.
+/// Shows the focus card in place of the note while a focus runs — unless its list is asked for (#529).
 struct FocusSwitch<Content: View>: View {
     @ObservedObject var state: FocusTimerState
-    @ViewBuilder var content: (Bool) -> Content
+    /// `card`: the focus card; `focusing`: a focus runs (the note shows the focus strip over its list).
+    @ViewBuilder var content: (_ card: Bool, _ focusing: Bool) -> Content
 
-    var body: some View { content(state.isFocusing) }
+    var body: some View { content(state.isFocusing && !state.showsList, state.isFocusing) }
+}
+
+/// #529: while a focus runs and the note shows its list, a strip over the list — the to-do, the time left, ⏸ and the
+/// way back to the card. The list, the input line and the keys work as always (Space pauses, Esc asks to stop).
+struct FocusStrip: View {
+    @ObservedObject var model: AppModel
+    @ObservedObject var state: FocusTimerState
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+            if let session = state.session {
+                strip(session, at: timeline.date)
+            }
+        }
+    }
+
+    private func strip(_ session: FocusSession, at now: Date) -> some View {
+        let timer = session.timer
+        let paused = timer.isPaused
+        return HStack(spacing: 8) {
+            Circle().fill(paused ? PaperTheme.ink3 : PaperTheme.clay).frame(width: 7, height: 7)
+                .accessibilityHidden(true)
+            Text(session.title)
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(PaperTheme.ink)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 6)
+            Text(paused ? L("멈춤") : FocusTimer.clock(timer.remaining(at: now)))
+                .font(.system(size: 12.5, weight: .semibold).monospacedDigit())
+                .foregroundStyle(paused ? PaperTheme.ink3 : PaperTheme.sageText)
+            Button { model.petCommand(.focusStep(.togglePause)) } label: {
+                Image(systemName: paused ? "play.fill" : "pause.fill").font(.system(size: 10, weight: .semibold))
+            }
+            .buttonStyle(QuietButtonStyle(size: 24))
+            .help(paused ? L("계속") : L("일시정지"))
+            .accessibilityLabel(paused ? L("계속") : L("일시정지"))
+            Button { state.showsList = false } label: {
+                Image(systemName: "arrow.up.left.and.arrow.down.right").font(.system(size: 10, weight: .semibold))
+            }
+            .buttonStyle(QuietButtonStyle(size: 24))
+            .help(L("집중 화면 보기"))
+            .accessibilityLabel(L("집중 화면 보기"))
+        }
+        .padding(.leading, 12)
+        .padding(.trailing, 6)
+        .frame(height: 34)
+        .background(PaperTheme.sage2, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay { RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(PaperTheme.sage, lineWidth: 1) }
+        .contentShape(Rectangle())
+        .onTapGesture { state.showsList = false }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Focus.topLine(language: .current) + " · " + session.title)
+    }
 }
 
 /// The focus card's handwritten title: centred, up to two lines, with the lines kept as close as

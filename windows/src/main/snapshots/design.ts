@@ -265,6 +265,18 @@ export async function focusShots(directory: string, save: Save, wait: Wait, sett
     await run(`document.querySelector(".fc-rest")?.click()`);
     await shot(`${prefix}focus-expanded`);
     await run(`document.querySelector(".fc-rest")?.click()`);
+    // #529: the list with the focus strip over it (the card's list button), then back by the strip.
+    await run(`document.querySelector(".fc-to-list")?.click()`);
+    await wait(450);
+    await settled(note);
+    const listed = await run(`(() => { const s = document.querySelector(".focus-strip"), c = document.querySelector(".focus-card"), l = document.querySelector(".sheet");
+      if (!s || s.hidden || !c.hidden) return "NO STRIP";
+      if (!l || l.getBoundingClientRect().height < 40) return "NO LIST";
+      const t = s.querySelector(".fs-title"); return t.scrollWidth > t.clientWidth + 1 && t.textContent.length < 12 ? "title clipped" : ""; })()`) as string;
+    console.log(`focus ${prefix}focus-list: ${listed || "ok"}`);
+    if (listed) problems += 1;
+    await save(`${prefix}focus-list`, note.webContents.capturePage());
+    await run(`document.querySelector(".focus-strip")?.click()`);
     // Other sizes (at night the smallest only).
     for (const [width, height] of paper === "day" ? [[350, 400], [350, 520], [560, 760], [720, 1200]] as const : [[350, 400]] as const) {
       note.setSize(width, height);

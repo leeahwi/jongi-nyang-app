@@ -107,3 +107,13 @@ html, body { background: transparent; overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .bubble, .cat { animation: none !important; }
 }
+
+/* #527: under the cheering cat of a finished countdown, until it is put away. */
+.done-buttons { display: flex; gap: 6px; margin-top: 4px; pointer-events: auto; }
+.done-buttons[hidden] { display: none; }
+.done-buttons button {
+  padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--ink);
+  background: var(--paper); border: 1px solid var(--rule); box-shadow: 0 4px 10px -8px rgba(70, 58, 30, 0.4);
+  transition: background 0.12s, color 0.12s;
+}
+.done-buttons button:hover { color: var(--on-sage); background: var(--sage); border-color: var(--sage); }

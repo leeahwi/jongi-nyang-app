@@ -18,6 +18,10 @@ final class FocusTimerState: ObservableObject {
     @Published var timeUps = 0
     /// 다 했어요 was pressed: the card's title is being struck through before the session ends (F4).
     @Published var finishing = false
+    /// #529: while a focus runs, the note shows its list (with the focus strip on top) instead of the focus card.
+    @Published var showsList = false
+    /// #527: a plain timer of this many minutes ran out; its tag stays (다시 시작 · 닫기) until it is put away.
+    @Published var doneMinutes: Int?
 
     /// 집중 on a to-do is under way (the note shows the focus card).
     var isFocusing: Bool { session?.isFocus == true }
@@ -55,7 +59,6 @@ final class FocusTimerController {
     private var panel: NSPanel?
     private var tickTimer: Timer?
     private var messageTask: Task<Void, Never>?
-    private var lingerTask: Task<Void, Never>?
     private var dragStart: (mouse: NSPoint, origin: NSPoint)?
     private var subscriptions = Set<AnyCancellable>()
     /// The end of the stretch already announced (chime, pulse), so it's announced once.
@@ -161,11 +164,17 @@ final class FocusTimerController {
         }
     }
 
+    /// The note with the focus card (not its list, #529).
+    private func showCard() {
+        state.showsList = false
+        showNote()
+    }
+
     private func startFocus(_ session: FocusSession) {
         model.focusPicking = false
         state.restOpen = false
+        state.showsList = false
         // The tag steps aside: the note shows the focus card.
-        lingerTask?.cancel()
         hide()
         setSession(session)
         showNote()
@@ -240,6 +249,7 @@ final class FocusTimerController {
         if let record = session.record(done: done, at: now) { model.focusLog.append(record) }
         setSession(nil)
         state.restOpen = false
+        state.showsList = false
         if session.isFocus {
             hide()
             onFocusEnded()
@@ -255,7 +265,7 @@ final class FocusTimerController {
         if session == nil {
             stopTicking()
         } else {
-            lingerTask?.cancel()
+            state.doneMinutes = nil
             startTicking()
             updateBoard()
         }
@@ -286,6 +296,8 @@ final class FocusTimerController {
             guard announcedEnd != session.timer.endsAt else { return }
             announcedEnd = session.timer.endsAt
             if model.timerSound { NSSound(named: "Glass")?.play() }
+            // #529: the card's buttons are what comes next — it comes back from the list.
+            state.showsList = false
             state.timeUps += 1
             if !noteVisible() {
                 say(session.stage(at: now) == .restOver ? L("쉬는 시간 끝! 다음 라운드를 시작할까요?")
@@ -306,21 +318,20 @@ final class FocusTimerController {
             default: say(L("다시 집중해 볼까요?") + hint)
             }
         } else {
-            // Done: only the message stays for a moment, then the tag goes away.
+            // #527: done — the cheering cat and its message stay until 닫기 (or a click on the cat), with 다시 시작.
             end(at: now)
-            say(L("\(Int(session.timer.duration / 60))분 끝났어요!"), for: 10)
-            lingerTask = Task { @MainActor [weak self] in
-                try? await Task.sleep(for: .seconds(10))
-                guard !Task.isCancelled, self?.state.timer == nil else { return }
-                self?.hide()
-            }
+            let minutes = Int(session.timer.duration / 60)
+            state.doneMinutes = minutes
+            say(L("\(minutes)분 끝났어요!"), for: nil)
         }
         onFinished()
     }
 
-    private func say(_ text: String, for seconds: TimeInterval = 6) {
+    /// `seconds` nil: the message stays until the tag is put away (#527).
+    private func say(_ text: String, for seconds: TimeInterval? = 6) {
         messageTask?.cancel()
         withAnimation(Motion.animation(.bounce, reduce: Motion.reduced)) { state.message = text }
+        guard let seconds else { return }
         messageTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .seconds(seconds))
             guard !Task.isCancelled else { return }
@@ -348,6 +359,7 @@ final class FocusTimerController {
         panel?.orderOut(nil)
         dragStart = nil
         messageTask?.cancel()
+        if state.doneMinutes != nil { state.doneMinutes = nil }
         // Called every second while focusing with the note in view: setting it again redrew the note (1.39).
         if state.message != nil { state.message = nil }
     }
@@ -368,9 +380,13 @@ final class FocusTimerController {
             state: state,
             onPause: { [weak self] in
                 // While focusing, a click on the tag brings the focus card back.
-                if self?.isFocusing == true { self?.showNote() } else { self?.command(.togglePause) }
+                if self?.isFocusing == true { self?.showCard() } else { self?.command(.togglePause) }
             },
             onStop: { [weak self] in self?.command(.stop) },
+            onAgain: { [weak self] in
+                guard let self, let minutes = self.state.doneMinutes else { return }
+                self.command(.countdown(minutes: minutes))
+            },
             onDrag: { [weak self] in self?.drag() },
             onDragEnd: { [weak self] in self?.dragEnded() }
         )
@@ -442,11 +458,15 @@ final class FocusTimerController {
 
     func menu() -> NSMenu {
         let menu = NSMenu()
+        if state.doneMinutes != nil {
+            menu.addItem(PetMenuItem(L("닫기")) { [weak self] in self?.command(.stop) })
+            menu.addItem(.separator())
+        }
         if let session = state.session {
             menu.addItem(PetMenuItem(session.timer.isPaused ? L("계속") : L("일시정지")) { [weak self] in self?.command(.togglePause) })
             menu.addItem(PetMenuItem(L("5분 더")) { [weak self] in self?.command(.addMinutes(5)) })
             if session.isFocus {
-                menu.addItem(PetMenuItem(L("집중 화면 보기")) { [weak self] in self?.showNote() })
+                menu.addItem(PetMenuItem(L("집중 화면 보기")) { [weak self] in self?.showCard() })
                 menu.addItem(PetMenuItem(L("집중 그만두기")) { [weak self] in self?.command(.stop) })
             } else {
                 menu.addItem(PetMenuItem(L("중지")) { [weak self] in self?.command(.stop) })
@@ -483,6 +503,8 @@ struct FocusTimerView: View {
     @ObservedObject var state: FocusTimerState
     var onPause: () -> Void = {}
     var onStop: () -> Void = {}
+    /// #527: 다시 시작 on a finished timer's tag (the same length again).
+    var onAgain: () -> Void = {}
     var onDrag: () -> Void = {}
     var onDragEnd: () -> Void = {}
     private let catSize: CGFloat = 92
@@ -508,10 +530,21 @@ struct FocusTimerView: View {
                 }
                 .frame(width: catSize + 40, height: catSize + 26, alignment: .bottom)
             } else if state.message != nil {
-                // Done: the cat cheers under the message, then the window goes away.
+                // Done: the cat cheers under the message; #527: it stays until 닫기 or a click on the cat.
                 BreathingImage(image: PetArt.image(.cheer) ?? PaperTheme.mascot, style: .awake)
                     .frame(width: catSize, height: catSize)
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: onStop)
+                    .help(L("누르면 닫혀요"))
                     .accessibilityHidden(true)
+                if state.doneMinutes != nil {
+                    HStack(spacing: 6) {
+                        Button(L("다시 시작"), action: onAgain)
+                        Button(L("닫기"), action: onStop)
+                    }
+                    .buttonStyle(PaperActionButtonStyle())
+                    .fixedSize()
+                }
             }
         }
         // Room under the tilted board for its corner and shadow (they were cut by the panel's edge).

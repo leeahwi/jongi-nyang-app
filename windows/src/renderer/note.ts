@@ -173,6 +173,8 @@ const focusCard = new FocusCard({
   shown: () => fitTabs(true),
 });
 document.getElementById("app")!.append(focusCard.element);
+// #529: the focus strip over the list while a focus runs with its list shown.
+chipsRow.before(focusCard.strip);
 
 /** 할 일 골라 집중…: 오늘 with a small 집중 on each open row (on hover); Esc or 취소 leaves. */
 let picking = false;
@@ -675,6 +677,7 @@ const line = new InputLine({
     return Boolean(result.made);
   },
   onArrowUp: (event) => enterList(event, -1),
+  history: true,
   onEscape: (event) => { if (line.value) { event.preventDefault(); line.clear(); } else line.field.blur(); },
 });
 // 2b (I): `+ 회사에 넣기` lasts while the line has the keyboard (or holds words).
@@ -2658,6 +2661,14 @@ window.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "z" && toast.visible) { event.preventDefault(); void undoLast(flow); }
     return;
   }
+  // #529: a focus with its list shown — the list's keys work, but Space pauses and Esc (nothing picked) asks to stop.
+  if (focusCard.listing && !event.defaultPrevented) {
+    const target = event.target as HTMLElement | null;
+    const typing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target?.isContentEditable === true;
+    const plain = !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+    if (!typing && plain && event.key === " " && !(target instanceof HTMLButtonElement)) { event.preventDefault(); focusCard.togglePause(); return; }
+    if (!typing && plain && event.key === "Escape" && !selectedID && !picking && !menuOpen() && !toast.visible) { event.preventDefault(); focusCard.escape(); return; }
+  }
   if (picking && event.key === "Escape") { event.preventDefault(); setPicking(false); return; }
   // A paper menu up: its own keys (drawerMenu.ts).
   if (menuOpen()) return;
@@ -2757,6 +2768,8 @@ api.on("note:row-command", (payload) => {
   if (command === "guide") openGuide();
   if (command === "select-task") showTask(id);
   if (command === "pick-focus") { if (!focusCard.visible) setPicking(true); }
+  // #529: the timer's tag (or its menu) brings the focus card back from the list.
+  if (command === "focus-card") focusCard.showCard();
   if (command === "pick-cancel") setPicking(false);
   if (command === "morning-pick") { askingPick = true; setPage("today"); line.refresh(); }
   if (command === "morning-pick-off") { askingPick = false; line.refresh(); }

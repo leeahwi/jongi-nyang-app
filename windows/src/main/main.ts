@@ -621,6 +621,9 @@ export function shortcutQuestion(): ConfirmQuestion {
     { title: t("입력"), rows: [
       { title: t("입력 줄로 가기"), keys: ["Ctrl", "N"] },
       { title: t("넣기 · 고치기 끝"), keys: ["Enter"] },
+      // #528: in the input line.
+      { title: t("전에 넣은 줄"), keys: ["↑"], also: ["↓"] },
+      { title: t("입력 줄에서 목록으로"), keys: ["Alt", "↑"] },
       { title: t("고치기 취소"), keys: ["Esc"] },
       { title: t("실행 취소"), keys: ["Ctrl", "Z"] },
       { title: t("다시 실행"), keys: ["Ctrl", "Y"] },
@@ -2599,7 +2602,11 @@ app.whenReady().then(async () => {
     // H3: the to-do's space when the session ended (none for 일반 and a plain timer).
     record: (record) => { const space = record.taskId ? spaceOf(store.todoSpaces, record.taskId) : undefined; if (focusLog.append(space ? { ...record, space } : record)) desk.sendAll("history:changed"); },
     complete: (taskId) => store.complete(taskId),
-    showNote: () => { if (!snapshotDirectory) showNote(); else note.showInactive(); },
+    showNote: () => {
+      if (!snapshotDirectory) showNote(); else note.showInactive();
+      // #529: the focus card, not its list.
+      note.webContents.send("note:row-command", { id: "", command: "focus-card" });
+    },
     noteVisible: () => note.isVisible() && !note.isMinimized(),
     pick: pickFocus,
     focusEnded: () => taskReminders?.poke(),
