@@ -418,6 +418,13 @@ final class DrawerPanel: NSPanel {
         super.sendEvent(event)
     }
 
+    /// A ⌘ key comes here before the menu bar — and never reaches `sendEvent` once a menu item has it: the drawer's own
+    /// ⌘N (a new memo here, not the note's 새 할 일), ⌘F, ⌘L, ⌘W … go to `onKey` first.
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.type == .keyDown, onKey(event) { return true }
+        return super.performKeyEquivalent(with: event)
+    }
+
     override func cancelOperation(_ sender: Any?) { onCancel() }
 }
 

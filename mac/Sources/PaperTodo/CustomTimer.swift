@@ -138,7 +138,7 @@ struct TimerLengthField: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             TextField("예: 40 또는 1:30", text: $text)
                 .textFieldStyle(.plain)
                 .font(.system(size: compact ? 13 : 15, weight: .medium).monospacedDigit())

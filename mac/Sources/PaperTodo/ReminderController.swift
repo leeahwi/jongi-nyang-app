@@ -693,11 +693,12 @@ extension View {
             .contentShape(Rectangle())
     }
 
-    /// A few words under a row, inside the card (no separator above).
+    /// A few words under a row, inside the card (no separator above). Clear of the row's control: under a
+    /// segmented control the words sat 2 pt below it (they were pulled up 4 pt).
     func settingsCaption() -> some View {
         padding(.horizontal, 14)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, -4)
+            .padding(.top, 4)
     }
 }
 
@@ -1157,7 +1158,7 @@ struct PetSettingsPanel: View {
             }
             .settingsRow()
             if model.typingScope != .off {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
                     if model.typingNoPermission {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Text(L("입력 모니터링 권한이 없어서 종이냥 안에서만 두드려요."))
@@ -1177,10 +1178,6 @@ struct PetSettingsPanel: View {
                     } else {
                         Text(model.typingScope == .everywhere ? L("다른 앱에서 칠 때도 두드려요. 어떤 키인지는 보지 않고, 눌렸다는 것만 알아요.")
                              : L("종이냥에서 글자를 치면 구석에 나와 두드리고, 멈추면 곧 들어가요. 무엇을 쳤는지는 보지 않아요."))
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    if model.typingScope == .everywhere {
-                        Text(L("종이냥은 아직 Apple의 정식 서명이 없어서, 업데이트하면 macOS가 권한을 다시 물을 수 있어요."))
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }

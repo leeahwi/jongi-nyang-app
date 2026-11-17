@@ -1324,6 +1324,25 @@ private enum PresentationTests {
             try expect(MenuBarState.current(model: model, timer: timer, now: now).accessibility.contains(words[1]), "VoiceOver still hears a paused time")
         }
 
+        try await test("#546: the drawer's ⌘ keys go to the drawer before the menu bar (⌘N: a new memo, not 새 할 일)") {
+            _ = NSApplication.shared
+            let panel = DrawerPanel()
+            defer { panel.close() }
+            var heard: [String] = []
+            panel.onKey = { event in
+                guard event.modifierFlags.contains(.command), event.charactersIgnoringModifiers == "n" else { return false }
+                heard.append("n")
+                return true
+            }
+            let key = { (characters: String, code: UInt16) in
+                NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command, timestamp: 0, windowNumber: panel.windowNumber,
+                                 context: nil, characters: characters, charactersIgnoringModifiers: characters, isARepeat: false, keyCode: code)!
+            }
+            try expect(panel.performKeyEquivalent(with: key("n", 45)), "⌘N is the drawer's")
+            try expectEqual(heard, ["n"], "the drawer's key handler had it")
+            try expect(!panel.performKeyEquivalent(with: key("q", 12)), "⌘Q (not the drawer's) goes on to the menus")
+        }
+
         try await test("#527: a plain timer that ran out stays up (다시 시작 · 닫기) until it is put away") {
             let fixture = try Fixture(items: [])
             defer { fixture.cleanup() }

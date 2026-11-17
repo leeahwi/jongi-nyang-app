@@ -64,8 +64,31 @@ swift scripts/make-icon.swift "$bundle/Contents/Resources" "$task_root/Sources/P
 # #175 (security review S-01): ad-hoc signed with the hardened runtime (no Developer ID yet: the user's call). Checked on
 # an off-screen test copy: the app starts, the bundled extension's files are sealed, Carbon hot keys register and
 # `claude mcp add` (zsh) still runs. No entitlements are needed.
-codesign --force --deep --options runtime --sign - "$bundle"
+# #494: an ad-hoc signature is known to macOS only by its hash, so every build was a new app to privacy settings (Input
+# Monitoring for 타닥냥 ‘모든 앱에서’ had to be turned on again after each update). On the build machine a self-signed
+# certificate in a keychain of its own signs instead: the designated requirement becomes the identifier and that
+# certificate, the same for every build. Its settings live outside the repository (PAPERTODO_SIGNING_ENV, by default
+# ~/.config/jongi-nyang/signing/signing.env: PAPERTODO_SIGN_KEYCHAIN, _KEYCHAIN_PASSWORD, _IDENTITY); without them
+# (CI, another machine) the build stays ad-hoc. PAPERTODO_REQUIRE_SIGNING=1 (release builds) stops instead.
+signing_env="${PAPERTODO_SIGNING_ENV:-$HOME/.config/jongi-nyang/signing/signing.env}"
+sign_with=(--sign -)
+if [ -f "$signing_env" ]; then
+    # shellcheck disable=SC1090
+    source "$signing_env"
+    security unlock-keychain -p "$PAPERTODO_SIGN_KEYCHAIN_PASSWORD" "$PAPERTODO_SIGN_KEYCHAIN"
+    sign_with=(--keychain "$PAPERTODO_SIGN_KEYCHAIN" --sign "$PAPERTODO_SIGN_IDENTITY")
+elif [ "${PAPERTODO_REQUIRE_SIGNING:-0}" = 1 ]; then
+    echo "build.sh: no signing settings ($signing_env) — a release build would be ad-hoc again (#494)" >&2
+    exit 1
+fi
+codesign --force --deep --options runtime "${sign_with[@]}" "$bundle"
 codesign --verify --deep --strict "$bundle"
+if [ "${sign_with[1]}" != "-" ]; then
+    codesign -d -r- "$bundle" 2>&1 | grep -q 'certificate leaf' || { echo "build.sh: the signature isn't the build machine's certificate (#494)" >&2; exit 1; }
+    echo "Signed with the build machine's certificate (#494)."
+else
+    echo "Signed ad-hoc (no signing settings on this machine)."
+fi
 # #225: every file the app ships — the extension's program, the .mcpb and what's in it, the resources — not only the
 # binary. In 1.42.1 the extension held 298 paths of the Mac that built it.
 "${check_paths[@]}" "$bundle"

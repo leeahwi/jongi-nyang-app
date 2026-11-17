@@ -462,7 +462,7 @@ struct IntentField: NSViewRepresentable {
 
         /// ↑ · ↓ to `onArrow`; when it put other words in the line (#528, the lines put in before), they show at once with
         /// the caret at their end.
-        private func arrow(_ step: Int, _ control: NSControl, _ textView: NSTextView) -> Bool {
+        @MainActor private func arrow(_ step: Int, _ control: NSControl, _ textView: NSTextView) -> Bool {
             let before = parent.text
             guard parent.onArrow(step) else { return false }
             let text = parent.text
