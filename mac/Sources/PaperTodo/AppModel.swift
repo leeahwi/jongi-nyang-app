@@ -1281,8 +1281,10 @@ final class AppModel: ObservableObject {
     }
     var onChooseStorage: (() -> Void)?
     var onResetStorage: (() -> Void)?
-    func chooseStorageFolder() { onChooseStorage?() }
-    func resetStorageFolder() { onResetStorage?() }
+    /// #516: after the click that got here has finished — both are buttons, and the move's questions run a modal loop,
+    /// which inside a SwiftUI action can't lay out its slip (an invisible question the app waits on).
+    func chooseStorageFolder() { DispatchQueue.main.async { [weak self] in self?.onChooseStorage?() } }
+    func resetStorageFolder() { DispatchQueue.main.async { [weak self] in self?.onResetStorage?() } }
 
     /// Another device changed the shared files: take its list, memos and repeats. The list waits
     /// while a title is being edited here (the next check catches up); memos written here and the

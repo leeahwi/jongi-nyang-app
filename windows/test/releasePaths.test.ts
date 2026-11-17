@@ -149,7 +149,8 @@ test("only Electron's own resolver text is allowed, only in the app's exe and on
 test("the home folder is found and shown as <home>", () => {
   const folder = releaseFolder();
   try {
-    put(folder, "out/main.js", `const where = ${JSON.stringify(path.join(os.homedir(), "jongi-nyang"))};\n`);
+    // As it is, not JSON.stringify: on Windows that writes each \ as \\, which isn't the home folder's bytes.
+    put(folder, "out/main.js", `// built in ${path.join(os.homedir(), "jongi-nyang")}\n`);
     const { code, output } = run(folder);
     assert.equal(code, 1, output);
     assert.match(output, /<home> \(ASCII\) × 1/);

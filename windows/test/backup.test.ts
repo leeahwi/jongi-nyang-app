@@ -192,7 +192,8 @@ test("합치기 into a folder with its own list: the counts add up, and nothing 
   assert.equal(fs.readdirSync(path.join(settings, "backups")).length, 2);
 });
 
-test("a write that fails half-way leaves the folder as it was", () => {
+// A read-only folder is made with chmod, which doesn't stop writes into a folder on Windows; the macOS runner checks it.
+test("a write that fails half-way leaves the folder as it was", { skip: process.platform === "win32" }, () => {
   const folder = filledFolder();
   const before = readDataFiles(folder);
   // One of the new files can't be written (#173: temporary names are random now, so the archive folder is made read-only

@@ -22,7 +22,9 @@ test("#379 되돌리기 leaves the other lines as they were; a month that can't 
   assert.equal(fs.readFileSync(month, "utf8"), `${newer}\n${odd}\n`);
   assert.equal(store.storageError, undefined);
 
-  // The folder can't be written: the month stays, and the note says so.
+  // The folder can't be written: the month stays, and the note says so. chmod doesn't stop writes into a folder on
+  // Windows, so this half runs on the macOS runner only.
+  if (process.platform === "win32") return;
   fs.writeFileSync(month, `${newer}\n${filed}\n`);
   fs.chmodSync(path.dirname(month), 0o555);
   try {

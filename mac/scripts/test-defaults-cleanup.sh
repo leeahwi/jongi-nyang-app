@@ -25,10 +25,10 @@ expect "after the process ended, no file in the temporary folder" "[ ! -e \"$sui
 for name in com.noa.PaperTodo COM.NOA.PAPERTODO com.noa.papertodo com.noa.PaperTodo. com.noa.PaperTodoX com.noa.PaperTodo.plist \
     com.noa.PaperTodo..Perf2 com.noa.PaperTodo.Perf2.plist PaperTodo PaperTodo. '' ' com.noa.PaperTodo' 'com.noa.PaperTodo ' \
     com.noa.PaperTodo/../com.noa.PaperTodo "$HOME/Library/Preferences/com.noa.PaperTodo" NSGlobalDomain com.apple.finder; do
-    expect "shell refuses ‘$name’" "! test_defaults_name_ok '$name'"
+    expect "shell refuses ‘${name}’" "! test_defaults_name_ok '$name'"
 done
 for name in PaperTodo.Design.6F1C2A9E-0000-4000-8000-000000000000 PaperTodo.Preview com.noa.PaperTodo.Perf2 com.noa.PaperTodo.LiveTest; do
-    expect "shell allows ‘$name’" "test_defaults_name_ok '$name'"
+    expect "shell allows ‘${name}’" "test_defaults_name_ok '$name'"
 done
 expect "test_defaults_require stops on com.noa.PaperTodo" "! ( test_defaults_require com.noa.PaperTodo ) 2>/dev/null"
 expect "test_defaults_remove stops on com.noa.PaperTodo (before defaults delete)" "! ( defaults() { echo called; }; test_defaults_remove com.noa.PaperTodo ) 2>/dev/null | grep -q called"
