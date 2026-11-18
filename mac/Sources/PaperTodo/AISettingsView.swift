@@ -10,7 +10,8 @@ struct AISettingsPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            SettingsGroup(title: L("AI 연결"), more: "ai", footer: L("켜면 Claude가 할 일 · 일정 · 메모를 보고 새로 넣어요. 고칠 땐 먼저 물어보고, 지우지는 못해요. 읽은 내용은 대화와 함께 Claude로 가요.")) {
+            // #558: not the pane's own title again — what the group does.
+            SettingsGroup(title: L("켜기"), more: "ai", footer: L("켜면 Claude가 할 일 · 일정 · 메모를 보고 새로 넣어요. 고칠 땐 먼저 물어보고, 지우지는 못해요. 읽은 내용은 대화와 함께 Claude로 가요.")) {
                 HStack(spacing: 12) {
                     SettingsLabel(L("Claude가 종이냥을 보고 쓸 수 있게 하기"), systemImage: "bubble.left")
                     Spacer(minLength: 8)

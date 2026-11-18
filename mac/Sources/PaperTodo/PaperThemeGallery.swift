@@ -177,7 +177,7 @@ struct PaperThemeGroup: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
-        SettingsGroup(title: L("종이"), footer: L("노트 · 달력 · 위젯 · 쪽지 · 책상이 같은 종이를 써요. 밝은 종이는 밤이 되면 ‘밤에는’에서 고른 종이로 바뀌어요.")) {
+        SettingsGroup(title: L("종이"), footer: L("밝은 종이는 밤이 되면 ‘밤에는’에서 고른 종이로 바뀌어요.")) {
             PaperTileGrid(picked: model.paperTheme, label: L("종이")) { model.paperTheme = $0 }
             SettingsSeparator()
             PaperNightRow(night: $model.paperNight, enabled: !model.paperTheme.isDark)

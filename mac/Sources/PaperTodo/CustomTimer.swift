@@ -153,7 +153,7 @@ struct TimerLengthField: View {
                 .accessibilityLabel("타이머 시간")
                 .onAppear { if autofocus { focused = true } }
             hint
-                .font(.system(size: 11, weight: .medium))
+                .font(.system(size: 11.5, weight: .medium))
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .padding(.leading, 4)

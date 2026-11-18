@@ -2,7 +2,7 @@ import { dayKey } from "../core/archive";
 import type { CalendarEvent } from "../core/calendar";
 import {
   awayText, clockText, columns, dayEndMinutes, dayMinutes, draggedSpan, edgeBand, followedSpan, hourHeight, isSoon, kicker, leftText, minutesUntil, newCandidates,
-  nothingLeftText, nudged, rangeText, ringText, rowLimit, scrollTop, slot, stretched, stripItems, stripSentence, stripSpans, stripState, wholeDayLink,
+  nothingLeftText, nudged, rangeText, ringText, rowLimit, scrollTop, slot, stretched, stripItems, stripSentence, stripSpans, stripState, wholeDayLink, foldedStrip,
   stripMarks, type DragEdge, type Span, type StripItem, type StripState } from "../core/dayStrip";
 import { draftFromEvent, eventMark } from "../core/events";
 import { timerLeftText } from "../core/glance";
@@ -84,6 +84,39 @@ export class DayStripView {
     });
   }
 
+  /** #554: folded to one line (the default), so the to-dos come first; kept on this PC (the page's own storage). */
+  private folded = (() => { try { return localStorage.getItem("dayStrip.folded") !== "0"; } catch { return true; } })();
+
+  private setFolded(folded: boolean): void {
+    this.folded = folded;
+    try { localStorage.setItem("dayStrip.folded", folded ? "1" : "0"); } catch { /* kept for this run */ }
+    if (!reduceMotion() && this.element.isConnected) this.pendingHeight = this.element.offsetHeight;
+    this.drawnKey = "";
+    this.render();
+  }
+
+  /** One line: `● 지금 팀 회의 · 30분 남음   다음 15:30 치과  ⌄` — the whole line unfolds the strip. */
+  private foldedLine(strip: StripState, narrow: boolean): HTMLElement {
+    const line = foldedStrip(strip, lang());
+    const soon = strip.mode === "next" && isSoon(strip.minutes);
+    const tone = strip.mode === "now" ? "now" : soon ? "soon" : "far";
+    const button = h("button", { class: `strip-folded ${tone}`, title: t("하루 띠 펼치기"), "aria-expanded": "false", "aria-label": stripSentence(strip, lang()) },
+      ...(line
+        ? [h("i", { class: "sf-dot", "aria-hidden": "true" }), h("span", { class: "sf-lead" }, line.lead), h("span", { class: "sf-status" }, `· ${line.status}`),
+          h("span", { class: "spacer" }), line.next && !narrow ? h("span", { class: "sf-next" }, line.next) : null]
+        : [h("span", { class: "sf-nothing" }, nothingLeftText(lang())), h("span", { class: "spacer" })]),
+      icon("chevron", 10, 2.2));
+    button.addEventListener("click", (event) => { event.stopPropagation(); this.setFolded(false); });
+    return button;
+  }
+
+  /** The open strip's ⌃: back to one line. */
+  private foldButton(): HTMLElement {
+    const button = h("button", { class: "strip-fold", title: t("하루 띠 접기"), "aria-label": t("하루 띠 접기"), "aria-expanded": "true" }, icon("chevron", 10, 2.2));
+    button.addEventListener("click", (event) => { event.stopPropagation(); this.setFolded(true); });
+    return button;
+  }
+
   /** Snapshots set another moment (`window.ribbonNow`). */
   private moment(): Date {
     const forced = (window as { ribbonNow?: string }).ribbonNow;
@@ -129,7 +162,7 @@ export class DayStripView {
     const strip = stripState(items, now, rowLimit(window.innerWidth, window.innerHeight));
     this.marks = open ? new Map() : stripMarks(strip);
     const focusing = state.focus?.taskId && state.timer ? state.focus.taskId : undefined;
-    const key = JSON.stringify([lang(), open, narrow, compact, open ? window.innerHeight : 0, ribbon.startHour, ribbon.endHour, ribbon.now, ribbon.hours, ribbon.bars, ribbon.blocks, ribbon.allDay, ribbon.more,
+    const key = JSON.stringify([lang(), open, this.folded, narrow, compact, open ? window.innerHeight : 0, ribbon.startHour, ribbon.endHour, ribbon.now, ribbon.hours, ribbon.bars, ribbon.blocks, ribbon.allDay, ribbon.more,
       strip.mode, strip.minutes, strip.lead && [strip.lead.id, strip.lead.title, strip.lead.start, strip.lead.end, strip.lead.event?.location], strip.rows.map((row) => [row.id, row.title, row.start, minutesUntil(now, row.start)]),
       open ? items.map((item) => [item.id, item.title, item.start, item.end, item.done, item.event?.location, item.event?.color]) : 0, focusing, this.ticking, state.prefs.font, state.ai?.marks, spaces]);
     if (key === this.drawnKey && this.element.childElementCount > 0) return true;
@@ -149,10 +182,16 @@ export class DayStripView {
       this.selected = undefined;
       this.closePopover();
       this.element.setAttribute("aria-label", stripSentence(strip, lang()));
+      this.element.classList.toggle("folded", this.folded);
+      if (this.folded) {
+        this.element.replaceChildren(this.foldedLine(strip, narrow));
+        this.animateHeight();
+        return true;
+      }
       // No all-day event (1.30): 하루 전체 › sits at the bar's right end instead of taking a line of its own; the bar and
       // its hours stop short of it (the Mac's DayStripView too).
       const head = ribbon.allDay.length === 0
-        ? [h("div", { class: "strip-barline" }, h("div", { class: "strip-barcol" }, this.bar(ribbon), compact ? null : this.hours(ribbon)), this.wholeDayLink(narrow))]
+        ? [h("div", { class: "strip-barline" }, h("div", { class: "strip-barcol" }, this.bar(ribbon), compact ? null : this.hours(ribbon)), this.wholeDayLink(narrow), this.foldButton())]
         : [this.top(ribbon, narrow, false), this.bar(ribbon), compact ? null : this.hours(ribbon)];
       this.element.replaceChildren(...[
         ...head, this.lead(strip, now), strip.rows.length ? this.rows(strip.rows, now) : null,
@@ -207,7 +246,7 @@ export class DayStripView {
       if (!counter) { counter = h("span", { class: "ad-more" }); pills.append(counter); }
       counter.textContent = `+${more + 1}`;
     });
-    if (!open) return h("div", { class: "strip-top" }, pills, h("span", { class: "spacer" }), this.wholeDayLink(narrow));
+    if (!open) return h("div", { class: "strip-top" }, pills, h("span", { class: "spacer" }), this.wholeDayLink(narrow), this.foldButton());
     const title = h("button", { class: "tt-title", title: t("접기 (Esc)") }, t("오늘 하루"));
     title.addEventListener("click", (event) => { event.stopPropagation(); this.setOpen(false); });
     const fold = h("button", { class: "strip-link fold", title: t("접기 (Esc)"), "aria-label": t("하루 일정표 접기"), "aria-expanded": "true" }, t("접기", undefined, "strip"), icon("chevron", 10, 2.2));
@@ -269,10 +308,10 @@ export class DayStripView {
     const focusable = strip.mode === "now" && item.kind === "task";
     const said = strip.mode === "now" ? leftText(strip.minutes, lang()) : awayText(strip.minutes, lang());
     // The ring: its arc on a track around a paper centre, the number and its small word inside.
-    const radius = 23.5, length = 2 * Math.PI * radius;
+    const radius = 25.5, length = 2 * Math.PI * radius;
     const ring = h("button", { class: `strip-ring ${strip.mode}${soon ? " soon" : ""}`, title: focusable ? t("눌러서 집중 시작") : this.tooltip(item), "aria-label": `${item.title}, ${said}` });
-    ring.innerHTML = `<svg viewBox="0 0 52 52" aria-hidden="true"><circle class="rc-face" cx="26" cy="26" r="24"/><circle class="rc-track" cx="26" cy="26" r="${radius}"/>${strip.progress > 0
-      ? `<circle class="rc-arc" cx="26" cy="26" r="${radius}" stroke-dasharray="${(length * Math.min(1, strip.progress)).toFixed(2)} ${length.toFixed(2)}" transform="rotate(-90 26 26)"/>` : ""}</svg>`;
+    ring.innerHTML = `<svg viewBox="0 0 56 56" aria-hidden="true"><circle class="rc-face" cx="28" cy="28" r="26"/><circle class="rc-track" cx="28" cy="28" r="${radius}"/>${strip.progress > 0
+      ? `<circle class="rc-arc" cx="28" cy="28" r="${radius}" stroke-dasharray="${(length * Math.min(1, strip.progress)).toFixed(2)} ${length.toFixed(2)}" transform="rotate(-90 28 28)"/>` : ""}</svg>`;
     const caption = h("small", {}, text.caption);
     const value = h("b", {}, text.value);
     ring.append(h("span", { class: "rc-text", "aria-hidden": "true" }, value, caption));
@@ -292,11 +331,11 @@ export class DayStripView {
     // The full kicker when it fits, else the short one ("지금 · ~14:00"); the caption a little smaller when it's long.
     requestAnimationFrame(() => {
       if (kick.isConnected && kick.scrollWidth > kick.clientWidth + 0.5) kick.textContent = kicker(strip.mode, item, lang(), true);
-      // As on the Mac (StripRing.captionFit): 8.5 px on one line, else 7.5 px, else two short lines at 8 px ("20 min te gaan").
+      // As on the Mac (StripRing.captionFit, #555): 10 px on one line, else 9 px, else two short lines at 9 px ("20 min te gaan").
       // "1시간" · "12 h" fit at 13 px; "23시간" a little smaller (the Mac's minimumScaleFactor 0.8).
-      if (value.isConnected && value.getBoundingClientRect().width > 40) value.style.fontSize = "10.5px";
+      if (value.isConnected && value.getBoundingClientRect().width > 44) value.style.fontSize = "10.5px";
       const over = () => caption.scrollWidth > caption.clientWidth + 0.5;
-      if (caption.isConnected && over()) caption.style.fontSize = "7.5px";
+      if (caption.isConnected && over()) caption.style.fontSize = "9px";
       if (caption.isConnected && over()) { caption.style.fontSize = ""; caption.classList.add("two"); }
     });
     return h("div", { class: "strip-lead" }, ring, column);

@@ -232,10 +232,10 @@ struct FocusCardView: View {
                     }
                     .accessibilityHidden(true)
                 Text(label)
-                    .font(.system(size: 11))
-                    .foregroundStyle(PaperTheme.ink3)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(PaperTheme.ink2)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.9)
                 if !over {
                     // 1.38: ⏸ / ▶ under the time (Space), not only a click on the ring.
                     Button { model.petCommand(.focusStep(.togglePause)) } label: {
@@ -348,8 +348,8 @@ struct FocusCardView: View {
                     withAnimation(reduceMotion ? nil : .easeOut(duration: 0.18)) { state.restOpen.toggle() }
                 } label: {
                     Text(line).lineLimit(1).minimumScaleFactor(0.85)
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(PaperTheme.ink3)
+                    .font(.system(size: 12))
+                    .foregroundStyle(PaperTheme.ink2)
                     .frame(maxWidth: .infinity, minHeight: 32)
                     .contentShape(Rectangle())
                 }

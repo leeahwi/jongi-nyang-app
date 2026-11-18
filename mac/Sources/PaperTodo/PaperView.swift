@@ -389,15 +389,16 @@ struct PaperView: View {
             Spacer(minLength: 8)
             // Nothing done yet: nothing to hide — gone, but its place kept, so nothing moves when the first is done.
             let nothingDone = model.completedCount == 0
+            // #557: a button like 완료 기록 (a symbol and its word, a wash on hover), not a faint word like a hint.
             Button {
                 model.hideCompleted.toggle()
             } label: {
-                Text(model.hideCompleted ? L("완료 보기") : L("완료 숨기기")).lineLimit(1)
+                FooterButtonLabel(symbol: model.hideCompleted ? "eye" : "eye.slash",
+                                  text: model.hideCompleted ? L("완료 보기") : L("완료 숨기기"))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(FooterButtonStyle())
             .disabled(nothingDone)
             .help("완료한 할 일 표시 전환")
-            .foregroundStyle(PaperTheme.faded)
             .opacity(nothingDone ? 0 : 1)
             .accessibilityHidden(nothingDone)
         }
@@ -413,18 +414,49 @@ struct PaperView: View {
 
     private var historyButton: some View {
         Button(action: model.showHistory) {
-            HStack(spacing: 4) {
-                Image(systemName: "leaf").font(.system(size: 11))
-                Text("완료 기록").lineLimit(1)
-            }
-            .padding(.horizontal, 6)
-            .frame(height: 22)
-            .contentShape(Rectangle())
+            FooterButtonLabel(symbol: "leaf", text: L("완료 기록"))
         }
-        .buttonStyle(.plain)
-        .foregroundStyle(PaperTheme.secondary)
+        .buttonStyle(FooterButtonStyle())
         .help("완료 기록 (⌘ Y)")
         .accessibilityLabel("완료 기록 보기")
+    }
+}
+
+/// #557: a footer button's face — a symbol and its word (완료 기록 · 완료 숨기기 · 달력), so it reads as a button beside a
+/// hint, which has no symbol.
+struct FooterButtonLabel: View {
+    let symbol: String
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: symbol).font(.system(size: 11))
+            Text(text).lineLimit(1)
+        }
+    }
+}
+
+/// #557: the note footer's buttons — ink2, and on hover sage words on a faint sage wash (as on Windows).
+struct FooterButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View { Face(configuration: configuration) }
+
+    private struct Face: View {
+        let configuration: ButtonStyleConfiguration
+        @State private var hovering = false
+        @Environment(\.isEnabled) private var enabled
+
+        var body: some View {
+            let lit = enabled && (hovering || configuration.isPressed)
+            configuration.label
+                .font(.system(size: 11))
+                .foregroundStyle(lit ? PaperTheme.sageText : PaperTheme.secondary)
+                .padding(.horizontal, 7)
+                .frame(height: 24)
+                .background(RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(PaperTheme.sage.opacity(configuration.isPressed ? 0.16 : lit ? 0.1 : 0)))
+                .contentShape(Rectangle())
+                .onHover { hovering = $0 }
+        }
     }
 }
 

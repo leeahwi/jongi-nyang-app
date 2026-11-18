@@ -246,6 +246,27 @@ public enum DayStrip {
         }
     }
 
+    /// #554: the strip folded to one line (the default): what's on now or next, its time, and the row after it.
+    /// now: "지금 팀 회의" · "30분 남음" · "다음 15:30 치과"; next: "다음 14:00 보고서 마무리" · "40분 뒤" · "그다음 15:30 치과";
+    /// en "Now Team meeting" · "30 min left" · "Next 3:30 PM Dentist"; nil when nothing is left (the folded line says so).
+    public struct Folded: Equatable, Sendable {
+        public let lead: String
+        public let status: String
+        public let next: String?
+    }
+
+    public static func folded(_ state: State, language: AppLanguage, calendar: Calendar = .paper) -> Folded? {
+        guard let lead = state.lead, state.mode != .nothing else { return nil }
+        let index = language.index
+        let after = state.mode == .now ? ["다음", "Next", "Volgende"][index] : ["그다음", "Then", "Daarna"][index]
+        let next = state.rows.first.map { after + " " + clockText($0.start, language: language, calendar: calendar) + " " + $0.title }
+        if state.mode == .now {
+            return Folded(lead: DayRibbon.nowWord(language) + " " + lead.title, status: leftText(state.minutes, language: language), next: next)
+        }
+        return Folded(lead: ["다음", "Next", "Volgende"][index] + " " + clockText(lead.start, language: language, calendar: calendar) + " " + lead.title,
+                      status: awayText(state.minutes, language: language), next: next)
+    }
+
     // MARK: The whole day (하루 일정표)
 
     /// 50 pt for an hour.

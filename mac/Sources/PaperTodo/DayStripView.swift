@@ -63,6 +63,9 @@ struct DayStripView: View {
                              narrow: narrow, allDay: { allDayEvents(layout.allDay, limit: narrow ? 1 : 2) },
                              onClose: { setOpen(false, now: now) }, takesFocus: openedHere, preview: timetablePreview)
                     .transition(.opacity)
+            } else if model.dayStripFolded {
+                folded(state, now: now)
+                    .transition(.opacity)
             } else {
                 strip(layout, state: state, now: now)
                     .transition(.opacity)
@@ -83,6 +86,73 @@ struct DayStripView: View {
         Rectangle().fill(contrast == .increased ? PaperTheme.ink3 : PaperTheme.rule).frame(height: 1)
     }
 
+    // MARK: Folded (#554)
+
+    private func setFolded(_ folded: Bool) {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { model.dayStripFolded = folded }
+    }
+
+    /// One line: `● 지금 팀 회의 · 30분 남음   다음 15:30 치과  ⌄` — the whole line unfolds the strip.
+    private func folded(_ state: DayStrip.State, now: Date) -> some View {
+        let line = DayStrip.folded(state, language: .current)
+        let soon = state.mode == .next && DayStrip.isSoon(state.minutes)
+        let tint = state.mode == .now ? PaperTheme.sage : soon ? PaperTheme.clay : PaperTheme.ink3
+        return Button { setFolded(false) } label: {
+            HStack(spacing: 7) {
+                if let line {
+                    Circle().fill(tint).frame(width: 7, height: 7)
+                    Text(line.lead)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(PaperTheme.ink)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .layoutPriority(1)
+                    Text("· " + line.status)
+                        .font(.system(size: 12, weight: .medium).monospacedDigit())
+                        .foregroundStyle(state.mode == .now ? PaperTheme.sageText : soon ? PaperTheme.clayText : PaperTheme.ink2)
+                        .lineLimit(1)
+                        .fixedSize()
+                    Spacer(minLength: 8)
+                    if let next = line.next, !narrow {
+                        Text(next)
+                            .font(.system(size: 11.5, weight: .medium).monospacedDigit())
+                            .foregroundStyle(PaperTheme.ink2)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+                } else {
+                    Text(DayRibbon.nothingAhead(.current))
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(PaperTheme.ink2)
+                    Spacer(minLength: 8)
+                }
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(PaperTheme.ink2)
+                    .frame(width: 18, height: 18)
+            }
+            .frame(minHeight: 24)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(L("하루 띠 펼치기"))
+        .accessibilityHint(L("하루 띠 펼치기"))
+    }
+
+    /// The open strip's ⌃: back to one line.
+    private var foldButton: some View {
+        Button { setFolded(true) } label: {
+            Image(systemName: "chevron.up")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(PaperTheme.ink2)
+                .frame(width: 18, height: 18)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(L("하루 띠 접기"))
+        .accessibilityLabel(L("하루 띠 접기"))
+    }
+
     // MARK: The strip
 
     private func strip(_ layout: DayRibbon.Layout, state: DayStrip.State, now: Date) -> some View {
@@ -96,12 +166,14 @@ struct DayStripView: View {
                         if !compact { hourLabels(layout) }
                     }
                     wholeDayLink(now: now)
+                    foldButton
                 }
             } else {
                 HStack(spacing: 8) {
                     allDayEvents(layout.allDay, limit: narrow ? 1 : 2)
                     Spacer(minLength: 8)
                     wholeDayLink(now: now)
+                    foldButton
                 }
                 dayBar(layout, now: now).padding(.top, 4)
                 if !compact { hourLabels(layout) }
@@ -191,7 +263,7 @@ struct DayStripView: View {
                     // The first label starts at its hour, the last ends at it, the others centre on it.
                     let anchor: CGFloat = index == 0 ? 0 : index == layout.labels.count - 1 ? 1 : 0.5
                     Text(DayRibbon.hourLabel(hour, language: .current))
-                        .font(.system(size: 9, weight: .medium).monospacedDigit())
+                        .font(.system(size: 10, weight: .medium).monospacedDigit())
                         .foregroundStyle(PaperTheme.ink3)
                         .fixedSize()
                         .alignmentGuide(.leading) { d in -(x - d.width * anchor) }
@@ -199,7 +271,7 @@ struct DayStripView: View {
             }
             .frame(width: geometry.size.width, alignment: .leading)
         }
-        .frame(height: 12)
+        .frame(height: 13)
         .accessibilityHidden(true)
     }
 
@@ -270,7 +342,7 @@ struct DayStripView: View {
                       track: state.mode == .now ? PaperTheme.sage2 : soon ? PaperTheme.clay2 : PaperTheme.rule,
                       value: text.value, caption: text.caption,
                       valueColor: state.mode == .now ? PaperTheme.ink : soon ? PaperTheme.clayText : PaperTheme.ink2,
-                      captionColor: soon ? PaperTheme.clayText : PaperTheme.ink3)
+                      captionColor: soon ? PaperTheme.clayText : PaperTheme.ink2)
         }
         .buttonStyle(.plain)
         .help(focusable ? L("눌러서 집중 시작") : tooltip(item))
@@ -296,8 +368,8 @@ struct DayStripView: View {
             text.lineLimit(1)
             if bell { Image(systemName: "bell").font(.system(size: 9, weight: .medium)).accessibilityLabel(L("알림")) }
         }
-        .font(.system(size: 11, weight: .medium).monospacedDigit())
-        .foregroundStyle(PaperTheme.ink3)
+        .font(.system(size: 11.5, weight: .medium).monospacedDigit())
+        .foregroundStyle(PaperTheme.ink2)
         .padding(.top, 1)
     }
 
@@ -461,14 +533,15 @@ struct StripDayBar: View {
 
 /// The ring beside what's on: a 5 pt arc on its track around a paper centre, the number and its small word inside.
 struct StripRing: View {
-    /// 8.5 pt on one line when it fits the ring's opening (36 pt), else 7.5 pt, else two lines at 8 pt.
+    /// #555: 10 pt on one line when it fits the ring's opening (40 pt), else 9 pt, else two lines at 9 pt (the ring
+    /// is 56 pt, so no word in it is under 9 pt; it was 7.5–8.5 in a 52 pt ring).
     static func captionFit(_ caption: String) -> (size: CGFloat, lines: Int) {
         func width(_ size: CGFloat) -> CGFloat {
             (caption as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: size, weight: .medium)]).width
         }
-        if width(8.5) <= 36 { return (8.5, 1) }
-        if width(7.5) <= 36 { return (7.5, 1) }
-        return (8, 2)
+        if width(10) <= 40 { return (10, 1) }
+        if width(9) <= 40 { return (9, 1) }
+        return (9, 2)
     }
 
     let progress: Double
@@ -506,13 +579,13 @@ struct StripRing: View {
                     .lineLimit(fit.lines)
                     .multilineTextAlignment(.center)
                     .lineSpacing(-1)
-                    .frame(width: fit.lines == 1 ? 37 : 30)
+                    .frame(width: fit.lines == 1 ? 42 : 34)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            .frame(width: 40)
+            .frame(width: 44)
             .offset(y: 0.5)
         }
-        .frame(width: 52, height: 52)
+        .frame(width: 56, height: 56)
         .contentShape(Circle())
     }
 }

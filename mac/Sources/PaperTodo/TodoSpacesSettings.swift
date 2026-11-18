@@ -22,7 +22,8 @@ struct SpacesSettingsPanel: View {
 
     var body: some View {
         let spaces = model.todoSpaces.visible
-        SettingsGroup(title: L("스페이스"), more: "spaces", footer: L("머리말에서 한 스페이스만 볼 수 있어요. 입력 줄에 #이름을 붙이면 그 스페이스로 들어가요.")
+        // #558: not the pane's own title again.
+        SettingsGroup(title: L("내 스페이스"), more: "spaces", footer: L("머리말에서 한 스페이스만 볼 수 있어요. 입력 줄에 #이름을 붙이면 그 스페이스로 들어가요.")
                       + (spaces.isEmpty ? "" : "\n" + SpaceDevice.deskFooter(.current, device: "Mac"))) {
             let draft = draft ?? previewDraft
             if !spaces.isEmpty {

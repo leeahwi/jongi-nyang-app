@@ -595,13 +595,18 @@ public struct MemoFolders: Equatable, Sendable {
     }
 
     /// What each visible bookmark shows (#116, D-2): the picked one its name; the others their first letter, or two
-    /// where another un-picked one starts with the same letter (Shopping · Study → Sh · St), never more. Letters are
-    /// counted past spaces and compared without case. The shared cases B1… in shared/cases/drawer-bookmark-cases.json.
+    /// where another un-picked one starts with the same letter (Shopping · Study → Sh · St), never more. #552: a Hangul
+    /// name always shows its first two letters (stacked) — one Hangul letter starts too many words to tell folders apart.
+    /// Letters are counted past spaces and compared without case. The shared cases B1… in shared/cases/drawer-bookmark-cases.json.
     public static func bookmarkLetters(_ names: [String], picked: Int?) -> [String] {
         func letters(_ name: String, _ count: Int) -> String { String(name.filter { !$0.isWhitespace }.prefix(count)) }
+        func hangul(_ name: String) -> Bool {
+            name.unicodeScalars.first { !$0.properties.isWhitespace }.map { (0xAC00...0xD7A3).contains($0.value) || (0x3131...0x318E).contains($0.value) } ?? false
+        }
         let firsts = names.map { letters($0, 1).lowercased() }
         return names.enumerated().map { index, name in
             if index == picked { return name }
+            if hangul(name) { return letters(name, 2) }
             let shared = firsts[index].isEmpty ? false : firsts.indices.contains { $0 != index && $0 != picked && firsts[$0] == firsts[index] }
             return letters(name, shared ? 2 : 1)
         }

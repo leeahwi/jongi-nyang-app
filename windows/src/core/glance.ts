@@ -234,9 +234,12 @@ export function glanceProgress(total: number, done: number, lang: Lang = "ko"): 
 /** The header's date, as the note's header: "11월 3일 화요일" — the logical day (before 4 a.m. still yesterday). */
 export const glanceDate = (now: Date, lang: Lang = "ko"): string => longDate(logicalDayStart(now), lang);
 
-/** An empty card's chip: "오늘 일정 없음" · "No events today" · "Geen afspraken"; the timer's and the alarm's what to type. */
+/**
+ * An empty card's chip, what it does (#556: it read as a state, ‘오늘 일정 없음’, but made an event): "일정 넣기" ·
+ * "Add event" · "Afspraak toevoegen" (the quick entry's button words); the timer's and the alarm's what to type.
+ */
 export function glanceChip(kind: GlanceCardKind, lang: Lang = "ko"): string {
-  return kind === "event" ? ["오늘 일정 없음", "No events today", "Geen afspraken"][langIndex(lang)] : emptyLines[kind][langIndex(lang)];
+  return kind === "event" ? ["일정 넣기", "Add event", "Afspraak toevoegen"][langIndex(lang)] : emptyLines[kind][langIndex(lang)];
 }
 
 // ─── Where the window goes ──────────────────────────────────────────────────────

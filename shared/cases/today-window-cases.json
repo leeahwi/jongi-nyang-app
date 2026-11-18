@@ -42,7 +42,7 @@
     { "case": "D2 새벽 1시 반은 아직 어제(4시 규칙)", "at": [2026, 11, 3, 1, 30], "ko": "11월 2일 월요일", "en": "Monday, November 2", "nl": "maandag 2 november" }
   ],
   "chips": {
-    "event": { "ko": "오늘 일정 없음", "en": "No events today", "nl": "Geen afspraken" },
+    "event": { "ko": "일정 넣기", "en": "Add event", "nl": "Afspraak toevoegen" },
     "timer": { "ko": "‘타이머 25’", "en": "‘timer 25’", "nl": "‘timer 25’" },
     "alarm": { "ko": "‘알람 7시’", "en": "‘alarm 7am’", "nl": "‘wekker 7:00’" }
   }

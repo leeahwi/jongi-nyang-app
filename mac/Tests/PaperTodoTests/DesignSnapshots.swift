@@ -199,6 +199,8 @@ enum DesignSnapshots {
             DayStripView(model: model, calendar: model.calendar, noteHeight: 640, now: ribbonNow, timetablePreview: preview)
                 .frame(width: 420).background(PaperTheme.paper)
         }
+        // #554: these show the strip opened; folded (the default) after them.
+        model.dayStripFolded = false
         try render(strip(ribbonNow, 420, 560), size: nil, to: output.appendingPathComponent("strip-now-event.png"))
         try render(strip(at(14, 20), 420, 560), size: nil, to: output.appendingPathComponent("strip-now-task.png"))
         try render(strip(at(12, 40), 420, 560), size: nil, to: output.appendingPathComponent("strip-next-soon.png"))
@@ -212,6 +214,15 @@ enum DesignSnapshots {
                              ("note-strip-small", NSSize(width: 350, height: 400)), ("note-strip-wide", NSSize(width: 720, height: 900))] {
             try render(PaperView(model: model, previewNow: ribbonNow), size: size, to: output.appendingPathComponent("\(name).png"))
         }
+        // #554: folded to one line — now, next soon, next far, nothing left, narrow, and in the note.
+        model.dayStripFolded = true
+        try render(strip(ribbonNow, 420, 560), size: nil, to: output.appendingPathComponent("strip-folded-now.png"))
+        try render(strip(at(12, 40), 420, 560), size: nil, to: output.appendingPathComponent("strip-folded-next.png"))
+        try render(strip(at(10, 30), 420, 560), size: nil, to: output.appendingPathComponent("strip-folded-next-far.png"))
+        try render(strip(at(23, 50), 420, 560), size: nil, to: output.appendingPathComponent("strip-folded-nothing.png"))
+        try render(strip(ribbonNow, 350, 560), size: nil, to: output.appendingPathComponent("strip-folded-narrow.png"))
+        try render(PaperView(model: model, previewNow: ribbonNow), size: NSSize(width: 420, height: 640), to: output.appendingPathComponent("note-strip-folded.png"))
+        model.dayStripFolded = false
         // Opened: a done to-do, one over and not done, a reminder beside a to-do (two columns), now at 13:20.
         let done = ranged(t("서류 정리", "Sort the papers", "Papieren ordenen"), "10:30", "11:30", done: true)
         let late = ranged(t("메일 답장", "Answer emails", "Mails beantwoorden"), "11:45", "12:30")

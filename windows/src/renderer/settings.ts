@@ -302,12 +302,9 @@ function intervalTitle(minutes: number): string {
   return minutes % 60 === 0 ? t("{hours}시간마다", { hours: minutes / 60 }) : t("{hours}시간 {minutes}분마다", { hours: Math.floor(minutes / 60), minutes: minutes % 60 });
 }
 
+/** #558 (as on the Mac): one line that the rows don't already say (the row says ‘only while to-dos are left’). */
 function statusText(): string {
-  const { prefs, nextPeriodicDue } = state;
-  if (!prefs.reminderEnabled) return t("꺼져 있어요. 켜면 노트를 쓰는 동안에는 잠시 기다렸다 알려 줘요.");
-  if (!state.items.some((item) => !item.isCompleted && pageOf(item, new Date()) === "today")) return t("남은 할 일이 생기면 알려 줘요.");
-  if (nextPeriodicDue) return t("노트를 쓰는 동안은 잠시 기다려요.");
-  return t("알림 시간을 준비하고 있어요.");
+  return t("노트를 쓰는 동안은 잠시 기다려요.");
 }
 
 /** Under 잠시 쉬기 (#240): when the next one comes, while there is one (the footnote said it before). */
@@ -375,10 +372,10 @@ function appearance(): Node[] {
 
   return [
     group(t("언어"), [languageRow]),
-    group(t("낮 · 밤"), [paperRow], t("책상 · 노트 · 쪽지 · 서랍이 같이 바뀌어요. 자동이면 Windows가 어둡게 모드일 때 밤이 돼요.")),
+    group(t("낮 · 밤"), [paperRow], t("자동이면 Windows가 어둡게 모드일 때 밤이 돼요.")),
     // 종이 (#244): fifteen papers for the notepad, the calendar, the widget, the slips and the desk, and 밤에는 under them.
     group(t("종이"), [paperTiles(t("종이"), prefs.paperTheme, noteTileFrame, (paper) => set("paperTheme", paper)), nightRow(prefs.paperNight, prefs.paperTheme, (value) => set("paperNight", value), t("밤에는"))],
-      `${t("노트 · 달력 · 위젯 · 쪽지 · 책상이 같은 종이를 써요.")} ${t("밝은 종이는 밤이 되면 ‘밤에는’에서 고른 종이로 바뀌어요.")}`),
+      t("밝은 종이는 밤이 되면 ‘밤에는’에서 고른 종이로 바뀌어요.")),
     // The sample sheet, named like every other group (#21).
     h("div", { class: "group" }, h("div", { class: "label" }, t("미리보기")), preview),
     group(t("노트 글꼴"), [fontRow, sizeRow], t("Ctrl + = 와 Ctrl + − 로 한 칸씩 바꿔요. 줄 간격은 노트의 줄에 맞춰져 있어요.")),
@@ -636,7 +633,7 @@ function aiPane(): Node[] {
     }
   }
   return [
-    group(t("AI 연결"), [enabledRow], t("켜면 Claude가 할 일 · 일정 · 메모를 보고 새로 넣어요. 고칠 땐 먼저 물어보고, 지우지는 못해요. 읽은 내용은 대화와 함께 Claude로 가요."), false, "ai"),
+    group(t("켜기"), [enabledRow], t("켜면 Claude가 할 일 · 일정 · 메모를 보고 새로 넣어요. 고칠 땐 먼저 물어보고, 지우지는 못해요. 읽은 내용은 대화와 함께 Claude로 가요."), false, "ai"),
     group(t("연결하기"), [desktopRow, codeRow], t("따로 켜 두는 프로그램은 없어요. 연결하면 위 스위치도 켜져요.")),
     group(t("최근 AI 작업"), [...rows, clearRow], t("되돌리기는 그 뒤로 바뀌지 않은 항목만 되돌려요. Claude가 넣거나 고친 줄에는 그날 동안 작은 도장이 찍혀요.")),
   ];
@@ -903,7 +900,7 @@ function pet(): Node[] {
   const previewRow = h("div", { class: "row" }, glyph("quote"), h("span", { class: "grow" }, t("지금 한마디 듣기")), preview);
   return [
     group(t("종이냥 펫"), [showRow, wanderRow, petSizeRow],
-      t("작업 표시줄 위에 앉아 눈을 깜빡이고, 가끔 걸어 다녀요. 끌어서 옮기고, 우클릭하면 메뉴가 나와요."), false, "pet"),
+      t("끌어서 옮기고, 우클릭하면 메뉴가 나와요."), false, "pet"),
     group(t("종이냥 한마디"), [chatterRow, frequencyRow, questionRow, previewRow],
       t("가끔 응원하거나 말을 걸어요. 집중할 때와 밤 11시–아침 7시에는 조용해요."), false, "pet"),
     typingGroup(),
@@ -1119,7 +1116,7 @@ function clock(): Node[] {
     ], t("집중과 휴식을 번갈아 해요. −와 +로 1분씩, Shift와 함께 누르면 5분씩 바뀌어요. 숫자를 눌러 직접 적어도 돼요."), false, "timer"),
     group(t("타이머 크기"), [h("div", { class: "row" }, glyph("timer"), h("span", { class: "grow" }, t("크기")),
       segmented(timerSizes.map((value) => ({ value, title: timerSizeTitles[lang()][value] })), prefs.timerSize, (value) => set("timerSize", value), t("타이머 크기")))],
-    t("화면에 뜨는 타이머(팻말을 든 고양이)의 크기예요. 타이머를 우클릭해 ‘크기’에서도 바꿀 수 있어요.")),
+    t("타이머를 우클릭해 ‘크기’에서도 바꿀 수 있어요.")),
     group(t("타이머 시작"), [startRow, customRow]),
   ];
 }
@@ -1149,7 +1146,7 @@ function calendarSettings(): Node[] {
   const holidayRow = h("div", { class: "row" }, glyph("flag"), h("span", { class: "grow" }, t("공휴일 보이기")),
     toggle(prefs.calendarHolidays, t("공휴일 보이기"), (value) => set("calendarHolidays", value)));
   return [
-    group(t("오늘 일정"), [stripRow, alertRow], t("하루 띠는 제목 아래에 지금 하는 일과 다음 일을 보여 줘요. 누르면 하루 일정표가 펼쳐져요."), false, "calendar"),
+    group(t("오늘 일정"), [stripRow, alertRow], t("하루 띠는 처음엔 한 줄로 접혀 있어요. 누르면 펼쳐지고, ‘하루 전체 ›’를 누르면 하루 일정표가 열려요."), false, "calendar"),
     group(t("달력"), [lunarRow, holidayRow], t("한국의 공휴일이에요. 선거일처럼 그때 정해지는 쉬는 날은 앱을 업데이트하면 더해져요.")),
     widgetGroup(),
   ];
@@ -1378,7 +1375,7 @@ function drawerPane(): Node[] {
     ].filter(Boolean).join(" ")),
     h("div", { class: "group" }, h("div", { class: "label" }, t("미리보기")), drawerFontPreview(prefs)),
     group(t("메모 글꼴"), [fontRow, codeRow, sizeRow, lineRow, paragraphRow],
-      `${t("글꼴과 글자 크기는 서랍의 모든 메모와 카드 미리보기에 같이 써요.")} ${t("코드 글꼴은 ‘코드’ 표시와 코드 묶음, 고정폭 글꼴에 써요. D2Coding은 한글이 영문 두 칸 폭이라 코드 줄의 칸이 맞아요.")}`),
+      t("코드 글꼴은 ‘코드’ 표시와 코드 묶음, 고정폭 글꼴에 써요. D2Coding은 한글이 영문 두 칸 폭이라 코드 줄의 칸이 맞아요.")),
   ];
 }
 
@@ -1612,7 +1609,7 @@ function spacesPane(): Node[] {
   }
   return [
     // #53: the pane's header says what spaces are for; the footnote only what comes after (as on the Mac).
-    group(t("스페이스"), [...rows, lastRow],
+    group(t("내 스페이스"), [...rows, lastRow],
       [t("머리말에서 한 스페이스만 볼 수 있어요. 입력 줄에 {tag}을 붙이면 그 스페이스로 들어가요.", { tag: `#${t("이름").toLowerCase()}` }),
         ...(spaces.length ? [deviceDeskFooter(lang(), lang() === "nl" ? "pc" : "PC")] : [])].join(" "), false, "spaces"),
     // 2b: 스페이스별로 묶기 and its look (메모지 · 책갈피), only once there is a space to group by.

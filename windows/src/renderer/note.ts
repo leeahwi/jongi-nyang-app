@@ -1084,7 +1084,8 @@ function renderTodayFooter(completed: number): void {
     history.addEventListener("click", () => api.act({ type: "openHistory" }));
     parts.push(history);
   }
-  const toggle = h("button", { class: "toggle-done", title: t("완료한 할 일 표시 전환") }, state.prefs.hideCompleted ? t("완료 보기") : t("완료 숨기기"));
+  // #557: a button like 완료 기록 (an icon and its word, a wash on hover), not a faint word like a hint.
+  const toggle = h("button", { class: "history toggle-done", title: t("완료한 할 일 표시 전환") }, icon(state.prefs.hideCompleted ? "eye" : "eyeOff", 14), state.prefs.hideCompleted ? t("완료 보기") : t("완료 숨기기"));
   toggle.disabled = completed === 0;
   toggle.addEventListener("click", () => api.act({ type: "setPref", key: "hideCompleted", value: !state.prefs.hideCompleted }));
   footer.replaceChildren(...parts.map((part) => typeof part === "string" ? h("span", {}, part) : part), h("span", { class: "spacer" }), toggle);
@@ -1231,8 +1232,9 @@ function renderAhead(): void {
   reconcile(sheet, [aheadList]);
   const calendarButton = h("button", { class: "history", title: t("달력 (Ctrl+D)") }, icon("calendar", 14), t("달력"));
   calendarButton.addEventListener("click", () => api.act({ type: "openCalendar" }));
-  // As on the Mac: the hint at the left (it goes first when the note is narrow), 달력 at the right.
-  footer.replaceChildren(h("span", { class: "footer-hint" }, icon("move", 13), h("span", {}, sections.length ? t("다른 날로 끌면 마감이 바뀌어요") : t("날이 되면 오늘로 올라와요"))), h("span", { class: "spacer" }), calendarButton);
+  // As on the Mac: the hint at the left (it goes first when the note is narrow), 달력 at the right. #557: the hint has no
+  // icon and is a step fainter than the buttons, so it doesn't read as one.
+  footer.replaceChildren(h("span", { class: "footer-hint" }, h("span", {}, sections.length ? t("다른 날로 끌면 마감이 바뀌어요") : t("날이 되면 오늘로 올라와요"))), h("span", { class: "spacer" }), calendarButton);
 }
 
 /** 언젠가's block; while a drag is on and 언젠가 is empty, it shows (with its heading) as a place to drop. */

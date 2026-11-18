@@ -227,6 +227,24 @@ export function stripSentence(state: StripState, lang: Lang = "ko"): string {
   return rows ? `${first}. ${["그다음", "Then", "Daarna"][index]} ${rows}` : first;
 }
 
+/**
+ * #554: the strip folded to one line (the default): what's on now or next, its time, and the row after it.
+ * now: "지금 팀 회의" · "30분 남음" · "다음 15:30 치과"; next: "다음 14:00 보고서 마무리" · "40분 뒤" · "그다음 15:30 치과";
+ * undefined when nothing is left (the folded line says so). The Mac's DayStrip.folded.
+ */
+export interface FoldedStrip { lead: string; status: string; next?: string }
+
+export function foldedStrip(state: StripState, lang: Lang = "ko"): FoldedStrip | undefined {
+  const lead = state.lead;
+  if (!lead || state.mode === "nothing") return undefined;
+  const index = langIndex(lang);
+  const after = state.mode === "now" ? nextWords[index] : ["그다음", "Then", "Daarna"][index];
+  const row = state.rows[0];
+  const next = row ? `${after} ${clockOf(row.start, lang)} ${row.title}` : undefined;
+  if (state.mode === "now") return { lead: `${nowWords[index]} ${lead.title}`, status: leftText(state.minutes, lang), ...(next ? { next } : {}) };
+  return { lead: `${nextWords[index]} ${clockOf(lead.start, lang)} ${lead.title}`, status: awayText(state.minutes, lang), ...(next ? { next } : {}) };
+}
+
 // ─── The whole day (하루 일정표) ─────────────────────────────────────────────
 
 /** 50 px for an hour. */

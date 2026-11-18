@@ -6,7 +6,7 @@ import { langs } from "../src/core/lang";
 import type { TodoItem } from "../src/core/notebook";
 import {
   awayText, columns, dragBounds, draggedSpan, edgeBand, followedSpan, isSoon, kicker, leftText, markWord, minutesUntil, newCandidates, nudged, ringText, rowLimit, scrollTop, slot, stripMarks,
-  stretched, stripItems, stripSentence, stripSpans, stripState, wholeDayLink, type DragEdge, type Span, type StripItem, type StripKind,
+  stretched, stripItems, stripSentence, foldedStrip, stripSpans, stripState, wholeDayLink, type DragEdge, type Span, type StripItem, type StripKind,
 } from "../src/core/dayStrip";
 import { clockKey } from "../src/core/timeRange";
 
@@ -48,6 +48,12 @@ test("R1 something on now", () => {
     "Now 팀 회의, 40 min left. Next 2:00 PM 보고서 마무리, 3:30 PM 치과",
     "Nu 팀 회의, nog 40 min. Volgende 14:00 보고서 마무리, 15:30 치과",
   ]);
+  // #554: folded to one line (the Mac's DayStripTests).
+  assert.deepEqual(langs.map((lang) => foldedStrip(s, lang)), [
+    { lead: "지금 팀 회의", status: "40분 남음", next: "다음 14:00 보고서 마무리" },
+    { lead: "Now 팀 회의", status: "40 min left", next: "Next 2:00 PM 보고서 마무리" },
+    { lead: "Nu 팀 회의", status: "nog 40 min", next: "Volgende 14:00 보고서 마무리" },
+  ]);
 });
 
 test("R8 the list's marks (#31): the to-dos the strip shows", () => {
@@ -87,6 +93,11 @@ test("R3 nothing on, the next soon", () => {
     "Next 1:00 PM 팀 회의, in 20 min. Then 2:00 PM 보고서 마무리, 3:30 PM 치과",
     "Volgende 13:00 팀 회의, over 20 min. Daarna 14:00 보고서 마무리, 15:30 치과",
   ]);
+  assert.deepEqual(langs.map((lang) => foldedStrip(s, lang)), [
+    { lead: "다음 13:00 팀 회의", status: "20분 뒤", next: "그다음 14:00 보고서 마무리" },
+    { lead: "Next 1:00 PM 팀 회의", status: "in 20 min", next: "Then 2:00 PM 보고서 마무리" },
+    { lead: "Volgende 13:00 팀 회의", status: "over 20 min", next: "Daarna 14:00 보고서 마무리" },
+  ]);
 });
 
 test("R4 nothing on, the next far; nothing left", () => {
@@ -112,6 +123,7 @@ test("R4 nothing on, the next far; nothing left", () => {
   assert.equal(s.lead, undefined);
   assert.deepEqual(s.rows, []);
   assert.deepEqual(langs.map((lang) => stripSentence(s, lang)), ["오늘 남은 일정이 없어요", "Nothing else today", "Verder niets vandaag"]);
+  assert.equal(foldedStrip(s, "ko"), undefined);
 });
 
 test("R5 the latest start is current; an event first at the same start", () => {

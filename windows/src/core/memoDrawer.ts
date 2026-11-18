@@ -202,15 +202,17 @@ export function visibleFolders(data: MemoFolders): MemoFolder[] {
 
 /**
  * What each visible bookmark shows (#116, D-2): the picked one its name; the others their first letter, or two where
- * another un-picked one starts with the same letter (Shopping · Study → Sh · St), never more. Letters are counted past
- * spaces and compared without case. The shared cases B1… in shared/cases/drawer-bookmark-cases.json (the Mac's
- * MemoFolders.bookmarkLetters).
+ * another un-picked one starts with the same letter (Shopping · Study → Sh · St), never more. #552: a Hangul name always
+ * shows its first two letters (stacked) — one Hangul letter starts too many words to tell folders apart. Letters are
+ * counted past spaces and compared without case. The shared cases B1… in shared/cases/drawer-bookmark-cases.json (the
+ * Mac's MemoFolders.bookmarkLetters).
  */
 export function bookmarkLetters(names: readonly string[], picked: number | null): string[] {
   const letters = (name: string, count: number) => Array.from(name.replace(/\s+/g, "")).slice(0, count).join("");
   const firsts = names.map((name) => letters(name, 1).toLowerCase());
   return names.map((name, index) => {
     if (index === picked) return name;
+    if (/^[\uAC00-\uD7A3\u3131-\u318E]/.test(name.trimStart())) return letters(name, 2);
     const shared = firsts[index] !== "" && firsts.some((first, other) => other !== index && other !== picked && first === firsts[index]);
     return letters(name, shared ? 2 : 1);
   });

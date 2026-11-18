@@ -126,8 +126,9 @@ function keepTail(name: string): string {
  */
 function chipElement(entry: GlanceCard): HTMLElement {
   const text = glanceChip(entry.kind, lang());
-  const chip = h("button", { class: "chip g-chip", title: text, "aria-label": `${entry.label}: ${entry.small}` },
-    icon(entry.kind === "event" ? "calendar" : entry.kind, 13), h("span", {}, text));
+  // #556: the event's chip is an action like the other two (+, ‘일정 넣기’); the state stays in what a reader says.
+  const chip = h("button", { class: "chip g-chip", title: text, "aria-label": `${entry.label}: ${entry.small}${entry.kind === "event" ? `, ${text}` : ""}` },
+    icon(entry.kind === "event" ? "plus" : entry.kind, 13), h("span", {}, text));
   chip.addEventListener("click", () => {
     if (entry.kind === "event") { void api.act({ type: "calendarNewEvent" }); close(); return; }
     line.set(entry.kind === "timer" ? timerHint(lang()) : alarmHint(lang()));

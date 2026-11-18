@@ -490,8 +490,9 @@ struct TodayWindowView: View {
         let action: () -> Void
         switch kind {
         case .event:
-            symbol = "calendar"
-            label = L("다음 일정") + ": " + TodayGlance.noEvent(language)
+            // #556: an action like the other two (+, ‘일정 넣기’); the state stays in what VoiceOver reads.
+            symbol = "plus"
+            label = L("다음 일정") + ": " + TodayGlance.noEvent(language) + ", " + text
             action = { model.newEvent(); onOpenNote() }
         case .timer:
             symbol = "timer"
@@ -644,7 +645,7 @@ private struct GlanceCard: View {
     private var card: some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(caption)
-                .font(.system(size: 9.5, weight: .semibold))
+                .font(.system(size: 10.5, weight: .semibold))
                 .tracking(0.3)
                 .foregroundStyle(accent ?? PaperTheme.ink3)
                 .lineLimit(1)
@@ -677,7 +678,7 @@ private struct GlanceCard: View {
 
     private var lineText: some View {
         Text(shownLine)
-            .font(.system(size: 10.5).monospacedDigit())
+            .font(.system(size: 11).monospacedDigit())
             .foregroundStyle(PaperTheme.ink2)
             .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
@@ -690,7 +691,7 @@ private struct GlanceCard: View {
     /// its own) — then the two parts go on two lines from the start, without the dot (#240, 점검 3의 23).
     private var shownLine: String {
         guard lineWidth > 0, let cut = line.range(of: "\u{00A0}· ") else { return line }
-        let font = NSFont.monospacedDigitSystemFont(ofSize: 10.5, weight: .regular)
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular)
         let needed = (line as NSString).size(withAttributes: [.font: font]).width
         return needed <= lineWidth ? line : String(line[..<cut.lowerBound]) + "\n" + String(line[cut.upperBound...])
     }
@@ -708,7 +709,7 @@ private struct GlanceCard: View {
     }
 }
 
-/// #200: an empty card as a quiet chip (the slips' chip: paper-2, ink-2, a small symbol) — ‘오늘 일정 없음’,
+/// #200: an empty card as a quiet chip (the slips' chip: paper-2, ink-2, a small symbol) — ‘+ 일정 넣기’ (#556),
 /// ‘‘타이머 25’’, ‘‘알람 7시’’.
 private struct GlanceChip: View {
     let symbol: String

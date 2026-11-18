@@ -182,10 +182,11 @@ public enum TodayGlance {
         language.longDate(Archive.logicalDayStart(now, calendar: calendar), calendar: calendar)
     }
 
-    /// An empty card's chip: "오늘 일정 없음" · "No events today" · "Geen afspraken"; the timer's and the alarm's what to type.
+    /// An empty card's chip, what it does (#556: it read as a state, ‘오늘 일정 없음’, but made an event): "일정 넣기" ·
+    /// "Add event" · "Afspraak toevoegen" (the quick entry's button words); the timer's and the alarm's what to type.
     public static func chipText(_ kind: CardKind, language: AppLanguage) -> String {
         switch kind {
-        case .event: ["오늘 일정 없음", "No events today", "Geen afspraken"][language.index]
+        case .event: ["일정 넣기", "Add event", "Afspraak toevoegen"][language.index]
         case .timer: timerHint(language)
         case .alarm: alarmHint(language)
         }

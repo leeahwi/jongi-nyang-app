@@ -529,16 +529,8 @@ struct SettingsPaneView: View {
         return L("\(minutes / 60)시간 \(minutes % 60)분마다")
     }
 
-    private var statusText: String {
-        if !controller.enabled {
-            return L("꺼져 있어요. 켜면 노트를 쓰는 동안에는 잠시 기다렸다 알려 줘요.")
-        } else if !controller.hasTasks {
-            return L("남은 할 일이 생기면 알려 줘요.")
-        } else if controller.nextDue != nil {
-            return L("노트를 쓰는 동안은 잠시 기다려요.")
-        }
-        return L("알림 시간을 준비하고 있어요.")
-    }
+    /// #558: one line that the rows don't already say (the row says ‘only while to-dos are left’, 잠시 쉬기 the next time).
+    private var statusText: String { L("노트를 쓰는 동안은 잠시 기다려요.") }
 
     /// Under 잠시 쉬기: when the next one comes, while there is one (#240: the footnote said it before).
     private var restDetail: String {
@@ -984,7 +976,7 @@ struct CalendarSettingsPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            SettingsGroup(title: L("오늘 일정"), more: "calendar", footer: L("하루 띠는 제목 아래에 지금 하는 일과 다음 일을 보여 줘요. 누르면 하루 일정표가 펼쳐져요.")) {
+            SettingsGroup(title: L("오늘 일정"), more: "calendar", footer: L("하루 띠는 처음엔 한 줄로 접혀 있어요. 누르면 펼쳐지고, ‘하루 전체 ›’를 누르면 하루 일정표가 열려요.")) {
                 HStack {
                     SettingsLabel(L("하루 띠 보이기"), systemImage: "calendar")
                     Spacer()
@@ -1089,7 +1081,7 @@ struct PetSettingsPanel: View {
 
     @ViewBuilder
     private var petGroup: some View {
-            SettingsGroup(title: L("종이냥 펫"), more: "pet", footer: L("Dock 위에 앉아 눈을 깜빡이고, 가끔 걸어 다녀요. 끌어서 옮기고, 우클릭하면 메뉴가 나와요.")) {
+            SettingsGroup(title: L("종이냥 펫"), more: "pet", footer: L("끌어서 옮기고, 우클릭하면 메뉴가 나와요.")) {
                 toggleRow(L("펫 보이기"), systemImage: "cat", isOn: $model.petVisible)
                 SettingsSeparator()
                 toggleRow(L("돌아다니기"), systemImage: "figure.walk", isOn: $model.petWanders)
@@ -1249,7 +1241,7 @@ struct PetSettingsPanel: View {
                 toggleRow(L("끝날 때 소리"), systemImage: "speaker.wave.2", isOn: $model.timerSound)
             }
 
-            SettingsGroup(title: L("타이머 크기"), footer: L("화면에 뜨는 타이머(팻말을 든 고양이)의 크기예요. 타이머를 우클릭해 ‘크기’에서도 바꿀 수 있어요.")) {
+            SettingsGroup(title: L("타이머 크기"), footer: L("타이머를 우클릭해 ‘크기’에서도 바꿀 수 있어요.")) {
                 HStack(spacing: 12) {
                     SettingsLabel(L("크기"), systemImage: "arrow.up.left.and.arrow.down.right")
                     Spacer(minLength: 8)
@@ -1516,7 +1508,7 @@ struct PaperColorGroup: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
-        SettingsGroup(title: L("낮 · 밤"), footer: L("책상 · 노트 · 쪽지 · 서랍이 같이 바뀌어요. 자동이면 Mac이 어두운 모드일 때 밤이 돼요.")) {
+        SettingsGroup(title: L("낮 · 밤"), footer: L("자동이면 Mac이 어두운 모드일 때 밤이 돼요.")) {
             HStack(spacing: 12) {
                 // The icon follows the choice: half and half for 자동, a sun for 낮, a moon for 밤 (#21).
                 SettingsLabel(L("낮 · 밤"), systemImage: model.paperColor == .day ? "sun.max" : model.paperColor == .night ? "moon" : "circle.lefthalf.filled")

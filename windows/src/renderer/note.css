@@ -198,8 +198,8 @@
 .footer .spacer { flex: 1; }
 .footer .history { height: 24px; padding: 0 7px; gap: 5px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; color: var(--secondary); }
 .footer .history:hover { color: var(--sage-text); background: color-mix(in srgb, var(--sage) 10%, transparent); }
-.footer .toggle-done { font-size: 10.5px; color: var(--faded); }
-.footer .toggle-done:hover:not(:disabled) { color: var(--secondary); }
+/* #557: 완료 숨기기 is a .history button too (icon, word, wash); hidden, not just dimmed, while nothing is done. */
+.footer .toggle-done:disabled { visibility: hidden; }
 .footer .warning { color: var(--clay-text); display: inline-flex; align-items: center; gap: 5px; }
 .footer > span:has(> .icon:only-child) { display: inline-flex; color: var(--ink-3); }
 /* Reminder editor, attached to its row */
@@ -320,6 +320,21 @@
 .strip-link { flex: none; display: inline-flex; align-items: center; gap: 3px; min-height: 18px; padding: 0; font: 500 11px/18px var(--ui); color: var(--sage-text) !important; white-space: nowrap; }
 .strip-link:hover { text-decoration: underline; text-underline-offset: 2px; }
 .strip-link.fold .icon { transform: rotate(180deg); }
+/* #554: the strip folded to one line (the default), and the open strip's ⌃. */
+.strip-folded { width: 100%; display: flex; align-items: center; gap: 7px; min-height: 24px; padding: 0; text-align: left; font-family: var(--ui); }
+.strip-folded .spacer { flex: 1; }
+.sf-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--ink-3); }
+.strip-folded.now .sf-dot { background: var(--sage); }
+.strip-folded.soon .sf-dot { background: var(--clay); }
+.sf-lead { min-width: 0; font: 600 13px/1.3 var(--ui); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sf-status { flex: none; font: 500 12px/1.3 var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; }
+.strip-folded.now .sf-status { color: var(--sage-text); }
+.strip-folded.soon .sf-status { color: var(--clay-text); }
+.sf-next { min-width: 0; font: 500 11.5px/1.3 var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sf-nothing { font: 400 12.5px/1.3 var(--ui); color: var(--ink-2); }
+.strip-folded .icon { flex: none; color: var(--ink-2); }
+.strip-fold { flex: none; width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink-2); }
+.strip-fold .icon { transform: rotate(180deg); }
 /* No all-day event: the link at the bar's right end (the bar 3 px down, so its middle meets the link's). */
 .strip-barline { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
 .strip-barcol { flex: 1 1 auto; min-width: 0; }
@@ -334,14 +349,14 @@
 .sb-track i.task { background: var(--sage); opacity: 0.5; }
 .sb-track i.task.done { opacity: 0.25; }
 .sb-now { position: absolute; top: 0; width: 2px; height: 12px; border-radius: 1px; background: var(--clay); }
-.strip-hours { position: relative; height: 12px; font: 500 9px/12px var(--ui); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.strip-hours { position: relative; height: 13px; font: 500 10px/13px var(--ui); color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .strip-hours span { position: absolute; top: 0; transform: translateX(-50%); }
 .strip-hours span.first { transform: none; }
 .strip-hours span.last { transform: translateX(-100%); }
 
 .strip-lead { display: flex; align-items: center; gap: 12px; margin-top: 9px; min-width: 0; }
-.strip-ring { position: relative; flex: none; width: 52px; height: 52px; padding: 0; border-radius: 50% !important; }
-.strip-ring svg { position: absolute; inset: 0; width: 52px; height: 52px; }
+.strip-ring { position: relative; flex: none; width: 56px; height: 56px; padding: 0; border-radius: 50% !important; }
+.strip-ring svg { position: absolute; inset: 0; width: 56px; height: 56px; }
 .rc-face { fill: var(--paper); }
 .strip-ring:hover .rc-face { fill: var(--paper-2); }
 .rc-track { fill: none; stroke-width: 5; stroke: var(--rule); }
@@ -353,9 +368,9 @@
 .rc-text b { font: 600 13px/15px var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; }
 .strip-ring.now .rc-text b { color: var(--ink); }
 .strip-ring.soon .rc-text b { color: var(--clay-text); }
-.rc-text small { display: block; width: 40px; text-align: center; font: 500 8.5px/11px var(--ui); color: var(--ink-3); white-space: nowrap; overflow: hidden; }
-/* Two short lines (#54: nl "min te gaan" now on 지금 too): the descenders may reach under the 9 px lines, so nothing clips them. */
-.rc-text small.two { width: 32px; font: 500 8px/9px var(--ui); white-space: normal; overflow-wrap: anywhere; word-break: keep-all; overflow: visible; }
+.rc-text small { display: block; width: 44px; text-align: center; font: 500 10px/12px var(--ui); color: var(--ink-2); white-space: nowrap; overflow: hidden; }
+/* Two short lines (#54: nl "min te gaan" now on 지금 too): the descenders may reach under the 10 px lines, so nothing clips them. */
+.rc-text small.two { width: 36px; font: 500 9px/10px var(--ui); white-space: normal; overflow-wrap: anywhere; word-break: keep-all; overflow: visible; }
 .strip-ring.soon .rc-text small { color: var(--clay-text); }
 .lead-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .lead-kicker { font: 600 10.5px/14px var(--ui); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; color: var(--sage-text); white-space: nowrap; overflow: hidden; }
@@ -372,7 +387,7 @@
 .lc-box .icon { width: 9px; height: 9px; }
 .lead-check:hover .lc-box { border-color: var(--sage); }
 .lead-check.ticked .lc-box { background: var(--sage); border-color: var(--sage); color: var(--on-sage); transform: scale(1.12); }
-.lead-sub { display: flex; align-items: center; gap: 4px; min-width: 0; margin-top: 1px; font: 500 11px/14px var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lead-sub { display: flex; align-items: center; gap: 4px; min-width: 0; margin-top: 1px; font: 500 11.5px/15px var(--ui); font-variant-numeric: tabular-nums; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lead-sub .icon { flex: none; }
 .strip-nothing { min-height: 24px; margin-top: 9px; display: flex; align-items: center; font: 400 12.5px/16px var(--ui); color: var(--ink-3); }
 
@@ -610,7 +625,7 @@
 .fc-in { position: relative; display: grid; justify-items: center; gap: 1px; }
 .fc-time { font: 650 calc(var(--size) * 0.205) / 1.1 var(--ui); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--ink); }
 .fc-time.tclock { justify-items: center; }
-.fc-under { font-size: 11px; line-height: 1.3; color: var(--ink-3); }
+.fc-under { font-size: 11.5px; line-height: 1.3; color: var(--ink-2); }
 .fc-task { max-width: 100%; margin-top: 2px; font-family: var(--title-font); font-size: 33px; line-height: 1.15; color: var(--ink); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; padding: 0 var(--ink-over);
   background: linear-gradient(color-mix(in srgb, var(--ink) 62%, transparent), color-mix(in srgb, var(--ink) 62%, transparent)) no-repeat 0 58% / 0% 1.5px; }
 :root[data-font="clean"] .fc-task { font-size: 20px; font-weight: 600; line-height: 1.35; }

@@ -768,6 +768,8 @@ export async function stripShots(directory: string, save: Save, wait: Wait, sett
   };
   floating.hide();
   focusTimer.command({ kind: "stop" });
+  // #554: these shots show the strip opened (folded is the default; its own shots follow strip-nothing-left).
+  await run(`localStorage.setItem("dayStrip.folded", "0")`);
   note.webContents.reload();
   note.showInactive();
   await wait(1200);
@@ -847,6 +849,15 @@ export async function stripShots(directory: string, save: Save, wait: Wait, sett
     await check(`${prefix}strip-next-far`);
     await moment(20, 30);
     await check(`${prefix}strip-nothing-left`);
+    // #554: folded to one line by the open strip's ⌃ — now, next soon, nothing left; the line opens it again.
+    await moment(13, 20);
+    await run(`document.querySelector(".strip-fold")?.click()`);
+    await check(`${prefix}strip-folded-now`);
+    await moment(12, 40);
+    await check(`${prefix}strip-folded-next`);
+    await moment(20, 30);
+    await check(`${prefix}strip-folded-nothing`);
+    await run(`document.querySelector(".strip-folded")?.click()`);
     // All-day pills and +N; then a long title going on now.
     store.replaceEvents([...baseEvents, event(t("부산 출장"), 540, 600, "purple", undefined, true), event(t("팀 워크숍"), 540, 600, "sage", undefined, true)]);
     await moment(13, 20);

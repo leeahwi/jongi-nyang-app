@@ -8,7 +8,7 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 
 | Phase | Milestone | Mac | Windows |
 | --- | --- | --- | --- |
-| Polish | [Claude Code without Node · a safer shared folder](#claude-code-without-node--a-safer-shared-folder) | 1.50.0 – 1.52.2 | 1.35.0 – 1.37.0 |
+| Polish | [Claude Code without Node · a safer shared folder](#claude-code-without-node--a-safer-shared-folder) | 1.50.0 – 1.53.0 | 1.35.0 – 1.38.0 |
 | Widen | [Tap-tap cat · sizes to pick](#tap-tap-cat--sizes-to-pick) | 1.49.0 – 1.49.1 | 1.34.0 – 1.34.1 |
 | Widen | [Desktop calendar widgets · fifteen papers](#desktop-calendar-widgets--fifteen-papers) | 1.48.0 | 1.33.0 |
 | Widen | [Spaces per device · a new Today window](#spaces-per-device--a-new-today-window) | 1.47.0 | 1.32.0 |
@@ -45,7 +45,7 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 
 ## Claude Code without Node · a safer shared folder
 
-**Mac 1.50.0 – 1.52.2 · Windows 1.35.0 – 1.37.0** — Claude Code connects without Node.js, and with a shared folder neither app saves over what another device or Claude wrote, or over a file it briefly couldn't read. The case files both apps read moved to `shared/cases/` and are now twenty-five (new: the day boundary, conflict copies and joining item by item).
+**Mac 1.50.0 – 1.53.0 · Windows 1.35.0 – 1.38.0** — Claude Code connects without Node.js, and with a shared folder neither app saves over what another device or Claude wrote, or over a file it briefly couldn't read. The case files both apps read moved to `shared/cases/` and are now twenty-five (new: the day boundary, conflict copies and joining item by item).
 
 ![The AI connection pane on the Desk: the Claude Code row has a Copy Claude Code command button and says no Node.js is needed](docs/screenshots/mac/en/desk-ai.png)
 
@@ -55,6 +55,7 @@ The detailed per-version notes (in Korean) are in [`mac/CHANGELOG.md`](mac/CHANG
 - **Copy problem info** — Help on Windows copies monitors, scaling and window positions to paste into a problem report. No to-dos, notes or paths are included.
 - **A new-note shortcut · waiting for cloud files** (1.51.0 · 1.36.0) — in the notes drawer, ⌘N · Ctrl+N opens a blank note right away. When files in the storage folder aren't downloaded yet, the app waits on a slip instead of freezing and opens by itself once they're down. 1.51.1 also fixes a freeze when choosing a folder that already holds a list.
 - **Your list during a focus · ↑ on the input line** (1.52.0 · 1.37.0) — the focus card's list button keeps your to-do list at hand while the focus runs on, and ↑ on an empty input line brings back lines you put in before. A finished timer stays until you close it, and typing Korean on the Mac no longer breaks syllables apart. From 1.52.2 the Mac keeps its Input Monitoring permission across updates, and ⌘N in the notes drawer opens a new note there.
+- **A folding day ribbon · easier secondary text** (1.53.0 · 1.38.0) — the Today tab's day ribbon folds to one line so your to-dos come first, and small, faint secondary text is larger and darker. The Today window's ‘+ Add event’, clearer buttons at the bottom of the notepad and shorter Settings captions came with it.
 - **Lighter** — on the Mac, a click-through widget no longer wakes the app for modifier keys in other apps, and a list it has just saved isn't read again. On Windows, the resting cat and the timer use less graphics work.
 
 ## Tap-tap cat · sizes to pick

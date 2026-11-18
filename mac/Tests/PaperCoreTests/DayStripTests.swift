@@ -68,6 +68,11 @@ private enum DayStripTests {
                       ["지금 팀 회의, 40분 남음. 다음 14:00 보고서 마무리, 15:30 치과",
                        "Now 팀 회의, 40 min left. Next 2:00 PM 보고서 마무리, 3:30 PM 치과",
                        "Nu 팀 회의, nog 40 min. Volgende 14:00 보고서 마무리, 15:30 치과"], "sentence")
+            // #554: folded to one line.
+            try equal(languages.map { DayStrip.folded(s, language: $0, calendar: seoul) },
+                      [DayStrip.Folded(lead: "지금 팀 회의", status: "40분 남음", next: "다음 14:00 보고서 마무리"),
+                       DayStrip.Folded(lead: "Now 팀 회의", status: "40 min left", next: "Next 2:00 PM 보고서 마무리"),
+                       DayStrip.Folded(lead: "Nu 팀 회의", status: "nog 40 min", next: "Volgende 14:00 보고서 마무리")], "folded")
         }
         try test("R8 the list's marks (#31): the to-dos the strip shows") {
             let marked = { (now: Date, list: [TodoItem]) -> [String: DayStrip.Mode] in
@@ -103,6 +108,10 @@ private enum DayStripTests {
                       ["다음 13:00 팀 회의, 20분 뒤. 그다음 14:00 보고서 마무리, 15:30 치과",
                        "Next 1:00 PM 팀 회의, in 20 min. Then 2:00 PM 보고서 마무리, 3:30 PM 치과",
                        "Volgende 13:00 팀 회의, over 20 min. Daarna 14:00 보고서 마무리, 15:30 치과"], "sentence")
+            try equal(languages.map { DayStrip.folded(s, language: $0, calendar: seoul) },
+                      [DayStrip.Folded(lead: "다음 13:00 팀 회의", status: "20분 뒤", next: "그다음 14:00 보고서 마무리"),
+                       DayStrip.Folded(lead: "Next 1:00 PM 팀 회의", status: "in 20 min", next: "Then 2:00 PM 보고서 마무리"),
+                       DayStrip.Folded(lead: "Volgende 13:00 팀 회의", status: "over 20 min", next: "Daarna 14:00 보고서 마무리")], "folded")
         }
         try test("R4 nothing on, the next far; nothing left") {
             var s = state(at(10, 30))
@@ -125,6 +134,7 @@ private enum DayStripTests {
             s = state(at(20, 30))
             try equal(s.mode, .nothing, "nothing left"); try equal(s.lead == nil && s.rows.isEmpty, true, "empty")
             try equal(languages.map { DayStrip.sentence(s, language: $0, calendar: seoul) }, ["오늘 남은 일정이 없어요", "Nothing else today", "Verder niets vandaag"], "sentence")
+            try equal(DayStrip.folded(s, language: .ko, calendar: seoul), nil, "folded: nothing left")
         }
         try test("R5 the latest start is current; an event first at the same start") {
             var s = state(at(13, 40), events: [event("A", (13, 0), (15, 0))], tasks: [task("B", "13:30", "14:00")])

@@ -378,25 +378,17 @@ struct AheadPageView: View {
 
     private var footer: some View {
         HStack(spacing: 8) {
-            // The hint, when there's room for all of it.
+            // The hint, when there's room for all of it — #557: no symbol and a step fainter, so it doesn't read as a button.
             ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) {
-                    Image(systemName: "hand.draw").font(.system(size: 11))
-                    Text("다른 날로 끌면 마감이 바뀌어요").lineLimit(1).fixedSize()
-                }
+                Text("다른 날로 끌면 마감이 바뀌어요").lineLimit(1).fixedSize()
+                    .foregroundStyle(PaperTheme.ink3)
                 Color.clear.frame(width: 1, height: 1)
             }
             Spacer(minLength: 8)
             Button(action: model.showCalendar) {
-                HStack(spacing: 4) {
-                    Image(systemName: "calendar").font(.system(size: 11))
-                    Text("달력").lineLimit(1)
-                }
-                .padding(.horizontal, 6)
-                .frame(height: 22)
-                .contentShape(Rectangle())
+                FooterButtonLabel(symbol: "calendar", text: L("달력"))
             }
-            .buttonStyle(.plain)
+            .buttonStyle(FooterButtonStyle())
             .help("달력 (⌘ D)")
         }
         .font(.system(size: 11))

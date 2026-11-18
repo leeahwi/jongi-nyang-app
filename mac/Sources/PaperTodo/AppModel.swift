@@ -181,6 +181,8 @@ final class AppModel: ObservableObject {
     }
     @Published var pomodoroAutoContinue: Bool { didSet { preferences.set(pomodoroAutoContinue, forKey: "pet.autoContinue") } }
     @Published var timerSound: Bool { didSet { preferences.set(timerSound, forKey: "pet.sound") } }
+    /// #554: the 오늘 sheet's 하루 띠 folded to one line (the default), so the to-dos come first.
+    @Published var dayStripFolded: Bool { didSet { preferences.set(dayStripFolded, forKey: "dayStrip.folded") } }
     /// How big the floating timer is drawn.
     @Published var timerSize: TimerSize { didSet { preferences.set(timerSize.rawValue, forKey: "timer.size") } }
     /// Typed timer lengths (직접 정하기), newest first, for every timer menu.
@@ -752,6 +754,7 @@ final class AppModel: ObservableObject {
         pomodoroAutoContinue = flag("pet.autoContinue", true)
         timerSize = TimerSize(rawValue: store.string(forKey: "timer.size") ?? "") ?? .regular
         timerSound = flag("pet.sound", true)
+        dayStripFolded = flag("dayStrip.folded", true)
         sweepEnabled = flag("sweep.enabled", true)
         sweepTime = Sweep.times.contains(store.integer(forKey: "sweep.time")) ? store.integer(forKey: "sweep.time") : Sweep.defaultTime
         dailyPickEnabled = flag("dailyPick.enabled", false)
