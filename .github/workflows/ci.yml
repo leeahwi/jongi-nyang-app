@@ -28,8 +28,8 @@ jobs:
       run:
         working-directory: windows
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           # windows/package.json: "engines": { "node": ">=22.12" }, the version the release build uses.
           node-version: 22
